@@ -19,7 +19,7 @@ import matplotlib.pyplot as plt
 N                 = 80      # number of time domain samples in frame
 nb_samples        = 100000
 nb_batch          = 32
-nb_epochs         = 100
+nb_epochs         = 25
 width             = 256
 pairs             = 2*width
 fo_min            = 50
@@ -115,12 +115,25 @@ std = np.std(err_angle)
 print("angle var: %4.2f std: %4.2f rads" % (var,std))
 print("angle var: %4.2f std: %4.2f degs" % (var*180/np.pi,std*180/np.pi))
 
+def sample_model(r):
+    phase = np.zeros(width, dtype=complex)
+    phase_est = np.zeros(width, dtype=complex)
+    phase_err = np.zeros(width, dtype=complex)
+    for m in range(1,L[r]):
+        wm = m*Wo_N[r]
+        bin = int(np.round(wm*width/np.pi))
+        phase[m] = phase_end[r,2*bin] + 1j*phase_end[r,2*bin+1]
+        phase_est[m] = phase_end_est[r,2*bin] + 1j*phase_end_est[r,2*bin+1]
+        phase_err[m] = phase[m] * np.conj(phase_est[m])
+    return phase, phase_err
+    
 plot_en = 1;
 if plot_en:
     plt.figure(1)
     plt.plot(history.history['loss'])
     plt.title('model loss')
     plt.xlabel('epoch')
+    plt.show(block=False)
  
     plt.figure(2)
     plt.subplot(211)
@@ -128,22 +141,17 @@ if plot_en:
     plt.subplot(212)
     plt.hist(Wo_0*(Fs/2)/np.pi, bins=20)
     plt.title('phase angle error (deg) and fo (Hz)')
+    plt.show(block=False)
 
     plt.figure(3)
     plt.title('sample vectors and error')
     for r in range(12):
         plt.subplot(3,4,r+1)
-        phase = np.zeros(width, dtype=complex)
-        phase_est = np.zeros(width, dtype=complex)
-        phase_err = np.zeros(width, dtype=complex)
-        for m in range(1,L[r]):
-            wm = m*Wo_N[r]
-            bin = int(np.round(wm*width/np.pi))
-            phase[m] = phase_end[r,2*bin] + 1j*phase_end[r,2*bin+1]
-            phase_est[m] = phase_end_est[r,2*bin] + 1j*phase_end_est[r,2*bin+1]
-            phase_err[m] = phase[m] * np.conj(phase_est[m])
-    
+        phase, phase_err = sample_model(r)    
         plt.plot(np.angle(phase[1:L[r]+1])*180/np.pi,'g')
         plt.plot(np.angle(phase_err[1:L[r]+1])*180/np.pi,'r')
-    plt.show()
-   
+    plt.show(block=False)
+
+    # click on last figure to close all and finish
+    plt.waitforbuttonpress(0)
+    plt.close()
