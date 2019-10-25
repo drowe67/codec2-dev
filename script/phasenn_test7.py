@@ -24,7 +24,7 @@ from scipy import signal
 N                 = 80      # number of time domain samples in frame
 nb_samples        = 100000
 nb_batch          = 32
-nb_epochs         = 10
+nb_epochs         = 25
 width             = 256
 pairs             = 2*width
 fo_min            = 50
@@ -38,6 +38,8 @@ dfo               = 0.00   # dfo models aren't solved yet
 # phase encoded as cos,sin pairs ref:
 phase_start = np.zeros((nb_samples, pairs))
 phase_end = np.zeros((nb_samples, pairs))
+filter_amp = np.zeros((nb_samples, width))
+filter_phase = np.zeros((nb_samples, width))
 Wo_N = np.zeros(nb_samples)
 Wo_0 = np.zeros(nb_samples)
 L = np.zeros(nb_samples, dtype=int)
@@ -64,11 +66,14 @@ for i in range(nb_samples):
     L[i] = np.min((L_0, L_N))
     #print("fo: %f %f L: %d %d min: %d" % (fo_0, fo_N, L_0, L_N, L[i]))
 
-    # sample 2nd order IIR filter
+    # sample 2nd order IIR filter with random peak freq and amplitude
 
-    alpha = np.pi/4; gamma = 0.8
+    r = np.random.rand(2)
+    alpha = 0.1*np.pi + 0.8*np.pi*r[0]
+    gamma = 0.8
+    #alpha = np.pi/4; gamma = 0.8
     w,h = signal.freqz(1, [1, -2*gamma*np.cos(alpha), gamma*gamma], range(1,L[i])*Wo_0[i])
-
+    
     for m in range(1,L[i]):
         bin_0 = int(np.round(m*Wo_0[i]*width/np.pi))
         mWo_0 = bin_0*np.pi/width
@@ -77,22 +82,23 @@ for i in range(nb_samples):
         #print("m: %d bin_0: %d bin_N: %d" % (m, bin_0,bin_N))
         
         r = np.random.rand(1)
-        #phase_start_pol = -np.pi + r[0]*2*np.pi
-        phase_start_pol = -mWo_0
+        phase_start_pol = -np.pi + r[0]*2*np.pi
         phase_start[i,2*bin_0]   = np.cos(phase_start_pol)
         phase_start[i,2*bin_0+1] = np.sin(phase_start_pol)
 
         # phase shift average of two frequencies
-        #phase_end_pol = phase_start_pol + N*(mWo_0 + mWo_N)/2 + np.angle(h[m-1])
-        phase_end_pol =  np.angle(h[m-1])
+        phase_end_pol = phase_start_pol + N*(mWo_0 + mWo_N)/2 + np.angle(h[m-1])
 
         phase_end[i,2*bin_N]   = np.cos(phase_end_pol)
         phase_end[i,2*bin_N+1] = np.sin(phase_end_pol)
 
-input = np.column_stack([Wo_0, Wo_N, phase_start])
+        filter_amp[i,bin_0] = np.log10(abs(h[m-1]))
+        filter_phase[i,bin_0] = np.angle(h[m-1])
+        
+input = np.column_stack([filter_amp, phase_start])
 
 model = models.Sequential()
-model.add(layers.Dense(pairs, activation='relu', input_dim=(pairs+2)))
+model.add(layers.Dense(pairs, activation='relu', input_dim=(width+pairs)))
 model.add(layers.Dense(pairs))
 model.summary()
 
@@ -128,13 +134,16 @@ def sample_model(r):
     phase = np.zeros(width, dtype=complex)
     phase_est = np.zeros(width, dtype=complex)
     phase_err = np.zeros(width, dtype=complex)
+    phase_filt = np.zeros(width)
+    
     for m in range(1,L[r]):
         wm = m*Wo_N[r]
         bin = int(np.round(wm*width/np.pi))
         phase[m] = phase_end[r,2*bin] + 1j*phase_end[r,2*bin+1]
         phase_est[m] = phase_end_est[r,2*bin] + 1j*phase_end_est[r,2*bin+1]
         phase_err[m] = phase[m] * np.conj(phase_est[m])
-    return phase, phase_err
+        phase_filt[m] = filter_phase[r,bin]
+    return phase, phase_err, phase_filt
     
 plot_en = 1;
 if plot_en:
@@ -156,9 +165,11 @@ if plot_en:
     plt.title('sample vectors and error')
     for r in range(12):
         plt.subplot(3,4,r+1)
-        phase, phase_err = sample_model(r)    
+        phase, phase_err, phase_filt = sample_model(r)    
         plt.plot(np.angle(phase[1:L[r]+1])*180/np.pi,'g')
         plt.plot(np.angle(phase_err[1:L[r]+1])*180/np.pi,'r')
+        plt.plot(phase_filt[1:L[r]+1]*180/np.pi,'b')
+        plt.ylim(-180,180)
     plt.show(block=False)
 
     # click on last figure to close all and finish
