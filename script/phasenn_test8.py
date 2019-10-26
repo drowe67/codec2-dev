@@ -33,7 +33,7 @@ assert loss_func([[[0,1,0]], [[0,2,0]]]) == np.array([1])
 N                 = 80      # number of time domain samples in frame
 nb_samples        = 400000
 nb_batch          = 32
-nb_epochs         = 50
+nb_epochs         = 100
 width             = 256
 pairs             = 2*width
 fo_min            = 50
@@ -63,9 +63,9 @@ for i in range(nb_samples):
  
     # sample 2nd order IIR filter with random peak freq
 
-    r = np.random.rand(1)
+    r = np.random.rand(2)
     alpha = 0.1*np.pi + 0.8*np.pi*r[0]
-    gamma = 0.8;
+    gamma = r[1]
     w,h = signal.freqz(1, [1, -2*gamma*np.cos(alpha), gamma*gamma], range(1,L[i])*Wo[i])
     
     for m in range(1,L[i]):
@@ -79,13 +79,12 @@ for i in range(nb_samples):
 
 model = models.Sequential()
 model.add(layers.Dense(pairs, activation='relu', input_dim=width))
-model.add(layers.Dense(pairs, activation='relu', input_dim=width))
-model.add(layers.Dense(pairs, activation='relu', input_dim=width))
+model.add(layers.Dense(4*pairs, activation='relu'))
 model.add(layers.Dense(pairs))
 model.summary()
 
 from keras import optimizers
-sgd = optimizers.SGD(lr=0.04, decay=1e-6, momentum=0.9, nesterov=True)
+sgd = optimizers.SGD(lr=0.08, decay=1e-6, momentum=0.9, nesterov=True)
 model.compile(loss=sparse_loss, optimizer=sgd)
 history = model.fit(filter_amp, filter_phase_rect, batch_size=nb_batch, epochs=nb_epochs)
 
