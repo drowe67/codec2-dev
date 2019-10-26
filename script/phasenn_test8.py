@@ -13,13 +13,27 @@ from keras import models,layers
 from keras import initializers
 import matplotlib.pyplot as plt
 from scipy import signal
+from keras import backend as K
+
+# custom loss function
+def sparse_loss(y_true, y_pred):
+    mask = K.cast( K.not_equal(y_pred, 0), dtype='float32')
+    n = K.sum(mask)
+    return K.sum(K.square((y_pred - y_true)*mask))/n
+
+# testing custom loss function
+x = layers.Input(shape=(None,))
+y = layers.Input(shape=(None,))
+loss_func = K.Function([x, y], [sparse_loss(x, y)])
+assert loss_func([[[1,1,1]], [[0,2,0]]]) == np.array([1])
+assert loss_func([[[0,1,0]], [[0,2,0]]]) == np.array([1])
 
 # constants
 
 N                 = 80      # number of time domain samples in frame
-nb_samples        = 100000
+nb_samples        = 400000
 nb_batch          = 32
-nb_epochs         = 25
+nb_epochs         = 50
 width             = 256
 pairs             = 2*width
 fo_min            = 50
@@ -44,7 +58,6 @@ for i in range(nb_samples):
     r = np.random.rand(1)
     log_fo = np.log10(fo_min) + (np.log10(fo_max)-np.log10(fo_min))*r[0]
     fo = 10 ** log_fo
-    fo = fo_min
     Wo[i] = fo*2*np.pi/Fs
     L[i] = int(np.floor(np.pi/Wo[i]))
  
@@ -66,15 +79,14 @@ for i in range(nb_samples):
 
 model = models.Sequential()
 model.add(layers.Dense(pairs, activation='relu', input_dim=width))
-model.add(layers.Dense(pairs, activation='relu'))
+model.add(layers.Dense(pairs, activation='relu', input_dim=width))
+model.add(layers.Dense(pairs, activation='relu', input_dim=width))
 model.add(layers.Dense(pairs))
 model.summary()
 
-# Compile and fit our model 
-
 from keras import optimizers
 sgd = optimizers.SGD(lr=0.04, decay=1e-6, momentum=0.9, nesterov=True)
-model.compile(loss='mse', optimizer=sgd)
+model.compile(loss=sparse_loss, optimizer=sgd)
 history = model.fit(filter_amp, filter_phase_rect, batch_size=nb_batch, epochs=nb_epochs)
 
 # measure error in rectangular coordinates over all samples
