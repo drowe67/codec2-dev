@@ -179,6 +179,8 @@ function [bps Rs Tcp Ns Nc] = ofdm_init_mode(mode="700D")
   % some "canned" modes
   if strcmp(mode,"700D")
     Ts = 0.018; Nc = 17;
+  elseif strcmp(mode,"2020")
+    Ts = 0.0205; Nc = 31;
   elseif strcmp(mode,"2200")
     Tframe = 0.175; Ts = Tframe/Ns; Nc = 37;
   else
