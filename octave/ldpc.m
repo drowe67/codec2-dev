@@ -63,6 +63,7 @@ function [code_param framesize rate] = ldpc_init_user(HRA, modulation, mod_order
     code_param.bits_per_symbol = log2(mod_order);
 
     code_param.ldpc_data_bits_per_frame = length(code_param.H_cols) - length(code_param.P_matrix);
+    code_param.ldpc_parity_bits_per_frame = framesize - code_param.ldpc_data_bits_per_frame;
     code_param.ldpc_coded_bits_per_frame = framesize;
 
     code_param.data_bits_per_frame  = code_param.ldpc_data_bits_per_frame;

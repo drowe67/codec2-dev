@@ -1086,14 +1086,19 @@ function [code_param Nbitspercodecframe Ncodecframespermodemframe] = codec_to_fr
     load HRA_504_396.txt
     code_param = ldpc_init_user(HRA_504_396, modulation, mod_order, mapping);
     code_param.data_bits_per_frame = 312;
+    code_param.coded_bits_per_frame = code_param.data_bits_per_frame + code_param.ldpc_parity_bits_per_frame;
+    code_param.coded_syms_per_frame = code_param.coded_bits_per_frame/code_param.bits_per_symbol;
     printf("2020 mode\n");
-    printf("  Nbitsperframe: %d\n", Nbitsperframe);
-    printf("  total bits per LDPC codeword: %d\n", code_param.coded_bits_per_frame);
-    printf("  data bits per LDPC codeword: %d\n", code_param.data_bits_per_frame);
-    printf("  data bits per frame: %d\n", code_param.data_bits_per_frame);
+    printf("ldpc_data_bits_per_frame = %d\n", code_param.ldpc_data_bits_per_frame);
+    printf("ldpc_coded_bits_per_frame  = %d\n", code_param.ldpc_coded_bits_per_frame);
+    printf("ldpc_parity_bits_per_frame  = %d\n", code_param.ldpc_parity_bits_per_frame);
+    printf("data_bits_per_frame = %d\n", code_param.data_bits_per_frame);
+    printf("coded_bits_per_frame  = %d\n", code_param.coded_bits_per_frame);
+    printf("coded_syms_per_frame  = %d\n", code_param.coded_syms_per_frame);
+    printf("ofdm_bits_per_frame  = %d\n", Nbitsperframe);
     Nbitspercodecframe = 52; Ncodecframespermodemframe = 6;
     printf("  Nuwbits: %d  Ntxtbits: %d\n", Nuwbits, Ntxtbits);
-    Nparity = code_param.coded_bits_per_frame -  code_param.data_bits_per_frame;
+    Nparity = code_param.ldpc_parity_bits_per_frame;
     totalbitsperframe = code_param.data_bits_per_frame + Nparity + Nuwbits + Ntxtbits;
     printf("Total bits per frame: %d\n", totalbitsperframe);
     assert(totalbitsperframe == Nbitsperframe);
@@ -1101,8 +1106,7 @@ function [code_param Nbitspercodecframe Ncodecframespermodemframe] = codec_to_fr
 endfunction
 
 
-% Assemble a modem frame from input codec bits based on the current FreeDV "mode".  For 700D the modem
-% frame is one LDPC codeword, for "2200" it consists of two LDPC codewords and some unprotected bits.  Note
+% Assemble a modem frame from input codec bits based on the current FreeDV "mode".  Note
 % we don't insert UW and txt bits at this stage, that is handled as a second stage of modem frame
 % construction a little later.
 
@@ -1112,9 +1116,13 @@ function [frame_bits bits_per_frame] = assemble_frame(states, code_param, mode, 
 
   if strcmp(mode, "700D")
     frame_bits = LdpcEncode(codec_bits, code_param.H_rows, code_param.P_matrix);
-    bits_per_frame = length(frame_bits);
-  else
-    bits_per_frame = code_param._data_bits_per_frame;
   end
+  if strcmp(mode, "2020")
+    Nunused = code_param.ldpc_data_bits_per_frame - code_param.data_bits_per_frame;
+    frame_bits = LdpcEncode([codec_bits zeros(1,Nunused)], code_param.H_rows, code_param.P_matrix);
+    % remove unused datat bits
+    frame_bits = [ frame_bits(1:code_param.data_bits_per_frame) frame_bits(code_param.ldpc_data_bits_per_frame+1:end) ];
+  end
+  bits_per_frame = length(frame_bits);
     
 endfunction

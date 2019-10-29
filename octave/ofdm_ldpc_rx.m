@@ -46,8 +46,8 @@ function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", interleave_frames = 
   % Some handy constants, "frame" refers to modem frame less UW and
   % txt bits.
   
-  Ncodedbitsperframe = bits_per_frame;
-  Nsymbolsperframe = bits_per_frame/bps;
+  Ncodedbitsperframe = code_param.coded_bits_per_frame;
+  Nsymbolsperframe = code_param.coded_syms_per_frame;
   Nuwtxtsymbolsperframe = (Nuwbits+Ntxtbits)/bps;
   Nsymbolsperinterleavedframe = interleave_frames*Nsymbolsperframe;
 
@@ -217,8 +217,8 @@ function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", interleave_frames = 
             errors = xor(codec_bits, arx_bits);
             Nerrs  = sum(errors);
             Tbits_coded += code_param.data_bits_per_frame;
+            rx_bits = [rx_bits arx_bits];
           end
-          rx_bits = [rx_bits arx_bits];
           
           Nerrs_coded(ff) = Nerrs;
           Terrs_coded += Nerrs;
