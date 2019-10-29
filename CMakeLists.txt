@@ -45,7 +45,7 @@ set(CODEC2_VERSION_MAJOR 0)
 set(CODEC2_VERSION_MINOR 9)
 # Set to patch level if needed, otherwise leave FALSE.
 # Must be positive (non-zero) if set, since 0 == FALSE in CMake.
-set(CODEC2_VERSION_PATCH FALSE)
+set(CODEC2_VERSION_PATCH 1)
 set(CODEC2_VERSION "${CODEC2_VERSION_MAJOR}.${CODEC2_VERSION_MINOR}")
 # Patch level version bumps should not change API/ABI.
 set(SOVERSION "${CODEC2_VERSION_MAJOR}.${CODEC2_VERSION_MINOR}")
