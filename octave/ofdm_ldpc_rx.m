@@ -3,7 +3,7 @@
 %
 % OFDM file based rx, with LDPC and interleaver, Octave version of src/ofdm_demod.c
 
-function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", interleave_frames = 1, error_pattern_filename, start_secs, len_secs)
+function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", interleave_frames = 1, error_pattern_filename, start_secs, len_secs=0)
   ofdm_lib;
   ldpc;
   gp_interleaver;
@@ -24,7 +24,7 @@ function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", interleave_frames = 
   
   % some constants used for assembling modem frames
   
-  [code_param Nbitspercodecframe Ncodecframespermodemframe Nunprotect] = codec_to_frame_packing(states, mode);
+  [code_param Nbitspercodecframe Ncodecframespermodemframe] = codec_to_frame_packing(states, mode);
 
   % load real samples from file
 
@@ -40,18 +40,11 @@ function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", interleave_frames = 
   %   easier than using a test frame of bits that spans the entire interleaver
   %   frame.  Doesn't affect operation with the speech codec.
   
-  if strcmp(mode, "700D")
-    codec_bits = round(ofdm_rand(code_param.data_bits_per_frame)/32767);
-  else
-    codec_bits = round(ofdm_rand(Ncodecframespermodemframe*Nbitspercodecframe)/32767);
-  end
-
+  codec_bits = round(ofdm_rand(code_param.data_bits_per_frame)/32767);
   [frame_bits bits_per_frame] = assemble_frame(states, code_param, mode, codec_bits, Ncodecframespermodemframe, Nbitspercodecframe);
 
   % Some handy constants, "frame" refers to modem frame less UW and
-  % txt bits.  For 700D this is comprised on one LDPC codeword, for
-  % 2200 "codeword" is a mix of several LDPC codewords and some
-  % unprotected bits.
+  % txt bits.
   
   Ncodedbitsperframe = bits_per_frame;
   Nsymbolsperframe = bits_per_frame/bps;
@@ -170,8 +163,7 @@ function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", interleave_frames = 
       if strcmp(states.sync_state_interleaver,'search')
         Nerrs = 0;
         if strcmp(mode, "700D")
-          % using LDPC decoder to obtain interleaver sync only supported for 700D so far, lets assume 2200 only works
-          % with interleave_frames = 1.
+          % using LDPC decoder to obtain interleaver sync only supported for 700D so far
           st = 1; en = Ncodedbitsperframe/bps;
           [rx_codeword paritychecks] = ldpc_dec(code_param, max_iterations, demod_type, decoder_type, rx_np_de(st:en)/mean_amp, min(EsNo,30), rx_amp_de(st:en)/mean_amp);
           Nerrs = code_param.data_bits_per_frame - max(paritychecks);
@@ -218,9 +210,6 @@ function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", interleave_frames = 
         rx_bits = [];
         for ff=1:interleave_frames
 
-          % this is where we need to modify things for "2200".  LDPC decode then rebuild codec_bits.  Hmm, would be easier
-          % with a custom designed LDPC code.
-
           if strcmp(mode, "700D")
             st = (ff-1)*Nsymbolsperframe+1; en = st + Nsymbolsperframe-1;
             [rx_codeword paritychecks] = ldpc_dec(code_param, max_iterations, demod_type, decoder_type, rx_np_de(st:en)/mean_amp, min(EsNo,30), rx_amp_de(st:en)/mean_amp);
@@ -228,49 +217,7 @@ function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", interleave_frames = 
             errors = xor(codec_bits, arx_bits);
             Nerrs  = sum(errors);
             Tbits_coded += code_param.data_bits_per_frame;
-          else
-            % "2200" mode, run LDPC decoder twice, re-assemble codec bit stream
-            
-            assert(interleave_frames == 1);
-            Ncodewordsymbolsperframe = code_param.code_bits_per_frame/bps;
-            data_bits_per_frame = code_param.data_bits_per_frame;
-            code_bits_per_frame = code_param.code_bits_per_frame;
-            st = 1; en = st + Ncodewordsymbolsperframe - 1;
-            rx_codeword1 = ldpc_dec(code_param, max_iterations, demod_type, decoder_type, rx_np_de(st:en)/mean_amp, min(EsNo,30), rx_amp_de(st:en)/mean_amp);
-            st += Ncodewordsymbolsperframe; en += Ncodewordsymbolsperframe;
-            rx_codeword2 = ldpc_dec(code_param, max_iterations, demod_type, decoder_type, rx_np_de(st:en)/mean_amp, min(EsNo,30), rx_amp_de(st:en)/mean_amp);
-
-            protected_bits = [rx_codeword1(1:data_bits_per_frame) rx_codeword2(1:data_bits_per_frame)];
-            unprotected_bits = rx_bits_raw(2*code_bits_per_frame+1:2*code_bits_per_frame+Nunprotect);
-            %printf("lprot: %d lunprot: %d\n", length(protected_bits), length(unprotected_bits));
-            
-            % OK now reconstruct codec frames from protected and unprotected bits
-
-            Nprotectedbitspercodecframe = 2*code_param.data_bits_per_frame/Ncodecframespermodemframe;
-            Nunprotectedbitspercodecframe = Nbitspercodecframe - Nprotectedbitspercodecframe;
-            rx_codec_bits = []; Nerrs = 0;
-            for i=1:Ncodecframespermodemframe
-              a = (i-1)*Nprotectedbitspercodecframe + 1;
-              b = a + Nprotectedbitspercodecframe-1;
-              c = (i-1)*Nunprotectedbitspercodecframe+1;
-              d = c + Nunprotectedbitspercodecframe-1;
-              rx_codec_bits = [rx_codec_bits protected_bits(a:b) unprotected_bits(c:d)];
-
-              % note we are just counting errors in coded part
-              
-              e  = (i-1)*Nbitspercodecframe + 1;
-              g  = e + Nprotectedbitspercodecframe-1;
-              Nerrs += sum(xor(codec_bits(e:g), protected_bits(a:b)));
-              Tbits_coded += Nprotectedbitspercodecframe;
-            end
-            arx_bits = rx_codec_bits;
-
-            % to generate codec error bit stream compare reconstructed rx codec frames to original
-            
-            codec_errors = xor(codec_bits, rx_codec_bits);
-            error_positions = [error_positions codec_errors]; 
           end
-
           rx_bits = [rx_bits arx_bits];
           
           Nerrs_coded(ff) = Nerrs;
@@ -310,9 +257,8 @@ function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", interleave_frames = 
       Terrs_coded = Tbits_coded = 0;
       error_positions = Nerrs_coded_log = [];
     end
-
   end
-
+  
   printf("Raw BER..: %5.4f Tbits: %5d Terrs: %5d\n", Terrs/(Tbits+1E-12), Tbits, Terrs);
   printf("Coded BER: %5.4f Tbits: %5d Terrs: %5d\n", Terrs_coded/(Tbits_coded+1E-12), Tbits_coded, Terrs_coded);
 
@@ -365,8 +311,11 @@ function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", interleave_frames = 
   title('Signal and Noise Power estimates');
   ylabel('SNR (dB)')
 
-  figure(7); clf; plot_specgram(rx); axis([0 len_secs 500 2500])
-
+  figure(7); clf; plot_specgram(rx);
+  if len_secs
+    axis([0 len_secs 500 2500])
+  end
+  
   if (nargin == 4) && strlen(error_pattern_filename)
     fep = fopen(error_pattern_filename, "wb");
     fwrite(fep, error_positions, "uchar");

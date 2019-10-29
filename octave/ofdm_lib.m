@@ -881,7 +881,7 @@ function [tx_bits payload_data_bits codeword] = create_ldpc_test_frame(states, c
     init_cml('~/cml/'); % TODO: make this path sensible and portable
     load HRA_112_112.txt
     [code_param framesize rate] = ldpc_init_user(HRA_112_112, modulation, mod_order, mapping);
-    assert(Nbitsperframe == (code_param.code_bits_per_frame + Nuwbits + Ntxtbits));
+    assert(Nbitsperframe == (code_param.coded_bits_per_frame + Nuwbits + Ntxtbits));
 
     payload_data_bits = round(ofdm_rand(code_param.data_bits_per_frame)/32767);
     codeword = LdpcEncode(payload_data_bits, code_param.H_rows, code_param.P_matrix);
@@ -1070,7 +1070,7 @@ endfunction
 
 % Set up a bunch of constants to support modem frame construction from LDPC codewords and codec source bits
 
-function [code_param Nbitspercodecframe Ncodecframespermodemframe Nunprotect] = codec_to_frame_packing(states, mode)
+function [code_param Nbitspercodecframe Ncodecframespermodemframe] = codec_to_frame_packing(states, mode)
   ofdm_load_const;
   mod_order = 4; bps = 2; modulation = 'QPSK'; mapping = 'gray';
 
@@ -1078,24 +1078,23 @@ function [code_param Nbitspercodecframe Ncodecframespermodemframe Nunprotect] = 
   if strcmp(mode, "700D")
     load HRA_112_112.txt
     code_param = ldpc_init_user(HRA_112_112, modulation, mod_order, mapping);
-    assert(Nbitsperframe == (code_param.code_bits_per_frame + Nuwbits + Ntxtbits));
+    assert(Nbitsperframe == (code_param.coded_bits_per_frame + Nuwbits + Ntxtbits));
     % unused for this mode
-    Nbitspercodecframe = Ncodecframespermodemframe = Nunprotect = 0;
-  else
-    % mode == "2200", partial protection of codec frames
-    load HRA_112_56.txt
-    code_param = ldpc_init_user(HRA_112_56, modulation, mod_order, mapping);
-    printf("2200 mode\n");
+    Nbitspercodecframe = Ncodecframespermodemframe = 0;
+  end
+  if strcmp(mode, "2020")
+    load HRA_504_396.txt
+    code_param = ldpc_init_user(HRA_504_396, modulation, mod_order, mapping);
+    code_param.data_bits_per_frame = 312;
+    printf("2020 mode\n");
     printf("  Nbitsperframe: %d\n", Nbitsperframe);
-    printf("  total bits per LDPC codeword: %d\n", code_param.code_bits_per_frame);
+    printf("  total bits per LDPC codeword: %d\n", code_param.coded_bits_per_frame);
     printf("  data bits per LDPC codeword: %d\n", code_param.data_bits_per_frame);
-    printf("  LDPC frames: %d\n", 2);
-    printf("  total LDPC codeword bits: %d\n", 2*code_param.code_bits_per_frame);
-    Nbitspercodecframe = 56; Ncodecframespermodemframe = 7;
-    Nunprotect = Ncodecframespermodemframe*Nbitspercodecframe - 2*code_param.data_bits_per_frame;
-    printf("  unprotected codec bits: %d\n", Nunprotect);
+    printf("  data bits per frame: %d\n", code_param.data_bits_per_frame);
+    Nbitspercodecframe = 52; Ncodecframespermodemframe = 6;
     printf("  Nuwbits: %d  Ntxtbits: %d\n", Nuwbits, Ntxtbits);
-    totalbitsperframe = 2*code_param.code_bits_per_frame + Nunprotect + Nuwbits + Ntxtbits;
+    Nparity = code_param.coded_bits_per_frame -  code_param.data_bits_per_frame;
+    totalbitsperframe = code_param.data_bits_per_frame + Nparity + Nuwbits + Ntxtbits;
     printf("Total bits per frame: %d\n", totalbitsperframe);
     assert(totalbitsperframe == Nbitsperframe);
   end
@@ -1115,28 +1114,7 @@ function [frame_bits bits_per_frame] = assemble_frame(states, code_param, mode, 
     frame_bits = LdpcEncode(codec_bits, code_param.H_rows, code_param.P_matrix);
     bits_per_frame = length(frame_bits);
   else
-
-    # extract first part of codec frames into data bits for LDPC encoding
-    
-    Nprotectedbitspercodecframe = 2*code_param.data_bits_per_frame/Ncodecframespermodemframe;
-    protected_bits = unprotected_bits = [];
-    for i=1:Ncodecframespermodemframe
-      a  = (i-1)*Nbitspercodecframe + 1;
-      b  = a + Nprotectedbitspercodecframe-1;
-      c = i*Nbitspercodecframe;
-      protected_bits = [protected_bits codec_bits(a:b)];
-      unprotected_bits = [unprotected_bits codec_bits(b+1:c)];
-    end
-    
-    # LDPC encode protected bits into two codewords
-
-    data_bits_per_frame = code_param.data_bits_per_frame;
-    codeword1 = LdpcEncode(protected_bits(1:data_bits_per_frame), code_param.H_rows, code_param.P_matrix);
-    codeword2 = LdpcEncode(protected_bits(data_bits_per_frame+1:2*data_bits_per_frame), code_param.H_rows, code_param.P_matrix);
-    
-    # add unprotected parts of codec frames
-
-    frame_bits = [codeword1 codeword2 unprotected_bits];
-    bits_per_frame = length(frame_bits);
+    bits_per_frame = code_param._data_bits_per_frame;
   end
+    
 endfunction
