@@ -55,11 +55,11 @@ endfunction
 function [t_est timing_valid timing_mx av_level] = est_timing(states, rx, rate_fs_pilot_samples, step)
     ofdm_load_const;
     Npsam = length(rate_fs_pilot_samples);
-
-    Ncorr = length(rx) - (Nsamperframe+Npsam) + 1;
-    assert(Ncorr > 0);
+    
+    Ncorr = length(rx) - (Nsamperframe+Npsam);
     corr = zeros(1,Ncorr);
-
+    %printf("Npsam: %d M+Ncp: %d Ncorr: %d Nsamperframe: %d step: %d\n", Npsam,  M+Ncp, Ncorr, Nsamperframe, step);
+    
     % normalise correlation so we can compare to a threshold across varying input levels
 
     av_level = 2*sqrt(states.timing_norm*(rx*rx')/length(rx)) + 1E-12;
@@ -438,7 +438,7 @@ function [timing_valid states] = ofdm_sync_search(states, rxbuf_in)
 
   % Attempt coarse timing estimate (i.e. detect start of frame) at a range of frequency offsets
 
-  st = M+Ncp + Nsamperframe + 1; en = st + 2*Nsamperframe;
+  st = M+Ncp + Nsamperframe + 1; en = st + 2*Nsamperframe +  M+Ncp - 1;
   timing_mx = 0; fcoarse = 0; timing_valid = 0; 
   for afcoarse=-40:40:40
     % vector of local oscillator samples to shift input vector
@@ -446,7 +446,7 @@ function [timing_valid states] = ofdm_sync_search(states, rxbuf_in)
 
     if afcoarse != 0
       w = 2*pi*afcoarse/Fs;
-      wvec = exp(-j*w*(0:2*Nsamperframe));
+      wvec = exp(-j*w*(0:2*Nsamperframe+M+Ncp-1));
 
       % choose best timing offset metric at this freq offset
       [act_est atiming_valid atiming_mx] = est_timing(states, wvec .* states.rxbuf(st:en), states.rate_fs_pilot_samples, 2);
@@ -469,7 +469,7 @@ function [timing_valid states] = ofdm_sync_search(states, rxbuf_in)
 
   if fcoarse != 0
     w = 2*pi*fcoarse/Fs;
-    wvec = exp(-j*w*(0:2*Nsamperframe));
+    wvec = exp(-j*w*(0:2*Nsamperframe+M+Ncp-1));
     foff_est = est_freq_offset_pilot_corr(states, wvec .* states.rxbuf(st:en), states.rate_fs_pilot_samples, ct_est);
     foff_est += fcoarse;
   else
