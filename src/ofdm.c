@@ -567,7 +567,6 @@ static int est_timing(struct OFDM *ofdm, complex float *rx, int length,
     int Ncorr = length - (ofdm_samplesperframe + (ofdm_m + ofdm_ncp));
     float corr[Ncorr];
     int i, j;
-
     float acc = 0.0f;
 
     for (i = 0; i < length; i++) {
@@ -983,7 +982,7 @@ static int ofdm_sync_search_core(struct OFDM *ofdm) {
     /* Attempt coarse timing estimate (i.e. detect start of frame) at a range of frequency offsets */
 
     int st = ofdm_m + ofdm_ncp + ofdm_samplesperframe;
-    int en = st + 2 * ofdm_samplesperframe;
+    int en = st + 2 * ofdm_samplesperframe + ofdm_m + ofdm_ncp;
 
     int fcoarse = 0;
     float atiming_mx, timing_mx = 0.0f;
