@@ -1680,7 +1680,11 @@ void ofdm_get_demod_stats(struct OFDM *ofdm, struct MODEM_STATS *stats) {
             ofdm_nc * ofdm_rs / 3000.0f);
     float total = ofdm->frame_count * ofdm_samplesperframe;
 
-    stats->snr_est = 0.9f * stats->snr_est + 0.1f * snr_est;
+    /* fast attack, slow decay */
+    if (snr_est > stats->snr_est)
+        stats->snr_est = snr_est;
+    else
+        stats->snr_est = 0.9f * stats->snr_est + 0.1f * snr_est;
     stats->sync = ((ofdm->sync_state == synced) || (ofdm->sync_state == trial));
     stats->foff = ofdm->foff_est_hz;
     stats->rx_timing = ofdm->timing_est;
