@@ -73,8 +73,7 @@ function [t_est timing_valid timing_mx av_level] = est_timing(states, rx, rate_f
     end
 
     [timing_mx t_est] = max(corr);
-    % only declare timing valid if there are enough samples in rxbuf to demodulate a frame
-    timing_valid = (abs(rx(t_est)) > 0) && (timing_mx > timing_mx_thresh);
+    timing_valid = timing_mx > timing_mx_thresh;
     
     if verbose > 1
       printf("  av_level: %5.4f mx: %4.3f timing_est: %4d timing_valid: %d\n", av_level, timing_mx, t_est, timing_valid);
@@ -284,7 +283,7 @@ function states = ofdm_init(bps, Rs, Tcp, Ns, Nc)
 
   % fine timing search +/- window_width/2 from current timing instant
 
-  states.ftwindow_width = 11; 
+  states.ftwindow_width = states.Nsamperframe; 
  
   % Receive buffer: D P DDD P DDD P DDD P D
   %                         ^
@@ -543,6 +542,7 @@ function [rx_bits states aphase_est_pilot_log rx_np rx_amp] = ofdm_demod(states,
     en = st + Nsamperframe-1 + M+Ncp + ftwindow_width-1;
           
     [ft_est timing_valid timing_mx] = est_timing(states, rxbuf(st:en) .* exp(-j*woff_est*(st:en)), rate_fs_pilot_samples, 1);
+    % printf("  timing_est: %d ft_est: %d timing_valid: %d timing_mx: %d\n", timing_est, ft_est, timing_valid, timing_mx);
     
     if timing_valid
       timing_est = timing_est + ft_est - ceil(ftwindow_width/2);

@@ -242,7 +242,8 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     ofdm_max_samplesperframe = ofdm_samplesperframe + (ofdm_m + ofdm_ncp) / 4;
     ofdm_rxbuf = 3 * ofdm_samplesperframe + 3 * (ofdm_m + ofdm_ncp);
     ofdm_nuwbits = (ofdm_ns - 1) * ofdm_bps - ofdm_ntxtbits;    // 10
-
+    ofdm_ftwindowwidth = ofdm_samplesperframe;
+    
     /* Were ready to start filling in the OFDM structure now */
     ofdm = (struct OFDM *) MALLOC(sizeof (struct OFDM));
     assert(ofdm != NULL);
