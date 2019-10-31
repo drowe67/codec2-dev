@@ -355,11 +355,18 @@ if(UNITTEST)
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/unittest
              )
            
-    add_test(NAME test_OFDM_modem_time_sync
-             COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/unittest/ofdm_time_sync.sh
+    add_test(NAME test_OFDM_modem_time_sync_700D
+             COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/unittest/ofdm_time_sync.sh 700D
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/unittest
              )
            
+if(LPCNET)
+    add_test(NAME test_OFDM_modem_time_sync_2020
+             COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/unittest/ofdm_time_sync.sh 2020
+             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/unittest
+             )
+endif()
+
     add_test(NAME test_OFDM_modem_fading_DPSK_BER
              COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/unittest/ofdm_fade_dpsk.sh
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/unittest

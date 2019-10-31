@@ -10,7 +10,14 @@ results=$(mktemp)
 # bunch of runs at different time offsets into a sample off air file with low SNR and semi-staionary fading
 for start_secs in `seq 0 29`;
 do
-    ofdm_demod --in ../wav/vk2tpm_004.wav --out /dev/null --verbose 2 --ldpc 1 --start_secs $start_secs --len_secs 5 2>/dev/null > $onerun
+    if [ "$1" = "700D" ]; then
+        ofdm_demod --in ../wav/vk2tpm_004.wav --out /dev/null --verbose 2 --ldpc 1 \
+                   --start_secs $start_secs --len_secs 5 2>/dev/null > $onerun
+    fi;
+    if [ "$1" = "2020" ]; then
+        ofdm_demod --nc 31 --ts 0.0205 --in ../wav/david4.wav --out /dev/null --verbose 2 --ldpc 2 -p 312 \
+                   --start_secs $start_secs  --len_secs 5 2>/dev/null > $onerun
+    fi;
     [ ! $? -eq 0 ] && { echo "error running ofdm_demod"; exit 1; }
     cat $onerun | sed -n "s/time_to_sync: \([0-9..]*\)/\1/p" >> $results
 done

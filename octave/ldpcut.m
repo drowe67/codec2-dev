@@ -64,7 +64,7 @@ function sim_out = run_simulation(sim_in)
     % Encode a bunch of frames
 
     for nn=1:Ntrials        
-      atx_bits = round(rand( 1, code_param.data_bits_per_frame));
+      atx_bits = round(rand( 1, code_param.ldpc_data_bits_per_frame));
       tx_bits = [tx_bits atx_bits];
       [tx_codeword atx_symbols] = ldpc_enc(atx_bits, code_param);
       tx_symbols = [tx_symbols atx_symbols];
@@ -82,26 +82,26 @@ function sim_out = run_simulation(sim_in)
     rx_bits_log = [];
 
     for nn = 1: Ntrials        
-      st = (nn-1)*code_param.symbols_per_frame + 1;
-      en = (nn)*code_param.symbols_per_frame;
+      st = (nn-1)*code_param.ldpc_coded_syms_per_frame + 1;
+      en = (nn)*code_param.ldpc_coded_syms_per_frame;
 
       % coded 
 
-      arx_codeword = ldpc_dec(code_param, max_iterations, demod_type, decoder_type, rx_symbols(st:en), EsNo);
-      st = (nn-1)*code_param.data_bits_per_frame + 1;
-      en = (nn)*code_param.data_bits_per_frame;
-      error_positions = xor(arx_codeword(1:code_param.data_bits_per_frame), tx_bits(st:en));
+      arx_codeword = ldpc_dec(code_param, max_iterations, demod_type, decoder_type, rx_symbols(st:en), EsNo, ones(1,code_param.ldpc_coded_syms_per_frame));
+      st = (nn-1)*code_param.ldpc_data_bits_per_frame + 1;
+      en = (nn)*code_param.ldpc_data_bits_per_frame;
+      error_positions = xor(arx_codeword(1:code_param.ldpc_data_bits_per_frame), tx_bits(st:en));
       Nerrs = sum( error_positions);
-      rx_bits_log = [rx_bits_log arx_codeword(1:code_param.data_bits_per_frame)];
+      rx_bits_log = [rx_bits_log arx_codeword(1:code_param.ldpc_data_bits_per_frame)];
         
       % uncoded - to est raw BER compare first half or received frame to tx_bits as code is systematic
       
       raw_rx_bits = [];
-      for s=1:code_param.symbols_per_frame*rate
+      for s=1:code_param.ldpc_coded_syms_per_frame*rate
         raw_rx_bits = [raw_rx_bits qpsk_demod(rx_symbols(st+s-1))];
       end
       Nerrs_raw = sum(xor(raw_rx_bits, tx_bits(st:en)));
-      Nbits_raw = code_param.data_bits_per_frame;
+      Nbits_raw = code_param.ldpc_data_bits_per_frame;
 
       if verbose == 2
         % print "." if frame decoded without errors, 'x' if we can't decode
@@ -112,7 +112,7 @@ function sim_out = run_simulation(sim_in)
 
       if Nerrs > 0,  Ferrs = Ferrs + 1;  end
       Terrs     += Nerrs;
-      Tbits     += code_param.data_bits_per_frame;        
+      Tbits     += code_param.ldpc_data_bits_per_frame;        
       Terrs_raw += Nerrs_raw;
       Tbits_raw += Nbits_raw;
     end
@@ -143,12 +143,7 @@ format;
 % Start CML library (see CML set up instructions in ldpc.m)
 % ---------------------------------------------------------------------------------
 
-currentdir = pwd;
-addpath '/home/david/Desktop/cml/mat' % assume the source files stored here
-cd /home/david/Desktop/cml
-CmlStartup                            % note that this is not in the cml path!
-cd(currentdir)
-
+init_cml('~/cml/');
 
 % ---------------------------------------------------------------------------------
 % 1/ Simplest possible one frame simulation
@@ -169,9 +164,9 @@ code_param = ldpc_init_wimax(rate, framesize, modulation, mod_order, mapping);
 
 EsNo = 10;               % decoder needs an estimated channel EsNo (linear ratio, not dB)
 
-tx_bits = round(rand(1, code_param.data_bits_per_frame));
+tx_bits = round(rand(1, code_param.ldpc_data_bits_per_frame));
 [tx_codeword, qpsk_symbols] = ldpc_enc(tx_bits, code_param);
-rx_codeword = ldpc_dec(code_param, max_iterations, demod_type, decoder_type, qpsk_symbols, EsNo);
+rx_codeword = ldpc_dec(code_param, max_iterations, demod_type, decoder_type, qpsk_symbols, EsNo, ones(1,length(qpsk_symbols)));
 
 errors_positions = xor(tx_bits, rx_codeword(1:framesize*rate));
 Nerr = sum(errors_positions);

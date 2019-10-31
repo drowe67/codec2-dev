@@ -90,7 +90,7 @@ int main(int argc, char *argv[]) {
     struct freedv             *freedv;
     int                        nin, nout, frame = 0;
     struct my_callback_state   my_cb_state;
-    struct MODEM_STATS         stats;
+    struct MODEM_STATS         stats = {0};
     int                        mode;
     int                        sync;
     float                      snr_est;

@@ -242,7 +242,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     ofdm_max_samplesperframe = ofdm_samplesperframe + (ofdm_m + ofdm_ncp) / 4;
     ofdm_rxbuf = 3 * ofdm_samplesperframe + 3 * (ofdm_m + ofdm_ncp);
     ofdm_nuwbits = (ofdm_ns - 1) * ofdm_bps - ofdm_ntxtbits;    // 10
-
+    
     /* Were ready to start filling in the OFDM structure now */
     ofdm = (struct OFDM *) MALLOC(sizeof (struct OFDM));
     assert(ofdm != NULL);
@@ -567,7 +567,6 @@ static int est_timing(struct OFDM *ofdm, complex float *rx, int length,
     int Ncorr = length - (ofdm_samplesperframe + (ofdm_m + ofdm_ncp));
     float corr[Ncorr];
     int i, j;
-
     float acc = 0.0f;
 
     for (i = 0; i < length; i++) {
@@ -983,7 +982,7 @@ static int ofdm_sync_search_core(struct OFDM *ofdm) {
     /* Attempt coarse timing estimate (i.e. detect start of frame) at a range of frequency offsets */
 
     int st = ofdm_m + ofdm_ncp + ofdm_samplesperframe;
-    int en = st + 2 * ofdm_samplesperframe;
+    int en = st + 2 * ofdm_samplesperframe + ofdm_m + ofdm_ncp;
 
     int fcoarse = 0;
     float atiming_mx, timing_mx = 0.0f;
@@ -1126,7 +1125,7 @@ static void ofdm_demod_core(struct OFDM *ofdm, int *rx_bits) {
 
         int ft_est = est_timing(ofdm, work, (en - st), 0.0f, &ofdm->timing_mx, &ofdm->timing_valid, 1);
         
-        ofdm->timing_est += (ft_est - ceilf(ofdm_ftwindowwidth / 2));
+        ofdm->timing_est += ft_est - ceilf((float)ofdm_ftwindowwidth / 2) + 1;
 
         if (ofdm->verbose > 2) {
             fprintf(stderr, "  ft_est: %2d timing_est: %2d sample_point: %2d\n", ft_est, ofdm->timing_est,
@@ -1681,7 +1680,11 @@ void ofdm_get_demod_stats(struct OFDM *ofdm, struct MODEM_STATS *stats) {
             ofdm_nc * ofdm_rs / 3000.0f);
     float total = ofdm->frame_count * ofdm_samplesperframe;
 
-    stats->snr_est = 0.9f * stats->snr_est + 0.1f * snr_est;
+    /* fast attack, slow decay */
+    if (snr_est > stats->snr_est)
+        stats->snr_est = snr_est;
+    else
+        stats->snr_est = 0.9f * stats->snr_est + 0.1f * snr_est;
     stats->sync = ((ofdm->sync_state == synced) || (ofdm->sync_state == trial));
     stats->foff = ofdm->foff_est_hz;
     stats->rx_timing = ofdm->timing_est;
