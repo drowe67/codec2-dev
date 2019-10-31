@@ -283,7 +283,7 @@ function states = ofdm_init(bps, Rs, Tcp, Ns, Nc)
 
   % fine timing search +/- window_width/2 from current timing instant
 
-  states.ftwindow_width = states.Nsamperframe; 
+  states.ftwindow_width = 11; 
  
   % Receive buffer: D P DDD P DDD P DDD P D
   %                         ^

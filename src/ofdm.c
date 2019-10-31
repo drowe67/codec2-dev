@@ -242,7 +242,6 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     ofdm_max_samplesperframe = ofdm_samplesperframe + (ofdm_m + ofdm_ncp) / 4;
     ofdm_rxbuf = 3 * ofdm_samplesperframe + 3 * (ofdm_m + ofdm_ncp);
     ofdm_nuwbits = (ofdm_ns - 1) * ofdm_bps - ofdm_ntxtbits;    // 10
-    ofdm_ftwindowwidth = ofdm_samplesperframe;
     
     /* Were ready to start filling in the OFDM structure now */
     ofdm = (struct OFDM *) MALLOC(sizeof (struct OFDM));
@@ -1126,7 +1125,7 @@ static void ofdm_demod_core(struct OFDM *ofdm, int *rx_bits) {
 
         int ft_est = est_timing(ofdm, work, (en - st), 0.0f, &ofdm->timing_mx, &ofdm->timing_valid, 1);
         
-        ofdm->timing_est += (ft_est - ceilf(ofdm_ftwindowwidth / 2));
+        ofdm->timing_est += ft_est - ceilf((float)ofdm_ftwindowwidth / 2) + 1;
 
         if (ofdm->verbose > 2) {
             fprintf(stderr, "  ft_est: %2d timing_est: %2d sample_point: %2d\n", ft_est, ofdm->timing_est,
