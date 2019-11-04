@@ -36,6 +36,7 @@
 #include "sine.h"
 #include "nlp.h"
 #include "kiss_fft.h"
+#include "wvector.h"
 
 int   frames;
 
@@ -90,8 +91,6 @@ int main(int argc, char *argv[])
     float Sn[m];	        /* float input speech samples */
     kiss_fft_cfg  fft_fwd_cfg;
     COMP  Sw[FFT_ENC];	        /* DFT of Sn[] */
-    float w[m];	                /* time domain hamming window */
-    COMP  W[FFT_ENC];	        /* DFT of w[] */
     float pitch_samples;
     int   i;
     float f0, prev_f0;
@@ -129,7 +128,6 @@ int main(int argc, char *argv[])
 
     nlp_states = nlp_create(&c2const);
     fft_fwd_cfg = kiss_fft_alloc(FFT_ENC, 0, NULL, NULL);
-    make_analysis_window(&c2const, fft_fwd_cfg, w, W);
 
     frames = 0;
     prev_f0 = 1/P_MAX_S;
@@ -140,12 +138,12 @@ int main(int argc, char *argv[])
         Sn[i] = Sn[i+n];
       for(i=0; i<n; i++)
         Sn[i+m-n] = buf[i];
-      dft_speech(&c2const, fft_fwd_cfg, Sw, Sn, w);
+      dft_speech(&c2const, fft_fwd_cfg, Sw, Sn, wvector);
       #ifdef DUMP
       dump_Sn(m, Sn); dump_Sw(Sw);
       #endif
 
-      f0 = nlp(nlp_states, Sn, n, &pitch_samples, Sw, W, &prev_f0);
+      f0 = nlp(nlp_states, Sn, n, &pitch_samples, Sw, &prev_f0);
 
       fprintf(stderr,"%d %f %f\n", frames++, f0, pitch_samples);
       fprintf(fout,"%f %f\n", f0, pitch_samples);

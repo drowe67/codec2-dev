@@ -35,6 +35,8 @@
 #include "dump.h"
 #include "octave.h"
 #include "newamp1.h"
+#include "wvec.h"
+#include "wvector.h"
 #include "quantise.h"
 
 #define FRAMES 300
@@ -48,8 +50,6 @@ int main(int argc, char *argv[]) {
     float Sn[m_pitch];	        /* float input speech samples            */
     COMP  Sw[FFT_ENC];	        /* DFT of Sn[]                           */
     codec2_fft_cfg fft_fwd_cfg; /* fwd FFT states                        */
-    float w[m_pitch];	        /* time domain hamming window            */
-    COMP  W[FFT_ENC];	        /* DFT of w[]                            */
     MODEL model;
     void *nlp_states;
     codec2_fft_cfg phase_fft_fwd_cfg, phase_fft_inv_cfg;
@@ -63,7 +63,6 @@ int main(int argc, char *argv[]) {
     nlp_states = nlp_create(&c2const);
     prev_f0 = 1.0/P_MAX_S;
     fft_fwd_cfg = codec2_fft_alloc(FFT_ENC, 0, NULL, NULL); 
-    make_analysis_window(&c2const,fft_fwd_cfg, w, W);
 
     phase_fft_fwd_cfg = codec2_fft_alloc(NEWAMP1_PHASE_NFFT, 0, NULL, NULL);
     phase_fft_inv_cfg = codec2_fft_alloc(NEWAMP1_PHASE_NFFT, 1, NULL, NULL);
@@ -134,13 +133,13 @@ int main(int argc, char *argv[]) {
 
 	/* Estimate Sinusoidal Model Parameters ----------------------*/
 
-	nlp(nlp_states, Sn, n_samp, &pitch, Sw, W, &prev_f0);
+	nlp(nlp_states, Sn, n_samp, &pitch, Sw, &prev_f0);
 	model.Wo = TWO_PI/pitch;
 
-	dft_speech(&c2const, fft_fwd_cfg, Sw, Sn, w);
+	dft_speech(&c2const, fft_fwd_cfg, Sw, Sn, wvector);
 	two_stage_pitch_refinement(&c2const, &model, Sw);
-	estimate_amplitudes(&model, Sw, W, 1);
-        est_voicing_mbe(&c2const, &model, Sw, W);
+	estimate_amplitudes(&model, Sw, Wvec, 1);
+        est_voicing_mbe(&c2const, &model, Sw, Wvec);
         //voicing[f] = model.voiced;
 
         /* newamp1  processing ----------------------------------------*/

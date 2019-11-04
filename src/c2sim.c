@@ -50,6 +50,8 @@
 #include "phaseexp.h"
 #include "bpf.h"
 #include "bpfb.h"
+#include "wvec.h"
+#include "wvector.h"
 #include "newamp1.h"
 
 void synth_one_frame(int n_samp, codec2_fftr_cfg fftr_inv_cfg, short buf[], MODEL *model, float Sn_[], float Pn[], int prede, float *de_mem, float gain);
@@ -403,8 +405,6 @@ int main(int argc, char *argv[])
     codec2_fft_cfg  fft_fwd_cfg;
     codec2_fftr_cfg  fftr_fwd_cfg;
     codec2_fftr_cfg  fftr_inv_cfg;
-    float w[m_pitch];	        /* time domain hamming window            */
-    COMP  W[FFT_ENC];	/* DFT of w[]                            */
     MODEL model;
     float Pn[2*N_SAMP];	/* trapezoidal synthesis window          */
     float Sn_[2*N_SAMP];	/* synthesised speech */
@@ -490,7 +490,6 @@ int main(int argc, char *argv[])
     codec2_fft_cfg phase_fft_fwd_cfg = codec2_fft_alloc(NEWAMP1_PHASE_NFFT, 0, NULL, NULL);
     codec2_fft_cfg phase_fft_inv_cfg = codec2_fft_alloc(NEWAMP1_PHASE_NFFT, 1, NULL, NULL);
 
-    make_analysis_window(&c2const, fft_fwd_cfg, w, W);
     make_synthesis_window(&c2const, Pn);
     quantise_init();
 
@@ -584,12 +583,12 @@ int main(int argc, char *argv[])
 
 	\*------------------------------------------------------------*/
 
-        nlp(nlp_states, Sn, N_SAMP, &pitch, Sw, W, &prev_f0);
+        nlp(nlp_states, Sn, N_SAMP, &pitch, Sw, &prev_f0);
 	model.Wo = TWO_PI/pitch;
 
-        dft_speech(&c2const, fft_fwd_cfg, Sw, Sn, w);
+        dft_speech(&c2const, fft_fwd_cfg, Sw, Sn, wvector);
 	two_stage_pitch_refinement(&c2const, &model, Sw);
-	estimate_amplitudes(&model, Sw, W, 1);
+	estimate_amplitudes(&model, Sw, Wvec, 1);
 
         #ifdef DUMP
         dump_Sn(m_pitch, Sn); dump_Sw(Sw); dump_model(&model);
@@ -643,11 +642,7 @@ int main(int argc, char *argv[])
 
 	    /* determine voicing */
 
-	    #if 0
-            snr = est_voicing_mbe(&c2const, &model, Sw, W, Sw_, Ew);
-            #else
-	    snr = est_voicing_mbe(&c2const, &model, Sw, W);
-            #endif
+	    snr = est_voicing_mbe(&c2const, &model, Sw, Wvec);
 
 	    if (dump_pitch_e)
 		fprintf(fjvm, "%f %f %d ", model.Wo, snr, model.voiced);
@@ -679,7 +674,7 @@ int main(int argc, char *argv[])
 
 	if (lpc_model) {
 
-            e = speech_to_uq_lsps(lsps, ak, Sn, w, m_pitch, order);
+            e = speech_to_uq_lsps(lsps, ak, Sn, wvector, m_pitch, order);
             for(i=0; i<order; i++)
                 lsps_[i] = lsps[i];
             

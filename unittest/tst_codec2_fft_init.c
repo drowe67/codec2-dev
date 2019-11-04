@@ -33,6 +33,8 @@
 #include "codec2.h"
 #include "codec2_internal.h"
 #include "defines.h"
+#include "wvec.h"
+#include "wvector.h"
 
 #include "machdep.h"
 
@@ -65,9 +67,8 @@ int main(int argc, char *argv[]) {
 
     j = (codec2->c2const.m_pitch / 2) - 8;
     for (i=0; i<16; i++) {
-        printf("w[%d] = %f", j+i, 
-                (double)codec2->w[j+i]);
-        if (!float_cmp(codec2->w[j+i], expect_w[i])) {
+        printf("w[%d] = %f", j+i, (double)wvector[j+i]);
+        if (!float_cmp(wvector[j+i], expect_w[i])) {
             printf(" Error, expected %f", (double)expect_w[i]);
             }
         printf("\n");
@@ -77,9 +78,8 @@ int main(int argc, char *argv[]) {
 
     j = (FFT_ENC / 2) - 8;
     for (i=0; i<16; i++) {
-        printf("W[%d] = %f", j+i, 
-                (double)codec2->W[j+i].real);
-        if (!float_cmp(codec2->W[j+i].real, expect_W[i])) {
+        printf("W[%d] = %f", j+i, Wvec[j+i]);
+        if (!float_cmp(Wvec[j+i], expect_W[i])) {
             printf(" Error, expected %f", (double)expect_W[i]);
             }
         printf("\n");
