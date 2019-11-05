@@ -258,7 +258,6 @@ float nlp(
   int    n,			/* frames shift (no. new samples in Sn[])             */
   float *pitch,			/* estimated pitch period in samples at current Fs    */
   COMP   Sw[],                  /* Freq domain version of Sn[]                        */
-  COMP   W[],                   /* Freq domain window                                 */
   float *prev_f0                /* previous pitch f0 in Hz, memory for pitch tracking */
 )
 {
@@ -505,7 +504,7 @@ float post_process_sub_multiples(COMP Fw[],
 
 \*---------------------------------------------------------------------------*/
 
-float post_process_mbe(COMP Fw[], int pmin, int pmax, float gmax, COMP Sw[], COMP W[], float *prev_Wo)
+float post_process_mbe(COMP Fw[], int pmin, int pmax, float gmax, COMP Sw[], float W[], float *prev_Wo)
 {
   float candidate_f0;
   float f0,best_f0;		/* fundamental frequency */
@@ -608,7 +607,7 @@ float post_process_mbe(COMP Fw[], int pmin, int pmax, float gmax, COMP Sw[], COM
 
 float test_candidate_mbe(
     COMP  Sw[],
-    COMP  W[],
+    float W[],
     float f0
 )
 {
@@ -639,9 +638,9 @@ float test_candidate_mbe(
 
 	for(m=al; m<bl; m++) {
 	    offset = FFT_ENC/2 + m - l*Wo*FFT_ENC/TWO_PI + 0.5;
-	    Am.real += Sw[m].real*W[offset].real + Sw[m].imag*W[offset].imag;
-	    Am.imag += Sw[m].imag*W[offset].real - Sw[m].real*W[offset].imag;
-	    den += W[offset].real*W[offset].real + W[offset].imag*W[offset].imag;
+	    Am.real += Sw[m].real*W[offset];
+	    Am.imag += Sw[m].imag*W[offset];
+	    den += W[offset]*W[offset];
         }
 
         Am.real = Am.real/den;

@@ -404,7 +404,7 @@ int main(int argc, char *argv[])
     codec2_fftr_cfg  fftr_fwd_cfg;
     codec2_fftr_cfg  fftr_inv_cfg;
     float w[m_pitch];	        /* time domain hamming window            */
-    COMP  W[FFT_ENC];	/* DFT of w[]                            */
+    float W[FFT_ENC];	/* DFT of w[]                            */
     MODEL model;
     float Pn[2*N_SAMP];	/* trapezoidal synthesis window          */
     float Sn_[2*N_SAMP];	/* synthesised speech */
@@ -584,7 +584,7 @@ int main(int argc, char *argv[])
 
 	\*------------------------------------------------------------*/
 
-        nlp(nlp_states, Sn, N_SAMP, &pitch, Sw, W, &prev_f0);
+        nlp(nlp_states, Sn, N_SAMP, &pitch, Sw, &prev_f0);
 	model.Wo = TWO_PI/pitch;
 
         dft_speech(&c2const, fft_fwd_cfg, Sw, Sn, w);

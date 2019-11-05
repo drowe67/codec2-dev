@@ -2520,7 +2520,7 @@ void analyse_one_frame(struct CODEC2 *c2, MODEL *model, short speech[])
 
     /* Estimate pitch */
 
-    nlp(c2->nlp, c2->Sn, n_samp, &pitch, Sw, c2->W, &c2->prev_f0_enc);
+    nlp(c2->nlp, c2->Sn, n_samp, &pitch, Sw, &c2->prev_f0_enc);
     //PROFILE_SAMPLE_AND_LOG(model_start, nlp_start, "    nlp");
 
     model->Wo = TWO_PI/pitch;
