@@ -133,8 +133,8 @@ typedef struct {
 } NLP;
 
 #ifdef POST_PROCESS_MBE
-float test_candidate_mbe(COMP Sw[], COMP W[], float f0);
-float post_process_mbe(COMP Fw[], int pmin, int pmax, float gmax, COMP Sw[], COMP W[], float *prev_Wo);
+float test_candidate_mbe(COMP Sw[], float W[], float f0);
+float post_process_mbe(COMP Fw[], int pmin, int pmax, float gmax, COMP Sw[], float W[], float *prev_Wo);
 #endif
 float post_process_sub_multiples(COMP Fw[],
 				 int pmin, int pmax, float gmax, int gmax_bin,
@@ -258,6 +258,7 @@ float nlp(
   int    n,			/* frames shift (no. new samples in Sn[])             */
   float *pitch,			/* estimated pitch period in samples at current Fs    */
   COMP   Sw[],                  /* Freq domain version of Sn[]                        */
+  float  W[],                   /* Freq domain window                                 */
   float *prev_f0                /* previous pitch f0 in Hz, memory for pitch tracking */
 )
 {
@@ -650,8 +651,8 @@ float test_candidate_mbe(
 
         for(m=al; m<bl; m++) {
 	    offset = FFT_ENC/2 + m - l*Wo*FFT_ENC/TWO_PI + 0.5;
-	    Sw_[m].real = Am.real*W[offset].real - Am.imag*W[offset].imag;
-	    Sw_[m].imag = Am.real*W[offset].imag + Am.imag*W[offset].real;
+	    Sw_[m].real = Am.real*W[offset];
+	    Sw_[m].imag = Am.imag*W[offset];
 	    error += (Sw[m].real - Sw_[m].real)*(Sw[m].real - Sw_[m].real);
 	    error += (Sw[m].imag - Sw_[m].imag)*(Sw[m].imag - Sw_[m].imag);
 	}

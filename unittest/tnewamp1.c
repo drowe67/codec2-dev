@@ -134,7 +134,7 @@ int main(int argc, char *argv[]) {
 
 	/* Estimate Sinusoidal Model Parameters ----------------------*/
 
-	nlp(nlp_states, Sn, n_samp, &pitch, Sw, &prev_f0);
+	nlp(nlp_states, Sn, n_samp, &pitch, Sw, W, &prev_f0);
 	model.Wo = TWO_PI/pitch;
 
 	dft_speech(&c2const, fft_fwd_cfg, Sw, Sn, w);

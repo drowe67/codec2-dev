@@ -145,7 +145,7 @@ int main(int argc, char *argv[])
       dump_Sn(m, Sn); dump_Sw(Sw);
       #endif
 
-      f0 = nlp(nlp_states, Sn, n, &pitch_samples, Sw, &prev_f0);
+      f0 = nlp(nlp_states, Sn, n, &pitch_samples, Sw, W, &prev_f0);
 
       fprintf(stderr,"%d %f %f\n", frames++, f0, pitch_samples);
       fprintf(fout,"%f %f\n", f0, pitch_samples);

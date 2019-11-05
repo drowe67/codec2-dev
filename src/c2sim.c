@@ -584,7 +584,7 @@ int main(int argc, char *argv[])
 
 	\*------------------------------------------------------------*/
 
-        nlp(nlp_states, Sn, N_SAMP, &pitch, Sw, &prev_f0);
+        nlp(nlp_states, Sn, N_SAMP, &pitch, Sw, W, &prev_f0);
 	model.Wo = TWO_PI/pitch;
 
         dft_speech(&c2const, fft_fwd_cfg, Sw, Sn, w);
