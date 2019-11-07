@@ -406,8 +406,6 @@ void estimate_amplitudes(MODEL *model, COMP Sw[], float W[], int est_phase)
   int   b;		/* DFT bin of centre of current harmonic */
   float den;		/* denominator of amplitude expression */
   float r, one_on_r;	/* number of rads/bin */
-  int   offset;
-  COMP  Am;
 
   r = TWO_PI/FFT_ENC;
   one_on_r = 1.0/r;
@@ -421,12 +419,8 @@ void estimate_amplitudes(MODEL *model, COMP Sw[], float W[], int est_phase)
     /* Estimate ampltude of harmonic */
 
     den = 0.0;
-    Am.real = Am.imag = 0.0;
-    offset = FFT_ENC/2 - (int)(m*model->Wo*one_on_r + 0.5);
     for(i=am; i<bm; i++) {
       den += Sw[i].real*Sw[i].real + Sw[i].imag*Sw[i].imag;
-      Am.real += Sw[i].real*W[i + offset];
-      Am.imag += Sw[i].imag*W[i + offset];
     }
 
     model->A[m] = sqrtf(den);
