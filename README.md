@@ -18,7 +18,7 @@ Also included:
 
 Also see [INSTALL](INSTALL) for more general building and installing instructions. 
 
-1. Build Codec 2:
+1/ Build Codec 2:
 ```
 $ cd codec2
 $ mkdir build_linux
@@ -27,13 +27,13 @@ $ cmake ..
 $ make
 ```
 
-1. Listen to Codec 2:
+2/ Listen to Codec 2:
 ```
 $ ./src/c2demo ../raw/hts1a.raw hts1a_c2.raw
 $ play -t raw -r 8000 -e signed-integer -b 16 ../raw/hts1a.raw
 $ play -t raw -r 8000 -e signed-integer -b 16 ./hts1a_c2.raw
 ```
-2. Compress, decompress and then play a file:
+3/ Compress, decompress and then play a file:
 
    using 2400 bps bit rate encoding
 ```
@@ -53,7 +53,7 @@ $ ./src/c2dec 700C hts1a_c2.bit hts1a_c2_700.raw
 ```
 $ play -t raw -r 8000 -e signed-integer -b 16 ./hts1a_c2_700.raw
 ```
-3. If you prefer a one-liner without saving to files:
+4/ If you prefer a one-liner without saving to files:
 ```
 $ ./src/c2enc 1300 ../raw/hts1a.raw - | ./src/c2dec 1300 - - | play -t raw -r 8000 -b 16 -e signed-integer -
 ```
