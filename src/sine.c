@@ -403,22 +403,18 @@ void estimate_amplitudes(MODEL *model, COMP Sw[], float W[], int est_phase)
 {
   int   i,m;		/* loop variables */
   int   am,bm;		/* bounds of current harmonic */
-  int   b;		/* DFT bin of centre of current harmonic */
   float den;		/* denominator of amplitude expression */
-  float r, one_on_r;	/* number of rads/bin */
 
-  r = TWO_PI/FFT_ENC;
-  one_on_r = 1.0/r;
+  float r = TWO_PI/FFT_ENC;
+  float one_on_r = 1.0/r;
 
   for(m=1; m<=model->L; m++) {
-    den = 0.0;
-    am = (int)((m - 0.5)*model->Wo*one_on_r + 0.5);
-    bm = (int)((m + 0.5)*model->Wo*one_on_r + 0.5);
-    b = (int)(m*model->Wo/r + 0.5);
-
     /* Estimate ampltude of harmonic */
 
     den = 0.0;
+    am = (int)((m - 0.5)*model->Wo*one_on_r + 0.5);
+    bm = (int)((m + 0.5)*model->Wo*one_on_r + 0.5);
+
     for(i=am; i<bm; i++) {
       den += Sw[i].real*Sw[i].real + Sw[i].imag*Sw[i].imag;
     }
@@ -426,6 +422,7 @@ void estimate_amplitudes(MODEL *model, COMP Sw[], float W[], int est_phase)
     model->A[m] = sqrtf(den);
 
     if (est_phase) {
+        int b = (int)(m*model->Wo/r + 0.5); /* DFT bin of centre of current harmonic */
 
         /* Estimate phase of harmonic, this is expensive in CPU for
            embedded devicesso we make it an option */
