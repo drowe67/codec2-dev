@@ -85,8 +85,8 @@ int main(int argc, char *argv[]) {
     j = (FFT_ENC / 2) - 8;
     for (i=0; i<16; i++) {
         printf("W[%d] = %f", j+i, 
-                (double)codec2->W[j+i].real);
-        if (!float_cmp(codec2->W[j+i].real, expect_W[i])) {
+                (double)codec2->W[j+i]);
+        if (!float_cmp(codec2->W[j+i], expect_W[i])) {
             printf(" Error, expected %f", (double)expect_W[i]);
             }
         printf("\n");

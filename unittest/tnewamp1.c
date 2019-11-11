@@ -49,7 +49,7 @@ int main(int argc, char *argv[]) {
     COMP  Sw[FFT_ENC];	        /* DFT of Sn[]                           */
     codec2_fft_cfg fft_fwd_cfg; /* fwd FFT states                        */
     float w[m_pitch];	        /* time domain hamming window            */
-    COMP  W[FFT_ENC];	        /* DFT of w[]                            */
+    float W[FFT_ENC];	        /* DFT of w[]                            */
     MODEL model;
     void *nlp_states;
     codec2_fft_cfg phase_fft_fwd_cfg, phase_fft_inv_cfg;
