@@ -28,18 +28,18 @@
 #ifndef OFDM_INTERNAL_H
 #define OFDM_INTERNAL_H
 
-#ifdef __cplusplus
-extern "C"
-{
-#endif
-
 #include <complex.h>
 #include <stdbool.h>
 #include <stdint.h>
 
 #include "codec2_ofdm.h"
 #include "filter.h"
-    
+
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
 #ifndef M_PI
 #define M_PI        3.14159265358979323846f
 #endif

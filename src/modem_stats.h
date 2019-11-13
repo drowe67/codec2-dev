@@ -25,15 +25,15 @@
   along with this program; if not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifdef __cplusplus
-  extern "C" {
-#endif
-
 #ifndef __MODEM_STATS__
 #define __MODEM_STATS__
 
 #include "comp.h"
 #include "kiss_fft.h"
+
+#ifdef __cplusplus
+  extern "C" {
+#endif
 
 #define MODEM_STATS_NC_MAX      50
 #define MODEM_STATS_NR_MAX      8
@@ -81,8 +81,9 @@ void modem_stats_open(struct MODEM_STATS *f);
 void modem_stats_close(struct MODEM_STATS *f);
 void modem_stats_get_rx_spectrum(struct MODEM_STATS *f, float mag_spec_dB[], COMP rx_fdm[], int nin);
 
-#endif
-
 #ifdef __cplusplus
 }
 #endif
+
+#endif
+

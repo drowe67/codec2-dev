@@ -26,14 +26,14 @@
   along with this program; if not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifdef __cplusplus
-  extern "C" {
-#endif
-
 #ifndef __CODEC2__
 #define  __CODEC2__
 
 #include <codec2/version.h>
+
+#ifdef __cplusplus
+  extern "C" {
+#endif
 
 #define CODEC2_MODE_3200 	0
 #define CODEC2_MODE_2400 	1
@@ -122,9 +122,9 @@ float *codec2_enable_user_ratek(struct CODEC2 *codec2_state, int *K);
 void codec2_700c_post_filter(struct CODEC2 *codec2_state, int en);
 void codec2_700c_eq(struct CODEC2 *codec2_state, int en);
       
-#endif
-
 #ifdef __cplusplus
 }
+#endif
+
 #endif
 
