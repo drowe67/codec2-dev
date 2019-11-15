@@ -300,7 +300,8 @@ function states = ofdm_init(bps, Rs, Tcp, Ns, Nc)
   states.foff_est_en = 1;
   states.phase_est_en = 1;
   states.phase_est_bandwidth = "high";
-
+  states.dpsk = 0;
+  
   states.foff_est_gain = 0.1;
   states.foff_est_hz = 0;
   states.sample_point = states.timing_est = 1;
@@ -672,7 +673,11 @@ function [rx_bits states aphase_est_pilot_log rx_np rx_amp] = ofdm_demod(states,
   for rr=1:Ns-1
     for c=2:Nc+1
       if phase_est_en
-        rx_corr = rx_sym(rr+2,c) * exp(-j*aphase_est_pilot(c));
+        if states.dpsk
+          rx_corr = rx_sym(rr+2,c) *  rx_sym(rr+1,c)';
+        else
+          rx_corr = rx_sym(rr+2,c) * exp(-j*aphase_est_pilot(c));
+        end
       else
         rx_corr = rx_sym(rr+2,c);
       end

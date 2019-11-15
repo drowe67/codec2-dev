@@ -15,6 +15,8 @@ function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", interleave_frames = 
   states = ofdm_init(bps, Rs, Tcp, Ns, Nc);
   ofdm_load_const;
   states.verbose = 1;
+  states.dpsk = 1;
+  %states.phase_est_bandwidth = "high";
   
   mod_order = 4; bps = 2; modulation = 'QPSK'; mapping = 'gray';
   demod_type = 0; decoder_type = 0; max_iterations = 100;
