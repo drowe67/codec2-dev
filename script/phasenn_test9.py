@@ -24,7 +24,7 @@ from keras import backend as K
 N                 = 80      # number of time domain samples in frame
 nb_samples        = 10000
 nb_batch          = 32
-nb_epochs         = 25
+nb_epochs         = 10
 width             = 256
 pairs             = 2*width
 fo_min            = 50
@@ -59,8 +59,8 @@ for i in range(nb_samples):
     r = np.random.rand(3)
 
     # sample 2nd order IIR filter with random peak freq (alpha) and peak amplitude (gamma)
-    alpha = 0.1*np.pi + 0.8*np.pi*r[0]
-    gamma = r[1]
+    alpha = 0.1*np.pi + 0.4*np.pi*r[0]
+    gamma = 0.9 + 0.09*r[1]
     w,h = signal.freqz(1, [1, -2*gamma*np.cos(alpha), gamma*gamma], range(1,L[i])*Wo[i])
     
     # select n0 between 0...P-1 (it's periodic)
@@ -81,7 +81,7 @@ for i in range(nb_samples):
                               
 model = models.Sequential()
 model.add(layers.Dense(pairs, activation='relu', input_dim=pairs))
-model.add(layers.Dense(pairs, activation='relu'))
+model.add(layers.Dense(128, activation='relu'))
 model.add(layers.Dense(1))
 model.summary()
 
@@ -97,7 +97,29 @@ err = target - target_est
 var = np.var(err)
 std = np.std(err)
 print("var: %f std: %f" % (var,std))
-print(target.shape, target_est.shape, err.shape)
+
+def sample_freq(r):
+    phase_L = np.zeros(L[r], dtype=complex)
+    amp_L = np.zeros(L[r])
+    
+    for m in range(1,L[r]):
+        wm = m*Wo[r]
+        bin = int(np.round(wm*width/np.pi))
+        phase_L[m] = phase_rect[r,2*bin] + 1j*phase_rect[r,2*bin+1]
+        amp_L[m] = amp[r,bin]
+    return phase_L, amp_L
+
+# synthesise time domain signal
+def sample_time(r):
+    s = np.zeros(2*N);
+    
+    for m in range(1,L[r]):
+        wm = m*Wo[r]
+        bin = int(np.round(wm*width/np.pi))
+        Am = 10 ** amp[r,bin]
+        phi_m = np.angle(phase_rect[r,2*bin] + 1j*phase_rect[r,2*bin+1])
+        s = s + Am*np.cos(wm*(range(2*N)) + phi_m)
+    return s
 
 plot_en = 1;
 if plot_en:
@@ -112,8 +134,31 @@ if plot_en:
     plt.show(block=False)
 
     plt.figure(3)
-    plt.plot(target[:10],'b')
-    plt.plot(target_est[:10],'g')
+    plt.plot(target[:12],'b')
+    plt.plot(target_est[:12],'g')
+    plt.show(block=False)
+
+    plt.figure(4)
+    plt.title('Freq Domain')
+    for r in range(12):
+        plt.subplot(3,4,r+1)
+        phase_L, amp_L = sample_freq(r)
+        plt.plot(20*amp_L,'g')
+        plt.ylim(-20,20)
+    plt.show(block=False)
+
+    plt.figure(5)
+    plt.title('Time Domain')
+    for r in range(12):
+        plt.subplot(3,4,r+1)
+        s = sample_time(r)
+        P = 2*L[r]
+        n0_ = target_est[r]*P
+        print("F0: %5.1f P: %3d L: %3d n0: %3d n0_est: %5.1f" % (Wo[r]*(Fs/2)/np.pi, P, L[r], n0[r], n0_))
+        plt.plot(s,'g')
+        plt.plot([n0[r],n0[r]], [-25,25],'r')
+        plt.plot([n0_,n0_], [-25,25],'b')
+        plt.ylim(-50,50)
     plt.show(block=False)
 
     # click on last figure to close all and finish
