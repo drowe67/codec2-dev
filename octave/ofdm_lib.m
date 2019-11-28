@@ -411,6 +411,9 @@ function tx = ofdm_txframe(states, tx_sym_lin)
     arowofsymbols = tx_sym_lin(s:s+Nc-1);
     s += Nc;
     aframe(r+1,2:Nc+1) = arowofsymbols;
+    if states.dpsk
+      aframe(r+1,2:Nc+1) = aframe(r+1,2:Nc+1) .* aframe(r,2:Nc+1);
+    end   
   end
   tx_sym = [tx_sym; aframe];
 
@@ -1005,7 +1008,7 @@ function states = sync_state_machine(states, rx_uw)
         states.sync_counter = 0;
       end
 
-      if states.sync_counter == 12
+      if states.sync_counter == 2
         next_state = "search";
         states.sync_state_interleaver = "search";
         states.phase_est_bandwidth = "high";
