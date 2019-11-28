@@ -1008,7 +1008,7 @@ function states = sync_state_machine(states, rx_uw)
         states.sync_counter = 0;
       end
 
-      if states.sync_counter == 2
+      if states.sync_counter == 6
         next_state = "search";
         states.sync_state_interleaver = "search";
         states.phase_est_bandwidth = "high";
