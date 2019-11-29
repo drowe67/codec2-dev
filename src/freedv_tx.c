@@ -105,7 +105,7 @@ int main(int argc, char *argv[]) {
         #ifdef __LPCNET__
         sprintf(f2020,"|2020");
         #endif     
-        printf("usage: %s 1600|700|700B|700C|700D|2400A|2400B|800XA%s InputRawSpeechFile OutputModemRawFile\n"
+        printf("usage: %s 1600|700C|700D|2400A|2400B|800XA%s InputRawSpeechFile OutputModemRawFile\n"
                " [--testframes] [--interleave depth] [--codectx] [--datatx] [--clip 0|1] [--txbpf 0|1] [--extvco] [--dpsk]\n", argv[0], f2020);
         printf("e.g    %s 1600 hts1a.raw hts1a_fdmdv.raw\n", argv[0]);
         exit(1);
@@ -114,10 +114,6 @@ int main(int argc, char *argv[]) {
     mode = -1;
     if (!strcmp(argv[1],"1600"))
         mode = FREEDV_MODE_1600;
-    if (!strcmp(argv[1],"700"))
-        mode = FREEDV_MODE_700;
-    if (!strcmp(argv[1],"700B"))
-        mode = FREEDV_MODE_700B;
     if (!strcmp(argv[1],"700C"))
         mode = FREEDV_MODE_700C;
     if (!strcmp(argv[1],"700D"))
@@ -161,11 +157,7 @@ int main(int argc, char *argv[]) {
             if (strcmp(argv[i], "--codectx") == 0) {
                 int c2_mode;
                 
-                if (mode == FREEDV_MODE_700)  {
-                    c2_mode = CODEC2_MODE_700;
-                } else if ((mode == FREEDV_MODE_700B)|| (mode == FREEDV_MODE_800XA)) {
-                    c2_mode = CODEC2_MODE_700B;
-                } else if ((mode == FREEDV_MODE_700C)|| (mode == FREEDV_MODE_700D)) {
+                if ((mode == FREEDV_MODE_700C) || (mode == FREEDV_MODE_700D) || (mode == FREEDV_MODE_800XA)) {
                     c2_mode = CODEC2_MODE_700C;
                 } else {
                     c2_mode = CODEC2_MODE_1300;
