@@ -65,7 +65,7 @@
 
 #include "debug_alloc.h"
 
-#define VERSION     12    /* The API version number.  The first version
+#define VERSION     13    /* The API version number.  The first version
                            is 10.  Increment if the API changes in a
                            way that would require changes by the API
                            user. */
@@ -76,6 +76,8 @@
  *              Changed all input and output sample rates to 8000 sps.  Rates for FREEDV_MODE_700 and 700B were 7500.
  * Version 12   August 2018
  *              Added OFDM configuration switch structure
+ * Version 13   November 2019
+ *              Removed 700 and 700B modes
  */
 
 /* experimentally derived fudge factors to normalise power across modes */
@@ -113,10 +115,9 @@ struct freedv *freedv_open(int mode) {
 
 struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
     struct freedv *f;
-    int            Nc, codec2_mode, nbit, nbyte = 0;
+    int            Nc, codec2_mode, nbit = 0, nbyte = 0;
     
-    if (false == (FDV_MODE_ACTIVE( FREEDV_MODE_1600,mode) || FDV_MODE_ACTIVE( FREEDV_MODE_700,mode) || 
-		FDV_MODE_ACTIVE( FREEDV_MODE_700B,mode) || FDV_MODE_ACTIVE( FREEDV_MODE_2400A,mode) || 
+    if (false == (FDV_MODE_ACTIVE( FREEDV_MODE_1600,mode) || FDV_MODE_ACTIVE( FREEDV_MODE_2400A,mode) || 
 		FDV_MODE_ACTIVE( FREEDV_MODE_2400B,mode) || FDV_MODE_ACTIVE( FREEDV_MODE_800XA,mode) || 
 		FDV_MODE_ACTIVE( FREEDV_MODE_700C,mode) || FDV_MODE_ACTIVE( FREEDV_MODE_700D,mode)  ||
                   FDV_MODE_ACTIVE( FREEDV_MODE_2020,mode)) )
@@ -180,16 +181,10 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
         f->sz_error_pattern = fdmdv_error_pattern_size(f->fdmdv);
     }
 
-    if (FDV_MODE_ACTIVE( FREEDV_MODE_700, mode) || FDV_MODE_ACTIVE( FREEDV_MODE_700B, mode) || FDV_MODE_ACTIVE( FREEDV_MODE_700C, mode)) {
+    if (FDV_MODE_ACTIVE( FREEDV_MODE_700C, mode)) {
         f->snr_squelch_thresh = 0.0;
         f->squelch_en = 0;
         switch(mode) {
-        case FREEDV_MODE_700:
-            codec2_mode = CODEC2_MODE_700;
-            break;
-        case FREEDV_MODE_700B:
-            codec2_mode = CODEC2_MODE_700B;
-            break;
         case FREEDV_MODE_700C:
             codec2_mode = CODEC2_MODE_700C;
             break;
@@ -564,12 +559,12 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
         nbyte = nbyte*2;
         nbit = 8*nbyte;
         f->n_codec_bits = nbit;
-    } else if (FDV_MODE_ACTIVE( FREEDV_MODE_700, mode) || FDV_MODE_ACTIVE( FREEDV_MODE_700B, mode) || FDV_MODE_ACTIVE( FREEDV_MODE_700C, mode)) {
+    } else if FDV_MODE_ACTIVE( FREEDV_MODE_700C, mode) {
         f->n_speech_samples = 2*codec2_samples_per_frame(f->codec2);
         f->n_codec_bits = 2*codec2_bits_per_frame(f->codec2);
         nbit = f->n_codec_bits;
         nbyte = 2*((codec2_bits_per_frame(f->codec2) + 7) / 8);
-    } else if (FDV_MODE_ACTIVE(FREEDV_MODE_700D, mode)) /* mode == FREEDV_MODE_700D */ {
+        } else if (FDV_MODE_ACTIVE(FREEDV_MODE_700D, mode)) /* mode == FREEDV_MODE_700D */ {
 
         /* should be exactly an integer number of Codec 2 frames in a OFDM modem frame */
 
@@ -613,7 +608,7 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
     if (FDV_MODE_ACTIVE( FREEDV_MODE_1600, mode))
         f->codec_bits = (int*)MALLOC(nbit*sizeof(int));
 
-    if (FDV_MODE_ACTIVE( FREEDV_MODE_700, mode) || FDV_MODE_ACTIVE( FREEDV_MODE_700B, mode) || FDV_MODE_ACTIVE( FREEDV_MODE_700C, mode))
+    if (FDV_MODE_ACTIVE( FREEDV_MODE_700C, mode))
         f->codec_bits = (int*)MALLOC(COHPSK_BITS_PER_FRAME*sizeof(int));
         
     /* Note: VHF Framer/deframer goes directly from packed codec/vc/proto bits to filled frame */
@@ -625,7 +620,7 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
 
     /* Sample rate conversion for modes using COHPSK */
     
-    if (FDV_MODE_ACTIVE( FREEDV_MODE_700, mode) || FDV_MODE_ACTIVE( FREEDV_MODE_700B, mode) || FDV_MODE_ACTIVE( FREEDV_MODE_700C, mode) ) { 
+    if (FDV_MODE_ACTIVE( FREEDV_MODE_700C, mode) ) { 
         f->ptFilter7500to8000 = (struct quisk_cfFilter *)MALLOC(sizeof(struct quisk_cfFilter));
         f->ptFilter8000to7500 = (struct quisk_cfFilter *)MALLOC(sizeof(struct quisk_cfFilter));
         quisk_filt_cfInit(f->ptFilter8000to7500, quiskFilt120t480, sizeof(quiskFilt120t480)/sizeof(float));
@@ -670,7 +665,7 @@ void freedv_close(struct freedv *freedv) {
         FREE(freedv->fdmdv_bits);
         fdmdv_destroy(freedv->fdmdv);
     }
-    if (FDV_MODE_ACTIVE( FREEDV_MODE_700, freedv->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_700B, freedv->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_700C, freedv->mode))
+    if (FDV_MODE_ACTIVE( FREEDV_MODE_700C, freedv->mode))
         cohpsk_destroy(freedv->cohpsk);
     if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, freedv->mode)) {
         FREE(freedv->packed_codec_bits_tx);
@@ -924,8 +919,7 @@ void freedv_tx(struct freedv *f, short mod_out[], short speech_in[]) {
     assert(f != NULL);
     COMP tx_fdm[f->n_nom_modem_samples];
     int  i;
-    assert((FDV_MODE_ACTIVE( FREEDV_MODE_1600, f->mode))  || (FDV_MODE_ACTIVE( FREEDV_MODE_700, f->mode))   || 
-           (FDV_MODE_ACTIVE( FREEDV_MODE_700B, f->mode))  || (FDV_MODE_ACTIVE( FREEDV_MODE_700C, f->mode))  ||
+    assert((FDV_MODE_ACTIVE( FREEDV_MODE_1600, f->mode))  || (FDV_MODE_ACTIVE( FREEDV_MODE_700C, f->mode))  ||
            (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode))  || 
            (FDV_MODE_ACTIVE( FREEDV_MODE_2400A, f->mode)) || (FDV_MODE_ACTIVE( FREEDV_MODE_2400B, f->mode)) || 
            (FDV_MODE_ACTIVE( FREEDV_MODE_800XA, f->mode)) || (FDV_MODE_ACTIVE( FREEDV_MODE_2020, f->mode)));
@@ -1075,12 +1069,6 @@ static void freedv_comptx_700(struct freedv *f, COMP mod_out[]) {
         // bits/frame to send txt messages
 
         switch(f->mode) {
-        case FREEDV_MODE_700:
-            nspare = 2;
-            break;
-        case FREEDV_MODE_700B:
-            nspare = 1; // Just one spare bit for FREEDV_MODE_700B
-            break;
         case FREEDV_MODE_700C:
             nspare = 0; // and no spare bits for 700C atm
             break;
@@ -1305,8 +1293,7 @@ static void freedv_comptx_2020(struct freedv *f, COMP mod_out[]) {
 void freedv_comptx(struct freedv *f, COMP mod_out[], short speech_in[]) {
     assert(f != NULL);
 
-    assert((FDV_MODE_ACTIVE( FREEDV_MODE_1600, f->mode)) || (FDV_MODE_ACTIVE( FREEDV_MODE_700, f->mode)) || 
-           (FDV_MODE_ACTIVE( FREEDV_MODE_700B, f->mode)) || (FDV_MODE_ACTIVE( FREEDV_MODE_700C, f->mode)) || 
+    assert((FDV_MODE_ACTIVE( FREEDV_MODE_1600, f->mode)) || (FDV_MODE_ACTIVE( FREEDV_MODE_700C, f->mode)) || 
            (FDV_MODE_ACTIVE( FREEDV_MODE_2400A, f->mode)) || (FDV_MODE_ACTIVE( FREEDV_MODE_2400B, f->mode)) ||
            (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode))  || (FDV_MODE_ACTIVE( FREEDV_MODE_2020, f->mode)));
 
@@ -1324,7 +1311,7 @@ void freedv_comptx(struct freedv *f, COMP mod_out[], short speech_in[]) {
     
     /* all these modes need to pack a bunch of codec frames into one modem frame */
     
-    if ((FDV_MODE_ACTIVE( FREEDV_MODE_700, f->mode)) || (FDV_MODE_ACTIVE( FREEDV_MODE_700B, f->mode)) || (FDV_MODE_ACTIVE( FREEDV_MODE_700C, f->mode))) {
+    if (FDV_MODE_ACTIVE( FREEDV_MODE_700C, f->mode)) {
 	int codec_frames = f->n_codec_bits / bits_per_codec_frame;
 
         for (j=0; j<codec_frames; j++) {
@@ -1436,8 +1423,6 @@ void freedv_codectx(struct freedv *f, short mod_out[], unsigned char *packed_cod
         case FREEDV_MODE_1600:
             freedv_comptx_fdmdv_1600(f, tx_fdm);
             break;
-        case FREEDV_MODE_700:
-        case FREEDV_MODE_700B:
         case FREEDV_MODE_700C:
             freedv_comptx_700(f, tx_fdm);
             break;
@@ -1501,7 +1486,7 @@ int  freedv_data_ntxframes (struct freedv *f){
 }
 
 int freedv_nin(struct freedv *f) {
-    if ((FDV_MODE_ACTIVE( FREEDV_MODE_700, f->mode)) || (FDV_MODE_ACTIVE( FREEDV_MODE_700B, f->mode)) || (FDV_MODE_ACTIVE( FREEDV_MODE_700C, f->mode)))
+    if (FDV_MODE_ACTIVE( FREEDV_MODE_700C, f->mode))
         // For mode 700, the input rate is 8000 sps, but the modem rate is 7500 sps
         // For mode 700, we request a larger number of Rx samples that will be decimated to f->nin samples
         return (16 * f->nin + f->ptFilter8000to7500->decim_index) / 15;
@@ -1573,8 +1558,7 @@ int freedv_rx(struct freedv *f, short speech_out[], short demod_in[]) {
         return freedv_floatrx(f,speech_out,rx_float);
     }
     
-    if ( (FDV_MODE_ACTIVE( FREEDV_MODE_1600, f->mode)) || (FDV_MODE_ACTIVE( FREEDV_MODE_700, f->mode)) || 
-         (FDV_MODE_ACTIVE( FREEDV_MODE_700B, f->mode)) || (FDV_MODE_ACTIVE( FREEDV_MODE_700C, f->mode))
+    if ( (FDV_MODE_ACTIVE( FREEDV_MODE_1600, f->mode)) || (FDV_MODE_ACTIVE( FREEDV_MODE_700C, f->mode))
          || (FDV_MODE_ACTIVE( FREEDV_MODE_2020, f->mode))) {
 
         float gain = 1.0;
@@ -1905,12 +1889,6 @@ static int freedv_comprx_700(struct freedv *f, COMP demod_in_8kHz[], int *valid)
                 /* extract txt msg data bit(s) */
 
                 switch(f->mode) {
-                case FREEDV_MODE_700:
-                    nspare = 2;
-                    break;
-                case FREEDV_MODE_700B:
-                    nspare = 1; // Just one spare bit for FREEDV_MODE_700B
-                    break;
                 case FREEDV_MODE_700C:
                     nspare = 0; // and no spare bits for 700C atm
                     break;
@@ -2461,7 +2439,7 @@ int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]) {
     if (FDV_MODE_ACTIVE( FREEDV_MODE_1600, f->mode)) {
         nout = freedv_comprx_fdmdv_1600(f, demod_in, &valid);
     }
-    if ((FDV_MODE_ACTIVE( FREEDV_MODE_700, f->mode)) || (FDV_MODE_ACTIVE( FREEDV_MODE_700B, f->mode)) || (FDV_MODE_ACTIVE( FREEDV_MODE_700C, f->mode))) {
+    if (FDV_MODE_ACTIVE( FREEDV_MODE_700C, f->mode)) {
         nout = freedv_comprx_700(f, demod_in, &valid);
     }
 
@@ -2629,7 +2607,7 @@ int freedv_codecrx(struct freedv *f, unsigned char *packed_codec_bits, short dem
             freedv_comprx_fdmdv_1600(f, rx_fdm, &valid);
         }
 
-        if ((FDV_MODE_ACTIVE( FREEDV_MODE_700, f->mode)) || (FDV_MODE_ACTIVE( FREEDV_MODE_700B, f->mode)) || (FDV_MODE_ACTIVE( FREEDV_MODE_700C, f->mode))) {
+        if (FDV_MODE_ACTIVE( FREEDV_MODE_700C, f->mode)) {
             freedv_comprx_700(f, rx_fdm, &valid);
         }
 
@@ -2797,7 +2775,7 @@ void freedv_get_modem_stats(struct freedv *f, int *sync, float *snr_est)
 {
     if (FDV_MODE_ACTIVE( FREEDV_MODE_1600, f->mode))
         fdmdv_get_demod_stats(f->fdmdv, &f->stats);
-    if ((FDV_MODE_ACTIVE( FREEDV_MODE_700, f->mode)) || (FDV_MODE_ACTIVE( FREEDV_MODE_700B, f->mode))  || (FDV_MODE_ACTIVE( FREEDV_MODE_700C, f->mode)))
+    if (FDV_MODE_ACTIVE( FREEDV_MODE_700C, f->mode))
         cohpsk_get_demod_stats(f->cohpsk, &f->stats);
     if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_2020, f->mode)) {
         ofdm_get_demod_stats(f->ofdm, &f->stats);
@@ -2993,7 +2971,7 @@ int freedv_get_sync_interleaver(struct freedv *f) {
 
 int freedv_get_sz_error_pattern(struct freedv *f) 
 {
-    if (FDV_MODE_ACTIVE( FREEDV_MODE_700, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_700B, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_700C, f->mode)) {
+    if (FDV_MODE_ACTIVE( FREEDV_MODE_700C, f->mode)) {
         /* if diversity disabled callback sends error pattern for upper and lower carriers */
         return f->sz_error_pattern * (2 - f->test_frames_diversity);
     }
@@ -3024,7 +3002,7 @@ void freedv_get_modem_extended_stats(struct freedv *f, struct MODEM_STATS *stats
         fmfsk_get_demod_stats(f->fmfsk, stats);
     }
     
-    if (FDV_MODE_ACTIVE( FREEDV_MODE_700, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_700B, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_700C, f->mode)) {
+    if (FDV_MODE_ACTIVE( FREEDV_MODE_700C, f->mode)) {
         cohpsk_get_demod_stats(f->cohpsk, stats);
     }
     
