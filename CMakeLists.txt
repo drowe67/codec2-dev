@@ -456,4 +456,9 @@ endif()
              )
              set_tests_properties(test_FreeDV_700D_rx_memory_leak PROPERTIES PASS_REGULAR_EXPRESSION "ERROR SUMMARY: 0 errors")
 
+     add_test(NAME test_dot_c2_mode
+             COMMAND sh -c "$<TARGET_FILE:c2enc> 700C ~/codec2/raw/hts1a.raw hts1a.c2 && $<TARGET_FILE:c2dec> 1600 hts1a.c2 /dev/null"
+             )
+             set_tests_properties(test_dot_c2_mode PROPERTIES PASS_REGULAR_EXPRESSION "mode 8")
+
 endif(UNITTEST)
