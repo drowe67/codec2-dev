@@ -208,11 +208,11 @@ int main(int argc, char *argv[])
 	        }
 
                 if (!phase0) {
-                    printf("needs --phase0 to resample phase when using --dec\n");
+                    fprintf(stderr, "needs --phase0 to resample phase when using --dec\n");
                     exit(1);
                 }
                 if (!lpc_model) {
-                    printf("needs --lpc [order] to resample amplitudes when using --dec\n");
+                    fprintf(stderr, "needs --lpc [order] to resample amplitudes when using --dec\n");
                     exit(1);
                 }
 
@@ -366,8 +366,8 @@ int main(int argc, char *argv[])
             break;
 
          case 'h':
-            print_help(long_options, num_opts, argv);
-            break;
+             print_help(long_options, num_opts, argv);
+             break;
 
          case 'o':
 	     if (strcmp(optarg, "-") == 0) fout = stdout;
