@@ -1,8 +1,6 @@
 # Codec 2 README
 
-Codec 2 is an open source (LGPL 2.1) low bit rate speech codec:
-
-http://rowetel.com/codec2.html
+Codec 2 is an open source (LGPL 2.1) low bit rate speech codec: http://rowetel.com/codec2.html
 
 Also included:
 
