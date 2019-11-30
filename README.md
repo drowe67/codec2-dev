@@ -8,10 +8,10 @@ Also included:
 
   + FreeDV API source code.  FreeDV is an open source digital voice
     protocol that integrates the modems, codecs, and FEC
-  + FDMDV DPSK modem [README_fdmdv](README_fdmdv.md) for HF channels
+  + FDMDV DPSK modem [README_fdmdv](README_fdmdv.txt) for HF channels
   + Coherent PSK [README_cohpsk](README_cohpsk.md) for HF channels
-  + Non-coherent FSK modem [README_fsk](README_fsk.md)
-  + Coherent OFDM modem for HF channels [README_ofdm](README_ofdm.md)
+  + Non-coherent FSK modem [README_fsk](README_fsk.txt)
+  + Coherent OFDM modem for HF channels [README_ofdm](README_ofdm.txt)
   + software for High Altitude Balloon image and telemetry reception
 
 ## Quickstart
