@@ -73,9 +73,6 @@ int main(int argc, char *argv[])
     int lsp = 0, lspd = 0, lspvq = 0;
     int lspres = 0;
     int lspjvm = 0, lspjnd = 0, lspmel = 0, lspmelvq = 0;
-    #ifdef __EXPERIMENTAL__
-    int lspanssi = 0,
-    #endif
     int prede = 0;
     int   postfilt;
     int   hand_voicing = 0, phaseexp = 0, ampexp = 0, hi = 0, simlpcpf = 0, lspmelread = 0;
@@ -130,9 +127,6 @@ int main(int argc, char *argv[])
         { "lspvq", no_argument, &lspvq, 1 },
         { "lspres", no_argument, &lspres, 1 },
         { "lspjvm", no_argument, &lspjvm, 1 },
-        #ifdef __EXPERIMENTAL__
-        { "lspanssi", no_argument, &lspanssi, 1 },
-        #endif
         { "phase0", no_argument, &phase0, 1 },
         { "phaseexp", required_argument, &phaseexp, 1 },
         { "ampexp", required_argument, &ampexp, 1 },
@@ -776,14 +770,6 @@ int main(int argc, char *argv[])
 		lsp_to_lpc(lsps_, ak, LPC_ORD);
 	    }
 
-#ifdef __EXPERIMENTAL__
-	    if (lspvq) {
-		lspvq_quantise(lsps, lsps_, LPC_ORD);
-		bw_expand_lsps(lsps_, LPC_ORD, 50.0, 100.0);
-		lsp_to_lpc(lsps_, ak, LPC_ORD);
-	    }
-#endif
-
 	    if (lspjvm) {
 		/* Jean-Marc's multi-stage, split VQ */
 		lspjvm_quantise(lsps, lsps_, LPC_ORD);
@@ -794,16 +780,6 @@ int main(int argc, char *argv[])
 		    lsp_to_lpc(lsps_bw, ak, LPC_ORD);
 		}
 	    }
-
-#ifdef __EXPERIMENTAL__
-	    if (lspanssi) {
-		/*  multi-stage VQ from Anssi Ramo OH3GDD */
-
-		lspanssi_quantise(lsps, lsps_, LPC_ORD, 5);
-		bw_expand_lsps(lsps_, LPC_ORD, 50.0, 100.0);
-		lsp_to_lpc(lsps_, ak, LPC_ORD);
-	    }
-#endif
 
 	    /* experimenting with non-linear LSP spacing to see if
 	       it's just noticable */
