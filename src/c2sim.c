@@ -71,14 +71,12 @@ int main(int argc, char *argv[])
 
     int lpc_model = 0, order = LPC_ORD;
     int lsp = 0, lspd = 0, lspvq = 0;
-    int lspres = 0;
-    int lspjvm = 0, lspjnd = 0, lspmel = 0, lspmelvq = 0;
+    int lspjvm = 0;
     int prede = 0;
     int   postfilt;
-    int   hand_voicing = 0, phaseexp = 0, ampexp = 0, hi = 0, simlpcpf = 0, lspmelread = 0;
+    int   hand_voicing = 0, phaseexp = 0, ampexp = 0, hi = 0, simlpcpf = 0;
     int   lpcpf = 0;
     FILE *fvoicing = 0;
-    FILE *flspmel = 0;
     int dec;
     int decimate = 1;
     int   amread, Woread, pahw;
@@ -118,14 +116,9 @@ int main(int argc, char *argv[])
         { "Fs", required_argument, &set_fs, 1 },
         { "mel", required_argument, &mel_resampling, 1 },
         { "lpc", required_argument, &lpc_model, 1 },
-        { "lspjnd", no_argument, &lspjnd, 1 },
-        { "lspmel", no_argument, &lspmel, 1 },
-        { "lspmelread", required_argument, &lspmelread, 1 },
-        { "lspmelvq", no_argument, &lspmelvq, 1 },
         { "lsp", no_argument, &lsp, 1 },
         { "lspd", no_argument, &lspd, 1 },
         { "lspvq", no_argument, &lspvq, 1 },
-        { "lspres", no_argument, &lspres, 1 },
         { "lspjvm", no_argument, &lspjvm, 1 },
         { "phase0", no_argument, &phase0, 1 },
         { "phaseexp", required_argument, &phaseexp, 1 },
@@ -219,12 +212,6 @@ int main(int argc, char *argv[])
             } else if(strcmp(long_options[option_index].name, "hand_voicing") == 0) {
 	        if ((fvoicing = fopen(optarg,"rt")) == NULL) {
 	            fprintf(stderr, "Error opening voicing file: %s: %s.\n",
-		        optarg, strerror(errno));
-                    exit(1);
-                }
-            } else if(strcmp(long_options[option_index].name, "lspmelread") == 0) {
-	        if ((flspmel = fopen(optarg,"rb")) == NULL) {
-	            fprintf(stderr, "Error opening float lspmel file: %s: %s.\n",
 		        optarg, strerror(errno));
                     exit(1);
                 }
@@ -447,7 +434,6 @@ int main(int argc, char *argv[])
     struct AEXP *aexp = NULL;
     #endif
     float bpf_buf[BPF_N+N_SAMP];
-    float lspmelvq_mse = 0.0;
 
     COMP Aw[FFT_ENC];
     COMP H[MAX_AMP];
@@ -781,89 +767,6 @@ int main(int argc, char *argv[])
 		}
 	    }
 
-	    /* experimenting with non-linear LSP spacing to see if
-	       it's just noticable */
-
-	    if (lspjnd) {
-		for(i=0; i<LPC_ORD; i++)
-		    lsps_[i] = lsps[i];
-		locate_lsps_jnd_steps(lsps_, LPC_ORD);
-		lsp_to_lpc(lsps_, ak, LPC_ORD);
-	    }
-
-	    /* Another experiment with non-linear LSP spacing, this
-	       time using a scaled version of mel frequency axis
-	       warping.  The scaling is such that the integer output
-	       can be directly sent over the channel.
-	    */
-
-	    if (lspmel) {
-		float f, f_;
-		float mel[order];
-		int   mel_indexes[order];
-
-		for(i=0; i<order; i++) {
-		    f = (4000.0/PI)*lsps[i];
-		    mel[i] = floor(2595.0*log10(1.0 + f/700.0) + 0.5);
-		}
-
-                #define MEL_ROUND 25
-		for(i=1; i<order; i++) {
-		    if (mel[i] <= mel[i-1]+MEL_ROUND) {
-			mel[i]+=MEL_ROUND/2;
-			mel[i-1]-=MEL_ROUND/2;
-                        i = 1;
-                    }
-		}
-
-                #ifdef DUMP
-                dump_mel(mel, order);
-                #endif
-
- 		encode_mels_scalar(mel_indexes, mel, 6);
-                #ifdef DUMP
-                dump_mel_indexes(mel_indexes, 6);
-                #endif
-		//decode_mels_scalar(mel, mel_indexes, 6);
-
-                /* read in VQed lsp-mels from octave/melvq.m */
-
-                if (lspmelread) {
-                    float mel_[order];
-                    int ret = fread(mel_, sizeof(float), order, flspmel);
-                    assert(ret == order);
-                    for(i=0; i<order; i++) {
-                        lspmelvq_mse += pow(mel[i] - mel_[i], 2.0);
-                        mel[i] = mel_[i];
-                    }
-                }
-
-                if (lspmelvq) {
-                    int indexes[3];
-                    //lspmelvq_mse += lspmelvq_quantise(mel, mel, order);
-                    lspmelvq_mse += lspmelvq_mbest_encode(indexes, mel, mel, order, 5);
-                }
-
-                /* ensure no unstable filters after quantisation */
-
-                #define MEL_ROUND 25
-		for(i=1; i<order; i++) {
-		    if (mel[i] <= mel[i-1]+MEL_ROUND) {
-			mel[i]+=MEL_ROUND/2;
-			mel[i-1]-=MEL_ROUND/2;
-                        i = 1;
-                    }
-		}
-
-		for(i=0; i<order; i++) {
-		    f_ = 700.0*( pow(10.0, mel[i]/2595.0) - 1.0);
-		    lsps_[i] = f_*(PI/4000.0);
-		}
-
-		lsp_to_lpc(lsps_, ak, order);
-
-	    }
-
 	    if (scalar_quant_Wo_e) {
 
 		e = decode_energy(encode_energy(e, E_BITS), E_BITS);
@@ -1015,16 +918,8 @@ int main(int argc, char *argv[])
 
     if (lpc_model) {
     	fprintf(stderr, "SNR av = %5.2f dB\n", sum_snr/frames);
-        if (lspmelvq || lspmelread)
-            fprintf(stderr, "lspmelvq std = %3.1f Hz\n", sqrt(lspmelvq_mse/frames));
     }
 
-    #if 0
-    if (phaseexp)
-	phase_experiment_destroy(pexp);
-    if (ampexp)
-	amp_experiment_destroy(aexp);
-    #endif
     #ifdef DUMP
     if (dump)
 	dump_off();
@@ -1035,7 +930,6 @@ int main(int argc, char *argv[])
 
     nlp_destroy(nlp_states);
 
-    if (flspmel != NULL) fclose(flspmel);
     if (fam     != NULL) fclose(fam);
     if (fWo     != NULL) fclose(fWo);
     if (faw     != NULL) fclose(faw);
