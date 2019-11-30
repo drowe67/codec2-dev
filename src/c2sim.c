@@ -72,7 +72,7 @@ int main(int argc, char *argv[])
     int lspjvm = 0;
     int prede = 0;
     int   postfilt;
-    int   hand_voicing = 0, hi = 0, simlpcpf = 0;
+    int   hand_voicing = 0, hi = 0, simlpcpf = 0, modelin=0, modelout=0;
     int   lpcpf = 0;
     FILE *fvoicing = 0;
     int dec;
@@ -94,6 +94,8 @@ int main(int argc, char *argv[])
     FILE *fjvm = NULL;
     FILE *flspEWov = NULL;
     FILE *ften_ms_centre = NULL;
+    FILE *fmodelout = NULL;
+    FILE *fmodelin = NULL;
     #ifdef DUMP
     int   dump;
     #endif
@@ -105,7 +107,6 @@ int main(int argc, char *argv[])
     int   lspEWov = 0;
     int   ten_ms_centre = 0;
     FILE  *fphasenn = NULL;
-    int   dumpphasenn = 0;
     
     char* opt_string = "ho:";
     struct option long_options[] = {
@@ -138,9 +139,10 @@ int main(int argc, char *argv[])
         { "Woread", required_argument, &Woread, 1 },
         { "pahw", required_argument, &pahw, 1 },
         { "lspEWov", required_argument, &lspEWov, 1 },
-        { "dumpphasenn", required_argument, &dumpphasenn, 1 },
         { "ten_ms_centre", required_argument, &ten_ms_centre, 1 },
         { "framelength_s", required_argument, NULL, 0 },
+        { "modelout",  required_argument, &modelout, 1 },
+        { "modelin",   required_argument, &modelin, 1 },
         #ifdef DUMP
         { "dump", required_argument, &dump, 1 },
         #endif
@@ -278,13 +280,6 @@ int main(int argc, char *argv[])
 		        optarg, strerror(errno));
                     exit(1);
                 }                 
-	    } else if(strcmp(long_options[option_index].name, "dumpphasenn") == 0) {
-                /* another feature file for phasenn  experiments */
-	        if ((fphasenn = fopen(optarg,"wb")) == NULL) {
-	            fprintf(stderr, "Error opening phasenn binary file: %s: %s\n",
-		        optarg, strerror(errno));
-                    exit(1);
-                }
 	    } else if(strcmp(long_options[option_index].name, "ten_ms_centre") == 0) {
                 /* dump 10ms of audio centred on analysis frame to check time alignment with 
                    16 kHz source audio */
@@ -294,7 +289,27 @@ int main(int argc, char *argv[])
 		        optarg, strerror(errno));
                     exit(1);
                 }                 
-	    } else if(strcmp(long_options[option_index].name, "rate") == 0) {
+	    } else if(strcmp(long_options[option_index].name, "modelout") == 0) {
+                /* write model records to file or stdout */
+                modelout = 1;
+                if (strcmp(optarg, "-") == 0) fmodelout = stdout;
+	        else if ((fmodelout = fopen(optarg,"wb")) == NULL) {
+	            fprintf(stderr, "Error opening modelout file: %s: %s\n",
+		        optarg, strerror(errno));
+                    exit(1);
+                }                 
+                fprintf(stderr, "each model record is %d bytes\n", (int)sizeof(MODEL));
+	    } else if(strcmp(long_options[option_index].name, "modelin") == 0) {
+                /* read model records from file or stdin */
+                modelin = 1;
+                if (strcmp(optarg, "-") == 0) fmodelin = stdin;
+	        else if ((fmodelin = fopen(optarg,"rb")) == NULL) {
+	            fprintf(stderr, "Error opening modelin file: %s: %s\n",
+		        optarg, strerror(errno));
+                    exit(1);
+                }                 
+                fprintf(stderr, "each model record is %d bytes\n", (int)sizeof(MODEL));
+            } else if(strcmp(long_options[option_index].name, "rate") == 0) {
                 if(strcmp(optarg,"3200") == 0) {
 	            lpc_model = 1;
 		    scalar_quant_Wo_e = 1;
@@ -456,14 +471,6 @@ int main(int argc, char *argv[])
     ex_phase[0] = 0;
     Woe_[0] = Woe_[1] = 1.0;
 
-    if (dumpphasenn)
-        fprintf(stderr, "nb_features: %d \n", (c2const.max_amp+1)*3);
-    /*
-      printf("lspd: %d lspdt: %d lspdt_mode: %d  phase0: %d postfilt: %d "
-	   "decimate: %d dt: %d\n",lspd,lspdt,lspdt_mode,phase0,postfilt,
-	   decimate,dt);
-    */
-
     /* Initialise ------------------------------------------------------------*/
 
     fft_fwd_cfg = codec2_fft_alloc(FFT_ENC, 0, NULL, NULL);   /* fwd FFT,used in several places   */
@@ -504,6 +511,7 @@ int main(int argc, char *argv[])
         //    fprintf(stderr, "%d %f\n", i, rate_K_sample_freqs_kHz[i]);
     }
 
+    
     /*----------------------------------------------------------------* \
 
                             Main Loop
@@ -565,33 +573,6 @@ int main(int argc, char *argv[])
 	two_stage_pitch_refinement(&c2const, &model, Sw);
 	estimate_amplitudes(&model, Sw, W, 1);
 
-        /* 
-           Machine learning features for phasenn experiments.
-        */
-        if (dumpphasenn) {
-            /* 0 ..... Fs/2 mapped to 0...max_amp */
-            float r = M_PI/c2const.max_amp;
-            float sparse_A[c2const.max_amp+1];   /* log amplitude, small dynamic range */
-            float sparse_cos[c2const.max_amp+1]; /* cos() of phase */
-            float sparse_sin[c2const.max_amp+1]; /* sin() of phase */
-            int   m,b;
-
-            for(b=0; b<=c2const.max_amp; b++) {
-                sparse_A[b] = 0.0;
-                sparse_cos[b] = 0.0;
-                sparse_sin[b] = 0.0;
-            }
-            for(m=1; m<=model.L; m++) {
-                b = (int)(m*model.Wo/r + 0.5);
-                assert(b <= c2const.max_amp);
-                sparse_A[b] = log10(model.A[m]);
-                sparse_cos[b] = cos(model.phi[m]);
-                sparse_sin[b] = sin(model.phi[m]);
-            }
-            fwrite(&sparse_A,   sizeof(float), c2const.max_amp+1, fphasenn);
-            fwrite(&sparse_cos, sizeof(float), c2const.max_amp+1, fphasenn);
-            fwrite(&sparse_sin, sizeof(float), c2const.max_amp+1, fphasenn);
-        }
         #ifdef DUMP
         dump_Sn(m_pitch, Sn); dump_Sw(Sw); dump_model(&model);
         #endif
@@ -735,7 +716,6 @@ int main(int argc, char *argv[])
 	    }
 
 	    if (scalar_quant_Wo_e) {
-
 		e = decode_energy(encode_energy(e, E_BITS), E_BITS);
                 model.Wo = decode_Wo(&c2const, encode_Wo(&c2const, model.Wo, WO_BITS), WO_BITS);
 		model.L  = PI/model.Wo; /* if we quantise Wo re-compute L */
@@ -749,9 +729,7 @@ int main(int argc, char *argv[])
 	    }
 
 	    if (vector_quant_Wo_e) {
-
 		/* JVM's experimental joint Wo & LPC energy quantiser */
-
 		quantise_WoE(&c2const, &model, &e, Woe_);
 	    }
 
@@ -854,12 +832,19 @@ int main(int argc, char *argv[])
                     }
                     phase_synth_zero_order(n_samp, &model_dec[i], ex_phase, H);
                 }
-
                 
                 if (postfilt)
                     postfilter(&model_dec[i], &bg_est);
+                if (modelin) {
+                    int nrec;
+                    nrec = fread(&model_dec[i],sizeof(MODEL),1,fmodelin);
+                    assert(nrec == 1);
+                }
                 synth_one_frame(n_samp, fftr_inv_cfg, buf, &model_dec[i], Sn_, Pn, prede, &de_mem, gain);
-                if (fout != NULL) fwrite(buf,sizeof(short),N_SAMP,fout);
+                if (fout != NULL)
+                    fwrite(buf,sizeof(short),N_SAMP,fout);
+                if (modelout)
+                    fwrite(&model_dec[i],sizeof(MODEL),1,fmodelout);
             }
 
             /* update memories for next frame ----------------------------*/
@@ -905,6 +890,7 @@ int main(int argc, char *argv[])
     if (flspEWov != NULL) fclose(flspEWov);
     if (fphasenn != NULL) fclose(fphasenn);
     if (ften_ms_centre != NULL) fclose(ften_ms_centre);
+    if (fmodelout != NULL) fclose(fmodelout);
     
     return 0;
 }
