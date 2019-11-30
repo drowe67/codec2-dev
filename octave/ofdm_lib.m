@@ -55,11 +55,11 @@ endfunction
 function [t_est timing_valid timing_mx av_level] = est_timing(states, rx, rate_fs_pilot_samples, step)
     ofdm_load_const;
     Npsam = length(rate_fs_pilot_samples);
-
-    Ncorr = length(rx) - (Nsamperframe+Npsam) + 1;
-    assert(Ncorr > 0);
+    
+    Ncorr = length(rx) - (Nsamperframe+Npsam);
     corr = zeros(1,Ncorr);
-
+    %printf("Npsam: %d M+Ncp: %d Ncorr: %d Nsamperframe: %d step: %d\n", Npsam,  M+Ncp, Ncorr, Nsamperframe, step);
+    
     % normalise correlation so we can compare to a threshold across varying input levels
 
     av_level = 2*sqrt(states.timing_norm*(rx*rx')/length(rx)) + 1E-12;
@@ -179,6 +179,8 @@ function [bps Rs Tcp Ns Nc] = ofdm_init_mode(mode="700D")
   % some "canned" modes
   if strcmp(mode,"700D")
     Ts = 0.018; Nc = 17;
+  elseif strcmp(mode,"2020")
+    Ts = 0.0205; Nc = 31;
   elseif strcmp(mode,"2200")
     Tframe = 0.175; Ts = Tframe/Ns; Nc = 37;
   else
@@ -436,7 +438,7 @@ function [timing_valid states] = ofdm_sync_search(states, rxbuf_in)
 
   % Attempt coarse timing estimate (i.e. detect start of frame) at a range of frequency offsets
 
-  st = M+Ncp + Nsamperframe + 1; en = st + 2*Nsamperframe;
+  st = M+Ncp + Nsamperframe + 1; en = st + 2*Nsamperframe +  M+Ncp - 1;
   timing_mx = 0; fcoarse = 0; timing_valid = 0; 
   for afcoarse=-40:40:40
     % vector of local oscillator samples to shift input vector
@@ -444,7 +446,7 @@ function [timing_valid states] = ofdm_sync_search(states, rxbuf_in)
 
     if afcoarse != 0
       w = 2*pi*afcoarse/Fs;
-      wvec = exp(-j*w*(0:2*Nsamperframe));
+      wvec = exp(-j*w*(0:2*Nsamperframe+M+Ncp-1));
 
       % choose best timing offset metric at this freq offset
       [act_est atiming_valid atiming_mx] = est_timing(states, wvec .* states.rxbuf(st:en), states.rate_fs_pilot_samples, 2);
@@ -467,7 +469,7 @@ function [timing_valid states] = ofdm_sync_search(states, rxbuf_in)
 
   if fcoarse != 0
     w = 2*pi*fcoarse/Fs;
-    wvec = exp(-j*w*(0:2*Nsamperframe));
+    wvec = exp(-j*w*(0:2*Nsamperframe+M+Ncp-1));
     foff_est = est_freq_offset_pilot_corr(states, wvec .* states.rxbuf(st:en), states.rate_fs_pilot_samples, ct_est);
     foff_est += fcoarse;
   else
@@ -541,6 +543,7 @@ function [rx_bits states aphase_est_pilot_log rx_np rx_amp] = ofdm_demod(states,
     en = st + Nsamperframe-1 + M+Ncp + ftwindow_width-1;
           
     [ft_est timing_valid timing_mx] = est_timing(states, rxbuf(st:en) .* exp(-j*woff_est*(st:en)), rate_fs_pilot_samples, 1);
+    % printf("  timing_est: %d ft_est: %d timing_valid: %d timing_mx: %d\n", timing_est, ft_est, timing_valid, timing_mx);
     
     if timing_valid
       timing_est = timing_est + ft_est - ceil(ftwindow_width/2);
@@ -879,7 +882,7 @@ function [tx_bits payload_data_bits codeword] = create_ldpc_test_frame(states, c
     init_cml('~/cml/'); % TODO: make this path sensible and portable
     load HRA_112_112.txt
     [code_param framesize rate] = ldpc_init_user(HRA_112_112, modulation, mod_order, mapping);
-    assert(Nbitsperframe == (code_param.code_bits_per_frame + Nuwbits + Ntxtbits));
+    assert(Nbitsperframe == (code_param.coded_bits_per_frame + Nuwbits + Ntxtbits));
 
     payload_data_bits = round(ofdm_rand(code_param.data_bits_per_frame)/32767);
     codeword = LdpcEncode(payload_data_bits, code_param.H_rows, code_param.P_matrix);
@@ -1068,7 +1071,7 @@ endfunction
 
 % Set up a bunch of constants to support modem frame construction from LDPC codewords and codec source bits
 
-function [code_param Nbitspercodecframe Ncodecframespermodemframe Nunprotect] = codec_to_frame_packing(states, mode)
+function [code_param Nbitspercodecframe Ncodecframespermodemframe] = codec_to_frame_packing(states, mode)
   ofdm_load_const;
   mod_order = 4; bps = 2; modulation = 'QPSK'; mapping = 'gray';
 
@@ -1076,32 +1079,35 @@ function [code_param Nbitspercodecframe Ncodecframespermodemframe Nunprotect] = 
   if strcmp(mode, "700D")
     load HRA_112_112.txt
     code_param = ldpc_init_user(HRA_112_112, modulation, mod_order, mapping);
-    assert(Nbitsperframe == (code_param.code_bits_per_frame + Nuwbits + Ntxtbits));
+    assert(Nbitsperframe == (code_param.coded_bits_per_frame + Nuwbits + Ntxtbits));
     % unused for this mode
-    Nbitspercodecframe = Ncodecframespermodemframe = Nunprotect = 0;
-  else
-    % mode == "2200", partial protection of codec frames
-    load HRA_112_56.txt
-    code_param = ldpc_init_user(HRA_112_56, modulation, mod_order, mapping);
-    printf("2200 mode\n");
-    printf("  Nbitsperframe: %d\n", Nbitsperframe);
-    printf("  total bits per LDPC codeword: %d\n", code_param.code_bits_per_frame);
-    printf("  data bits per LDPC codeword: %d\n", code_param.data_bits_per_frame);
-    printf("  LDPC frames: %d\n", 2);
-    printf("  total LDPC codeword bits: %d\n", 2*code_param.code_bits_per_frame);
-    Nbitspercodecframe = 56; Ncodecframespermodemframe = 7;
-    Nunprotect = Ncodecframespermodemframe*Nbitspercodecframe - 2*code_param.data_bits_per_frame;
-    printf("  unprotected codec bits: %d\n", Nunprotect);
+    Nbitspercodecframe = Ncodecframespermodemframe = 0;
+  end
+  if strcmp(mode, "2020")
+    load HRA_504_396.txt
+    code_param = ldpc_init_user(HRA_504_396, modulation, mod_order, mapping);
+    code_param.data_bits_per_frame = 312;
+    code_param.coded_bits_per_frame = code_param.data_bits_per_frame + code_param.ldpc_parity_bits_per_frame;
+    code_param.coded_syms_per_frame = code_param.coded_bits_per_frame/code_param.bits_per_symbol;
+    printf("2020 mode\n");
+    printf("ldpc_data_bits_per_frame = %d\n", code_param.ldpc_data_bits_per_frame);
+    printf("ldpc_coded_bits_per_frame  = %d\n", code_param.ldpc_coded_bits_per_frame);
+    printf("ldpc_parity_bits_per_frame  = %d\n", code_param.ldpc_parity_bits_per_frame);
+    printf("data_bits_per_frame = %d\n", code_param.data_bits_per_frame);
+    printf("coded_bits_per_frame  = %d\n", code_param.coded_bits_per_frame);
+    printf("coded_syms_per_frame  = %d\n", code_param.coded_syms_per_frame);
+    printf("ofdm_bits_per_frame  = %d\n", Nbitsperframe);
+    Nbitspercodecframe = 52; Ncodecframespermodemframe = 6;
     printf("  Nuwbits: %d  Ntxtbits: %d\n", Nuwbits, Ntxtbits);
-    totalbitsperframe = 2*code_param.code_bits_per_frame + Nunprotect + Nuwbits + Ntxtbits;
+    Nparity = code_param.ldpc_parity_bits_per_frame;
+    totalbitsperframe = code_param.data_bits_per_frame + Nparity + Nuwbits + Ntxtbits;
     printf("Total bits per frame: %d\n", totalbitsperframe);
     assert(totalbitsperframe == Nbitsperframe);
   end
 endfunction
 
 
-% Assemble a modem frame from input codec bits based on the current FreeDV "mode".  For 700D the modem
-% frame is one LDPC codeword, for "2200" it consists of two LDPC codewords and some unprotected bits.  Note
+% Assemble a modem frame from input codec bits based on the current FreeDV "mode".  Note
 % we don't insert UW and txt bits at this stage, that is handled as a second stage of modem frame
 % construction a little later.
 
@@ -1111,30 +1117,13 @@ function [frame_bits bits_per_frame] = assemble_frame(states, code_param, mode, 
 
   if strcmp(mode, "700D")
     frame_bits = LdpcEncode(codec_bits, code_param.H_rows, code_param.P_matrix);
-    bits_per_frame = length(frame_bits);
-  else
-
-    # extract first part of codec frames into data bits for LDPC encoding
-    
-    Nprotectedbitspercodecframe = 2*code_param.data_bits_per_frame/Ncodecframespermodemframe;
-    protected_bits = unprotected_bits = [];
-    for i=1:Ncodecframespermodemframe
-      a  = (i-1)*Nbitspercodecframe + 1;
-      b  = a + Nprotectedbitspercodecframe-1;
-      c = i*Nbitspercodecframe;
-      protected_bits = [protected_bits codec_bits(a:b)];
-      unprotected_bits = [unprotected_bits codec_bits(b+1:c)];
-    end
-    
-    # LDPC encode protected bits into two codewords
-
-    data_bits_per_frame = code_param.data_bits_per_frame;
-    codeword1 = LdpcEncode(protected_bits(1:data_bits_per_frame), code_param.H_rows, code_param.P_matrix);
-    codeword2 = LdpcEncode(protected_bits(data_bits_per_frame+1:2*data_bits_per_frame), code_param.H_rows, code_param.P_matrix);
-    
-    # add unprotected parts of codec frames
-
-    frame_bits = [codeword1 codeword2 unprotected_bits];
-    bits_per_frame = length(frame_bits);
   end
+  if strcmp(mode, "2020")
+    Nunused = code_param.ldpc_data_bits_per_frame - code_param.data_bits_per_frame;
+    frame_bits = LdpcEncode([codec_bits zeros(1,Nunused)], code_param.H_rows, code_param.P_matrix);
+    % remove unused datat bits
+    frame_bits = [ frame_bits(1:code_param.data_bits_per_frame) frame_bits(code_param.ldpc_data_bits_per_frame+1:end) ];
+  end
+  bits_per_frame = length(frame_bits);
+    
 endfunction

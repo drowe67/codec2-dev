@@ -28,10 +28,6 @@
   along with this program; if not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifdef __cplusplus
-  extern "C" {
-#endif
-
 #ifndef __FREEDV_API__
 #define __FREEDV_API__
 
@@ -41,9 +37,11 @@
 #include "comp.h"
 #include "codec2_ofdm.h"
 
+#ifdef __cplusplus
+  extern "C" {
+#endif
+
 #define FREEDV_MODE_1600        0
-#define FREEDV_MODE_700         1
-#define FREEDV_MODE_700B        2
 #define FREEDV_MODE_2400A       3
 #define FREEDV_MODE_2400B       4
 #define FREEDV_MODE_800XA       5
@@ -180,8 +178,11 @@ void freedv_set_carrier_ampl            (struct freedv *freedv, int c, float amp
 void freedv_set_sync                    (struct freedv *freedv, int sync_cmd);
 void freedv_set_verbose                 (struct freedv *freedv, int verbosity);
 void freedv_set_tx_bpf                  (struct freedv *freedv, int val);
+void freedv_set_dpsk                    (struct freedv *freedv, int val);
 void freedv_set_ext_vco                 (struct freedv *f, int val);
-
+void freedv_set_phase_est_bandwidth_mode(struct freedv *f, int val);
+void freedv_set_eq                      (struct freedv *f, int val);
+      
 // Get parameters -------------------------------------------------------------------------
 
 struct MODEM_STATS;
@@ -208,9 +209,8 @@ int freedv_get_sz_error_pattern     (struct freedv *freedv);
 int freedv_get_protocol_bits        (struct freedv *freedv);
 int freedv_get_speech_sample_rate   (struct freedv *freedv);
 
-
-#endif
-
 #ifdef __cplusplus
 }
 #endif
+
+#endif //__FREEDV_API__

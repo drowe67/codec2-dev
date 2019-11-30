@@ -37,11 +37,10 @@
 #ifndef __CODEC_2_TDMA_H
 #define __CODEC_2_TDMA_H
 
-#include "fsk.h"
 #include <stdint.h>
 #include <stdbool.h>
 #include "comp_prim.h"
-
+#include "fsk.h"
 
 #define TDMA_FRAME_A 3   /* 4800T Frame */
 

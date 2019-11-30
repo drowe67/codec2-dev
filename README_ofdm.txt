@@ -123,12 +123,13 @@ FreeDV 2020 extensions
    BER......: 0.0348 Tbits: 1044792 Terrs: 36345
    Coded BER: 0.0094 Tbits: 820908 Terrs:  7717
    
-14. 31 carrier waveform, (504,396) code, but only 312 data bits used, so
-    we don't send unused data bits.  This means we need less carriers
-    (so more power per carrier), and code rate is increased slightly
-    (sorta).  Anyhoo, it works about 1.7dB better:
+14. 20.5ms symbol period, 31 carrier waveform, (504,396) code, but only
+    312 data bits used, so we don't send unused data bits.  This means
+    we need less carriers (so more power per carrier), and code rate
+    is increased slightly (sorta).  Anyhoo, it works about 1.7dB
+    better:
 
-    build_linux/src$ nc=31; ./ofdm_mod --in /dev/zero --testframes 300 --nc $nc --ldpc 2 --verbose 1 -p 312 | ./cohpsk_ch - - -21.6 --Fs 8000 -f 10 --ssbfilt 1 | ./ofdm_demod --out /dev/null --testframes --nc $nc --verbose 1 --ldpc 2 -p 312
+    build_linux/src$ nc=31; ./ofdm_mod --in /dev/zero --testframes 300 --ts 0.0205 --nc $nc --ldpc 2 --verbose 1 -p 312 | ./cohpsk_ch - - -21.6 --Fs 8000 -f 10 --ssbfilt 1 | ./ofdm_demod --out /dev/null --testframes --ts 0.0205 --nc $nc --verbose 1 --ldpc 2 -p 312
 
     SNR3k(dB):  2.21 C/No: 37.0 PAPR:  9.6 
     BER......: 0.0505 Tbits: 874020 Terrs: 44148
@@ -182,7 +183,7 @@ Here are some useful tests for the LDPC coded C version of the modem, useful to 
 
 1/ AWGN channel, -2dB:
 
-./ofdm_mod --in /dev/zero --ldpc --testframes 60 --txbpf | ./cohpsk_ch - - -20 --Fs 8000 -f -10 | ./ofdm_demod --out /dev/null --testframes --verbose 1 --ldpc 1
+./ofdm_mod --in /dev/zero --ldpc 1 --testframes 60 --txbpf | ./cohpsk_ch - - -20 --Fs 8000 -f -10 | ./ofdm_demod --out /dev/null --testframes --verbose 1 --ldpc 1
 
 SVN Rev 3671:
   SNR3k(dB): -1.85 C/No: 32.9 PAPR:  9.8

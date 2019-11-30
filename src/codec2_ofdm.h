@@ -28,13 +28,8 @@
 #ifndef CODEC2_OFDM_H
 #define CODEC2_OFDM_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 /* Includes */
     
-#include <complex.h>
 #include <stdbool.h>
 #include <stdint.h>
   
@@ -43,16 +38,22 @@ extern "C" {
 
 /* Defines */
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define OFDM_AMP_SCALE (2E5*1.1491/1.06)   /* use to scale to 16 bit short */
 #define OFDM_CLIP (32767*0.35)             /* experimentally derived constant to reduce PAPR to about 8dB */
 
 #define UN_SYNC      0  /* Used with the ofdm_set_sync() */
 #define AUTO_SYNC    1
 #define MANUAL_SYNC  2
-    
-#define AUTO_PHASE_EST 0
-#define LOW_PHASE_EST  1
-#define HIGH_PHASE_EST 2
+
+#define AUTO_PHASE_EST   0 
+#define LOCKED_PHASE_EST 1
+
+#define LOW_BW       0
+#define HIGH_BW      1
 
 struct OFDM_CONFIG;
 struct OFDM;
@@ -79,6 +80,7 @@ int ofdm_get_samples_per_frame(void);
 int ofdm_get_max_samples_per_frame(void);
 int ofdm_get_bits_per_frame(void);
 void ofdm_get_demod_stats(struct OFDM *ofdm, struct MODEM_STATS *stats);
+int ofdm_get_phase_est_bandwidth_mode(struct OFDM *ofdm);
 
 /* option setters */
 
@@ -86,10 +88,12 @@ void ofdm_set_verbose(struct OFDM *, int);
 void ofdm_set_timing_enable(struct OFDM *, bool);
 void ofdm_set_foff_est_enable(struct OFDM *, bool);
 void ofdm_set_phase_est_enable(struct OFDM *, bool);
+void ofdm_set_phase_est_bandwidth_mode(struct OFDM *ofdm, int val);
 void ofdm_set_off_est_hz(struct OFDM *, float);
 void ofdm_set_sync(struct OFDM *, int);
 void ofdm_set_tx_bpf(struct OFDM *, bool);
-
+void ofdm_set_dpsk(struct OFDM *ofdm, bool val);
+    
 void ofdm_print_info(struct OFDM *);
 
 #ifdef __cplusplus

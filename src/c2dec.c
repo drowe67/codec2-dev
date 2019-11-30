@@ -112,7 +112,7 @@ int main(int argc, char *argv[])
     char *ext = strrchr(argv[2], '.');
     if ((ext != NULL) && (strcmp(ext, ".c2") == 0)) {
         int nread = fread(&in_hdr,sizeof(in_hdr),1,fin);
-        assert (nread == sizeof(in_hdr));
+        assert (nread == 1);
         
         if (memcmp(in_hdr.magic, c2_file_magic, sizeof(c2_file_magic)) == 0) {
             fprintf(stderr, "Detected Codec2 file version %d.%d in mode %d\n",
@@ -141,10 +141,6 @@ int main(int argc, char *argv[])
         mode = CODEC2_MODE_1300;
         else if (strcmp(argv[1],"1200") == 0)
         mode = CODEC2_MODE_1200;
-        else if (strcmp(argv[1],"700") == 0)
-        mode = CODEC2_MODE_700;
-        else if (strcmp(argv[1],"700B") == 0)
-        mode = CODEC2_MODE_700B; 
         else if (strcmp(argv[1],"700C") == 0)
         mode = CODEC2_MODE_700C;
         else if (strcmp(argv[1],"450") == 0)
@@ -152,7 +148,7 @@ int main(int argc, char *argv[])
         else if (strcmp(argv[1],"450PWB") == 0)
         mode = CODEC2_MODE_450PWB;
         else {
-        fprintf(stderr, "Error in mode: %s.  Must be 3200, 2400, 1600, 1400, 1300, 1200, 700, 700B, 700C, 450, or 450PWB\n", argv[1]);
+        fprintf(stderr, "Error in mode: %s.  Must be 3200, 2400, 1600, 1400, 1300, 1200, 700C, 450, or 450PWB\n", argv[1]);
         exit(1);
         }
         bit_rate = atoi(argv[1]);

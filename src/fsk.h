@@ -28,6 +28,7 @@
 
 #ifndef __C2FSK_H
 #define __C2FSK_H
+
 #include <stdint.h>
 #include "comp.h"
 #include "kiss_fftr.h"

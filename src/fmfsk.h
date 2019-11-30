@@ -28,6 +28,7 @@
 
 #ifndef __C2FMFSK_H
 #define __C2FMFSK_H
+
 #include <stdint.h>
 #include "comp.h"
 #include "modem_stats.h"

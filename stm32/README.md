@@ -2,7 +2,7 @@
 
 ## Quickstart
 
-1. Build codec2 for your host system, see codec2/README.md and codec2/INSTALL
+1. Build codec2 for your host system, see [codec2/README.md](../README.md)
 
 2. Install a gcc arm toolchain:
    ```

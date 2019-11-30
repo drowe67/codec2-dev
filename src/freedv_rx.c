@@ -90,12 +90,12 @@ int main(int argc, char *argv[]) {
     struct freedv             *freedv;
     int                        nin, nout, frame = 0;
     struct my_callback_state   my_cb_state;
-    struct MODEM_STATS         stats;
+    struct MODEM_STATS         stats = {0};
     int                        mode;
     int                        sync;
     float                      snr_est;
     float                      clock_offset;
-    int                        use_codecrx, use_testframes, interleave_frames, verbose, discard, use_complex;
+    int                        use_codecrx, use_testframes, interleave_frames, verbose, discard, use_complex, use_dpsk;
     struct CODEC2             *c2 = NULL;
     int                        i;
 
@@ -105,8 +105,8 @@ int main(int argc, char *argv[]) {
         #ifdef __LPCNET__
         sprintf(f2020,"|2020");
         #endif     
-	printf("usage: %s 1600|700|700B|700C|700D|2400A|2400B|800XA%s InputModemSpeechFile OutputSpeechRawFile\n"
-               " [--testframes] [--interleaver depth] [--codecrx] [-v] [--discard] [--usecomplex]\n", argv[0],f2020);
+	printf("usage: %s 1600|700C|700D|2400A|2400B|800XA%s InputModemSpeechFile OutputSpeechRawFile\n"
+               " [--testframes] [--interleaver depth] [--codecrx] [-v] [--discard] [--usecomplex] [--dpsk]\n", argv[0],f2020);
 	printf("e.g    %s 1600 hts1a_fdmdv.raw hts1a_out.raw\n", argv[0]);
 	exit(1);
     }
@@ -114,10 +114,6 @@ int main(int argc, char *argv[]) {
     mode = -1;
     if (!strcmp(argv[1],"1600"))
         mode = FREEDV_MODE_1600;
-    if (!strcmp(argv[1],"700"))
-        mode = FREEDV_MODE_700;
-    if (!strcmp(argv[1],"700B"))
-        mode = FREEDV_MODE_700B;
     if (!strcmp(argv[1],"700C"))
         mode = FREEDV_MODE_700C;
     if (!strcmp(argv[1],"700D"))
@@ -148,7 +144,7 @@ int main(int argc, char *argv[]) {
 	exit(1);
     }
 
-    use_codecrx = 0; use_testframes = 0; interleave_frames = 1; verbose = 0; discard = 0; use_complex = 0;
+    use_codecrx = 0; use_testframes = 0; interleave_frames = 1; verbose = 0; discard = 0; use_complex = 0; use_dpsk = 0;
 
     if (argc > 4) {
         for (i = 4; i < argc; i++) {
@@ -158,11 +154,7 @@ int main(int argc, char *argv[]) {
             if (strcmp(argv[i], "--codecrx") == 0) {
                 int c2_mode;
 
-                if (mode == FREEDV_MODE_700)  {
-		    c2_mode = CODEC2_MODE_700;
-		} else if ((mode == FREEDV_MODE_700B)|| (mode == FREEDV_MODE_800XA)) {
-                    c2_mode = CODEC2_MODE_700B;
-                } else if ((mode == FREEDV_MODE_700C)|| (mode == FREEDV_MODE_700D)) {
+                if ((mode == FREEDV_MODE_700C) || (mode == FREEDV_MODE_700D) || (mode == FREEDV_MODE_800XA)) {
                     c2_mode = CODEC2_MODE_700C;
                 } else {
                     c2_mode = CODEC2_MODE_1300;
@@ -189,6 +181,9 @@ int main(int argc, char *argv[]) {
                 fprintf(stderr, "using complex!\n");
                 use_complex = 1;
             }
+            if (strcmp(argv[i], "--dpsk") == 0) {
+                use_dpsk = 1;
+            }
         }
     }
 
@@ -207,6 +202,7 @@ int main(int argc, char *argv[]) {
 
     freedv_set_snr_squelch_thresh(freedv, -100.0);
     freedv_set_squelch_en(freedv, 0);
+    freedv_set_dpsk(freedv, use_dpsk);
 
     short speech_out[freedv_get_n_speech_samples(freedv)];
     short demod_in[freedv_get_n_max_modem_samples(freedv)];
@@ -304,7 +300,7 @@ int main(int argc, char *argv[]) {
         float uncoded_ber = (float)Terrs/Tbits;
         fprintf(stderr, "BER......: %5.4f Tbits: %5d Terrs: %5d\n", 
 		(double)uncoded_ber, Tbits, Terrs);
-        if (mode == FREEDV_MODE_700D) {
+        if ((mode == FREEDV_MODE_700D) || (mode == FREEDV_MODE_2020)) {
             int Tbits_coded = freedv_get_total_bits_coded(freedv);
             int Terrs_coded = freedv_get_total_bit_errors_coded(freedv);
             float coded_ber = (float)Terrs_coded/Tbits_coded;

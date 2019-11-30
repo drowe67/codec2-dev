@@ -60,6 +60,7 @@
 /*  
   Use Octave to generate the fading channel models:
 
+     octave:26> cohpsk_ch_fading("../raw/faster_fading_samples.float", 8000, 2.0, 8000*60)
      octave:26> cohpsk_ch_fading("../raw/fast_fading_samples.float", 8000, 1.0, 8000*60)
      octave:27> cohpsk_ch_fading("../raw/slow_fading_samples.float", 8000, 0.1, 8000*60)
 
@@ -68,8 +69,9 @@
 */
 
 #define DEFAULT_RAW_DIR "../../raw"
-#define FAST_FADING_FILE_NAME "fast_fading_samples.float"
-#define SLOW_FADING_FILE_NAME "slow_fading_samples.float"
+#define SLOW_FADING_FILE_NAME   "slow_fading_samples.float"
+#define FAST_FADING_FILE_NAME   "fast_fading_samples.float"
+#define FASTER_FADING_FILE_NAME "faster_fading_samples.float"
 
 int opt_exists(char *argv[], int argc, char opt[]) {
     int i;
@@ -85,7 +87,6 @@ int main(int argc, char *argv[])
 {
     FILE          *fin, *ffading, *fout;
     char	   *raw_dir;
-    char	   *fname;
     float          NodB, foff_hz;
     int            fading_en, nhfdelay;
 
@@ -133,11 +134,14 @@ int main(int argc, char *argv[])
             foff_hz = atoi(argv[arg+1]);
         }
         fading_en = 0;
-        if (opt_exists(argv, argc, "--fast")) {
+        if (opt_exists(argv, argc, "--slow")) {
             fading_en = 1;
         }
-        if (opt_exists(argv, argc, "--slow")) {
+        if (opt_exists(argv, argc, "--fast")) {
             fading_en = 2;
+        }
+        if (opt_exists(argv, argc, "--faster")) {
+            fading_en = 3;
         }
         inclip = 1.0;
         if ((arg = opt_exists(argv, argc, "--clip"))) {
@@ -155,7 +159,7 @@ int main(int argc, char *argv[])
     }
     else {
         fprintf(stderr, "usage: %s InputRealModemRawFile OutputRealModemRawFile No(dB/Hz) [--Fs SampleRateHz]"
-                        " [-f FoffHz] [--slow] [--fast] [--clip 0to1] [--ssbfilt 0|1] [--raw_dir Path]\n", argv[0]);
+                        " [-f FoffHz] [--slow] [--fast] [--faster] [--clip 0to1] [--ssbfilt 0|1] [--raw_dir Path]\n", argv[0]);
         exit(1);
     }
     fprintf(stderr, "cohpsk_ch ----------------------------------------------------------------------------------\n");
@@ -181,31 +185,34 @@ int main(int argc, char *argv[])
     ffading = NULL;
     nhfdelay = 0;
     if (fading_en) {
+        char fname[256];
+        
         if (fading_en == 1) {
-	    fname = MALLOC(strlen(raw_dir) + 1 + strlen(FAST_FADING_FILE_NAME));
-	    sprintf(fname, "%s/%s", raw_dir, FAST_FADING_FILE_NAME);
+	    sprintf(fname, "%s/%s", raw_dir, SLOW_FADING_FILE_NAME);
             ffading = fopen(fname, "rb");
             if (ffading == NULL) {
+            cant_load_fading_file:
                 fprintf(stderr, "-----------------------------------------------------\n");
-                fprintf(stderr, "cohpsk_ch ERROR: Can't find fast fading file: %s\n", fname);
+                fprintf(stderr, "cohpsk_ch ERROR: Can't find fading file: %s\n", fname);
                 fprintf(stderr, "->See cohpsk_ch.c source for instructions on how to generate this file.\n");
                 fprintf(stderr, "-----------------------------------------------------\n");
                 exit(1);
             }
-	    FREE(fname);
-            nhfdelay = floor(FAST_FADING_DELAY_MS*Fs/1000);
+            nhfdelay = floor(SLOW_FADING_DELAY_MS*Fs/1000);
         }
 
         if (fading_en == 2) {
-	    fname = MALLOC(strlen(raw_dir) + 1 + strlen(SLOW_FADING_FILE_NAME));
-	    sprintf(fname, "%s/%s", raw_dir, SLOW_FADING_FILE_NAME);
+	    sprintf(fname, "%s/%s", raw_dir, FAST_FADING_FILE_NAME);
             ffading = fopen(fname, "rb");
-            if (ffading == NULL) {
-                fprintf(stderr, "Can't find slow fading file: %s\n", fname);
-                exit(1);
-            }
-	    FREE(fname);
-            nhfdelay = floor(SLOW_FADING_DELAY_MS*Fs/1000);
+            if (ffading == NULL) goto cant_load_fading_file;
+            nhfdelay = floor(FAST_FADING_DELAY_MS*Fs/1000);
+        }
+
+        if (fading_en == 3) {
+	    sprintf(fname, "%s/%s", raw_dir, FASTER_FADING_FILE_NAME);
+            ffading = fopen(fname, "rb");
+            if (ffading == NULL) goto cant_load_fading_file;
+            nhfdelay = floor(FAST_FADING_DELAY_MS*Fs/1000);
         }
 
         ch_fdm_delay = (COMP*)MALLOC((nhfdelay+COHPSK_NOM_SAMPLES_PER_FRAME)*sizeof(COMP));

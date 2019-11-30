@@ -16,20 +16,24 @@ Also included:
 
 ## Quickstart
 
-Also see INSTALL for more general building and installing instructions. 
+Also see [INSTALL](INSTALL) for more general building and installing instructions. 
 
-1/ Listen to Codec 2:
+1/ Build Codec 2:
 ```
 $ cd codec2
 $ mkdir build_linux
 $ cd build_linux
 $ cmake ..
 $ make
+```
+
+2/ Listen to Codec 2:
+```
 $ ./src/c2demo ../raw/hts1a.raw hts1a_c2.raw
 $ play -t raw -r 8000 -e signed-integer -b 16 ../raw/hts1a.raw
 $ play -t raw -r 8000 -e signed-integer -b 16 ./hts1a_c2.raw
 ```
-2/ Compress, decompress and then play a file:
+3/ Compress, decompress and then play a file:
 
    using 2400 bps bit rate encoding
 ```
@@ -49,9 +53,17 @@ $ ./src/c2dec 700C hts1a_c2.bit hts1a_c2_700.raw
 ```
 $ play -t raw -r 8000 -e signed-integer -b 16 ./hts1a_c2_700.raw
 ```
-3/ Same thing with pipes:
+4/ If you prefer a one-liner without saving to files:
 ```
-$ ./src/c2enc 1300 ../raw/hts1a.raw - | ./src/c2dec 1300 - - | play -t raw -r 8000 -s -2 -
+$ ./src/c2enc 1300 ../raw/hts1a.raw - | ./src/c2dec 1300 - - | play -t raw -r 8000 -b 16 -e signed-integer -
+```
+   Same at 450 bit/s:
+```
+$ ./src/c2enc 450 ../raw/ve9qrp.raw - | ./src/c2dec 450 - - | play -t raw -r 8000 -e signed-integer -b 16 -
+```
+   Please note that 450PWB (pseudo-wideband) can be chosen for decoding, providing a bandwidth extension to 8kHz/16ksps from a 4kHz/8ksps encoded 450bit/s file:
+```
+$ ./src/c2enc 450 ../raw/ve9qrp.raw - | ./src/c2dec 450PWB - - | play -t raw -r 16000 -e signed-integer -b 16 -
 ```
 ## Programs
 
@@ -118,13 +130,13 @@ NOTE: Instructions assume you are creating a build_linux directory from within
 
 Reference: Plugging together lpcnet_enc -> ofdm_mod -> ofdm_demod -> lpcnet_dec:
 ```
-$ cat ~/LPCNet/wav/wia.wav | ~/LPCNet/build_linux/src/lpcnet_enc -s | ./ofdm_mod --nc 31 --ldpc 2 --verbose 1 -p 312 | ./ofdm_demod --nc 31 --verbose 1 --ldpc 2 -p 312 | ~/LPCNet/build_linux/src/lpcnet_dec -s | aplay -f S16_LE -r 16000
+$ cat ~/LPCNet/wav/wia.wav | ~/LPCNet/build_linux/src/lpcnet_enc -s | ./ofdm_mod --ts 0.0205 --nc 31 --ldpc 2 --verbose 1 -p 312 | ./ofdm_demod --ts 0.0205 --nc 31 --verbose 1 --ldpc 2 -p 312 | ~/LPCNet/build_linux/src/lpcnet_dec -s | aplay -f S16_LE -r 16000
 ```
 We are trying to integrate all of the above into FreeDV API.
 
 Listen the reference tx:
 ```
-$ cat ~/LPCNet/wav/wia.wav | ~/LPCNet/build_linux/src/lpcnet_enc -s | ./ofdm_mod --nc 31 --ldpc 2 --verbose 1 -p 312 | aplay -f S16_LE
+$ cat ~/LPCNet/wav/wia.wav | ~/LPCNet/build_linux/src/lpcnet_enc -s | ./ofdm_mod --ts 0.0205 --nc 31 --ldpc 2 --verbose 1 -p 312 | aplay -f S16_LE
 ```
 
 Listen the freedv_tx:
@@ -134,13 +146,13 @@ $ ./freedv_tx 2020 ~/LPCNet/wav/wia.wav - | aplay -f S16_LE
 
 FreeDV API tx, with reference rx from above:
 ```
-$ ./freedv_tx 2020 ~/LPCNet/wav/wia.wav - | ./ofdm_demod --nc 31 --verbose 1 --ldpc 2 -p 312 | ~/LPCNet/build_linux/src/lpcnet_dec -s | aplay -f S16_LE -r 16000
+$ ./freedv_tx 2020 ~/LPCNet/wav/wia.wav - | ./ofdm_demod --ts 0.0205 --nc 31 --verbose 1 --ldpc 2 -p 312 | ~/LPCNet/build_linux/src/lpcnet_dec -s | aplay -f S16_LE -r 16000
 ```
 
 FreeDV API tx and rx:
 ```
-$ ./freedv_tx 2020 ~/Downloads/wianews-2019-01-20.s16 - | ./freedv_rx 2020 - - | aplay -f S16_LE -r 16000
-$ ./freedv_tx 2020 ~/Downloads/wianews-2019-01-20.s16 - --testframes | ./freedv_rx 2020 - /dev/null --testframes -vv
+$ ./freedv_tx 2020 ~/LPCNet/wav/all.wav - | ./freedv_rx 2020 - - | aplay -f S16_LE -r 16000
+$ ./freedv_tx 2020 ~/LPCNet/wav/all.wav - --testframes | ./freedv_rx 2020 - /dev/null --testframes -vv
 ```
 
 Simulated HF slow fading channel, 10.8dB SNR:

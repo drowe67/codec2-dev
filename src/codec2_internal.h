@@ -42,7 +42,7 @@ struct CODEC2 {
     codec2_fft_cfg  fft_fwd_cfg;           /* forward FFT config                        */
     codec2_fftr_cfg fftr_fwd_cfg;          /* forward real FFT config                   */
     float        *w;	                   /* [m_pitch] time domain hamming window      */
-    COMP          W[FFT_ENC];	           /* DFT of w[]                                */
+    float         W[FFT_ENC];	           /* DFT of w[]                                */
     float        *Pn;	                   /* [2*n_samp] trapezoidal synthesis window   */
     float        *bpf_buf;                 /* buffer for band pass filter               */
     float        *Sn;                      /* [m_pitch] input speech                    */

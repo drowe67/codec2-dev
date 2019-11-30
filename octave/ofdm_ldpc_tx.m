@@ -49,7 +49,7 @@ function ofdm_ldpc_tx(filename, mode="700D", interleave_frames = 1, Nsec, EbNodB
 
   % some constants used for assembling modem frames
   
-  [code_param Nbitspercodecframe Ncodecframespermodemframe Nunprotect] = codec_to_frame_packing(states, mode);
+  [code_param Nbitspercodecframe Ncodecframespermodemframe] = codec_to_frame_packing(states, mode);
 
   % Generate fixed test frame of tx bits and run OFDM modulator
 

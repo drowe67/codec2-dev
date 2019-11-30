@@ -69,7 +69,7 @@ if cml_support
 
   load HRA_112_112.txt
   [code_param framesize rate] = ldpc_init_user(HRA_112_112, modulation, mod_order, mapping);
-  assert(Nbitsperframe == (code_param.code_bits_per_frame + states.Nuwbits + states.Ntxtbits));
+  assert(Nbitsperframe == (code_param.coded_bits_per_frame + states.Nuwbits + states.Ntxtbits));
 end
 
 tx_bits = zeros(1,Nbitsperframe);
@@ -170,7 +170,7 @@ for f=1:Nframes
     symbol_likelihood = Demod2D(arx_np(Nuwtxtsymbolsperframe+1:end)/mean_amp, S_matrix, EsNo, arx_amp(Nuwtxtsymbolsperframe+1:end)/mean_amp);
     bit_likelihood = Somap(symbol_likelihood);
 
-    [x_hat paritychecks] = MpDecode(-bit_likelihood(1:code_param.code_bits_per_frame), code_param.H_rows, code_param.H_cols, max_iterations, decoder_type, 1, 1);
+    [x_hat paritychecks] = MpDecode(-bit_likelihood(1:code_param.coded_bits_per_frame), code_param.H_rows, code_param.H_cols, max_iterations, decoder_type, 1, 1);
     [mx mx_ind] = max(paritychecks);
     detected_data = x_hat(mx_ind,:);
     

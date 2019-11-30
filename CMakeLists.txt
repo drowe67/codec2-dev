@@ -5,6 +5,8 @@
 # Please report questions, comments, problems, or patches to the freetel
 # mailing list: https://lists.sourceforge.net/lists/listinfo/freetel-codec2
 #
+set(CMAKE_OSX_DEPLOYMENT_TARGET "10.9" CACHE STRING "Minimum OS X deployment version")
+
 project(codec2 C)
 
 cmake_minimum_required(VERSION 3.0)
@@ -45,7 +47,7 @@ set(CODEC2_VERSION_MAJOR 0)
 set(CODEC2_VERSION_MINOR 9)
 # Set to patch level if needed, otherwise leave FALSE.
 # Must be positive (non-zero) if set, since 0 == FALSE in CMake.
-set(CODEC2_VERSION_PATCH FALSE)
+set(CODEC2_VERSION_PATCH 2)
 set(CODEC2_VERSION "${CODEC2_VERSION_MAJOR}.${CODEC2_VERSION_MINOR}")
 # Patch level version bumps should not change API/ABI.
 set(SOVERSION "${CODEC2_VERSION_MAJOR}.${CODEC2_VERSION_MINOR}")
@@ -159,16 +161,20 @@ if (_GNU_SOURCE)
     add_definitions(-D_GNU_SOURCE=1)
 endif()
 
-check_symbol_exists(floor  math.h HAVE_FLOOR)
-check_symbol_exists(ceil   math.h HAVE_CEIL)
-check_symbol_exists(pow    math.h HAVE_POW)
-check_symbol_exists(sqrt   math.h HAVE_SQRT)
-check_symbol_exists(sin    math.h HAVE_SIN)
-check_symbol_exists(cos    math.h HAVE_COS)
-check_symbol_exists(atan2  math.h HAVE_ATAN2)
-check_symbol_exists(log10  math.h HAVE_LOG10)
-check_symbol_exists(round  math.h HAVE_ROUND)
-check_symbol_exists(getopt math.h HAVE_GETOPT)
+if(UNIX)
+    set(CMAKE_REQUIRED_LIBRARIES m)
+endif()
+
+check_symbol_exists(floor  math.h   HAVE_FLOOR)
+check_symbol_exists(ceil   math.h   HAVE_CEIL)
+check_symbol_exists(pow    math.h   HAVE_POW)
+check_symbol_exists(sqrt   math.h   HAVE_SQRT)
+check_symbol_exists(sin    math.h   HAVE_SIN)
+check_symbol_exists(cos    math.h   HAVE_COS)
+check_symbol_exists(atan2  math.h   HAVE_ATAN2)
+check_symbol_exists(log10  math.h   HAVE_LOG10)
+check_symbol_exists(round  math.h   HAVE_ROUND)
+check_symbol_exists(getopt getopt.h HAVE_GETOPT)
 
 configure_file ("${PROJECT_SOURCE_DIR}/cmake/config.h.in"
                 "${PROJECT_BINARY_DIR}/config.h" )
@@ -192,21 +198,22 @@ include_directories(${PROJECT_BINARY_DIR})
 #
 if(LPCNET)
     if(LPCNET_BUILD_DIR)
-        find_package(lpcnet REQUIRED
+        find_package(lpcnetfreedv REQUIRED
             PATHS ${LPCNET_BUILD_DIR}
             NO_DEFAULT_PATH
             CONFIGS lpcnetfreedv.cmake
         )
-        if(lpcnet_FOUND)
+        if(lpcnetfreedv_FOUND)
             message(STATUS "liblpcnetfreedv found in build tree.")
             add_definitions("-D__LPCNET__")
         else()
             message(FATAL_ERROR "LPCNet include/library not found in build tree.")
         endif()
     else()
-        find_package(lpcnet REQUIRED)
-        if(lpcnet_FOUND)
+        find_package(lpcnetfreedv REQUIRED)
+        if(lpcnetfreedv_FOUND)
             add_definitions("-D__LPCNET__")
+            message(STATUS "liblpcnetfreedv found.")
         else()
             message(FATAL_ERROR "lpcnetfreedv library not found.")
         endif()
@@ -345,8 +352,25 @@ if(UNITTEST)
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/unittest
              )
            
-    add_test(NAME test_OFDM_modem_time_sync
-             COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/unittest/ofdm_time_sync.sh
+    add_test(NAME test_OFDM_modem_phase_est_bw
+             COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/unittest/ofdm_phase_est_bw.sh
+             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/unittest
+             )
+           
+    add_test(NAME test_OFDM_modem_time_sync_700D
+             COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/unittest/ofdm_time_sync.sh 700D
+             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/unittest
+             )
+           
+if(LPCNET)
+    add_test(NAME test_OFDM_modem_time_sync_2020
+             COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/unittest/ofdm_time_sync.sh 2020
+             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/unittest
+             )
+endif()
+
+    add_test(NAME test_OFDM_modem_fading_DPSK_BER
+             COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/unittest/ofdm_fade_dpsk.sh
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/unittest
              )
            
@@ -393,10 +417,21 @@ if(UNITTEST)
     add_test(NAME test_FreeDV_API_700D_AWGN_BER_Interleave
              COMMAND sh -c "dd bs=2560 count=120 if=/dev/zero | $<TARGET_FILE:freedv_tx> 700D - - --interleave 8 --testframes | $<TARGET_FILE:cohpsk_ch> - - -20 --Fs 8000 -f -10 | $<TARGET_FILE:freedv_rx> 700D - /dev/null --interleave 8 --testframes"
              )
+if(LPCNET)
 
-    add_test(NAME test_fifo
+    add_test(NAME test_FreeDV_API_2020_to_ofdm_demod
+             COMMAND sh -c "$<TARGET_FILE:freedv_tx> 2020 ~/LPCNet/wav/all.wav - --testframes | $<TARGET_FILE:ofdm_demod> --ts 0.0205 --nc 31 --verbose 1 --ldpc 2 -p 312 --testframes > /dev/null"
+             )
+
+    add_test(NAME test_ofdm_mod_to_FreeDV_API_2020
+             COMMAND sh -c "$<TARGET_FILE:ofdm_mod> --in /dev/zero --ts 0.0205 --nc 31 --verbose 1 --ldpc 2 -p 312 --testframes 10 | $<TARGET_FILE:freedv_rx> 2020 - /dev/null --testframes"
+             )
+endif()
+           
+     add_test(NAME test_fifo
              COMMAND $<TARGET_FILE:tfifo>
              )
+
      add_test(NAME test_FreeDV_1600_tx_memory_leak
              COMMAND sh -c " valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./freedv_tx 1600 ../../raw/hts1a.raw /dev/null"
              WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/src
@@ -422,5 +457,11 @@ if(UNITTEST)
              WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/src
              )
              set_tests_properties(test_FreeDV_700D_rx_memory_leak PROPERTIES PASS_REGULAR_EXPRESSION "ERROR SUMMARY: 0 errors")
+
+     add_test(NAME test_dot_c2_mode
+             COMMAND sh -c "./c2enc 700C ../../raw/hts1a.raw hts1a.c2 && ./c2dec 1600 hts1a.c2 /dev/null"
+             WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/src
+             )
+             set_tests_properties(test_dot_c2_mode PROPERTIES PASS_REGULAR_EXPRESSION "mode 8")
 
 endif(UNITTEST)
