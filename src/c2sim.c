@@ -46,8 +46,6 @@
 #include "phase.h"
 #include "postfilter.h"
 #include "interp.h"
-#include "ampexp.h"
-#include "phaseexp.h"
 #include "bpf.h"
 #include "bpfb.h"
 #include "newamp1.h"
@@ -74,7 +72,7 @@ int main(int argc, char *argv[])
     int lspjvm = 0;
     int prede = 0;
     int   postfilt;
-    int   hand_voicing = 0, phaseexp = 0, ampexp = 0, hi = 0, simlpcpf = 0;
+    int   hand_voicing = 0, hi = 0, simlpcpf = 0;
     int   lpcpf = 0;
     FILE *fvoicing = 0;
     int dec;
@@ -99,8 +97,6 @@ int main(int argc, char *argv[])
     #ifdef DUMP
     int   dump;
     #endif
-    char  ampexp_arg[MAX_STR];
-    char  phaseexp_arg[MAX_STR];
     char  out_file[MAX_STR];
     FILE *fout = NULL;	/* output speech file */
     int   mel_resampling = 0;
@@ -121,8 +117,6 @@ int main(int argc, char *argv[])
         { "lspvq", no_argument, &lspvq, 1 },
         { "lspjvm", no_argument, &lspjvm, 1 },
         { "phase0", no_argument, &phase0, 1 },
-        { "phaseexp", required_argument, &phaseexp, 1 },
-        { "ampexp", required_argument, &ampexp, 1 },
         { "postfilter", no_argument, &postfilt, 1 },
         { "hand_voicing", required_argument, &hand_voicing, 1 },
         { "dec", required_argument, &dec, 1 },
@@ -245,10 +239,6 @@ int main(int argc, char *argv[])
 		        optarg, strerror(errno));
                     exit(1);
                 }
-	    } else if(strcmp(long_options[option_index].name, "phaseexp") == 0) {
-		strcpy(phaseexp_arg, optarg);
-	    } else if(strcmp(long_options[option_index].name, "ampexp") == 0) {
-		strcpy(ampexp_arg, optarg);
 	    } else if(strcmp(long_options[option_index].name, "gain") == 0) {
 		gain = atof(optarg);
 	    } else if(strcmp(long_options[option_index].name, "framelength_s") == 0) {
@@ -486,14 +476,6 @@ int main(int argc, char *argv[])
     make_synthesis_window(&c2const, Pn);
     quantise_init();
 
-    /* disabled for now while we convert to runtime n_samp */
-    #if 0
-    if (phaseexp)
-	pexp = phase_experiment_create();
-    if (ampexp)
-	aexp = amp_experiment_create();
-    #endif
-
     if (bpfb_en)
         bpf_en = 1;
     if (bpf_en) {
@@ -612,21 +594,6 @@ int main(int argc, char *argv[])
         }
         #ifdef DUMP
         dump_Sn(m_pitch, Sn); dump_Sw(Sw); dump_model(&model);
-        #endif
-
-        #if 0
-	if (ampexp)
-	    amp_experiment(aexp, &model, ampexp_arg);
-
-	if (phaseexp) {
-            #ifdef DUMP
-	    dump_phase(&model.phi[0], model.L);
-            #endif
-	    phase_experiment(pexp, &model, phaseexp_arg);
-            #ifdef DUMP
-	    dump_phase_(&model.phi[0], model.L);
-            #endif
-	}
         #endif
 
 	if (hi) {
