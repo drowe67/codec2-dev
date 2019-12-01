@@ -4,8 +4,7 @@
 
 set(D ${CMAKE_CURRENT_SOURCE_DIR}/codebook)
 
-# lsp quantisers
-
+# lsp quantisers (2400/1400/1300 modes)
 set(CODEBOOKS
     ${D}/lsp1.txt
     ${D}/lsp2.txt
@@ -19,8 +18,7 @@ set(CODEBOOKS
     ${D}/lsp10.txt
 )
 
-# lspd quantisers
-
+# lspd quantisers (3200 mode)
 set(CODEBOOKSD
     ${D}/dlsp1.txt
     ${D}/dlsp2.txt
@@ -34,29 +32,17 @@ set(CODEBOOKSD
     ${D}/dlsp10.txt
 )
 
+# LSP VQ (1200 mode)
 set(CODEBOOKSJVM
     ${D}/lspjvm1.txt
     ${D}/lspjvm2.txt
     ${D}/lspjvm3.txt
 )
 
-set(CODEBOOKSMEL
-    ${D}/mel1.txt
-    ${D}/mel2.txt
-    ${D}/mel3.txt
-    ${D}/mel4.txt
-    ${D}/mel5.txt
-    ${D}/mel6.txt
-)
-
-set(CODEBOOKSLSPMELVQ
-    ${D}/lspmelvq1.txt
-    ${D}/lspmelvq2.txt
-    ${D}/lspmelvq3.txt
-)
-
+# Joint Wo-energy VQ (1200 mode)
 set(CODEBOOKSGE ${D}/gecb.txt)
 
+# 700C two stage VQ
 set(CODEBOOKSNEWAMP1
     ${D}/train_120_1.txt
     ${D}/train_120_2.txt
@@ -66,6 +52,7 @@ set(CODEBOOKSNEWAMP1_ENERGY
     ${D}/newamp1_energy_q.txt
 )
 
+# 450 mode two stage VQ
 set(CODEBOOKSNEWAMP2
     ${D}/codes_450.txt
 )
@@ -116,21 +103,6 @@ add_custom_command(
     OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/codebookjvm.c
     COMMAND generate_codebook lsp_cbjvm ${CODEBOOKSJVM} > ${CMAKE_CURRENT_BINARY_DIR}/codebookjvm.c
     DEPENDS generate_codebook ${CODEBOOKSJVM}
-)
-
-
-# codebookmel.c
-add_custom_command(
-    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/codebookmel.c
-    COMMAND generate_codebook mel_cb ${CODEBOOKSMEL} > ${CMAKE_CURRENT_BINARY_DIR}/codebookmel.c
-    DEPENDS generate_codebook ${CODEBOOKSMEL}
-)
-
-# codebooklspmelvq.c
-add_custom_command(
-    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/codebooklspmelvq.c
-    COMMAND generate_codebook lspmelvq_cb ${CODEBOOKSLSPMELVQ} > ${CMAKE_CURRENT_BINARY_DIR}/codebooklspmelvq.c
-    DEPENDS generate_codebook ${CODEBOOKSLSPMELVQ}
 )
 
 # codebookge.c
@@ -202,8 +174,6 @@ set(CODEC2_SRCS
     codebook.c
     codebookd.c
     codebookjvm.c
-    codebookmel.c
-    codebooklspmelvq.c
     codebookge.c
     codebooknewamp1.c
     codebooknewamp1_energy.c

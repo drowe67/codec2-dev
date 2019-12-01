@@ -46,8 +46,6 @@
 #include "phase.h"
 #include "postfilter.h"
 #include "interp.h"
-#include "ampexp.h"
-#include "phaseexp.h"
 #include "bpf.h"
 #include "bpfb.h"
 #include "newamp1.h"
@@ -71,17 +69,12 @@ int main(int argc, char *argv[])
 
     int lpc_model = 0, order = LPC_ORD;
     int lsp = 0, lspd = 0, lspvq = 0;
-    int lspres = 0;
-    int lspjvm = 0, lspjnd = 0, lspmel = 0, lspmelvq = 0;
-    #ifdef __EXPERIMENTAL__
-    int lspanssi = 0,
-    #endif
+    int lspjvm = 0;
     int prede = 0;
     int   postfilt;
-    int   hand_voicing = 0, phaseexp = 0, ampexp = 0, hi = 0, simlpcpf = 0, lspmelread = 0;
+    int   hand_voicing = 0, hi = 0, simlpcpf = 0, modelin=0, modelout=0;
     int   lpcpf = 0;
     FILE *fvoicing = 0;
-    FILE *flspmel = 0;
     int dec;
     int decimate = 1;
     int   amread, Woread, pahw;
@@ -101,11 +94,11 @@ int main(int argc, char *argv[])
     FILE *fjvm = NULL;
     FILE *flspEWov = NULL;
     FILE *ften_ms_centre = NULL;
+    FILE *fmodelout = NULL;
+    FILE *fmodelin = NULL;
     #ifdef DUMP
     int   dump;
     #endif
-    char  ampexp_arg[MAX_STR];
-    char  phaseexp_arg[MAX_STR];
     char  out_file[MAX_STR];
     FILE *fout = NULL;	/* output speech file */
     int   mel_resampling = 0;
@@ -113,27 +106,18 @@ int main(int argc, char *argv[])
     float framelength_s = N_S;
     int   lspEWov = 0;
     int   ten_ms_centre = 0;
+    FILE  *fphasenn = NULL;
     
     char* opt_string = "ho:";
     struct option long_options[] = {
         { "Fs", required_argument, &set_fs, 1 },
         { "mel", required_argument, &mel_resampling, 1 },
         { "lpc", required_argument, &lpc_model, 1 },
-        { "lspjnd", no_argument, &lspjnd, 1 },
-        { "lspmel", no_argument, &lspmel, 1 },
-        { "lspmelread", required_argument, &lspmelread, 1 },
-        { "lspmelvq", no_argument, &lspmelvq, 1 },
         { "lsp", no_argument, &lsp, 1 },
         { "lspd", no_argument, &lspd, 1 },
         { "lspvq", no_argument, &lspvq, 1 },
-        { "lspres", no_argument, &lspres, 1 },
         { "lspjvm", no_argument, &lspjvm, 1 },
-        #ifdef __EXPERIMENTAL__
-        { "lspanssi", no_argument, &lspanssi, 1 },
-        #endif
         { "phase0", no_argument, &phase0, 1 },
-        { "phaseexp", required_argument, &phaseexp, 1 },
-        { "ampexp", required_argument, &ampexp, 1 },
         { "postfilter", no_argument, &postfilt, 1 },
         { "hand_voicing", required_argument, &hand_voicing, 1 },
         { "dec", required_argument, &dec, 1 },
@@ -157,6 +141,8 @@ int main(int argc, char *argv[])
         { "lspEWov", required_argument, &lspEWov, 1 },
         { "ten_ms_centre", required_argument, &ten_ms_centre, 1 },
         { "framelength_s", required_argument, NULL, 0 },
+        { "modelout",  required_argument, &modelout, 1 },
+        { "modelin",   required_argument, &modelin, 1 },
         #ifdef DUMP
         { "dump", required_argument, &dump, 1 },
         #endif
@@ -211,23 +197,17 @@ int main(int argc, char *argv[])
 	        }
 
                 if (!phase0) {
-                    printf("needs --phase0 to resample phase when using --dec\n");
+                    fprintf(stderr, "needs --phase0 to resample phase when using --dec\n");
                     exit(1);
                 }
                 if (!lpc_model) {
-                    printf("needs --lpc [order] to resample amplitudes when using --dec\n");
+                    fprintf(stderr, "needs --lpc [order] to resample amplitudes when using --dec\n");
                     exit(1);
                 }
 
             } else if(strcmp(long_options[option_index].name, "hand_voicing") == 0) {
 	        if ((fvoicing = fopen(optarg,"rt")) == NULL) {
 	            fprintf(stderr, "Error opening voicing file: %s: %s.\n",
-		        optarg, strerror(errno));
-                    exit(1);
-                }
-            } else if(strcmp(long_options[option_index].name, "lspmelread") == 0) {
-	        if ((flspmel = fopen(optarg,"rb")) == NULL) {
-	            fprintf(stderr, "Error opening float lspmel file: %s: %s.\n",
 		        optarg, strerror(errno));
                     exit(1);
                 }
@@ -261,10 +241,6 @@ int main(int argc, char *argv[])
 		        optarg, strerror(errno));
                     exit(1);
                 }
-	    } else if(strcmp(long_options[option_index].name, "phaseexp") == 0) {
-		strcpy(phaseexp_arg, optarg);
-	    } else if(strcmp(long_options[option_index].name, "ampexp") == 0) {
-		strcpy(ampexp_arg, optarg);
 	    } else if(strcmp(long_options[option_index].name, "gain") == 0) {
 		gain = atof(optarg);
 	    } else if(strcmp(long_options[option_index].name, "framelength_s") == 0) {
@@ -313,7 +289,27 @@ int main(int argc, char *argv[])
 		        optarg, strerror(errno));
                     exit(1);
                 }                 
-	    } else if(strcmp(long_options[option_index].name, "rate") == 0) {
+	    } else if(strcmp(long_options[option_index].name, "modelout") == 0) {
+                /* write model records to file or stdout */
+                modelout = 1;
+                if (strcmp(optarg, "-") == 0) fmodelout = stdout;
+	        else if ((fmodelout = fopen(optarg,"wb")) == NULL) {
+	            fprintf(stderr, "Error opening modelout file: %s: %s\n",
+		        optarg, strerror(errno));
+                    exit(1);
+                }                 
+                fprintf(stderr, "each model record is %d bytes\n", (int)sizeof(MODEL));
+	    } else if(strcmp(long_options[option_index].name, "modelin") == 0) {
+                /* read model records from file or stdin */
+                modelin = 1;
+                if (strcmp(optarg, "-") == 0) fmodelin = stdin;
+	        else if ((fmodelin = fopen(optarg,"rb")) == NULL) {
+	            fprintf(stderr, "Error opening modelin file: %s: %s\n",
+		        optarg, strerror(errno));
+                    exit(1);
+                }                 
+                fprintf(stderr, "each model record is %d bytes\n", (int)sizeof(MODEL));
+            } else if(strcmp(long_options[option_index].name, "rate") == 0) {
                 if(strcmp(optarg,"3200") == 0) {
 	            lpc_model = 1;
 		    scalar_quant_Wo_e = 1;
@@ -362,8 +358,8 @@ int main(int argc, char *argv[])
             break;
 
          case 'h':
-            print_help(long_options, num_opts, argv);
-            break;
+             print_help(long_options, num_opts, argv);
+             break;
 
          case 'o':
 	     if (strcmp(optarg, "-") == 0) fout = stdout;
@@ -443,7 +439,6 @@ int main(int argc, char *argv[])
     struct AEXP *aexp = NULL;
     #endif
     float bpf_buf[BPF_N+N_SAMP];
-    float lspmelvq_mse = 0.0;
 
     COMP Aw[FFT_ENC];
     COMP H[MAX_AMP];
@@ -476,12 +471,6 @@ int main(int argc, char *argv[])
     ex_phase[0] = 0;
     Woe_[0] = Woe_[1] = 1.0;
 
-    /*
-      printf("lspd: %d lspdt: %d lspdt_mode: %d  phase0: %d postfilt: %d "
-	   "decimate: %d dt: %d\n",lspd,lspdt,lspdt_mode,phase0,postfilt,
-	   decimate,dt);
-    */
-
     /* Initialise ------------------------------------------------------------*/
 
     fft_fwd_cfg = codec2_fft_alloc(FFT_ENC, 0, NULL, NULL);   /* fwd FFT,used in several places   */
@@ -493,14 +482,6 @@ int main(int argc, char *argv[])
     make_analysis_window(&c2const, fft_fwd_cfg, w, W);
     make_synthesis_window(&c2const, Pn);
     quantise_init();
-
-    /* disabled for now while we convert to runtime n_samp */
-    #if 0
-    if (phaseexp)
-	pexp = phase_experiment_create();
-    if (ampexp)
-	aexp = amp_experiment_create();
-    #endif
 
     if (bpfb_en)
         bpf_en = 1;
@@ -530,6 +511,7 @@ int main(int argc, char *argv[])
         //    fprintf(stderr, "%d %f\n", i, rate_K_sample_freqs_kHz[i]);
     }
 
+    
     /*----------------------------------------------------------------* \
 
                             Main Loop
@@ -593,21 +575,6 @@ int main(int argc, char *argv[])
 
         #ifdef DUMP
         dump_Sn(m_pitch, Sn); dump_Sw(Sw); dump_model(&model);
-        #endif
-
-        #if 0
-	if (ampexp)
-	    amp_experiment(aexp, &model, ampexp_arg);
-
-	if (phaseexp) {
-            #ifdef DUMP
-	    dump_phase(&model.phi[0], model.L);
-            #endif
-	    phase_experiment(pexp, &model, phaseexp_arg);
-            #ifdef DUMP
-	    dump_phase_(&model.phi[0], model.L);
-            #endif
-	}
         #endif
 
 	if (hi) {
@@ -737,14 +704,6 @@ int main(int argc, char *argv[])
 		lsp_to_lpc(lsps_, ak, LPC_ORD);
 	    }
 
-#ifdef __EXPERIMENTAL__
-	    if (lspvq) {
-		lspvq_quantise(lsps, lsps_, LPC_ORD);
-		bw_expand_lsps(lsps_, LPC_ORD, 50.0, 100.0);
-		lsp_to_lpc(lsps_, ak, LPC_ORD);
-	    }
-#endif
-
 	    if (lspjvm) {
 		/* Jean-Marc's multi-stage, split VQ */
 		lspjvm_quantise(lsps, lsps_, LPC_ORD);
@@ -756,101 +715,7 @@ int main(int argc, char *argv[])
 		}
 	    }
 
-#ifdef __EXPERIMENTAL__
-	    if (lspanssi) {
-		/*  multi-stage VQ from Anssi Ramo OH3GDD */
-
-		lspanssi_quantise(lsps, lsps_, LPC_ORD, 5);
-		bw_expand_lsps(lsps_, LPC_ORD, 50.0, 100.0);
-		lsp_to_lpc(lsps_, ak, LPC_ORD);
-	    }
-#endif
-
-	    /* experimenting with non-linear LSP spacing to see if
-	       it's just noticable */
-
-	    if (lspjnd) {
-		for(i=0; i<LPC_ORD; i++)
-		    lsps_[i] = lsps[i];
-		locate_lsps_jnd_steps(lsps_, LPC_ORD);
-		lsp_to_lpc(lsps_, ak, LPC_ORD);
-	    }
-
-	    /* Another experiment with non-linear LSP spacing, this
-	       time using a scaled version of mel frequency axis
-	       warping.  The scaling is such that the integer output
-	       can be directly sent over the channel.
-	    */
-
-	    if (lspmel) {
-		float f, f_;
-		float mel[order];
-		int   mel_indexes[order];
-
-		for(i=0; i<order; i++) {
-		    f = (4000.0/PI)*lsps[i];
-		    mel[i] = floor(2595.0*log10(1.0 + f/700.0) + 0.5);
-		}
-
-                #define MEL_ROUND 25
-		for(i=1; i<order; i++) {
-		    if (mel[i] <= mel[i-1]+MEL_ROUND) {
-			mel[i]+=MEL_ROUND/2;
-			mel[i-1]-=MEL_ROUND/2;
-                        i = 1;
-                    }
-		}
-
-                #ifdef DUMP
-                dump_mel(mel, order);
-                #endif
-
- 		encode_mels_scalar(mel_indexes, mel, 6);
-                #ifdef DUMP
-                dump_mel_indexes(mel_indexes, 6);
-                #endif
-		//decode_mels_scalar(mel, mel_indexes, 6);
-
-                /* read in VQed lsp-mels from octave/melvq.m */
-
-                if (lspmelread) {
-                    float mel_[order];
-                    int ret = fread(mel_, sizeof(float), order, flspmel);
-                    assert(ret == order);
-                    for(i=0; i<order; i++) {
-                        lspmelvq_mse += pow(mel[i] - mel_[i], 2.0);
-                        mel[i] = mel_[i];
-                    }
-                }
-
-                if (lspmelvq) {
-                    int indexes[3];
-                    //lspmelvq_mse += lspmelvq_quantise(mel, mel, order);
-                    lspmelvq_mse += lspmelvq_mbest_encode(indexes, mel, mel, order, 5);
-                }
-
-                /* ensure no unstable filters after quantisation */
-
-                #define MEL_ROUND 25
-		for(i=1; i<order; i++) {
-		    if (mel[i] <= mel[i-1]+MEL_ROUND) {
-			mel[i]+=MEL_ROUND/2;
-			mel[i-1]-=MEL_ROUND/2;
-                        i = 1;
-                    }
-		}
-
-		for(i=0; i<order; i++) {
-		    f_ = 700.0*( pow(10.0, mel[i]/2595.0) - 1.0);
-		    lsps_[i] = f_*(PI/4000.0);
-		}
-
-		lsp_to_lpc(lsps_, ak, order);
-
-	    }
-
 	    if (scalar_quant_Wo_e) {
-
 		e = decode_energy(encode_energy(e, E_BITS), E_BITS);
                 model.Wo = decode_Wo(&c2const, encode_Wo(&c2const, model.Wo, WO_BITS), WO_BITS);
 		model.L  = PI/model.Wo; /* if we quantise Wo re-compute L */
@@ -864,9 +729,7 @@ int main(int argc, char *argv[])
 	    }
 
 	    if (vector_quant_Wo_e) {
-
 		/* JVM's experimental joint Wo & LPC energy quantiser */
-
 		quantise_WoE(&c2const, &model, &e, Woe_);
 	    }
 
@@ -969,12 +832,19 @@ int main(int argc, char *argv[])
                     }
                     phase_synth_zero_order(n_samp, &model_dec[i], ex_phase, H);
                 }
-
                 
                 if (postfilt)
                     postfilter(&model_dec[i], &bg_est);
+                if (modelin) {
+                    int nrec;
+                    nrec = fread(&model_dec[i],sizeof(MODEL),1,fmodelin);
+                    assert(nrec == 1);
+                }
                 synth_one_frame(n_samp, fftr_inv_cfg, buf, &model_dec[i], Sn_, Pn, prede, &de_mem, gain);
-                if (fout != NULL) fwrite(buf,sizeof(short),N_SAMP,fout);
+                if (fout != NULL)
+                    fwrite(buf,sizeof(short),N_SAMP,fout);
+                if (modelout)
+                    fwrite(&model_dec[i],sizeof(MODEL),1,fmodelout);
             }
 
             /* update memories for next frame ----------------------------*/
@@ -1000,16 +870,8 @@ int main(int argc, char *argv[])
 
     if (lpc_model) {
     	fprintf(stderr, "SNR av = %5.2f dB\n", sum_snr/frames);
-        if (lspmelvq || lspmelread)
-            fprintf(stderr, "lspmelvq std = %3.1f Hz\n", sqrt(lspmelvq_mse/frames));
     }
 
-    #if 0
-    if (phaseexp)
-	phase_experiment_destroy(pexp);
-    if (ampexp)
-	amp_experiment_destroy(aexp);
-    #endif
     #ifdef DUMP
     if (dump)
 	dump_off();
@@ -1020,14 +882,15 @@ int main(int argc, char *argv[])
 
     nlp_destroy(nlp_states);
 
-    if (flspmel != NULL) fclose(flspmel);
     if (fam     != NULL) fclose(fam);
     if (fWo     != NULL) fclose(fWo);
     if (faw     != NULL) fclose(faw);
     if (fhm     != NULL) fclose(fhm);
     if (fjvm    != NULL) fclose(fjvm);
     if (flspEWov != NULL) fclose(flspEWov);
+    if (fphasenn != NULL) fclose(fphasenn);
     if (ften_ms_centre != NULL) fclose(ften_ms_centre);
+    if (fmodelout != NULL) fclose(fmodelout);
     
     return 0;
 }
