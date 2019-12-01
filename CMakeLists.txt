@@ -458,10 +458,43 @@ endif()
              )
              set_tests_properties(test_FreeDV_700D_rx_memory_leak PROPERTIES PASS_REGULAR_EXPRESSION "ERROR SUMMARY: 0 errors")
 
-     add_test(NAME test_dot_c2_mode
+     add_test(NAME test_mode_dot_c2
              COMMAND sh -c "./c2enc 700C ../../raw/hts1a.raw hts1a.c2 && ./c2dec 1600 hts1a.c2 /dev/null"
              WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/src
              )
-             set_tests_properties(test_dot_c2_mode PROPERTIES PASS_REGULAR_EXPRESSION "mode 8")
+             set_tests_properties(test_mode_dot_c2 PROPERTIES PASS_REGULAR_EXPRESSION "mode 8")
+
+     add_test(NAME test_mode_3200
+             COMMAND sh -c "./c2enc 3200 ../../raw/hts1a.raw - | ./c2dec 3200 - - | sox -t .s16 -r 8000 - hts1a_3200.wav"
+             WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/src
+             )
+     add_test(NAME test_mode_2400
+             COMMAND sh -c "./c2enc 2400 ../../raw/hts1a.raw - | ./c2dec 2400 - - | sox -t .s16 -r 8000 - hts1a_2400.wav"
+             WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/src
+             )
+     add_test(NAME test_mode_1400
+             COMMAND sh -c "./c2enc 1400 ../../raw/hts1a.raw - | ./c2dec 1400 - - | sox -t .s16 -r 8000 - hts1a_1400.wav"
+             WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/src
+             )
+     add_test(NAME test_mode_1300
+             COMMAND sh -c "./c2enc 1300 ../../raw/hts1a.raw - | ./c2dec 1300 - - | sox -t .s16 -r 8000 - hts1a_1300.wav"
+             WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/src
+             )
+     add_test(NAME test_mode_1200
+             COMMAND sh -c "./c2enc 1200 ../../raw/hts1a.raw - | ./c2dec 1200 - - | sox -t .s16 -r 8000 - hts1a_1200.wav"
+             WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/src
+             )
+     add_test(NAME test_mode_700C
+             COMMAND sh -c "./c2enc 700C ../../raw/hts1a.raw - | ./c2dec 700C - - | sox -t .s16 -r 8000 - hts1a_700C.wav"
+             WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/src
+             )
+     add_test(NAME test_mode_450
+             COMMAND sh -c "./c2enc 450 ../../raw/hts1a.raw - | ./c2dec 450 - - | sox -t .s16 -r 8000 - hts1a_450.wav"
+             WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/src
+             )
+     add_test(NAME test_mode_450PWB
+             COMMAND sh -c "./c2enc 450PWB ../../raw/hts1a.raw - | ./c2dec 450PWB - - | sox -t .s16 -r 16000 - hts1a_450PWB.wav"
+             WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/src
+             )
 
 endif(UNITTEST)
