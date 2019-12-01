@@ -68,22 +68,6 @@ int lspd_bits(int i) {
     return lsp_cbd[i].log2m;
 }
 
-#ifndef CORTEX_M4
-int mel_bits(int i) {
-    return mel_cb[i].log2m;
-}
-
-int lspmelvq_cb_bits(int i) {
-    return lspmelvq_cb[i].log2m;
-}
-#endif
-
-#ifdef __EXPERIMENTAL__
-int lspdt_bits(int i) {
-    return lsp_cbdt[i].log2m;
-}
-#endif
-
 int lsp_pred_vq_bits(int i) {
     return lsp_cbjvm[i].log2m;
 }
