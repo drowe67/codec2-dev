@@ -464,4 +464,9 @@ endif()
              )
              set_tests_properties(test_dot_c2_mode PROPERTIES PASS_REGULAR_EXPRESSION "mode 8")
 
+     add_test(NAME test_est_n0
+             COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/unittest/est_n0.sh
+             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/unittest
+             )
+
 endif(UNITTEST)
