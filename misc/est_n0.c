@@ -25,7 +25,7 @@ int main(void) {
 	    float error = 0.0;
 	    for(int m=1; m<=L; m++) {
 		complex diff = cexp(I*model.phi[m]) - cexp(I*n0*m*Wo);
-		error += model.A[m]*model.A[m]*cabs(diff)*cabs(diff);
+		error += log10(model.A[m])*cabs(diff)*cabs(diff);
 	    }
 	    if (error < best_error) {
 		best_error = error;
