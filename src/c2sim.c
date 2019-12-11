@@ -603,27 +603,19 @@ int main(int argc, char *argv[])
 
 	\*------------------------------------------------------------*/
 
+	/* estimate voicing - do this all the time so model.voicing
+	 * is set, useful for machine learning work */
+	snr = est_voicing_mbe(&c2const, &model, Sw, W);
+
 	if (phase0) {
             #ifdef DUMP
 	    dump_phase(&model.phi[0], model.L);
             #endif
 
-	    /* determine voicing */
-
-	    #if 0
-            snr = est_voicing_mbe(&c2const, &model, Sw, W, Sw_, Ew);
-            #else
-	    snr = est_voicing_mbe(&c2const, &model, Sw, W);
-            #endif
-
 	    if (dump_pitch_e)
 		fprintf(fjvm, "%f %f %d ", model.Wo, snr, model.voiced);
 
-	    //printf("snr %3.2f v: %d Wo: %f prev_Wo: %f\n", snr, model.voiced,
-	    //	   model.Wo, prev_uq_Wo);
             #ifdef DUMP
-	    //dump_Sw_(Sw_);
-	    //dump_Ew(Ew);
 	    dump_snr(snr);
             #endif
 
@@ -654,21 +646,6 @@ int main(int argc, char *argv[])
 	    dump_ak(ak, order);
             dump_E(e);
             #endif
-
-	    /* tracking down -ve energy values with BW expansion */
-	    /*
-	    if (e < 0.0) {
-		int i;
-		FILE*f=fopen("x.txt","wt");
-		for(i=0; i<M_PITCH; i++)
-		    fprintf(f,"%f\n", Sn[i]);
-		fclose(f);
-		printf("e = %f frames = %d\n", e, frames);
-		for(i=0; i<order; i++)
-		    printf("%f ", ak[i]);
-		exit(0);
-	    }
-	    */
 
 	    if (dump_pitch_e)
 		fprintf(fjvm, "%f\n", e);
