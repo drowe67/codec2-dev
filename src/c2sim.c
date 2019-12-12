@@ -810,13 +810,13 @@ int main(int argc, char *argv[])
                     phase_synth_zero_order(n_samp, &model_dec[i], ex_phase, H);
                 }
                 
-                if (postfilt)
-                    postfilter(&model_dec[i], &bg_est);
                 if (modelin) {
                     int nrec;
                     nrec = fread(&model_dec[i],sizeof(MODEL),1,fmodelin);
                     assert(nrec == 1);
                 }
+                if (postfilt)
+                    postfilter(&model_dec[i], &bg_est);
                 synth_one_frame(n_samp, fftr_inv_cfg, buf, &model_dec[i], Sn_, Pn, prede, &de_mem, gain);
                 if (fout != NULL)
                     fwrite(buf,sizeof(short),N_SAMP,fout);
