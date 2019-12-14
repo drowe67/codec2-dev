@@ -504,13 +504,8 @@ int main(int argc, char *argv[])
 
     float rate_K_sample_freqs_kHz[K];
     if (mel_resampling) {
-        float mel_start = ftomel(100); 
-        float mel_end = ftomel(0.95*Fs/2);
-        mel_sample_freqs_kHz(rate_K_sample_freqs_kHz, K, mel_start, mel_end);
-        //for(i=0; i<K; i++)
-        //    fprintf(stderr, "%d %f\n", i, rate_K_sample_freqs_kHz[i]);
+	mel_sample_freqs_kHz(rate_K_sample_freqs_kHz, NEWAMP1_K, ftomel(200.0), ftomel(3700.0) );
     }
-
     
     /*----------------------------------------------------------------* \
 

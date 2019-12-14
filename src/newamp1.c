@@ -340,8 +340,7 @@ void resample_rate_L(C2CONST *c2const, MODEL *model, float rate_K_vec[], float r
 
    for(k=0; k<K; k++) {
        rate_K_vec_term[k+1] = rate_K_vec[k];
-       rate_K_sample_freqs_kHz_term[k+1] = rate_K_sample_freqs_kHz[k];
-  
+       rate_K_sample_freqs_kHz_term[k+1] = rate_K_sample_freqs_kHz[k];  
        //printf("k: %d f: %f rate_K: %f\n", k, rate_K_sample_freqs_kHz[k], rate_K_vec[k]);
    }
 
@@ -475,8 +474,7 @@ void newamp1_model_to_indexes(C2CONST *c2const,
     else {
         indexes[3] = 0;
     }
-
- }
+}
 
 
 /*---------------------------------------------------------------------------*\
@@ -615,7 +613,7 @@ void newamp1_indexes_to_model(C2CONST *c2const,
 
     interp_Wo_v(aWo_, aL_, avoicing_, *Wo_left, Wo_right, *voicing_left, voicing_right);
 
-    /* back to rate L amplitudes, synthesis phase for each frame */
+    /* back to rate L amplitudes, synthesise phase for each frame */
 
     for(i=0; i<M; i++) {
         model_[i].Wo = aWo_[i];

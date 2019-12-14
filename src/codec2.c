@@ -261,7 +261,7 @@ struct CODEC2 * codec2_create(int mode)
         c2->phase_fft_inv_cfg = codec2_fft_alloc(NEWAMP2_PHASE_NFFT, 1, NULL, NULL);
     }
 
-    c2->fmlfeat = NULL;
+    c2->fmlfeat = NULL; c2->fmlmodel = NULL;
 
     // make sure that one of the two decode function pointers is empty
     // for the encode function pointer this is not required since we always set it
@@ -1567,7 +1567,15 @@ void codec2_encode_700c(struct CODEC2 *c2, unsigned char * bits, short speech[])
         fwrite(&mean, 1, sizeof(float), c2->fmlfeat);
         fwrite(rate_K_vec_no_mean, K, sizeof(float), c2->fmlfeat);
         fwrite(rate_K_vec_no_mean_, K, sizeof(float), c2->fmlfeat);
+	MODEL model_; memcpy(&model_, &model, sizeof(model));
+	float rate_K_vec_[K];
+	for(int k=0; k<K; k++)
+	    rate_K_vec_[k] = rate_K_vec_no_mean_[k] + mean;
+	resample_rate_L(&c2->c2const, &model_, rate_K_vec_, c2->rate_K_sample_freqs_kHz, K);
+        fwrite(&model_.A, MAX_AMP, sizeof(float), c2->fmlfeat);
     }
+    if (c2->fmlmodel != NULL)
+	fwrite(&model,sizeof(MODEL),1,c2->fmlmodel);
 #endif
     
     pack_natural_or_gray(bits, &nbit, indexes[0], 9, 0);
@@ -1626,7 +1634,7 @@ void codec2_decode_700c(struct CODEC2 *c2, short speech[], const unsigned char *
 
 
    for(i=0; i<M; i++) {
-       /* 700C is a little quiter so lets apply some experimentally derived audio gain */
+       /* 700C is a little quieter so lets apply some experimentally derived audio gain */
        synthesise_one_frame(c2, &speech[c2->n_samp*i], &model[i], &HH[i][0], 1.5);
    }
 }
@@ -2002,13 +2010,6 @@ void codec2_decode_450pwb(struct CODEC2 *c2, short speech[], const unsigned char
 void synthesise_one_frame(struct CODEC2 *c2, short speech[], MODEL *model, COMP Aw[], float gain)
 {
     int     i;
-    //PROFILE_VAR(phase_start, pf_start, synth_start);
-
-    //#ifdef DUMP
-    //dump_quantised_model(model);
-    //#endif
-
-    //PROFILE_SAMPLE(phase_start);
 
     if ( CODEC2_MODE_ACTIVE(CODEC2_MODE_700C, c2->mode) || CODEC2_MODE_ACTIVE(CODEC2_MODE_450, c2->mode) || CODEC2_MODE_ACTIVE(CODEC2_MODE_450PWB, c2->mode)  ) {
         /* newamp1/2, we've already worked out rate L phase */
@@ -2021,20 +2022,13 @@ void synthesise_one_frame(struct CODEC2 *c2, short speech[], MODEL *model, COMP 
         phase_synth_zero_order(c2->n_samp, model, &c2->ex_phase, H);
     }
 
-    //PROFILE_SAMPLE_AND_LOG(pf_start, phase_start, "    phase_synth");
-
     postfilter(model, &c2->bg_est);
-
-    //PROFILE_SAMPLE_AND_LOG(synth_start, pf_start, "    postfilter");
-
     synthesise(c2->n_samp, c2->fftr_inv_cfg, c2->Sn_, model, c2->Pn, 1);
 
     for(i=0; i<c2->n_samp; i++) {
         c2->Sn_[i] *= gain;
     }
     
-    //PROFILE_SAMPLE_AND_LOG2(synth_start, "    synth");
-
     ear_protection(c2->Sn_, c2->n_samp);
 
     for(i=0; i<c2->n_samp; i++) {
@@ -2048,7 +2042,8 @@ void synthesise_one_frame(struct CODEC2 *c2, short speech[], MODEL *model, COMP 
 
 }
 
-/*---------------------------------------------------------------------------*\
+
+/*---------------------------------------------------------------------------* \
 
   FUNCTION....: analyse_one_frame()
   AUTHOR......: David Rowe
@@ -2064,7 +2059,6 @@ void analyse_one_frame(struct CODEC2 *c2, MODEL *model, short speech[])
     COMP    Sw[FFT_ENC];
     float   pitch;
     int     i;
-    //PROFILE_VAR(dft_start, nlp_start, model_start, two_stage, estamps);
     int     n_samp = c2->n_samp;
     int     m_pitch = c2->m_pitch;
 
@@ -2075,32 +2069,29 @@ void analyse_one_frame(struct CODEC2 *c2, MODEL *model, short speech[])
     for(i=0; i<n_samp; i++)
       c2->Sn[i+m_pitch-n_samp] = speech[i];
 
-    //PROFILE_SAMPLE(dft_start);
     dft_speech(&c2->c2const, c2->fft_fwd_cfg, Sw, c2->Sn, c2->w);
-    //PROFILE_SAMPLE_AND_LOG(nlp_start, dft_start, "    dft_speech");
 
     /* Estimate pitch */
-
     nlp(c2->nlp, c2->Sn, n_samp, &pitch, Sw, c2->W, &c2->prev_f0_enc);
-    //PROFILE_SAMPLE_AND_LOG(model_start, nlp_start, "    nlp");
-
     model->Wo = TWO_PI/pitch;
     model->L = PI/model->Wo;
 
     /* estimate model parameters */
-
     two_stage_pitch_refinement(&c2->c2const, model, Sw);
-    //PROFILE_SAMPLE_AND_LOG(two_stage, model_start, "    two_stage");
-    estimate_amplitudes(model, Sw, c2->W, 0);
-    //PROFILE_SAMPLE_AND_LOG(estamps, two_stage, "    est_amps");
+
+    /* estimate phases when doing ML experiments */
+    if (c2->fmlfeat != NULL)
+	estimate_amplitudes(model, Sw, c2->W, 1);
+    else
+	estimate_amplitudes(model, Sw, c2->W, 0);
     est_voicing_mbe(&c2->c2const, model, Sw, c2->W);
-    //PROFILE_SAMPLE_AND_LOG2(estamps, "    est_voicing");
     #ifdef DUMP
     dump_model(model);
     #endif
 }
 
-/*---------------------------------------------------------------------------*\
+
+/*---------------------------------------------------------------------------* \
 
   FUNCTION....: ear_protection()
   AUTHOR......: David Rowe
@@ -2133,11 +2124,11 @@ static void ear_protection(float in_out[], int n) {
 
     if (over > 1.0) {
         gain = 1.0/(over*over);
-        //fprintf(stderr, "gain: %f\n", gain);
         for(i=0; i<n; i++)
             in_out[i] *= gain;
     }
 }
+
 
 void codec2_set_lpc_post_filter(struct CODEC2 *c2, int enable, int bass_boost, float beta, float gamma)
 {
@@ -2148,6 +2139,7 @@ void codec2_set_lpc_post_filter(struct CODEC2 *c2, int enable, int bass_boost, f
     c2->beta = beta;
     c2->gamma = gamma;
 }
+
 
 /*
    Allows optional stealing of one of the voicing bits for use as a
@@ -2245,9 +2237,13 @@ void codec2_set_softdec(struct CODEC2 *c2, float *softdec)
     c2->softdec = softdec;
 }
 
-void codec2_open_mlfeat(struct CODEC2 *codec2_state, char *filename) {
-    if ((codec2_state->fmlfeat = fopen(filename, "wb")) == NULL) {
-	fprintf(stderr, "error opening machine learning feature file: %s\n", filename);
+void codec2_open_mlfeat(struct CODEC2 *codec2_state, char *feat_fn, char *model_fn) {
+    if ((codec2_state->fmlfeat = fopen(feat_fn, "wb")) == NULL) {
+	fprintf(stderr, "error opening machine learning feature file: %s\n", feat_fn);
+	exit(1);
+    }    
+    if ((codec2_state->fmlmodel = fopen(model_fn, "wb")) == NULL) {
+	fprintf(stderr, "error opening machine learning Codec 2 model file: %s\n", feat_fn);
 	exit(1);
     }    
 }

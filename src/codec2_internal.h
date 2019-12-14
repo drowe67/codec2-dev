@@ -93,7 +93,7 @@ struct CODEC2 {
     float          n2_pwb_prev_rate_K_vec_[NEWAMP2_16K_K];
 
     /* used to dump features for deep learning experiments */
-    FILE *fmlfeat;
+    FILE *fmlfeat, *fmlmodel;
 
     /* encode/decode function pointers for the selected mode */
     void (*encode)(struct CODEC2 *c2, unsigned char * bits, short speech[]);

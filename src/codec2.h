@@ -113,7 +113,7 @@ void codec2_set_softdec(struct CODEC2 *c2, float *softdec);
 float codec2_get_energy(struct CODEC2 *codec2_state, const unsigned char *bits);
       
 // support for ML and VQ experiments
-void codec2_open_mlfeat(struct CODEC2 *codec2_state, char *filename);
+void codec2_open_mlfeat(struct CODEC2 *codec2_state, char *feat_filename, char *model_filename);
 void codec2_load_codebook(struct CODEC2 *codec2_state, int num, char *filename);
 float codec2_get_var(struct CODEC2 *codec2_state);
 float *codec2_enable_user_ratek(struct CODEC2 *codec2_state, int *K);
