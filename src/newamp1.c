@@ -40,8 +40,6 @@
 #include "mbest.h"
 #include "newamp1.h"
 
-#define NEWAMP1_VQ_MBEST_DEPTH 5  /* how many candidates we keep for each stage of mbest search */
-
 /*---------------------------------------------------------------------------*\
 
   FUNCTION....: interp_para()

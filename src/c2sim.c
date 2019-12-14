@@ -101,7 +101,7 @@ int main(int argc, char *argv[])
     #endif
     char  out_file[MAX_STR];
     FILE *fout = NULL;	/* output speech file */
-    int   mel_resampling = 0;
+    int   rateK = 0, newamp1vq = 0, rate_K_dec = 0;
     int   K = 20;
     float framelength_s = N_S;
     int   lspEWov = 0;
@@ -111,7 +111,9 @@ int main(int argc, char *argv[])
     char* opt_string = "ho:";
     struct option long_options[] = {
         { "Fs", required_argument, &set_fs, 1 },
-        { "mel", required_argument, &mel_resampling, 1 },
+        { "rateK", no_argument, &rateK, 1 },
+        { "newamp1vq", no_argument, &newamp1vq, 1 },
+        { "rateKdec", required_argument, &rate_K_dec, 1 },
         { "lpc", required_argument, &lpc_model, 1 },
         { "lsp", no_argument, &lsp, 1 },
         { "lspd", no_argument, &lspd, 1 },
@@ -175,8 +177,6 @@ int main(int argc, char *argv[])
                     fprintf(stderr, "Error Fs must be 8000 or 16000\n");
                     exit(1);
                 }
-            } else if(strcmp(long_options[option_index].name, "mel") == 0) {
-                K = atoi(optarg);
             } else if(strcmp(long_options[option_index].name, "lpc") == 0) {
                 order = atoi(optarg);
             #ifdef DUMP
@@ -188,6 +188,9 @@ int main(int argc, char *argv[])
                   || strcmp(long_options[option_index].name, "lspd") == 0
                   || strcmp(long_options[option_index].name, "lspvq") == 0) {
 	        assert(order == LPC_ORD);
+            } else if(strcmp(long_options[option_index].name, "rateKdec") == 0) {
+                rate_K_dec = atoi(optarg);
+                fprintf(stderr, "rate_K_dec: %d\n", rate_K_dec);
             } else if(strcmp(long_options[option_index].name, "dec") == 0) {
 
                 decimate = atoi(optarg);
@@ -502,9 +505,23 @@ int main(int argc, char *argv[])
 
     /* mel resampling experiments */
 
-    float rate_K_sample_freqs_kHz[K];
-    if (mel_resampling) {
+    float rate_K_sample_freqs_kHz[K]; float se = 0.0; int nse = 0;
+    if (rateK) {
 	mel_sample_freqs_kHz(rate_K_sample_freqs_kHz, NEWAMP1_K, ftomel(200.0), ftomel(3700.0) );
+    }
+    float rate_K_vec_delay[rate_K_dec+1][K]; 
+    float rate_K_vec_delay_[rate_K_dec+1][K];
+    MODEL rate_K_model_delay[rate_K_dec+1];
+    for (int d=0; d<=rate_K_dec; d++) {
+        for(int k=0; k<K; k++) {
+            rate_K_vec_delay[d][k] = 0;
+            rate_K_vec_delay_[d][k] = 0;
+        }
+        for(m=1; m<=MAX_AMP; m++)
+            rate_K_model_delay[d].A[m] = 0.0;
+        rate_K_model_delay[d].Wo = c2const.Wo_min;
+        rate_K_model_delay[d].L = M_PI/prev_model_dec.Wo;
+        rate_K_model_delay[d].voiced = 0;
     }
     
     /*----------------------------------------------------------------* \
@@ -582,14 +599,70 @@ int main(int argc, char *argv[])
 
 	/*------------------------------------------------------------*\
 
-	                     Mel scale resampling
+	                  newamp1 simulation, as used in 700C
 
 	\*------------------------------------------------------------*/
 
-        if (mel_resampling) {
+        if (rateK) {
             float rate_K_vec[K];
             resample_const_rate_f(&c2const, &model, rate_K_vec, rate_K_sample_freqs_kHz, K);
-            resample_rate_L(&c2const, &model, rate_K_vec, rate_K_sample_freqs_kHz, K);
+
+            float rate_K_vec_[K];
+            if (newamp1vq) {
+                /* remove mean */
+                float sum = 0.0;
+                for(int k=0; k<K; k++)
+                    sum += rate_K_vec[k];   
+                float mean = sum/K;
+                float rate_K_vec_no_mean[K];
+                for(int k=0; k<K; k++)
+                    rate_K_vec_no_mean[k] = rate_K_vec[k] - mean;
+
+                /* two stage VQ */
+                float rate_K_vec_no_mean_[K]; int indexes[2];
+                rate_K_mbest_encode(indexes, rate_K_vec_no_mean, rate_K_vec_no_mean_, K, NEWAMP1_VQ_MBEST_DEPTH);
+                for(int k=0; k<K; k++)
+                    rate_K_vec_[k] = rate_K_vec_no_mean_[k] + mean;
+
+                /* running sum of squared error for variance calculation */
+                for(int k=0; k<K; k++)
+                    se += pow(rate_K_vec_no_mean[k]-rate_K_vec_no_mean_[k],2.0);
+                nse += K;
+            }
+            else {
+                for(int k=0; k<K; k++)
+                    rate_K_vec_[k] = rate_K_vec[k];
+            }
+
+            if (rate_K_dec) {
+                // update delay lines
+                for(int d=0; d<rate_K_dec; d++) {
+                    rate_K_model_delay[d] = rate_K_model_delay[d+1];
+                    memcpy(&rate_K_vec_delay[d][0], &rate_K_vec_delay[d+1][0], sizeof(float)*K);
+                }
+                rate_K_model_delay[rate_K_dec] = model;
+                memcpy(&rate_K_vec_delay[rate_K_dec][0], rate_K_vec, sizeof(float)*K);
+
+                // every rate_K_dec frames, calculate interpolated output values
+                if ((frames % rate_K_dec) == 0) {
+                    float c=0.0, inc = 1.0/rate_K_dec;
+                    for(int d=0; d<=rate_K_dec; d++) {
+                        for(int k=0; k<K; k++)
+                            rate_K_vec_delay_[d][k] = (1.0-c)*rate_K_vec_delay[0][k] + c*rate_K_vec_delay[rate_K_dec][k];
+                        c += inc;
+                    }
+                } else {
+                    for(int d=0; d<rate_K_dec; d++) {
+                        memcpy(&rate_K_vec_delay_[d][0], &rate_K_vec_delay_[d+1][0], sizeof(float)*K);
+                    }
+                }
+                
+                // output from delay line
+                model = rate_K_model_delay[0];
+                for(int k=0; k<K; k++)
+                    rate_K_vec_[k] = rate_K_vec_delay_[0][k];
+            }
+            resample_rate_L(&c2const, &model, rate_K_vec_, rate_K_sample_freqs_kHz, K);
         }
 
 	/*------------------------------------------------------------*\
@@ -843,7 +916,10 @@ int main(int argc, char *argv[])
     if (lpc_model) {
     	fprintf(stderr, "SNR av = %5.2f dB\n", sum_snr/frames);
     }
-
+    if (newamp1vq) {
+    	fprintf(stderr, "var: %3.2f dB*dB\n", se/nse);        
+    }
+    
     #ifdef DUMP
     if (dump)
 	dump_off();
