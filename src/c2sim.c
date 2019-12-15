@@ -599,74 +599,6 @@ int main(int argc, char *argv[])
 
 	/*------------------------------------------------------------*\
 
-	                  newamp1 simulation, as used in 700C
-
-	\*------------------------------------------------------------*/
-
-        if (rateK) {
-            float rate_K_vec[K];
-            resample_const_rate_f(&c2const, &model, rate_K_vec, rate_K_sample_freqs_kHz, K);
-
-            float rate_K_vec_[K];
-            if (newamp1vq) {
-                /* remove mean */
-                float sum = 0.0;
-                for(int k=0; k<K; k++)
-                    sum += rate_K_vec[k];   
-                float mean = sum/K;
-                float rate_K_vec_no_mean[K];
-                for(int k=0; k<K; k++)
-                    rate_K_vec_no_mean[k] = rate_K_vec[k] - mean;
-
-                /* two stage VQ */
-                float rate_K_vec_no_mean_[K]; int indexes[2];
-                rate_K_mbest_encode(indexes, rate_K_vec_no_mean, rate_K_vec_no_mean_, K, NEWAMP1_VQ_MBEST_DEPTH);
-                for(int k=0; k<K; k++)
-                    rate_K_vec_[k] = rate_K_vec_no_mean_[k] + mean;
-
-                /* running sum of squared error for variance calculation */
-                for(int k=0; k<K; k++)
-                    se += pow(rate_K_vec_no_mean[k]-rate_K_vec_no_mean_[k],2.0);
-                nse += K;
-            }
-            else {
-                for(int k=0; k<K; k++)
-                    rate_K_vec_[k] = rate_K_vec[k];
-            }
-
-            if (rate_K_dec) {
-                // update delay lines
-                for(int d=0; d<rate_K_dec; d++) {
-                    rate_K_model_delay[d] = rate_K_model_delay[d+1];
-                    memcpy(&rate_K_vec_delay[d][0], &rate_K_vec_delay[d+1][0], sizeof(float)*K);
-                }
-                rate_K_model_delay[rate_K_dec] = model;
-                memcpy(&rate_K_vec_delay[rate_K_dec][0], rate_K_vec, sizeof(float)*K);
-
-                // every rate_K_dec frames, calculate interpolated output values
-                if ((frames % rate_K_dec) == 0) {
-                    float c=0.0, inc = 1.0/rate_K_dec;
-                    for(int d=0; d<=rate_K_dec; d++) {
-                        for(int k=0; k<K; k++)
-                            rate_K_vec_delay_[d][k] = (1.0-c)*rate_K_vec_delay[0][k] + c*rate_K_vec_delay[rate_K_dec][k];
-                        c += inc;
-                    }
-                } else {
-                    for(int d=0; d<rate_K_dec; d++) {
-                        memcpy(&rate_K_vec_delay_[d][0], &rate_K_vec_delay_[d+1][0], sizeof(float)*K);
-                    }
-                }
-                
-                // output from delay line
-                model = rate_K_model_delay[0];
-                for(int k=0; k<K; k++)
-                    rate_K_vec_[k] = rate_K_vec_delay_[0][k];
-            }
-            resample_rate_L(&c2const, &model, rate_K_vec_, rate_K_sample_freqs_kHz, K);
-        }
-
-	/*------------------------------------------------------------*\
-
                             Zero-phase modelling
 
 	\*------------------------------------------------------------*/
@@ -807,6 +739,74 @@ int main(int argc, char *argv[])
             fwrite(&ak[1], order, sizeof(float), flspEWov);
         }
             
+	/*------------------------------------------------------------*\
+
+	            Optional newamp1 simulation, as used in 700C
+
+	\*------------------------------------------------------------*/
+
+        if (rateK) {
+            float rate_K_vec[K];
+            resample_const_rate_f(&c2const, &model, rate_K_vec, rate_K_sample_freqs_kHz, K);
+
+            float rate_K_vec_[K];
+            if (newamp1vq) {
+                /* remove mean */
+                float sum = 0.0;
+                for(int k=0; k<K; k++)
+                    sum += rate_K_vec[k];   
+                float mean = sum/K;
+                float rate_K_vec_no_mean[K];
+                for(int k=0; k<K; k++)
+                    rate_K_vec_no_mean[k] = rate_K_vec[k] - mean;
+
+                /* two stage VQ */
+                float rate_K_vec_no_mean_[K]; int indexes[2];
+                rate_K_mbest_encode(indexes, rate_K_vec_no_mean, rate_K_vec_no_mean_, K, NEWAMP1_VQ_MBEST_DEPTH);
+                for(int k=0; k<K; k++)
+                    rate_K_vec_[k] = rate_K_vec_no_mean_[k] + mean;
+
+                /* running sum of squared error for variance calculation */
+                for(int k=0; k<K; k++)
+                    se += pow(rate_K_vec_no_mean[k]-rate_K_vec_no_mean_[k],2.0);
+                nse += K;
+            }
+            else {
+                for(int k=0; k<K; k++)
+                    rate_K_vec_[k] = rate_K_vec[k];
+            }
+
+            if (rate_K_dec) {
+                // update delay lines
+                for(int d=0; d<rate_K_dec; d++) {
+                    rate_K_model_delay[d] = rate_K_model_delay[d+1];
+                    memcpy(&rate_K_vec_delay[d][0], &rate_K_vec_delay[d+1][0], sizeof(float)*K);
+                }
+                rate_K_model_delay[rate_K_dec] = model;
+                memcpy(&rate_K_vec_delay[rate_K_dec][0], rate_K_vec_, sizeof(float)*K);
+
+                // every rate_K_dec frames, calculate interpolated output values
+                if ((frames % rate_K_dec) == 0) {
+                    float c=0.0, inc = 1.0/rate_K_dec;
+                    for(int d=0; d<=rate_K_dec; d++) {
+                        for(int k=0; k<K; k++)
+                            rate_K_vec_delay_[d][k] = (1.0-c)*rate_K_vec_delay[0][k] + c*rate_K_vec_delay[rate_K_dec][k];
+                        c += inc;
+                    }
+                } else {
+                    for(int d=0; d<rate_K_dec; d++) {
+                        memcpy(&rate_K_vec_delay_[d][0], &rate_K_vec_delay_[d+1][0], sizeof(float)*K);
+                    }
+                }
+                
+                // output from delay line
+                model = rate_K_model_delay[0];
+                for(int k=0; k<K; k++)
+                    rate_K_vec_[k] = rate_K_vec_delay_[0][k];
+            }
+            resample_rate_L(&c2const, &model, rate_K_vec_, rate_K_sample_freqs_kHz, K);
+        }
+
 	/*------------------------------------------------------------*\
 
           Synthesise and optional decimation to 20 or 40ms frame rate
