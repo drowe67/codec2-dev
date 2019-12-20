@@ -10,15 +10,15 @@
  
   i) 10 seconds, AWGN channel at Eb/No=3dB
 
-    octave:4> ofdm_tx('awgn_ebno_3dB_700d.raw', "700D", 10, 3);
+    octave:4> ofdm_tx("awgn_ebno_3dB_700d.raw", "700D", 10, 3);
 
   ii) 10 seconds, HF channel at Eb/No=6dB
 
-    ofdm_tx('hf_ebno_6dB_700d.raw',  "700D", 10, 6, 'hf');
+    ofdm_tx("hf_ebno_6dB_700d.raw",  "700D", 10, 6, "hf");
     
-  iii) 10 seconds, 2200 waveform, AWGN channel, Eb/No=100dB (effectively noise free)
+  iii) 10 seconds, 2200 waveform, AWGN channel, Eb/No=100dB (noise free)
 
-    ofdm_tx('hf_ebno_6dB_700d.raw',  "2200", 10);
+    ofdm_tx("hf_2020.raw", "2200", 10);
 #}
 
 % Note EbNodB is for payload data bits, so will be 10log10(rate) higher than
@@ -27,13 +27,22 @@
 function ofdm_tx(filename, mode="700D", Nsec, EbNodB=100, channel='awgn', freq_offset_Hz=0, dfoff_hz_per_sec = 0, initial_noise_sams=0, tx_filter=0)
   ofdm_lib;
 
+  dpsk = 0;
+  if strcmp(mode,"700D-DPSK")
+    mode = "700D"; dpsk = 1;
+  end
+  if strcmp(mode,"2020-DPSK")
+    mode = "2020"; dpsk = 1;
+  end
+  
   % init modem
   
   [bps Rs Tcp Ns Nc] = ofdm_init_mode(mode)
   states = ofdm_init(bps, Rs, Tcp, Ns, Nc);
   print_config(states);
   ofdm_load_const;
-
+  states.dpsk=dpsk;
+  
   % Generate fixed test frame of tx bits and run OFDM modulator
 
   Nrows = Nsec*Rs;
@@ -59,30 +68,37 @@ function ofdm_tx(filename, mode="700D", Nsec, EbNodB=100, channel='awgn', freq_o
 
   % set up HF model ---------------------------------------------------------------
 
-  if strcmp(channel, 'hf')
-    randn('seed',1);
+  if ischar(channel)
+    if strcmp(channel, 'hf')
+      randn('seed',1);
 
-    % some typical values, or replace with user supplied
+      % some typical values, or replace with user supplied
 
-    dopplerSpreadHz = 1; path_delay_ms = 1;
+      dopplerSpreadHz = 1; path_delay_ms = 1;
 
-    path_delay_samples = path_delay_ms*Fs/1000;
-    printf("Doppler Spread: %3.2f Hz Path Delay: %3.2f ms %d samples\n",
-           dopplerSpreadHz, path_delay_ms, path_delay_samples);
+      path_delay_samples = path_delay_ms*Fs/1000;
+      printf("Doppler Spread: %3.2f Hz Path Delay: %3.2f ms %d samples\n",
+             dopplerSpreadHz, path_delay_ms, path_delay_samples);
 
-    % generate same fading pattern for every run
+      % generate same fading pattern for every run
 
-    randn('seed',1);
+      randn('seed',1);
 
-    spread1 = doppler_spread(dopplerSpreadHz, Fs, (Nsec*(M+Ncp)/M)*Fs*1.1);
-    spread2 = doppler_spread(dopplerSpreadHz, Fs, (Nsec*(M+Ncp)/M)*Fs*1.1);
+      spread1 = doppler_spread(dopplerSpreadHz, Fs, (Nsec*(M+Ncp)/M)*Fs*1.1);
+      spread2 = doppler_spread(dopplerSpreadHz, Fs, (Nsec*(M+Ncp)/M)*Fs*1.1);
 
-    % sometimes doppler_spread() doesn't return exactly the number of samples we need
+      % sometimes doppler_spread() doesn't return exactly the number of samples we need
  
-    assert(length(spread1) >= Nsam, "not enough doppler spreading samples");
-    assert(length(spread2) >= Nsam, "not enough doppler spreading samples");
+      assert(length(spread1) >= Nsam, "not enough doppler spreading samples");
+      assert(length(spread2) >= Nsam, "not enough doppler spreading samples");
+    end
+  else
+    % passed in an array of complex samples, use for one path spreading/fading model
+    spread1 = channel;
+    assert(length(spread1) >= Nsam, "not enough spreading samples");
+    channel = 'custom';
   end
-
+  
   % experimental coarse amplitude quantisation
 
   quant_tx = 0;
@@ -120,7 +136,10 @@ function ofdm_tx(filename, mode="700D", Nsec, EbNodB=100, channel='awgn', freq_o
     rx_pwr = var(rx);
     rx *= sqrt(nom_rx_pwr/rx_pwr);
   end
-
+  if strcmp(channel, 'custom')
+    rx  = tx(1:Nsam) .* spread1(1:Nsam);
+  end
+  
   phase_offset = woffset*(1:Nsam) + 0.5*dwoffset*((1:Nsam).^2);
   rx = rx .* exp(j*phase_offset);
 

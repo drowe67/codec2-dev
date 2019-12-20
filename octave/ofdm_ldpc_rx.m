@@ -9,12 +9,22 @@ function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", interleave_frames = 
   gp_interleaver;
   more off;
 
+  dpsk = 0;
+  if strcmp(mode,"700D-DPSK")
+    mode = "700D"; dpsk = 1;
+  end
+  if strcmp(mode,"2020-DPSK")
+    mode = "2020"; dpsk = 1;
+  end
+  
   % init modem
 
   [bps Rs Tcp Ns Nc] = ofdm_init_mode(mode);
   states = ofdm_init(bps, Rs, Tcp, Ns, Nc);
   ofdm_load_const;
   states.verbose = 1;
+  states.dpsk = dpsk;
+  %states.phase_est_bandwidth = "high";
   
   mod_order = 4; bps = 2; modulation = 'QPSK'; mapping = 'gray';
   demod_type = 0; decoder_type = 0; max_iterations = 100;
