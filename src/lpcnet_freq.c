@@ -32,6 +32,7 @@
 */
 
 #include <assert.h>
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include "comp.h"
@@ -84,7 +85,7 @@ int lpcnet_compute_band_energy(float *bandE, COMP *X, float Fs, int Nfft) {
     sum[0] *= 2;
     sum[nb_bands-1] *= 2;
     for (int i=0;i<nb_bands;i++)
-	bandE[i] = sum[i];
+	bandE[i] = log10(sum[i]);
 
     return nb_bands;
 }
