@@ -107,6 +107,7 @@ int main(int argc, char *argv[])
     int   lspEWov = 0;
     int   ten_ms_centre = 0;
     FILE  *fphasenn = NULL;
+    FILE  *frateK = NULL; int rateKout;
     
     char* opt_string = "ho:";
     struct option long_options[] = {
@@ -114,6 +115,7 @@ int main(int argc, char *argv[])
         { "rateK", no_argument, &rateK, 1 },
         { "newamp1vq", no_argument, &newamp1vq, 1 },
         { "rateKdec", required_argument, &rate_K_dec, 1 },
+        { "rateKout", required_argument, &rateKout, 1 },
         { "lpc", required_argument, &lpc_model, 1 },
         { "lsp", no_argument, &lsp, 1 },
         { "lspd", no_argument, &lspd, 1 },
@@ -191,6 +193,14 @@ int main(int argc, char *argv[])
             } else if(strcmp(long_options[option_index].name, "rateKdec") == 0) {
                 rate_K_dec = atoi(optarg);
                 fprintf(stderr, "rate_K_dec: %d\n", rate_K_dec);
+	    } else if(strcmp(long_options[option_index].name, "rateKout") == 0) {
+                /* read model records from file or stdin */
+                if ((frateK = fopen(optarg,"wb")) == NULL) {
+	            fprintf(stderr, "Error opening rateK file: %s: %s\n",
+		        optarg, strerror(errno));
+                    exit(1);
+                }                 
+                fprintf(stderr, "each record is %d bytes\n", (int)(K*sizeof(float)));
             } else if(strcmp(long_options[option_index].name, "dec") == 0) {
 
                 decimate = atoi(optarg);
@@ -749,6 +759,9 @@ int main(int argc, char *argv[])
             float rate_K_vec[K];
             resample_const_rate_f(&c2const, &model, rate_K_vec, rate_K_sample_freqs_kHz, K);
 
+	    if (frateK != NULL)
+		assert(fwrite(rate_K_vec, sizeof(float), K, frateK) == K);
+	    
             float rate_K_vec_[K];
             if (newamp1vq) {
                 /* remove mean */
@@ -937,6 +950,7 @@ int main(int argc, char *argv[])
     if (fjvm    != NULL) fclose(fjvm);
     if (flspEWov != NULL) fclose(flspEWov);
     if (fphasenn != NULL) fclose(fphasenn);
+    if (frateK != NULL) fclose(frateK);
     if (ften_ms_centre != NULL) fclose(ften_ms_centre);
     if (fmodelout != NULL) fclose(fmodelout);
     
