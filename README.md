@@ -1,17 +1,15 @@
 # Codec 2 README
 
-Codec 2 is an open source (LGPL 2.1) low bit rate speech codec:
-
-http://rowetel.com/codec2.html
+Codec 2 is an open source (LGPL 2.1) low bit rate speech codec: http://rowetel.com/codec2.html
 
 Also included:
 
   + FreeDV API source code.  FreeDV is an open source digital voice
     protocol that integrates the modems, codecs, and FEC
-  + FDMDV DPSK modem (README_fdmdv) for HF channels
-  + Coherent PSK ((README_cohpsk) for HF channels
-  + Non-coherent FSK modem (README_fsk)
-  + Coherent OFDM modem for HF channels (README_ofdm)
+  + FDMDV DPSK modem [README_fdmdv](README_fdmdv.txt) for HF channels
+  + Coherent PSK [README_cohpsk](README_cohpsk.md) for HF channels
+  + Non-coherent FSK modem [README_fsk](README_fsk.txt)
+  + Coherent OFDM modem for HF channels [README_ofdm](README_ofdm.txt)
   + software for High Altitude Balloon image and telemetry reception
 
 ## Quickstart

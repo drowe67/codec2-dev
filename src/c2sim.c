@@ -919,6 +919,11 @@ int main(int argc, char *argv[])
                 }
                 if (postfilt)
                     postfilter(&model_dec[i], &bg_est);
+                if (modelin) {
+                    int nrec;
+                    nrec = fread(&model_dec[i],sizeof(MODEL),1,fmodelin);
+                    assert(nrec == 1);
+                }
                 synth_one_frame(n_samp, fftr_inv_cfg, buf, &model_dec[i], Sn_, Pn, prede, &de_mem, gain);
                 if (fout != NULL)
                     fwrite(buf,sizeof(short),N_SAMP,fout);
@@ -953,7 +958,6 @@ int main(int argc, char *argv[])
     if (newamp1vq) {
     	fprintf(stderr, "var: %3.2f dB*dB\n", se/nse);        
     }
-    
     #ifdef DUMP
     if (dump)
 	dump_off();
