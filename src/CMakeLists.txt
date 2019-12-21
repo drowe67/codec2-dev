@@ -195,6 +195,7 @@ set(CODEC2_SRCS
     horus_l2.c
     HRA_112_112.c
     HRAb_396_504.c
+    lpcnet_freq.c
 )
 
 set(CODEC2_PUBLIC_HEADERS

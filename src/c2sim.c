@@ -49,6 +49,7 @@
 #include "bpf.h"
 #include "bpfb.h"
 #include "newamp1.h"
+#include "lpcnet_freq.h"
 
 void synth_one_frame(int n_samp, codec2_fftr_cfg fftr_inv_cfg, short buf[], MODEL *model, float Sn_[], float Pn[], int prede, float *de_mem, float gain);
 void print_help(const struct option *long_options, int num_opts, char* argv[]);
@@ -102,12 +103,14 @@ int main(int argc, char *argv[])
     char  out_file[MAX_STR];
     FILE *fout = NULL;	/* output speech file */
     int   rateK = 0, newamp1vq = 0, rate_K_dec = 0, perframe=0;
+    int   bands = 0;
     int   K = 20;
     float framelength_s = N_S;
     int   lspEWov = 0;
     int   ten_ms_centre = 0;
     FILE  *fphasenn = NULL;
     FILE  *frateK = NULL; int rateKout;
+    FILE *fbands = NULL;
     
     char* opt_string = "ho:";
     struct option long_options[] = {
@@ -117,6 +120,7 @@ int main(int argc, char *argv[])
         { "newamp1vq", no_argument, &newamp1vq, 1 },
         { "rateKdec", required_argument, &rate_K_dec, 1 },
         { "rateKout", required_argument, &rateKout, 1 },
+        { "bands",required_argument, &bands, 1 },
         { "lpc", required_argument, &lpc_model, 1 },
         { "lsp", no_argument, &lsp, 1 },
         { "lspd", no_argument, &lspd, 1 },
@@ -202,6 +206,13 @@ int main(int argc, char *argv[])
                     exit(1);
                 }                 
                 fprintf(stderr, "each record is %d bytes\n", (int)(K*sizeof(float)));
+	    } else if(strcmp(long_options[option_index].name, "bands") == 0) {
+                /* read model records from file or stdin */
+                if ((fbands = fopen(optarg,"wb")) == NULL) {
+	            fprintf(stderr, "Error opening bands file: %s: %s\n",
+		        optarg, strerror(errno));
+                    exit(1);
+                }                 
             } else if(strcmp(long_options[option_index].name, "dec") == 0) {
 
                 decimate = atoi(optarg);
@@ -750,6 +761,13 @@ int main(int argc, char *argv[])
             fwrite(&ak[1], order, sizeof(float), flspEWov);
         }
             
+	/* LPCNet type mel spaced band ML data */
+	if (fbands) {
+	    float bandE[LPCNET_FREQ_MAX_BANDS];
+	    int nbands = lpcnet_compute_band_energy(bandE, Sw, Fs, FFT_ENC);
+	    assert(fwrite(bandE, sizeof(float), nbands, fbands) == nbands);
+	}
+    
 	/*------------------------------------------------------------*\
 
 	            Optional newamp1 simulation, as used in 700C
@@ -978,6 +996,7 @@ int main(int argc, char *argv[])
     if (frateK != NULL) fclose(frateK);
     if (ften_ms_centre != NULL) fclose(ften_ms_centre);
     if (fmodelout != NULL) fclose(fmodelout);
+    if (fbands != NULL) fclose(fbands);
     
     return 0;
 }
