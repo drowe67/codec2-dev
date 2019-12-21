@@ -101,7 +101,7 @@ int main(int argc, char *argv[])
     #endif
     char  out_file[MAX_STR];
     FILE *fout = NULL;	/* output speech file */
-    int   rateK = 0, newamp1vq = 0, rate_K_dec = 0;
+    int   rateK = 0, newamp1vq = 0, rate_K_dec = 0, perframe=0;
     int   K = 20;
     float framelength_s = N_S;
     int   lspEWov = 0;
@@ -113,6 +113,7 @@ int main(int argc, char *argv[])
     struct option long_options[] = {
         { "Fs", required_argument, &set_fs, 1 },
         { "rateK", no_argument, &rateK, 1 },
+        { "perframe", no_argument, &perframe, 1 },
         { "newamp1vq", no_argument, &newamp1vq, 1 },
         { "rateKdec", required_argument, &rate_K_dec, 1 },
         { "rateKout", required_argument, &rateKout, 1 },
@@ -798,15 +799,35 @@ int main(int argc, char *argv[])
                 rate_K_model_delay[rate_K_dec] = model;
                 memcpy(&rate_K_vec_delay[rate_K_dec][0], rate_K_vec_, sizeof(float)*K);
 
-                // every rate_K_dec frames, calculate interpolated output values
                 if ((frames % rate_K_dec) == 0) {
-                    float c=0.0, inc = 1.0/rate_K_dec;
-                    for(int d=0; d<=rate_K_dec; d++) {
-                        for(int k=0; k<K; k++)
-                            rate_K_vec_delay_[d][k] = (1.0-c)*rate_K_vec_delay[0][k] + c*rate_K_vec_delay[rate_K_dec][k];
-                        c += inc;
+                    // every rate_K_dec frames, calculate interpolated output values
+                    if (perframe) {
+                        // calculate interpolation coeff c for each frame
+                        float *A = &rate_K_vec_delay[0][0];
+                        float *B = &rate_K_vec_delay[rate_K_dec][0];
+                        for(int d=0; d<=rate_K_dec; d++) {
+                            float *T = &rate_K_vec_delay[d][0];
+                            float num = 0.0, den = 0.0;
+                            for(int k=0; k<K; k++) {
+                                num += (B[k]-T[k])*(A[k]-B[k]);
+                                den += (A[k]-B[k])*(A[k]-B[k]);
+                            }
+                            float c = -num/den;
+                            for(int k=0; k<K; k++)
+                                rate_K_vec_delay_[d][k] = c*A[k] + (1.0-c)*B[k];
+                        }                        
+                    }
+                    else {
+                        // use linear interpolation
+                        float c=0.0, inc = 1.0/rate_K_dec;
+                        for(int d=0; d<=rate_K_dec; d++) {
+                            for(int k=0; k<K; k++)
+                                rate_K_vec_delay_[d][k] = (1.0-c)*rate_K_vec_delay[0][k] + c*rate_K_vec_delay[rate_K_dec][k];
+                            c += inc;
+                        }
                     }
                 } else {
+                    // otherwise just shift out frames we have already interpolated
                     for(int d=0; d<rate_K_dec; d++) {
                         memcpy(&rate_K_vec_delay_[d][0], &rate_K_vec_delay_[d+1][0], sizeof(float)*K);
                     }
