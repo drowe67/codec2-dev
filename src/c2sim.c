@@ -933,15 +933,13 @@ int main(int argc, char *argv[])
                 if (modelin) {
                     int nrec;
                     nrec = fread(&model_dec[i],sizeof(MODEL),1,fmodelin);
-                    assert(nrec == 1);
+                    if (nrec != 1) {
+			fprintf(stderr, "Error reading model in record in frame %d - do you have enough records in file?\n", frames);
+			exit(1);
+		    }
                 }
                 if (postfilt)
                     postfilter(&model_dec[i], &bg_est);
-                if (modelin) {
-                    int nrec;
-                    nrec = fread(&model_dec[i],sizeof(MODEL),1,fmodelin);
-                    assert(nrec == 1);
-                }
                 synth_one_frame(n_samp, fftr_inv_cfg, buf, &model_dec[i], Sn_, Pn, prede, &de_mem, gain);
                 if (fout != NULL)
                     fwrite(buf,sizeof(short),N_SAMP,fout);
