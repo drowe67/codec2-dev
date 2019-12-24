@@ -187,7 +187,6 @@ float rate_K_mbest_encode(int *indexes, float *x, float *xq, int ndim, int mbest
   /* Stage 1 */
 
   mbest_search(codebook1, x, w, ndim, newamp1vq_cb[0].m, mbest_stage1, index);
-  MBEST_PRINT("Stage 1:", mbest_stage1);
 
   /* Stage 2 */
 
@@ -197,7 +196,6 @@ float rate_K_mbest_encode(int *indexes, float *x, float *xq, int ndim, int mbest
 	  target[i] = x[i] - codebook1[ndim*n1+i];
       mbest_search(codebook2, target, w, ndim, newamp1vq_cb[1].m, mbest_stage2, index);
   }
-  MBEST_PRINT("Stage 2:", mbest_stage2);
 
   n1 = mbest_stage2->list[0].index[1];
   n2 = mbest_stage2->list[0].index[0];

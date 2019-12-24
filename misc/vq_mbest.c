@@ -52,7 +52,7 @@ int main(int argc, char *argv[]) {
 	    k = atoi(optarg);
 	    assert(k < MAX_K);
 	    break; 
-       case 'q':
+	case 'q':
 	    /* load up list of comma delimited file names */
             strcpy(fnames, optarg);
             p = fnames;
@@ -105,14 +105,17 @@ int main(int argc, char *argv[]) {
     if ((num_stages == 0) || (k == 0))
 	goto help;
 
-    int   indexes[num_stages];
-    int wr = 0;
+    int   indexes[num_stages], nvecs = 0;
     float target[k], quantised[k];
+    float sqe = 0.0;
     while(fread(&target, sizeof(float), k, stdin)) {
 	quant_pred_mbest(quantised, indexes, target, num_stages, vq, m, k, mbest_survivors);
+	for(int i=0; i<k; i++)
+	    sqe += pow(target[i]-quantised[i], 2.0);
 	fwrite(&quantised, sizeof(float), k, stdout);
+	nvecs++;
     }
-    fprintf(stderr, "wr: %d\n", wr);
+    fprintf(stderr, "var: %f\n", sqe/(nvecs*k));
     return 0;
 }
 
@@ -130,7 +133,7 @@ void pv(char s[], float v[], int k) {
 
 // mbest algorithm version, backported from LPCNet/src
 
-float quant_pred_mbest(float vec_out[],
+void quant_pred_mbest(float vec_out[],
                       int   indexes[],
                       float vec_in[],
                       int   num_stages,
@@ -162,7 +165,7 @@ float quant_pred_mbest(float vec_out[],
        mbest_survivors at each stage */
     
     mbest_search(vq, err, w, k, m[0], mbest_stage[0], index);
-    if (verbose) MBEST_PRINT("Stage 1:", mbest_stage[0]);
+    if (verbose) mbest_print("Stage 1:", mbest_stage[0]);
     
     for(s=1; s<num_stages; s++) {
 
@@ -186,7 +189,7 @@ float quant_pred_mbest(float vec_out[],
             mbest_search(&vq[s*k*MAX_ENTRIES], target, w, k, m[s], mbest_stage[s], index);
         }
         char str[80]; sprintf(str,"Stage %d:", s+1);
-        if (verbose) MBEST_PRINT(str, mbest_stage[s]);
+        if (verbose) mbest_print(str, mbest_stage[s]);
     }
 
     for(s=0; s<num_stages; s++) {

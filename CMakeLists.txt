@@ -501,5 +501,11 @@ endif()
              COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/unittest/est_n0.sh
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/unittest
              )
+     add_test(NAME test_vq_mbest
+             COMMAND sh -c "./tvq_mbest; \
+                            cat target.f32 | ../misc/vq_mbest -k 2 -q vq1.f32,vq2.f32 --mbest 2 -v > out.f32; \
+                            diff target.f32 out.f32"
+             WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/unittest
+             )
 
 endif(UNITTEST)
