@@ -115,7 +115,7 @@ int main(int argc, char *argv[]) {
 	fwrite(&quantised, sizeof(float), k, stdout);
 	nvecs++;
     }
-    fprintf(stderr, "var: %f\n", sqe/(nvecs*k));
+    fprintf(stderr, "%4.2f\n", sqe/(nvecs*k));
     return 0;
 }
 
