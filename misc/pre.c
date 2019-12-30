@@ -25,7 +25,7 @@ int main(int argc, char*argv[]) {
 
     if (argc != 3) {
 	printf("usage: pre InputRawSpeechFile OutputRawSpeechFile\n");
-	printf("e.g    pre input.raw output.raw");
+	printf("e.g    pre input.raw output.raw\n");
 	exit(1);
     }
 

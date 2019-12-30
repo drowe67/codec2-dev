@@ -34,7 +34,7 @@ int main(int argc, char *argv[]) {
     int   k=0, mbest_survivors=0, num_stages=0;
     char  fnames[256], fn[256], *comma, *p;
     FILE *fq;
-	    
+    float lower = -1E32;
     
     int o = 0; int opt_idx = 0;
     while (o != -1) {
@@ -42,6 +42,7 @@ int main(int argc, char *argv[]) {
 	   {"k",       required_argument, 0, 'q'},
 	   {"quant",   required_argument, 0, 'q'},
 	   {"mbest",   required_argument, 0, 'm'},
+	   {"lower",   required_argument, 0, 'l'},
 	   {"verbose", required_argument, 0, 'v'},
 	   {0, 0, 0, 0}
         };
@@ -91,11 +92,14 @@ int main(int argc, char *argv[]) {
             mbest_survivors = atoi(optarg);
             fprintf(stderr, "mbest_survivors = %d\n",  mbest_survivors);
             break;
+        case 'l':
+            lower = atof(optarg);
+            break;
         case 'v':
             verbose = 1;
             break;
 	help:
-            fprintf(stderr, "usage: %s -k dimension -q vq1.f32,vq2.f32,.... [-m mbest_survivors]\n", argv[0]);
+            fprintf(stderr, "usage: %s -k dimension -q vq1.f32,vq2.f32,.... [-m mbest_survivors] [--lower lowermeanLimit]\n", argv[0]);
 	    fprintf(stderr, "input vectors on stdin, output quantised vectors on stdout\n");
 	    fprintf(stderr, "--mbest  number of survivors at each stage, set to 0 for standard VQ search\n");
             exit(1);
@@ -109,9 +113,24 @@ int main(int argc, char *argv[]) {
     float target[k], quantised[k];
     float sqe = 0.0;
     while(fread(&target, sizeof(float), k, stdin)) {
-	quant_pred_mbest(quantised, indexes, target, num_stages, vq, m, k, mbest_survivors);
+	int dont_count = 0;
+	/* optional clamping to lower limit or mean */
+	float mean = 0.0;
 	for(int i=0; i<k; i++)
-	    sqe += pow(target[i]-quantised[i], 2.0);
+	    mean += target[i];
+	mean /= k;         
+	float difference = mean - lower;
+	if (difference < 0.0) {
+	    /* bring target up to lower clamping limit */
+	    for(int i=0; i<k; i++)
+		target[i] += -difference;
+	    dont_count = 1;
+	}
+	quant_pred_mbest(quantised, indexes, target, num_stages, vq, m, k, mbest_survivors);
+	if (dont_count == 0) {
+	    for(int i=0; i<k; i++)
+		sqe += pow(target[i]-quantised[i], 2.0);
+	}
 	fwrite(&quantised, sizeof(float), k, stdout);
 	nvecs++;
     }
