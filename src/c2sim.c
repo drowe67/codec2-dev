@@ -103,7 +103,8 @@ int main(int argc, char *argv[])
     char  out_file[MAX_STR];
     FILE *fout = NULL;	/* output speech file */
     int   rateK = 0, newamp1vq = 0, rate_K_dec = 0, perframe=0;
-    int   bands = 0;
+    int   bands = 0, bands_lower_en;
+    float bands_lower = -1E32;
     int   K = 20;
     float framelength_s = N_S;
     int   lspEWov = 0;
@@ -121,6 +122,7 @@ int main(int argc, char *argv[])
         { "rateKdec", required_argument, &rate_K_dec, 1 },
         { "rateKout", required_argument, &rateKout, 1 },
         { "bands",required_argument, &bands, 1 },
+        { "bands_lower",required_argument, &bands_lower_en, 1 },
         { "lpc", required_argument, &lpc_model, 1 },
         { "lsp", no_argument, &lsp, 1 },
         { "lspd", no_argument, &lspd, 1 },
@@ -213,6 +215,9 @@ int main(int argc, char *argv[])
 		        optarg, strerror(errno));
                     exit(1);
                 }                 
+	    } else if(strcmp(long_options[option_index].name, "bands_lower") == 0) {
+		bands_lower = atof(optarg);
+		fprintf(stderr, "bands_lower: %f\n", bands_lower);
             } else if(strcmp(long_options[option_index].name, "dec") == 0) {
 
                 decimate = atoi(optarg);
@@ -435,7 +440,7 @@ int main(int argc, char *argv[])
     float pitch;
     float snr;
     float sum_snr;
-
+    
     float pre_mem = 0.0, de_mem = 0.0;
     float ak[1+order];
     // COMP  Sw_[FFT_ENC];
@@ -762,10 +767,16 @@ int main(int argc, char *argv[])
         }
             
 	/* LPCNet type mel spaced band ML data */
+	float bands_mean = 0.0;
 	if (fbands) {
 	    float bandE[LPCNET_FREQ_MAX_BANDS];
 	    int nbands = lpcnet_compute_band_energy(bandE, Sw, Fs, FFT_ENC);
-	    assert(fwrite(bandE, sizeof(float), nbands, fbands) == nbands);
+	    for(int i=0; i<nbands; i++)
+		bands_mean += bandE[i];
+	    bands_mean /= nbands;
+	    //fprintf(stderr, "bands_mean: %f bands_lower %f\n", bands_mean,  bands_lower);
+	    if (bands_mean > bands_lower)
+		assert(fwrite(bandE, sizeof(float), nbands, fbands) == nbands);
 	}
     
 	/*------------------------------------------------------------*\
@@ -943,8 +954,15 @@ int main(int argc, char *argv[])
                 synth_one_frame(n_samp, fftr_inv_cfg, buf, &model_dec[i], Sn_, Pn, prede, &de_mem, gain);
                 if (fout != NULL)
                     fwrite(buf,sizeof(short),N_SAMP,fout);
-                if (modelout)
-                    fwrite(&model_dec[i],sizeof(MODEL),1,fmodelout);
+                if (modelout) {
+		    /* optionally don't write to filter out low energy frames */
+		    if (bands) {
+			if (bands_mean > bands_lower)
+			    fwrite(&model_dec[i],sizeof(MODEL),1,fmodelout);
+		    }
+		    else
+			fwrite(&model_dec[i],sizeof(MODEL),1,fmodelout);
+		}
             }
 
             /* update memories for next frame ----------------------------*/
