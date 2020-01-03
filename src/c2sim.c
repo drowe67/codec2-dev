@@ -922,6 +922,15 @@ int main(int argc, char *argv[])
                     #endif
                 }
 
+                if (modelin) {
+                    int nrec;
+                    nrec = fread(&model_dec[i],sizeof(MODEL),1,fmodelin);
+                    if (nrec != 1) {
+			fprintf(stderr, "Error reading model in record in frame %d - do you have enough records in file?\n", frames);
+			exit(1);
+		    }
+                }
+
                 if (phase0) {
                     /* optionally read in Aw, replacing values generated using LPC */
 
@@ -941,14 +950,6 @@ int main(int argc, char *argv[])
                     phase_synth_zero_order(n_samp, &model_dec[i], ex_phase, H);
                 }
                 
-                if (modelin) {
-                    int nrec;
-                    nrec = fread(&model_dec[i],sizeof(MODEL),1,fmodelin);
-                    if (nrec != 1) {
-			fprintf(stderr, "Error reading model in record in frame %d - do you have enough records in file?\n", frames);
-			exit(1);
-		    }
-                }
                 if (postfilt)
                     postfilter(&model_dec[i], &bg_est);
                 synth_one_frame(n_samp, fftr_inv_cfg, buf, &model_dec[i], Sn_, Pn, prede, &de_mem, gain);
