@@ -1705,8 +1705,6 @@ float codec2_get_energy(struct CODEC2 *c2, const unsigned char *bits)
 	   ( CODEC2_MODE_ACTIVE(CODEC2_MODE_1400, c2->mode)) ||
 	   ( CODEC2_MODE_ACTIVE(CODEC2_MODE_1300, c2->mode)) ||
 	   ( CODEC2_MODE_ACTIVE(CODEC2_MODE_1200, c2->mode)) ||
-	   ( CODEC2_MODE_ACTIVE(CODEC2_MODE_700, c2->mode)) ||
-	   ( CODEC2_MODE_ACTIVE(CODEC2_MODE_700B, c2->mode)) ||
 	   ( CODEC2_MODE_ACTIVE(CODEC2_MODE_700C, c2->mode)) ||
 	   ( CODEC2_MODE_ACTIVE(CODEC2_MODE_450, c2->mode)) ||
 	   ( CODEC2_MODE_ACTIVE(CODEC2_MODE_450PWB, c2->mode))
@@ -1746,16 +1744,6 @@ float codec2_get_energy(struct CODEC2 *c2, const unsigned char *bits)
         nbit = 1 + 1;
         WoE_index = unpack(bits, &nbit, WO_E_BITS);
         decode_WoE(&c2->c2const, &model, &e, xq_dec, WoE_index);
-    }
-    if ( CODEC2_MODE_ACTIVE(CODEC2_MODE_700, c2->mode)) {
-        nbit = 1 + 5;
-        e_index = unpack_natural_or_gray(bits, &nbit, 3, c2->gray);
-        e = decode_energy(e_index, 3);
-    }
-    if ( CODEC2_MODE_ACTIVE(CODEC2_MODE_700B, c2->mode)) {
-        nbit = 1 + 5;
-        e_index = unpack_natural_or_gray(bits, &nbit, 3, c2->gray);
-        e = decode_energy(e_index, 3);
     }
     if ( CODEC2_MODE_ACTIVE(CODEC2_MODE_700C, c2->mode)) {
         e = codec2_energy_700c(c2, bits);
@@ -2168,12 +2156,6 @@ int codec2_get_spare_bit_index(struct CODEC2 *c2)
         break;
     case CODEC2_MODE_1600:
         return 15; // bit 15 (16th bit) is v2 (third voicing bit)
-        break;
-    case CODEC2_MODE_700:
-        return 26; // bits 26 and 27 are spare
-        break;
-    case CODEC2_MODE_700B:
-        return 27; // bit 27 is spare
         break;
     }
 
