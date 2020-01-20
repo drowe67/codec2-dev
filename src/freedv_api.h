@@ -65,12 +65,6 @@
 #if !defined(FREEDV_MODE_1600_EN)
         #define FREEDV_MODE_1600_EN FREEDV_MODE_EN_DEFAULT
 #endif
-#if !defined(FREEDV_MODE_700_EN)
-        #define FREEDV_MODE_700_EN FREEDV_MODE_EN_DEFAULT
-#endif
-#if !defined(FREEDV_MODE_700B_EN)
-        #define FREEDV_MODE_700B_EN FREEDV_MODE_EN_DEFAULT
-#endif
 #if !defined(FREEDV_MODE_700C_EN)
         #define FREEDV_MODE_700C_EN FREEDV_MODE_EN_DEFAULT
 #endif
