@@ -41,8 +41,6 @@
 #define CODEC2_MODE_1400 	3
 #define CODEC2_MODE_1300 	4
 #define CODEC2_MODE_1200 	5
-#define CODEC2_MODE_700  	6
-#define CODEC2_MODE_700B 	7
 #define CODEC2_MODE_700C 	8
 #define CODEC2_MODE_450 	10
 #define CODEC2_MODE_450PWB 	11
@@ -76,12 +74,6 @@
 #endif
 #if !defined(CODEC2_MODE_1200_EN)
         #define CODEC2_MODE_1200_EN CODEC2_MODE_EN_DEFAULT
-#endif
-#if !defined(CODEC2_MODE_700_EN)
-        #define CODEC2_MODE_700_EN CODEC2_MODE_EN_DEFAULT
-#endif
-#if !defined(CODEC2_MODE_700B_EN)
-        #define CODEC2_MODE_700B_EN CODEC2_MODE_EN_DEFAULT
 #endif
 #if !defined(CODEC2_MODE_700C_EN)
         #define CODEC2_MODE_700C_EN CODEC2_MODE_EN_DEFAULT
