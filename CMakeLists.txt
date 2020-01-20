@@ -386,7 +386,7 @@ endif()
              )
 
     add_test(NAME test_ldpc_enc_dec_HRAb_396_504
-             COMMAND sh -c "$<TARGET_FILE:ldpc_enc> /dev/zero - --sd --code HRAb_396_504 --testframes 200 | $<TARGET_FILE:ldpc_noise> - - -2.5 | $<TARGET_FILE:ldpc_dec> - /dev/null --code HRAb_396_504 --sd --testframes"
+             COMMAND sh -c "$<TARGET_FILE:ldpc_enc> /dev/zero - --sd --code HRAb_396_504 --testframes 200 | $<TARGET_FILE:ldpc_noise> - - -2.0 | $<TARGET_FILE:ldpc_dec> - /dev/null --code HRAb_396_504 --sd --testframes"
              )
 
     # some more LDPC tests, placed in a script for convenience
