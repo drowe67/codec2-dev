@@ -216,7 +216,7 @@ struct CODEC2 * codec2_create(int mode)
         c2->bpf_buf[i] = 0.0;
 
     c2->softdec = NULL;
-    c2->gray = 0;
+    c2->gray = 1;
     
     /* newamp1 initialisation */
 
