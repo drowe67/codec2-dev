@@ -53,8 +53,8 @@ int main(int argc, char *argv[]) {
     float    loop_time;
     int      enable_stats = 0;
     int      quadrature = 0;
-    int fsk_lower = -1;
-    int fsk_upper = -1;
+    int     fsk_lower = -1;
+    int     fsk_upper = -1;
 
     stats_loop = 0;
     stats_rate = 8;
