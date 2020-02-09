@@ -68,8 +68,8 @@ int main(int argc, char *argv[]) {
             {"help",      no_argument,        0, 'h'},
             {"mode",      required_argument,  0, 'm'},
             {"stats",     optional_argument,  0, 't'},
-            {"fsk_lower", optional_argument,  0, 'b'},
-            {"fsk_upper", optional_argument,  0, 'u'},
+            {"fsk_lower", required_argument,  0, 'b'},
+            {"fsk_upper", required_argument,  0, 'u'},
             {0, 0, 0, 0}
         };
         
