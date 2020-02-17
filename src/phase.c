@@ -241,6 +241,13 @@ void mag_to_phase(float phase[],             /* Nfft/2+1 output phase samples in
     int  Ns = Nfft/2+1;
     int  i;
 
+    /* initialize array */
+
+    for(i=0; i<Nfft; i++) {
+        Sdb[i].real = 0.0;
+        Sdb[i].imag = 0.0;
+    }
+
     /* install negative frequency components, 1/Nfft takes into
        account kiss fft lack of scaling on ifft */
 

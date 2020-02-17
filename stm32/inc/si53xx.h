@@ -284,7 +284,7 @@ typedef struct {
 
 
 
-T_Si5351_data   Si5351_Config;
+extern T_Si5351_data   Si5351_Config;
 
 /* private routines */
 

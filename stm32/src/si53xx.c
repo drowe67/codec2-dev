@@ -42,6 +42,7 @@
 #include "math.h"
 #include "si53xx.h"
 
+T_Si5351_data   Si5351_Config;
 
 void si5351_write(uint8_t REGaddr, uint8_t data) {
     // ignoring errors
