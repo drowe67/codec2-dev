@@ -48,11 +48,12 @@ int main(int argc, char *argv[])
     char          *unpacked_bits_char;
     int            bit, byte,i;
     int            report_var = 0;
+    int            eq = 0;
     
     if (argc < 4) {
-	printf("usage: c2enc 3200|2400|1600|1400|1300|1200|700|700B|700C|450|450PWB InputRawspeechFile OutputBitFile [--natural] [--softdec] [--bitperchar] [--mlfeat] [--loadcb stageNum Filename] [--var]\n");
-	printf("e.g    c2enc 1400 ../raw/hts1a.raw hts1a.c2\n");
-	printf("e.g    c2enc 1300 ../raw/hts1a.raw hts1a.c2 --natural\n");
+	printf("usage: c2enc 3200|2400|1600|1400|1300|1200|700C|450|450PWB InputRawspeechFile OutputBitFile [--natural] [--softdec] [--bitperchar] [--mlfeat f32File modelFile] [--loadcb stageNum Filename] [--var] [--eq]\n");
+	printf("e.g. (headerless)    c2enc 1300 ../raw/hts1a.raw hts1a.bin\n");
+	printf("e.g. (with header to detect mode)   c2enc 1300 ../raw/hts1a.raw hts1a.c2\n");
 	exit(1);
     }
 
@@ -68,10 +69,6 @@ int main(int argc, char *argv[])
 	mode = CODEC2_MODE_1300;
     else if (strcmp(argv[1],"1200") == 0)
 	mode = CODEC2_MODE_1200;
-    else if (strcmp(argv[1],"700") == 0)
-	mode = CODEC2_MODE_700;
-    else if (strcmp(argv[1],"700B") == 0)
-	mode = CODEC2_MODE_700B;
     else if (strcmp(argv[1],"700C") == 0)
 	mode = CODEC2_MODE_700C;
     else if (strcmp(argv[1],"450") == 0)
@@ -79,7 +76,7 @@ int main(int argc, char *argv[])
     else if (strcmp(argv[1],"450PWB") == 0)
 	mode = CODEC2_MODE_450;
     else {
-	fprintf(stderr, "Error in mode: %s.  Must be 3200, 2400, 1600, 1400, 1300, 1200, 700, 700B, 700C, 450, 450PWB or WB\n", argv[1]);
+	fprintf(stderr, "Error in mode: %s.  Must be 3200, 2400, 1600, 1400, 1300, 1200, 700C, 450, 450PWB or WB\n", argv[1]);
 	exit(1);
     }
 
@@ -135,7 +132,7 @@ int main(int argc, char *argv[])
         }
         if (strcmp(argv[i], "--mlfeat") == 0) {
             /* dump machine learning features (700C only) */
-            codec2_open_mlfeat(codec2, argv[i+1]);
+            codec2_open_mlfeat(codec2, argv[i+1], argv[i+2]);
         }
         if (strcmp(argv[i], "--loadcb") == 0) {
             /* load VQ stage (700C only) */
@@ -144,10 +141,14 @@ int main(int argc, char *argv[])
         if (strcmp(argv[i], "--var") == 0) {
             report_var = 1;
         }
-
+        if (strcmp(argv[i], "--eq") == 0) {
+            eq = 1;
+        }
         
     }
     codec2_set_natural_or_gray(codec2, gray);
+    codec2_700c_eq(codec2, eq);
+    
     //fprintf(stderr,"gray: %d softdec: %d\n", gray, softdec);
 
     while(fread(buf, sizeof(short), nsam, fin) == (size_t)nsam) {
@@ -186,7 +187,7 @@ int main(int argc, char *argv[])
 
     if (report_var) {
         float var = codec2_get_var(codec2);
-        fprintf(stderr, "%s var: %f std: %f\n", argv[2], var, sqrt(var));
+        fprintf(stderr, "%s var: %5.2f std: %5.2f\n", argv[2], var, sqrt(var));
     }
     codec2_destroy(codec2);
 

@@ -367,6 +367,7 @@ int main(int argc, char *argv[])
                     Tbits++;
                 }
             }
+            fprintf(stderr, "Terrs_raw: %d  Tbits_raw: %d Terr: %d Tbits: %d\n", Terrs_raw, Tbits_raw, Terrs, Tbits);
         }
 
         free(input_double);

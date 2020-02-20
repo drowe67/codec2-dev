@@ -62,7 +62,7 @@ C2CONST c2const_create(int Fs, float framelength_s) {
     assert((Fs == 8000) || (Fs = 16000));
     c2const.Fs = Fs;
     c2const.n_samp = round(Fs*framelength_s);
-    c2const.max_amp = floor(Fs*P_MIN_S/2);
+    c2const.max_amp = floor(Fs*P_MAX_S/2);
     c2const.p_min = floor(Fs*P_MIN_S);
     c2const.p_max = floor(Fs*P_MAX_S);
     c2const.m_pitch = floor(Fs*M_PITCH_S);
@@ -97,11 +97,10 @@ C2CONST c2const_create(int Fs, float framelength_s) {
 
 \*---------------------------------------------------------------------------*/
 
-void make_analysis_window(C2CONST *c2const, codec2_fft_cfg fft_fwd_cfg, float w[], COMP W[])
+void make_analysis_window(C2CONST *c2const, codec2_fft_cfg fft_fwd_cfg, float w[], float W[])
 {
   float m;
   COMP  wshift[FFT_ENC];
-  COMP  temp;
   int   i,j;
   int   m_pitch = c2const->m_pitch;
   int   nw      = c2const->nw;
@@ -156,6 +155,8 @@ void make_analysis_window(C2CONST *c2const, codec2_fft_cfg fft_fwd_cfg, float w[
        nw/2              nw/2
   */
 
+  COMP temp[FFT_ENC];
+
   for(i=0; i<FFT_ENC; i++) {
     wshift[i].real = 0.0;
     wshift[i].imag = 0.0;
@@ -165,7 +166,7 @@ void make_analysis_window(C2CONST *c2const, codec2_fft_cfg fft_fwd_cfg, float w[
   for(i=FFT_ENC-nw/2,j=m_pitch/2-nw/2; i<FFT_ENC; i++,j++)
    wshift[i].real = w[j];
 
-  codec2_fft(fft_fwd_cfg, wshift, W);
+  codec2_fft(fft_fwd_cfg, wshift, temp);
 
   /*
       Re-arrange W[] to be symmetrical about FFT_ENC/2.  Makes later
@@ -192,12 +193,8 @@ void make_analysis_window(C2CONST *c2const, codec2_fft_cfg fft_fwd_cfg, float w[
 
 
   for(i=0; i<FFT_ENC/2; i++) {
-    temp.real = W[i].real;
-    temp.imag = W[i].imag;
-    W[i].real = W[i+FFT_ENC/2].real;
-    W[i].imag = W[i+FFT_ENC/2].imag;
-    W[i+FFT_ENC/2].real = temp.real;
-    W[i+FFT_ENC/2].imag = temp.imag;
+      W[i] = temp[i + FFT_ENC / 2].real;
+      W[i + FFT_ENC / 2] = temp[i].real;
   }
 
 }
@@ -402,39 +399,30 @@ void hs_pitch_refinement(MODEL *model, COMP Sw[], float pmin, float pmax, float 
 
 \*---------------------------------------------------------------------------*/
 
-void estimate_amplitudes(MODEL *model, COMP Sw[], COMP W[], int est_phase)
+void estimate_amplitudes(MODEL *model, COMP Sw[], float W[], int est_phase)
 {
   int   i,m;		/* loop variables */
   int   am,bm;		/* bounds of current harmonic */
-  int   b;		/* DFT bin of centre of current harmonic */
   float den;		/* denominator of amplitude expression */
-  float r, one_on_r;	/* number of rads/bin */
-  int   offset;
-  COMP  Am;
 
-  r = TWO_PI/FFT_ENC;
-  one_on_r = 1.0/r;
+  float r = TWO_PI/FFT_ENC;
+  float one_on_r = 1.0/r;
 
   for(m=1; m<=model->L; m++) {
-    den = 0.0;
-    am = (int)((m - 0.5)*model->Wo*one_on_r + 0.5);
-    bm = (int)((m + 0.5)*model->Wo*one_on_r + 0.5);
-    b = (int)(m*model->Wo/r + 0.5);
-
     /* Estimate ampltude of harmonic */
 
     den = 0.0;
-    Am.real = Am.imag = 0.0;
-    offset = FFT_ENC/2 - (int)(m*model->Wo*one_on_r + 0.5);
+    am = (int)((m - 0.5)*model->Wo*one_on_r + 0.5);
+    bm = (int)((m + 0.5)*model->Wo*one_on_r + 0.5);
+
     for(i=am; i<bm; i++) {
       den += Sw[i].real*Sw[i].real + Sw[i].imag*Sw[i].imag;
-      Am.real += Sw[i].real*W[i + offset].real;
-      Am.imag += Sw[i].imag*W[i + offset].real;
     }
 
     model->A[m] = sqrtf(den);
 
     if (est_phase) {
+        int b = (int)(m*model->Wo/r + 0.5); /* DFT bin of centre of current harmonic */
 
         /* Estimate phase of harmonic, this is expensive in CPU for
            embedded devicesso we make it an option */
@@ -459,7 +447,7 @@ float est_voicing_mbe(
                       C2CONST *c2const,
                       MODEL *model,
                       COMP   Sw[],
-                      COMP   W[]
+                      float  W[]
                       )
 {
     int   l,al,bl,m;    /* loop variables */
@@ -497,9 +485,9 @@ float est_voicing_mbe(
 
         offset = FFT_ENC/2 - l*Wo*FFT_ENC/TWO_PI + 0.5;
 	for(m=al; m<bl; m++) {
-	    Am.real += Sw[m].real*W[offset+m].real;
-	    Am.imag += Sw[m].imag*W[offset+m].real;
-	    den += W[offset+m].real*W[offset+m].real;
+	    Am.real += Sw[m].real*W[offset+m];
+	    Am.imag += Sw[m].imag*W[offset+m];
+	    den += W[offset+m]*W[offset+m];
         }
 
         Am.real = Am.real/den;
@@ -507,10 +495,9 @@ float est_voicing_mbe(
 
         /* Determine error between estimated harmonic and original */
 
-// Redundant!        offset = FFT_ENC/2 - l*Wo*FFT_ENC/TWO_PI + 0.5;
         for(m=al; m<bl; m++) {
-	    Ew.real = Sw[m].real - Am.real*W[offset+m].real;
-	    Ew.imag = Sw[m].imag - Am.imag*W[offset+m].real;
+	    Ew.real = Sw[m].real - Am.real*W[offset+m];
+	    Ew.imag = Sw[m].imag - Am.imag*W[offset+m];
 	    error += Ew.real*Ew.real;
 	    error += Ew.imag*Ew.imag;
 	}

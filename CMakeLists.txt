@@ -5,6 +5,8 @@
 # Please report questions, comments, problems, or patches to the freetel
 # mailing list: https://lists.sourceforge.net/lists/listinfo/freetel-codec2
 #
+set(CMAKE_OSX_DEPLOYMENT_TARGET "10.9" CACHE STRING "Minimum OS X deployment version")
+
 project(codec2 C)
 
 cmake_minimum_required(VERSION 3.0)
@@ -45,7 +47,7 @@ set(CODEC2_VERSION_MAJOR 0)
 set(CODEC2_VERSION_MINOR 9)
 # Set to patch level if needed, otherwise leave FALSE.
 # Must be positive (non-zero) if set, since 0 == FALSE in CMake.
-set(CODEC2_VERSION_PATCH FALSE)
+set(CODEC2_VERSION_PATCH 2)
 set(CODEC2_VERSION "${CODEC2_VERSION_MAJOR}.${CODEC2_VERSION_MINOR}")
 # Patch level version bumps should not change API/ABI.
 set(SOVERSION "${CODEC2_VERSION_MAJOR}.${CODEC2_VERSION_MINOR}")
@@ -80,7 +82,7 @@ if(NOT WIN32)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC")
 endif()
 
-set(CMAKE_C_FLAGS_DEBUG "-g -O2")
+set(CMAKE_C_FLAGS_DEBUG "-g -O2 -DDUMP")
 set(CMAKE_C_FLAGS_RELEASE "-O3")
 
 #
@@ -159,16 +161,20 @@ if (_GNU_SOURCE)
     add_definitions(-D_GNU_SOURCE=1)
 endif()
 
-check_symbol_exists(floor  math.h HAVE_FLOOR)
-check_symbol_exists(ceil   math.h HAVE_CEIL)
-check_symbol_exists(pow    math.h HAVE_POW)
-check_symbol_exists(sqrt   math.h HAVE_SQRT)
-check_symbol_exists(sin    math.h HAVE_SIN)
-check_symbol_exists(cos    math.h HAVE_COS)
-check_symbol_exists(atan2  math.h HAVE_ATAN2)
-check_symbol_exists(log10  math.h HAVE_LOG10)
-check_symbol_exists(round  math.h HAVE_ROUND)
-check_symbol_exists(getopt math.h HAVE_GETOPT)
+if(UNIX)
+    set(CMAKE_REQUIRED_LIBRARIES m)
+endif()
+
+check_symbol_exists(floor  math.h   HAVE_FLOOR)
+check_symbol_exists(ceil   math.h   HAVE_CEIL)
+check_symbol_exists(pow    math.h   HAVE_POW)
+check_symbol_exists(sqrt   math.h   HAVE_SQRT)
+check_symbol_exists(sin    math.h   HAVE_SIN)
+check_symbol_exists(cos    math.h   HAVE_COS)
+check_symbol_exists(atan2  math.h   HAVE_ATAN2)
+check_symbol_exists(log10  math.h   HAVE_LOG10)
+check_symbol_exists(round  math.h   HAVE_ROUND)
+check_symbol_exists(getopt getopt.h HAVE_GETOPT)
 
 configure_file ("${PROJECT_SOURCE_DIR}/cmake/config.h.in"
                 "${PROJECT_BINARY_DIR}/config.h" )
@@ -192,21 +198,22 @@ include_directories(${PROJECT_BINARY_DIR})
 #
 if(LPCNET)
     if(LPCNET_BUILD_DIR)
-        find_package(lpcnet REQUIRED
+        find_package(lpcnetfreedv REQUIRED
             PATHS ${LPCNET_BUILD_DIR}
             NO_DEFAULT_PATH
             CONFIGS lpcnetfreedv.cmake
         )
-        if(lpcnet_FOUND)
+        if(lpcnetfreedv_FOUND)
             message(STATUS "liblpcnetfreedv found in build tree.")
             add_definitions("-D__LPCNET__")
         else()
             message(FATAL_ERROR "LPCNet include/library not found in build tree.")
         endif()
     else()
-        find_package(lpcnet REQUIRED)
-        if(lpcnet_FOUND)
+        find_package(lpcnetfreedv REQUIRED)
+        if(lpcnetfreedv_FOUND)
             add_definitions("-D__LPCNET__")
+            message(STATUS "liblpcnetfreedv found.")
         else()
             message(FATAL_ERROR "lpcnetfreedv library not found.")
         endif()
@@ -296,6 +303,14 @@ if(UNITTEST)
     include(CTest)
     enable_testing()
 
+    add_test(NAME test_codec2_700c_octave_port
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            ./c2sim ../../raw/cq_ref.raw --phase0 --postfilter --dump cq_ref --lpc 10 --dump_pitch_e cq_ref_pitche.txt; \
+                            cd ${CMAKE_CURRENT_BINARY_DIR}/unittest; ./tnewamp1 ../../raw/cq_ref.raw; \
+                            cd ${CMAKE_CURRENT_SOURCE_DIR}/octave;  \
+                            octave --no-gui -qf run_tnewamp1.m")
+             set_tests_properties(test_codec2_700c_octave_port PROPERTIES PASS_REGULAR_EXPRESSION "fails: 0")
+
     add_test(NAME test_FDMDV_modem_octave_port
              COMMAND sh -c "$<TARGET_FILE:tfdmdv> && octave --no-gui -qf ${CMAKE_CURRENT_SOURCE_DIR}/octave/tfdmdv.m"
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/octave)
@@ -337,8 +352,25 @@ if(UNITTEST)
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/unittest
              )
            
-    add_test(NAME test_OFDM_modem_time_sync
-             COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/unittest/ofdm_time_sync.sh
+    add_test(NAME test_OFDM_modem_phase_est_bw
+             COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/unittest/ofdm_phase_est_bw.sh
+             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/unittest
+             )
+           
+    add_test(NAME test_OFDM_modem_time_sync_700D
+             COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/unittest/ofdm_time_sync.sh 700D
+             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/unittest
+             )
+           
+if(LPCNET)
+    add_test(NAME test_OFDM_modem_time_sync_2020
+             COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/unittest/ofdm_time_sync.sh 2020
+             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/unittest
+             )
+endif()
+
+    add_test(NAME test_OFDM_modem_fading_DPSK_BER
+             COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/unittest/ofdm_fade_dpsk.sh
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/unittest
              )
            
@@ -347,6 +379,12 @@ if(UNITTEST)
              )
              set_tests_properties(test_horus_binary PROPERTIES
              PASS_REGULAR_EXPRESSION "1C9A9545")
+
+    add_test(NAME test_horus_binary_iq
+             COMMAND sh -c "cat ${CMAKE_CURRENT_SOURCE_DIR}/raw/horusb_iq_s16.raw | $<TARGET_FILE:horus_demod> -q -m binary --fsk_lower=1000 --fsk_upper=20000 - -"
+             )
+             set_tests_properties(test_horus_binary_iq PROPERTIES
+             PASS_REGULAR_EXPRESSION "000900071E2A000000000000000000000000259A6B14")
 
     # tests ldpc_enc/ldpc_noise/ldpc_dec
     add_test(NAME test_ldpc_enc_dec
@@ -385,34 +423,95 @@ if(UNITTEST)
     add_test(NAME test_FreeDV_API_700D_AWGN_BER_Interleave
              COMMAND sh -c "dd bs=2560 count=120 if=/dev/zero | $<TARGET_FILE:freedv_tx> 700D - - --interleave 8 --testframes | $<TARGET_FILE:cohpsk_ch> - - -20 --Fs 8000 -f -10 | $<TARGET_FILE:freedv_rx> 700D - /dev/null --interleave 8 --testframes"
              )
+if(LPCNET)
 
-    add_test(NAME test_fifo
+    add_test(NAME test_FreeDV_API_2020_to_ofdm_demod
+             COMMAND sh -c "$<TARGET_FILE:freedv_tx> 2020 ~/LPCNet/wav/all.wav - --testframes | $<TARGET_FILE:ofdm_demod> --ts 0.0205 --nc 31 --verbose 1 --ldpc 2 -p 312 --testframes > /dev/null"
+             )
+
+    add_test(NAME test_ofdm_mod_to_FreeDV_API_2020
+             COMMAND sh -c "$<TARGET_FILE:ofdm_mod> --in /dev/zero --ts 0.0205 --nc 31 --verbose 1 --ldpc 2 -p 312 --testframes 10 | $<TARGET_FILE:freedv_rx> 2020 - /dev/null --testframes"
+             )
+endif()
+           
+     add_test(NAME test_fifo
              COMMAND $<TARGET_FILE:tfifo>
              )
-     add_test(NAME test_FreeDV_1600_tx_memory_leak
+
+     add_test(NAME test_memory_leak_FreeDV_1600_tx
              COMMAND sh -c " valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./freedv_tx 1600 ../../raw/hts1a.raw /dev/null"
              WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/src
              )
-             set_tests_properties(test_FreeDV_1600_tx_memory_leak PROPERTIES PASS_REGULAR_EXPRESSION "ERROR SUMMARY: 0 errors")
+             set_tests_properties(test_memory_leak_FreeDV_1600_tx PROPERTIES PASS_REGULAR_EXPRESSION "ERROR SUMMARY: 0 errors")
 
-     add_test(NAME test_FreeDV_1600_rx_memory_leak
+     add_test(NAME test_memory_leak_FreeDV_1600_rx
              COMMAND sh -c "./freedv_tx 1600 ../../raw/hts1a.raw t.raw; \
                             valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./freedv_rx 1600 t.raw /dev/null"
              WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/src
              )
-             set_tests_properties(test_FreeDV_1600_rx_memory_leak PROPERTIES PASS_REGULAR_EXPRESSION "ERROR SUMMARY: 0 errors")
+             set_tests_properties(test_memory_leak_FreeDV_1600_rx PROPERTIES PASS_REGULAR_EXPRESSION "ERROR SUMMARY: 0 errors")
 
-     add_test(NAME test_FreeDV_700D_tx_memory_leak
+     add_test(NAME test_memory_leak_FreeDV_700D_tx
              COMMAND sh -c " valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./freedv_tx 700D ../../raw/hts1a.raw /dev/null"
              WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/src
              )
-             set_tests_properties(test_FreeDV_700D_tx_memory_leak PROPERTIES PASS_REGULAR_EXPRESSION "ERROR SUMMARY: 0 errors")
+             set_tests_properties(test_memory_leak_FreeDV_700D_tx PROPERTIES PASS_REGULAR_EXPRESSION "ERROR SUMMARY: 0 errors")
 
-     add_test(NAME test_FreeDV_700D_rx_memory_leak
+     add_test(NAME test_memory_leak_FreeDV_700D_rx
              COMMAND sh -c "./freedv_tx 1600 ../../raw/hts1a.raw t.raw; \
                             valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./freedv_rx 700D t.raw /dev/null"
              WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/src
              )
-             set_tests_properties(test_FreeDV_700D_rx_memory_leak PROPERTIES PASS_REGULAR_EXPRESSION "ERROR SUMMARY: 0 errors")
+             set_tests_properties(test_memory_leak_FreeDV_700D_rx PROPERTIES PASS_REGULAR_EXPRESSION "ERROR SUMMARY: 0 errors")
+
+     add_test(NAME test_mode_dot_c2
+             COMMAND sh -c "./c2enc 700C ../../raw/hts1a.raw hts1a.c2 && ./c2dec 1600 hts1a.c2 /dev/null"
+             WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/src
+             )
+             set_tests_properties(test_mode_dot_c2 PROPERTIES PASS_REGULAR_EXPRESSION "mode 8")
+
+     add_test(NAME test_mode_3200
+             COMMAND sh -c "./c2enc 3200 ../../raw/hts1a.raw - | ./c2dec 3200 - - | sox -t .s16 -r 8000 - hts1a_3200.wav"
+             WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/src
+             )
+     add_test(NAME test_mode_2400
+             COMMAND sh -c "./c2enc 2400 ../../raw/hts1a.raw - | ./c2dec 2400 - - | sox -t .s16 -r 8000 - hts1a_2400.wav"
+             WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/src
+             )
+     add_test(NAME test_mode_1400
+             COMMAND sh -c "./c2enc 1400 ../../raw/hts1a.raw - | ./c2dec 1400 - - | sox -t .s16 -r 8000 - hts1a_1400.wav"
+             WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/src
+             )
+     add_test(NAME test_mode_1300
+             COMMAND sh -c "./c2enc 1300 ../../raw/hts1a.raw - | ./c2dec 1300 - - | sox -t .s16 -r 8000 - hts1a_1300.wav"
+             WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/src
+             )
+     add_test(NAME test_mode_1200
+             COMMAND sh -c "./c2enc 1200 ../../raw/hts1a.raw - | ./c2dec 1200 - - | sox -t .s16 -r 8000 - hts1a_1200.wav"
+             WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/src
+             )
+     add_test(NAME test_mode_700C
+             COMMAND sh -c "./c2enc 700C ../../raw/hts1a.raw - | ./c2dec 700C - - | sox -t .s16 -r 8000 - hts1a_700C.wav"
+             WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/src
+             )
+     add_test(NAME test_mode_450
+             COMMAND sh -c "./c2enc 450 ../../raw/hts1a.raw - | ./c2dec 450 - - | sox -t .s16 -r 8000 - hts1a_450.wav"
+             WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/src
+             )
+     add_test(NAME test_mode_450PWB
+             COMMAND sh -c "./c2enc 450PWB ../../raw/hts1a.raw - | ./c2dec 450PWB - - | sox -t .s16 -r 16000 - hts1a_450PWB.wav"
+             WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/src
+             )
+
+     add_test(NAME test_est_n0
+             COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/unittest/est_n0.sh
+             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/unittest
+             )
+     add_test(NAME test_vq_mbest
+             COMMAND sh -c "./tvq_mbest; \
+                            cat target.f32 | ../misc/vq_mbest -k 2 -q vq1.f32,vq2.f32 --mbest 2 -v > out.f32; \
+                            diff target.f32 out.f32"
+             WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/unittest
+             )
 
 endif(UNITTEST)

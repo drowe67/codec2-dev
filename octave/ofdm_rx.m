@@ -9,6 +9,14 @@ function ofdm_rx(filename, mode="700D", error_pattern_filename)
   ofdm_lib;
   more off;
 
+  dpsk = 0;
+  if strcmp(mode,"700D-DPSK")
+    mode = "700D"; dpsk = 1;
+  end
+  if strcmp(mode,"2020-DPSK")
+    mode = "2020"; dpsk = 1;
+  end
+  
   % init modem
 
   [bps Rs Tcp Ns Nc] = ofdm_init_mode(mode);
@@ -16,7 +24,8 @@ function ofdm_rx(filename, mode="700D", error_pattern_filename)
   print_config(states);
   ofdm_load_const;
   states.verbose = 0;
-
+  states.dpsk=dpsk;
+  
   % load real samples from file
 
   Ascale = states.amp_scale/2; % as input is a real valued signal

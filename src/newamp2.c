@@ -145,7 +145,6 @@ void n2_rate_K_mbest_encode(int *indexes, float *x, float *xq, int ndim)
   /* Stage 1 */
 
   mbest_search450(codebook1, x, w, ndim,NEWAMP2_K, newamp2vq_cb[0].m, mbest_stage1, index);
-  MBEST_PRINT("Stage 1:", mbest_stage1);
   n1 = mbest_stage1->list[0].index[0];
 
   mbest_destroy(mbest_stage1);

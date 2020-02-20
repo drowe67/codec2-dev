@@ -956,15 +956,15 @@ end
 
 % Run an acquisition test, returning vectors of estimation errors.
 % Generates a vector of noise followed by continous rx signal to
-% simulate signal starting.  Freq est will improve over time as we
-% have an averaging statistic.  We then measure how long it takes to
+% simulate signal starting.  We then measure how long it takes to
 % get good timing and freq estimates.
 
-function [delta_ct delta_foff timing_mx_log] = acquisition_test(Ntests=10, EbNodB=100, foff_hz=0, hf_en=0, verbose=0)
+function [delta_ct delta_foff timing_mx_log] = acquisition_test(mode="700D", Ntests=10, EbNodB=100, foff_hz=0, hf_en=0, verbose=0)
 
-  Ts = 0.018; 
-  sim_in.Tcp = 0.002; 
-  sim_in.Rs = 1/Ts; sim_in.bps = 2; sim_in.Nc = 17; sim_in.Ns = 8;
+  [bps Rs Tcp Ns Nc] = ofdm_init_mode(mode);
+  states = ofdm_init(bps, Rs, Tcp, Ns, Nc);
+  sim_in.Tcp = Tcp; 
+  sim_in.Rs = Rs; sim_in.bps = bps; sim_in.Nc = Nc; sim_in.Ns = Ns;
 
   sim_in.Nsec = (Ntests+1)*(sim_in.Ns+1)/sim_in.Rs;
 
@@ -975,7 +975,7 @@ function [delta_ct delta_foff timing_mx_log] = acquisition_test(Ntests=10, EbNod
          the -ve noise over to the +ve side, increasing the noise by 3dB.  In
          ofdm_tx.m and friends, we add real nosie that is correctly scaled so
          no problemo.  This means we need to increase the Eb/No below by 3dB
-         to ensure the correct level of nosie ta the input of the timing_est.         
+         to ensure the correct level of noise at the input of the timing_est.         
   #}
   
   sim_in.EbNodB = EbNodB + 3;
@@ -1021,7 +1021,7 @@ function [delta_ct delta_foff timing_mx_log] = acquisition_test(Ntests=10, EbNod
   i = 1;
   states.foff_metric = 0;
   for w=1:Nsamperframe:length(rx)-4*Nsamperframe
-    [ct_est timing_valid timing_mx] = est_timing(states, real(rx(w+st:w+en)), rate_fs_pilot_samples);
+    [ct_est timing_valid timing_mx] = est_timing(states, real(rx(w+st:w+en)), rate_fs_pilot_samples, 1);
     foff_est = est_freq_offset_pilot_corr(states, real(rx(w+st:w+en)), rate_fs_pilot_samples, ct_est);
     if states.verbose
       printf("i: %2d w: %5d ct_est: %4d foff_est: %5.1f timing_mx: %3.2f timing_vld: %d\n", i++, w, ct_est, foff_est, timing_mx, timing_valid);
@@ -1055,7 +1055,7 @@ endfunction
 
 #}
 
-function res = acquisition_histograms(fine_en = 0, foff, EbNoAWGN=-1, EbNoHF=3, verbose=1)
+function res = acquisition_histograms(mode="700D", fine_en = 0, foff, EbNoAWGN=-1, EbNoHF=3, verbose=1)
   Fs = 8000;
   Ntests = 100;
 
@@ -1066,7 +1066,7 @@ function res = acquisition_histograms(fine_en = 0, foff, EbNoAWGN=-1, EbNoHF=3, 
 
   % AWGN channel at uncoded Eb/No operating point
 
-  [dct dfoff] = acquisition_test(Ntests, EbNoAWGN, foff, 0, fine_en);
+  [dct dfoff] = acquisition_test(mode, Ntests, EbNoAWGN, foff, 0, fine_en);
 
   % Probability of acquistion is what matters, e.g. if it's 50% we can
   % expect sync within 2 frames
@@ -1093,7 +1093,7 @@ function res = acquisition_histograms(fine_en = 0, foff, EbNoAWGN=-1, EbNoHF=3, 
 
   % HF channel at uncoded operating point
 
-  [dct dfoff] = acquisition_test(Ntests, EbNoHF, foff, 1, fine_en);
+  [dct dfoff] = acquisition_test(mode, Ntests, EbNoHF, foff, 1, fine_en);
 
   PtHF = length(find (abs(dct) < ttol_samples))/length(dct);
   printf("HF P(time offset acq) = %3.2f\n", PtHF);
@@ -1121,9 +1121,9 @@ endfunction
 
 % plot some curves of Acquisition probability against EbNo and freq offset
 
-function acquistion_curves
+function acquistion_curves(mode="700D")
 
-  EbNo = [-1 2 5 8];
+  EbNo = [-1 2 5 8 20];
   %foff = [-20 -15 -10 -5 0 5 10 15 20];
   foff = [-15 -5 0 5 15];
   cc = ['b' 'g' 'k' 'c' 'm'];
@@ -1132,6 +1132,10 @@ function acquistion_curves
   figure(2); clf; hold on; title('P(freq) AWGN'); xlabel('Eb/No dB'); legend('location', 'southeast');
   figure(3); clf; hold on; title('P(timing) HF'); xlabel('Eb/No dB'); legend('location', 'southeast');
   figure(4); clf; hold on; title('P(freq) HF'); xlabel('Eb/No dB'); legend('location', 'southeast');
+
+  for f=1:4
+    ylim([0 1]);
+  end
   
   for f = 1:length(foff)
     afoff = foff(f);
@@ -1139,7 +1143,7 @@ function acquistion_curves
     for e = 1:length(EbNo)
       aEbNo = EbNo(e);
       res = zeros(1,4);
-      res = acquisition_histograms(fine_en = 0, afoff, aEbNo, aEbNo+4, verbose = 0);
+      res = acquisition_histograms(mode, fine_en = 0, afoff, aEbNo, aEbNo+4, verbose = 0);
       res_log = [res_log; res];
     end
     figure(1); l = sprintf('%c+-;%3.1f Hz;', cc(f), afoff); plot(EbNo, res_log(:,1), l);
@@ -1147,11 +1151,11 @@ function acquistion_curves
     figure(3); l = sprintf('%c+-;%3.1f Hz;', cc(f), afoff); plot(EbNo+4, res_log(:,2), l);
     figure(4); l = sprintf('%c+-;%3.1f Hz;', cc(f), afoff); plot(EbNo+4, res_log(:,4), l);
   end
-
-  figure(1); print('-deps', '-color', "ofdm_dev_acq_curves_time_awgn.eps")
-  figure(2); print('-deps', '-color', "ofdm_dev_acq_curves_freq_awgn.eps")
-  figure(3); print('-deps', '-color', "ofdm_dev_acq_curves_time_hf.eps")
-  figure(4); print('-deps', '-color', "ofdm_dev_acq_curves_freq_hf.eps")
+  
+  figure(1); print('-deps', '-color', sprintf("ofdm_dev_acq_curves_time_awgn_%s.eps", mode))
+  figure(2); print('-deps', '-color', sprintf("ofdm_dev_acq_curves_freq_awgn_%s.eps", mode))
+  figure(3); print('-deps', '-color', sprintf("ofdm_dev_acq_curves_time_hf_%s.eps", mode))
+  figure(4); print('-deps', '-color', sprintf("ofdm_dev_acq_curves_freq_hf_%s.eps", mode))
 endfunction
 
 
@@ -1159,7 +1163,7 @@ endfunction
 % we are out of sync, or have sync with a bad freq offset est, or have
 % lost modem signal
 
-function sync_metrics(x_axis = 'EbNo')
+function sync_metrics(mode = "700D", x_axis = 'EbNo')
   Fs      = 8000;
   Ntests  = 4;
   f_offHz = [-25:25];
@@ -1168,14 +1172,14 @@ function sync_metrics(x_axis = 'EbNo')
   %EbNodB  = [-10 0 10];
   cc = ['b' 'g' 'k' 'c' 'm' 'b'];
   pt = ['+' '+' '+' '+' '+' 'o'];
-  
+    
   mean_mx1_log = mean_dfoff_log = [];
   for f = 1:length(f_offHz)
     af_offHz = f_offHz(f);
     mean_mx1_row = mean_dfoff_row = [];
     for e = 1:length(EbNodB)
       aEbNodB = EbNodB(e);
-      [dct dfoff timing_mx_log] = acquisition_test(Ntests, aEbNodB, af_offHz);
+      [dct dfoff timing_mx_log] = acquisition_test(mode, Ntests, aEbNodB, af_offHz);
       mean_mx1 = mean(timing_mx_log(:,1));
       printf("f_offHz: %5.2f EbNodB: % 6.2f mx1: %3.2f\n", af_offHz, aEbNodB, mean_mx1);
       mean_mx1_row = [mean_mx1_row mean_mx1];
@@ -1279,7 +1283,7 @@ function debug_false_sync(EbNodB = 100)
   xlabel('Freq Offset (Hz)');
 end
 
-
+#{
 % Using an input raw file, plot frame by frame metric information,
 % used to debug false syncs
 
@@ -1342,7 +1346,7 @@ function metric_fbf(fn, Nsec)
   plot(w_log,av_level_log,'g+-;av level;');
   hold off;
 endfunction
-
+#}
 
 % ---------------------------------------------------------
 % choose simulation to run here 
@@ -1360,11 +1364,11 @@ else
   init_cml('~/cml/');
 end
 
-run_single(100);
+%run_single(100);
 %run_curves
 %run_curves_estimators
-%acquisition_histograms(fin_en=0, foff_hz=-15, EbNoAWGN=-1, EbNoHF=3)
-%acquisition_test(Ntests=10, EbNodB=-1, foff_hz=0, hf_en=0, verbose=1);
+%acquisition_histograms("700D", fin_en=0, foff_hz=-15, EbNoAWGN=-1, EbNoHF=3)
+%acquisition_test("700D", Ntests=10, EbNodB=-1, foff_hz=0, hf_en=0, verbose=1);
 %sync_metrics('freq')
 %run_curves_snr
 %acquisition_dev(Ntests=10, EbNodB=100, foff_hz=0)

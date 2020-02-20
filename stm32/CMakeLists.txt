@@ -183,7 +183,6 @@ codebook.c
 codebookd.c
 codebookjvm.c
 codebookge.c
-codebookmel.c
 codebooknewamp1_energy.c
 codebooknewamp1.c
 )

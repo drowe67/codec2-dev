@@ -49,7 +49,7 @@ int main(int argc, char *argv[]) {
     COMP  Sw[FFT_ENC];	        /* DFT of Sn[]                           */
     codec2_fft_cfg fft_fwd_cfg; /* fwd FFT states                        */
     float w[m_pitch];	        /* time domain hamming window            */
-    COMP  W[FFT_ENC];	        /* DFT of w[]                            */
+    float W[FFT_ENC];	        /* DFT of w[]                            */
     MODEL model;
     void *nlp_states;
     codec2_fft_cfg phase_fft_fwd_cfg, phase_fft_inv_cfg;
@@ -88,7 +88,11 @@ int main(int argc, char *argv[]) {
     COMP  H[FRAMES][MAX_AMP];
     int indexes[FRAMES][NEWAMP1_N_INDEXES];
     float se = 0.0;
-
+    float eq[K];
+        
+    for(k=0; k<K; k++)
+        eq[k] = 0.0;
+    
     for(f=0; f<FRAMES; f++) {
         for(m=0; m<MAX_AMP+2; m++) {
             model_octave[f][m] = 0.0;
@@ -150,7 +154,8 @@ int main(int argc, char *argv[]) {
                                  &mean[f],
                                  &rate_K_surface_no_mean[f][0],
                                  &rate_K_surface_no_mean_[f][0],
-                                 &se);
+                                 &se,
+                                 eq, 0);
 
         newamp1_indexes_to_rate_K_vec(&rate_K_surface_[f][0],
                                       &rate_K_surface_no_mean_[f][0],
@@ -159,6 +164,7 @@ int main(int argc, char *argv[]) {
                                       &mean_[f],
                                       &indexes[f][0], NULL, 1);
 
+        #ifdef VERBOSE
         fprintf(stderr,"f: %d Wo: %4.3f L: %d v: %d\n", f, model.Wo, model.L, model.voiced);
         if ((f % M) == 0) {
             for(i=0; i<5; i++) {
@@ -167,6 +173,7 @@ int main(int argc, char *argv[]) {
             fprintf(stderr,"\n");
             fprintf(stderr,"  %d %d %d %d\n", indexes[f][0], indexes[f][1], indexes[f][2], indexes[f][3]);
         }
+        #endif
         /* log vectors */
  
         model_octave[f][0] = model.Wo;
@@ -176,7 +183,7 @@ int main(int argc, char *argv[]) {
         }        
     }
 
-     /* Decoder */
+    /* Decoder */
 
     MODEL model__[M];
     float prev_rate_K_vec_[K];
@@ -212,6 +219,7 @@ int main(int argc, char *argv[]) {
                                  &indexes[f][0],
                                  NULL, 1);
 
+        #ifdef VERBOSE
         fprintf(stderr,"f: %d\n", f);
         fprintf(stderr,"  %d %d %d %d\n", indexes[f][0], indexes[f][1], indexes[f][2], indexes[f][3]);
         for(i=0; i<M; i++) {
@@ -233,7 +241,8 @@ int main(int argc, char *argv[]) {
         }
 
         fprintf(stderr,"\n\n");
-
+        #endif
+        
         //if (f == 7)
         //  exit(0);
 
@@ -274,6 +283,7 @@ int main(int argc, char *argv[]) {
     fprintf(fout, "# Created by tnewamp1.c\n");
     octave_save_float(fout, "rate_K_surface_c", (float*)rate_K_surface, FRAMES, K, K);
     octave_save_float(fout, "mean_c", (float*)mean, 1, FRAMES, 1);
+    octave_save_float(fout, "eq_c", eq, 1, K, K);
     octave_save_float(fout, "rate_K_surface_no_mean_c", (float*)rate_K_surface_no_mean, FRAMES, K, K);
     octave_save_float(fout, "rate_K_surface_no_mean__c", (float*)rate_K_surface_no_mean_, FRAMES, K, K);
     octave_save_float(fout, "mean__c", (float*)mean_, FRAMES, 1, 1);

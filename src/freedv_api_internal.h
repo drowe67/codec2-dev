@@ -31,10 +31,6 @@
   along with this program; if not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifdef __cplusplus
-  extern "C" {
-#endif
-
 #ifndef __FREEDV_API_INTERNAL__
 #define __FREEDV_API_INTERNAL__
 
@@ -45,6 +41,10 @@
 #include "codec2_cohpsk.h"
 #ifdef __LPCNET__
 #include "lpcnet_freedv.h"
+#endif
+
+#ifdef __cplusplus
+  extern "C" {
 #endif
 
 // identifiers for no- Codec2 Speech codecs, make sure no overlpa with CODEC2_XXX modes
@@ -159,8 +159,9 @@ struct freedv {
     int n_protocol_bits;
 };
 
-#endif
-
 #ifdef __cplusplus
 }
 #endif
+
+#endif
+

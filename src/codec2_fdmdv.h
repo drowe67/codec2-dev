@@ -38,6 +38,9 @@
 #ifndef __FDMDV__
 #define __FDMDV__
 
+#include "comp.h"
+#include "modem_stats.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -54,9 +57,6 @@ extern "C" {
 #else
 #define CODEC2_WIN32SUPPORT
 #endif
-
-#include "comp.h"
-#include "modem_stats.h"
 
 #define FDMDV_NC                      14  /* default number of data carriers                                */
 #define FDMDV_NC_MAX                  20  /* maximum number of data carriers                                */

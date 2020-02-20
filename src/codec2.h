@@ -26,14 +26,14 @@
   along with this program; if not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifdef __cplusplus
-  extern "C" {
-#endif
-
 #ifndef __CODEC2__
 #define  __CODEC2__
 
 #include <codec2/version.h>
+
+#ifdef __cplusplus
+  extern "C" {
+#endif
 
 #define CODEC2_MODE_3200 	0
 #define CODEC2_MODE_2400 	1
@@ -41,8 +41,6 @@
 #define CODEC2_MODE_1400 	3
 #define CODEC2_MODE_1300 	4
 #define CODEC2_MODE_1200 	5
-#define CODEC2_MODE_700  	6
-#define CODEC2_MODE_700B 	7
 #define CODEC2_MODE_700C 	8
 #define CODEC2_MODE_450 	10
 #define CODEC2_MODE_450PWB 	11
@@ -77,12 +75,6 @@
 #if !defined(CODEC2_MODE_1200_EN)
         #define CODEC2_MODE_1200_EN CODEC2_MODE_EN_DEFAULT
 #endif
-#if !defined(CODEC2_MODE_700_EN)
-        #define CODEC2_MODE_700_EN CODEC2_MODE_EN_DEFAULT
-#endif
-#if !defined(CODEC2_MODE_700B_EN)
-        #define CODEC2_MODE_700B_EN CODEC2_MODE_EN_DEFAULT
-#endif
 #if !defined(CODEC2_MODE_700C_EN)
         #define CODEC2_MODE_700C_EN CODEC2_MODE_EN_DEFAULT
 #endif
@@ -111,17 +103,20 @@ int  codec2_rebuild_spare_bit(struct CODEC2 *codec2_state, int unpacked_bits[]);
 void codec2_set_natural_or_gray(struct CODEC2 *codec2_state, int gray);
 void codec2_set_softdec(struct CODEC2 *c2, float *softdec);
 float codec2_get_energy(struct CODEC2 *codec2_state, const unsigned char *bits);
-
+      
 // support for ML and VQ experiments
-void codec2_open_mlfeat(struct CODEC2 *codec2_state, char *filename);
+void codec2_open_mlfeat(struct CODEC2 *codec2_state, char *feat_filename, char *model_filename);
 void codec2_load_codebook(struct CODEC2 *codec2_state, int num, char *filename);
 float codec2_get_var(struct CODEC2 *codec2_state);
 float *codec2_enable_user_ratek(struct CODEC2 *codec2_state, int *K);
-void codec2_700c_post_filter(struct CODEC2 *codec2_state, int en);
-      
-#endif
 
+// 700C post filter and equaliser
+void codec2_700c_post_filter(struct CODEC2 *codec2_state, int en);
+void codec2_700c_eq(struct CODEC2 *codec2_state, int en);
+      
 #ifdef __cplusplus
 }
+#endif
+
 #endif
 

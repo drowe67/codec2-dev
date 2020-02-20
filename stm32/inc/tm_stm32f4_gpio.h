@@ -30,11 +30,6 @@
 #ifndef TM_GPIO_H
 #define TM_GPIO_H 150
 
-/* C++ detection */
-#ifdef __cplusplus
-extern "C" {
-#endif
-	
 /**
  * @addtogroup TM_STM32F4xx_Libraries
  * @{
@@ -93,6 +88,11 @@ extern "C" {
 #include "stm32f4xx.h"
 #include "stm32f4xx_gpio.h"
 #include "defines.h"
+
+/* C++ detection */
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /**
  * @defgroup TM_GPIO_Macros

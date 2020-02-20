@@ -168,7 +168,7 @@ int main(int argc, char *argv[]) {
         quantise(cb, vec, k, 1, &e, &se);
     }
     var = se/(J*k);
-    printf("\r  Iteration 0, var = %f, sd = %f\n", var, sqrt(var));
+    printf("\r  It: 0, var: %f sd: %f\n", var, sqrt(var));
 
     /* set up initial codebook state from samples of training set */
 
@@ -211,7 +211,7 @@ int main(int argc, char *argv[]) {
 	var = se/(J*k);
 	delta = (var_1-var)/var;
 
-	printf("\r  Iteration %ld, var = %4.2f, sd = %4.2f outliers > 1/2/3 dB = %3.2f/%f3.2/%3.2f Delta = %5.4f\n", j, var, sqrt(var),
+	printf("\r  It: %ld, var: %f sd: %f outliers > 1/2/3 dB = %3.2f/%f3.2/%3.2f Delta = %5.4f\n", j, var, sqrt(var),
                (float)noutliers[0]/J, (float)noutliers[1]/J, (float)noutliers[2]/J, delta);
 	j++;
 

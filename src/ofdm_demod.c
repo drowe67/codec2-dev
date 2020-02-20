@@ -83,7 +83,7 @@ void opt_help() {
     fprintf(stderr, "  --ns           Nframes   Number of Symbol Frames (8 default)\n");
     fprintf(stderr, "  --tcp            Nsecs   Cyclic Prefix Duration (.002 default)\n");
     fprintf(stderr, "  --ts             Nsecs   Symbol Duration (.018 default)\n");
-    fprintf(stderr, "  --bandwidth    [0|1|2]   Select Auto Phase Estimate (0) Low (1) High (2) RX mode (default 2)\n");
+    fprintf(stderr, "  --bandwidth      [0|1]   Select phase est bw mode AUTO low or high (0) or LOCKED high (1) (default 0)\n");
     fprintf(stderr, "  --interleave     depth   Interleaver for LDPC frames, e.g. 1,2,4,8,16 (default is 1)\n");
     fprintf(stderr, "                           Must also specify --ldpc option\n");
     fprintf(stderr, "  --tx_freq         freq   Set modulation TX centre Frequency (1500.0 default)\n");
@@ -97,6 +97,7 @@ void opt_help() {
     fprintf(stderr, "  --start_secs      secs   Number of seconds delay before we start to demod\n");
     fprintf(stderr, "  --len_secs        secs   Number of seconds to run demod\n");
     fprintf(stderr, "  --skip_secs   timeSecs   At timeSecs introduce a large timing error by skipping half a frame of samples\n");
+    fprintf(stderr, "  --dpsk                   Differential PSK.\n");
     fprintf(stderr, "\n");
     
     exit(-1);
@@ -130,7 +131,7 @@ int main(int argc, char *argv[]) {
     int nc = 17;
     int ns = 8;
     int verbose = 0;
-    int phase_est_bandwidth = HIGH_PHASE_EST;
+    int phase_est_bandwidth_mode = AUTO_PHASE_EST;
     int ldpc_en = 0;
     int data_bits_per_frame = 0;
 
@@ -141,7 +142,8 @@ int main(int argc, char *argv[]) {
     bool log_active = false;
     bool ldpc_check = false;
     bool llr_en = false;
-
+    bool dpsk = false;
+    
     float tcp = 0.002f;
     float ts = 0.018f;
     float rx_centre = 1500.0f;
@@ -173,6 +175,7 @@ int main(int argc, char *argv[]) {
         {"start_secs", 'x', OPTPARSE_REQUIRED},        
         {"len_secs", 'y', OPTPARSE_REQUIRED},        
         {"skip_secs", 'z', OPTPARSE_REQUIRED},        
+        {"dpsk", 'q', OPTPARSE_NONE},        
         {0, 0, 0}
     };
 
@@ -238,10 +241,13 @@ int main(int argc, char *argv[]) {
                 ns = atoi(options.optarg);
                 break;
             case 'o':
-                phase_est_bandwidth = atoi(options.optarg);
+                phase_est_bandwidth_mode = atoi(options.optarg);
                 break;
             case 'p':
                 data_bits_per_frame = atoi(options.optarg);
+                break;
+            case 'q':
+                dpsk = true;
                 break;
             case 'v':
                 verbose = atoi(options.optarg);
@@ -310,12 +316,6 @@ int main(int argc, char *argv[]) {
     ofdm_config->fs = FS; /* Sample Frequency */
     ofdm_config->txtbits = 4; /* number of auxiliary data bits */
 
-    if ((phase_est_bandwidth <= 2) && (phase_est_bandwidth >= 0)) {
-        ofdm_config->phase_est_bandwidth = phase_est_bandwidth;
-    } else {
-        ofdm_config->phase_est_bandwidth = HIGH_PHASE_EST;
-    }
-
     ofdm_config->ftwindowwidth = 11;
     ofdm_config->ofdm_timing_mx_thresh = 0.30f;
 
@@ -324,6 +324,9 @@ int main(int argc, char *argv[]) {
 
     free(ofdm_config);
 
+    ofdm_set_phase_est_bandwidth_mode(ofdm, phase_est_bandwidth_mode);
+    ofdm_set_dpsk(ofdm, dpsk);
+    
     /* Get a copy of the actual modem config */
     ofdm_config = ofdm_get_config_param();
 
@@ -383,7 +386,7 @@ int main(int argc, char *argv[]) {
         assert(data_bits_per_frame <= ldpc.ldpc_data_bits_per_frame);
         assert(coded_bits_per_frame <= ldpc.ldpc_coded_bits_per_frame);
         
-        if (verbose) {
+        if (verbose > 1) {
             fprintf(stderr, "ldpc_data_bits_per_frame = %d\n", ldpc.ldpc_data_bits_per_frame);
             fprintf(stderr, "ldpc_coded_bits_per_frame  = %d\n", ldpc.ldpc_coded_bits_per_frame);
             fprintf(stderr, "data_bits_per_frame = %d\n", data_bits_per_frame);
@@ -397,14 +400,12 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "interleave_frames: %d\n", interleave_frames);
         ofdm_set_verbose(ofdm, verbose);
         
-        fprintf(stderr, "Phase Estimate Mode: ");
+        fprintf(stderr, "Phase Estimate Switching: ");
 
-        switch (phase_est_bandwidth) {
+        switch (phase_est_bandwidth_mode) {
         case 0: fprintf(stderr, "Auto\n");
                 break;
-        case 1: fprintf(stderr, "Low\n");
-                break;
-        case 2: fprintf(stderr, "High\n");
+        case 1: fprintf(stderr, "Locked\n");
         }
     }
 

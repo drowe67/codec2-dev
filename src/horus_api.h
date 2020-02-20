@@ -26,15 +26,17 @@
   along with this program; if not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifdef __cplusplus
-  extern "C" {
-#endif
+
 
 #ifndef __HORUS_API__
+#define __HORUS_API__
 
 #include <stdint.h>
 #include "modem_stats.h"
       
+#ifdef __cplusplus
+  extern "C" {
+#endif
 #define HORUS_MODE_BINARY            0
 #define HORUS_MODE_RTTY              1
 
@@ -50,7 +52,7 @@ uint32_t      horus_nin   (struct horus *hstates);
 
 /* returns 1 if ascii_out[] is valid */
       
-int           horus_rx    (struct horus *hstates, char ascii_out[], short demod_in[]);
+int           horus_rx    (struct horus *hstates, char ascii_out[], short demod_in[], int quadrature);
 
 /* set verbose level */
       
@@ -67,14 +69,15 @@ void          horus_get_modem_extended_stats (struct horus *hstates, struct MODE
 int           horus_crc_ok                   (struct horus *hstates);
 int           horus_get_total_payload_bits   (struct horus *hstates);
 void          horus_set_total_payload_bits   (struct horus *hstates, int val);
+void          horus_set_freq_est_limits      (struct horus *hstates, float fsk_lower, float fsk_upper);
 
 /* how much storage you need for demod_in[] and  ascii_out[] */
       
 int           horus_get_max_demod_in         (struct horus *hstates);
 int           horus_get_max_ascii_out_len    (struct horus *hstates);
 
-#endif
-
 #ifdef __cplusplus
 }
+#endif
+
 #endif

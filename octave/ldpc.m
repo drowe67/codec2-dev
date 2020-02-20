@@ -41,11 +41,11 @@ end
 
 function code_param = ldpc_init_wimax(rate, framesize, modulation, mod_order, mapping)
     [code_param.H_rows, code_param.H_cols, code_param.P_matrix] = InitializeWiMaxLDPC( rate, framesize,  0 );
-    code_param.data_bits_per_frame = length(code_param.H_cols) - length( code_param.P_matrix );
+    code_param.ldpc_data_bits_per_frame = length(code_param.H_cols) - length( code_param.P_matrix );
     code_param.S_matrix = CreateConstellation( modulation, mod_order, mapping );
     code_param.bits_per_symbol = log2(mod_order);
-    code_param.code_bits_per_frame = framesize;
-    code_param.symbols_per_frame = framesize/code_param.bits_per_symbol;
+    code_param.ldpc_coded_bits_per_frame = framesize;
+    code_param.ldpc_coded_syms_per_frame = framesize/code_param.bits_per_symbol;
 endfunction
 
 
@@ -59,11 +59,16 @@ function [code_param framesize rate] = ldpc_init_user(HRA, modulation, mod_order
     code_param.H_rows = H_rows; 
     code_param.H_cols = H_cols;
     code_param.P_matrix = [];
-    code_param.data_bits_per_frame = length(code_param.H_cols) - length(code_param.P_matrix); 
     code_param.S_matrix = CreateConstellation( modulation, mod_order, mapping );
     code_param.bits_per_symbol = log2(mod_order);
-    code_param.code_bits_per_frame = framesize;
-    code_param.symbols_per_frame = framesize/code_param.bits_per_symbol;
+
+    code_param.ldpc_data_bits_per_frame = length(code_param.H_cols) - length(code_param.P_matrix);
+    code_param.ldpc_parity_bits_per_frame = framesize - code_param.ldpc_data_bits_per_frame;
+    code_param.ldpc_coded_bits_per_frame = framesize;
+
+    code_param.data_bits_per_frame  = code_param.ldpc_data_bits_per_frame;
+    code_param.coded_bits_per_frame = code_param.ldpc_coded_bits_per_frame;
+    code_param.coded_syms_per_frame = code_param.coded_bits_per_frame/code_param.bits_per_symbol;
 endfunction
 
 
@@ -78,10 +83,10 @@ function [detected_data paritychecks] = ldpc_dec(code_param, max_iterations, dem
     
     % initialize the extrinsic decoder input
 
-    input_somap_c = zeros(1, code_param.code_bits_per_frame );
+    input_somap_c = zeros(1, code_param.ldpc_coded_bits_per_frame );
     bit_likelihood = Somap( symbol_likelihood, demod_type, input_somap_c );
     
-    input_decoder_c = bit_likelihood(1:code_param.code_bits_per_frame);
+    input_decoder_c = bit_likelihood(1:code_param.ldpc_coded_bits_per_frame);
     
     [x_hat paritychecks] = MpDecode( -input_decoder_c, code_param.H_rows, code_param.H_cols, ...
                               max_iterations, decoder_type, 1, 1);

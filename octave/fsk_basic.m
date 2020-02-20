@@ -1,7 +1,7 @@
 % fsk_basic.m
 % David Rowe 30 sep 2016
 %
-% Basic non-coherence FSK modem simulation to illustrate principles
+% Basic non-coherent FSK modem simulation to illustrate principles
 % and compare to ideal
 
 rand('seed',1);

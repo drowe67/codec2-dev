@@ -30,11 +30,6 @@
 #ifndef TM_MCOOUTPUT_H
 #define TM_MCOOUTPUT_H 110
 
-/* C++ detection */
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 /**
  * @addtogroup TM_STM32F4xx_Libraries
  * @{
@@ -85,12 +80,17 @@ extern "C" {
  - TM GPIO
 @endverbatim
  */
+
 #include "stm32f4xx.h"
 #include "stm32f4xx_rcc.h"
 #include "defines.h"
 #include "tm_stm32f4_gpio.h"
 
- 
+/* C++ detection */
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /**
  * @defgroup TM_MCO_Typedefs
  * @brief    Library Typedefs

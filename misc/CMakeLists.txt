@@ -25,5 +25,17 @@ add_executable(tnlp tnlp.c)
 target_link_libraries(tnlp codec2)
 
 add_executable(tlininterp tlininterp.c)
+
 add_executable(tdec tdec.c)
 
+add_executable(est_n0 est_n0.c)
+target_link_libraries(est_n0 m)
+
+add_executable(timpulse timpulse.c)
+target_link_libraries(timpulse m)
+
+add_executable(vq_mbest vq_mbest.c)
+target_link_libraries(vq_mbest codec2)
+
+add_executable(pre pre.c)
+target_link_libraries(pre codec2)

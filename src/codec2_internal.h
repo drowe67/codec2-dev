@@ -42,7 +42,7 @@ struct CODEC2 {
     codec2_fft_cfg  fft_fwd_cfg;           /* forward FFT config                        */
     codec2_fftr_cfg fftr_fwd_cfg;          /* forward real FFT config                   */
     float        *w;	                   /* [m_pitch] time domain hamming window      */
-    COMP          W[FFT_ENC];	           /* DFT of w[]                                */
+    float         W[FFT_ENC];	           /* DFT of w[]                                */
     float        *Pn;	                   /* [2*n_samp] trapezoidal synthesis window   */
     float        *bpf_buf;                 /* buffer for band pass filter               */
     float        *Sn;                      /* [m_pitch] input speech                    */
@@ -82,6 +82,8 @@ struct CODEC2 {
     unsigned int   nse;                      /* number of terms in sum       */
     float         *user_rate_K_vec_no_mean_; /* optional, user supplied vector for quantisation experiments */
     int            post_filter_en;
+    float          eq[NEWAMP1_K];            /* optional equaliser */
+    int            eq_en;
     
     /*newamp2 states (also uses newamp1 states )*/
     float 	   energy_prev;
@@ -91,7 +93,7 @@ struct CODEC2 {
     float          n2_pwb_prev_rate_K_vec_[NEWAMP2_16K_K];
 
     /* used to dump features for deep learning experiments */
-    FILE *fmlfeat;
+    FILE *fmlfeat, *fmlmodel;
 
     /* encode/decode function pointers for the selected mode */
     void (*encode)(struct CODEC2 *c2, unsigned char * bits, short speech[]);

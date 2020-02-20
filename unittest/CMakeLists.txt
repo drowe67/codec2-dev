@@ -33,11 +33,12 @@ add_library(function_trace STATIC ../unittest/function_trace.c)
 
 add_executable(ofdm_stack ofdm_stack.c ../src/ofdm.c ../src/octave.c ../src/kiss_fft.c ../src/modem_probe.c ../src/mpdecode_core.c ../src/phi0.c ../src/filter.c)
 if (CMAKE_C_COMPILER MATCHES "gcc$")
+    target_link_libraries(ofdm_stack function_trace m -no-pie "-Wl,-Map=ofdm_stack.map")
     target_compile_options(ofdm_stack PUBLIC -fstack-usage -finstrument-functions -no-pie)
 else()
+    target_link_libraries(ofdm_stack function_trace m -no-pie)
     target_compile_options(ofdm_stack PUBLIC -finstrument-functions -no-pie)
 endif()
-target_link_libraries(ofdm_stack function_trace m -no-pie "-Wl,-Map=ofdm_stack.map")
 add_definitions(-D__UNITTEST__)
 
 add_executable(tnewamp1 tnewamp1.c ../src/quantise.c ../src/newamp1.c ../src/mbest.c ../src/kiss_fft.c ../src/sine.c ../src/nlp.c ../src/dump.c ../src/octave.c ${CODEBOOKS})
@@ -52,3 +53,5 @@ target_link_libraries(test_phi0 m)
 
 add_executable(tst_codec2_fft_init tst_codec2_fft_init.c)
 target_link_libraries(tst_codec2_fft_init m codec2)
+
+add_executable(tvq_mbest tvq_mbest.c)
