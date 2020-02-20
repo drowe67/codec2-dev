@@ -53,3 +53,5 @@ target_link_libraries(test_phi0 m)
 
 add_executable(tst_codec2_fft_init tst_codec2_fft_init.c)
 target_link_libraries(tst_codec2_fft_init m codec2)
+
+add_executable(tvq_mbest tvq_mbest.c)

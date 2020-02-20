@@ -30,9 +30,11 @@
 #ifndef __NEWAMP1__
 #define __NEWAMP1__
 
-#define NEWAMP1_N_INDEXES    4  /* Number of indexes to pack: vq1, vq2, energy, Wo */
-#define NEWAMP1_PHASE_NFFT 128  /* size of FFT used for phase synthesis            */
-#define NEWAMP1_K           20  /* rate K vector length                            */
+#define NEWAMP1_N_INDEXES    4   /* Number of indexes to pack: vq1, vq2, energy, Wo */
+#define NEWAMP1_PHASE_NFFT 128   /* size of FFT used for phase synthesis            */
+#define NEWAMP1_K           20   /* rate K vector length                            */
+#define NEWAMP1_VQ_MBEST_DEPTH 5 /* how many candidates we keep for each stage of mbest search */
+
 
 #include "codec2_fft.h"
 #include "comp.h"

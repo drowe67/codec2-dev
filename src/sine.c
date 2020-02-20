@@ -62,7 +62,7 @@ C2CONST c2const_create(int Fs, float framelength_s) {
     assert((Fs == 8000) || (Fs = 16000));
     c2const.Fs = Fs;
     c2const.n_samp = round(Fs*framelength_s);
-    c2const.max_amp = floor(Fs*P_MIN_S/2);
+    c2const.max_amp = floor(Fs*P_MAX_S/2);
     c2const.p_min = floor(Fs*P_MIN_S);
     c2const.p_max = floor(Fs*P_MAX_S);
     c2const.m_pitch = floor(Fs*M_PITCH_S);

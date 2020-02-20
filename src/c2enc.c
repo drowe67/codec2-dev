@@ -51,7 +51,7 @@ int main(int argc, char *argv[])
     int            eq = 0;
     
     if (argc < 4) {
-	printf("usage: c2enc 3200|2400|1600|1400|1300|1200|700C|450|450PWB InputRawspeechFile OutputBitFile [--natural] [--softdec] [--bitperchar] [--mlfeat] [--loadcb stageNum Filename] [--var] [--eq]\n");
+	printf("usage: c2enc 3200|2400|1600|1400|1300|1200|700C|450|450PWB InputRawspeechFile OutputBitFile [--natural] [--softdec] [--bitperchar] [--mlfeat f32File modelFile] [--loadcb stageNum Filename] [--var] [--eq]\n");
 	printf("e.g. (headerless)    c2enc 1300 ../raw/hts1a.raw hts1a.bin\n");
 	printf("e.g. (with header to detect mode)   c2enc 1300 ../raw/hts1a.raw hts1a.c2\n");
 	exit(1);
@@ -132,7 +132,7 @@ int main(int argc, char *argv[])
         }
         if (strcmp(argv[i], "--mlfeat") == 0) {
             /* dump machine learning features (700C only) */
-            codec2_open_mlfeat(codec2, argv[i+1]);
+            codec2_open_mlfeat(codec2, argv[i+1], argv[i+2]);
         }
         if (strcmp(argv[i], "--loadcb") == 0) {
             /* load VQ stage (700C only) */

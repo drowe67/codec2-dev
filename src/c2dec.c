@@ -211,7 +211,7 @@ int main(int argc, char *argv[])
 	        report_energy = 1;
 	    }
 	    else if (strcmp(long_options[option_index].name, "mlfeat") == 0) {
-	        codec2_open_mlfeat(codec2, optarg);
+	        codec2_open_mlfeat(codec2, optarg, optarg+1);
 	    }
 	    else if (strcmp(long_options[option_index].name, "loadcb") == 0) {
                 /* load VQ stage (700C only) */

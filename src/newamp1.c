@@ -40,8 +40,6 @@
 #include "mbest.h"
 #include "newamp1.h"
 
-#define NEWAMP1_VQ_MBEST_DEPTH 5  /* how many candidates we keep for each stage of mbest search */
-
 /*---------------------------------------------------------------------------*\
 
   FUNCTION....: interp_para()
@@ -189,7 +187,6 @@ float rate_K_mbest_encode(int *indexes, float *x, float *xq, int ndim, int mbest
   /* Stage 1 */
 
   mbest_search(codebook1, x, w, ndim, newamp1vq_cb[0].m, mbest_stage1, index);
-  MBEST_PRINT("Stage 1:", mbest_stage1);
 
   /* Stage 2 */
 
@@ -199,7 +196,6 @@ float rate_K_mbest_encode(int *indexes, float *x, float *xq, int ndim, int mbest
 	  target[i] = x[i] - codebook1[ndim*n1+i];
       mbest_search(codebook2, target, w, ndim, newamp1vq_cb[1].m, mbest_stage2, index);
   }
-  MBEST_PRINT("Stage 2:", mbest_stage2);
 
   n1 = mbest_stage2->list[0].index[1];
   n2 = mbest_stage2->list[0].index[0];
@@ -340,8 +336,7 @@ void resample_rate_L(C2CONST *c2const, MODEL *model, float rate_K_vec[], float r
 
    for(k=0; k<K; k++) {
        rate_K_vec_term[k+1] = rate_K_vec[k];
-       rate_K_sample_freqs_kHz_term[k+1] = rate_K_sample_freqs_kHz[k];
-  
+       rate_K_sample_freqs_kHz_term[k+1] = rate_K_sample_freqs_kHz[k];  
        //printf("k: %d f: %f rate_K: %f\n", k, rate_K_sample_freqs_kHz[k], rate_K_vec[k]);
    }
 
@@ -475,8 +470,7 @@ void newamp1_model_to_indexes(C2CONST *c2const,
     else {
         indexes[3] = 0;
     }
-
- }
+}
 
 
 /*---------------------------------------------------------------------------*\
@@ -615,7 +609,7 @@ void newamp1_indexes_to_model(C2CONST *c2const,
 
     interp_Wo_v(aWo_, aL_, avoicing_, *Wo_left, Wo_right, *voicing_left, voicing_right);
 
-    /* back to rate L amplitudes, synthesis phase for each frame */
+    /* back to rate L amplitudes, synthesise phase for each frame */
 
     for(i=0; i<M; i++) {
         model_[i].Wo = aWo_[i];
