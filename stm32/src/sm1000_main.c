@@ -299,6 +299,7 @@ struct freedv *set_freedv_mode(int op_mode, int *n_samples) {
         usart_printf("FreeDV 700D\n");
         f = freedv_open(FREEDV_MODE_700D);
         assert(f != NULL);
+        freedv_set_eq(f, 1); /* equaliser on by default */
         *n_samples = freedv_get_n_speech_samples(f);
         break;
     }
