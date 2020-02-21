@@ -36,11 +36,8 @@ int opt_exists(char *argv[], int argc, char opt[]) {
 
 int main(int argc, char *argv[])
 {
-    unsigned char ibits[NUMBERROWSHCOLS];
-    unsigned char pbits[NUMBERPARITYBITS];
     FILE         *fin, *fout;
-    int           arg, sd, i, frames, codename, testframes, Nframes, data_bits_per_frame;
-    double        sdout[NUMBERROWSHCOLS+NUMBERPARITYBITS];
+    int           arg, sd, i, frames, codename, testframes, Nframes, data_bits_per_frame, parity_bits_per_frame;
     struct LDPC   ldpc;
     int unused_data_bits;
     
@@ -108,7 +105,12 @@ int main(int argc, char *argv[])
         ldpc.H_cols = H_cols;
     }
     data_bits_per_frame = ldpc.NumberRowsHcols;
+    parity_bits_per_frame = ldpc.NumberParityBits;
     
+    unsigned char ibits[data_bits_per_frame];
+    unsigned char pbits[parity_bits_per_frame];
+    double        sdout[data_bits_per_frame+parity_bits_per_frame];
+
     if (strcmp(argv[1], "-")  == 0) fin = stdin;
     else if ( (fin = fopen(argv[1],"rb")) == NULL ) {
         fprintf(stderr, "Error opening input bit file: %s: %s.\n",
@@ -164,13 +166,13 @@ int main(int argc, char *argv[])
             /* map to BPSK symbols */
             for (i=0; i<data_bits_per_frame-unused_data_bits; i++)
                 sdout[i] = 1.0 - 2.0 * ibits[i];
-            for (i=0; i<ldpc.NumberParityBits; i++)
+            for (i=0; i<parity_bits_per_frame; i++)
                 sdout[i+data_bits_per_frame-unused_data_bits] = 1.0 - 2.0 * pbits[i];
-            written += fwrite(sdout, sizeof(double), data_bits_per_frame-unused_data_bits+ldpc.NumberParityBits, fout); 
+            written += fwrite(sdout, sizeof(double), data_bits_per_frame-unused_data_bits+parity_bits_per_frame, fout); 
         }
         else {
             fwrite(ibits, sizeof(char), data_bits_per_frame, fout); 
-            fwrite(pbits, sizeof(char), ldpc.NumberParityBits, fout); 
+            fwrite(pbits, sizeof(char), parity_bits_per_frame, fout); 
         }
         
         frames++;       

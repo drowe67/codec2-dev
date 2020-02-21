@@ -380,6 +380,12 @@ endif()
              set_tests_properties(test_horus_binary PROPERTIES
              PASS_REGULAR_EXPRESSION "1C9A9545")
 
+    add_test(NAME test_horus_binary_iq
+             COMMAND sh -c "cat ${CMAKE_CURRENT_SOURCE_DIR}/raw/horusb_iq_s16.raw | $<TARGET_FILE:horus_demod> -q -m binary --fsk_lower=1000 --fsk_upper=20000 - -"
+             )
+             set_tests_properties(test_horus_binary_iq PROPERTIES
+             PASS_REGULAR_EXPRESSION "000900071E2A000000000000000000000000259A6B14")
+
     # tests ldpc_enc/ldpc_noise/ldpc_dec
     add_test(NAME test_ldpc_enc_dec
              COMMAND sh -c "$<TARGET_FILE:ldpc_enc> /dev/zero - --sd --code HRA_112_112 --testframes 200 | $<TARGET_FILE:ldpc_noise> - - 0.5 | $<TARGET_FILE:ldpc_dec> - /dev/null --code HRA_112_112 --sd --testframes"

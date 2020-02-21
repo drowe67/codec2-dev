@@ -349,7 +349,7 @@ int extract_horus_binary(struct horus *hstates, char hex_out[], int uw_loc) {
 }
 
 
-int horus_rx(struct horus *hstates, char ascii_out[], short demod_in[]) {
+int horus_rx(struct horus *hstates, char ascii_out[], short demod_in[], int quadrature) {
     int i, j, uw_loc, packet_detected;
     
     assert(hstates != NULL);
@@ -372,14 +372,19 @@ int horus_rx(struct horus *hstates, char ascii_out[], short demod_in[]) {
     /* demodulate latest bits */
 
     /* Note: allocating this array as an automatic variable caused OSX to
-       "Bus Error 10" (segfault), so lets malloc() it.  TODO: A real
+       "Bus Error 10" (segfault), so lets malloc() it. TODO: A real
        short sample option for fsk_demod() would be useful */
     
     COMP *demod_in_comp = (COMP*)malloc(sizeof(COMP)*hstates->fsk->nin);
     
     for (i=0; i<hstates->fsk->nin; i++) {
-        demod_in_comp[i].real = demod_in[i];
-        demod_in_comp[i].imag = 0;
+	if (quadrature) {
+	    demod_in_comp[i].real = demod_in[i * 2];
+	    demod_in_comp[i].imag = demod_in[i * 2 + 1];
+	} else {
+	    demod_in_comp[i].real = demod_in[i];
+	    demod_in_comp[i].imag = 0;
+	}
     }
     fsk_demod(hstates->fsk, &hstates->rx_bits[rx_bits_len-Nbits], demod_in_comp);
     free(demod_in_comp);
@@ -445,7 +450,7 @@ int horus_get_max_ascii_out_len(struct horus *hstates) {
         return hstates->max_packet_len/10;     /* 7 bit ASCII, plus 3 sync bits */
     }
     if (hstates->mode == HORUS_MODE_BINARY) {
-        return HORUS_BINARY_NUM_PAYLOAD_BYTES;
+        return (HORUS_BINARY_NUM_PAYLOAD_BYTES*2+1);     /* Hexadecimal encoded */
     }
     assert(0); /* should never get here */
     return 0;
@@ -501,4 +506,12 @@ int horus_get_total_payload_bits(struct horus *hstates) {
 void horus_set_total_payload_bits(struct horus *hstates, int val) {
     assert(hstates != NULL);
     hstates->total_payload_bits = val;
+}
+
+void horus_set_freq_est_limits(struct horus *hstates, float fsk_lower, float fsk_upper) {
+    assert(hstates != NULL);
+    assert(fsk_lower> 0);
+    assert(fsk_upper > fsk_lower);
+    hstates->fsk->est_min = fsk_lower;
+    hstates->fsk->est_max = fsk_upper;    
 }
