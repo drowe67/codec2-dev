@@ -451,13 +451,20 @@ int main(void) {
     morse_player.msg = NULL;
     op_mode = prefs.op_mode;
 
-    /* play a start-up tune. */
-    morse_play(&morse_player, VERSION);
-    //sfx_play(&sfx_player, sound_startup);
-
     /* default op-mode */
     f = set_freedv_mode(op_mode, &n_samples);
     n_samples_16k = 2*n_samples;
+
+    /* play VERSION and op mode at start-up.  Morse player can't queue
+       so we assemble a concatenated string here */
+    char startup_announcement[16];
+    if (op_mode == ANALOG)
+        snprintf(startup_announcement, 16, VERSION " ANA");
+    else if (op_mode == DV1600)
+        snprintf(startup_announcement, 16, VERSION " 1600");
+    else if (op_mode == DV700D)
+        snprintf(startup_announcement, 16, VERSION " 700D");
+    morse_play(&morse_player, startup_announcement);
 
     usart_printf("entering main loop...\n");
     uint32_t lastms = ms;    
@@ -816,9 +823,11 @@ int process_core_state_machine(int core_state, struct menu_t *menu, int *op_mode
                     if (save_settings) {
                         int oldest = -1;
                         int res;
-                        /* Copy the settings in */
+                        /* Copy the morse settings in */
                         prefs.menu_freq = morse_player.freq;
                         prefs.menu_speed = morse_player.dit_time;
+                        /* make sure we have same op mode as power on prefs */
+                        *op_mode = prefs.op_mode;
                         /* Increment serial number */
                         prefs.serial++;
                         /* Find the oldest image */
