@@ -29,7 +29,7 @@ This is the hardest part of SM1000 set up and will take some time.
 
 ***Sorry, we do not have specific instructions for your radio***.
 
-Study the wiring of you radio, the [SM1000 schematic](https://svn.code.sf.net/p/freetel/code/smartmic/SM1000-F/MFG-SM1000-F/SCH-SM1000-F.pdf), and this section of the manual.  Draw a schematic or wiring diagram.  Take it slowly.  Connect one part of the interface at at time and test. For example start with PTT. When that is working, connect receive audio and test, then transmit audio.
+Study the wiring of you radio, the [SM1000 schematic](https://svn.code.sf.net/p/freetel/code/smartmic/SM1000-F/MFG-SM1000-F/SCH-SM1000-F.pdf) **Rig Interface** section, and this section of the manual.  Draw a schematic or wiring diagram.  Take it slowly.  Connect one part of the interface at at time and test. For example start with PTT. When that is working, connect receive audio and test, then transmit audio.
 
 1. You can connect the SM1000 to your radio using the 3.5mm sockets or the RJ45 connector. The RIG MIC, RIG SPKR and RIG PTT signals are connected in parallel to the 3.5mm sockets and the RJ45.
 
@@ -39,10 +39,10 @@ Study the wiring of you radio, the [SM1000 schematic](https://svn.code.sf.net/p/
 
 1. RJ45 connection to your radio – The CN12 Patch Panel is configured to connect the audio and PTT connections to your radio. You only need to configure the CN12 Patch Panel if you are using the RJ45. If you are using the 3.5mm connectors you do not need to configure the CN12 Patch Panel. Here is an example for a Yaesu radio:
 
-   ![](sm1000_cn12.png)
+   ![](sm1000_cn12_rev2.png)
    ![](sm1000_cn4_cn12.jpg)
 
-1. All grounds are floating (unconnected) by default, but can be connected together using the extra ground connections on CN12. In the Yaesu example above all grounds are connected together using the wires between pins 10-11 and 12-13. However many radios have a separate microphone ground.
+1. All grounds are floating (unconnected) by default, but can be connected together using the extra ground connections on CN12. In the Yaesu example above all grounds are connected together using the wires between pins 10-13 and 11-12. Some radios have a separate microphone ground.
 
 1. Some radios have reversed numbering for their RJ45.
 
