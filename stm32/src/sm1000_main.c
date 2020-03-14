@@ -44,7 +44,7 @@
 #include "menu.h"
 #include "tot.h"
 
-#define VERSION         "V2"
+#define VERSION         "V3"
 #define FORTY_MS_16K    (0.04*16000)         /* 40ms of samples at 16 kHz */
 #define FREEDV_NSAMPLES_16K (2*FREEDV_NSAMPLES)
 #define CCM             (void*)0x10000000    /* start of 64k CCM memory   */
@@ -270,6 +270,42 @@ int load_prefs()
     return 0;
 }
 
+void print_prefs(struct prefs_t *prefs) {
+    usart_printf("serial: %d\n", (int)prefs->serial);
+    usart_printf("tot_period: %d\n", (int)prefs->tot_period);
+    usart_printf("tot_warn_period: %d\n", (int)prefs->tot_warn_period);
+    usart_printf("menu_freq: %d\n", (int)prefs->menu_freq);
+    usart_printf("menu_speed: %d\n", (int)prefs->menu_speed);
+    usart_printf("menu_vol: %d\n", (int)prefs->menu_vol);
+    usart_printf("op_mode: %d\n", (int)prefs->op_mode);
+    usart_printf("prefs_changed: %d\n", prefs_changed);
+}
+
+struct freedv *set_freedv_mode(int op_mode, int *n_samples) {
+    struct freedv *f = NULL;
+    switch(op_mode) {
+    case ANALOG:
+        usart_printf("Analog\n");
+        *n_samples = FORTY_MS_16K/4;
+        f = NULL;
+        break;
+    case DV1600:
+        usart_printf("FreeDV 1600\n");
+        f = freedv_open(FREEDV_MODE_1600);
+        assert(f != NULL);
+        *n_samples = freedv_get_n_speech_samples(f);
+        break;
+    case DV700D:
+        usart_printf("FreeDV 700D\n");
+        f = freedv_open(FREEDV_MODE_700D);
+        assert(f != NULL);
+        freedv_set_eq(f, 1); /* equaliser on by default */
+        *n_samples = freedv_get_n_speech_samples(f);
+        break;
+    }
+    return f;
+}
+
 int process_core_state_machine(int core_state, struct menu_t  *menu, int *op_mode);
 
 int main(void) {
@@ -339,7 +375,6 @@ int main(void) {
     assert((void*)pccm < CCM+CCM_LEN);
 
     /* clear buffers */
-
     for(i=0; i<FDMDV_OS_TAPS_16K+n_samples_16k; i++)
         adc16k[i] = 0; 
     for(i=0; i<n_samples_16k; i++)
@@ -353,7 +388,6 @@ int main(void) {
     memtools_find_unused(usart_printf);
     
     /* put outputs into a known state */
-
     led_pwr(1); led_ptt(0); led_rt(0); led_err(0); not_cptt(1);
 
     if (!switch_back()) {
@@ -388,6 +422,7 @@ int main(void) {
 
     /* Try to load preferences from flash */
     if (load_prefs() < 0) {
+        usart_printf("loading default preferences....\n");
         /* Fail!  Load defaults. */
         memset(&prefs, 0, sizeof(prefs));
         prefs.op_mode = ANALOG;
@@ -397,6 +432,7 @@ int main(void) {
         prefs.tot_period = 0; /* Disable time-out timer */
         prefs.tot_warn_period = 15;
     }
+    print_prefs(&prefs);
 
     /* Set up time-out timer, 100msec ticks */
     tot.tick_period        = 100;
@@ -415,16 +451,23 @@ int main(void) {
     morse_player.msg = NULL;
     op_mode = prefs.op_mode;
 
-    /* play a start-up tune. */
-    morse_play(&morse_player, VERSION);
-    //sfx_play(&sfx_player, sound_startup);
+    /* default op-mode */
+    f = set_freedv_mode(op_mode, &n_samples);
+    n_samples_16k = 2*n_samples;
+
+    /* play VERSION and op mode at start-up.  Morse player can't queue
+       so we assemble a concatenated string here */
+    char startup_announcement[16];
+    if (op_mode == ANALOG)
+        snprintf(startup_announcement, 16, VERSION " ANA");
+    else if (op_mode == DV1600)
+        snprintf(startup_announcement, 16, VERSION " 1600");
+    else if (op_mode == DV700D)
+        snprintf(startup_announcement, 16, VERSION " 700D");
+    morse_play(&morse_player, startup_announcement);
 
     usart_printf("entering main loop...\n");
-
-    uint32_t lastms = ms;
-    n_samples = FORTY_MS_16K/4;
-    n_samples_16k = 2*n_samples;
-   
+    uint32_t lastms = ms;    
     while(1) {
         /* Read switch states */
         switch_update(&sw_select,   (!switch_select()) ? 1 : 0);
@@ -447,25 +490,8 @@ int main(void) {
         /* if mode has changed, re-open freedv */
         if (op_mode != prev_op_mode) {
             usart_printf("Mode change prev_op_mode: %d op_mode: %d\n", prev_op_mode, op_mode);
-            if (f) freedv_close(f); f = NULL;
-            switch(op_mode) {
-            case ANALOG:
-                usart_printf("Analog\n");
-                n_samples = FORTY_MS_16K/4;
-                break;
-            case DV1600:
-                usart_printf("FreeDV 1600\n");
-                f = freedv_open(FREEDV_MODE_1600);
-                assert(f != NULL);
-                n_samples = freedv_get_n_speech_samples(f);
-                break;
-            case DV700D:
-                usart_printf("FreeDV 700D\n");
-                f = freedv_open(FREEDV_MODE_700D);
-                assert(f != NULL);
-                n_samples = freedv_get_n_speech_samples(f);
-                break;
-            }
+            if (f) { freedv_close(f); } f = NULL;
+            f = set_freedv_mode(op_mode, &n_samples);
             n_samples_16k = 2*n_samples;
             usart_printf("FreeDV f = 0x%x n_samples: %d n_samples_16k: %d\n", (int)f, n_samples, n_samples_16k);
 
@@ -694,6 +720,9 @@ int process_core_state_machine(int core_state, struct menu_t *menu, int *op_mode
                     menuTicker = MENU_DELAY;
                     core_state = STATE_MENU;
                     prefs_changed = 0;
+                    usart_printf("Entering menu ...\n");
+                    print_prefs(&prefs);
+
                 } else if (switch_released(&sw_select)) {
                     /* Shortcut: change current mode */
                     *op_mode = (*op_mode + 1) % MAX_MODES;
@@ -767,6 +796,8 @@ int process_core_state_machine(int core_state, struct menu_t *menu, int *op_mode
                     press_ack = 2;
                     menuTicker = MENU_DELAY;
 
+                    usart_printf("Leaving menu ... stack_depth: %d \n", menu->stack_depth);
+                    print_prefs(&prefs);
                     if (!menu->stack_depth)
                         save_settings = prefs_changed;
 
@@ -792,9 +823,11 @@ int process_core_state_machine(int core_state, struct menu_t *menu, int *op_mode
                     if (save_settings) {
                         int oldest = -1;
                         int res;
-                        /* Copy the settings in */
+                        /* Copy the morse settings in */
                         prefs.menu_freq = morse_player.freq;
                         prefs.menu_speed = morse_player.dit_time;
+                        /* make sure we have same op mode as power on prefs */
+                        *op_mode = prefs.op_mode;
                         /* Increment serial number */
                         prefs.serial++;
                         /* Find the oldest image */
@@ -803,6 +836,7 @@ int process_core_state_machine(int core_state, struct menu_t *menu, int *op_mode
                             oldest = 0; /* No current image */
 
                         /* Write new settings over it */
+                        usart_printf("vrom_write\n");
                         res = vrom_write(oldest + PREFS_IMG_BASE, 0,
                                          sizeof(prefs), &prefs);
                         if (res >= 0)
@@ -908,7 +942,7 @@ static const struct menu_item_t menu_root = {
     .label          = "MENU",
     .event_cb       = menu_default_cb,
     .children       = menu_root_children,
-    .num_children   = 2,
+    .num_children   = 3,
 };
 
 /* Child declarations */
