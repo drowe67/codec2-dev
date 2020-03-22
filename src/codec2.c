@@ -1634,6 +1634,15 @@ void codec2_decode_700c(struct CODEC2 *c2, short speech[], const unsigned char *
 
 
    for(i=0; i<M; i++) {
+       int K = 20;
+       if (c2->fmlfeat != NULL) {
+	   /* 20*4 + 1*4 + 1*4 == 88 bytes/record */
+	   fwrite(&interpolated_surface_[i][0], K, sizeof(float), c2->fmlfeat);
+	   fwrite(&model[i].Wo, 1, sizeof(float), c2->fmlfeat);
+	   float v = model[i].voiced;
+	   fwrite(&v, 1, sizeof(float), c2->fmlfeat);
+       }
+       
        /* 700C is a little quieter so lets apply some experimentally derived audio gain */
        synthesise_one_frame(c2, &speech[c2->n_samp*i], &model[i], &HH[i][0], 1.5);
    }
@@ -2224,10 +2233,12 @@ void codec2_open_mlfeat(struct CODEC2 *codec2_state, char *feat_fn, char *model_
 	fprintf(stderr, "error opening machine learning feature file: %s\n", feat_fn);
 	exit(1);
     }    
-    if ((codec2_state->fmlmodel = fopen(model_fn, "wb")) == NULL) {
+    if (model_fn) {
+	if ((codec2_state->fmlmodel = fopen(model_fn, "wb")) == NULL) {
 	fprintf(stderr, "error opening machine learning Codec 2 model file: %s\n", feat_fn);
 	exit(1);
-    }    
+	}
+    }
 }
 
 #ifndef __EMBEDDED__

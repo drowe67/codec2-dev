@@ -209,7 +209,7 @@ int main(int argc, char *argv[])
                 }                 
                 fprintf(stderr, "each record is %d bytes\n", (int)(K*sizeof(float)));
 	    } else if(strcmp(long_options[option_index].name, "bands") == 0) {
-                /* read model records from file or stdin */
+                /* write mel spaced band energies to file or stdout */
                 if ((fbands = fopen(optarg,"wb")) == NULL) {
 	            fprintf(stderr, "Error opening bands file: %s: %s\n",
 		        optarg, strerror(errno));
