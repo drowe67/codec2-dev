@@ -80,7 +80,7 @@ Built as part of codec2-dev, see README for build instructions.
 
 6. Run C mod/demod with LDPC and 2 frames interleaving:
 
-     build_linux/src$ ./ofdm_mod --in /dev/zero --ldpc --testframes 60 --interleave 2 | ./ofdm_demod --out /dev/null --testframes --ldpc 1 --verbose 1 --interleave 2
+     build_linux/src$ ./ofdm_mod --in /dev/zero --ldpc 1 --testframes 60 --interleave 2 | ./ofdm_demod --out /dev/null --testframes --ldpc 1 --verbose 1 --interleave 2
 
 7. Pass Codec 2 700C compressed speech through OFDM modem:
 
