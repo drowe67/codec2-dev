@@ -62,7 +62,7 @@ void opt_help() {
     fprintf(stderr, "  --tcp        Nsecs    Cyclic Prefix Duration (.002 default)\n");
     fprintf(stderr, "  --ts         Nsecs    Symbol Duration (.018 default)\n");
     fprintf(stderr, "  --testframes Nsecs    Transmit test frames (adjusts test frames for raw and LDPC modes)\n");
-    fprintf(stderr, "  --interleave depth    Interleave depth for LDPC frames, e.g. 1..16 (default is 1)\n");
+    fprintf(stderr, "  --interleave depth    Interleave depth for LDPC frames, e.g. 1,2,4,8,16 (default is 1)\n");
     fprintf(stderr, "  --tx_freq     freq    Set an optional modulation TX centre frequency (1500.0 default)\n");
     fprintf(stderr, "  --rx_freq     freq    Set an optional modulation RX centre frequency (1500.0 default)\n\n");
     fprintf(stderr, "  --verbose  [1|2|3]    Verbose output level to stderr (default off)\n");
