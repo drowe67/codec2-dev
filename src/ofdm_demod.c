@@ -84,7 +84,7 @@ void opt_help() {
     fprintf(stderr, "  --tcp            Nsecs   Cyclic Prefix Duration (.002 default)\n");
     fprintf(stderr, "  --ts             Nsecs   Symbol Duration (.018 default)\n");
     fprintf(stderr, "  --bandwidth      [0|1]   Select phase est bw mode AUTO low or high (0) or LOCKED high (1) (default 0)\n");
-    fprintf(stderr, "  --interleave     depth   Interleaver for LDPC frames, e.g. 1..16 (default is 1)\n");
+    fprintf(stderr, "  --interleave     depth   Interleaver for LDPC frames, e.g. 1,2,4,8,16 (default is 1)\n");
     fprintf(stderr, "                           Must also specify --ldpc option\n");
     fprintf(stderr, "  --tx_freq         freq   Set modulation TX centre Frequency (1500.0 default)\n");
     fprintf(stderr, "  --rx_freq         freq   Set modulation RX centre Frequency (1500.0 default)\n");
