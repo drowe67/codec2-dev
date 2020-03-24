@@ -244,6 +244,9 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
 #ifdef __EMBEDDED__
 	f->ldpc->max_iter = 10;
 #endif	
+	/*
+	 * Code length 224 divided by 2 bits per symbol = 112 symbols per frame
+	 */
         int coded_syms_per_frame = f->ldpc->coded_syms_per_frame;
         
         if (adv == NULL) {
