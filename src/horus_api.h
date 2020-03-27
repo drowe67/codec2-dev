@@ -26,24 +26,22 @@
   along with this program; if not, see <http://www.gnu.org/licenses/>.
 */
 
-
+#ifdef __cplusplus
+  extern "C" {
+#endif
 
 #ifndef __HORUS_API__
-#define __HORUS_API__
 
 #include <stdint.h>
 #include "modem_stats.h"
       
-#ifdef __cplusplus
-  extern "C" {
-#endif
 #define HORUS_MODE_BINARY            0
 #define HORUS_MODE_RTTY              1
 
 struct horus;
 struct MODEM_STATS;
 
-struct horus *horus_open  (int mode);
+struct horus *horus_open  (int mode, int Rs);
 void          horus_close (struct horus *hstates);
 
 /* call before horus_rx() to determine how many shorts to pass in */
@@ -76,8 +74,8 @@ void          horus_set_freq_est_limits      (struct horus *hstates, float fsk_l
 int           horus_get_max_demod_in         (struct horus *hstates);
 int           horus_get_max_ascii_out_len    (struct horus *hstates);
 
-#ifdef __cplusplus
-}
 #endif
 
+#ifdef __cplusplus
+}
 #endif
