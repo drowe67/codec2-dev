@@ -107,7 +107,8 @@ int main(int argc, char *argv[])
     float bands_lower = -1E32;
     int   K = 20;
     float framelength_s = N_S;
-    int   lspEWov = 0;
+    int   lspEWov = 0, rateKWov = 0;
+    FILE  *frateKWov = NULL;
     int   ten_ms_centre = 0;
     FILE  *fphasenn = NULL;
     FILE  *frateK = NULL; int rateKout;
@@ -150,6 +151,7 @@ int main(int argc, char *argv[])
         { "Woread", required_argument, &Woread, 1 },
         { "pahw", required_argument, &pahw, 1 },
         { "lspEWov", required_argument, &lspEWov, 1 },
+        { "rateKWov", required_argument, &rateKWov, 1 },
         { "ten_ms_centre", required_argument, &ten_ms_centre, 1 },
         { "framelength_s", required_argument, NULL, 0 },
         { "modelout",  required_argument, &modelout, 1 },
@@ -307,6 +309,14 @@ int main(int argc, char *argv[])
                 lpc_model = 1; phase0 = 1;
 	        if ((flspEWov = fopen(optarg,"wb")) == NULL) {
 	            fprintf(stderr, "Error opening lspEWov float file: %s: %s\n",
+		        optarg, strerror(errno));
+                    exit(1);
+                }                 
+	    } else if(strcmp(long_options[option_index].name, "rateKWov") == 0) {
+                /* feature file for deep learning experiments */
+                rateK = 1;
+	        if ((frateKWov = fopen(optarg,"wb")) == NULL) {
+	            fprintf(stderr, "Error opening rateKWov float file: %s: %s\n",
 		        optarg, strerror(errno));
                     exit(1);
                 }                 
@@ -616,6 +626,18 @@ int main(int argc, char *argv[])
         dump_Sn(m_pitch, Sn); dump_Sw(Sw); dump_model(&model);
         #endif
 
+	/* speech centred on analysis frame for Deep Learning work */
+            
+	if (ten_ms_centre) {
+	    int n_10_ms = Fs*0.01;
+	    int n_5_ms = Fs*0.005;
+	    short buf[n_10_ms];
+	    for(i=0; i<n_10_ms; i++) {
+		buf[i] = Sn[m_pitch/2-n_5_ms+i];
+	    }
+	    fwrite(buf, n_10_ms, sizeof(short), ften_ms_centre);                  
+	}
+            
 	if (hi) {
 	    int m;
 	    for(m=1; m<model.L/2; m++)
@@ -677,18 +699,6 @@ int main(int argc, char *argv[])
 	    if (dump_pitch_e)
 		fprintf(fjvm, "%f\n", e);
 
-            /* speech centred on analysis frame for Deep Learning work */
-            
-            if (ten_ms_centre) {
-                int n_10_ms = Fs*0.01;
-                int n_5_ms = Fs*0.005;
-                short buf[n_10_ms];
-                for(i=0; i<n_10_ms; i++) {
-                    buf[i] = Sn[m_pitch/2-n_5_ms+i];
-                }
-                fwrite(buf, n_10_ms, sizeof(short), ften_ms_centre);                  
-            }
-            
             #ifdef DUMP
             dump_lsp(lsps);
             #endif
@@ -819,6 +829,16 @@ int main(int argc, char *argv[])
                     rate_K_vec_[k] = rate_K_vec[k];
             }
 
+	    if (frateKWov != NULL) {
+		/* We use standard nb_features=55 feature records for compatability with train_lpcnet.py */
+		float features[55] = {0};
+		memcpy(features, rate_K_vec_, K*sizeof(float));
+		int pitch_index = 2.0*M_PI/model.Wo;
+		features[36] = 0.01*(pitch_index-200);
+		features[37] = model.voiced;
+		fwrite(features, 55, sizeof(float), frateKWov);
+	    }
+	    
             if (rate_K_dec) {
                 // update delay lines
                 for(int d=0; d<rate_K_dec; d++) {
@@ -1014,7 +1034,8 @@ int main(int argc, char *argv[])
     if (ften_ms_centre != NULL) fclose(ften_ms_centre);
     if (fmodelout != NULL) fclose(fmodelout);
     if (fbands != NULL) fclose(fbands);
-    
+    if (frateKWov != NULL) fclose(frateKWov);
+  
     return 0;
 }
 

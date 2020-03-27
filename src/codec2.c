@@ -1636,11 +1636,13 @@ void codec2_decode_700c(struct CODEC2 *c2, short speech[], const unsigned char *
    for(i=0; i<M; i++) {
        int K = 20;
        if (c2->fmlfeat != NULL) {
-	   /* 20*4 + 1*4 + 1*4 == 88 bytes/record */
-	   fwrite(&interpolated_surface_[i][0], K, sizeof(float), c2->fmlfeat);
-	   fwrite(&model[i].Wo, 1, sizeof(float), c2->fmlfeat);
-	   float v = model[i].voiced;
-	   fwrite(&v, 1, sizeof(float), c2->fmlfeat);
+	   /* We use standard nb_features=55 feature records for compatability with train_lpcnet.py */
+	   float features[55] = {0};
+	   memcpy(features, &interpolated_surface_[i][0], K*sizeof(float));
+	   int pitch_index = 2.0*M_PI/model[i].Wo;
+	   features[36] = 0.01*(pitch_index-200);
+	   features[37] = model[i].voiced;
+	   fwrite(features, 55, sizeof(float), c2->fmlfeat);
        }
        
        /* 700C is a little quieter so lets apply some experimentally derived audio gain */
