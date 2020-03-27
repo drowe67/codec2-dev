@@ -125,8 +125,6 @@ int main(int argc, char *argv[]) {
             case 'r':
                 if (optarg != NULL){
                     Rs = atoi(optarg);
-                } else{
-                    Rs = 100;
                 }
                 break;
             break;
@@ -148,6 +146,7 @@ int main(int argc, char *argv[]) {
         fprintf(stderr,"InputModemRawFile      48 kHz 16 bit shorts real modem signal from radio\n");
         fprintf(stderr," -m RTTY|binary\n"); 
         fprintf(stderr,"--mode=RTTY|binary     RTTY or binary Horus protcols\n");
+        fprintf(stderr,"--rate=[Rs]            Modem baud rate. Default: 100\n");
         fprintf(stderr," -t[r] --stats=[r]     Print out modem statistics to stderr in JSON.\n");
         fprintf(stderr,"                       r, if provided, sets the number of modem frames\n"
                        "                       between statistic printouts\n");
