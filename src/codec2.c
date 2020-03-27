@@ -1634,13 +1634,14 @@ void codec2_decode_700c(struct CODEC2 *c2, short speech[], const unsigned char *
 
 
    for(i=0; i<M; i++) {
-       int K = 20;
        if (c2->fmlfeat != NULL) {
 	   /* We use standard nb_features=55 feature records for compatability with train_lpcnet.py */
 	   float features[55] = {0};
-	   memcpy(features, &interpolated_surface_[i][0], K*sizeof(float));
+	   /* just using 18/20 for compatability with LPCNet, coarse scaling for NN imput */
+	   for(int j=0; j<18; j++)
+	       features[i] = (interpolated_surface_[i][j]-30)/40;
 	   int pitch_index = 2.0*M_PI/model[i].Wo;
-	   features[36] = 0.01*(pitch_index-200);
+	   features[36] = 0.02*(pitch_index-100);
 	   features[37] = model[i].voiced;
 	   fwrite(features, 55, sizeof(float), c2->fmlfeat);
        }

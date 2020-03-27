@@ -832,9 +832,11 @@ int main(int argc, char *argv[])
 	    if (frateKWov != NULL) {
 		/* We use standard nb_features=55 feature records for compatability with train_lpcnet.py */
 		float features[55] = {0};
-		memcpy(features, rate_K_vec_, K*sizeof(float));
+		/* just using 18/20 for compatability with LPCNet, coarse scaling for NN imput */
+		for(int i=0; i<18; i++)
+		    features[i] = (rate_K_vec_[i]-30)/40;
 		int pitch_index = 2.0*M_PI/model.Wo;
-		features[36] = 0.01*(pitch_index-200);
+		features[36] = 0.02*(pitch_index-100);
 		features[37] = model.voiced;
 		fwrite(features, 55, sizeof(float), frateKWov);
 	    }
