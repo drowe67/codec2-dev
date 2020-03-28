@@ -513,5 +513,9 @@ endif()
                             diff target.f32 out.f32"
              WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/unittest
              )
+     add_test(NAME test_700c_eq
+             COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/unittest/test_700c_eq.sh
+             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/unittest
+             )
 
 endif(UNITTEST)
