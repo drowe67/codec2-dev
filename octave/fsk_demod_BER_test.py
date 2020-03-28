@@ -25,37 +25,47 @@ import sys
 import numpy as np
 import matplotlib.pyplot as plt
 import scipy.signal
+import scipy.interpolate
 
 
 # Variables you will want to adjust:
-
 
 # Eb/N0 Range to test:
 EBNO_RANGE = np.arange(0,20.5,1)
 
 # Baud rates to test:
-BAUD_RATES = [4800, 500, 100, 50]
+BAUD_RATES = [500, 100, 50]
 
 # Order of the FSK signal (2 or 4)
 FSK_ORDER = 4
 
 # Test Length (bits)
-TEST_LENGTH = 1e4
+TEST_LENGTH = 1e5
 
 # IF sample rate
 SAMPLE_RATE = 48000
 
 # Frequency of the low tone (Hz)
-LOW_TONE = 3000
+LOW_TONE = 10000
 
 # Tone spacing (Hz)
-TONE_SPACING = 5000
+TONE_SPACING = 250
 
 # Switch to 'Low Bit-Rate' mode below this baud rate.
 LBR_BREAK_POINT = 300
 
-# Enable doppler shift. (Not implemented yet!)
+# Enable doppler shift.
+# NOTE: This will apply up to +/- 6kHz of doppler shift to the test signal,
+# emulating transmission through a LEO linear transponder.
+# You will need to set the modem centre frequency and parameters such that
+# the modem signal will be contained within a 1-22 kHz modem RX passband.
+# For 100 baud Horus Binary testing, I use:
+# LOW_TONE = 10000
+# TONE_SPACING = 250
+# The TEST_LENGTH setting must also be long enough so that the test modem file
+# is at least 780 seconds long. For 100 baud 4FSK, a TEST_LENGTH of 2e6 is enough.
 DOPPLER_ENABLED = False
+DOPPLER_FILE = "doppler.npz" # generate using sat_doppler.py
 
 # Where to place the initial test samples.
 SAMPLE_DIR = "./samples"
@@ -121,6 +131,36 @@ def save_sample(data, filename):
     # TODO: Allow saving as complex s16 - see view solution here: https://stackoverflow.com/questions/47086134/how-to-convert-a-numpy-complex-array-to-a-two-element-float-array
 
 
+def apply_doppler(data, dopplerfile, fs=48000):
+    """ Apply a doppler curve to an input data stream """
+
+    npzfile = np.load(dopplerfile)
+
+    _time = npzfile['arr_0']
+    _doppler = npzfile['arr_1']
+
+
+    if len(data) < _time[-1]*fs:
+        print("Input data length too short - use more bits!")
+    
+    # Clip data length if its too long for the input doppler data
+    if len(data) > _time[-1]*fs:
+        data = data[:int(_time[-1]*fs)]
+
+    # Interpolate the doppler data
+    _interp = scipy.interpolate.interp1d(_time, _doppler, kind='cubic')
+
+    _timesteps = np.arange(0,len(data))/fs
+    _interp_doppler = _interp(_timesteps)
+
+    _step = np.arange(0,len(data))
+
+    mixed = data * np.exp(2*np.pi*(_interp_doppler/fs)*_step*1j)
+
+    return mixed
+
+    
+
 
 def calculate_variance(data, threshold=-100.0):
     # Calculate the variance of a set of radiosonde samples.
@@ -158,7 +198,7 @@ def add_noise(data, variance, baud_rate, ebno, fs=96000,  bitspersymbol=1.0, nor
         return _noisy
 
 
-def generate_lowsnr(filename, outfile,  fs, baud, ebno, order):
+def generate_lowsnr(sample, outfile,  fs, baud, ebno, order):
     """ Generate a low SNR test file  """
 
     if order == 2:
@@ -166,11 +206,10 @@ def generate_lowsnr(filename, outfile,  fs, baud, ebno, order):
     else:
         _bits_per_symbol = 2
 
-    _sample = load_sample(filename)
 
-    _var = calculate_variance(_sample)
+    _var = calculate_variance(sample)
 
-    _noisy = add_noise(_sample, _var, baud, ebno, fs, _bits_per_symbol)
+    _noisy = add_noise(sample, _var, baud, ebno, fs, _bits_per_symbol)
 
     save_sample(_noisy, outfile)
 
@@ -227,10 +266,12 @@ def generate_fsk(baud):
 
     _runtime = time.time() - _start
 
+    print("Finished generating test signal.")
+
     return _filename
 
 
-def process_fsk(filename, baud, complex_samples=True):
+def process_fsk(filename, baud, complex_samples=True, override_bits=None):
     """ Run a fsk file through fsk_demod """
 
     if baud < LBR_BREAK_POINT:
@@ -289,8 +330,18 @@ def process_fsk(filename, baud, complex_samples=True):
     _bits = float(_fields[7][:-1]) # remove the trailing comma
     _errors = float(_fields[10])
 
+    if override_bits != None:
+        if _bits < override_bits:
+            print("Demod got %d bits, but we sent %d bits." % (_bits, override_bits))
+            _errors += (override_bits - _bits)
+
     # Calculate and return BER
-    return _errors/_bits
+    _ber = _errors/_bits
+
+    if _ber > 1.0:
+        _ber = 1.0
+
+    return _ber
 
 if __name__ == "__main__":
 
@@ -300,15 +351,26 @@ if __name__ == "__main__":
 
         _file = generate_fsk(_baud)
 
+        print("Loading file and converting to complex.")
+        _sample = load_sample(_file)
+
+        if DOPPLER_ENABLED:
+            print("Applying Doppler.")
+            _sample = apply_doppler(_sample, DOPPLER_FILE)
+            print("Done.")
+            _override_bits = _baud*(len(_sample)/SAMPLE_RATE)
+        else:
+            _override_bits = None
+
         _temp_file = "%s/temp.bin" % GENERATED_DIR
 
         _ebnos = []
         _bers = []
 
         for _ebno in EBNO_RANGE:
-            generate_lowsnr(_file, _temp_file , SAMPLE_RATE, _baud, _ebno, FSK_ORDER)
+            generate_lowsnr(_sample, _temp_file , SAMPLE_RATE, _baud, _ebno, FSK_ORDER)
 
-            _ber = process_fsk(_temp_file, _baud)
+            _ber = process_fsk(_temp_file, _baud, override_bits=_override_bits)
 
             print("%.1f, %.8f" % (_ebno, _ber))
 
