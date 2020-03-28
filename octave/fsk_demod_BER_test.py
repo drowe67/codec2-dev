@@ -34,13 +34,13 @@ import scipy.interpolate
 EBNO_RANGE = np.arange(0,20.5,1)
 
 # Baud rates to test:
-BAUD_RATES = [500, 100, 50]
+BAUD_RATES = [100]
 
 # Order of the FSK signal (2 or 4)
 FSK_ORDER = 4
 
 # Test Length (bits)
-TEST_LENGTH = 1e5
+TEST_LENGTH = 2e5
 
 # IF sample rate
 SAMPLE_RATE = 48000
@@ -64,8 +64,11 @@ LBR_BREAK_POINT = 300
 # TONE_SPACING = 250
 # The TEST_LENGTH setting must also be long enough so that the test modem file
 # is at least 780 seconds long. For 100 baud 4FSK, a TEST_LENGTH of 2e6 is enough.
-DOPPLER_ENABLED = False
+DOPPLER_ENABLED = True
 DOPPLER_FILE = "doppler.npz" # generate using sat_doppler.py
+
+
+STATS_OUTPUT = True
 
 # Where to place the initial test samples.
 SAMPLE_DIR = "./samples"
@@ -153,9 +156,9 @@ def apply_doppler(data, dopplerfile, fs=48000):
     _timesteps = np.arange(0,len(data))/fs
     _interp_doppler = _interp(_timesteps)
 
-    _step = np.arange(0,len(data))
-
-    mixed = data * np.exp(2*np.pi*(_interp_doppler/fs)*_step*1j)
+    # This isn't working properly.
+    phase = np.cumsum(_interp_doppler/fs)
+    mixed = data * np.exp(1.0j*2.0*np.pi*phase)
 
     return mixed
 
@@ -271,7 +274,7 @@ def generate_fsk(baud):
     return _filename
 
 
-def process_fsk(filename, baud, complex_samples=True, override_bits=None):
+def process_fsk(filename, baud, complex_samples=True, override_bits=None, stats=False, statsfile=""):
     """ Run a fsk file through fsk_demod """
 
     if baud < LBR_BREAK_POINT:
@@ -284,20 +287,33 @@ def process_fsk(filename, baud, complex_samples=True, override_bits=None):
     else:
         _cpx = ""
 
-    _cmd = "cat %s | csdr convert_f_s16 | %s/fsk_demod %s%s%d %d %d - - | %s/fsk_put_test_bits - 2>&1" % (
+    if stats:
+        _stats_file = GENERATED_DIR + "/" + statsfile + ".stats"
+        _stats = "--stats=50 "
+    else:
+        _stats = ""
+
+    _cmd = "cat %s | csdr convert_f_s16 | %s/fsk_demod %s%s%s%d %d %d - - " % (
         filename,
         CODEC2_UTILS,
         _lbr,
         _cpx,
+        _stats,
         FSK_ORDER,
         SAMPLE_RATE,
         baud,
+    )
+
+    if stats:
+        _cmd += "2> %s" % _stats_file
+    
+    _cmd += "| %s/fsk_put_test_bits - 2>&1" % (
         CODEC2_UTILS
     )
 
     #print("Processing %s" % filename)
 
-    #print(_cmd)
+    print(_cmd)
 
     # Run the command.
     try:
@@ -360,7 +376,7 @@ if __name__ == "__main__":
             print("Done.")
             _override_bits = _baud*(len(_sample)/SAMPLE_RATE)
         else:
-            _override_bits = None
+            _override_bits = TEST_LENGTH
 
         _temp_file = "%s/temp.bin" % GENERATED_DIR
 
@@ -370,7 +386,7 @@ if __name__ == "__main__":
         for _ebno in EBNO_RANGE:
             generate_lowsnr(_sample, _temp_file , SAMPLE_RATE, _baud, _ebno, FSK_ORDER)
 
-            _ber = process_fsk(_temp_file, _baud, override_bits=_override_bits)
+            _ber = process_fsk(_temp_file, _baud, override_bits=_override_bits, stats=STATS_OUTPUT, statsfile="fsk_%d_%.1f"%(_baud, _ebno))
 
             print("%.1f, %.8f" % (_ebno, _ber))
 
