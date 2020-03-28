@@ -390,7 +390,22 @@ void determine_phase(C2CONST *c2const, COMP H[], MODEL *model, int Nfft, codec2_
 }
 
 
-/*---------------------------------------------------------------------------*\
+/* update and optionally run "front eq" equaliser on before VQ */
+void newamp1_eq(float rate_K_vec_no_mean[], float eq[], int K, int eq_en) {
+    static float ideal[] = {8,10,12,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,-20};
+    float gain = 0.02;
+    float update;
+    
+    for(int k=0; k<K; k++) {
+        update = rate_K_vec_no_mean[k] - ideal[k];
+        eq[k] = (1.0-gain)*eq[k] + gain*update;
+        if (eq[k] < 0.0) eq[k] = 0.0;
+        if (eq_en)
+            rate_K_vec_no_mean[k] -= eq[k];
+    }
+}
+
+/*---------------------------------------------------------------------------* \
 
   FUNCTION....: newamp1_model_to_indexes
   AUTHOR......: David Rowe
@@ -429,18 +444,8 @@ void newamp1_model_to_indexes(C2CONST *c2const,
         rate_K_vec_no_mean[k] = rate_K_vec[k] - *mean;
 
     /* update and optionally run "front eq" equaliser on before VQ */
-    static float ideal[] = {8,10,12,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,-20};
-    float gain = 0.02;
-    float update;
-        
-    for(k=0; k<K; k++) {
-        update = rate_K_vec_no_mean[k] - ideal[k];
-        eq[k] = (1.0-gain)*eq[k] + gain*update;
-        if (eq[k] < 0.0) eq[k] = 0.0;
-        if (eq_en)
-            rate_K_vec_no_mean[k] -= eq[k];
-    }
-
+    newamp1_eq(rate_K_vec_no_mean, eq, K, eq_en);
+ 
     /* two stage VQ */
     rate_K_mbest_encode(indexes, rate_K_vec_no_mean, rate_K_vec_no_mean_, K, NEWAMP1_VQ_MBEST_DEPTH);
 

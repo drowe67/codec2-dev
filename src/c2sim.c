@@ -560,6 +560,8 @@ int main(int argc, char *argv[])
         rate_K_model_delay[d].L = M_PI/prev_model_dec.Wo;
         rate_K_model_delay[d].voiced = 0;
     }
+    float eq[K];
+    for(int k=0; k<K; k++) eq[k] = 0;
     
     /*----------------------------------------------------------------* \
 
@@ -812,6 +814,8 @@ int main(int argc, char *argv[])
                 float rate_K_vec_no_mean[K];
                 for(int k=0; k<K; k++)
                     rate_K_vec_no_mean[k] = rate_K_vec[k] - mean;
+		
+		newamp1_eq(rate_K_vec_no_mean, eq, K, 1);
 
                 /* two stage VQ */
                 float rate_K_vec_no_mean_[K]; int indexes[2];
