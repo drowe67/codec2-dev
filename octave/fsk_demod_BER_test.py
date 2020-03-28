@@ -40,7 +40,7 @@ BAUD_RATES = [4800, 500, 100, 50]
 FSK_ORDER = 4
 
 # Test Length (bits)
-TEST_LENGTH = 1e6
+TEST_LENGTH = 1e4
 
 # IF sample rate
 SAMPLE_RATE = 48000
@@ -140,7 +140,7 @@ def add_noise(data, variance, baud_rate, ebno, fs=96000,  bitspersymbol=1.0, nor
 
     # Calculate the noise variance we need to add
     _noise_variance = variance*fs/(baud_rate*_ebno*bitspersymbol)
-    
+
     # If we are working with real samples, we need to halve the noise contribution.
     if real:
         _noise_variance = _noise_variance*0.5
@@ -327,6 +327,10 @@ if __name__ == "__main__":
 
     plt.xlabel("Eb/N0 (dB)")
     plt.ylabel("BER")
+
+    # Crop plot to reasonable limits
+    plt.ylim(1e-3, 1)
+    plt.xlim(0,15)
 
     plt.title('fsk_demod %d-FSK BER performance' % FSK_ORDER)
 
