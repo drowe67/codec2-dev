@@ -212,10 +212,11 @@ int main(int argc,char *argv[]){
     }
     else {
         fsk = fsk_create_hbr(Fs,Rs,P,M,1200,400);
-        if(fsk_lower> 0 && fsk_upper > fsk_lower){
-            fsk_set_est_limits(fsk,fsk_lower,fsk_upper);
-            fprintf(stderr,"Setting estimator limits to %d to %d Hz.\n",fsk_lower, fsk_upper);
-        }
+    }
+
+    if(fsk_lower> 0 && fsk_upper > fsk_lower){
+        fsk_set_est_limits(fsk,fsk_lower,fsk_upper);
+        fprintf(stderr,"Setting estimator limits to %d to %d Hz.\n",fsk_lower, fsk_upper);
     }
 
     if(fin==NULL || fout==NULL || fsk==NULL){
