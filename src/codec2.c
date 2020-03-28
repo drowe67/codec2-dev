@@ -1639,7 +1639,7 @@ void codec2_decode_700c(struct CODEC2 *c2, short speech[], const unsigned char *
 	   float features[55] = {0};
 	   /* just using 18/20 for compatability with LPCNet, coarse scaling for NN imput */
 	   for(int j=0; j<18; j++)
-	       features[i] = (interpolated_surface_[i][j]-30)/40;
+	       features[j] = (interpolated_surface_[i][j]-30)/40;
 	   int pitch_index = 2.0*M_PI/model[i].Wo;
 	   features[36] = 0.02*(pitch_index-100);
 	   features[37] = model[i].voiced;
