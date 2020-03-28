@@ -24,6 +24,7 @@ import sys
 
 import numpy as np
 import matplotlib.pyplot as plt
+import scipy.signal
 
 
 # Variables you will want to adjust:
@@ -33,13 +34,13 @@ import matplotlib.pyplot as plt
 EBNO_RANGE = np.arange(0,20.5,1)
 
 # Baud rates to test:
-BAUD_RATES = [4800, 480, 100, 48, 25]
+BAUD_RATES = [4800, 500, 100, 50]
 
 # Order of the FSK signal (2 or 4)
 FSK_ORDER = 4
 
 # Test Length (bits)
-TEST_LENGTH = 1e5
+TEST_LENGTH = 1e6
 
 # IF sample rate
 SAMPLE_RATE = 48000
@@ -105,8 +106,12 @@ THEORY_BER_2 = [
 # Functions to read files and add noise.
 #
 
-def load_sample(filename):
-    return np.fromfile(filename, dtype='c8')
+def load_sample(filename, loadreal=True):
+    # If loading real samples (which is what fsk_mod outputs), apply a hilbert transform to get an analytic signal.
+    if loadreal:
+        return scipy.signal.hilbert(np.fromfile(filename, dtype='f4'))
+    else:
+        return np.fromfile(filename, dtype='c8')
 
 
 def save_sample(data, filename):
@@ -114,6 +119,7 @@ def save_sample(data, filename):
     data.astype(dtype='c8').tofile(filename)
 
     # TODO: Allow saving as complex s16 - see view solution here: https://stackoverflow.com/questions/47086134/how-to-convert-a-numpy-complex-array-to-a-two-element-float-array
+
 
 
 def calculate_variance(data, threshold=-100.0):
@@ -126,14 +132,18 @@ def calculate_variance(data, threshold=-100.0):
     return np.var(data[_data_log>threshold])
 
 
-def add_noise(data, variance, baud_rate, ebno, fs=96000,  bitspersymbol=1.0, normalise=True):
+def add_noise(data, variance, baud_rate, ebno, fs=96000,  bitspersymbol=1.0, normalise=True, real=False):
     # Add calibrated noise to a sample.
 
     # Calculate Eb/No in linear units.
     _ebno = 10.0**((ebno)/10.0)
 
     # Calculate the noise variance we need to add
-    _noise_variance = 0.5*variance*fs/(baud_rate*_ebno*bitspersymbol)
+    _noise_variance = variance*fs/(baud_rate*_ebno*bitspersymbol)
+    
+    # If we are working with real samples, we need to halve the noise contribution.
+    if real:
+        _noise_variance = _noise_variance*0.5
 
     # Generate complex random samples
     _rand_i = np.sqrt(_noise_variance/2.0)*np.random.randn(len(data))
@@ -220,7 +230,7 @@ def generate_fsk(baud):
     return _filename
 
 
-def process_fsk(filename, baud):
+def process_fsk(filename, baud, complex_samples=True):
     """ Run a fsk file through fsk_demod """
 
     if baud < LBR_BREAK_POINT:
@@ -228,10 +238,16 @@ def process_fsk(filename, baud):
     else:
         _lbr = ""
 
-    _cmd = "cat %s | csdr convert_f_s16 | %s/fsk_demod %s%d %d %d - - | %s/fsk_put_test_bits - 2>&1" % (
+    if complex_samples:
+        _cpx = "--cs16 "
+    else:
+        _cpx = ""
+
+    _cmd = "cat %s | csdr convert_f_s16 | %s/fsk_demod %s%s%d %d %d - - | %s/fsk_put_test_bits - 2>&1" % (
         filename,
         CODEC2_UTILS,
         _lbr,
+        _cpx,
         FSK_ORDER,
         SAMPLE_RATE,
         baud,
