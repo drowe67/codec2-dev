@@ -31,7 +31,9 @@ import scipy.interpolate
 # Variables you will want to adjust:
 
 # Eb/N0 Range to test:
-EBNO_RANGE = np.arange(0,20.5,1)
+# Default: 0 through 5 dB in 0.5 db steps, then up to 20 db in 1db steps.
+EBNO_RANGE = np.append(np.arange(0,5,0.5), np.arange(5,20.5,1))
+
 
 # Baud rates to test:
 BAUD_RATES = [100,50,25]
@@ -60,7 +62,7 @@ SAMPLE_RATE = 48000
 LOW_TONE = 2000
 
 # Tone spacing (Hz)
-TONE_SPACING = 250 # Set the tone spacing to the highest baud rate.
+TONE_SPACING = 250
 
 # Switch to 'Low Bit-Rate' mode below this baud rate.
 LBR_BREAK_POINT = 600

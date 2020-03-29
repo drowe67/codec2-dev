@@ -32,9 +32,9 @@
 #include <string.h>
 #include "fsk.h"
 
-#define TEST_FRAME_SIZE 1000  /* must match fsk_get_test_bits.c */
+#define TEST_FRAME_SIZE 100  /* must match fsk_get_test_bits.c */
 
-#define FRAME_DETECTION_THRESHOLD 0.4
+#define FRAME_DETECTION_THRESHOLD 0.1
 
 int main(int argc,char *argv[]){
     int bitcnt,biterr,i,errs;
