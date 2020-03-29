@@ -32,16 +32,30 @@
 #include <string.h>
 #include "fsk.h"
 
-#define TEST_FRAME_SIZE 100  /* must match fsk_get_test_bits.c */
+#define TEST_FRAME_SIZE 1000  /* must match fsk_get_test_bits.c */
+
+#define FRAME_DETECTION_THRESHOLD 0.4
 
 int main(int argc,char *argv[]){
     int bitcnt,biterr,i,errs;
+    int framesize = TEST_FRAME_SIZE;
+    float threshold = FRAME_DETECTION_THRESHOLD;
     FILE *fin;
     uint8_t *bitbuf_tx, *bitbuf_rx, abit;
     
-    if(argc != 2){
-        fprintf(stderr,"usage: %s InputBitsOnePerByte \n",argv[0]);
+    if(argc < 2){
+        fprintf(stderr,"usage: %s InputBitsOnePerByte [framesize] [threshold] \n",argv[0]);
         exit(1);
+    }
+
+    if(argc > 2){
+        framesize = atoi(argv[2]);
+        fprintf(stderr, "Using custom framesize %d.\n", framesize);
+    }
+
+    if(argc > 3){
+        threshold = atof(argv[3]);
+        fprintf(stderr, "Using custom threshold %.2f.\n", threshold);
     }
     
     if(strcmp(argv[1],"-")==0 || argc<2){
@@ -56,12 +70,12 @@ int main(int argc,char *argv[]){
     }
 
     /* allocate buffers for processing */
-    bitbuf_tx = (uint8_t*)alloca(sizeof(uint8_t)*TEST_FRAME_SIZE);
-    bitbuf_rx = (uint8_t*)alloca(sizeof(uint8_t)*TEST_FRAME_SIZE);
+    bitbuf_tx = (uint8_t*)alloca(sizeof(uint8_t)*framesize);
+    bitbuf_rx = (uint8_t*)alloca(sizeof(uint8_t)*framesize);
     
     /* Generate known tx frame from known seed */
     srand(158324);
-    for(i=0; i<TEST_FRAME_SIZE; i++){
+    for(i=0; i<framesize; i++){
 	bitbuf_tx[i] = rand()&0x1;
 	bitbuf_rx[i] = 0;
     }
@@ -73,23 +87,23 @@ int main(int argc,char *argv[]){
 
         /* update silding window of input bits */
 
-        for(i=0; i<TEST_FRAME_SIZE-1; i++) {
+        for(i=0; i<framesize-1; i++) {
             bitbuf_rx[i] = bitbuf_rx[i+1];
         }
-        bitbuf_rx[TEST_FRAME_SIZE-1] = abit;
+        bitbuf_rx[framesize-1] = abit;
 
         /* compare to know tx frame.  If they are time aligned, there
            will be a fairly low bit error rate */
 
         errs = 0;
-        for(i=0; i<TEST_FRAME_SIZE; i++) {
+        for(i=0; i<framesize; i++) {
             if (bitbuf_rx[i] != bitbuf_tx[i]) {
                 errs++;
             }
         }
-        if (errs < 0.1*TEST_FRAME_SIZE) {
+        if (errs < threshold * framesize) {
             /* OK, we have a valid test frame sync, so lets count errors */
-            bitcnt += TEST_FRAME_SIZE;
+            bitcnt += framesize;
             biterr += errs;
             fprintf(stderr,"errs: %d FSK BER %f, bits tested %d, bit errors %d\n",
                     errs, ((float)biterr/(float)bitcnt),bitcnt,biterr);

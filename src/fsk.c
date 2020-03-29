@@ -287,6 +287,8 @@ struct FSK * fsk_create(int Fs, int Rs,int M, int tx_f1, int tx_fs)
     fsk = (struct FSK*) malloc(sizeof(struct FSK));
     if(fsk == NULL) return NULL;
      
+    // This parameters affects decode performance for very low baud rates (<100).
+    // Needs further investigation as to if this should scale inverse to baud rate.
     Ndft = 1024;
     
     /* Set constant config parameters */

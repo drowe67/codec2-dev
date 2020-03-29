@@ -34,25 +34,39 @@ import scipy.interpolate
 EBNO_RANGE = np.arange(0,20.5,1)
 
 # Baud rates to test:
-BAUD_RATES = [100]
+BAUD_RATES = [100,50,25]
 
 # Order of the FSK signal (2 or 4)
 FSK_ORDER = 4
 
 # Test Length (bits)
-TEST_LENGTH = 2e5
+TEST_LENGTH = 2e4
+
+# Pseudorandom sequence length to generate test frames.
+# NOTE: BER results are quite dependent on the frame length and threshold parameters.
+FRAME_LENGTH = 2000
+
+# Frame threshold detection. This has the effect of setting an upper bound on the BER.
+FRAME_THRESHOLD = 0.4
+
+# Allow a reduction in 'expected' bits of this value, as we expect the modem to need
+# some time to 'spin up' the estimators.
+FRAME_IGNORE = FRAME_LENGTH
 
 # IF sample rate
 SAMPLE_RATE = 48000
 
 # Frequency of the low tone (Hz)
-LOW_TONE = 10000
+LOW_TONE = 2000
 
 # Tone spacing (Hz)
-TONE_SPACING = 250
+TONE_SPACING = 250 # Set the tone spacing to the highest baud rate.
 
 # Switch to 'Low Bit-Rate' mode below this baud rate.
-LBR_BREAK_POINT = 300
+LBR_BREAK_POINT = 600
+
+# Halt simulation for a particular baud rate when the BER drops below this level.
+BER_BREAK_POINT = 1e-3
 
 # Enable doppler shift.
 # NOTE: This will apply up to +/- 6kHz of doppler shift to the test signal,
@@ -64,7 +78,7 @@ LBR_BREAK_POINT = 300
 # TONE_SPACING = 250
 # The TEST_LENGTH setting must also be long enough so that the test modem file
 # is at least 780 seconds long. For 100 baud 4FSK, a TEST_LENGTH of 2e6 is enough.
-DOPPLER_ENABLED = True
+DOPPLER_ENABLED = False
 DOPPLER_FILE = "doppler.npz" # generate using sat_doppler.py
 
 
@@ -242,9 +256,10 @@ def generate_fsk(baud):
     )
     
     # Generate the command we need to make:
-    _cmd = "%s/fsk_get_test_bits - %d | %s/fsk_mod %d %d %d %d %d - - | csdr convert_s16_f > %s" % (
+    _cmd = "%s/fsk_get_test_bits - %d %d | %s/fsk_mod %d %d %d %d %d - - | csdr convert_s16_f > %s" % (
         CODEC2_UTILS,
         _num_bits,
+        FRAME_LENGTH,
         CODEC2_UTILS,
         FSK_ORDER,
         SAMPLE_RATE,
@@ -254,7 +269,7 @@ def generate_fsk(baud):
         _filename
     )
 
-    #print(_cmd)
+    print(_cmd)
 
     print("Generating test signal: %d-FSK, %d baud" % (FSK_ORDER, baud))
 
@@ -307,8 +322,10 @@ def process_fsk(filename, baud, complex_samples=True, override_bits=None, stats=
     if stats:
         _cmd += "2> %s" % _stats_file
     
-    _cmd += "| %s/fsk_put_test_bits - 2>&1" % (
-        CODEC2_UTILS
+    _cmd += "| %s/fsk_put_test_bits - %d %.2f 2>&1" % (
+        CODEC2_UTILS,
+        FRAME_LENGTH,
+        FRAME_THRESHOLD
     )
 
     #print("Processing %s" % filename)
@@ -333,8 +350,13 @@ def process_fsk(filename, baud, complex_samples=True, override_bits=None, stats=
         _last_line = _output.split('\n')[-2]
     except:
         # Lack of a line indicates that we have decoded no data. return a BER of 1.
+        print("No bits decoded.")
         return 1.0
 
+    # Detect no decoded bits when feeding in custom put_bits parameters.
+    if 'Using' in _last_line:
+        print("No bits decoded.")
+        return 1.0
 
     # Example line:
     # errs: 0 FSK BER 0.000000, bits tested 5800, bit errors 0
@@ -345,6 +367,9 @@ def process_fsk(filename, baud, complex_samples=True, override_bits=None, stats=
     # Extract number of bits and errors
     _bits = float(_fields[7][:-1]) # remove the trailing comma
     _errors = float(_fields[10])
+
+
+    print("Bits: %d, Errors: %d, Raw BER: %.8f" % (_bits, _errors, _errors/_bits))
 
     if override_bits != None:
         if _bits < override_bits:
@@ -361,7 +386,8 @@ def process_fsk(filename, baud, complex_samples=True, override_bits=None, stats=
 
 if __name__ == "__main__":
 
-    plt.figure()
+
+    plot_data = {}
 
     for _baud in BAUD_RATES:
 
@@ -374,9 +400,9 @@ if __name__ == "__main__":
             print("Applying Doppler.")
             _sample = apply_doppler(_sample, DOPPLER_FILE)
             print("Done.")
-            _override_bits = _baud*(len(_sample)/SAMPLE_RATE)
+            _override_bits = _baud*(len(_sample)/SAMPLE_RATE) - FRAME_IGNORE
         else:
-            _override_bits = TEST_LENGTH
+            _override_bits = TEST_LENGTH - FRAME_IGNORE
 
         _temp_file = "%s/temp.bin" % GENERATED_DIR
 
@@ -392,11 +418,22 @@ if __name__ == "__main__":
 
             _ebnos.append(_ebno)
             _bers.append(_ber)
-        
-        _temp = {'baud': _baud, 'ebno': _ebnos, 'ber': _bers}
-        print(_temp)
 
-        plt.semilogy(_ebnos, _bers, label="Simulated - %d bd" % _baud)
+            # Halt the simulation if the BER drops below our break point.
+            if _ber < BER_BREAK_POINT:
+                break
+        
+        plot_data[_baud]= {'baud': _baud, 'ebno': _ebnos, 'ber': _bers}
+        print(plot_data[_baud])
+
+        #plt.semilogy(plot_data[_baud]['ebno'], plot_data[_baud]['ber'], label="Simulated - %d bd" % _baud)
+
+    plt.figure()
+
+    print(plot_data)
+
+    for _b in plot_data:
+        plt.semilogy(plot_data[_b]['ebno'], plot_data[_b]['ber'], label="Simulated - %d bd" % _b)
 
     if FSK_ORDER == 2:
         plt.semilogy(THEORY_EBNO, THEORY_BER_2, label="Theory")
@@ -408,7 +445,7 @@ if __name__ == "__main__":
 
     # Crop plot to reasonable limits
     plt.ylim(1e-3, 1)
-    plt.xlim(0,15)
+    plt.xlim(0,10)
 
     plt.title('fsk_demod %d-FSK BER performance' % FSK_ORDER)
 
