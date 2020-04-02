@@ -21,6 +21,7 @@ import time
 import traceback
 import subprocess
 import sys
+import argparse
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -188,7 +189,9 @@ def calculate_variance(data, threshold=-100.0):
 
     _data_log = 20*np.log10(np.abs(data))
 
-    return np.var(data[_data_log>threshold])
+    # MSE is better than variance as a power estimate, as it counts DC
+    data_thresh = data[_data_log>threshold]
+    return np.mean(data_thresh*np.conj(data_thresh))
 
 
 def add_noise(data, variance, baud_rate, ebno, fs=96000,  bitspersymbol=1.0, normalise=True, real=False):
@@ -388,7 +391,39 @@ def process_fsk(filename, baud, complex_samples=True, override_bits=None, stats=
 
 if __name__ == "__main__":
 
+    parser = argparse.ArgumentParser(description='FSK modem BER simulations')
+    parser.add_argument('--test', action='store_true', help='run automated test')
+    args = parser.parse_args()
 
+    if args.test:
+        # test the AWGN channel simulation.  We use BPSK that's phase shifted to exercise the
+        # complex maths a bit
+        
+        nb_bits = 100000; EbNo = 4
+        tx_bits = np.random.randint(2,size=nb_bits)
+        tx_bpsk_symbols = (2*tx_bits - 1) * np.exp(1j*np.pi/3)
+        tx_power = calculate_variance(tx_bpsk_symbols)
+
+        # check calculate_variance()
+        assert (tx_power < 1.1 and tx_power > 0.9)
+
+        # BPSK modem simulation
+        rx_bpsk_symbols = add_noise(tx_bpsk_symbols, tx_power, 1, EbNo, 1, 1)
+        rx_bpsk_symbols = rx_bpsk_symbols * np.exp(-1j*np.pi/3)
+        rx_bits = np.array([1 if np.real(s) > 0 else 0 for s in rx_bpsk_symbols])
+        nb_errors = np.sum(np.bitwise_xor(tx_bits,rx_bits))
+        ber = nb_errors/nb_bits
+        
+        # set limit of +/- 0.25dB on BER
+        EbNo_lin_upper = 10**((EbNo-0.25)/10)
+        bpsk_ber_theory_upper = 0.5*scipy.special.erfc(np.sqrt(EbNo_lin_upper))
+        EbNo_lin_lower = 10**((EbNo+0.25)/10)
+        bpsk_ber_theory_lower = 0.5*scipy.special.erfc(np.sqrt(EbNo_lin_lower))
+        print("nb_errors: %d ber: %4.3f ber_lower_limit: %4.3f ber_upper_limit: %4.3f" % (nb_errors, ber, bpsk_ber_theory_lower, bpsk_ber_theory_upper))
+        assert (ber < bpsk_ber_theory_upper and ber > bpsk_ber_theory_lower)
+        print("AWGN channel simulation test PASSED!")
+        exit()
+        
     plot_data = {}
 
     for _baud in BAUD_RATES:
