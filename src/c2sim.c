@@ -315,7 +315,7 @@ int main(int argc, char *argv[])
                 }                 
 	    } else if(strcmp(long_options[option_index].name, "rateKWov") == 0) {
                 /* feature file for deep learning experiments */
-                rateK = 1;
+                rateK = 1; newamp1vq = 1;
 	        if ((frateKWov = fopen(optarg,"wb")) == NULL) {
 	            fprintf(stderr, "Error opening rateKWov float file: %s: %s\n",
 		        optarg, strerror(errno));
