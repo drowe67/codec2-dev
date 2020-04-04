@@ -107,7 +107,7 @@ int main(int argc, char *argv[])
     float bands_lower = -1E32;
     int   K = 20;
     float framelength_s = N_S;
-    int   lspEWov = 0, rateKWov = 0;
+    int   lspEWov = 0, rateKWov = 0, first = 0;
     FILE  *frateKWov = NULL;
     int   ten_ms_centre = 0;
     FILE  *fphasenn = NULL;
@@ -152,6 +152,7 @@ int main(int argc, char *argv[])
         { "pahw", required_argument, &pahw, 1 },
         { "lspEWov", required_argument, &lspEWov, 1 },
         { "rateKWov", required_argument, &rateKWov, 1 },
+        { "first", no_argument, &first, 1 },
         { "ten_ms_centre", required_argument, &ten_ms_centre, 1 },
         { "framelength_s", required_argument, NULL, 0 },
         { "modelout",  required_argument, &modelout, 1 },
@@ -842,6 +843,12 @@ int main(int argc, char *argv[])
 		int pitch_index = 2.0*M_PI/model.Wo;
 		features[36] = 0.02*(pitch_index-100);
 		features[37] = model.voiced;
+		if (first)
+		    features[18] = -0.9;
+		if (lpc_model) {
+		    for(int i=0; i<order; i++)
+			features[18+i] = ak[i+1];
+		}
 		fwrite(features, 55, sizeof(float), frateKWov);
 	    }
 	    
