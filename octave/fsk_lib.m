@@ -10,9 +10,6 @@
 % Handles frequency offsets, performance right on ideal, C implementation
 % in codec2-dev/src
 
-% NOTE: DR is in the process of refactoring this Octave code, pls email me 
-%       if something is broken
-
 1;
 
 function states = fsk_init(Fs, Rs, M=2)
