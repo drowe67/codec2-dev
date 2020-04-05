@@ -33,11 +33,11 @@ import scipy.interpolate
 
 # Eb/N0 Range to test:
 # Default: 0 through 5 dB in 0.5 db steps, then up to 20 db in 1db steps.
-EBNO_RANGE = np.append(np.arange(0,5,0.5), np.arange(5,20.5,1))
+EBNO_RANGE = np.append(np.arange(0, 5, 0.5), np.arange(5, 20.5, 1))
 
 
 # Baud rates to test:
-BAUD_RATES = [100,50,25]
+BAUD_RATES = [100, 50, 25]
 
 # Order of the FSK signal (2 or 4)
 FSK_ORDER = 4
@@ -82,7 +82,7 @@ BER_BREAK_POINT = 1e-3
 # The TEST_LENGTH setting must also be long enough so that the test modem file
 # is at least 780 seconds long. For 100 baud 4FSK, a TEST_LENGTH of 2e6 is enough.
 DOPPLER_ENABLED = False
-DOPPLER_FILE = "doppler.npz" # generate using sat_doppler.py
+DOPPLER_FILE = "doppler.npz"  # generate using sat_doppler.py
 
 
 STATS_OUTPUT = True
@@ -97,7 +97,7 @@ GENERATED_DIR = "./generated"
 CODEC2_UTILS = "../build/src"
 
 
-THEORY_EBNO = [0,1,2,3,4,5,6,7,8,9,10]
+THEORY_EBNO = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 THEORY_BER_4 = [
     0.22934,
     0.18475,
@@ -110,13 +110,13 @@ THEORY_BER_4 = [
     0.00168,
     3.39e-4,
     4.44e-5,
-    #3.38e-6,
-    #1.30e-7,
-    #2.16e-9,
-    #1.23e-11,
-    #1.85e-14,
-    #5.13e-18,
-    #1.71e-22
+    # 3.38e-6,
+    # 1.30e-7,
+    # 2.16e-9,
+    # 1.23e-11,
+    # 1.85e-14,
+    # 5.13e-18,
+    # 1.71e-22
 ]
 THEORY_BER_2 = [
     0.30327,
@@ -129,24 +129,25 @@ THEORY_BER_2 = [
     0.04080,
     0.02132,
     0.00942,
-    0.00337
+    0.00337,
 ]
 
 #
 # Functions to read files and add noise.
 #
 
+
 def load_sample(filename, loadreal=True):
     # If loading real samples (which is what fsk_mod outputs), apply a hilbert transform to get an analytic signal.
     if loadreal:
-        return scipy.signal.hilbert(np.fromfile(filename, dtype='f4'))
+        return scipy.signal.hilbert(np.fromfile(filename, dtype="f4"))
     else:
-        return np.fromfile(filename, dtype='c8')
+        return np.fromfile(filename, dtype="c8")
 
 
 def save_sample(data, filename):
     # We have to make sure to convert to complex64..
-    data.astype(dtype='c8').tofile(filename)
+    data.astype(dtype="c8").tofile(filename)
 
     # TODO: Allow saving as complex s16 - see view solution here: https://stackoverflow.com/questions/47086134/how-to-convert-a-numpy-complex-array-to-a-two-element-float-array
 
@@ -156,78 +157,83 @@ def apply_doppler(data, dopplerfile, fs=48000):
 
     npzfile = np.load(dopplerfile)
 
-    _time = npzfile['arr_0']
-    _doppler = npzfile['arr_1']
+    _time = npzfile["arr_0"]
+    _doppler = npzfile["arr_1"]
 
-
-    if len(data) < _time[-1]*fs:
+    if len(data) < _time[-1] * fs:
         print("Input data length too short - use more bits!")
-    
+
     # Clip data length if its too long for the input doppler data
-    if len(data) > _time[-1]*fs:
-        data = data[:int(_time[-1]*fs)]
+    if len(data) > _time[-1] * fs:
+        data = data[: int(_time[-1] * fs)]
 
     # Interpolate the doppler data
-    _interp = scipy.interpolate.interp1d(_time, _doppler, kind='cubic')
+    _interp = scipy.interpolate.interp1d(_time, _doppler, kind="cubic")
 
-    _timesteps = np.arange(0,len(data))/fs
+    _timesteps = np.arange(0, len(data)) / fs
     _interp_doppler = _interp(_timesteps)
 
     # This isn't working properly.
-    phase = np.cumsum(_interp_doppler/fs)
-    mixed = data * np.exp(1.0j*2.0*np.pi*phase)
+    phase = np.cumsum(_interp_doppler / fs)
+    mixed = data * np.exp(1.0j * 2.0 * np.pi * phase)
 
     return mixed
-
-    
 
 
 def calculate_variance(data, threshold=-100.0):
     # Calculate the variance of a set of radiosonde samples.
-    # Optionally use a threshold to limit the sample the variance 
+    # Optionally use a threshold to limit the sample the variance
     # is calculated over to ones that actually have sonde packets in them.
 
-    _data_log = 20*np.log10(np.abs(data))
+    _data_log = 20 * np.log10(np.abs(data))
 
     # MSE is better than variance as a power estimate, as it counts DC
-    data_thresh = data[_data_log>threshold]
-    return np.mean(data_thresh*np.conj(data_thresh))
+    data_thresh = data[_data_log > threshold]
+    return np.mean(data_thresh * np.conj(data_thresh))
 
 
-def add_noise(data, variance, baud_rate, ebno, fs=96000,  bitspersymbol=1.0, normalise=True, real=False):
+def add_noise(
+    data,
+    variance,
+    baud_rate,
+    ebno,
+    fs=96000,
+    bitspersymbol=1.0,
+    normalise=True,
+    real=False,
+):
     # Add calibrated noise to a sample.
 
     # Calculate Eb/No in linear units.
-    _ebno = 10.0**((ebno)/10.0)
+    _ebno = 10.0 ** ((ebno) / 10.0)
 
     # Calculate the noise variance we need to add
-    _noise_variance = variance*fs/(baud_rate*_ebno*bitspersymbol)
+    _noise_variance = variance * fs / (baud_rate * _ebno * bitspersymbol)
 
     # If we are working with real samples, we need to halve the noise contribution.
     if real:
-        _noise_variance = _noise_variance*0.5
+        _noise_variance = _noise_variance * 0.5
 
     # Generate complex random samples
-    _rand_i = np.sqrt(_noise_variance/2.0)*np.random.randn(len(data))
-    _rand_q = np.sqrt(_noise_variance/2.0)*np.random.randn(len(data))
+    _rand_i = np.sqrt(_noise_variance / 2.0) * np.random.randn(len(data))
+    _rand_q = np.sqrt(_noise_variance / 2.0) * np.random.randn(len(data))
 
-    _noisy = (data + (_rand_i + 1j*_rand_q))
+    _noisy = data + (_rand_i + 1j * _rand_q)
 
     if normalise:
-        #print("Normalised to 1.0")
-        return _noisy/np.max(np.abs(_noisy))
+        # print("Normalised to 1.0")
+        return _noisy / np.max(np.abs(_noisy))
     else:
         return _noisy
 
 
-def generate_lowsnr(sample, outfile,  fs, baud, ebno, order):
+def generate_lowsnr(sample, outfile, fs, baud, ebno, order):
     """ Generate a low SNR test file  """
 
     if order == 2:
         _bits_per_symbol = 1
     else:
         _bits_per_symbol = 2
-
 
     _var = calculate_variance(sample)
 
@@ -242,6 +248,7 @@ def generate_lowsnr(sample, outfile,  fs, baud, ebno, order):
 #   Functions to deal with codec2 utils
 #
 
+
 def generate_fsk(baud):
     """ Generate a set of FSK data """
 
@@ -253,25 +260,23 @@ def generate_fsk(baud):
 
     _num_bits = TEST_LENGTH
 
-    _filename = "%s/fsk_%d_%d_%d_f.bin" % (
-        SAMPLE_DIR,
-        FSK_ORDER,
-        SAMPLE_RATE,
-        baud
-    )
-    
+    _filename = "%s/fsk_%d_%d_%d_f.bin" % (SAMPLE_DIR, FSK_ORDER, SAMPLE_RATE, baud)
+
     # Generate the command we need to make:
-    _cmd = "%s/fsk_get_test_bits - %d %d | %s/fsk_mod %d %d %d %d %d - - | csdr convert_s16_f > %s" % (
-        CODEC2_UTILS,
-        _num_bits,
-        FRAME_LENGTH,
-        CODEC2_UTILS,
-        FSK_ORDER,
-        SAMPLE_RATE,
-        baud,
-        LOW_TONE,
-        TONE_SPACING,
-        _filename
+    _cmd = (
+        "%s/fsk_get_test_bits - %d %d | %s/fsk_mod %d %d %d %d %d - - | csdr convert_s16_f > %s"
+        % (
+            CODEC2_UTILS,
+            _num_bits,
+            FRAME_LENGTH,
+            CODEC2_UTILS,
+            FSK_ORDER,
+            SAMPLE_RATE,
+            baud,
+            LOW_TONE,
+            TONE_SPACING,
+            _filename,
+        )
     )
 
     print(_cmd)
@@ -284,7 +289,7 @@ def generate_fsk(baud):
         _output = subprocess.check_output(_cmd, shell=True, stderr=None)
         _output = _output.decode()
     except:
-        #traceback.print_exc()
+        # traceback.print_exc()
         _output = "error"
 
     _runtime = time.time() - _start
@@ -294,7 +299,9 @@ def generate_fsk(baud):
     return _filename
 
 
-def process_fsk(filename, baud, complex_samples=True, override_bits=None, stats=False, statsfile=""):
+def process_fsk(
+    filename, baud, complex_samples=True, override_bits=None, stats=False, statsfile=""
+):
     """ Run a fsk file through fsk_demod """
 
     if baud < LBR_BREAK_POINT:
@@ -326,14 +333,14 @@ def process_fsk(filename, baud, complex_samples=True, override_bits=None, stats=
 
     if stats:
         _cmd += "2> %s" % _stats_file
-    
+
     _cmd += "| %s/fsk_put_test_bits - %d %.2f 2>&1" % (
         CODEC2_UTILS,
         FRAME_LENGTH,
-        FRAME_THRESHOLD
+        FRAME_THRESHOLD,
     )
 
-    #print("Processing %s" % filename)
+    # print("Processing %s" % filename)
 
     print(_cmd)
 
@@ -343,7 +350,7 @@ def process_fsk(filename, baud, complex_samples=True, override_bits=None, stats=
         _output = subprocess.check_output(_cmd, shell=True)
         _output = _output.decode()
     except:
-        #traceback.print_exc()
+        # traceback.print_exc()
         _output = "error"
         print("Run failed!")
         return -1
@@ -352,14 +359,14 @@ def process_fsk(filename, baud, complex_samples=True, override_bits=None, stats=
 
     # Try to grab last line of the stderr outout
     try:
-        _last_line = _output.split('\n')[-2]
+        _last_line = _output.split("\n")[-2]
     except:
         # Lack of a line indicates that we have decoded no data. return a BER of 1.
         print("No bits decoded.")
         return 1.0
 
     # Detect no decoded bits when feeding in custom put_bits parameters.
-    if 'Using' in _last_line:
+    if "Using" in _last_line:
         print("No bits decoded.")
         return 1.0
 
@@ -367,63 +374,67 @@ def process_fsk(filename, baud, complex_samples=True, override_bits=None, stats=
     # errs: 0 FSK BER 0.000000, bits tested 5800, bit errors 0
 
     # split into fields
-    _fields = _last_line.split(' ')
+    _fields = _last_line.split(" ")
 
     # Extract number of bits and errors
-    _bits = float(_fields[7][:-1]) # remove the trailing comma
+    _bits = float(_fields[7][:-1])  # remove the trailing comma
     _errors = float(_fields[10])
 
-
-    print("Bits: %d, Errors: %d, Raw BER: %.8f" % (_bits, _errors, _errors/_bits))
+    print("Bits: %d, Errors: %d, Raw BER: %.8f" % (_bits, _errors, _errors / _bits))
 
     if override_bits != None:
         if _bits < override_bits:
             print("Demod got %d bits, but we sent %d bits." % (_bits, override_bits))
-            _errors += (override_bits - _bits)
+            _errors += override_bits - _bits
 
     # Calculate and return BER
-    _ber = _errors/_bits
+    _ber = _errors / _bits
 
     if _ber > 1.0:
         _ber = 1.0
 
     return _ber
 
+
 if __name__ == "__main__":
 
-    parser = argparse.ArgumentParser(description='FSK modem BER simulations')
-    parser.add_argument('--test', action='store_true', help='run automated test')
+    parser = argparse.ArgumentParser(description="FSK modem BER simulations")
+    parser.add_argument("--test", action="store_true", help="run automated test")
     args = parser.parse_args()
 
     if args.test:
         # test the AWGN channel simulation.  We use BPSK that's phase shifted to exercise the
         # complex maths a bit
-        
-        nb_bits = 100000; EbNo = 4
-        tx_bits = np.random.randint(2,size=nb_bits)
-        tx_bpsk_symbols = (2*tx_bits - 1) * np.exp(1j*np.pi/3)
+
+        nb_bits = 100000
+        EbNo = 4
+        tx_bits = np.random.randint(2, size=nb_bits)
+        tx_bpsk_symbols = (2 * tx_bits - 1) * np.exp(1j * np.pi / 3)
         tx_power = calculate_variance(tx_bpsk_symbols)
 
         # check calculate_variance()
-        assert (tx_power < 1.1 and tx_power > 0.9)
+        assert tx_power < 1.1 and tx_power > 0.9
 
         # BPSK modem simulation
         rx_bpsk_symbols = add_noise(tx_bpsk_symbols, tx_power, 1, EbNo, 1, 1)
-        rx_bpsk_symbols = rx_bpsk_symbols * np.exp(-1j*np.pi/3)
+        rx_bpsk_symbols = rx_bpsk_symbols * np.exp(-1j * np.pi / 3)
         rx_bits = np.array([1 if np.real(s) > 0 else 0 for s in rx_bpsk_symbols])
-        nb_errors = np.sum(np.bitwise_xor(tx_bits,rx_bits))
-        ber = nb_errors/nb_bits
-        
+        nb_errors = np.sum(np.bitwise_xor(tx_bits, rx_bits))
+        ber = nb_errors / nb_bits
+
         # set limit of +/- 0.25dB on BER
-        EbNo_lin_upper = 10**((EbNo-0.25)/10)
-        bpsk_ber_theory_upper = 0.5*scipy.special.erfc(np.sqrt(EbNo_lin_upper))
-        EbNo_lin_lower = 10**((EbNo+0.25)/10)
-        bpsk_ber_theory_lower = 0.5*scipy.special.erfc(np.sqrt(EbNo_lin_lower))
-        print("nb_errors: %d ber: %4.3f ber_lower_limit: %4.3f ber_upper_limit: %4.3f" % (nb_errors, ber, bpsk_ber_theory_lower, bpsk_ber_theory_upper))
-        assert (ber < bpsk_ber_theory_upper and ber > bpsk_ber_theory_lower)
+        EbNo_lin_upper = 10 ** ((EbNo - 0.25) / 10)
+        bpsk_ber_theory_upper = 0.5 * scipy.special.erfc(np.sqrt(EbNo_lin_upper))
+        EbNo_lin_lower = 10 ** ((EbNo + 0.25) / 10)
+        bpsk_ber_theory_lower = 0.5 * scipy.special.erfc(np.sqrt(EbNo_lin_lower))
+        print(
+            "nb_errors: %d ber: %4.3f ber_lower_limit: %4.3f ber_upper_limit: %4.3f"
+            % (nb_errors, ber, bpsk_ber_theory_lower, bpsk_ber_theory_upper)
+        )
+        assert ber < bpsk_ber_theory_upper and ber > bpsk_ber_theory_lower
         print("AWGN channel simulation test PASSED!")
         exit()
-        
+
     plot_data = {}
 
     for _baud in BAUD_RATES:
@@ -437,7 +448,7 @@ if __name__ == "__main__":
             print("Applying Doppler.")
             _sample = apply_doppler(_sample, DOPPLER_FILE)
             print("Done.")
-            _override_bits = _baud*(len(_sample)/SAMPLE_RATE) - FRAME_IGNORE
+            _override_bits = _baud * (len(_sample) / SAMPLE_RATE) - FRAME_IGNORE
         else:
             _override_bits = TEST_LENGTH - FRAME_IGNORE
 
@@ -447,9 +458,15 @@ if __name__ == "__main__":
         _bers = []
 
         for _ebno in EBNO_RANGE:
-            generate_lowsnr(_sample, _temp_file , SAMPLE_RATE, _baud, _ebno, FSK_ORDER)
+            generate_lowsnr(_sample, _temp_file, SAMPLE_RATE, _baud, _ebno, FSK_ORDER)
 
-            _ber = process_fsk(_temp_file, _baud, override_bits=_override_bits, stats=STATS_OUTPUT, statsfile="fsk_%d_%.1f"%(_baud, _ebno))
+            _ber = process_fsk(
+                _temp_file,
+                _baud,
+                override_bits=_override_bits,
+                stats=STATS_OUTPUT,
+                statsfile="fsk_%d_%.1f" % (_baud, _ebno),
+            )
 
             print("%.1f, %.8f" % (_ebno, _ber))
 
@@ -459,18 +476,20 @@ if __name__ == "__main__":
             # Halt the simulation if the BER drops below our break point.
             if _ber < BER_BREAK_POINT:
                 break
-        
-        plot_data[_baud]= {'baud': _baud, 'ebno': _ebnos, 'ber': _bers}
+
+        plot_data[_baud] = {"baud": _baud, "ebno": _ebnos, "ber": _bers}
         print(plot_data[_baud])
 
-        #plt.semilogy(plot_data[_baud]['ebno'], plot_data[_baud]['ber'], label="Simulated - %d bd" % _baud)
+        # plt.semilogy(plot_data[_baud]['ebno'], plot_data[_baud]['ber'], label="Simulated - %d bd" % _baud)
 
     plt.figure()
 
     print(plot_data)
 
     for _b in plot_data:
-        plt.semilogy(plot_data[_b]['ebno'], plot_data[_b]['ber'], label="Simulated - %d bd" % _b)
+        plt.semilogy(
+            plot_data[_b]["ebno"], plot_data[_b]["ber"], label="Simulated - %d bd" % _b
+        )
 
     if FSK_ORDER == 2:
         plt.semilogy(THEORY_EBNO, THEORY_BER_2, label="Theory")
@@ -482,9 +501,9 @@ if __name__ == "__main__":
 
     # Crop plot to reasonable limits
     plt.ylim(1e-3, 1)
-    plt.xlim(0,10)
+    plt.xlim(0, 10)
 
-    plt.title('fsk_demod %d-FSK BER performance' % FSK_ORDER)
+    plt.title("fsk_demod %d-FSK BER performance" % FSK_ORDER)
 
     plt.grid()
     plt.legend()
