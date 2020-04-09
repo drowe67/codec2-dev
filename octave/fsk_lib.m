@@ -193,8 +193,7 @@ function states = est_freq(states, sf, ntones)
 
   % scale averaging time constant based on number of samples 
 
-  tc = 0.95*Ndft/Fs;
-  %tc = .95;
+  tc = 0.95*Ndft/Fs;  
   % Update mag DFT  ---------------------------------------------
 
   numffts = floor(length(sf)/Ndft);
@@ -232,6 +231,41 @@ function states = est_freq(states, sf, ntones)
   end
 
   states.f = sort(f);
+  
+  % Search for each tone method 2 - correlate with mask with non-zero entries at tone spacings
+
+  % create a mask with non-zero entries at tone spacing
+  mask = zeros(1,Ndft);
+  mask(1) = 1;
+  for m=1:ntones-1
+    bin = round(m*states.tx_tone_separation*Ndft/Fs);
+    mask(bin) = 1;
+  end
+  mask = mask(1:bin);
+
+  % drag mask over Sf, looking for peak in correlation
+  bmax = st; corr_max = 0;
+  Sf = states.Sf; corr_log = [];
+  st = floor(fmin*Ndft/Fs);
+  en = floor(fmax*Ndft/Fs);
+  for b=st:en-size(mask)
+    corr = mask * Sf(b:b+length(mask)-1);
+    corr_log = [corr_log corr];
+    if corr > corr_max
+      corr_max = corr;
+      b_max = b;
+    end
+  end
+  if 0
+    figure(1); clf; subplot(211); plot(Sf);
+    hold on; plot(100*[zeros(1,b_max) mask],'g'); hold off;
+    subplot(212); plot(corr_log);
+    kbhit;
+  end
+  foff = b_max*Fs/Ndft;
+  %printf("foff: %4.0f\n", foff);
+  states.ftx(1:4);
+  states.f2 = foff + (0:ntones-1)*states.tx_tone_separation;
 end
 
 
