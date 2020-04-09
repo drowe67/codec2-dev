@@ -212,7 +212,7 @@ function states = est_freq(states, sf, ntones)
   %clf
   %plot(Sf(1:Ndft/2));
 
-  % Search for each tone --------------------------------------------------------
+  % Search for each tone method 1 - peak pick each tone location ----------------------------------
 
   for m=1:ntones
     [tone_amp tone_index] = max(Sf(1:Ndft/2));
@@ -232,16 +232,18 @@ function states = est_freq(states, sf, ntones)
 
   states.f = sort(f);
   
-  % Search for each tone method 2 - correlate with mask with non-zero entries at tone spacings
+  % Search for each tone method 2 - correlate with mask with non-zero entries at tone spacings -----
 
-  % create a mask with non-zero entries at tone spacing
+  % Create a mask with non-zero entries at tone spacing.  Might be
+  % smarted to use teh DFT of a hanning window as mask
+  
   mask = zeros(1,Ndft);
-  mask(1) = 1;
+  mask(1:3) = 1;
   for m=1:ntones-1
     bin = round(m*states.tx_tone_separation*Ndft/Fs);
-    mask(bin) = 1;
+    mask(bin:bin+2) = 1;
   end
-  mask = mask(1:bin);
+  mask = mask(1:bin+2);
 
   % drag mask over Sf, looking for peak in correlation
   bmax = st; corr_max = 0;
@@ -256,14 +258,14 @@ function states = est_freq(states, sf, ntones)
       b_max = b;
     end
   end
-  if 0
+  foff = b_max*Fs/Ndft;
+  if bitand(states.verbose, 0x8)
     figure(1); clf; subplot(211); plot(Sf);
     hold on; plot(100*[zeros(1,b_max) mask],'g'); hold off;
     subplot(212); plot(corr_log);
+    printf("foff: %4.0f\n", foff);
     kbhit;
   end
-  foff = b_max*Fs/Ndft;
-  %printf("foff: %4.0f\n", foff);
   states.ftx(1:4);
   states.f2 = foff + (0:ntones-1)*states.tx_tone_separation;
 end

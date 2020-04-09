@@ -5,7 +5,7 @@
 
 fsk_lib;
 
-function [states f_log f_log2 num_dud] = run_test(EbNodB = 10, num_frames=10)
+function [states f_log f_log2 num_dud1 num_dud2] = run_test(EbNodB = 10, num_frames=10)
   Fs = 8000;
   Rs = 100;
   M  = 4;
@@ -48,47 +48,63 @@ function [states f_log f_log2 num_dud] = run_test(EbNodB = 10, num_frames=10)
   end
 
   % Lets say that for a valid freq estimate, all four tones must be within 0.1*Rs of their tx freqeuncy
-  num_dud = 0;
+  num_dud1 = 0; num_dud2 = 0;
   for i=1:length(f_log)
     if sum(abs(f_log(i,:)-states.ftx) > 0.1*states.Rs)
-      num_dud++;
+      num_dud1++;
+    end
+    if sum(abs(f_log2(i,:)-states.ftx) > 0.1*states.Rs)
+      num_dud2++;
     end
   end
 end
 
 function run_single(EbNodB = 3, num_frames = 10)
-  [states f_log f_log2 num_dud] = run_test(EbNodB, num_frames);
+  [states f_log f_log2 num_dud1 num_dud2] = run_test(EbNodB, num_frames);
   
-  percent_dud = 100*num_dud/length(f_log);
-  printf("EbNodB: %4.2fdB tests: %d duds: %d %4.2f%% bad freq estimates\n", EbNodB, length(f_log), num_dud, percent_dud)
+  percent_dud1 = 100*num_dud1/length(f_log);
+  percent_dud2 = 100*num_dud2/length(f_log);
+  printf("EbNodB: %4.2f dB tests: %3d duds1: %3d %5.2f %% duds1: %3d %5.2f %%\n",
+         EbNodB, length(f_log), num_dud1, percent_dud1, num_dud2, percent_dud2)
 
-  figure(1); clf; plot(f_log,'b'); hold on; plot(f_log2,'r');
-  xlabel('Time (samples)'); ylabel('Frequency (Hz)');
+  figure(1); clf;
+  plot(f_log(:,1), 'linewidth', 2, 'b;peak;');
+  hold on;
+  plot(f_log(:,2:states.M), 'linewidth', 2, 'b');
+  plot(f_log2(:,1),'linewidth', 2, 'r;mask;');
+  plot(f_log2(:,2:states.M),'linewidth', 2, 'r');
+  hold off;
+  xlabel('Time (frames)'); ylabel('Frequency (Hz)');
+  title(sprintf("EbNo = %4.2f dB", EbNodB));
   print("fsk_freq_est_single.png", "-dpng")
 end
 
 function run_curve
 
-   EbNodB = 2:9;
+   EbNodB = 0:9;
    percent_log = [];
    for ne = 1:length(EbNodB)
-      [f_log num_dud] = run_test(EbNodB(ne), 100);
-      percent_dud = 100*num_dud/length(f_log);
-      percent_log = [percent_log percent_dud];
-      printf("EbNodB: %4.2f dB tests: %d duds: %3d %4.2f %% bad freq estimates\n", EbNodB(ne), length(f_log), num_dud, percent_dud)
+      [states f_log f_log2 num_dud1 num_dud2] = run_test(EbNodB(ne), 100);
+      percent_dud1 = 100*num_dud1/length(f_log);
+      percent_dud2 = 100*num_dud2/length(f_log);
+      percent_log = [percent_log; [percent_dud1 percent_dud2]];
+      printf("EbNodB: %4.2f dB tests: %3d duds1: %3d %5.2f %% duds2: %3d %5.2f %% \n",
+             EbNodB(ne), length(f_log), num_dud1, percent_dud1, num_dud2, percent_dud2)
   end
   
-  figure(1); clf; plot(EbNodB, percent_log); grid;
+  figure(1); clf; plot(EbNodB, percent_log(:,1), 'linewidth', 2, '+-;peak;'); grid;
+  hold on;  plot(EbNodB, percent_log(:,2), 'linewidth', 2, 'r+-;mask;'); hold off;
   xlabel('Eb/No (dB)'); ylabel('% Errors');
   print("fsk_freq_est_curve.png", "-dpng")
 end
 
 graphics_toolkit("gnuplot");
+more off;
 
 % same results every time
 rand('state',1); 
 randn('state',1);
 
 # choose one of these to run
-run_single(3)
-#run_curve
+run_single(0)
+run_curve
