@@ -840,8 +840,10 @@ int main(int argc, char *argv[])
 		/* just using 18/20 for compatability with LPCNet, coarse scaling for NN imput */
 		for(int i=0; i<18; i++)
 		    features[i] = (rate_K_vec_[i]-30)/40;
-		int pitch_index = 2.0*M_PI/model.Wo;
+		// keep in range of 40 ... 255 for pitch embedding
+		int pitch_index = 21 + 2.0*M_PI/model.Wo;
 		features[36] = 0.02*(pitch_index-100);
+		//features[36] = (model.Wo - c2const.Wo_min)/(c2const.Wo_max - c2const.Wo_min) - 0.5;
 		features[37] = model.voiced;
 		if (first)
 		    features[18] = -0.9;
