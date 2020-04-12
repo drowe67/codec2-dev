@@ -28,7 +28,7 @@ function states = fsk_init(Fs, Rs, M=2)
 
   Nmem = states.Nmem  = N+2*Ts;                   % two symbol memory in down converted signals to allow for timing adj
 
-  states.Sf = zeros(states.Ndft/2,1);             % current memory of dft mag samples
+  states.Sf = zeros(states.Ndft,1);             % current memory of dft mag samples
   states.f_dc = zeros(M,Nmem);
   states.P = 8;                                   % oversample rate out of filter
   assert(Ts/states.P == floor(Ts/states.P), "Ts/P must be an integer");
@@ -86,7 +86,7 @@ function states = fsk_init_hbr(Fs,P,Rs,M=2,nsym=48)
 
   Nmem = states.Nmem  = N+2*Ts;  % two symbol memory in down converted signals to allow for timing adj
 
-  states.Sf = zeros(states.Ndft/2,1); % currentmemory of dft mag samples
+  states.Sf = zeros(states.Ndft,1); % current memory of dft mag samples
   states.f_dc = zeros(M,Nmem);
   states.P = P;                  % oversample rate out of filter
   assert(Ts/states.P == floor(Ts/states.P), "Ts/P must be an integer");
@@ -188,46 +188,45 @@ function states = est_freq(states, sf, ntones)
 
   fmin = states.fest_fmin;
   fmax = states.fest_fmax;
-  st = floor(fmin*Ndft/Fs);
-  en = floor(fmax*Ndft/Fs);
-
+  % note 0 Hz is mapped to Ndft/2 via fftshift
+  st = floor(fmin*Ndft/Fs) + Ndft/2;  st = max(1,st);
+  en = floor(fmax*Ndft/Fs) + Ndft/2;  en = min(Ndft,en);
+  
+  % printf("Fs: %f Ndft: %d fmin: %f fmax: %f st: %d en: %d\n",Fs, Ndft,  fmin, fmax, st, en)
+  
   % scale averaging time constant based on number of samples 
-
   tc = 0.95*Ndft/Fs;  
+
   % Update mag DFT  ---------------------------------------------
 
+  % we break up input buffer to a series of Ndft sequences
   numffts = floor(length(sf)/Ndft);
   h = hanning(Ndft);
   for i=1:numffts
     a = (i-1)*Ndft+1; b = i*Ndft;
-    Sf = abs(fft(sf(a:b) .* h, Ndft));
-    Sf(1:st) = 0; Sf(en:Ndft/2) = 0;
-    states.Sf = (1-tc)*states.Sf + tc*Sf(1:Ndft/2);
+    Sf = abs(fftshift(fft(sf(a:b) .* h, Ndft)));
+    states.Sf = (1-tc)*states.Sf + tc*Sf;
   end
-
-  f = []; a = [];
-  Sf = states.Sf;
-
-  %figure(8)
-  %clf
-  %plot(Sf(1:Ndft/2));
 
   % Search for each tone method 1 - peak pick each tone location ----------------------------------
 
+  f = []; a = [];
+  Sf = states.Sf;
   for m=1:ntones
-    [tone_amp tone_index] = max(Sf(1:Ndft/2));
-
-    f = [f (tone_index-1)*Fs/Ndft];
+    [tone_amp tone_index] = max(Sf(st:en));
+    tone_index += st - 1;
+    
+    f = [f (tone_index-1-Ndft/2)*Fs/Ndft];
     a = [a tone_amp];
 
     % zero out region min_tone_spacing/2 either side of max so we can find next highest peak
     % closest spacing for non-coh mFSK is Rs
 
-    st = tone_index - floor((min_tone_spacing/2)*Ndft/Fs);
-    st = max(1,st);
-    en = tone_index + floor((min_tone_spacing/2)*Ndft/Fs);
-    en = min(Ndft/2,en);
-    Sf(st:en) = 0;
+    stz = tone_index - floor((min_tone_spacing/2)*Ndft/Fs);
+    stz = max(1,stz);
+    enz = tone_index + floor((min_tone_spacing/2)*Ndft/Fs);
+    enz = min(Ndft,enz);
+    Sf(stz:enz) = 0;
   end
 
   states.f = sort(f);
@@ -235,7 +234,7 @@ function states = est_freq(states, sf, ntones)
   % Search for each tone method 2 - correlate with mask with non-zero entries at tone spacings -----
 
   % Create a mask with non-zero entries at tone spacing.  Might be
-  % smarted to use teh DFT of a hanning window as mask
+  % smarter to use the DFT of a hanning window as mask
   
   mask = zeros(1,Ndft);
   mask(1:3) = 1;
@@ -248,9 +247,7 @@ function states = est_freq(states, sf, ntones)
   % drag mask over Sf, looking for peak in correlation
   bmax = st; corr_max = 0;
   Sf = states.Sf; corr_log = [];
-  st = floor(fmin*Ndft/Fs);
-  en = floor(fmax*Ndft/Fs);
-  for b=st:en-size(mask)
+  for b=st:en-length(mask)
     corr = mask * Sf(b:b+length(mask)-1);
     corr_log = [corr_log corr];
     if corr > corr_max
@@ -258,7 +255,7 @@ function states = est_freq(states, sf, ntones)
       b_max = b;
     end
   end
-  foff = b_max*Fs/Ndft;
+  foff = (b_max-Ndft/2)*Fs/Ndft;
   if bitand(states.verbose, 0x8)
     figure(1); clf; subplot(211); plot(Sf);
     hold on; plot(100*[zeros(1,b_max) mask],'g'); hold off;
@@ -266,7 +263,6 @@ function states = est_freq(states, sf, ntones)
     printf("foff: %4.0f\n", foff);
     kbhit;
   end
-  states.ftx(1:4);
   states.f2 = foff + (0:ntones-1)*states.tx_tone_separation;
 end
 

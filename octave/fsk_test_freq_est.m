@@ -12,16 +12,27 @@ function [states f_log f_log2 num_dud1 num_dud2] = run_test(EbNodB = 10, num_fra
   bits_per_frame = 512;
 
   states = fsk_init(Fs,Rs,M);
-  states.tx_real = 0;
-  states.ftx = 900 + 2*states.Rs*(1:states.M);
-  states.tx_tone_separation = 2*states.Rs;
   N = states.N;
 
-  % Freq. estimator limits - keep these narrow to stop errors with low SNR 4FSK
-  states.fest_fmin = 300;
-  states.fest_fmax = 2200;
-  states.fest_min_spacing = 100;
+  % complex signal
+  states.tx_real = 0;
 
+  states.tx_tone_separation = 2*states.Rs;
+  states.ftx = 900 + states.tx_tone_separation*(1:states.M);
+  states.fest_fmin = 300;
+  states.fest_fmax = 2300;
+
+  #{
+  % 250Hz tone separation, centred about 0 Hz
+  states.ftx = 250*(-2.5+(1:states.M));
+  states.tx_tone_separation = 250;
+
+  % stress the system a bit by searching over full range
+  states.fest_fmin = -Fs/2;
+  states.fest_fmax = +Fs/2;
+  states.fest_min_spacing = 100;
+  #}
+  
   EbNo = 10^(EbNodB/10);
   variance = states.Fs/(states.Rs*EbNo*states.bitspersymbol);
 
@@ -67,6 +78,9 @@ function run_single(EbNodB = 3, num_frames = 10)
   printf("EbNodB: %4.2f dB tests: %3d duds1: %3d %5.2f %% duds1: %3d %5.2f %%\n",
          EbNodB, length(f_log), num_dud1, percent_dud1, num_dud2, percent_dud2)
 
+  %printf("%d\n", states.ftx)
+  %f_log
+  %f_log2
   figure(1); clf;
   plot(f_log(:,1), 'linewidth', 2, 'b;peak;');
   hold on;
@@ -106,5 +120,5 @@ rand('state',1);
 randn('state',1);
 
 # choose one of these to run
-run_single(0)
+run_single(0,10)
 run_curve
