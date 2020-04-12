@@ -57,7 +57,11 @@ FRAME_THRESHOLD = 0.4
 FRAME_IGNORE = FRAME_LENGTH
 
 # IF sample rate
-SAMPLE_RATE = 48000
+SAMPLE_RATE = 12000
+
+# Frequency estimator limits
+ESTIMATOR_LOWER_LIMIT = 100
+ESTIMATOR_UPPER_LIMIT = int(SAMPLE_RATE/2 - 1000)
 
 # Frequency of the low tone (Hz)
 LOW_TONE = 2000
@@ -65,11 +69,18 @@ LOW_TONE = 2000
 # Tone spacing (Hz)
 TONE_SPACING = 250
 
+
 # Switch to 'Low Bit-Rate' mode below this baud rate.
 LBR_BREAK_POINT = 600
 
 # Halt simulation for a particular baud rate when the BER drops below this level.
-BER_BREAK_POINT = 1e-3
+BER_BREAK_POINT = 1e-4
+
+# If enabled, calculate Frequency Estimator error
+FEST_ERROR = True
+
+# Frequency estimator error calculation threshold (*Rs)
+FEST_THRESHOLD = 0.2
 
 # Enable doppler shift.
 # NOTE: This will apply up to +/- 6kHz of doppler shift to the test signal,
@@ -305,7 +316,7 @@ def process_fsk(
     """ Run a fsk file through fsk_demod """
 
     if baud < LBR_BREAK_POINT:
-        _lbr = "--lbr -b 1 -u 22000 "
+        _lbr = "--lbr -b %d -u %d " % (ESTIMATOR_LOWER_LIMIT, ESTIMATOR_UPPER_LIMIT)
     else:
         _lbr = ""
 
@@ -319,6 +330,7 @@ def process_fsk(
         _stats = "--stats=50 "
     else:
         _stats = ""
+        _stats_file = None
 
     _cmd = "cat %s | csdr convert_f_s16 | %s/fsk_demod %s%s%s%d %d %d - - " % (
         filename,
@@ -353,7 +365,7 @@ def process_fsk(
         # traceback.print_exc()
         _output = "error"
         print("Run failed!")
-        return -1
+        return (-1, _stats_file)
 
     _runtime = time.time() - _start
 
@@ -363,12 +375,12 @@ def process_fsk(
     except:
         # Lack of a line indicates that we have decoded no data. return a BER of 1.
         print("No bits decoded.")
-        return 1.0
+        return (1.0, _stats_file)
 
     # Detect no decoded bits when feeding in custom put_bits parameters.
     if "Using" in _last_line:
         print("No bits decoded.")
-        return 1.0
+        return (1.0, _stats_file)
 
     # Example line:
     # errs: 0 FSK BER 0.000000, bits tested 5800, bit errors 0
@@ -393,7 +405,69 @@ def process_fsk(
     if _ber > 1.0:
         _ber = 1.0
 
-    return _ber
+    return (_ber, _stats_file)
+
+
+def read_stats(filename, sps = 50):
+    """ Read in a statistics file, and re-organise it for easier calculations """
+
+    _output = {
+        'ebno': [],
+        'f1_est': [],
+        'f2_est': [],
+        'f3_est': [],
+        'f4_est': [],
+        'ppm': [],
+        'time': []
+    }
+
+    with open(filename, 'r') as _f:
+        for _line in _f:
+            if _line[0] != '{':
+                    continue
+
+            try:
+                _data = json.loads(_line)
+            except Exception as e:
+                #print("Line parsing error: %s" % str(e))
+                continue
+
+            _output['ebno'].append(_data['EbNodB'])
+            _output['f1_est'].append(_data['f1_est'])
+            _output['f2_est'].append(_data['f2_est'])
+
+            if 'f3_est' in _data:
+                _output['f3_est'].append(_data['f3_est'])
+                _output['f4_est'].append(_data['f4_est'])
+
+            _output['ppm'].append(_data['ppm'])
+
+            if _output['time'] == []:
+                _output['time'] = [0]
+            else:
+                _output['time'].append(_output['time'][-1]+1.0/sps)
+
+    return _output
+
+
+def freq_est_error(data, Rs):
+    """ Calculate the frequency estimator error """
+
+    _threshold = FEST_THRESHOLD*Rs
+
+    _total_points = len(data['f1_est'])*FSK_ORDER
+
+    _errors = 0
+
+    _errors += np.sum(np.abs(np.array(data['f1_est'])-LOW_TONE) > _threshold)
+    _errors += np.sum(np.abs(np.array(data['f2_est'])-LOW_TONE-TONE_SPACING) > _threshold)
+
+    if FSK_ORDER == 4:
+        _errors += np.sum(np.abs(np.array(data['f3_est'])-LOW_TONE-TONE_SPACING*2) > _threshold)
+        _errors += np.sum(np.abs(np.array(data['f4_est'])-LOW_TONE-TONE_SPACING*3) > _threshold)
+
+
+    return _errors/_total_points
 
 
 if __name__ == "__main__":
@@ -456,11 +530,12 @@ if __name__ == "__main__":
 
         _ebnos = []
         _bers = []
+        _fest_err = []
 
         for _ebno in EBNO_RANGE:
             generate_lowsnr(_sample, _temp_file, SAMPLE_RATE, _baud, _ebno, FSK_ORDER)
 
-            _ber = process_fsk(
+            _ber, _stats_file = process_fsk(
                 _temp_file,
                 _baud,
                 override_bits=_override_bits,
@@ -473,11 +548,15 @@ if __name__ == "__main__":
             _ebnos.append(_ebno)
             _bers.append(_ber)
 
+            if FEST_ERROR:
+                _stats = read_stats(_stats_file)
+                _fest_err.append(freq_est_error(_stats, _baud))
+
             # Halt the simulation if the BER drops below our break point.
             if _ber < BER_BREAK_POINT:
                 break
 
-        plot_data[_baud] = {"baud": _baud, "ebno": _ebnos, "ber": _bers}
+        plot_data[_baud] = {"baud": _baud, "ebno": _ebnos, "ber": _bers, "fest_err":_fest_err}
         print(plot_data[_baud])
 
         # plt.semilogy(plot_data[_baud]['ebno'], plot_data[_baud]['ber'], label="Simulated - %d bd" % _baud)
@@ -504,7 +583,19 @@ if __name__ == "__main__":
     plt.xlim(0, 10)
 
     plt.title("fsk_demod %d-FSK BER performance" % FSK_ORDER)
-
     plt.grid()
     plt.legend()
+
+    if FEST_ERROR:
+        plt.figure()
+
+        for _b in plot_data:
+            plt.plot(
+                plot_data[_b]["ebno"], plot_data[_b]["fest_err"], label="Simulated - %d bd" % _b
+            )
+        
+        plt.title("Frequency Estimator Error")
+        plt.grid()
+        plt.legend()
+
     plt.show()
