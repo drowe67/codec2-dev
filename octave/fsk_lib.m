@@ -23,6 +23,7 @@ function states = fsk_init(Fs, Rs, M=2)
   assert(Ts == floor(Ts), "Fs/Rs must be an integer");
 
   N = states.N = Ts*states.nsym;                  % processing buffer size, nice big window for timing est
+  states.small_fft = 1;
   states.Ndft = min(1024, 2.^ceil(log2(N)));      % find nearest power of 2 for efficient FFT
   states.nbit = states.nsym*states.bitspersymbol; % number of bits per processing frame
 
@@ -37,7 +38,8 @@ function states = fsk_init(Fs, Rs, M=2)
   states.verbose = 0;
   states.phi = zeros(1, M);                       % keep down converter osc phase continuous
 
-  %printf("M: %d Fs: %d Rs: %d Ts: %d nsym: %d nbit: %d\n", states.M, states.Fs, states.Rs, states.Ts, states.nsym, states.nbit);
+  %printf("M: %d Fs: %d Rs: %d Ts: %d nsym: %d nbit: %d N: %d Ndft: %d\n",
+  %       states.M, states.Fs, states.Rs, states.Ts, states.nsym, states.nbit, states.N, states.Ndft);
 
   % BER stats 
 
@@ -82,7 +84,8 @@ function states = fsk_init_hbr(Fs,P,Rs,M=2,nsym=48)
   states.nsym = N/Ts;            % number of symbols in one processing frame
   states.nbit = states.nsym*states.bitspersymbol; % number of bits per processing frame
 
-  states.Ndft = (2.^ceil(log2(N)))/2;  % find nearest power of 2 for efficient FFT
+  states.small_fft = 1;
+  states.Ndft = min(1024, 2.^ceil(log2(N)))
 
   Nmem = states.Nmem  = N+2*Ts;  % two symbol memory in down converted signals to allow for timing adj
 
@@ -131,7 +134,7 @@ endfunction
 
 % modulator function
 
-function tx  = fsk_mod(states, tx_bits)
+function tx = fsk_mod(states, tx_bits)
 
     M  = states.M;
     Ts = states.Ts;
@@ -192,22 +195,30 @@ function states = est_freq(states, sf, ntones)
   st = floor(fmin*Ndft/Fs) + Ndft/2;  st = max(1,st);
   en = floor(fmax*Ndft/Fs) + Ndft/2;  en = min(Ndft,en);
   
-  % printf("Fs: %f Ndft: %d fmin: %f fmax: %f st: %d en: %d\n",Fs, Ndft,  fmin, fmax, st, en)
+  %printf("Fs: %f Ndft: %d fmin: %f fmax: %f st: %d en: %d\n",Fs, Ndft,  fmin, fmax, st, en)
   
   % scale averaging time constant based on number of samples 
   tc = 0.95*Ndft/Fs;  
 
   % Update mag DFT  ---------------------------------------------
 
-  % we break up input buffer to a series of Ndft sequences
-  numffts = floor(length(sf)/Ndft);
-  h = hanning(Ndft);
-  for i=1:numffts
-    a = (i-1)*Ndft+1; b = i*Ndft;
-    Sf = abs(fftshift(fft(sf(a:b) .* h, Ndft)));
-    states.Sf = (1-tc)*states.Sf + tc*Sf;
+  if states.small_fft
+    % we break up input buffer to a series of Ndft sequences
+    numffts = floor(length(sf)/Ndft);
+    h = hanning(Ndft);
+    for i=1:numffts
+      a = (i-1)*Ndft+1; b = i*Ndft;
+      Sf = abs(fftshift(fft(sf(a:b) .* h, Ndft)));
+    end
+  else
+     x = zeros(Ndft,1);
+     x(1:N) = sf.*hanning(N);
+     Sf = abs(fftshift(fft(x)));
   end
+  states.Sf = (1-tc)*states.Sf + tc*Sf;
 
+  % figure(1); clf; plot(states.Sf);
+  
   % Search for each tone method 1 - peak pick each tone location ----------------------------------
 
   f = []; a = [];
@@ -255,7 +266,7 @@ function states = est_freq(states, sf, ntones)
       b_max = b;
     end
   end
-  foff = (b_max-Ndft/2)*Fs/Ndft;
+  foff = ((b_max-1)-Ndft/2)*Fs/Ndft;
   if bitand(states.verbose, 0x8)
     figure(1); clf; subplot(211); plot(Sf);
     hold on; plot(100*[zeros(1,b_max) mask],'g'); hold off;
