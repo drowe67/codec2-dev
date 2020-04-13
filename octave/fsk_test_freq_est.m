@@ -5,6 +5,7 @@
 
 fsk_lib;
 
+% "Genie" (ie perfect) timing estimate, we just want to see impact on BER from frequency est errors
 function rx_bits = simple_fsk_demod(states, rx, f)
   M = states.M; Ts = states.Ts; Fs = states.Fs; N = states.nin;
 
@@ -40,7 +41,7 @@ end
 % run a test at an Eb/No point, measure how many dud freq estimates using both algorithms
 function [states f_log f_log2 num_dud1 num_dud2 ber ber2] = run_test(EbNodB = 10, num_frames=10)
   Fs = 8000;
-  Rs = 100;
+  Rs = 25;
   M  = 4;
   bits_per_frame = 512;
 
@@ -54,7 +55,7 @@ function [states f_log f_log2 num_dud1 num_dud2 ber ber2] = run_test(EbNodB = 10
   states.ftx = 900 + states.tx_tone_separation*(1:M);
   states.fest_fmin = -Fs/2;
   states.fest_fmax = +Fs/2;
-  %states.small_fft = 0;
+  states.small_fft = 1;
   %states.Ndft = 2.^ceil(log2(N));
   %states.Sf = zeros(states.Ndft,1);
 
@@ -66,7 +67,6 @@ function [states f_log f_log2 num_dud1 num_dud2 ber ber2] = run_test(EbNodB = 10
   tx = fsk_mod(states, tx_bits);
   noise = sqrt(variance/2)*randn(length(tx),1) + j*sqrt(variance/2)*randn(length(tx),1);
   rx = tx + noise;
-
   run_frames = floor(length(rx)/N)-1;
   st = 1; f_log = []; f_log2 = []; rx_bits = []; rx_bits2 = [];
   for f=1:run_frames
@@ -158,11 +158,14 @@ function run_curve
   figure(1); clf; plot(EbNodB, percent_log(:,1), 'linewidth', 2, '+-;peak;'); grid;
   hold on;  plot(EbNodB, percent_log(:,2), 'linewidth', 2, 'r+-;mask;'); hold off;
   xlabel('Eb/No (dB)'); ylabel('% Errors');
+  title(sprintf("Fs = %d Rs = %d", states.Fs, states.Rs));
   print("fsk_freq_est_errors.png", "-dpng")
+
   figure(2); clf; semilogy(EbNodB, m4fsk_ber_theory, 'linewidth', 2, 'bk+-;theory;'); grid;
   hold on;  semilogy(EbNodB, ber_log(:,1), 'linewidth', 2, '+-;peak;');
   semilogy(EbNodB, ber_log(:,2), 'linewidth', 2, 'r+-;mask;'); hold off;
   xlabel('Eb/No (dB)'); ylabel('BER');
+  title(sprintf("Fs = %d Rs = %d", states.Fs, states.Rs));
   print("fsk_freq_est_ber.png", "-dpng")
 end
 
@@ -174,5 +177,5 @@ rand('state',1);
 randn('state',1);
 
 # choose one of these to run
-run_single(0,10)
+#run_single(3,3)
 run_curve

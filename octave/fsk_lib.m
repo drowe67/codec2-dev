@@ -25,11 +25,12 @@ function states = fsk_init(Fs, Rs, M=2)
   N = states.N = Ts*states.nsym;                  % processing buffer size, nice big window for timing est
   states.small_fft = 1;
   states.Ndft = min(1024, 2.^ceil(log2(N)));      % find nearest power of 2 for efficient FFT
+  states.Sf = zeros(states.Ndft,1);               % current memory of dft mag samples
+  states.tc = 0.05;                               % average DFT over longtime window, accurate at low Eb/No, but slow
+  
   states.nbit = states.nsym*states.bitspersymbol; % number of bits per processing frame
-
   Nmem = states.Nmem  = N+2*Ts;                   % two symbol memory in down converted signals to allow for timing adj
 
-  states.Sf = zeros(states.Ndft,1);             % current memory of dft mag samples
   states.f_dc = zeros(M,Nmem);
   states.P = 8;                                   % oversample rate out of filter
   assert(Ts/states.P == floor(Ts/states.P), "Ts/P must be an integer");
@@ -86,10 +87,11 @@ function states = fsk_init_hbr(Fs,P,Rs,M=2,nsym=48)
 
   states.small_fft = 1;
   states.Ndft = min(1024, 2.^ceil(log2(N)))
-
+  states.Sf = zeros(states.Ndft,1); % current memory of dft mag samples
+  states.tc = 0.95;                 % no (very little) averaging, narrow freq est window, fast acquisition
+  
   Nmem = states.Nmem  = N+2*Ts;  % two symbol memory in down converted signals to allow for timing adj
 
-  states.Sf = zeros(states.Ndft,1); % current memory of dft mag samples
   states.f_dc = zeros(M,Nmem);
   states.P = P;                  % oversample rate out of filter
   assert(Ts/states.P == floor(Ts/states.P), "Ts/P must be an integer");
@@ -197,9 +199,6 @@ function states = est_freq(states, sf, ntones)
   
   %printf("Fs: %f Ndft: %d fmin: %f fmax: %f st: %d en: %d\n",Fs, Ndft,  fmin, fmax, st, en)
   
-  % scale averaging time constant based on number of samples 
-  tc = 0.95*Ndft/Fs;  
-
   % Update mag DFT  ---------------------------------------------
 
   if states.small_fft
@@ -215,9 +214,14 @@ function states = est_freq(states, sf, ntones)
      x(1:N) = sf.*hanning(N);
      Sf = abs(fftshift(fft(x)));
   end
-  states.Sf = (1-tc)*states.Sf + tc*Sf;
 
-  % figure(1); clf; plot(states.Sf);
+  % Smooth DFT mag spectrum, slower to respond to changes but more
+  % accurate.  Single order IIR filter is an exponentially weighted
+  % moving average.  This means the freq est window is wider than
+  % timing est window
+  tc = states.tc; states.Sf = (1-tc)*states.Sf + tc*Sf;
+
+  %figure(1); clf; plot(states.Sf);
   
   % Search for each tone method 1 - peak pick each tone location ----------------------------------
 
@@ -267,6 +271,7 @@ function states = est_freq(states, sf, ntones)
     end
   end
   foff = ((b_max-1)-Ndft/2)*Fs/Ndft;
+  %states.verbose = 0x8;
   if bitand(states.verbose, 0x8)
     figure(1); clf; subplot(211); plot(Sf);
     hold on; plot(100*[zeros(1,b_max) mask],'g'); hold off;
