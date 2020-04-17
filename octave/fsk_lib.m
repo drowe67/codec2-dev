@@ -23,8 +23,9 @@ function states = fsk_init(Fs, Rs, M=2)
   assert(Ts == floor(Ts), "Fs/Rs must be an integer");
 
   N = states.N = Ts*states.nsym;                  % processing buffer size, nice big window for timing est
-  states.small_fft = 1;
-  states.Ndft = min(1024, 2.^ceil(log2(N)));      % find nearest power of 2 for efficient FFT
+  bin_width_Hz = 0.1*Rs;                          % we want enough DFT bins to get within 10% of the tones centre
+  Ndft = Fs/bin_width_Hz;
+  states.Ndft = 2.^ceil(log2(Ndft));              % round to nearest power of 2 for efficent FFT
   states.Sf = zeros(states.Ndft,1);               % current memory of dft mag samples
   states.tc = 0.05;                               % average DFT over longtime window, accurate at low Eb/No, but slow
   
@@ -85,7 +86,6 @@ function states = fsk_init_hbr(Fs,P,Rs,M=2,nsym=48)
   states.nsym = N/Ts;            % number of symbols in one processing frame
   states.nbit = states.nsym*states.bitspersymbol; % number of bits per processing frame
 
-  states.small_fft = 1;
   states.Ndft = min(1024, 2.^ceil(log2(N)))
   states.Sf = zeros(states.Ndft,1); % current memory of dft mag samples
   states.tc = 0.95;                 % no (very little) averaging, narrow freq est window, fast acquisition
@@ -197,22 +197,16 @@ function states = est_freq(states, sf, ntones)
   st = floor(fmin*Ndft/Fs) + Ndft/2;  st = max(1,st);
   en = floor(fmax*Ndft/Fs) + Ndft/2;  en = min(Ndft,en);
   
-  %printf("Fs: %f Ndft: %d fmin: %f fmax: %f st: %d en: %d\n",Fs, Ndft,  fmin, fmax, st, en)
+  #printf("Fs: %f Ndft: %d fmin: %f fmax: %f st: %d en: %d\n",Fs, Ndft,  fmin, fmax, st, en)
   
   % Update mag DFT  ---------------------------------------------
 
-  if states.small_fft
-    % we break up input buffer to a series of Ndft sequences
-    numffts = floor(length(sf)/Ndft);
-    h = hanning(Ndft);
-    for i=1:numffts
-      a = (i-1)*Ndft+1; b = i*Ndft;
-      Sf = abs(fftshift(fft(sf(a:b) .* h, Ndft)));
-    end
-  else
-     x = zeros(Ndft,1);
-     x(1:N) = sf.*hanning(N);
-     Sf = abs(fftshift(fft(x)));
+  % we break up input buffer to a series of Ndft sequences
+  numffts = floor(length(sf)/Ndft);
+  h = hanning(Ndft);
+  for i=1:numffts
+    a = (i-1)*Ndft+1; b = i*Ndft;
+    Sf = abs(fftshift(fft(sf(a:b) .* h, Ndft)));
   end
 
   % Smooth DFT mag spectrum, slower to respond to changes but more

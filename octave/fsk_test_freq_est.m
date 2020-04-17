@@ -40,7 +40,7 @@ end
 
 % run a test at an Eb/No point, measure how many dud freq estimates using both algorithms
 function [states f_log f_log2 num_dud1 num_dud2 ber ber2] = run_test(EbNodB = 10, num_frames=10)
-  Fs = 8000;
+  Fs = 24000;
   Rs = 25;
   M  = 4;
   bits_per_frame = 512;
@@ -52,7 +52,7 @@ function [states f_log f_log2 num_dud1 num_dud2 ber ber2] = run_test(EbNodB = 10
   states.tx_real = 0;
 
   states.tx_tone_separation = 250; % 2*states.Rs;
-  states.ftx = 900 + states.tx_tone_separation*(1:M);
+  states.ftx = -2.5*states.tx_tone_separation + states.tx_tone_separation*(1:M);
   states.fest_fmin = -Fs/2;
   states.fest_fmax = +Fs/2;
   states.small_fft = 1;
@@ -121,8 +121,11 @@ function run_single(EbNodB = 3, num_frames = 10)
          EbNodB, length(f_log), num_dud1, percent_dud1, num_dud2, percent_dud2, ber, ber2)
   
   figure(1); clf;
-  plot(f_log(:,1), 'linewidth', 2, 'b;peak;');
+  ideal=ones(length(f_log),1)*states.ftx;
+  plot((1:length(f_log)),ideal(:,1),'bk;ideal;')
+  hold on; plot((1:length(f_log)),ideal(:,2:states.M),'bk'); hold off;
   hold on;
+  plot(f_log(:,1), 'linewidth', 2, 'b;peak;');
   plot(f_log(:,2:states.M), 'linewidth', 2, 'b');
   plot(f_log2(:,1),'linewidth', 2, 'r;mask;');
   plot(f_log2(:,2:states.M),'linewidth', 2, 'r');
@@ -136,8 +139,12 @@ function run_single(EbNodB = 3, num_frames = 10)
   ind = find(abs(errors) < 100);
   errors2 = (f_log2 - states.ftx)(:);
   ind2 = find(abs(errors2) < 100);
-  subplot(211); hist(errors(ind),50)
-  subplot(212); hist(errors2(ind2),50)  
+  if length(ind)
+    subplot(211); hist(errors(ind),50)
+  end
+  if length(ind2)
+    subplot(212); hist(errors2(ind2),50)
+  end
 end
 
 function run_curve
@@ -151,7 +158,7 @@ function run_curve
       percent_dud2 = 100*num_dud2/length(f_log);
       percent_log = [percent_log; [percent_dud1 percent_dud2]];
       ber_log = [ber_log; [ber ber2]];
-      printf("EbNodB: %4.2f dB tests: %3d duds1: %3d %5.2f %% duds2: %3d %5.2f %% ber1: %4.4f ber2: %4.3f\n",
+      printf("EbNodB: %4.2f dB tests: %3d duds1: %3d %5.2f %% duds2: %3d %5.2f %% ber1: %4.3f ber2: %4.3f\n",
              EbNodB(ne), length(f_log), num_dud1, percent_dud1, num_dud2, percent_dud2, ber, ber2)
   end
   
@@ -177,5 +184,5 @@ rand('state',1);
 randn('state',1);
 
 # choose one of these to run
-#run_single(3,3)
+#run_single(3,1)
 run_curve
