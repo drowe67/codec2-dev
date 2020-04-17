@@ -27,7 +27,7 @@ function states = fsk_init(Fs, Rs, M=2)
   Ndft = Fs/bin_width_Hz;
   states.Ndft = 2.^ceil(log2(Ndft));              % round to nearest power of 2 for efficent FFT
   states.Sf = zeros(states.Ndft,1);               % current memory of dft mag samples
-  states.tc = 0.05;                               % average DFT over longtime window, accurate at low Eb/No, but slow
+  states.tc = 0.1;                                % average DFT over longtime window, accurate at low Eb/No, but slow
   
   states.nbit = states.nsym*states.bitspersymbol; % number of bits per processing frame
   Nmem = states.Nmem  = N+2*Ts;                   % two symbol memory in down converted signals to allow for timing adj
@@ -176,7 +176,7 @@ endfunction
 
 
 % Estimate the frequency of the FSK tones.  In some applications (such
-% as balloon telemtry) these may not be well controlled by the
+% as balloon telemetry) these may not be well controlled by the
 % transmitter, so we have to try to estimate them.
 
 function states = est_freq(states, sf, ntones)
@@ -202,10 +202,10 @@ function states = est_freq(states, sf, ntones)
   % Update mag DFT  ---------------------------------------------
 
   % we break up input buffer to a series of Ndft sequences
-  numffts = floor(length(sf)/Ndft);
+  numffts = floor(length(sf)/(Ndft/2)) - 1;
   h = hanning(Ndft);
   for i=1:numffts
-    a = (i-1)*Ndft+1; b = i*Ndft;
+    a = (i-1)*Ndft/2+1; b = a + Ndft - 1;
     Sf = abs(fftshift(fft(sf(a:b) .* h, Ndft)));
   end
 
