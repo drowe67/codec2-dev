@@ -389,6 +389,52 @@ void determine_phase(C2CONST *c2const, COMP H[], MODEL *model, int Nfft, codec2_
     }
 }
 
+/*---------------------------------------------------------------------------* \
+
+  FUNCTION....: determine_autoc
+  AUTHOR......: David Rowe
+  DATE CREATED: April 2020
+
+  Determine autocorrelation coefficients from model params, for machine 
+  learning experiments.
+
+\*---------------------------------------------------------------------------*/
+
+void determine_autoc(C2CONST *c2const, float Rk[], int order, MODEL *model, int Nfft, codec2_fft_cfg fwd_cfg, codec2_fft_cfg inv_cfg)
+{
+    int i,m,b;
+    int Ns = Nfft/2+1;
+    float Gdbfk[Ns], sample_freqs_kHz[Ns];
+    float AmdB[MAX_AMP+1], rate_L_sample_freqs_kHz[MAX_AMP+1];
+
+    /* interpolate in the log domain */
+    for(m=1; m<=model->L; m++) {
+        assert(model->A[m] != 0.0);
+        AmdB[m] = 20.0*log10f(model->A[m]);
+        rate_L_sample_freqs_kHz[m] = (float)m*model->Wo*(c2const->Fs/2000.0)/M_PI;        
+    }
+    
+    for(i=0; i<Ns; i++) {
+        sample_freqs_kHz[i] = (c2const->Fs/1000.0)*(float)i/Nfft;
+    }
+
+    interp_para(Gdbfk, &rate_L_sample_freqs_kHz[1], &AmdB[1], model->L, sample_freqs_kHz, Ns);
+
+    COMP S[Nfft], R[Nfft];
+
+    /* install negative frequency components, convert to mag squared of spectrum */
+    S[0].real = pow(10.0, Gdbfk[0]/10.0);
+    S[0].imag = 0.0;
+    for(i=1; i<Ns; i++) {
+	S[i].real = S[Nfft-i].real = pow(10.0, Gdbfk[i]/10.0);
+	S[i].imag = S[Nfft-i].imag = 0.0;
+    }
+
+    /* IDFT of mag squared is autocorrelation function */
+    codec2_fft(inv_cfg, S, R);
+    for(int k=0; k<order+1; k++) Rk[k] = R[k].real;
+}
+
 
 /* update and optionally run "front eq" equaliser on before VQ */
 void newamp1_eq(float rate_K_vec_no_mean[], float eq[], int K, int eq_en) {

@@ -848,6 +848,15 @@ int main(int argc, char *argv[])
 		if (first)
 		    features[18] = -0.9;
 		if (lpc_model) {
+		    MODEL model_;
+		    model_.Wo = model.Wo;
+		    model_.L  = model.L;
+		    model_.voiced = model.voiced;
+		    float Rk[order+1], ak[order+1];
+		    resample_rate_L(&c2const, &model_, rate_K_vec, rate_K_sample_freqs_kHz, K);
+		    determine_autoc(&c2const, Rk, order, &model_, NEWAMP1_PHASE_NFFT, phase_fft_fwd_cfg, phase_fft_inv_cfg);
+		    levinson_durbin(Rk, ak, order);
+
 		    for(int i=0; i<order; i++)
 			features[18+i] = ak[i+1];
 		}
