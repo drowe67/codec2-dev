@@ -1,7 +1,7 @@
-% fsk_test_freq_est.m
+% fsk_lock_down.m
 % David Rowe April 2020
-
-% test FSK frequency estimator, in particular at low Eb/No
+%
+% tests for "Lock down" waveform, low Eb/No 4FSK
 
 fsk_lib;
 
@@ -38,22 +38,23 @@ function rx_bits = simple_fsk_demod(states, rx, f)
   
 end
 
-% run a test at an Eb/No point, measure how many dud freq estimates using both algorithms
-function [states f_log f_log2 num_dud1 num_dud2 ber ber2] = run_test(EbNodB = 10, num_frames=10, Fs=8000, Rs=100, df=0)
+% set up "lock down" waveform
+function [states M bits_per_frame] = lock_down_init(Rs,Fs,df)
   M  = 4;
   bits_per_frame = 512;
-
   states = fsk_init(Fs,Rs,M);
-  N = states.N;
-
-  % complex signal
-  states.tx_real = 0;
-
-  states.tx_tone_separation = 250;
+  states.tx_real = 0; % complex signal
+   states.tx_tone_separation = 250;
   states.ftx = -2.5*states.tx_tone_separation + states.tx_tone_separation*(1:M);
   states.fest_fmin = -Fs/2;
   states.fest_fmax = +Fs/2;
-  states.df = df;
+  states.df = df; 
+end
+
+% run a test at an Eb/No point, measure how many dud freq estimates using both algorithms
+function [states f_log f_log2 num_dud1 num_dud2 ber ber2] = freq_run_test(EbNodB = 10, num_frames=10, Fs=8000, Rs=100, df=0)
+  [states M bits_per_frame] = lock_down_init(Rs,Fs,df);
+  N = states.N;
   
   EbNo = 10^(EbNodB/10);
   variance = states.Fs/(states.Rs*EbNo*states.bitspersymbol);
@@ -108,8 +109,8 @@ function [states f_log f_log2 num_dud1 num_dud2 ber ber2] = run_test(EbNodB = 10
   end
 end
 
-function run_single(EbNodB = 3, num_frames = 10)
-  [states f_log f_log2 num_dud1 num_dud2 ber ber2] = run_test(EbNodB, num_frames);
+function freq_run_single(EbNodB = 3, num_frames = 10)
+  [states f_log f_log2 num_dud1 num_dud2 ber ber2] = freq_run_test(EbNodB, num_frames);
   
   percent_dud1 = 100*num_dud1/length(f_log);
   percent_dud2 = 100*num_dud2/length(f_log);
@@ -145,13 +146,13 @@ end
 
 
 % test peak and mask algorthms side by side
-function run_curve_peak_mask
+function freq_run_curve_peak_mask
 
    EbNodB = 0:9;
    m4fsk_ber_theory = [0.23 0.18 0.14 0.09772 0.06156 0.03395 0.01579 0.00591 0.00168 3.39E-4];
    percent_log = []; ber_log = [];
    for ne = 1:length(EbNodB)
-      [states f_log f_log2 num_dud1 num_dud2 ber ber2] = run_test(EbNodB(ne), 10);
+      [states f_log f_log2 num_dud1 num_dud2 ber ber2] = freq_run_test(EbNodB(ne), 10);
       percent_dud1 = 100*num_dud1/length(f_log);
       percent_dud2 = 100*num_dud2/length(f_log);
       percent_log = [percent_log; [percent_dud1 percent_dud2]];
@@ -175,7 +176,7 @@ function run_curve_peak_mask
 end
 
 
-function run_curve_peak(Fs,Rs)
+function freq_run_curve_peak(Fs,Rs)
   EbNodB = 0:9;
   m4fsk_ber_theory = [0.23 0.18 0.14 0.09772 0.06156 0.03395 0.01579 0.00591 0.00168 3.39E-4];
   figure(1); clf; semilogy(EbNodB, m4fsk_ber_theory, 'linewidth', 2, 'bk+-;theory;'); grid;
@@ -186,7 +187,7 @@ function run_curve_peak(Fs,Rs)
   for df=-0.01:0.01:0.01
     ber_log = [];
     for ne = 1:length(EbNodB)
-      [states f_log f_log2 num_dud1 num_dud2 ber ber2] = run_test(EbNodB(ne), 100, Fs, Rs, df*Rs);
+      [states f_log f_log2 num_dud1 num_dud2 ber ber2] = freq_run_test(EbNodB(ne), 100, Fs, Rs, df*Rs);
       ber_log = [ber_log; [ber ber2]];
       printf("Fs: %d Rs: %d df %3.2f EbNodB: %4.2f dB tests: %3d ber: %4.3f\n",
              Fs, Rs, df, EbNodB(ne), length(f_log), ber2)
@@ -204,10 +205,9 @@ more off;
 rand('state',1); 
 randn('state',1);
 
-# choose one of these to run
-#run_single(3,10)
-#run_curve_peak_mask
-run_curve_peak(8000,100)
-#run_curve_peak(24000,25)
-#run_curve_peak(8000,10)
-#run_curve_peak(2000,10)
+% freq estimator tests (choose one if you like)
+#freq_run_single(3,10)
+#freq_run_curve_peak_mask
+#freq_run_curve_peak(8000,100)
+#freq_run_curve_peak(24000,25)
+#freq_run_curve_peak(8000,25)
