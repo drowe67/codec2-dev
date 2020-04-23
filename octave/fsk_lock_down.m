@@ -283,6 +283,7 @@ function [states ber per] = modem_run_test(EbNodB = 10, num_frames=10, Fs=8000, 
   per = 1 - num_frames_rx/num_frames;
 end
 
+
 function modem_run_curve_peak(Fs, Rs, num_frames=100)
   EbNodB = 0:9;
   m4fsk_ber_theory = [0.23 0.18 0.14 0.09772 0.06156 0.03395 0.01579 0.00591 0.00168 3.39E-4];
@@ -290,8 +291,8 @@ function modem_run_curve_peak(Fs, Rs, num_frames=100)
   xlabel('Eb/No (dB)'); ylabel('BER');
   title(sprintf("Mask: Fs = %d Hz Rs = %d Hz", Fs, Rs)); hold on;
   figure(2); clf;
-  xlabel('Eb/No (dB)'); ylabel('BER'); title(sprintf("Mask: Fs = %d Hz Rs = %d Hz", Fs, Rs));
-  hold on;
+  xlabel('Eb/No (dB)'); ylabel('PER'); title(sprintf("Mask: Fs = %d Hz Rs = %d Hz", Fs, Rs));
+  grid; axis([min(EbNodB) max(EbNodB) 0 1]); hold on;
   
   for df=-0.01:0.01:0.01
     ber_log = []; per_log = [];
@@ -300,7 +301,7 @@ function modem_run_curve_peak(Fs, Rs, num_frames=100)
       ber_log = [ber_log; ber]; per_log = [per_log; per];
     end 
     figure(1); semilogy(EbNodB, ber_log, 'linewidth', 2, sprintf("+-;df=% 3.2f Hz/s;",df*Rs));
-    figure(2); semilogy(EbNodB, per_log, 'linewidth', 2, sprintf("+-;df=% 3.2f Hz/s;",df*Rs));
+    figure(2); plot(EbNodB, per_log, 'linewidth', 2, sprintf("+-;df=% 3.2f Hz/s;",df*Rs));
   end
   figure(1); hold off; print(sprintf("fsk_modem_ber_%d_%d.png",Fs,Rs), "-dpng")
   figure(2); hold off; print(sprintf("fsk_modem_per_%d_%d.png",Fs,Rs), "-dpng")
@@ -322,6 +323,6 @@ randn('state',1);
 
 % complete modem tests (choose one if you like)
 #modem_run_test(1, 100, 24000, 25, 0.25, 1);
-modem_run_curve_peak(24000,25,20)
-#modem_run_curve_peak(8000,100)
+#modem_run_curve_peak(24000,25,100)
+modem_run_curve_peak(8000,25,100)
 
