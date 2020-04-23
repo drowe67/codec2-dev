@@ -12,13 +12,13 @@
 
 1;
 
-function states = fsk_init(Fs, Rs, M=2)
+function states = fsk_init(Fs, Rs, M=2, nsym=50)
   states.M = M;                    
   states.bitspersymbol = log2(M);
   states.Fs = Fs;
   states.Rs = Rs;
 
-  states.nsym = 50;                               % need enough symbols for good timing and freq offset est
+  states.nsym = nsym;                             % need enough symbols for good timing est
   Ts = states.Ts = Fs/Rs;                         % number of samples per symbol
   assert(Ts == floor(Ts), "Fs/Rs must be an integer");
 
@@ -46,6 +46,7 @@ function states = fsk_init(Fs, Rs, M=2)
   % BER stats 
 
   states.ber_state = 0;
+  states.ber_thresh0 = 0.05;  states.ber_thresh1 = 0.1; 
   states.Tbits = 0;
   states.Terrs = 0;
   states.nerr_log = 0;
@@ -437,7 +438,7 @@ endfunction
 % BER counter and test frame sync logic -------------------------------------------
 
 function states = ber_counter(states, test_frame, rx_bits_buf)
-  nbit = states.nbit;
+  nbit = length(test_frame);
   state = states.ber_state;
   next_state = state;
 
@@ -447,8 +448,6 @@ function states = ber_counter(states, test_frame, rx_bits_buf)
 
     nerrs_min = nbit;
     for i=1:nbit
-      size(rx_bits_buf(i:nbit+i-1))
-      size(test_frame)
       error_positions = xor(rx_bits_buf(i:nbit+i-1), test_frame);
       nerrs = sum(error_positions);
       if nerrs < nerrs_min
@@ -456,7 +455,7 @@ function states = ber_counter(states, test_frame, rx_bits_buf)
         states.coarse_offset = i;
       end
     end
-    if nerrs_min/nbit < 0.05 
+    if nerrs_min/nbit < states.ber_thresh0
       next_state = 1;
     end
     if bitand(states.verbose,0x4)
@@ -470,7 +469,7 @@ function states = ber_counter(states, test_frame, rx_bits_buf)
 
     error_positions = xor(rx_bits_buf(states.coarse_offset:states.coarse_offset+nbit-1), test_frame);
     nerrs = sum(error_positions);
-    if nerrs/nbit > 0.1
+    if nerrs/nbit > states.ber_thresh1
       next_state = 0;
     else
       states.Terrs += nerrs;
