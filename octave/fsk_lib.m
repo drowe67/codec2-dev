@@ -46,7 +46,7 @@ function states = fsk_init(Fs, Rs, M=2, nsym=50)
   % BER stats 
 
   states.ber_state = 0;
-  states.ber_thresh0 = 0.05;  states.ber_thresh1 = 0.1; 
+  states.ber_valid_thresh = 0.05;  states.ber_invalid_thresh = 0.1; 
   states.Tbits = 0;
   states.Terrs = 0;
   states.nerr_log = 0;
@@ -455,12 +455,13 @@ function states = ber_counter(states, test_frame, rx_bits_buf)
         states.coarse_offset = i;
       end
     end
-    if nerrs_min/nbit < states.ber_thresh0
+    if nerrs_min/nbit < states.ber_valid_thresh
       next_state = 1;
     end
     if bitand(states.verbose,0x4)
       printf("coarse offset: %d nerrs_min: %d next_state: %d\n", states.coarse_offset, nerrs_min, next_state);
     end
+    states.nerr = nerrs_min;
   end
 
   if state == 1  
@@ -469,13 +470,17 @@ function states = ber_counter(states, test_frame, rx_bits_buf)
 
     error_positions = xor(rx_bits_buf(states.coarse_offset:states.coarse_offset+nbit-1), test_frame);
     nerrs = sum(error_positions);
-    if nerrs/nbit > states.ber_thresh1
+    if nerrs/nbit > states.ber_invalid_thresh
       next_state = 0;
+      if bitand(states.verbose,0x4)
+        printf("coarse offset: %d nerrs: %d next_state: %d\n", states.coarse_offset, nerrs, next_state);
+      end
     else
       states.Terrs += nerrs;
       states.Tbits += nbit;
       states.nerr_log = [states.nerr_log nerrs];
     end
+    states.nerr = nerrs;
   end
 
   states.ber_state = next_state;

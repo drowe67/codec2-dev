@@ -48,8 +48,18 @@ function [states M bits_per_frame] = lock_down_init(Rs,Fs,df)
   states.ftx = -2.5*states.tx_tone_separation + states.tx_tone_separation*(1:M);
   states.fest_fmin = -Fs/2;
   states.fest_fmax = +Fs/2;
-  states.df = df; 
-  states.ber_thresh0 = 0.25;  states.ber_thresh1 = 1; 
+  states.df = df;
+
+  % cumulative PDF, cdf(x) probability of 0....x errors in frame
+  cdf = binocdf(1:bits_per_frame, bits_per_frame, 0.3);
+  % our valid frame threshold is 50% probability, so if we get this many errors
+  % we have a 50% chance it's a valid frame
+  nerrs_valid = find(cdf>=0.5)(1);
+  % our invalid frame threshold is 99% probability, so very unlikley to
+  % get this many errors
+  nerrs_invalid =  find(cdf>=0.99)(1);
+  states.ber_valid_thresh = nerrs_valid/bits_per_frame;
+  states.ber_invalid_thresh = nerrs_invalid/bits_per_frame; 
 end
 
 % run a test at an Eb/No point, measure how many dud freq estimates using both algorithms
@@ -200,9 +210,15 @@ function freq_run_curve_peak(Fs,Rs)
 end
 
 
-function [states ber] = modem_run_test(EbNodB = 10, num_frames=10, Fs=8000, Rs=100, df=0)
+% Run a complete modem (freq and timing estimators running) at a
+% single Eb/No point.  At low Eb/No the estimators occasionally fall
+% over so we get complete junk, we consider that case a packet error
+% and exclude it from the BER estimation.
+
+function [states ber per] = modem_run_test(EbNodB = 10, num_frames=10, Fs=8000, Rs=100, df=0, plots=0)
   [states M bits_per_frame] = lock_down_init(Rs, Fs, df);
   N = states.N;
+  if plots; states.verbose = 0x4; end
   
   EbNo = 10^(EbNodB/10);
   variance = states.Fs/(states.Rs*EbNo*states.bitspersymbol);
@@ -235,57 +251,59 @@ function [states ber] = modem_run_test(EbNodB = 10, num_frames=10, Fs=8000, Rs=1
     end
   end
 
-  % ignore start up transient
-  startup = 1; % TODO make this sensible/proportional so its scales across Rs
-  if num_frames > startup
-    tx_bits = tx_bits(startup*bits_per_frame:end);
-    rx_bits = rx_bits(startup*bits_per_frame:end);
-  end
-
-#{
-  figure(1); clf;
-  ideal=ones(length(f_log),1)*states.ftx;
-  plot((1:length(f_log)),ideal(:,1),'bk;ideal;')
-  hold on; plot((1:length(f_log)),ideal(:,2:states.M),'bk'); hold off;
-  hold on;
-  plot(f_log(:,1), 'linewidth', 2, 'b;peak;');
-  plot(f_log(:,2:states.M), 'linewidth', 2, 'b');
-  hold off;
-  xlabel('Time (frames)'); ylabel('Frequency (Hz)');
-#}
-
   num_frames=floor(length(rx_bits)/bits_per_frame);
+  log_nerrs = []; num_frames_rx = 0;
   for f=1:num_frames-1
     st = (f-1)*bits_per_frame + 1; en = (f+1)*bits_per_frame;
     states = ber_counter(states, test_frame, rx_bits(st:en));
+    log_nerrs = [log_nerrs states.nerr];
+    if states.ber_state; num_frames_rx++; end
   end
-  if states.ber_state
-    printf("Fs: %d Rs: %d df % 3.2f EbNodB: %4.2f dB nbits: %3d nerrs: %3d ber: %4.3f\n",
-            Fs, Rs, df, EbNodB, states.Tbits, states.Terrs, states.Terrs/states.Tbits);
+  if states.Terrs
+    printf("Fs: %d Rs: %d df % 3.2f EbNodB: %4.2f dB ftx: %3d frx: %3d nbits: %4d nerrs: %3d ber: %4.3f\n",
+            Fs, Rs, df, EbNodB, num_frames, num_frames_rx, states.Tbits, states.Terrs, states.Terrs/states.Tbits);
     ber = states.Terrs/states.Tbits;
   else
     ber = 0.5;
   end
+
+  if plots
+    figure(1); clf;
+    ideal=ones(length(f_log),1)*states.ftx;
+    plot((1:length(f_log)),ideal(:,1),'bk;ideal;')
+    hold on; plot((1:length(f_log)),ideal(:,2:states.M),'bk'); hold off;
+    hold on;
+    plot(f_log(:,1), 'linewidth', 2, 'b;peak;');
+    plot(f_log(:,2:states.M), 'linewidth', 2, 'b');
+    hold off;
+    xlabel('Time (frames)'); ylabel('Frequency (Hz)');
+    figure(2); clf; plot(log_nerrs);
+  end
+
+  per = 1 - num_frames_rx/num_frames;
 end
 
-function modem_run_curve_peak(Fs, Rs)
+function modem_run_curve_peak(Fs, Rs, num_frames=100)
   EbNodB = 0:9;
   m4fsk_ber_theory = [0.23 0.18 0.14 0.09772 0.06156 0.03395 0.01579 0.00591 0.00168 3.39E-4];
   figure(1); clf; semilogy(EbNodB, m4fsk_ber_theory, 'linewidth', 2, 'bk+-;theory;'); grid;
   xlabel('Eb/No (dB)'); ylabel('BER');
-  title(sprintf("Mask: Fs = %d Hz Rs = %d Hz", Fs, Rs));
+  title(sprintf("Mask: Fs = %d Hz Rs = %d Hz", Fs, Rs)); hold on;
+  figure(2); clf;
+  xlabel('Eb/No (dB)'); ylabel('BER'); title(sprintf("Mask: Fs = %d Hz Rs = %d Hz", Fs, Rs));
   hold on;
-   
+  
   for df=-0.01:0.01:0.01
-    ber_log = [];
+    ber_log = []; per_log = [];
     for ne = 1:length(EbNodB)
-      [states ber] = modem_run_test(EbNodB(ne), 100, Fs, Rs, df*Rs);
-      ber_log = [ber_log; ber];
+      [states ber per] = modem_run_test(EbNodB(ne), num_frames, Fs, Rs, df*Rs);
+      ber_log = [ber_log; ber]; per_log = [per_log; per];
     end 
-    semilogy(EbNodB, ber_log, 'linewidth', 2, sprintf("+-;df=% 3.2f Hz/s;",df*Rs));
+    figure(1); semilogy(EbNodB, ber_log, 'linewidth', 2, sprintf("+-;df=% 3.2f Hz/s;",df*Rs));
+    figure(2); semilogy(EbNodB, per_log, 'linewidth', 2, sprintf("+-;df=% 3.2f Hz/s;",df*Rs));
   end
-  hold off;
-  print(sprintf("fsk_modem_ber_%d_%d.png",Fs,Rs), "-dpng")
+  figure(1); hold off; print(sprintf("fsk_modem_ber_%d_%d.png",Fs,Rs), "-dpng")
+  figure(2); hold off; print(sprintf("fsk_modem_per_%d_%d.png",Fs,Rs), "-dpng")
 end
 
 graphics_toolkit("gnuplot");
@@ -303,7 +321,7 @@ randn('state',1);
 #freq_run_curve_peak(8000,25)
 
 % complete modem tests (choose one if you like)
-#modem_run_test(1, 20);
-modem_run_curve_peak(24000,25)
+#modem_run_test(1, 100, 24000, 25, 0.25, 1);
+modem_run_curve_peak(24000,25,20)
 #modem_run_curve_peak(8000,100)
 
