@@ -853,9 +853,9 @@ int main(int argc, char *argv[])
 		    model_.L  = model.L;
 		    model_.voiced = model.voiced;
 		    float Rk[order+1], ak[order+1];
-		    resample_rate_L(&c2const, &model_, rate_K_vec, rate_K_sample_freqs_kHz, K);
+		    resample_rate_L(&c2const, &model_, rate_K_vec_, rate_K_sample_freqs_kHz, K);
 		    determine_autoc(&c2const, Rk, order, &model_, NEWAMP1_PHASE_NFFT, phase_fft_fwd_cfg, phase_fft_inv_cfg);
-		    /* -40 dB noise floor and Lag windowing from LPCNet/freq.c - helps reduce large spikes in spctrum when LPC
+		    /* -40 dB noise floor and Lag windowing from LPCNet/freq.c - helps reduce large spikes in spectrum when LPC
                        analysis loses it. */
 		    Rk[0] += Rk[0]*1e-4 + 320/12/38.;
 		    for (i=1;i<order+1;i++) Rk[i] *= (1 - 6e-5*i*i);
