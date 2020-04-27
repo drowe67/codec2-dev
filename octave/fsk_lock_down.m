@@ -294,7 +294,7 @@ function modem_run_curve_peak(Fs, Rs, num_frames=100)
   xlabel('Eb/No (dB)'); ylabel('PER'); title(sprintf("Mask: Fs = %d Hz Rs = %d Hz", Fs, Rs));
   grid; axis([min(EbNodB) max(EbNodB) 0 1]); hold on;
   
-  for df=-0.01:0.01:0.01
+  for df=-0.05:0.05:0.05
     ber_log = []; per_log = [];
     for ne = 1:length(EbNodB)
       [states ber per] = modem_run_test(EbNodB(ne), num_frames, Fs, Rs, df*Rs);
@@ -305,6 +305,28 @@ function modem_run_curve_peak(Fs, Rs, num_frames=100)
   end
   figure(1); hold off; print(sprintf("fsk_modem_ber_%d_%d.png",Fs,Rs), "-dpng")
   figure(2); hold off; print(sprintf("fsk_modem_per_%d_%d.png",Fs,Rs), "-dpng")
+end
+
+% study code rate versus Rs and MDS
+function code_rate_table
+  packet_duration_sec = 20;
+  k = 256;
+  noise_figure = 1;
+  bits_per_symbol = 2;
+  
+  code_rate=[1 0.8 0.5 1/3];
+  raw_ber=[2E-3 0.04 0.08 0.16];
+  EbNodB_4fsk=[8 4.5 3.5 1.5];
+
+  printf("Code Rate | Raw BER | 4FSK Eb/No | n,k | Rs | MDS |\n");
+  printf("| --- | --- | --- | --- | --- | --- |\n");
+  for i=1:length(code_rate)
+    n = k/code_rate(i);
+    Rs = n/packet_duration_sec/bits_per_symbol;
+    mds = EbNodB_4fsk(i) + 10*log10(Rs) + noise_figure - 174; 
+    printf("%3.2f | %4.3f | %2.1f | %d,%d | %4.1f | %5.1f |\n",
+    code_rate(i), raw_ber(i), EbNodB_4fsk(i), n, k, Rs, mds);
+  end
 end
 
 graphics_toolkit("gnuplot");
@@ -322,7 +344,8 @@ randn('state',1);
 #freq_run_curve_peak(8000,25)
 
 % complete modem tests (choose one if you like)
-#modem_run_test(1, 100, 24000, 25, 0.25, 1);
+#modem_run_test(6, 20, 2000, 25, 1, 1);
 #modem_run_curve_peak(24000,25,100)
-modem_run_curve_peak(8000,25,100)
+#modem_run_curve_peak(2000,25,20)
 
+code_rate_table
