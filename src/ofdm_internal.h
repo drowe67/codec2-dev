@@ -150,7 +150,6 @@ struct OFDM {
     bool timing_en;
     bool foff_est_en;
     bool phase_est_en;
-    bool tx_bpf_en;
     bool dpsk;
 };
 

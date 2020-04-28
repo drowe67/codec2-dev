@@ -90,6 +90,8 @@ static struct OFDM_CONFIG ofdm_config;
 
 
 static struct quisk_cfFilter *ofdm_tx_bpf;
+static bool ofdm_tx_bpf_en;
+
 static complex float *tx_uw_syms;
 static int *uw_ind;
 static int *uw_ind_sym;
@@ -435,9 +437,10 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     ofdm->timing_norm = (ofdm_m + ofdm_ncp) * acc;
     ofdm->clock_offset_counter = 0;
     ofdm->sig_var = ofdm->noise_var = 1.0f;
-    ofdm->tx_bpf_en = false;
     ofdm->dpsk = false;
-    
+
+    ofdm_tx_bpf_en = false;    
+
     return ofdm; /* Success */
 }
 
@@ -811,7 +814,7 @@ void ofdm_txframe(struct OFDM *ofdm, complex float *tx, complex float *tx_sym_li
 
     /* optional Tx Band Pass Filter */
 
-    if (ofdm->tx_bpf_en == true) {
+    if (ofdm_tx_bpf_en == true) {
         assert(ofdm_tx_bpf != NULL);
         complex float tx_filt[ofdm_samplesperframe];
 
@@ -880,12 +883,12 @@ void ofdm_set_tx_bpf(bool val) {
     if (val == true) {
     	 if (ofdm_tx_bpf == NULL)
              allocate_tx_bpf();
-    	ofdm->tx_bpf_en = true;
+    	ofdm_tx_bpf_en = true;
     }
     else {
     	if (ofdm_tx_bpf != NULL)
             deallocate_tx_bpf();
-    	ofdm->tx_bpf_en = false;
+    	ofdm_tx_bpf_en = false;
     }
 }
 
@@ -1898,7 +1901,7 @@ void ofdm_print_info(struct OFDM *ofdm) {
     fprintf(stderr, "ofdm->timing_en = %s\n", ofdm->timing_en ? "true" : "false");
     fprintf(stderr, "ofdm->foff_est_en = %s\n", ofdm->foff_est_en ? "true" : "false");
     fprintf(stderr, "ofdm->phase_est_en = %s\n", ofdm->phase_est_en ? "true" : "false");
-    fprintf(stderr, "ofdm->tx_bpf_en = %s\n", ofdm->tx_bpf_en ? "true" : "false");
+    fprintf(stderr, "ofdm_tx_bpf_en = %s\n", ofdm_tx_bpf_en ? "true" : "false");
     fprintf(stderr, "ofdm->dpsk = %s\n", ofdm->dpsk ? "true" : "false");
     fprintf(stderr, "ofdm->phase_est_bandwidth_mode = %s\n", phase_est_bandwidth_mode[ofdm->phase_est_bandwidth_mode]);
 }
