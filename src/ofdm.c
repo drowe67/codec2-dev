@@ -45,8 +45,8 @@
 /* Static Prototypes */
 
 static float cnormf(complex float);
-static void allocate_tx_bpf(struct OFDM *);
-static void deallocate_tx_bpf(struct OFDM *);
+static void allocate_tx_bpf(void);
+static void deallocate_tx_bpf(void);
 static void dft(struct OFDM *, complex float *, complex float *);
 static void idft(struct OFDM *, complex float *, complex float *);
 static complex float vector_sum(complex float *, int);
@@ -88,6 +88,8 @@ static const int8_t pilotvalues[] = {
 
 static struct OFDM_CONFIG ofdm_config;
 
+
+static struct quisk_cfFilter *ofdm_tx_bpf;
 static complex float *tx_uw_syms;
 static int *uw_ind;
 static int *uw_ind_sym;
@@ -290,7 +292,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     }
 
     /* Null pointers to unallocated buffers */
-    ofdm->ofdm_tx_bpf = NULL;
+    ofdm_tx_bpf = NULL;
 
     /* store complex BPSK pilot symbols */
 
@@ -439,23 +441,23 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     return ofdm; /* Success */
 }
 
-static void allocate_tx_bpf(struct OFDM *ofdm) {
+static void allocate_tx_bpf() {
     //fprintf(stderr, "allocate_tx_bpf()\n");
-    ofdm->ofdm_tx_bpf = MALLOC(sizeof(struct quisk_cfFilter));
-    assert(ofdm->ofdm_tx_bpf != NULL);
+    ofdm_tx_bpf = MALLOC(sizeof(struct quisk_cfFilter));
+    assert(ofdm_tx_bpf != NULL);
     
     /* Transmit bandpass filter; complex coefficients, center frequency */
 
-    quisk_filt_cfInit(ofdm->ofdm_tx_bpf, filtP550S750, sizeof (filtP550S750) / sizeof (float));
-    quisk_cfTune(ofdm->ofdm_tx_bpf, ofdm_tx_centre / ofdm_fs);
+    quisk_filt_cfInit(ofdm_tx_bpf, filtP550S750, sizeof (filtP550S750) / sizeof (float));
+    quisk_cfTune(ofdm_tx_bpf, ofdm_tx_centre / ofdm_fs);
 }
 
-static void deallocate_tx_bpf(struct OFDM *ofdm) {
+static void deallocate_tx_bpf() {
     //fprintf(stderr, "deallocate_tx_bpf()\n");
-    assert(ofdm->ofdm_tx_bpf != NULL);
-    quisk_filt_destroy(ofdm->ofdm_tx_bpf);
-    FREE(ofdm->ofdm_tx_bpf);
-    ofdm->ofdm_tx_bpf = NULL;
+    assert(ofdm_tx_bpf != NULL);
+    quisk_filt_destroy(ofdm_tx_bpf);
+    FREE(ofdm_tx_bpf);
+    ofdm_tx_bpf = NULL;
 }
 
 void ofdm_destroy(struct OFDM *ofdm) {
@@ -810,10 +812,10 @@ void ofdm_txframe(struct OFDM *ofdm, complex float *tx, complex float *tx_sym_li
     /* optional Tx Band Pass Filter */
 
     if (ofdm->tx_bpf_en == true) {
-        assert(ofdm->ofdm_tx_bpf != NULL);
+        assert(ofdm_tx_bpf != NULL);
         complex float tx_filt[ofdm_samplesperframe];
 
-        quisk_ccfFilter(tx, tx_filt, ofdm_samplesperframe, ofdm->ofdm_tx_bpf);
+        quisk_ccfFilter(tx, tx_filt, ofdm_samplesperframe, ofdm_tx_bpf);
         memmove(tx, tx_filt, ofdm_samplesperframe * sizeof (complex float));
     }
 }
@@ -873,16 +875,16 @@ void ofdm_set_off_est_hz(struct OFDM *ofdm, float val) {
     ofdm->foff_est_hz = val;
 }
 
-void ofdm_set_tx_bpf(struct OFDM *ofdm, bool val) {
-    //fprintf(stderr, "ofdm_set_tx_bpf: val: %d ofdm_tx_bpf: %p \n", val, ofdm->ofdm_tx_bpf);
+void ofdm_set_tx_bpf(bool val) {
+    //fprintf(stderr, "ofdm_set_tx_bpf: val: %d ofdm_tx_bpf: %p \n", val, ofdm_tx_bpf);
     if (val == true) {
-    	 if (ofdm->ofdm_tx_bpf == NULL)
-             allocate_tx_bpf(ofdm);
+    	 if (ofdm_tx_bpf == NULL)
+             allocate_tx_bpf();
     	ofdm->tx_bpf_en = true;
     }
     else {
-    	if (ofdm->ofdm_tx_bpf != NULL)
-            deallocate_tx_bpf(ofdm);
+    	if (ofdm_tx_bpf != NULL)
+            deallocate_tx_bpf();
     	ofdm->tx_bpf_en = false;
     }
 }

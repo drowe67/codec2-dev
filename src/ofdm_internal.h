@@ -93,8 +93,6 @@ struct OFDM_CONFIG {
 
 struct OFDM {
     // Pointers
-
-    struct quisk_cfFilter *ofdm_tx_bpf;
     
     complex float *pilot_samples;
     complex float *rxbuf;

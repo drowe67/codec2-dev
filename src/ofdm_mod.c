@@ -339,7 +339,7 @@ int main(int argc, char *argv[]) {
     }
 
     if (txbpf_en) {
-        ofdm_set_tx_bpf(ofdm, 1);
+        ofdm_set_tx_bpf(1);
     }
     if (dpsk) {
         ofdm_set_dpsk(ofdm, 1);

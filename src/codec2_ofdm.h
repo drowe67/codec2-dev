@@ -91,7 +91,7 @@ void ofdm_set_phase_est_enable(struct OFDM *, bool);
 void ofdm_set_phase_est_bandwidth_mode(struct OFDM *ofdm, int val);
 void ofdm_set_off_est_hz(struct OFDM *, float);
 void ofdm_set_sync(struct OFDM *, int);
-void ofdm_set_tx_bpf(struct OFDM *, bool);
+void ofdm_set_tx_bpf(bool);
 void ofdm_set_dpsk(struct OFDM *ofdm, bool val);
     
 void ofdm_print_info(struct OFDM *);

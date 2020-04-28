@@ -299,7 +299,7 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
 
 #ifndef __EMBEDDED__
         /* tx BPF off on embedded platforms, as it consumes significant CPU */
-        ofdm_set_tx_bpf(f->ofdm, 1);
+        ofdm_set_tx_bpf(1);
 #endif
 
     }
@@ -414,7 +414,7 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
 	}
         
         /* TODO: tx BPF off by default, as we need new filter coeffs for FreeDV 2020 waveform */
-        ofdm_set_tx_bpf(f->ofdm, 0);
+        ofdm_set_tx_bpf(0);
         
         codec2_mode = CODEC_MODE_LPCNET_1733; // not really codec 2 but got to call it something        
     }
@@ -2818,7 +2818,7 @@ void freedv_set_ext_vco                   (struct freedv *f, int val) {f->ext_vc
 
 void freedv_set_tx_bpf(struct freedv *f, int val) {
     if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode)) {
-        ofdm_set_tx_bpf(f->ofdm, val);
+        ofdm_set_tx_bpf(val);
     }
 }
 
