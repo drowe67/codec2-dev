@@ -461,10 +461,6 @@ static void deallocate_tx_bpf(struct OFDM *ofdm) {
 void ofdm_destroy(struct OFDM *ofdm) {
     int i;
 
-    if (ofdm->ofdm_tx_bpf) {
-        deallocate_tx_bpf(ofdm);
-    }
-
     FREE(ofdm->pilot_samples);
     FREE(ofdm->rxbuf);
     FREE(ofdm->pilots);
