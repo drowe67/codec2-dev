@@ -101,11 +101,14 @@ struct OFDM {
     complex float *pilots;
     complex float **rx_sym;
     complex float *rx_np;
-
+    complex float *tx_uw_syms;
+    
     float *rx_amp;
     float *aphase_est_pilot_log;
 
     uint8_t *tx_uw;
+    int *uw_ind;
+    int *uw_ind_sym;
 
     // State enums
     State sync_state;
@@ -162,7 +165,7 @@ complex float qpsk_mod(int *);
 void qpsk_demod(complex float, int *);
 void ofdm_txframe(struct OFDM *, complex float *, complex float []);
 void ofdm_assemble_modem_frame(struct OFDM *, uint8_t [], uint8_t [], uint8_t []);
-void ofdm_assemble_modem_frame_symbols(complex float [], COMP [], uint8_t []);
+void ofdm_assemble_modem_frame_symbols(struct OFDM *, complex float [], COMP [], uint8_t []);
 void ofdm_disassemble_modem_frame(struct OFDM *, uint8_t [], COMP [], float [], short []);
 void ofdm_rand(uint16_t [], int);
 void ofdm_generate_payload_data_bits(uint8_t [], int);
