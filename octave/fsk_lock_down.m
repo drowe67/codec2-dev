@@ -187,7 +187,7 @@ function freq_run_curve_peak_mask
 end
 
 
-function freq_run_curve_peak(Fs,Rs)
+function freq_run_curve_mask(Fs,Rs)
   EbNodB = 0:9;
   m4fsk_ber_theory = [0.23 0.18 0.14 0.09772 0.06156 0.03395 0.01579 0.00591 0.00168 3.39E-4];
   figure(1); clf; semilogy(EbNodB, m4fsk_ber_theory, 'linewidth', 2, 'bk+-;theory;'); grid;
@@ -215,7 +215,7 @@ end
 % over so we get complete junk, we consider that case a packet error
 % and exclude it from the BER estimation.
 
-function [states ber per] = modem_run_test(EbNodB = 10, num_frames=10, Fs=8000, Rs=100, df=0, plots=0)
+function [states ber per] = modem_run_test(EbNodB = 10, num_frames=10, Fs=8000, Rs=100, df=0, plots=0, spreadHz=0)
   [states M bits_per_frame] = lock_down_init(Rs, Fs, df);
   N = states.N;
   if plots; states.verbose = 0x4; end
@@ -231,7 +231,14 @@ function [states ber per] = modem_run_test(EbNodB = 10, num_frames=10, Fs=8000, 
 
   tx = fsk_mod(states, tx_bits);
   noise = sqrt(variance/2)*randn(length(tx),1) + j*sqrt(variance/2)*randn(length(tx),1);
-  rx = tx + noise;
+  if spreadHz
+    % just use phase part of doppler spread, not interested in amplitude fading
+    spread = doppler_spread(spreadHz, Fs, round(1.1*length(tx)));
+    spread = exp(j*arg(spread(1:length(tx))));
+    rx = tx.*rot90(spread) + noise;
+  else
+    rx = tx + noise;
+  end
   run_frames = floor(length(rx)/N)-1;
   st = 1; f_log = []; f_log2 = []; rx_bits = []; rx_bits2 = [];
   for f=1:run_frames
@@ -260,8 +267,8 @@ function [states ber per] = modem_run_test(EbNodB = 10, num_frames=10, Fs=8000, 
     if states.ber_state; num_frames_rx++; end
   end
   if states.Terrs
-    printf("Fs: %d Rs: %d df % 3.2f EbNodB: %4.2f dB ftx: %3d frx: %3d nbits: %4d nerrs: %3d ber: %4.3f\n",
-            Fs, Rs, df, EbNodB, num_frames, num_frames_rx, states.Tbits, states.Terrs, states.Terrs/states.Tbits);
+    printf("Fs: %d Rs: %d df % 3.2f sp: %2.1f EbNo: %4.2f ftx: %3d frx: %3d nbits: %4d nerrs: %3d ber: %4.3f\n",
+            Fs, Rs, df, spreadHz, EbNodB, num_frames, num_frames_rx, states.Tbits, states.Terrs, states.Terrs/states.Tbits);
     ber = states.Terrs/states.Tbits;
   else
     ber = 0.5;
@@ -277,14 +284,15 @@ function [states ber per] = modem_run_test(EbNodB = 10, num_frames=10, Fs=8000, 
     plot(f_log(:,2:states.M), 'linewidth', 2, 'b');
     hold off;
     xlabel('Time (frames)'); ylabel('Frequency (Hz)');
-    figure(2); clf; plot(log_nerrs);
+    figure(2); clf; plot(log_nerrs); title('Errors per frame');
   end
 
   per = 1 - num_frames_rx/num_frames;
 end
 
 
-function modem_run_curve_peak(Fs, Rs, num_frames=100)
+% run BER v Eb/No curves over a range of frequency offsets
+function modem_run_curve(Fs, Rs, num_frames=100, dfmax=0.01)
   EbNodB = 0:9;
   m4fsk_ber_theory = [0.23 0.18 0.14 0.09772 0.06156 0.03395 0.01579 0.00591 0.00168 3.39E-4];
   figure(1); clf; semilogy(EbNodB, m4fsk_ber_theory, 'linewidth', 2, 'bk+-;theory;'); grid;
@@ -294,17 +302,45 @@ function modem_run_curve_peak(Fs, Rs, num_frames=100)
   xlabel('Eb/No (dB)'); ylabel('PER'); title(sprintf("Mask: Fs = %d Hz Rs = %d Hz", Fs, Rs));
   grid; axis([min(EbNodB) max(EbNodB) 0 1]); hold on;
   
-  for df=-0.05:0.05:0.05
+  for df=-dfmax:dfmax:dfmax
     ber_log = []; per_log = [];
     for ne = 1:length(EbNodB)
-      [states ber per] = modem_run_test(EbNodB(ne), num_frames, Fs, Rs, df*Rs);
+      [states ber per] = modem_run_test(EbNodB(ne), num_frames, Fs, Rs, 0, df*Rs);
       ber_log = [ber_log; ber]; per_log = [per_log; per];
     end 
     figure(1); semilogy(EbNodB, ber_log, 'linewidth', 2, sprintf("+-;df=% 3.2f Hz/s;",df*Rs));
     figure(2); plot(EbNodB, per_log, 'linewidth', 2, sprintf("+-;df=% 3.2f Hz/s;",df*Rs));
   end
+
   figure(1); hold off; print(sprintf("fsk_modem_ber_%d_%d.png",Fs,Rs), "-dpng")
   figure(2); hold off; print(sprintf("fsk_modem_per_%d_%d.png",Fs,Rs), "-dpng")
+end
+
+% run BER v Eb/No curve with some phase noise spreading the energy of the tones in frequency
+function modem_run_curve_spread(Fs, Rs, num_frames=100)
+  EbNodB = 0:9;
+  m4fsk_ber_theory = [0.23 0.18 0.14 0.09772 0.06156 0.03395 0.01579 0.00591 0.00168 3.39E-4];
+  figure(1); clf; semilogy(EbNodB, m4fsk_ber_theory, 'linewidth', 2, 'bk+-;theory;'); grid;
+  xlabel('Eb/No (dB)'); ylabel('BER');
+  title(sprintf("Spread: Fs = %d Hz Rs = %d Hz", Fs, Rs)); hold on;
+  figure(2); clf;
+  xlabel('Eb/No (dB)'); ylabel('PER');
+  title(sprintf("Spread: Fs = %d Hz Rs = %d Hz", Fs, Rs));
+  grid; axis([min(EbNodB) max(EbNodB) 0 1]); hold on;
+
+  spreadHz = [0.0 1 2 5];
+  for ns = 1:length(spreadHz)
+    ber_log = []; per_log = [];
+    for ne = 1:length(EbNodB)
+      [states ber per] = modem_run_test(EbNodB(ne), num_frames, Fs, Rs, 0, 0, spreadHz(ns));
+      ber_log = [ber_log; ber]; per_log = [per_log; per];
+    end 
+    figure(1); semilogy(EbNodB, ber_log, 'linewidth', 2, sprintf("+-;spread=% 3.2f Hz;",spreadHz(ns)));
+    figure(2); plot(EbNodB, per_log, 'linewidth', 2, sprintf("+-;spread=% 3.2f Hz;",spreadHz(ns)));
+  end
+  
+  figure(1); hold off; print(sprintf("fsk_modem_ber_spread_%d_%d.png",Fs,Rs), "-dpng")
+  figure(2); hold off; print(sprintf("fsk_modem_per_spread_%d_%d.png",Fs,Rs), "-dpng")
 end
 
 % study code rate versus Rs and MDS
@@ -320,7 +356,7 @@ function code_rate_table
   EbNodB_4fsk=[8 4.5 3.5 1.5];
 
   printf("Code Rate | Raw BER | 4FSK Eb/No | n,k | Rs | SNR | MDS |\n");
-  printf("| --- | --- | --- | --- | --- | --- |\n");
+  printf("| --- | --- | --- | --- | --- | --- | --- |\n");
   for i=1:length(code_rate)
     n = k/code_rate(i);
     Rb = n/packet_duration_sec;
@@ -339,16 +375,18 @@ more off;
 rand('state',1); 
 randn('state',1);
 
-% freq estimator tests (choose one if you like)
+% freq estimator tests (choose one)
 #freq_run_single(3,10)
 #freq_run_curve_peak_mask
-#freq_run_curve_peak(8000,100)
-#freq_run_curve_peak(24000,25)
-#freq_run_curve_peak(8000,25)
+#freq_run_curve_mask(8000,100)
+#freq_run_curve_mask(24000,25)
+#freq_run_curve_mask(8000,25)
 
-% complete modem tests (choose one if you like)
-#modem_run_test(6, 20, 2000, 25, 1, 1);
-#modem_run_curve_peak(24000,25,100)
-#modem_run_curve_peak(2000,25,20)
+% complete modem tests (choose one)
+#modem_run_curve(24000,25,100)
+#modem_run_curve(2000,25,20)
 
-code_rate_table
+#code_rate_table
+
+#modem_run_test(6, 20, 2000, 25, 0, 1, 1);
+modem_run_curve_spread(8000,25,50)
