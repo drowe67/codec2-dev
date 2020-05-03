@@ -28,15 +28,15 @@ install:
   stdperiph_lib.zip; fi
 - unset STDLIBURL STDLIBKEY # DO NOT TOUCH  
 # CML library for LDPC support
-- cd $HOME
+- cd ${HOME}
 - wget http://www.iterativesolutions.com/user/image/cml.1.10.zip
 - unzip cml.1.10.zip
-- ls ${HOME}/codec2-dev/octave/cml.patch
-- patch -p0 < ${HOME}/codec2-dev/octave/cml.patch
+- ls ${CODEC2DEV}/codec2-dev/octave/cml.patch
+- patch -p0 < ${CODEC2DEV}/octave/cml.patch
 - cd cml/source
 - octave --no-gui -qf --eval "make"
 script:
-- cd ${HOME}
+- cd ${CODEC2DEV}
 - mkdir -p $BUILDSTD
 - cd $BUILDSTD
 - cmake $CODEC2DEV
