@@ -31,7 +31,7 @@ install:
 - cd ${HOME}
 - wget http://www.iterativesolutions.com/user/image/cml.1.10.zip
 - unzip cml.1.10.zip
-- ls ${CODEC2DEV}/codec2-dev/octave/cml.patch
+- ls ${CODEC2DEV}/octave/cml.patch
 - patch -p0 < ${CODEC2DEV}/octave/cml.patch
 - cd cml/source
 - octave --no-gui -qf --eval "make"
