@@ -1,8 +1,6 @@
 % tfsk.m
 % Author: Brady O'Brien 8 January 2016
 
-
-
 %   Copyright 2016 David Rowe
 %  
 %  All rights reserved.
@@ -17,20 +15,6 @@
 %
 %  You should have received a copy of the GNU Lesser General Public License
 %  along with this program; if not, see <http://www.gnu.org/licenses/>.
-
-
-% Octave script to check c port of fsk_horus against the fsk_horus.m
-%
-% [X] - Functions to wrap around fsk_mod and fsk_demod executables
-%     [X] - fsk_mod
-%     [X] - fsk_demod
-% [X] - Functions to wrap around octave and c implementations, pass
-%       same dataset, compare outputs, and give clear go/no-go
-%     [X] - fsk_mod_test
-%     [X] - fsk_demod_test
-% [X] - Port of run_sim and EbNodB curve test battery
-% [X] - Extract and compare more parameters from demod
-% [X] - Run some tests in parallel
 
 #{
 
@@ -50,22 +34,25 @@
 
 #}
 
-%tfsk executable path/file
+% tfsk executable path/file
 global tfsk_location = '../build_linux/unittest/tfsk';
-
-%Set to 1 for verbose printouts
+% Set to 1 for verbose printouts
 global print_verbose = 0;
+global mod_pass_fail_maxdiff = 1e-3/5000;
 
-
-fsk_horus_as_a_lib = 1; % make sure calls to test functions at bottom are disabled
-%fsk_horus_2fsk;  
-fsk_horus
+fsk_horus_as_a_lib=1;
+fsk_horus;
 pkg load signal;
 pkg load parallel;
 graphics_toolkit('gnuplot');
 
-
-global mod_pass_fail_maxdiff = 1e-3/5000;
+function print_result(test_name, result)
+  printf("%s", test_name);
+  for i=1:(40-length(test_name))
+    printf(".");
+  end
+  printf(": %s\n", result);  
+end
 
 function mod = fsk_mod_c(Fs,Rs,f1,fsp,bits,M)
     global tfsk_location;
@@ -175,6 +162,7 @@ function test_stats = fsk_demod_xt(Fs,Rs,f1,fsp,mod,tname,M=2)
     states.ftx(2) = f1+fsp;
     states.ftx(3) = f1+fsp*2;
     states.ftx(4) = f1+fsp*3;
+    states.tx_tone_separation = fsp;
     states.dA = 1;
     states.dF = 0;
     modin = mod;
@@ -182,7 +170,7 @@ function test_stats = fsk_demod_xt(Fs,Rs,f1,fsp,mod,tname,M=2)
     while length(modin)>=states.nin
         ninold = states.nin;
         states = est_freq(states, modin(1:states.nin), states.M);
-        [bitbuf,states] = fsk_horus_demod(states, modin(1:states.nin));
+        [bitbuf,states] = fsk_demod(states, modin(1:states.nin));
         modin=modin(ninold+1:length(modin));
         obits = [obits bitbuf];
         
@@ -277,7 +265,7 @@ function [dmod,cmod,omod,pass] = fsk_mod_test(Fs,Rs,f1,fsp,bits,tname,M=2)
     
     states.dA = [1 1 1 1]; 
     states.dF = 0;
-    omod = fsk_horus_mod(states,bits);
+    omod = fsk_mod(states,bits);
     
     dmod = cmod-omod;
     pass = max(dmod)<(mod_pass_fail_maxdiff*length(dmod));
@@ -299,7 +287,7 @@ function pass = test_mod_horuscfg_randbits
         plot(dmod)
         title("Difference between octave and C mod impl");
     end
-    
+    print_result("test_mod_horuscfg_randbits", "OK");
 endfunction
 
 % Random bit modulator test
@@ -315,20 +303,21 @@ function pass = test_mod_horuscfgm4_randbits
         plot(dmod)
         title("Difference between octave and C mod impl");
     end
+    print_result("test_mod_horuscfgm4_randbits", "OK");
     
 endfunction
 
-% A big ol' channel impairment tester
-% Shamlessly taken from fsk_horus
-% This throws some channel imparment or another at the C and octave modem so they 
-% may be compared.
+
+% A big ol' channel impairment tester Shamlessly taken from fsk_horus
+% This throws some channel imparment or another at the C and octave
+% modem so they may be compared.
 function stats = tfsk_run_sim(test_frame_mode,EbNodB,timing_offset,fading,df,dA,M=2)
   global print_verbose;
   frames = 90;
   %EbNodB = 10;
   %timing_offset = 2.0; % see resample() for clock offset below
   %fading = 0;          % modulates tx power at 2Hz with 20dB fade depth, 
-                       % to simulate balloon rotating at end of mission
+                        % to simulate balloon rotating at end of mission
   %df     = 0;          % tx tone freq drift in Hz/s
   %dA     = 1;          % amplitude imbalance of tones (note this affects Eb so not a gd idea)
 
@@ -348,7 +337,6 @@ function stats = tfsk_run_sim(test_frame_mode,EbNodB,timing_offset,fading,df,dA,
     states = fsk_horus_init(8000, 100, M);
     states.f1_tx = 1200;
     states.f2_tx = 1600;
-    
   end
 
   if test_frame_mode == 4
@@ -428,7 +416,7 @@ function stats = tfsk_run_sim(test_frame_mode,EbNodB,timing_offset,fading,df,dA,
 	states.ftx(4) = f1+fsp*3;
   end
 
-  tx = fsk_horus_mod(states, tx_bits);
+  tx = fsk_mod(states, tx_bits);
 
   if timing_offset
     tx = resample(tx, 1000, 1001); % simulated 1000ppm sample clock offset
@@ -520,9 +508,13 @@ function pass = ebno_battery_test(timing_offset,fading,df,dA,M)
     dfv     = repmat(df,1,ebnodbs);
     dav     = repmat(dA,1,ebnodbs);
     mv      = repmat(M,1,ebnodbs);
-    statv = pararrayfun(floor(1.25*nproc()),@tfsk_run_sim,modev,ebnodbrange,timingv,fadingv,dfv,dav,mv);
+    %statv = pararrayfun(floor(1.25*nproc()),@tfsk_run_sim,modev,ebnodbrange,timingv,fadingv,dfv,dav,mv);
+    %statv = pararrayfun(1,@tfsk_run_sim,modev,ebnodbrange,timingv,fadingv,dfv,dav,mv);
+    
     %statv = arrayfun(@tfsk_run_sim,modev,ebnodbrange,timingv,fadingv,dfv,dav,mv);
 
+    tfsk_run_sim(mode, ebnodbrange(1), timing_offset, fading, df, dA, M)
+    
     passv = zeros(1,length(statv));
     for ii=(1:length(statv))
         passv(ii)=statv(ii).pass;
@@ -559,10 +551,9 @@ endfunction
 
 function pass = test_fsk_battery()
     pass = test_mod_horuscfg_randbits;
-    assert(pass)
     pass = pass && test_mod_horuscfgm4_randbits;
-    assert(pass)
     pass = pass && test_drift_var(4);
+    xx
     assert(pass)
     pass = pass && test_drift_var(2);
     assert(pass)
@@ -617,6 +608,7 @@ function plot_fsk_bers(M=2)
  
 endfunction
 
+% We kick off tests here ......
 
 xpass = test_fsk_battery
 %plot_fsk_bers(2)
