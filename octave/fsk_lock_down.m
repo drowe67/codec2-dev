@@ -219,7 +219,6 @@ function [states ber per] = modem_run_test(EbNodB = 10, num_frames=10, Fs=8000, 
   [states M bits_per_frame] = lock_down_init(Rs, Fs, df);
   N = states.N;
   if plots; states.verbose = 0x4; end
-  
   EbNo = 10^(EbNodB/10);
   variance = states.Fs/(states.Rs*EbNo*states.bitspersymbol);
 
@@ -305,7 +304,7 @@ function modem_run_curve(Fs, Rs, num_frames=100, dfmax=0.01)
   for df=-dfmax:dfmax:dfmax
     ber_log = []; per_log = [];
     for ne = 1:length(EbNodB)
-      [states ber per] = modem_run_test(EbNodB(ne), num_frames, Fs, Rs, 0, df*Rs);
+      [states ber per] = modem_run_test(EbNodB(ne), num_frames, Fs, Rs, df*Rs);
       ber_log = [ber_log; ber]; per_log = [per_log; per];
     end 
     figure(1); semilogy(EbNodB, ber_log, 'linewidth', 2, sprintf("+-;df=% 3.2f Hz/s;",df*Rs));
@@ -384,9 +383,9 @@ randn('state',1);
 
 % complete modem tests (choose one)
 #modem_run_curve(24000,25,100)
-#modem_run_curve(2000,25,20)
+modem_run_curve(8000,25,50,0.05)
 
 #code_rate_table
 
 #modem_run_test(6, 20, 2000, 25, 0, 1, 1);
-modem_run_curve_spread(8000,25,50)
+#modem_run_curve_spread(8000,25,50)
