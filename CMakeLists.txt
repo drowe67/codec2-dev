@@ -395,6 +395,10 @@ endif()
              COMMAND sh -c "$<TARGET_FILE:ldpc_enc> /dev/zero - --sd --code HRAb_396_504 --testframes 200 | $<TARGET_FILE:ldpc_noise> - - -2.0 | $<TARGET_FILE:ldpc_dec> - /dev/null --code HRAb_396_504 --sd --testframes"
              )
 
+    add_test(NAME test_ldpc_enc_dec_H_256_768
+             COMMAND sh -c "$<TARGET_FILE:ldpc_enc> /dev/zero - --sd --code H_256_768 --testframes 200 | $<TARGET_FILE:ldpc_noise> - - 3.0 | $<TARGET_FILE:ldpc_dec> - /dev/null --code H_256_768 --sd --testframes"
+             )
+
     # some more LDPC tests, placed in a script for convenience
     add_test(NAME test_ldpc_check
              COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/unittest/ldpc_check

@@ -195,6 +195,7 @@ set(CODEC2_SRCS
     horus_l2.c
     HRA_112_112.c
     HRAb_396_504.c
+    H_256_768_22.c
     lpcnet_freq.c
 )
 
