@@ -7,7 +7,7 @@ language: generic
 dist: xenial
 addons:
   apt:
-    packages: libc6-i386 octave-common octave octave-signal liboctave-dev gnuplot
+    packages: libc6-i386 octave octave-common octave-signal liboctave-dev gnuplot
               sox p7zip-full python3-numpy valgrind
               
 cache:
