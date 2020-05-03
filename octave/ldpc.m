@@ -17,10 +17,6 @@
 
 1;
 
-% NOTE: You will need to set the CML path in the call to init_cml() below
-%       for you CML install.  See lpdc.m for instructions on how to install 
-%       CML library
-
 function init_cml(path_to_cml)
   currentdir = pwd;
   
