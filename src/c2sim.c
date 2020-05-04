@@ -107,7 +107,8 @@ int main(int argc, char *argv[])
     float bands_lower = -1E32;
     int   K = 20;
     float framelength_s = N_S;
-    int   lspEWov = 0;
+    int   lspEWov = 0, rateKWov = 0, first = 0;
+    FILE  *frateKWov = NULL;
     int   ten_ms_centre = 0;
     FILE  *fphasenn = NULL;
     FILE  *frateK = NULL; int rateKout;
@@ -150,6 +151,8 @@ int main(int argc, char *argv[])
         { "Woread", required_argument, &Woread, 1 },
         { "pahw", required_argument, &pahw, 1 },
         { "lspEWov", required_argument, &lspEWov, 1 },
+        { "rateKWov", required_argument, &rateKWov, 1 },
+        { "first", no_argument, &first, 1 },
         { "ten_ms_centre", required_argument, &ten_ms_centre, 1 },
         { "framelength_s", required_argument, NULL, 0 },
         { "modelout",  required_argument, &modelout, 1 },
@@ -209,7 +212,7 @@ int main(int argc, char *argv[])
                 }                 
                 fprintf(stderr, "each record is %d bytes\n", (int)(K*sizeof(float)));
 	    } else if(strcmp(long_options[option_index].name, "bands") == 0) {
-                /* read model records from file or stdin */
+                /* write mel spaced band energies to file or stdout */
                 if ((fbands = fopen(optarg,"wb")) == NULL) {
 	            fprintf(stderr, "Error opening bands file: %s: %s\n",
 		        optarg, strerror(errno));
@@ -307,6 +310,14 @@ int main(int argc, char *argv[])
                 lpc_model = 1; phase0 = 1;
 	        if ((flspEWov = fopen(optarg,"wb")) == NULL) {
 	            fprintf(stderr, "Error opening lspEWov float file: %s: %s\n",
+		        optarg, strerror(errno));
+                    exit(1);
+                }                 
+	    } else if(strcmp(long_options[option_index].name, "rateKWov") == 0) {
+                /* feature file for deep learning experiments */
+                rateK = 1; newamp1vq = 1;
+	        if ((frateKWov = fopen(optarg,"wb")) == NULL) {
+	            fprintf(stderr, "Error opening rateKWov float file: %s: %s\n",
 		        optarg, strerror(errno));
                     exit(1);
                 }                 
@@ -550,6 +561,8 @@ int main(int argc, char *argv[])
         rate_K_model_delay[d].L = M_PI/prev_model_dec.Wo;
         rate_K_model_delay[d].voiced = 0;
     }
+    float eq[K];
+    for(int k=0; k<K; k++) eq[k] = 0;
     
     /*----------------------------------------------------------------* \
 
@@ -616,6 +629,18 @@ int main(int argc, char *argv[])
         dump_Sn(m_pitch, Sn); dump_Sw(Sw); dump_model(&model);
         #endif
 
+	/* speech centred on analysis frame for Deep Learning work */
+            
+	if (ten_ms_centre) {
+	    int n_10_ms = Fs*0.01;
+	    int n_5_ms = Fs*0.005;
+	    short buf[n_10_ms];
+	    for(i=0; i<n_10_ms; i++) {
+		buf[i] = Sn[m_pitch/2-n_5_ms+i];
+	    }
+	    fwrite(buf, n_10_ms, sizeof(short), ften_ms_centre);                  
+	}
+            
 	if (hi) {
 	    int m;
 	    for(m=1; m<model.L/2; m++)
@@ -677,18 +702,6 @@ int main(int argc, char *argv[])
 	    if (dump_pitch_e)
 		fprintf(fjvm, "%f\n", e);
 
-            /* speech centred on analysis frame for Deep Learning work */
-            
-            if (ten_ms_centre) {
-                int n_10_ms = Fs*0.01;
-                int n_5_ms = Fs*0.005;
-                short buf[n_10_ms];
-                for(i=0; i<n_10_ms; i++) {
-                    buf[i] = Sn[m_pitch/2-n_5_ms+i];
-                }
-                fwrite(buf, n_10_ms, sizeof(short), ften_ms_centre);                  
-            }
-            
             #ifdef DUMP
             dump_lsp(lsps);
             #endif
@@ -802,6 +815,8 @@ int main(int argc, char *argv[])
                 float rate_K_vec_no_mean[K];
                 for(int k=0; k<K; k++)
                     rate_K_vec_no_mean[k] = rate_K_vec[k] - mean;
+		
+		newamp1_eq(rate_K_vec_no_mean, eq, K, 1);
 
                 /* two stage VQ */
                 float rate_K_vec_no_mean_[K]; int indexes[2];
@@ -819,6 +834,39 @@ int main(int argc, char *argv[])
                     rate_K_vec_[k] = rate_K_vec[k];
             }
 
+	    if (frateKWov != NULL) {
+		/* We use standard nb_features=55 feature records for compatability with train_lpcnet.py */
+		float features[55] = {0};
+		/* just using 18/20 for compatability with LPCNet, coarse scaling for NN imput */
+		for(int i=0; i<18; i++)
+		    features[i] = (rate_K_vec_[i]-30)/40;
+		// keep in range of 40 ... 255 for pitch embedding
+		int pitch_index = 21 + 2.0*M_PI/model.Wo;
+		features[36] = 0.02*(pitch_index-100);
+		//features[36] = (model.Wo - c2const.Wo_min)/(c2const.Wo_max - c2const.Wo_min) - 0.5;
+		features[37] = model.voiced;
+		if (first)
+		    features[18] = -0.9;
+		if (lpc_model) {
+		    MODEL model_;
+		    model_.Wo = model.Wo;
+		    model_.L  = model.L;
+		    model_.voiced = model.voiced;
+		    float Rk[order+1], ak[order+1];
+		    resample_rate_L(&c2const, &model_, rate_K_vec_, rate_K_sample_freqs_kHz, K);
+		    determine_autoc(&c2const, Rk, order, &model_, NEWAMP1_PHASE_NFFT, phase_fft_fwd_cfg, phase_fft_inv_cfg);
+		    /* -40 dB noise floor and Lag windowing from LPCNet/freq.c - helps reduce large spikes in spectrum when LPC
+                       analysis loses it. */
+		    Rk[0] += Rk[0]*1e-4 + 320/12/38.;
+		    for (i=1;i<order+1;i++) Rk[i] *= (1 - 6e-5*i*i);
+		    levinson_durbin(Rk, ak, order);
+
+		    for(int i=0; i<order; i++)
+			features[18+i] = ak[i+1];
+		}
+		fwrite(features, 55, sizeof(float), frateKWov);
+	    }
+	    
             if (rate_K_dec) {
                 // update delay lines
                 for(int d=0; d<rate_K_dec; d++) {
@@ -922,6 +970,15 @@ int main(int argc, char *argv[])
                     #endif
                 }
 
+                if (modelin) {
+                    int nrec;
+                    nrec = fread(&model_dec[i],sizeof(MODEL),1,fmodelin);
+                    if (nrec != 1) {
+			fprintf(stderr, "Error reading model in record in frame %d - do you have enough records in file?\n", frames);
+			exit(1);
+		    }
+                }
+
                 if (phase0) {
                     /* optionally read in Aw, replacing values generated using LPC */
 
@@ -941,14 +998,6 @@ int main(int argc, char *argv[])
                     phase_synth_zero_order(n_samp, &model_dec[i], ex_phase, H);
                 }
                 
-                if (modelin) {
-                    int nrec;
-                    nrec = fread(&model_dec[i],sizeof(MODEL),1,fmodelin);
-                    if (nrec != 1) {
-			fprintf(stderr, "Error reading model in record in frame %d - do you have enough records in file?\n", frames);
-			exit(1);
-		    }
-                }
                 if (postfilt)
                     postfilter(&model_dec[i], &bg_est);
                 synth_one_frame(n_samp, fftr_inv_cfg, buf, &model_dec[i], Sn_, Pn, prede, &de_mem, gain);
@@ -1013,7 +1062,8 @@ int main(int argc, char *argv[])
     if (ften_ms_centre != NULL) fclose(ften_ms_centre);
     if (fmodelout != NULL) fclose(fmodelout);
     if (fbands != NULL) fclose(fbands);
-    
+    if (frateKWov != NULL) fclose(frateKWov);
+  
     return 0;
 }
 

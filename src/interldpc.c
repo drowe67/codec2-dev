@@ -287,7 +287,7 @@ void ofdm_ldpc_interleave_tx(struct OFDM *ofdm, struct LDPC *ldpc, complex float
     gp_interleave_comp(coded_symbols_inter, coded_symbols, interleave_frames * coded_syms_per_frame);
 
     for (j = 0; j < interleave_frames; j++) {
-        ofdm_assemble_modem_frame_symbols(tx_symbols, &coded_symbols_inter[j * coded_syms_per_frame], &txt_bits[config->txtbits * j]);
+        ofdm_assemble_modem_frame_symbols(ofdm, tx_symbols, &coded_symbols_inter[j * coded_syms_per_frame], &txt_bits[config->txtbits * j]);
         ofdm_txframe(ofdm, &tx_sams[j * Nsamperframe], tx_symbols);
     }
 }

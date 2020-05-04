@@ -1634,6 +1634,18 @@ void codec2_decode_700c(struct CODEC2 *c2, short speech[], const unsigned char *
 
 
    for(i=0; i<M; i++) {
+       if (c2->fmlfeat != NULL) {
+	   /* We use standard nb_features=55 feature records for compatability with train_lpcnet.py */
+	   float features[55] = {0};
+	   /* just using 18/20 for compatability with LPCNet, coarse scaling for NN imput */
+	   for(int j=0; j<18; j++)
+	       features[j] = (interpolated_surface_[i][j]-30)/40;
+	   int pitch_index = 21 + 2.0*M_PI/model[i].Wo;
+	   features[36] = 0.02*(pitch_index-100);
+	   features[37] = model[i].voiced;
+	   fwrite(features, 55, sizeof(float), c2->fmlfeat);
+       }
+       
        /* 700C is a little quieter so lets apply some experimentally derived audio gain */
        synthesise_one_frame(c2, &speech[c2->n_samp*i], &model[i], &HH[i][0], 1.5);
    }
@@ -2224,10 +2236,12 @@ void codec2_open_mlfeat(struct CODEC2 *codec2_state, char *feat_fn, char *model_
 	fprintf(stderr, "error opening machine learning feature file: %s\n", feat_fn);
 	exit(1);
     }    
-    if ((codec2_state->fmlmodel = fopen(model_fn, "wb")) == NULL) {
+    if (model_fn) {
+	if ((codec2_state->fmlmodel = fopen(model_fn, "wb")) == NULL) {
 	fprintf(stderr, "error opening machine learning Codec 2 model file: %s\n", feat_fn);
 	exit(1);
-    }    
+	}
+    }
 }
 
 #ifndef __EMBEDDED__

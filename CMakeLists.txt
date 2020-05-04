@@ -303,6 +303,10 @@ if(UNITTEST)
     include(CTest)
     enable_testing()
 
+    add_test(NAME test_CML_ldpcut
+             COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/octave; SHORT_VERSION_FOR_CTEST=1 octave --no-gui -qf ldpcut.m")
+             set_tests_properties(test_CML_ldpcut PROPERTIES PASS_REGULAR_EXPRESSION "Nerr: 0")
+
     add_test(NAME test_codec2_700c_octave_port
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
                             ./c2sim ../../raw/cq_ref.raw --phase0 --postfilter --dump cq_ref --lpc 10 --dump_pitch_e cq_ref_pitche.txt; \
@@ -516,6 +520,10 @@ endif()
                             cat target.f32 | ../misc/vq_mbest -k 2 -q vq1.f32,vq2.f32 --mbest 2 -v > out.f32; \
                             diff target.f32 out.f32"
              WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/unittest
+             )
+     add_test(NAME test_700c_eq
+             COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/unittest/test_700c_eq.sh
+             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/unittest
              )
 
 endif(UNITTEST)

@@ -210,9 +210,6 @@ int main(int argc, char *argv[])
 	    else if (strcmp(long_options[option_index].name, "energy") == 0) {
 	        report_energy = 1;
 	    }
-	    else if (strcmp(long_options[option_index].name, "mlfeat") == 0) {
-	        codec2_open_mlfeat(codec2, optarg, optarg+1);
-	    }
 	    else if (strcmp(long_options[option_index].name, "loadcb") == 0) {
                 /* load VQ stage (700C only) */
                 //fprintf(stderr, "%s\n", optarg+1);
@@ -227,6 +224,10 @@ int main(int argc, char *argv[])
 	    }
 	    else if (strcmp(long_options[option_index].name, "nopf") == 0) {
 	        codec2_700c_post_filter(codec2, 0);
+	    }
+	    else if (strcmp(long_options[option_index].name, "mlfeat") == 0) {
+		/* dump machine learning features (700C only) */
+		codec2_open_mlfeat(codec2, optarg, NULL);
 	    }
             break;
 

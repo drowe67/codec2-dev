@@ -88,10 +88,6 @@ static const int8_t pilotvalues[] = {
 
 static struct OFDM_CONFIG ofdm_config;
 
-static complex float *tx_uw_syms;
-static int *uw_ind;
-static int *uw_ind_sym;
-
 static float ofdm_tx_centre; /* TX Center frequency */
 static float ofdm_rx_centre; /* RX Center frequency */
 static float ofdm_fs; /* Sample rate */
@@ -355,11 +351,11 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
      * need to pair the UW bits so they fit into symbols.  The LDPC decoder
      * works on symbols so we can't break up any symbols into UW/LDPC bits.
      */
-    uw_ind = MALLOC(sizeof (int) * ofdm_nuwbits);
-    assert(uw_ind != NULL);
+    ofdm->uw_ind = MALLOC(sizeof (int) * ofdm_nuwbits);
+    assert(ofdm->uw_ind != NULL);
 
-    uw_ind_sym = MALLOC(sizeof (int) * (ofdm_nuwbits / 2));
-    assert(uw_ind_sym != NULL);
+    ofdm->uw_ind_sym = MALLOC(sizeof (int) * (ofdm_nuwbits / 2));
+    assert(ofdm->uw_ind_sym != NULL);
 
     /*
      * The Unique Word is placed in different indexes based on
@@ -367,17 +363,17 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
      */
     for (i = 0, j = 0; i < (ofdm_nuwbits / 2); i++, j += 2) {
         int val = floorf((i + 1) * (ofdm_nc + 1) / 2);
-        uw_ind_sym[i] = val;             // symbol index
+        ofdm->uw_ind_sym[i] = val;             // symbol index
 
-        uw_ind[j    ] = (val * 2);       // bit index 1
-        uw_ind[j + 1] = (val * 2) + 1;   // bit index 2
+        ofdm->uw_ind[j    ] = (val * 2);       // bit index 1
+        ofdm->uw_ind[j + 1] = (val * 2) + 1;   // bit index 2
     }
 
-    tx_uw_syms = MALLOC(sizeof (complex float) * (ofdm_nuwbits / 2));
-    assert(tx_uw_syms != NULL);
+    ofdm->tx_uw_syms = MALLOC(sizeof (complex float) * (ofdm_nuwbits / 2));
+    assert(ofdm->tx_uw_syms != NULL);
 
     for (i = 0; i < (ofdm_nuwbits / 2); i++) {
-        tx_uw_syms[i] = 1.0f;      // qpsk_mod(0:0)
+        ofdm->tx_uw_syms[i] = 1.0f;      // qpsk_mod(0:0)
     }
 
     /* sync state machine */
@@ -478,9 +474,9 @@ void ofdm_destroy(struct OFDM *ofdm) {
     FREE(ofdm->rx_amp);
     FREE(ofdm->aphase_est_pilot_log);
     FREE(ofdm->tx_uw);
-    FREE(tx_uw_syms);
-    FREE(uw_ind);
-    FREE(uw_ind_sym);
+    FREE(ofdm->tx_uw_syms);
+    FREE(ofdm->uw_ind);
+    FREE(ofdm->uw_ind_sym);
     FREE(ofdm);
 }
 
@@ -1722,7 +1718,7 @@ void ofdm_assemble_modem_frame(struct OFDM *ofdm, uint8_t modem_frame[],
     int u = 0;
 
     for (s = 0; s < (ofdm_bitsperframe - ofdm_ntxtbits); s++) {
-        if ((u < ofdm_nuwbits) && (s == uw_ind[u])) {
+        if ((u < ofdm_nuwbits) && (s == ofdm->uw_ind[u])) {
             modem_frame[s] = ofdm->tx_uw[u++];
         } else {
             modem_frame[s] = payload_bits[p++];
@@ -1742,7 +1738,7 @@ void ofdm_assemble_modem_frame(struct OFDM *ofdm, uint8_t modem_frame[],
 /*
  * Assemble modem frame from UW, payload symbols, and txt bits
  */
-void ofdm_assemble_modem_frame_symbols(complex float modem_frame[],
+void ofdm_assemble_modem_frame_symbols(struct OFDM *ofdm, complex float modem_frame[],
   COMP payload_syms[], uint8_t txt_bits[]) {
     complex float *payload = (complex float *) &payload_syms[0]; // complex has same memory layout
     int Nsymsperframe = ofdm_bitsperframe / ofdm_bps;
@@ -1755,8 +1751,8 @@ void ofdm_assemble_modem_frame_symbols(complex float modem_frame[],
     int u = 0;
 
     for (s = 0; s < (Nsymsperframe - Ntxtsyms); s++) {
-        if ((u < Nuwsyms) && (s == uw_ind_sym[u])) {
-            modem_frame[s] = tx_uw_syms[u++];
+        if ((u < Nuwsyms) && (s == ofdm->uw_ind_sym[u])) {
+            modem_frame[s] = ofdm->tx_uw_syms[u++];
         } else {
             modem_frame[s] = payload[p++];
         }
@@ -1787,7 +1783,7 @@ void ofdm_disassemble_modem_frame(struct OFDM *ofdm, uint8_t rx_uw[],
     int u = 0;
 
     for (s = 0; s < (Nsymsperframe - Ntxtsyms); s++) {
-        if ((u < Nuwsyms) && (s == uw_ind_sym[u])) {
+        if ((u < Nuwsyms) && (s == ofdm->uw_ind_sym[u])) {
             qpsk_demod(ofdm->rx_np[s], dibit);
 
             rx_uw[ofdm_bps * u    ] = dibit[1];

@@ -9,17 +9,13 @@
 % $ sudo apt-get install liboctave-dev
 % $ wget http://www.iterativesolutions.com/user/image/cml.1.10.zip
 % $ unzip cml.1.10.zip
-% $ patch -p0 < ~/codec2-dev/octave/cml.patch
+% $ patch -p0 < ~/codec2/octave/cml.patch
 % $ cd cml/source
 % $ octave --no-gui
 % octave:> make
 % (you'll see a few warnings but hopefully no errors)
 
 1;
-
-% NOTE: You will need to set the CML path in the call to init_cml() below
-%       for you CML install.  See lpdc.m for instructions on how to install 
-%       CML library
 
 function init_cml(path_to_cml)
   currentdir = pwd;

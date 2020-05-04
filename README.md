@@ -42,7 +42,7 @@ $ ./src/c2dec 2400 hts1a_c2.bit hts1a_c2_2400.raw
 ```
 $ play -t raw -r 8000 -e signed-integer -b 16 ./hts1a_c2_2400.raw
 ```
-   using 700C bps bit rate encoding
+   using 700 bps bit rate encoding
 ```
 $ ./src/c2enc 700C ../raw/hts1a.raw hts1a_c2.bit
 $ ./src/c2dec 700C hts1a_c2.bit hts1a_c2_700.raw
@@ -166,16 +166,17 @@ $ ./freedv_tx 2020 ~/LPCNet/wav/all.wav - | ./cohpsk_ch - - -22 --Fs 8000 | ./fr
 
 ## Building and Running Unit Tests
 
-CTest is used as a test frame work, with support from GNU Octave
-scripts.
+CTest is used as a test frame work, with support from GNU Octave scripts.
 
-1/ Install GNU Octave on Ubuntu with:
+1/ Install GNU Octave and libraries on Ubuntu with:
 ```
-$ sudo apt install octave octave-control octave-parallel octave-signal octave-specfun
+$ sudo apt install octave octave-common octave-signal octave-parallel liboctave-dev gnuplot
 ```
-  (see also Octave section below)
-  
-2/ To build and run the tests:
+(for more information see Octave section below)
+
+2/ Install CML library with instructions at the top of octave/ldpc.m
+
+3/ To build and run the tests:
 ```
 $ cd ~/codec2
 $ rm -Rf build_linux && mkdir build_linux
