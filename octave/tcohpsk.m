@@ -722,22 +722,22 @@ endfunction
 
 % function to write float fading samples for use by C programs
 
-function write_noise_file(raw_file_name, Fs, dopplerSpreadHz, len_samples)
-  spread = doppler_spread(dopplerSpreadHz, Fs, len_samples);
-  spread_2ms = doppler_spread(dopplerSpreadHz, Fs, len_samples);
-  hf_gain = 1.0/sqrt(var(spread)+var(spread_2ms));
-
-  % interleave real imag samples
-
-  inter = zeros(1,len_samples*4);
-  inter(1:4) = hf_gain;
-  for i=1:len_samples
-    inter(i*4+1) = real(spread(i));
-    inter(i*4+2) = imag(spread(i));
-    inter(i*4+3) = real(spread_2ms(i));
-    inter(i*4+4) = imag(spread_2ms(i));
-  end
-  f = fopen(raw_file_name,"wb");
-  fwrite(f, inter, "float32");
-  fclose(f);
-endfunction
+%function write_noise_file(raw_file_name, Fs, dopplerSpreadHz, len_samples)
+%  spread = doppler_spread(dopplerSpreadHz, Fs, len_samples);
+%  spread_2ms = doppler_spread(dopplerSpreadHz, Fs, len_samples);
+%  hf_gain = 1.0/sqrt(var(spread)+var(spread_2ms));
+%
+%  % interleave real imag samples
+%
+%  inter = zeros(1,len_samples*4);
+%  inter(1:4) = hf_gain;
+%  for i=1:len_samples
+%    inter(i*4+1) = real(spread(i));
+%    inter(i*4+2) = imag(spread(i));
+%    inter(i*4+3) = real(spread_2ms(i));
+%    inter(i*4+4) = imag(spread_2ms(i));
+%  end
+%  f = fopen(raw_file_name,"wb");
+%  fwrite(f, inter, "float32");
+%  fclose(f);
+%endfunction

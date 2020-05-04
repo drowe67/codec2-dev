@@ -9,7 +9,7 @@
 # high bandwidth phase est mode, the BER is < 5% for the "--faster" (2
 # Hz fading) channel model on a fairly high SNR channel.
 
-PATH=$PATH:../build_linux/src
+PATH=$PATH:@CMAKE_CURRENT_BINARY_DIR@/src
 RAW=$PWD/../raw
 results=$(mktemp)
 

@@ -2,7 +2,7 @@
 # David Dec 2019
 # Tests misc/est_n0
 
-PATH=$PATH:../build_linux/src:../build_linux/misc
+PATH=$PATH:@CMAKE_CURRENT_BINARY_DIR@/src:@CMAKE_CURRENT_BINARY_DIR@/misc
 onerun=$(mktemp)
 results=$(mktemp)
 

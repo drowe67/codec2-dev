@@ -62,7 +62,7 @@ function tnewamp1(input_prefix)
 
   % Load in C vectors and compare -----------------------------------------
  
-  load("../build_linux/unittest/tnewamp1_out.txt");
+  load("@CMAKE_CURRENT_BINARY_DIR@/unittest/tnewamp1_out.txt");
   
   K = 20;
   [frames tmp] = size(rate_K_surface_c);

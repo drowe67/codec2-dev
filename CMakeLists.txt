@@ -307,11 +307,13 @@ if(UNITTEST)
              COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/octave; SHORT_VERSION_FOR_CTEST=1 octave --no-gui -qf ldpcut.m")
              set_tests_properties(test_CML_ldpcut PROPERTIES PASS_REGULAR_EXPRESSION "Nerr: 0")
 
+    configure_file(octave/run_tnewamp1.m.in octave/run_tnewamp1.m)
+    configure_file(octave/tnewamp1.m.in octave/tnewamp1.m)
     add_test(NAME test_codec2_700c_octave_port
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
                             ./c2sim ../../raw/cq_ref.raw --phase0 --postfilter --dump cq_ref --lpc 10 --dump_pitch_e cq_ref_pitche.txt; \
                             cd ${CMAKE_CURRENT_BINARY_DIR}/unittest; ./tnewamp1 ../../raw/cq_ref.raw; \
-                            cd ${CMAKE_CURRENT_SOURCE_DIR}/octave;  \
+                            cd ${CMAKE_CURRENT_BINARY_DIR}/octave;  \
                             octave --no-gui -qf run_tnewamp1.m")
              set_tests_properties(test_codec2_700c_octave_port PROPERTIES PASS_REGULAR_EXPRESSION "fails: 0")
 
@@ -351,30 +353,34 @@ if(UNITTEST)
              COMMAND sh -c "$<TARGET_FILE:ofdm_mod> --in /dev/zero --ldpc 1 --testframes 60 --txbpf | $<TARGET_FILE:cohpsk_ch> - - -20 --Fs 8000 -f -50 | $<TARGET_FILE:ofdm_demod> --out /dev/null --testframes --ldpc 1 --verbose 1"
              )
 
+    configure_file(unittest/ofdm_fade.sh.in unittest/ofdm_fade.sh)
     add_test(NAME test_OFDM_modem_fading_BER
-             COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/unittest/ofdm_fade.sh
+             COMMAND ${CMAKE_CURRENT_BINARY_DIR}/unittest/ofdm_fade.sh
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/unittest
              )
            
+    configure_file(unittest/ofdm_phase_est_bw.sh.in unittest/ofdm_phase_est_bw.sh)
     add_test(NAME test_OFDM_modem_phase_est_bw
-             COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/unittest/ofdm_phase_est_bw.sh
+             COMMAND ${CMAKE_CURRENT_BINARY_DIR}/unittest/ofdm_phase_est_bw.sh
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/unittest
              )
            
+    configure_file(unittest/ofdm_time_sync.sh.in unittest/ofdm_time_sync.sh)
     add_test(NAME test_OFDM_modem_time_sync_700D
-             COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/unittest/ofdm_time_sync.sh 700D
+             COMMAND ${CMAKE_CURRENT_BINARY_DIR}/unittest/ofdm_time_sync.sh 700D
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/unittest
              )
            
 if(LPCNET)
     add_test(NAME test_OFDM_modem_time_sync_2020
-             COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/unittest/ofdm_time_sync.sh 2020
+             COMMAND ${CMAKE_CURRENT_BINARY_DIR}/unittest/ofdm_time_sync.sh 2020
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/unittest
              )
 endif()
 
+    configure_file(unittest/ofdm_fade_dpsk.sh.in unittest/ofdm_fade_dpsk.sh)
     add_test(NAME test_OFDM_modem_fading_DPSK_BER
-             COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/unittest/ofdm_fade_dpsk.sh
+             COMMAND ${CMAKE_CURRENT_BINARY_DIR}/unittest/ofdm_fade_dpsk.sh
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/unittest
              )
            
@@ -442,6 +448,7 @@ endif()
              COMMAND $<TARGET_FILE:tfifo>
              )
 
+if (NOT APPLE)
      add_test(NAME test_memory_leak_FreeDV_1600_tx
              COMMAND sh -c " valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./freedv_tx 1600 ../../raw/hts1a.raw /dev/null"
              WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/src
@@ -467,6 +474,7 @@ endif()
              WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/src
              )
              set_tests_properties(test_memory_leak_FreeDV_700D_rx PROPERTIES PASS_REGULAR_EXPRESSION "ERROR SUMMARY: 0 errors")
+endif(NOT APPLE)
 
      add_test(NAME test_mode_dot_c2
              COMMAND sh -c "./c2enc 700C ../../raw/hts1a.raw hts1a.c2 && ./c2dec 1600 hts1a.c2 /dev/null"
@@ -507,8 +515,9 @@ endif()
              WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/src
              )
 
+     configure_file(unittest/est_n0.sh.in unittest/est_n0.sh)
      add_test(NAME test_est_n0
-             COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/unittest/est_n0.sh
+             COMMAND ${CMAKE_CURRENT_BINARY_DIR}/unittest/est_n0.sh
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/unittest
              )
      add_test(NAME test_vq_mbest
@@ -517,8 +526,9 @@ endif()
                             diff target.f32 out.f32"
              WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/unittest
              )
+     configure_file(unittest/test_700c_eq.sh.in unittest/test_700c_eq.sh)
      add_test(NAME test_700c_eq
-             COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/unittest/test_700c_eq.sh
+             COMMAND ${CMAKE_CURRENT_BINARY_DIR}/unittest/test_700c_eq.sh
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/unittest
              )
 
