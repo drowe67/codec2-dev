@@ -172,6 +172,9 @@ errors_positions = xor(tx_bits, rx_codeword(1:framesize*rate));
 Nerr = sum(errors_positions);
 printf("Nerr: %d\n\n", Nerr);
 
+if getenv("SHORT_VERSION_FOR_CTEST")
+  return;
+end
 
 % ---------------------------------------------------------------------------------
 % 2/ Run a bunch of trials at just one EsNo point
@@ -188,7 +191,6 @@ sim_in.verbose = 2;
 sim_in.Ntrials = 100;
 sim_in.EbNodBvec = 9;
 run_simulation(sim_in);
-
 
 % ---------------------------------------------------------------------------------
 % 3/ Lets draw some Eb/No versus BER curves 

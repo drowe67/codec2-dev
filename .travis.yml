@@ -7,8 +7,9 @@ language: generic
 dist: xenial
 addons:
   apt:
-    packages: libc6-i386 octave-common octave gnuplot
-      sox p7zip-full python3-numpy octave-signal valgrind
+    packages: libc6-i386 octave octave-common octave-signal liboctave-dev gnuplot
+              sox p7zip-full python3-numpy valgrind
+              
 cache:
   directories:
   - "$HOME/$GCC_BASE"
@@ -26,7 +27,17 @@ install:
 - if [ ! "$STDLIBURL" == "" ]; then pwd; wget -q $STDLIBURL; 7z  x -p$STDLIBKEY -o$HOME
   stdperiph_lib.zip; fi
 - unset STDLIBURL STDLIBKEY # DO NOT TOUCH  
+# CML library for LDPC support ----------------------
+- cd ${HOME}
+- wget http://www.iterativesolutions.com/user/image/cml.1.10.zip
+- unzip cml.1.10.zip
+- ls ${CODEC2DEV}/octave/cml.patch
+- patch -p0 < ${CODEC2DEV}/octave/cml.patch
+- cd cml/source
+- octave --no-gui -qf --eval "make"
 script:
+# codec2 build and test -----------------------------
+- cd ${CODEC2DEV}
 - mkdir -p $BUILDSTD
 - cd $BUILDSTD
 - cmake $CODEC2DEV
