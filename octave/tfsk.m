@@ -64,6 +64,7 @@ function mod = fsk_mod_c(Fs,Rs,f1,fsp,bits,M)
     fclose(bitvecfile);
     
     %run the modulator
+    command
     system(command);
     
     modvecfile = fopen('fsk_mod_ut_modvec','rb');
@@ -156,6 +157,8 @@ function test_stats = fsk_demod_xt(Fs,Rs,f1,fsp,mod,tname,M=2)
     o_nin = [];
     %Run octave demod, dump some test vectors
     states = fsk_horus_init(Fs,Rs,M);
+    printf("fmin: %d fmax: %d\n", states.fest_fmin,  states.fest_fmax);
+
     Ts = states.Ts;
     P = states.P;
     states.ftx(1) = f1;
@@ -202,7 +205,11 @@ function test_stats = fsk_demod_xt(Fs,Rs,f1,fsp,mod,tname,M=2)
     
     % One part-per-thousand allowed on important parameters
     pass = 1;
-    
+
+    figure(1); subplot(211); plot(o_Sf(1:states.Ndft));
+    subplot(212); plot(t_fft_est(1:states.Ndft));
+    o_fest(1:4)
+    t_f_est(1:4)
     pass = vcompare(o_Sf,  t_fft_est,'fft est',tname,.001,1) && pass;
     pass = vcompare(o_fest,  t_f_est,'f est',tname,.001,2) && pass;
     pass = vcompare(o_rx_timing,  t_rx_timing,'rx timing',tname,.02,3) && pass;
@@ -266,6 +273,8 @@ function [dmod,cmod,omod,pass] = fsk_mod_test(Fs,Rs,f1,fsp,bits,tname,M=2)
     states.dA = [1 1 1 1]; 
     states.dF = 0;
     omod = fsk_mod(states,bits);
+
+    printf("cmod: %d omod: %d\n", length(cmod), length(omod));
     
     dmod = cmod-omod;
     pass = max(dmod)<(mod_pass_fail_maxdiff*length(dmod));

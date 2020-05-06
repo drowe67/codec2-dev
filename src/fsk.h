@@ -43,7 +43,7 @@
 
 struct FSK {
     /*  Static parameters set up by fsk_init */
-    int Ndft;               /* buffer size for freq offset est fft */
+    int Ndft;               /* freq offset est fft */
     int Fs;                 /* sample freq */
     int N;                  /* processing buffer size */
     int Rs;                 /* symbol rate */
@@ -55,6 +55,7 @@ struct FSK {
     int f1_tx;              /* f1 for modulator */
     int fs_tx;              /* Space between TX freqs for modulatosr */
     int mode;               /* 2FSK or 4FSK */
+    float tc;               /* time constant for smoothing FFTs */
     int est_min;            /* Minimum frequency for freq. estimator */
     int est_max;            /* Maximum frequency for freq. estimaotr */
     int est_space;          /* Minimum frequency spacing for freq. estimator */

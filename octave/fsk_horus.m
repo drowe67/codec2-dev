@@ -18,7 +18,7 @@ function states = fsk_horus_init(Fs,Rs,M=2)
   % Freq. estimator limits - keep these narrow to stop errors with low SNR 4FSK
 
   states.fest_fmin = 300;
-  states.fest_fmax = 2200;
+  states.fest_fmax = 2800;
   states.fest_min_spacing = 100;
 
 endfunction

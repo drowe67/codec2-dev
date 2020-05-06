@@ -195,7 +195,7 @@ struct FSK * fsk_create_hbr(int Fs, int Rs,int P,int M, int tx_f1, int tx_fs)
         return NULL;
     }
     
-    fsk->fft_est = (float*)malloc(sizeof(float)*fsk->Ndft/2);
+    fsk->fft_est = (float*)malloc(sizeof(float)*fsk->Ndft);
     if(fsk->fft_est == NULL){
         free(fsk->samp_old);
         free(fsk->fft_cfg);
@@ -219,7 +219,7 @@ struct FSK * fsk_create_hbr(int Fs, int Rs,int P,int M, int tx_f1, int tx_fs)
         #endif
     #endif
     
-    for(i=0;i<fsk->Ndft/2;i++)fsk->fft_est[i] = 0;
+    for(i=0;i<fsk->Ndft;i++) fsk->fft_est[i] = 0;
     
     fsk->norm_rx_timing = 0;
     
@@ -269,7 +269,6 @@ struct FSK * fsk_create(int Fs, int Rs,int M, int tx_f1, int tx_fs)
 {
     struct FSK *fsk;
     int i;
-    int Ndft = 0;
     int memold;
     
     /* Check configuration validity */
@@ -287,19 +286,22 @@ struct FSK * fsk_create(int Fs, int Rs,int M, int tx_f1, int tx_fs)
     fsk = (struct FSK*) malloc(sizeof(struct FSK));
     if(fsk == NULL) return NULL;
      
-    // This parameters affects decode performance for very low baud rates (<100).
-    // Needs further investigation as to if this should scale inverse to baud rate.
-    Ndft = 1024;
+    // Need enough bins to with 10% of tone centre
+    float bin_width_Hz = 0.1*Rs;
+    float Ndft = (float)Fs/bin_width_Hz;
+    Ndft = pow(2.0, ceil(log2(Ndft)));
+    fprintf(stderr, "Ndft = %f\n", Ndft);
     
     /* Set constant config parameters */
     fsk->Fs = Fs;
     fsk->Rs = Rs;
     fsk->Ts = Fs/Rs;
-    fsk->N = Fs;
     fsk->burst_mode = 0;
     fsk->P = horus_P;
-    fsk->Nsym = fsk->N/fsk->Ts;
+    fsk->Nsym = 50;
+    fsk->N = fsk->Ts*fsk->Nsym;
     fsk->Ndft = Ndft;
+    fsk->tc = 0.1;
     fsk->Nmem = fsk->N+(2*fsk->Ts);
     fsk->f1_tx = tx_f1;
     fsk->fs_tx = tx_fs;
@@ -310,7 +312,9 @@ struct FSK * fsk_create(int Fs, int Rs,int M, int tx_f1, int tx_fs)
     fsk->est_max = HORUS_MAX;
     fsk->est_space = HORUS_MIN_SPACING;
     
-    /* Set up rx state */
+    printf("C.....: M: %d Fs: %d Rs: %d Ts: %d nsym: %d nbit: %d N: %d Ndft: %d fmin: %d fmax: %d\n",
+           M, fsk->Fs, fsk->Rs, fsk->Ts, fsk->Nsym, fsk->Nbits, fsk->N, fsk->Ndft, fsk->est_min, fsk->est_max);
+   /* Set up rx state */
     for( i=0; i<M; i++)
         fsk->phi_c[i] = comp_exp_j(0);
     
@@ -335,7 +339,7 @@ struct FSK * fsk_create(int Fs, int Rs,int M, int tx_f1, int tx_fs)
         return NULL;
     }
     
-    fsk->fft_est = (float*)malloc(sizeof(float)*fsk->Ndft/2);
+    fsk->fft_est = (float*)malloc(sizeof(float)*fsk->Ndft);
     if(fsk->fft_est == NULL){
         free(fsk->samp_old);
         free(fsk->fft_cfg);
@@ -359,7 +363,7 @@ struct FSK * fsk_create(int Fs, int Rs,int M, int tx_f1, int tx_fs)
         #endif
     #endif
     
-    for(i=0;i<Ndft/2;i++)fsk->fft_est[i] = 0;
+    for(i=0;i<Ndft;i++)fsk->fft_est[i] = 0;
     
     fsk->norm_rx_timing = 0;
     
@@ -452,7 +456,7 @@ void fsk_set_nsym(struct FSK *fsk,int nsyms){
     fsk->fft_cfg = kiss_fft_alloc(Ndft,0,NULL,NULL);
     fsk->fft_est = (float*)malloc(sizeof(float)*fsk->Ndft/2);
     
-    for(i=0;i<Ndft/2;i++)fsk->fft_est[i] = 0;
+    for(i=0;i<Ndft;i++)fsk->fft_est[i] = 0;
     
 }
 
@@ -467,7 +471,7 @@ void fsk_enable_burst_mode(struct FSK *fsk,int nsyms){
 void fsk_clear_estimators(struct FSK *fsk){
     int i;
     /* Clear freq estimator state */
-    for(i=0; i < (fsk->Ndft/2); i++){
+    for(i=0; i < (fsk->Ndft); i++){
         fsk->fft_est[i] = 0;
     }
     /* Reset timing diff correction */
@@ -536,11 +540,10 @@ void fsk_demod_freq_est(struct FSK *fsk, COMP fsk_in[],float *freqs,int M){
     size_t i,j;
     float hann;
     float max;
-    float tc;
     int imax;
     kiss_fft_cfg fft_cfg = fsk->fft_cfg;
     int freqi[M];
-    int f_min,f_max,f_zero;
+    int st,en,f_zero;
     
     /* Array to do complex FFT from using kiss_fft */
     #ifdef DEMOD_ALLOC_STACK
@@ -551,81 +554,67 @@ void fsk_demod_freq_est(struct FSK *fsk, COMP fsk_in[],float *freqs,int M){
     kiss_fft_cpx *fftout = (kiss_fft_cpx*)malloc(sizeof(kiss_fft_cpx)*Ndft);
     #endif
     
-    f_min  = (fsk->est_min*Ndft)/Fs;
-    f_max  = (fsk->est_max*Ndft)/Fs;
-    f_zero = (fsk->est_space*Ndft)/Fs;
-  
-    /* scale averaging time constant based on number of samples */
-    tc = 0.95*Ndft/Fs;
+    st = (fsk->est_min*Ndft)/Fs + Ndft/2; if (st < 0) st = 0;
+    en = (fsk->est_max*Ndft)/Fs + Ndft/2; if (en > Ndft) en = Ndft;
+    //fprintf(stderr, "min: %d max: %d st: %d en: %d\n", fsk->est_min, fsk->est_max, st, en);
     
-    int samps;
-    int fft_samps;
-    int fft_loops = nin / Ndft;
+    f_zero = (fsk->est_space*Ndft)/Fs;
 
-    for(j=0; j<fft_loops; j++){
-        /* 48000 sample rate (for example) will have a spare */
-        /* 896 samples besides the 46 "Ndft" samples, so adjust */
-
-        samps = (nin - ((j + 1) * Ndft));
-        fft_samps = (samps >= Ndft) ? Ndft : samps;
-
+    int numffts = floor((float)nin/(Ndft/2)) - 1;
+    for(j=0; j<numffts; j++){
+        int a = j*Ndft/2;
+        //fprintf(stderr, "numffts: %d j: %d a: %d\n", numffts, (int)j, a);
         /* Copy FSK buffer into reals of FFT buffer and apply a hann window */
-        for(i=0; i<fft_samps; i++){
+        for(i=0; i<Ndft; i++){
             #ifdef USE_HANN_TABLE
             hann = fsk->hann_table[i];
             #else
             hann = 0.5 - 0.5 * cosf(2.0 * M_PI * (float)i / (float) (fft_samps-1));
             #endif
-            fftin[i].r = hann*fsk_in[i+Ndft*j].real;
-            fftin[i].i = hann*fsk_in[i+Ndft*j].imag;
+            fftin[i].r = hann*fsk_in[i+a].real;
+            fftin[i].i = hann*fsk_in[i+a].imag;
         }
 
-        /* Zero out the remaining slots on spare samples */
-        for(; i<Ndft;i++){
-            fftin[i].r = 0;
-            fftin[i].i = 0;
-        }
-        
         /* Do the FFT */
         kiss_fft(fft_cfg,fftin,fftout);
+
+        /* FFT shift to put DC bin at Ndft/2 */
+        kiss_fft_cpx tmp;
+        for(i=0; i<Ndft/2; i++) {
+            tmp = fftout[i];
+            fftout[i] = fftout[i+Ndft/2];
+            fftout[i+Ndft/2] = tmp;
+        }
         
-        /* Find the magnitude^2 of each freq slot and stash away in the real
-        * value, so this only has to be done once. Since we're only comparing
-        * these values and only need the mag of 2 points, we don't need to do
-        * a sqrt to each value */
-        for(i=0; i<Ndft/2; i++){
+        /* Find the magnitude^2 of each freq slot */
+        for(i=0; i<Ndft; i++) {
             fftout[i].r = (fftout[i].r*fftout[i].r) + (fftout[i].i*fftout[i].i) ;
         }
         
-        /* Zero out the minimum and maximum ends */
-        for(i=0; i<f_min; i++){
-            fftout[i].r = 0;
-        }
-        for(i=f_max-1; i<Ndft/2; i++){
-            fftout[i].r = 0;
-        }
         /* Mix back in with the previous fft block */
         /* Copy new fft est into imag of fftout for frequency divination below */
-        for(i=0; i<Ndft/2; i++){
+        float tc = fsk->tc;
+        for(i=0; i<Ndft; i++){
             fsk->fft_est[i] = (fsk->fft_est[i]*(1-tc)) + (sqrtf(fftout[i].r)*tc);
             fftout[i].i = fsk->fft_est[i];
         }
     }
     
-    modem_probe_samp_f("t_fft_est",fsk->fft_est,Ndft/2);
+    modem_probe_samp_f("t_fft_est",fsk->fft_est,Ndft);
     
     max = 0;
     /* Find the M frequency peaks here */
     for(i=0; i<M; i++){
         imax = 0;
         max = 0;
-        for(j=0;j<Ndft/2;j++){
+        for(j=st;j<en;j++){
             if(fftout[j].i > max){
                 max = fftout[j].i;
                 imax = j;
             }
         }
         /* Blank out FMax +/-Fspace/2 */
+        int f_min, f_max;
         f_min = imax - f_zero;
         f_min = f_min < 0 ? 0 : f_min;
         f_max = imax + f_zero;
@@ -634,7 +623,7 @@ void fsk_demod_freq_est(struct FSK *fsk, COMP fsk_in[],float *freqs,int M){
             fftout[j].i = 0;
         
         /* Stick the freq index on the list */
-        freqi[i] = imax;
+        freqi[i] = imax - Ndft/2;
     }
     
     /* Gnome sort the freq list */

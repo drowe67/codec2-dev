@@ -40,9 +40,6 @@ function states = fsk_init(Fs, Rs, M=2, nsym=50)
   states.verbose = 0;
   states.phi = zeros(1, M);                       % keep down converter osc phase continuous
 
-  %printf("M: %d Fs: %d Rs: %d Ts: %d nsym: %d nbit: %d N: %d Ndft: %d\n",
-  %       states.M, states.Fs, states.Rs, states.Ts, states.nsym, states.nbit, states.N, states.Ndft);
-
   % BER stats 
 
   states.ber_state = 0;
@@ -61,12 +58,14 @@ function states = fsk_init(Fs, Rs, M=2, nsym=50)
   states.ppm = 0;
   states.prev_pkt = [];
  
-  % Freq. estimator limits - keep these narrow to stop errors with low SNR 4FSK
-  % todo: make this Fs indep
+  % Freq. estimator limits
+  states.fest_fmax = (Fs/2)-Rs;
+  states.fest_fmin = Rs/2;
+  states.fest_min_spacing = 2*(Rs-(Rs/5));
 
-  states.fest_fmin = 800;
-  states.fest_fmax = 2500;
-  states.fest_min_spacing = 200;
+  printf("Octave: M: %d Fs: %d Rs: %d Ts: %d nsym: %d nbit: %d N: %d Ndft: %d fmin: %d fmax: %d\n",
+         states.M, states.Fs, states.Rs, states.Ts, states.nsym, states.nbit, states.N, states.Ndft, states.fest_fmin, states.fest_fmax);
+
 endfunction
 
 
@@ -194,7 +193,7 @@ function states = est_freq(states, sf, ntones)
 
   fmin = states.fest_fmin;
   fmax = states.fest_fmax;
-  % note 0 Hz is mapped to Ndft/2 via fftshift
+  % note 0 Hz is mapped to Ndft/2+1 via fftshift
   st = floor(fmin*Ndft/Fs) + Ndft/2;  st = max(1,st);
   en = floor(fmax*Ndft/Fs) + Ndft/2;  en = min(Ndft,en);
   
@@ -202,19 +201,20 @@ function states = est_freq(states, sf, ntones)
   
   % Update mag DFT  ---------------------------------------------
 
-  % we break up input buffer to a series of Ndft sequences
+  % we break up input buffer to a series of overlapping Ndft sequences
   numffts = floor(length(sf)/(Ndft/2)) - 1;
   h = hanning(Ndft);
   for i=1:numffts
     a = (i-1)*Ndft/2+1; b = a + Ndft - 1;
     Sf = abs(fftshift(fft(sf(a:b) .* h, Ndft)));
+
+    % Smooth DFT mag spectrum, slower to respond to changes but more
+    % accurate.  Single order IIR filter is an exponentially weighted
+    % moving average.  This means the freq est window is wider than
+    % timing est window
+    tc = states.tc; states.Sf = (1-tc)*states.Sf + tc*Sf;
   end
 
-  % Smooth DFT mag spectrum, slower to respond to changes but more
-  % accurate.  Single order IIR filter is an exponentially weighted
-  % moving average.  This means the freq est window is wider than
-  % timing est window
-  tc = states.tc; states.Sf = (1-tc)*states.Sf + tc*Sf;
 
   %figure(1); clf; plot(states.Sf);
   
