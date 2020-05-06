@@ -175,12 +175,15 @@ function tnewamp1(input_prefix)
    
   end
   
-  figure(1); clf;
+  f = figure(1); clf;
   mesh(angle(H));
-  figure(2); clf;
+  close(f, "force");
+  f = figure(2); clf;
   mesh(angle(H_c(:,1:max_amp)));
-  figure(3); clf;
+  close(f, "force");
+  f = figure(3); clf;
   mesh(abs(H - H_c(:,1:max_amp)));
+  close(f, "force");
 
   passes = 0; tests = 0;
   passes += check(eq, eq_c, 'Equaliser', 0.01); tests++;
