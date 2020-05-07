@@ -18,6 +18,7 @@ more off; format;
 ofdm_lib;
 autotest;
 ldpc
+global visible_flag = 'off';
 global passes = 0;
 global fails = 0;
 
