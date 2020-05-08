@@ -8,7 +8,6 @@
 
 fsk_lib;
 
-
 % Basic modem set up for Horus
 
 function states = fsk_horus_init(Fs,Rs,M=2)
@@ -20,7 +19,6 @@ function states = fsk_horus_init(Fs,Rs,M=2)
   states.fest_fmin = 300;
   states.fest_fmax = 2800;
   states.fest_min_spacing = 100;
-
 endfunction
 
 
@@ -372,6 +370,7 @@ function run_sim(test_frame_mode, M=2, frames = 10, EbNodB = 100, filename="fsk_
   end
   #}
   states.ftx = 900 + 2*states.Rs*(1:states.M);
+  states.tx_tone_separation = 2*states.Rs;
 
   % ----------------------------------------------------------------------
 
@@ -846,7 +845,7 @@ endfunction
 % Over the years this modem has been used for many different FSK signals ...
 
 if exist("fsk_horus_as_a_lib") == 0
-  %run_sim(4, 2, 30, 10);
+  run_sim(4, 2, 30, 20);
   %run_sim(5, 4, 30, 100);
   %rx_bits = demod_file("~/Desktop/115.wav",6,0,90);
   %rx_bits = demod_file("~/Desktop/fsk_800xa_rx_hackrf.wav",7);
@@ -865,5 +864,5 @@ if exist("fsk_horus_as_a_lib") == 0
   %rx_bits = demod_file("mp.raw",4);
   %rx_bits = demod_file("~/Desktop/launchbox_v2_landing_8KHz_final.wav",4);
   %rx_bits = demod_file("~/Desktop/fsk_800xa.wav",7);
-  rx_bits = demod_file("~/Desktop/rs41_96k_10s.iq16",8);
+  %rx_bits = demod_file("~/Desktop/rs41_96k_10s.iq16",8);
 end

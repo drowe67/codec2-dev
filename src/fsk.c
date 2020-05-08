@@ -290,7 +290,7 @@ struct FSK * fsk_create(int Fs, int Rs,int M, int tx_f1, int tx_fs)
     float bin_width_Hz = 0.1*Rs;
     float Ndft = (float)Fs/bin_width_Hz;
     Ndft = pow(2.0, ceil(log2(Ndft)));
-    fprintf(stderr, "Ndft = %f\n", Ndft);
+    //fprintf(stderr, "Ndft = %f\n", Ndft);
     
     /* Set constant config parameters */
     fsk->Fs = Fs;
@@ -312,9 +312,9 @@ struct FSK * fsk_create(int Fs, int Rs,int M, int tx_f1, int tx_fs)
     fsk->est_max = HORUS_MAX;
     fsk->est_space = HORUS_MIN_SPACING;
     
-    printf("C.....: M: %d Fs: %d Rs: %d Ts: %d nsym: %d nbit: %d N: %d Ndft: %d fmin: %d fmax: %d\n",
-           M, fsk->Fs, fsk->Rs, fsk->Ts, fsk->Nsym, fsk->Nbits, fsk->N, fsk->Ndft, fsk->est_min, fsk->est_max);
-   /* Set up rx state */
+    //printf("C.....: M: %d Fs: %d Rs: %d Ts: %d nsym: %d nbit: %d N: %d Ndft: %d fmin: %d fmax: %d\n",
+    //       M, fsk->Fs, fsk->Rs, fsk->Ts, fsk->Nsym, fsk->Nbits, fsk->N, fsk->Ndft, fsk->est_min, fsk->est_max);
+    /* Set up rx state */
     for( i=0; i<M; i++)
         fsk->phi_c[i] = comp_exp_j(0);
     
@@ -697,8 +697,7 @@ void fsk2_demod(struct FSK *fsk, uint8_t rx_bits[], float rx_sd[], COMP fsk_in[]
     /* Estimate tone frequencies */
     fsk_demod_freq_est(fsk,fsk_in,f_est,M);
     modem_probe_samp_f("t_f_est",f_est,M);
-    
-    
+        
     /* Allocate circular buffer for integration */
     #ifdef DEMOD_ALLOC_STACK
     f_intbuf_m = (COMP*) alloca(sizeof(COMP)*Ts);
@@ -718,12 +717,14 @@ void fsk2_demod(struct FSK *fsk, uint8_t rx_bits[], float rx_sd[], COMP fsk_in[]
         #endif
     }
     
+#ifdef RM_ME
     /* If this is the first run, we won't have any valid f_est */
     /* TODO: add first_run flag to FSK to make negative freqs possible */
     if(fsk->f_est[0]<1){
         for( m=0; m<M; m++)
             fsk->f_est[m] = f_est[m];
     }
+#endif
     
     /* Initalize downmixers for each symbol tone */
     for( m=0; m<M; m++){

@@ -78,18 +78,19 @@ endfunction
 function pass = vcompare(vc,voct,vname,tname,tol,pnum)
     global print_verbose;
     %Get delta of vectors
-    dvec = abs(abs(vc)-abs(voct));     
+    dvec = abs(abs(vc-voct));     
     
     %Normalize difference
     dvec = dvec ./ abs(max(abs(voct))+1e-8);
     
-    maxdvec = abs(max(dvec));
+    [maxdvec ind] = max(dvec);
+    maxdvec = abs(maxdvec);
     pass = maxdvec<tol;
     if print_verbose == 1
         printf('  Comparing vectors %s in test %s. Diff is %f\n',vname,tname,maxdvec);
     end
     if pass == 0
-        printf('\n*** vcompare failed %s in test %s. Diff: %f Tol: %f\n\n',vname,tname,maxdvec,tol);
+        printf('\n*** vcompare failed %s in test %s. Diff: %f Tol: %f c: %f oct: %f\n\n',vname,tname,maxdvec,tol, vc(ind), voct(ind));
         
         titlestr = sprintf('Diff between C and Octave of %s for %s',vname,tname)
         figure(10+pnum*2)
@@ -102,6 +103,7 @@ function pass = vcompare(vc,voct,vname,tname,tol,pnum)
     end
     
 endfunction
+
 
 function test_stats = fsk_demod_xt(Fs,Rs,f1,fsp,mod,tname,M=2)
     global print_verbose;
@@ -200,8 +202,9 @@ function test_stats = fsk_demod_xt(Fs,Rs,f1,fsp,mod,tname,M=2)
         end
     end
     
-    
     assert(vcompare(o_Sf,  t_fft_est,'fft est',tname,.001,1));
+    o_fest(1:12)
+    t_f_est(1:12)
     assert(vcompare(o_fest,  t_f_est,'f est',tname,.001,2));
     assert(vcompare(o_rx_timing,  t_rx_timing,'rx timing',tname,.02,3));
        
@@ -234,7 +237,7 @@ function test_stats = fsk_demod_xt(Fs,Rs,f1,fsp,mod,tname,M=2)
     end
     
     assert(diffpass);    
-    
+ 
     test_stats.pass = 1;
     test_stats.diff = sum(xor(obits,bits'));
     test_stats.cbits = bits';
@@ -262,8 +265,6 @@ function [dmod,cmod,omod,pass] = fsk_mod_test(Fs,Rs,f1,fsp,bits,tname,M=2)
     states.dF = 0;
     omod = fsk_mod(states,bits);
 
-    printf("cmod: %d omod: %d\n", length(cmod), length(omod));
-    
     dmod = cmod-omod;
     pass = max(dmod)<(mod_pass_fail_maxdiff*length(dmod));
     if !pass
@@ -492,6 +493,8 @@ function stats = tfsk_run_sim(test_frame_mode,EbNodB,timing_offset,fading,df,dA,
 endfunction
 
 
+% test current condition of a range of Eb/Nos
+
 function pass = ebno_battery_test(timing_offset,fading,df,dA,M)
     %Range of EbNodB over which to test
     ebnodbrange = (5:2:13);
@@ -505,37 +508,42 @@ function pass = ebno_battery_test(timing_offset,fading,df,dA,M)
     dfv     = repmat(df,1,ebnodbs);
     dav     = repmat(dA,1,ebnodbs);
     mv      = repmat(M,1,ebnodbs);
-    %statv = pararrayfun(floor(1.25*nproc()),@tfsk_run_sim,modev,ebnodbrange,timingv,fadingv,dfv,dav,mv);
-    %statv = pararrayfun(1,@tfsk_run_sim,modev,ebnodbrange,timingv,fadingv,dfv,dav,mv);
-    
-    %statv = arrayfun(@tfsk_run_sim,modev,ebnodbrange,timingv,fadingv,dfv,dav,mv);
 
-    tfsk_run_sim(mode, ebnodbrange(1), timing_offset, fading, df, dA, M)
-    
-    passv = zeros(1,length(statv));
-    for ii=(1:length(statv))
+    bunch_o_tests = 0;
+    if bunch_o_tests
+      % Brady's bunch of parallel tests (not up to date as of May 2020) over a range of Eb/Nos
+      statv = pararrayfun(floor(1.25*nproc()),@tfsk_run_sim,modev,ebnodbrange,timingv,fadingv,dfv,dav,mv);
+      passv = zeros(1,length(statv));
+      for ii=(1:length(statv))
         passv(ii)=statv(ii).pass;
         if statv(ii).pass
             printf("Test %s passed\n",statv(ii).name);
         else
             printf("Test %s failed\n",statv(ii).name);
         end
-    end
+      end
     
-    %All pass flags are '1'
-    pass = sum(passv)>=length(passv);
-    %and no tests died
-    pass = pass && length(passv)==ebnodbs;
-    passv;
-    assert(pass)
+      %All pass flags are '1'
+      pass = sum(passv)>=length(passv);
+      %and no tests died
+      pass = pass && length(passv)==ebnodbs;
+      passv;
+      assert(pass)
+    else
+      % David's single Eb/No point test subset
+      stats = tfsk_run_sim(mode, ebnodbrange(1), timing_offset, fading, df, dA, M);
+      pass = stats.pass;
+    end    
 endfunction
 
 %Test with and without sample clock offset
 function pass = test_timing_var(df,dA,M)
     pass = ebno_battery_test(1,0,df,dA,M)
     assert(pass)
+    printf("pass with timing offset = 1\n");
     pass = pass && ebno_battery_test(0,0,df,dA,M)
-    assert(pass)
+    xx
+   assert(pass)
 endfunction
 
 %Test with and without 1 Hz/S freq drift

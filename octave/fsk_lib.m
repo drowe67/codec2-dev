@@ -63,8 +63,9 @@ function states = fsk_init(Fs, Rs, M=2, nsym=50)
   states.fest_fmin = Rs/2;
   states.fest_min_spacing = 2*(Rs-(Rs/5));
 
-  printf("Octave: M: %d Fs: %d Rs: %d Ts: %d nsym: %d nbit: %d N: %d Ndft: %d fmin: %d fmax: %d\n",
-         states.M, states.Fs, states.Rs, states.Ts, states.nsym, states.nbit, states.N, states.Ndft, states.fest_fmin, states.fest_fmax);
+  %printf("Octave: M: %d Fs: %d Rs: %d Ts: %d nsym: %d nbit: %d N: %d Ndft: %d fmin: %d fmax: %d min_spacing: %d\n",
+  %       states.M, states.Fs, states.Rs, states.Ts, states.nsym, states.nbit, states.N, states.Ndft,
+  %       states.fest_fmin, states.fest_fmax, states.fest_min_spacing);
 
 endfunction
 
@@ -204,6 +205,7 @@ function states = est_freq(states, sf, ntones)
   % we break up input buffer to a series of overlapping Ndft sequences
   numffts = floor(length(sf)/(Ndft/2)) - 1;
   h = hanning(Ndft);
+  tc = states.tc;
   for i=1:numffts
     a = (i-1)*Ndft/2+1; b = a + Ndft - 1;
     Sf = abs(fftshift(fft(sf(a:b) .* h, Ndft)));
@@ -212,7 +214,7 @@ function states = est_freq(states, sf, ntones)
     % accurate.  Single order IIR filter is an exponentially weighted
     % moving average.  This means the freq est window is wider than
     % timing est window
-    tc = states.tc; states.Sf = (1-tc)*states.Sf + tc*Sf;
+    states.Sf = (1-tc)*states.Sf + tc*Sf;
   end
 
   % Search for each tone method 1 - peak pick each tone location ----------------------------------
@@ -313,7 +315,8 @@ function [rx_bits states] = fsk_demod(states, sf)
   % freq shift down to around DC, ensuring continuous phase from last frame
 
   for m=1:M
-    phi_vec = states.phi(m) + (1:nin)*2*pi*f(m)/Fs;
+    #phi_vec = states.phi(m) + (1:nin)*2*pi*f(m)/Fs;
+    phi_vec = (0:nin-1)*2*pi*f(m)/Fs;
     f_dc(m,nold+1:Nmem) = sf .* exp(j*phi_vec)';
     states.phi(m)  = phi_vec(nin);
     states.phi(m) -= 2*pi*floor(states.phi(m)/(2*pi));
@@ -348,7 +351,7 @@ function [rx_bits states] = fsk_demod(states, sf)
   % We have sampled the integrator output at Fs=P samples/symbol, so
   % lets do a single point DFT at w = 2*pi*f/Fs = 2*pi*Rs/(P*Rs)
   %
-  % Note timing non-lineariry derived by experiment.  Not quite sure what I'm doing here.....
+  % Note timing non-linearity derived by experiment.  Not quite sure what I'm doing here.....
   % but it gives 0dB impl loss for 2FSK Eb/No=9dB, testmode 1:
   %   Fs: 8000 Rs: 50 Ts: 160 nsym: 50
   %   frames: 200 Tbits: 9700 Terrs: 93 BER 0.010
