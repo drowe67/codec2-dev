@@ -845,7 +845,7 @@ endfunction
 % Over the years this modem has been used for many different FSK signals ...
 
 if exist("fsk_horus_as_a_lib") == 0
-  run_sim(4, 2, 30, 20);
+  run_sim(test_frame_mode=4, M=2, frames=30, EbNodB = 20);
   %run_sim(5, 4, 30, 100);
   %rx_bits = demod_file("~/Desktop/115.wav",6,0,90);
   %rx_bits = demod_file("~/Desktop/fsk_800xa_rx_hackrf.wav",7);

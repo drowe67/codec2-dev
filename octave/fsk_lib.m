@@ -99,7 +99,6 @@ function states = fsk_init_hbr(Fs,P,Rs,M=2,nsym=48)
 
   states.nin = N;                % can be N +/- Ts/P samples to adjust for sample clock offsets
   states.verbose = 0;
-  states.phi = zeros(1, M);      % keep down converter osc phase continuous
 
   %printf("M: %d Fs: %d Rs: %d Ts: %d nsym: %d nbit: %d\n", states.M, states.Fs, states.Rs, states.Ts, states.nsym, states.nbit);
 
@@ -315,11 +314,8 @@ function [rx_bits states] = fsk_demod(states, sf)
   % freq shift down to around DC, ensuring continuous phase from last frame
 
   for m=1:M
-    #phi_vec = states.phi(m) + (1:nin)*2*pi*f(m)/Fs;
     phi_vec = (0:nin-1)*2*pi*f(m)/Fs;
     f_dc(m,nold+1:Nmem) = sf .* exp(j*phi_vec)';
-    states.phi(m)  = phi_vec(nin);
-    states.phi(m) -= 2*pi*floor(states.phi(m)/(2*pi));
   end
 
   % save filter (integrator) memory for next time
