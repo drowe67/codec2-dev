@@ -307,36 +307,35 @@ if(UNITTEST)
              COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/octave; SHORT_VERSION_FOR_CTEST=1 octave --no-gui -qf ldpcut.m")
              set_tests_properties(test_CML_ldpcut PROPERTIES PASS_REGULAR_EXPRESSION "Nerr: 0")
 
-    configure_file(octave/run_tnewamp1.m.in octave/run_tnewamp1.m)
-    configure_file(octave/tnewamp1.m.in octave/tnewamp1.m)
     add_test(NAME test_codec2_700c_octave_port
-             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
-                            ./c2sim ${CMAKE_CURRENT_SOURCE_DIR}/raw/cq_ref.raw --phase0 --postfilter --dump cq_ref --lpc 10 --dump_pitch_e cq_ref_pitche.txt; \
-                            cd ${CMAKE_CURRENT_BINARY_DIR}/unittest; ./tnewamp1 ${CMAKE_CURRENT_SOURCE_DIR}/raw/cq_ref.raw; \
-                            cd ${CMAKE_CURRENT_BINARY_DIR}/octave;  \
-                            octave --no-gui -qf run_tnewamp1.m")
+             COMMAND sh -c "
+               cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+               ./c2sim ${CMAKE_CURRENT_SOURCE_DIR}/raw/cq_ref.raw --phase0 --postfilter --dump cq_ref --lpc 10 --dump_pitch_e cq_ref_pitche.txt;
+               cd ${CMAKE_CURRENT_BINARY_DIR}/unittest; ./tnewamp1 ${CMAKE_CURRENT_SOURCE_DIR}/raw/cq_ref.raw;
+               cd ${CMAKE_CURRENT_SOURCE_DIR}/octave;
+               DISPLAY=\"\" octave-cli -qf --eval 'tnewamp1(\"${CMAKE_CURRENT_BINARY_DIR}/src/cq_ref\", \"${CMAKE_CURRENT_BINARY_DIR}/unittest\")'")
              set_tests_properties(test_codec2_700c_octave_port PROPERTIES PASS_REGULAR_EXPRESSION "fails: 0")
 
     add_test(NAME test_FDMDV_modem_octave_port
-             COMMAND sh -c "$<TARGET_FILE:tfdmdv> && octave --no-gui -qf ${CMAKE_CURRENT_SOURCE_DIR}/octave/tfdmdv.m"
+             COMMAND sh -c "$<TARGET_FILE:tfdmdv> && DISPLAY=\"\" octave --no-gui -qf ${CMAKE_CURRENT_SOURCE_DIR}/octave/tfdmdv.m"
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/octave)
              set_tests_properties(test_FDMDV_modem_octave_port PROPERTIES
              PASS_REGULAR_EXPRESSION "fails: 0")
 
     add_test(NAME test_COHPSK_modem_octave_port
-             COMMAND sh -c "$<TARGET_FILE:tcohpsk> && octave --no-gui -qf ${CMAKE_CURRENT_SOURCE_DIR}/octave/tcohpsk.m"
+             COMMAND sh -c "$<TARGET_FILE:tcohpsk> && DISPLAY=\"\" octave-cli --no-gui -qf ${CMAKE_CURRENT_SOURCE_DIR}/octave/tcohpsk.m"
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/octave)
              set_tests_properties(test_COHPSK_modem_octave_port PROPERTIES
              PASS_REGULAR_EXPRESSION "fails: 0")
 
     add_test(NAME test_OFDM_modem_octave_port
-             COMMAND sh -c "PATH_TO_TOFDM=${CMAKE_CURRENT_BINARY_DIR}/unittest/tofdm octave --no-gui -qf ${CMAKE_CURRENT_SOURCE_DIR}/octave/tofdm.m"
+             COMMAND sh -c "PATH_TO_TOFDM=${CMAKE_CURRENT_BINARY_DIR}/unittest/tofdm DISPLAY=\"\" octave --no-gui -qf ${CMAKE_CURRENT_SOURCE_DIR}/octave/tofdm.m"
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/octave)
              set_tests_properties(test_OFDM_modem_octave_port PROPERTIES
              PASS_REGULAR_EXPRESSION "fails: 0")
 
     add_test(NAME test_OFDM_modem_octave_port_Nc_31
-             COMMAND sh -c "NC=31 PATH_TO_TOFDM=${CMAKE_CURRENT_BINARY_DIR}/unittest/tofdm octave --no-gui -qf ${CMAKE_CURRENT_SOURCE_DIR}/octave/tofdm.m"
+             COMMAND sh -c "NC=31 PATH_TO_TOFDM=${CMAKE_CURRENT_BINARY_DIR}/unittest/tofdm DISPLAY=\"\" octave --no-gui -qf ${CMAKE_CURRENT_SOURCE_DIR}/octave/tofdm.m"
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/octave)
              set_tests_properties(test_OFDM_modem_octave_port_Nc_31 PROPERTIES
              PASS_REGULAR_EXPRESSION "fails: 0")

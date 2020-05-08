@@ -7,13 +7,12 @@
 
 function stem_sig_and_error(plotnum, subplotnum, sig, error, titlestr, axisvec)
   global no_plot_list;
-  global visible_flag;
 
   if find(no_plot_list == plotnum)
     return;
   end
   
-  figure(plotnum, 'visible', visible_flag)
+  figure(plotnum)
   subplot(subplotnum)
   stem(sig,'g;Octave version;');
   hold on;
@@ -28,13 +27,12 @@ endfunction
 
 function plot_sig_and_error(plotnum, subplotnum, sig, error, titlestr, axisvec)
   global no_plot_list;
-  global visible_flag;
 
   if find(no_plot_list == plotnum)
     return;
   end
-
-  figure(plotnum, 'visible', visible_flag)
+  
+  figure(plotnum)
   subplot(subplotnum)
   plot(sig,'g;Octave version;');
   hold on;

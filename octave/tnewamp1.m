@@ -17,7 +17,7 @@
        $ cd codec2-dev/build_linux/src
        $ ./c2sim ../../raw/hts1a.raw --phase0 --postfilter --dump hts1a --lpc 10 --dump_pitch_e hts1a_pitche.txt
 
-    3/ Run C version which generates a file of Octave test vectors as ouput:
+    3/ Run C version which generates a file of Octave test vectors as output:
 
       $ cd codec2-dev/build_linux/unittest
       $ ./tnewamp1 ../../raw/hts1a.raw
@@ -34,9 +34,10 @@
                                       | play -q -t raw -r 8000 -s -2 -
 #}
 
-function tnewamp1(input_prefix)
+function tnewamp1(input_prefix, path_to_unittest="../build_linux/unittest/")
   printf("starting tnewamp1.c input_prefix: %s\n", input_prefix);
-  
+
+  visible_flag = 'off';
   newamp_700c;
   autotest;
   more off;
@@ -62,7 +63,7 @@ function tnewamp1(input_prefix)
 
   % Load in C vectors and compare -----------------------------------------
  
-  load("@CMAKE_CURRENT_BINARY_DIR@/unittest/tnewamp1_out.txt");
+  load(sprintf("%s/tnewamp1_out.txt", path_to_unittest));
   
   K = 20;
   [frames tmp] = size(rate_K_surface_c);
@@ -177,13 +178,10 @@ function tnewamp1(input_prefix)
   
   f = figure(1); clf;
   mesh(angle(H));
-  close(f, "force");
   f = figure(2); clf;
   mesh(angle(H_c(:,1:max_amp)));
-  close(f, "force");
   f = figure(3); clf;
   mesh(abs(H - H_c(:,1:max_amp)));
-  close(f, "force");
 
   passes = 0; tests = 0;
   passes += check(eq, eq_c, 'Equaliser', 0.01); tests++;

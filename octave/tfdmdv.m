@@ -46,7 +46,6 @@ Q  = f.Q;
 
 % Generate reference vectors using Octave implementation of FDMDV modem
 
-global visible_flag = 'off';
 global passes = 0;
 global fails = 0;
 frames = 35;

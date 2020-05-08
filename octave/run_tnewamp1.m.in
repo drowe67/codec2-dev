@@ -1,5 +1,0 @@
-% Needed this to keep Travis happy, I guess on that version of
-% Linux/Octave, octave functions can't be invoked from the command
-% line, just scripts
-addpath("@CMAKE_CURRENT_SOURCE_DIR@/octave")
-tnewamp1("@CMAKE_CURRENT_BINARY_DIR@/src/cq_ref")

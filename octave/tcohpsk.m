@@ -55,7 +55,6 @@
 pkg load signal;
 more off;
 
-global visible_flag = 'off';
 global passes = 0;
 global fails = 0;
 
