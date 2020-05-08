@@ -215,9 +215,6 @@ function states = est_freq(states, sf, ntones)
     tc = states.tc; states.Sf = (1-tc)*states.Sf + tc*Sf;
   end
 
-
-  %figure(1); clf; plot(states.Sf);
-  
   % Search for each tone method 1 - peak pick each tone location ----------------------------------
 
   f = []; a = [];
@@ -232,9 +229,9 @@ function states = est_freq(states, sf, ntones)
     % zero out region min_tone_spacing/2 either side of max so we can find next highest peak
     % closest spacing for non-coh mFSK is Rs
 
-    stz = tone_index - floor((min_tone_spacing/2)*Ndft/Fs);
+    stz = tone_index - floor((min_tone_spacing)*Ndft/Fs);
     stz = max(1,stz);
-    enz = tone_index + floor((min_tone_spacing/2)*Ndft/Fs);
+    enz = tone_index + floor((min_tone_spacing)*Ndft/Fs);
     enz = min(Ndft,enz);
     Sf(stz:enz) = 0;
   end

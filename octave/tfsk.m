@@ -157,7 +157,6 @@ function test_stats = fsk_demod_xt(Fs,Rs,f1,fsp,mod,tname,M=2)
     o_nin = [];
     %Run octave demod, dump some test vectors
     states = fsk_horus_init(Fs,Rs,M);
-    printf("fmin: %d fmax: %d\n", states.fest_fmin,  states.fest_fmax);
 
     Ts = states.Ts;
     P = states.P;
@@ -201,42 +200,32 @@ function test_stats = fsk_demod_xt(Fs,Rs,f1,fsp,mod,tname,M=2)
         end
     end
     
-    %close all
     
-    % One part-per-thousand allowed on important parameters
-    pass = 1;
-
-    figure(1); subplot(211); plot(o_Sf(1:states.Ndft));
-    subplot(212); plot(t_fft_est(1:states.Ndft));
-    o_fest(1:4)
-    t_f_est(1:4)
-    pass = vcompare(o_Sf,  t_fft_est,'fft est',tname,.001,1) && pass;
-    pass = vcompare(o_fest,  t_f_est,'f est',tname,.001,2) && pass;
-    pass = vcompare(o_rx_timing,  t_rx_timing,'rx timing',tname,.02,3) && pass;
-    
+    assert(vcompare(o_Sf,  t_fft_est,'fft est',tname,.001,1));
+    assert(vcompare(o_fest,  t_f_est,'f est',tname,.001,2));
+    assert(vcompare(o_rx_timing,  t_rx_timing,'rx timing',tname,.02,3));
+       
     if M==4
-        pass = vcompare(o_f3_dc,      t_f3_dc,    'f3 dc',    tname,.005,4) && pass;
-        pass = vcompare(o_f4_dc,      t_f4_dc,    'f4 dc',    tname,.005,5) && pass;
-        pass = vcompare(o_f3_int,     t_f3_int,   'f3 int',   tname,.005,6) && pass;
-        pass = vcompare(o_f4_int,     t_f4_int,   'f4 int',   tname,.005,7) && pass;
+        assert(vcompare(o_f3_dc,      t_f3_dc,    'f3 dc',    tname,.005,4))
+        assert(vcompare(o_f4_dc,      t_f4_dc,    'f4 dc',    tname,.005,5));
+        assert(vcompare(o_f3_int,     t_f3_int,   'f3 int',   tname,.005,6));
+        assert(vcompare(o_f4_int,     t_f4_int,   'f4 int',   tname,.005,7));
     end
+   
+    assert(vcompare(o_f1_dc,      t_f1_dc,    'f1 dc',    tname,.005,8));
+    assert(vcompare(o_f2_dc,      t_f2_dc,    'f2 dc',    tname,.005,9));
+    assert(vcompare(o_f2_int,     t_f2_int,   'f2 int',   tname,.005,10));
+    assert(vcompare(o_f1_int,     t_f1_int,   'f1 int',   tname,.005,11));
     
-    pass = vcompare(o_f1_dc,      t_f1_dc,    'f1 dc',    tname,.005,8) && pass;
-    pass = vcompare(o_f2_dc,      t_f2_dc,    'f2 dc',    tname,.005,9) && pass;
-    pass = vcompare(o_f2_int,     t_f2_int,   'f2 int',   tname,.005,10) && pass;
-    pass = vcompare(o_f1_int,     t_f1_int,   'f1 int',   tname,.005,11) && pass;
-
     % Much larger tolerances on unimportant statistics
-    pass = vcompare(o_ppm   ,     t_ppm,      'ppm',      tname,.02,12) && pass;
-    pass = vcompare(o_EbNodB,     t_EbNodB,'EbNodB',      tname,.02,13) && pass;
-    pass = vcompare(o_nin,        t_nin,      'nin',      tname,.0001,14) && pass;
-    pass = vcompare(o_norm_rx_timing,  t_norm_rx_timing,'norm rx timing',tname,.02,15) && pass;
-    
-    assert(pass);
+    assert(vcompare(o_ppm   ,     t_ppm,      'ppm',      tname,.02,12));
+    assert(vcompare(o_EbNodB,     t_EbNodB,'EbNodB',      tname,.02,13));
+    assert(vcompare(o_nin,        t_nin,      'nin',      tname,.0001,14));
+    assert(vcompare(o_norm_rx_timing,  t_norm_rx_timing,'norm rx timing',tname,.02,15));
+   
     diffpass = sum(xor(obits,bits'))<4;
     diffbits = sum(xor(obits,bits'));
-    
-    
+        
     if diffpass==0
         printf('\n***bitcompare test failed test %s diff %d\n\n',tname,sum(xor(obits,bits')))
         figure(15)
@@ -244,10 +233,9 @@ function test_stats = fsk_demod_xt(Fs,Rs,f1,fsp,mod,tname,M=2)
         title(sprintf('Bitcompare failure test %s',tname))
     end
     
-    pass = pass && diffpass;
+    assert(diffpass);    
     
-    
-    test_stats.pass = pass;
+    test_stats.pass = 1;
     test_stats.diff = sum(xor(obits,bits'));
     test_stats.cbits = bits';
     test_stats.obits = obits;
