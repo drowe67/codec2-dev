@@ -8,6 +8,7 @@
 
 fsk_lib;
 
+
 % Basic modem set up for Horus
 
 function states = fsk_horus_init(Fs,Rs,M=2)
@@ -19,6 +20,7 @@ function states = fsk_horus_init(Fs,Rs,M=2)
   states.fest_fmin = 300;
   states.fest_fmax = 2800;
   states.fest_min_spacing = 100;
+
 endfunction
 
 
@@ -361,17 +363,9 @@ function run_sim(test_frame_mode, M=2, frames = 10, EbNodB = 100, filename="fsk_
 
   % Tones must be at least Rs apart for ideal non-coherent FSK
 
-  #{
-  if states.M == 2
-    states.ftx = 1200 + [ 0 2*states.Rs ];
-  else
-    states.ftx = 1200 + 2*states.Rs*(1:4);
-    %states.ftx = 200 + states.Rs*(1:4); % EME
-  end
-  #}
   states.ftx = 900 + 2*states.Rs*(1:states.M);
-  states.tx_tone_separation = 2*states.Rs;
-
+  states.tx_tone_separation = states.ftx(2) - states.ftx(1);
+  
   % ----------------------------------------------------------------------
 
   states.verbose = 0x1;

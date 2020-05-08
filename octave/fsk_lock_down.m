@@ -48,7 +48,6 @@ function [states M bits_per_frame] = lock_down_init(Rs,Fs,df)
   states.ftx = -2.5*states.tx_tone_separation + states.tx_tone_separation*(1:M);
   states.fest_fmin = -Fs/2;
   states.fest_fmax = +Fs/2;
-  states.fest_min_spacing = Rs/2;
   states.df = df;
 
   % cumulative PDF, cdf(x) probability of 0....x errors in frame
@@ -164,7 +163,7 @@ function freq_run_curve_peak_mask
    m4fsk_ber_theory = [0.23 0.18 0.14 0.09772 0.06156 0.03395 0.01579 0.00591 0.00168 3.39E-4];
    percent_log = []; ber_log = [];
    for ne = 1:length(EbNodB)
-      [states f_log f_log2 num_dud1 num_dud2 ber ber2] = freq_run_test(EbNodB(ne), 50);
+      [states f_log f_log2 num_dud1 num_dud2 ber ber2] = freq_run_test(EbNodB(ne), 10);
       percent_dud1 = 100*num_dud1/length(f_log);
       percent_dud2 = 100*num_dud2/length(f_log);
       percent_log = [percent_log; [percent_dud1 percent_dud2]];
@@ -376,7 +375,7 @@ rand('state',1);
 randn('state',1);
 
 % freq estimator tests (choose one)
-#freq_run_single(5,20)
+#freq_run_single(3,10)
 #freq_run_curve_peak_mask
 #freq_run_curve_mask(8000,100)
 #freq_run_curve_mask(24000,25)
@@ -384,9 +383,10 @@ randn('state',1);
 
 % complete modem tests (choose one)
 #modem_run_curve(24000,25,100)
-modem_run_curve(8000,25,20,0.01)
-
-#code_rate_table
-
+modem_run_curve(8000,25,50,0.05)
 #modem_run_test(6, 20, 2000, 25, 0, 1, 1);
 #modem_run_curve_spread(8000,25,50)
+
+% just print a table of code rates
+#code_rate_table
+
