@@ -63,8 +63,8 @@ function states = fsk_init(Fs, Rs, M=2, nsym=50)
   states.fest_fmin = Rs/2;
   states.fest_min_spacing = 2*(Rs-(Rs/5));
 
-  printf("Octave: M: %d Fs: %d Rs: %d Ts: %d nsym: %d nbit: %d N: %d Ndft: %d fmin: %d fmax: %d\n",
-         states.M, states.Fs, states.Rs, states.Ts, states.nsym, states.nbit, states.N, states.Ndft, states.fest_fmin, states.fest_fmax);
+  %printf("Octave: M: %d Fs: %d Rs: %d Ts: %d nsym: %d nbit: %d N: %d Ndft: %d fmin: %d fmax: %d\n",
+  %       states.M, states.Fs, states.Rs, states.Ts, states.nsym, states.nbit, states.N, states.Ndft, states.fest_fmin, states.fest_fmax);
 
 endfunction
 
@@ -312,8 +312,7 @@ function [rx_bits states] = fsk_demod(states, sf)
   % freq shift down to around DC, ensuring continuous phase from last frame
 
   for m=1:M
-    phi_vec = (0:nin-1)*2*pi*f(m)/Fs;
-    phi_vec = states.phi(m) + (1:nin)*2*pi*f(m)/Fs;
+    phi_vec = states.phi(m) + (0:nin-1)*2*pi*f(m)/Fs;
     f_dc(m,nold+1:Nmem) = sf .* exp(j*phi_vec)';
   end
 

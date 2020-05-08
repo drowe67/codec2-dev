@@ -59,20 +59,16 @@ struct FSK {
     int est_min;            /* Minimum frequency for freq. estimator */
     int est_max;            /* Maximum frequency for freq. estimaotr */
     int est_space;          /* Minimum frequency spacing for freq. estimator */
-    float* hann_table;		/* Precomputed or runtime computed hann window table */
+    float* hann_table;	    /* Precomputed or runtime computed hann window table */
     
     /*  Parameters used by demod */
-    COMP phi_c[MODE_M_MAX];
+    float* fft_est;	    /* Freq est FFT magnitude */
+    COMP phi_c[MODE_M_MAX]; /* phase of each demod local oscillator */
+    COMP *f_dc;             /* down converted samples               */
     
     kiss_fft_cfg fft_cfg;   /* Config for KISS FFT, used in freq est */
     float norm_rx_timing;   /* Normalized RX timing */
-    
-    COMP* samp_old;         /* Tail end of last batch of samples */
-    int nstash;             /* How many elements are in there */
-    
-    float* fft_est;			/* Freq est FFT magnitude */
-    
-    /* Memory used by demod but not important between demod frames */
+        
     
     /*  Parameters used by mod */
     COMP tx_phase_c;        /* TX phase, but complex */ 

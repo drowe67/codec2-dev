@@ -103,6 +103,110 @@ static void fsk_generate_hann_table(struct FSK* fsk){
 
 
 
+#define HORUS_MIN 300
+#define HORUS_MAX 2800
+#define HORUS_MIN_SPACING 100
+
+/*---------------------------------------------------------------------------*\
+
+  FUNCTION....: fsk_create
+  AUTHOR......: Brady O'Brien
+  DATE CREATED: 7 January 2016
+  
+  Create and initialize an instance of the FSK modem. Returns a pointer
+  to the modem state/config struct. One modem config struct may be used
+  for both mod and demod. returns NULL on failure.
+
+\*---------------------------------------------------------------------------*/
+
+struct FSK * fsk_create(int Fs, int Rs,int M, int tx_f1, int tx_fs)
+{
+    struct FSK *fsk;
+    int i;
+
+    /* Check configuration validity */
+    assert(Fs > 0 );
+    assert(Rs > 0 );
+    assert(tx_f1 > 0);
+    assert(tx_fs > 0);
+    assert(horus_P > 0);
+    /* Ts (Fs/Rs) must be an integer */
+    assert( (Fs%Rs) == 0 );
+    /* Ts/P (Fs/Rs/P) must be an integer */
+    assert( ((Fs/Rs)%horus_P) == 0 );
+    assert( M==2 || M==4);
+    
+    fsk = (struct FSK*) malloc(sizeof(struct FSK)); assert(fsk != NULL);
+     
+    // Need enough bins to with 10% of tone centre
+    float bin_width_Hz = 0.1*Rs;
+    float Ndft = (float)Fs/bin_width_Hz;
+    Ndft = pow(2.0, ceil(log2(Ndft)));
+    
+    /* Set constant config parameters */
+    fsk->Fs = Fs;
+    fsk->Rs = Rs;
+    fsk->Ts = Fs/Rs;
+    fsk->burst_mode = 0;
+    fsk->P = horus_P;
+    fsk->Nsym = 50;
+    fsk->N = fsk->Ts*fsk->Nsym;
+    fsk->Ndft = Ndft;
+    fsk->tc = 0.1;
+    fsk->Nmem = fsk->N+(2*fsk->Ts);
+    fsk->f1_tx = tx_f1;
+    fsk->fs_tx = tx_fs;
+    fsk->nin = fsk->N;
+    fsk->mode = M==2 ? MODE_2FSK : MODE_4FSK;
+    fsk->Nbits = M==2 ? fsk->Nsym : fsk->Nsym*2;
+    fsk->est_min = HORUS_MIN;
+    fsk->est_max = HORUS_MAX;
+    fsk->est_space = HORUS_MIN_SPACING;
+    
+    //printf("C.....: M: %d Fs: %d Rs: %d Ts: %d nsym: %d nbit: %d N: %d Ndft: %d fmin: %d fmax: %d\n",
+    //       M, fsk->Fs, fsk->Rs, fsk->Ts, fsk->Nsym, fsk->Nbits, fsk->N, fsk->Ndft, fsk->est_min, fsk->est_max);
+    /* Set up rx state */
+    for(i=0; i<M; i++)
+        fsk->phi_c[i] = comp_exp_j(0);
+    fsk->f_dc = (COMP*)malloc(M*fsk->Nmem*sizeof(COMP)); assert(fsk->f_dc != NULL);
+    for(i=0; i<M*fsk->Nmem; i++)
+        fsk->f_dc[i] = comp0();
+        
+    fsk->fft_cfg = kiss_fft_alloc(Ndft,0,NULL,NULL); assert(fsk->fft_cfg != NULL);    
+    fsk->fft_est = (float*)malloc(sizeof(float)*fsk->Ndft); assert(fsk->fft_est != NULL);
+    
+    #ifdef USE_HANN_TABLE
+        #ifdef GENERATE_HANN_TABLE_RUNTIME
+            fsk->hann_table = (float*)malloc(sizeof(float)*fsk->Ndft); assert(fsk->hann_table != NULL);
+            fsk_generate_hann_table(fsk);
+        #else
+            fsk->hann_table = NULL;
+        #endif
+    #endif
+    
+    for(i=0;i<Ndft;i++)fsk->fft_est[i] = 0;
+    
+    fsk->norm_rx_timing = 0;
+    
+    /* Set up tx state */
+    fsk->tx_phase_c = comp_exp_j(0);
+    
+    /* Set up demod stats */
+    fsk->EbNodB = 0;
+    
+    for( i=0; i<M; i++)
+        fsk->f_est[i] = 0; 
+    
+    fsk->ppm = 0;
+    
+    fsk->stats = (struct MODEM_STATS*)malloc(sizeof(struct MODEM_STATS)); assert(fsk->stats != NULL);
+    stats_init(fsk);
+    fsk->normalise_eye = 1;
+    
+    return fsk;
+}
+
+
 /*---------------------------------------------------------------------------*\
 
   FUNCTION....: fsk_create_hbr
@@ -119,7 +223,6 @@ struct FSK * fsk_create_hbr(int Fs, int Rs,int P,int M, int tx_f1, int tx_fs)
 {
     struct FSK *fsk;
     int i;
-    int memold;
     int Ndft = 0;
     /* Number of symbols in a processing frame */
     int nsyms = 48;
@@ -135,9 +238,7 @@ struct FSK * fsk_create_hbr(int Fs, int Rs,int P,int M, int tx_f1, int tx_fs)
     assert( ((Fs/Rs)%P) == 0 );
     assert( M==2 || M==4);
     
-    fsk = (struct FSK*) malloc(sizeof(struct FSK));
-    if(fsk == NULL) return NULL;
-     
+    fsk = (struct FSK*) malloc(sizeof(struct FSK)); assert(fsk != NULL);
     
     /* Set constant config parameters */
     fsk->Fs = Fs;
@@ -166,7 +267,6 @@ struct FSK * fsk_create_hbr(int Fs, int Rs,int P,int M, int tx_f1, int tx_fs)
     if(fsk->est_min<0) fsk->est_min = 0;
     
     fsk->est_max = (Fs/2)-Rs/4;
-    
     fsk->est_space = Rs-(Rs/5);
     
     /* Set up rx state */
@@ -174,46 +274,13 @@ struct FSK * fsk_create_hbr(int Fs, int Rs,int P,int M, int tx_f1, int tx_fs)
     for( i=0; i<M; i++)
         fsk->phi_c[i] = comp_exp_j(0);
     
-    memold = (4*fsk->Ts);
-    
-    fsk->nstash = memold; 
-    fsk->samp_old = (COMP*) malloc(sizeof(COMP)*memold);
-    if(fsk->samp_old == NULL){
-        free(fsk);
-        return NULL;
-    }
-    
-    for(i=0;i<memold;i++) {
-        fsk->samp_old[i].real = 0;
-        fsk->samp_old[i].imag = 0;
-    }
-
-    fsk->fft_cfg = kiss_fft_alloc(fsk->Ndft,0,NULL,NULL);
-    if(fsk->fft_cfg == NULL){
-        free(fsk->samp_old);
-        free(fsk);
-        return NULL;
-    }
-    
-    fsk->fft_est = (float*)malloc(sizeof(float)*fsk->Ndft);
-    if(fsk->fft_est == NULL){
-        free(fsk->samp_old);
-        free(fsk->fft_cfg);
-        free(fsk);
-        return NULL;
-    }
+    fsk->fft_cfg = kiss_fft_alloc(fsk->Ndft,0,NULL,NULL); assert(fsk->fft_cfg != NULL);
+    fsk->fft_est = (float*)malloc(sizeof(float)*fsk->Ndft); assert(fsk->fft_est != NULL);
     
     #ifdef USE_HANN_TABLE
         #ifdef GENERATE_HANN_TABLE_RUNTIME
-            fsk->hann_table = (float*)malloc(sizeof(float)*fsk->Ndft);
-            if(fsk->hann_table == NULL){
-                free(fsk->fft_est);
-                free(fsk->samp_old);
-                free(fsk->fft_cfg);
-                free(fsk);
-                return NULL;
-            }
-            fsk_generate_hann_table(fsk);
+           fsk->hann_table = (float*)malloc(sizeof(float)*fsk->Ndft); assert(fsk->hann_table != NULL);
+           fsk_generate_hann_table(fsk);
         #else
             fsk->hann_table = NULL;
         #endif
@@ -234,163 +301,19 @@ struct FSK * fsk_create_hbr(int Fs, int Rs,int P,int M, int tx_f1, int tx_fs)
     
     fsk->ppm = 0;
 
-    fsk->stats = (struct MODEM_STATS*)malloc(sizeof(struct MODEM_STATS));
-    if(fsk->stats == NULL){
-        free(fsk->fft_est);
-        free(fsk->samp_old);
-        free(fsk->fft_cfg);
-        free(fsk);
-        return NULL;
-    }
+    fsk->stats = (struct MODEM_STATS*)malloc(sizeof(struct MODEM_STATS)); assert(fsk->stats != NULL);
     stats_init(fsk);
     fsk->normalise_eye = 1;
 
     return fsk;
 }
 
-
-#define HORUS_MIN 300
-#define HORUS_MAX 2800
-#define HORUS_MIN_SPACING 100
-
-/*---------------------------------------------------------------------------*\
-
-  FUNCTION....: fsk_create
-  AUTHOR......: Brady O'Brien
-  DATE CREATED: 7 January 2016
-  
-  Create and initialize an instance of the FSK modem. Returns a pointer
-  to the modem state/config struct. One modem config struct may be used
-  for both mod and demod. returns NULL on failure.
-
-\*---------------------------------------------------------------------------*/
-
-struct FSK * fsk_create(int Fs, int Rs,int M, int tx_f1, int tx_fs)
-{
-    struct FSK *fsk;
-    int i;
-    int memold;
-    
-    /* Check configuration validity */
-    assert(Fs > 0 );
-    assert(Rs > 0 );
-    assert(tx_f1 > 0);
-    assert(tx_fs > 0);
-    assert(horus_P > 0);
-    /* Ts (Fs/Rs) must be an integer */
-    assert( (Fs%Rs) == 0 );
-    /* Ts/P (Fs/Rs/P) must be an integer */
-    assert( ((Fs/Rs)%horus_P) == 0 );
-    assert( M==2 || M==4);
-    
-    fsk = (struct FSK*) malloc(sizeof(struct FSK));
-    if(fsk == NULL) return NULL;
-     
-    // Need enough bins to with 10% of tone centre
-    float bin_width_Hz = 0.1*Rs;
-    float Ndft = (float)Fs/bin_width_Hz;
-    Ndft = pow(2.0, ceil(log2(Ndft)));
-    //fprintf(stderr, "Ndft = %f\n", Ndft);
-    
-    /* Set constant config parameters */
-    fsk->Fs = Fs;
-    fsk->Rs = Rs;
-    fsk->Ts = Fs/Rs;
-    fsk->burst_mode = 0;
-    fsk->P = horus_P;
-    fsk->Nsym = 50;
-    fsk->N = fsk->Ts*fsk->Nsym;
-    fsk->Ndft = Ndft;
-    fsk->tc = 0.1;
-    fsk->Nmem = fsk->N+(2*fsk->Ts);
-    fsk->f1_tx = tx_f1;
-    fsk->fs_tx = tx_fs;
-    fsk->nin = fsk->N;
-    fsk->mode = M==2 ? MODE_2FSK : MODE_4FSK;
-    fsk->Nbits = M==2 ? fsk->Nsym : fsk->Nsym*2;
-    fsk->est_min = HORUS_MIN;
-    fsk->est_max = HORUS_MAX;
-    fsk->est_space = HORUS_MIN_SPACING;
-    
-    //printf("C.....: M: %d Fs: %d Rs: %d Ts: %d nsym: %d nbit: %d N: %d Ndft: %d fmin: %d fmax: %d\n",
-    //       M, fsk->Fs, fsk->Rs, fsk->Ts, fsk->Nsym, fsk->Nbits, fsk->N, fsk->Ndft, fsk->est_min, fsk->est_max);
-    /* Set up rx state */
-    for( i=0; i<M; i++)
-        fsk->phi_c[i] = comp_exp_j(0);
-    
-    memold = (4*fsk->Ts);
-    
-    fsk->nstash = memold; 
-    fsk->samp_old = (COMP*) malloc(sizeof(COMP)*memold);
-    if(fsk->samp_old == NULL){
-        free(fsk);
-        return NULL;
-    }
-    
-    for(i=0;i<memold;i++) {
-        fsk->samp_old[i].real = 0.0;
-        fsk->samp_old[i].imag = 0.0;
-    }
-    
-    fsk->fft_cfg = kiss_fft_alloc(Ndft,0,NULL,NULL);
-    if(fsk->fft_cfg == NULL){
-        free(fsk->samp_old);
-        free(fsk);
-        return NULL;
-    }
-    
-    fsk->fft_est = (float*)malloc(sizeof(float)*fsk->Ndft);
-    if(fsk->fft_est == NULL){
-        free(fsk->samp_old);
-        free(fsk->fft_cfg);
-        free(fsk);
-        return NULL;
-    }
-    
-    #ifdef USE_HANN_TABLE
-        #ifdef GENERATE_HANN_TABLE_RUNTIME
-            fsk->hann_table = (float*)malloc(sizeof(float)*fsk->Ndft);
-            if(fsk->hann_table == NULL){
-                free(fsk->fft_est);
-                free(fsk->samp_old);
-                free(fsk->fft_cfg);
-                free(fsk);
-                return NULL;
-            }
-            fsk_generate_hann_table(fsk);
-        #else
-            fsk->hann_table = NULL;
-        #endif
-    #endif
-    
-    for(i=0;i<Ndft;i++)fsk->fft_est[i] = 0;
-    
-    fsk->norm_rx_timing = 0;
-    
-    /* Set up tx state */
-    fsk->tx_phase_c = comp_exp_j(0);
-    
-    /* Set up demod stats */
-    fsk->EbNodB = 0;
-    
-    for( i=0; i<M; i++)
-        fsk->f_est[i] = 0; 
-    
-    fsk->ppm = 0;
-    
-    fsk->stats = (struct MODEM_STATS*)malloc(sizeof(struct MODEM_STATS));
-    
-    if(fsk->stats == NULL){
-        free(fsk->fft_est);
-        free(fsk->samp_old);
-        free(fsk->fft_cfg);
-        free(fsk);
-        return NULL;
-    }
-    stats_init(fsk);
-    fsk->normalise_eye = 1;
-    
-    return fsk;
+void fsk_destroy(struct FSK *fsk){
+    free(fsk->f_dc);
+    free(fsk->fft_cfg);
+    free(fsk->stats);
+    free(fsk->hann_table);
+    free(fsk);
 }
 
 /* make sure stats have known values in case monitoring process reads stats before they are set */
@@ -480,13 +403,6 @@ void fsk_clear_estimators(struct FSK *fsk){
 
 uint32_t fsk_nin(struct FSK *fsk){
     return (uint32_t)fsk->nin;
-}
-
-void fsk_destroy(struct FSK *fsk){
-    free(fsk->fft_cfg);
-    free(fsk->samp_old);
-    free(fsk->stats);
-    free(fsk);
 }
 
 void fsk_get_demod_stats(struct FSK *fsk, struct MODEM_STATS *stats){
@@ -649,7 +565,8 @@ void fsk_demod_freq_est(struct FSK *fsk, COMP fsk_in[],float *freqs,int M){
     #endif
 }
 
-void fsk2_demod(struct FSK *fsk, uint8_t rx_bits[], float rx_sd[], COMP fsk_in[]){
+/* core demodulator function */
+void fsk_demod_core(struct FSK *fsk, uint8_t rx_bits[], float rx_sd[], COMP fsk_in[]){
     int N = fsk->N;
     int Ts = fsk->Ts;
     int Rs = fsk->Rs;
@@ -659,171 +576,76 @@ void fsk2_demod(struct FSK *fsk, uint8_t rx_bits[], float rx_sd[], COMP fsk_in[]
     int P = fsk->P;
     int Nmem = fsk->Nmem;
     int M = fsk->mode;
-    size_t i,j,m,dc_i,cbuf_i;
+    size_t i,j,m;
     float ft1;
-    int nstash = fsk->nstash;
     
-    COMP* f_int[M];     /* Filtered and downsampled symbol tones */
     COMP t[M];          /* complex number temps */
     COMP t_c;           /* another complex temp */
-    COMP phi_c[M];  
+    COMP *phi_c = fsk->phi_c;  
+    COMP *f_dc = fsk->f_dc;  
     COMP phi_ft;        
     int nold = Nmem-nin;
     
-    COMP dphi[M];
     COMP dphift;
     float rx_timing,norm_rx_timing,old_norm_rx_timing,d_norm_rx_timing,appm;
-    int using_old_samps;
 
-    COMP* sample_src;
-    COMP* f_intbuf_m;
+    //COMP* sample_src;
+    //COMP* f_intbuf_m;
     
-    float f_est[M],fc_avg,fc_tx;
+    float *f_est = fsk->f_est;
+    float fc_avg,fc_tx;
     float meanebno,stdebno,eye_max;
     int neyesamp,neyeoffset;
     
     #ifdef MODEMPROBE_ENABLE
-    char mp_name_tmp[20]; /* Temporary string for modem probe trace names */
+    #define NMP_NAME 19
+    char mp_name_tmp[NMP_NAME+1]; /* Temporary string for modem probe trace names */
     #endif
 
-    //for(size_t jj = 0; jj<nin; jj++){
-    //    fprintf(stderr,"%f,j%f,",fsk_in[jj].real,fsk_in[jj].imag);
-    //}
-    
-    /* Load up demod phases from struct */
-    for( m=0; m<M; m++)
-        phi_c[m] = fsk->phi_c[m];
-    
     /* Estimate tone frequencies */
     fsk_demod_freq_est(fsk,fsk_in,f_est,M);
+    #ifdef MODEMPROBE_ENABLE
     modem_probe_samp_f("t_f_est",f_est,M);
-        
-    /* Allocate circular buffer for integration */
-    #ifdef DEMOD_ALLOC_STACK
-    f_intbuf_m = (COMP*) alloca(sizeof(COMP)*Ts);
-    #else
-    f_intbuf_m = (COMP*) malloc(sizeof(COMP)*Ts);    
     #endif
     
-    /* allocate memory for the integrated samples */
-    for( m=0; m<M; m++){
-        #ifdef DEMOD_ALLOC_STACK
-        /* allocate memory for the integrated samples */
-        /* Note: This must be kept after fsk_demod_freq_est for memory usage reasons */
-        f_int[m] = (COMP*) alloca(sizeof(COMP)*(nsym+1)*P);
-        
-        #else
-        f_int[m] = (COMP*) malloc(sizeof(COMP)*(nsym+1)*P);
-        #endif
+    /* update filter (integrator) memory by shifting in nin samples */
+    for(m=0; m<M; m++) {
+        for(i=0,j=Nmem-nold; i<nold; i++,j++)
+            f_dc[m*Nmem+i] = f_dc[m*Nmem+j];
     }
-    
-#ifdef RM_ME
-    /* If this is the first run, we won't have any valid f_est */
-    /* TODO: add first_run flag to FSK to make negative freqs possible */
-    if(fsk->f_est[0]<1){
-        for( m=0; m<M; m++)
-            fsk->f_est[m] = f_est[m];
-    }
-#endif
-    
-    /* Initalize downmixers for each symbol tone */
-    for( m=0; m<M; m++){
-        /* Back the stored phase off to account for re-integraton of old samples */
-        dphi[m] = comp_exp_j(-2*(Nmem-nin-(Ts/P))*M_PI*((fsk->f_est[m])/(float)(Fs)));
-        phi_c[m] = cmult(dphi[m],phi_c[m]);
-        //fprintf(stderr,"F%d = %f",m,fsk->f_est[m]);
-
-        /* Figure out how much to nudge each sample downmixer for every sample */
-        dphi[m] = comp_exp_j(2*M_PI*((fsk->f_est[m])/(float)(Fs)));
-    }
-    
-    /* Integrate and downsample for symbol tones */
-    for(m=0; m<M; m++){
-        /* Copy buffer pointers in to avoid second buffer indirection */
-        float f_est_m = f_est[m];
-        COMP* f_int_m = &(f_int[m][0]);
-        COMP dphi_m = dphi[m];
-        
-        dc_i = 0;
-        cbuf_i = 0;
-        sample_src = &(fsk->samp_old[nstash-nold]);
-        using_old_samps = 1;
-        
-        /* Pre-fill integration buffer */
-        for(dc_i=0; dc_i<Ts-(Ts/P); dc_i++){
-            /* Switch sample source to new samples when we run out of old ones */
-            if(dc_i>=nold && using_old_samps){
-                sample_src = &fsk_in[0];
-                dc_i = 0;
-                using_old_samps = 0;
-                
-                /* Recalculate delta-phi after switching to new sample source */
-                phi_c[m] = comp_normalize(phi_c[m]);
-                dphi_m = comp_exp_j(2*M_PI*((f_est_m)/(float)(Fs)));
-            }
-            /* Downconvert and place into integration buffer */
-            f_intbuf_m[dc_i]=cmult(sample_src[dc_i],cconj(phi_c[m]));
-            
-            #ifdef MODEMPROBE_ENABLE
-            snprintf(mp_name_tmp,19,"t_f%zd_dc",m+1);
-            modem_probe_samp_c(mp_name_tmp,&f_intbuf_m[dc_i],1);
-            #endif
-            /* Spin downconversion phases */
+  
+    /* freq shift down to around DC, ensuring continuous phase from last frame */
+    COMP dphi_m;
+    for(m=0; m<M; m++) {
+        dphi_m = comp_exp_j(2*M_PI*((f_est[m])/(float)(Fs)));
+        for(i=nold,j=0; i<Nmem; i++,j++) {
+            f_dc[m*Nmem+i] = cmult(fsk_in[j],cconj(phi_c[m]));
             phi_c[m] = cmult(phi_c[m],dphi_m);
         }
-        cbuf_i = dc_i;
-        
-        /* Integrate over Ts at offsets of Ts/P */
-        for(i=0; i<(nsym+1)*P; i++){
-            /* Downconvert and Place Ts/P samples in the integration buffers */
-            for(j=0; j<(Ts/P); j++,dc_i++){
-                /* Switch sample source to new samples when we run out of old ones */
-                if(dc_i>=nold && using_old_samps){
-                    sample_src = &fsk_in[0];
-                    dc_i = 0;
-                    using_old_samps = 0;
-                    
-                    /* Recalculate delta-phi after switching to new sample source */
-                    phi_c[m] = comp_normalize(phi_c[m]);
-                    dphi_m = comp_exp_j(2*M_PI*((f_est_m)/(float)(Fs)));
-                }
-                /* Downconvert and place into integration buffer */
-                f_intbuf_m[cbuf_i+j]=cmult(sample_src[dc_i],cconj(phi_c[m]));
-        
-                #ifdef MODEMPROBE_ENABLE
-                snprintf(mp_name_tmp,19,"t_f%zd_dc",m+1);
-                modem_probe_samp_c(mp_name_tmp,&f_intbuf_m[cbuf_i+j],1);
-                #endif
-                /* Spin downconversion phases */
-                phi_c[m] = cmult(phi_c[m],dphi_m);
-                
-            }
-            
-            /* Dump internal samples */
-            cbuf_i += Ts/P;
-            if(cbuf_i>=Ts) cbuf_i = 0;
-            
-            /* Integrate over the integration buffers, save samples */
-            float it_r = 0;
-            float it_i = 0;
-            for(j=0; j<Ts; j++){
-                it_r += f_intbuf_m[j].real;
-                it_i += f_intbuf_m[j].imag;
-            }
-            f_int_m[i].real = it_r;
-            f_int_m[i].imag = it_i;
+        phi_c[m] = comp_normalize(phi_c[m]);
+        snprintf(mp_name_tmp,NMP_NAME,"t_f%zd_dc",m+1);
+        modem_probe_samp_c(mp_name_tmp,&f_dc[m*Nmem],Nmem);
+        fprintf(stderr, "m: %d Nmem: %d\n", m, Nmem);
+    }
+#ifdef TMP
+
+    /* integrate over symbol period at a variety of offsets */
+
+    COMP f_int[M][(nsym+1)*P];
+    for(i=0; i<(nsym+1)*P; i++) {
+        int st = (i-1)*Ts/P;
+        int en = st+Ts;
+        for(m=0; m<M; m++) {
+            f_int[m][i] = comp0();
+            for(j=st; j<en; j++)
+                f_int[m][i] = cadd(f_int[m][i], f_dc[m*Nmem+j]);
+            #ifdef MODEMPROBE_ENABLE
+            snprintf(mp_name_tmp,19,"t_f%zd_dc",m+1);
+            modem_probe_samp_c(mp_name_tmp,&f_int[m][i],1);
+            #endif                       
         }
     }
-    
-    /* Save phases back into FSK struct */
-    for(m=0; m<M; m++){
-        fsk->phi_c[m] = phi_c[m];
-        fsk->f_est[m] = f_est[m];
-    }
-
-    /* Stash samples away in the old sample buffer for the next round of bit getting */
-    memcpy((void*)&(fsk->samp_old[0]),(void*)&(fsk_in[nin-nstash]),sizeof(COMP)*nstash);
-    
+        
     /* Fine Timing Estimation */
     /* Apply magic nonlinearity to f1_int and f2_int, shift down to 0, 
      * extract angle */
@@ -879,6 +701,9 @@ void fsk2_demod(struct FSK *fsk, uint8_t rx_bits[], float rx_sd[], COMP fsk_in[]
         else
             fsk->nin = N;
     }
+
+    // RM_EM lock nin for now for initial tests
+    fsk->nin=N;
     
     modem_probe_samp_f("t_norm_rx_timing",&(norm_rx_timing),1);
     modem_probe_samp_i("t_nin",&(fsk->nin),1);
@@ -1072,21 +897,16 @@ void fsk2_demod(struct FSK *fsk, uint8_t rx_bits[], float rx_sd[], COMP fsk_in[]
         modem_probe_samp_f(mp_name_tmp,&f_est[m],1);
     }
     #endif
+#endif
     
-    #ifndef DEMOD_ALLOC_STACK
-    for( m=0; m<M; m++){
-        free(f_int[m]);
-    }
-    free(f_intbuf_m);
-    #endif
 }
 
 void fsk_demod(struct FSK *fsk, uint8_t rx_bits[], COMP fsk_in[]){
-    fsk2_demod(fsk,rx_bits,NULL,fsk_in);
+    fsk_demod_core(fsk,rx_bits,NULL,fsk_in);
 }
 
 void fsk_demod_sd(struct FSK *fsk, float rx_sd[], COMP fsk_in[]){
-    fsk2_demod(fsk,NULL,rx_sd,fsk_in);
+    fsk_demod_core(fsk,NULL,rx_sd,fsk_in);
 }
 
 void fsk_mod(struct FSK *fsk,float fsk_out[],uint8_t tx_bits[]){
