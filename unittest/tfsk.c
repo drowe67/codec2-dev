@@ -133,6 +133,8 @@ int main(int argc,char *argv[]){
     }else{
         fsk = fsk_create(Fs,Rs,M,f1,fs);
     }
+    fsk->lock_nin = lock_nin;
+    
     /* Modulate! */
     if(test_type == TEST_MOD || test_type == TEST_SELF_FULL){
         /* Generate random bits for self test */
@@ -190,8 +192,7 @@ int main(int argc,char *argv[]){
         /* Demod-only test */
         if(test_type == TEST_DEMOD){
             while( fread(modbuf,sizeof(float),fsk_nin(fsk),fin) == fsk_nin(fsk) ){
-                int n;
-                if (lock_nin) n = fsk->N; else n = fsk_nin(fsk);
+                int n = fsk_nin(fsk);
                 COMP modbuf_comp[n];
                 for(i=0; i<n; i++) {
                     modbuf_comp[i].real = modbuf[i];
@@ -206,8 +207,7 @@ int main(int argc,char *argv[]){
             bitbufp = bitbuf;
             modbufp = modbuf;
             while( modbufp < modbuf + modbufsize){
-                int n;
-                if (lock_nin) n = fsk->N; else n = fsk_nin(fsk);
+                int n = fsk_nin(fsk);
                 COMP modbuf_comp[n];
                 for(i=0; i<n; i++) {
                     modbuf_comp[i].real = modbuf[i];

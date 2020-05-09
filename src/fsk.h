@@ -81,6 +81,7 @@ struct FSK {
     /*  Parameters used by mod/demod and driving code */
     int nin;                /* Number of samples to feed the next demod cycle */
     int burst_mode;         /* enables/disables 'burst' mode */
+    int lock_nin;           /* locks nin during testing */
     
     /*  modem statistic struct */
     struct MODEM_STATS *stats;

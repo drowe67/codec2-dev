@@ -224,7 +224,6 @@ function test_stats = fsk_demod_xt(Fs,Rs,f1,fsp,mod,tname,M=2,lock_nin=0)
     assert(vcompare(o_EbNodB,     t_EbNodB,'EbNodB',      tname,.02,13));
     assert(vcompare(o_nin,        t_nin,      'nin',      tname,.0001,14));
     assert(vcompare(o_norm_rx_timing,  t_norm_rx_timing,'norm rx timing',tname,.02,15));
-   
     diffpass = sum(xor(obits,bits'))<4;
     diffbits = sum(xor(obits,bits'));
         
@@ -506,7 +505,15 @@ function pass = ebno_battery_test(timing_offset,fading,df,dA,M)
     mv      = repmat(M,1,ebnodbs);
 
     %statv = pararrayfun(floor(1.25*nproc()),@tfsk_run_sim,modev,ebnodbrange,timingv,fadingv,dfv,dav,mv);
-    stats = tfsk_run_sim(mode, ebnodbrange(1), timing_offset, fading, df, dA, M);
+    %stats = tfsk_run_sim(mode, ebnodbrange(1), timing_offset, fading, df, dA, M);
+    mode
+    timing_offset
+    fading
+    df
+    dA
+    M
+    
+    %stats = tfsk_run_sim(mode, EbNodB=5, timing_offset, fading, df, dA, M);
     assert(stats.pass == 1);
     xx
     
@@ -606,10 +613,18 @@ endfunction
 
 % We kick off tests here ------------------------------------------------------
    
-xpass = test_fsk_battery
+%xpass = test_fsk_battery
 pass = 0;
 pass += test_mod_horuscfg_randbits;
 pass += test_mod_horuscfgm4_randbits;
-stats = tfsk_run_sim(mode=2, EbNodB=5, timing_offset=0, fading=0, df=0, dA=0, M=4, frame=10, lock_nin=1);
-pass += stats.pass;
+stats = tfsk_run_sim(test_frame_mode=2,EbNodB=5,timing_offset=1,fading=0,df=1,dA=1,M=4,frames=10,lock_nin=1);
+if stats.pass
+  print_result("Demod 10 frames nin locked", "OK");
+  pass += stats.pass;
+end
+stats = tfsk_run_sim(test_frame_mode=2,EbNodB=5,timing_offset=1,fading=0,df=1,dA=1,M=4,frames=10,lock_nin=0);
+if stats.pass
+  print_result("Demod 10 frames", "OK");
+  pass += stats.pass;
+end
 
