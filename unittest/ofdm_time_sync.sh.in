@@ -3,7 +3,7 @@
 # David June 2019
 # Tests ofdm modem sync time, using real, off air files
 
-PATH=$PATH:../build_linux/src
+PATH=$PATH:@CMAKE_CURRENT_BINARY_DIR@/src
 onerun=$(mktemp)
 results=$(mktemp)
 

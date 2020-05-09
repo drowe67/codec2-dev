@@ -11,6 +11,7 @@ function stem_sig_and_error(plotnum, subplotnum, sig, error, titlestr, axisvec)
   if find(no_plot_list == plotnum)
     return;
   end
+  
   figure(plotnum)
   subplot(subplotnum)
   stem(sig,'g;Octave version;');
@@ -30,7 +31,7 @@ function plot_sig_and_error(plotnum, subplotnum, sig, error, titlestr, axisvec)
   if find(no_plot_list == plotnum)
     return;
   end
-
+  
   figure(plotnum)
   subplot(subplotnum)
   plot(sig,'g;Octave version;');

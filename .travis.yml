@@ -4,11 +4,11 @@ env:
   - GCC_SHORT=8-2018q4
 sudo: required
 language: generic
-dist: xenial
+dist: focal
 addons:
   apt:
     packages: libc6-i386 octave octave-common octave-signal liboctave-dev gnuplot
-              sox p7zip-full python3-numpy valgrind
+              sox p7zip-full python3-numpy valgrind fonts-freefont-otf
               
 cache:
   directories:

@@ -609,7 +609,7 @@ else
 
   % some other useful plots
 
-  figure(1)
+  f = figure(1)
   clf
   subplot(211)
   plot(real(tx_fdm_frame_log))
@@ -617,8 +617,9 @@ else
   subplot(212)
   plot(imag(tx_fdm_frame_log))
   title('tx fdm imag');
+  close(f, "force")
 
-  figure(2)
+  f = figure(2)
   clf
   spec = 20*log10(abs(fft(tx_fdm_frame_log)));
   l = length(spec);
@@ -628,8 +629,9 @@ else
   ylabel('Amplitude (dB)')
   xlabel('Frequency (Hz)')
   grid;
+  close(f, "force")
 
-  figure(3)
+  f = figure(3)
   clf;
   % plot combined signals to show diversity gains
   combined = rx_symb_log(:,1:Nc);
@@ -640,15 +642,17 @@ else
   title('Scatter');
   ymax = abs(max(max(combined)));
   axis([-ymax ymax -ymax ymax])
+  close(f, "force")
 
-  figure(4)
+  f = figure(4)
   clf;
   subplot(211)
   plot(rx_phi_log)
   subplot(212)
   plot(rx_amp_log)
+  close(f, "force")
 
-  figure(5)
+  f = figure(5)
   clf;
   subplot(211)
   plot(rx_timing_log)
@@ -656,8 +660,9 @@ else
   subplot(212)
   stem(ratio_log)
   title('Sync ratio');
+  close(f, "force")
 
-  figure(6)
+  f = figure(6)
   clf;
   subplot(211)
   stem(nerr_log)
@@ -665,8 +670,9 @@ else
   subplot(212)
   plot(noise_rms_filt_log,'r', sig_rms_log,'g');
   title('Est rms signal and noise')
+  close(f, "force")
 
-  figure(7);
+  f = figure(7);
   clf;
   subplot(211)
   plot(foff_log,';freq offset;');
@@ -678,19 +684,22 @@ else
   subplot(212)
   plot(foff_log(1:length(f_est_log)) - f_est_log + Fcentre)
   title('freq offset estimation error');
+  close(f, "force")
 
-  figure(8)
+  f = figure(8)
   clf
   h = freqz(b,a,Fs/2);
   plot(20*log10(abs(h)))
   axis([1 Fs/2 -20 0])
   grid
   title('SSB tx filter')
+  close(f, "force")
 
-  figure(9)
+  f = figure(9)
   clf
   plot(error_positions_hist)    
   title('histogram of bit errors')                               
+  close(f, "force")
 
   
 end
@@ -722,22 +731,22 @@ endfunction
 
 % function to write float fading samples for use by C programs
 
-function write_noise_file(raw_file_name, Fs, dopplerSpreadHz, len_samples)
-  spread = doppler_spread(dopplerSpreadHz, Fs, len_samples);
-  spread_2ms = doppler_spread(dopplerSpreadHz, Fs, len_samples);
-  hf_gain = 1.0/sqrt(var(spread)+var(spread_2ms));
-
-  % interleave real imag samples
-
-  inter = zeros(1,len_samples*4);
-  inter(1:4) = hf_gain;
-  for i=1:len_samples
-    inter(i*4+1) = real(spread(i));
-    inter(i*4+2) = imag(spread(i));
-    inter(i*4+3) = real(spread_2ms(i));
-    inter(i*4+4) = imag(spread_2ms(i));
-  end
-  f = fopen(raw_file_name,"wb");
-  fwrite(f, inter, "float32");
-  fclose(f);
-endfunction
+%function write_noise_file(raw_file_name, Fs, dopplerSpreadHz, len_samples)
+%  spread = doppler_spread(dopplerSpreadHz, Fs, len_samples);
+%  spread_2ms = doppler_spread(dopplerSpreadHz, Fs, len_samples);
+%  hf_gain = 1.0/sqrt(var(spread)+var(spread_2ms));
+%
+%  % interleave real imag samples
+%
+%  inter = zeros(1,len_samples*4);
+%  inter(1:4) = hf_gain;
+%  for i=1:len_samples
+%    inter(i*4+1) = real(spread(i));
+%    inter(i*4+2) = imag(spread(i));
+%    inter(i*4+3) = real(spread_2ms(i));
+%    inter(i*4+4) = imag(spread_2ms(i));
+%  end
+%  f = fopen(raw_file_name,"wb");
+%  fwrite(f, inter, "float32");
+%  fclose(f);
+%endfunction

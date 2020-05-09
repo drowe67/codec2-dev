@@ -308,33 +308,34 @@ if(UNITTEST)
              set_tests_properties(test_CML_ldpcut PROPERTIES PASS_REGULAR_EXPRESSION "Nerr: 0")
 
     add_test(NAME test_codec2_700c_octave_port
-             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
-                            ./c2sim ../../raw/cq_ref.raw --phase0 --postfilter --dump cq_ref --lpc 10 --dump_pitch_e cq_ref_pitche.txt; \
-                            cd ${CMAKE_CURRENT_BINARY_DIR}/unittest; ./tnewamp1 ../../raw/cq_ref.raw; \
-                            cd ${CMAKE_CURRENT_SOURCE_DIR}/octave;  \
-                            octave --no-gui -qf run_tnewamp1.m")
+             COMMAND sh -c "
+               cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+               ./c2sim ${CMAKE_CURRENT_SOURCE_DIR}/raw/cq_ref.raw --phase0 --postfilter --dump cq_ref --lpc 10 --dump_pitch_e cq_ref_pitche.txt;
+               cd ${CMAKE_CURRENT_BINARY_DIR}/unittest; ./tnewamp1 ${CMAKE_CURRENT_SOURCE_DIR}/raw/cq_ref.raw;
+               cd ${CMAKE_CURRENT_SOURCE_DIR}/octave;
+               DISPLAY=\"\" octave-cli -qf --eval 'tnewamp1(\"${CMAKE_CURRENT_BINARY_DIR}/src/cq_ref\", \"${CMAKE_CURRENT_BINARY_DIR}/unittest\")'")
              set_tests_properties(test_codec2_700c_octave_port PROPERTIES PASS_REGULAR_EXPRESSION "fails: 0")
 
     add_test(NAME test_FDMDV_modem_octave_port
-             COMMAND sh -c "$<TARGET_FILE:tfdmdv> && octave --no-gui -qf ${CMAKE_CURRENT_SOURCE_DIR}/octave/tfdmdv.m"
+             COMMAND sh -c "$<TARGET_FILE:tfdmdv> && DISPLAY=\"\" octave-cli --no-gui -qf ${CMAKE_CURRENT_SOURCE_DIR}/octave/tfdmdv.m"
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/octave)
              set_tests_properties(test_FDMDV_modem_octave_port PROPERTIES
              PASS_REGULAR_EXPRESSION "fails: 0")
 
     add_test(NAME test_COHPSK_modem_octave_port
-             COMMAND sh -c "$<TARGET_FILE:tcohpsk> && octave --no-gui -qf ${CMAKE_CURRENT_SOURCE_DIR}/octave/tcohpsk.m"
+             COMMAND sh -c "$<TARGET_FILE:tcohpsk> && DISPLAY=\"\" octave-cli --no-gui -qf ${CMAKE_CURRENT_SOURCE_DIR}/octave/tcohpsk.m"
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/octave)
              set_tests_properties(test_COHPSK_modem_octave_port PROPERTIES
              PASS_REGULAR_EXPRESSION "fails: 0")
 
     add_test(NAME test_OFDM_modem_octave_port
-             COMMAND sh -c "PATH_TO_TOFDM=${CMAKE_CURRENT_BINARY_DIR}/unittest/tofdm octave --no-gui -qf ${CMAKE_CURRENT_SOURCE_DIR}/octave/tofdm.m"
+             COMMAND sh -c "PATH_TO_TOFDM=${CMAKE_CURRENT_BINARY_DIR}/unittest/tofdm DISPLAY=\"\" octave-cli --no-gui -qf ${CMAKE_CURRENT_SOURCE_DIR}/octave/tofdm.m"
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/octave)
              set_tests_properties(test_OFDM_modem_octave_port PROPERTIES
              PASS_REGULAR_EXPRESSION "fails: 0")
 
     add_test(NAME test_OFDM_modem_octave_port_Nc_31
-             COMMAND sh -c "NC=31 PATH_TO_TOFDM=${CMAKE_CURRENT_BINARY_DIR}/unittest/tofdm octave --no-gui -qf ${CMAKE_CURRENT_SOURCE_DIR}/octave/tofdm.m"
+             COMMAND sh -c "NC=31 PATH_TO_TOFDM=${CMAKE_CURRENT_BINARY_DIR}/unittest/tofdm DISPLAY=\"\" octave-cli --no-gui -qf ${CMAKE_CURRENT_SOURCE_DIR}/octave/tofdm.m"
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/octave)
              set_tests_properties(test_OFDM_modem_octave_port_Nc_31 PROPERTIES
              PASS_REGULAR_EXPRESSION "fails: 0")
@@ -351,30 +352,34 @@ if(UNITTEST)
              COMMAND sh -c "$<TARGET_FILE:ofdm_mod> --in /dev/zero --ldpc 1 --testframes 60 --txbpf | $<TARGET_FILE:cohpsk_ch> - - -20 --Fs 8000 -f -50 | $<TARGET_FILE:ofdm_demod> --out /dev/null --testframes --ldpc 1 --verbose 1"
              )
 
+    configure_file(unittest/ofdm_fade.sh.in unittest/ofdm_fade.sh)
     add_test(NAME test_OFDM_modem_fading_BER
-             COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/unittest/ofdm_fade.sh
+             COMMAND ${CMAKE_CURRENT_BINARY_DIR}/unittest/ofdm_fade.sh
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/unittest
              )
            
+    configure_file(unittest/ofdm_phase_est_bw.sh.in unittest/ofdm_phase_est_bw.sh)
     add_test(NAME test_OFDM_modem_phase_est_bw
-             COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/unittest/ofdm_phase_est_bw.sh
+             COMMAND ${CMAKE_CURRENT_BINARY_DIR}/unittest/ofdm_phase_est_bw.sh
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/unittest
              )
            
+    configure_file(unittest/ofdm_time_sync.sh.in unittest/ofdm_time_sync.sh)
     add_test(NAME test_OFDM_modem_time_sync_700D
-             COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/unittest/ofdm_time_sync.sh 700D
+             COMMAND ${CMAKE_CURRENT_BINARY_DIR}/unittest/ofdm_time_sync.sh 700D
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/unittest
              )
            
 if(LPCNET)
     add_test(NAME test_OFDM_modem_time_sync_2020
-             COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/unittest/ofdm_time_sync.sh 2020
+             COMMAND ${CMAKE_CURRENT_BINARY_DIR}/unittest/ofdm_time_sync.sh 2020
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/unittest
              )
 endif()
 
+    configure_file(unittest/ofdm_fade_dpsk.sh.in unittest/ofdm_fade_dpsk.sh)
     add_test(NAME test_OFDM_modem_fading_DPSK_BER
-             COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/unittest/ofdm_fade_dpsk.sh
+             COMMAND ${CMAKE_CURRENT_BINARY_DIR}/unittest/ofdm_fade_dpsk.sh
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/unittest
              )
            
@@ -446,73 +451,76 @@ endif()
              COMMAND $<TARGET_FILE:tfifo>
              )
 
+if (NOT APPLE)
      add_test(NAME test_memory_leak_FreeDV_1600_tx
-             COMMAND sh -c " valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./freedv_tx 1600 ../../raw/hts1a.raw /dev/null"
+             COMMAND sh -c " valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./freedv_tx 1600 ${CMAKE_CURRENT_SOURCE_DIR}/raw/hts1a.raw /dev/null"
              WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/src
              )
              set_tests_properties(test_memory_leak_FreeDV_1600_tx PROPERTIES PASS_REGULAR_EXPRESSION "ERROR SUMMARY: 0 errors")
 
      add_test(NAME test_memory_leak_FreeDV_1600_rx
-             COMMAND sh -c "./freedv_tx 1600 ../../raw/hts1a.raw t.raw; \
+             COMMAND sh -c "./freedv_tx 1600 ${CMAKE_CURRENT_SOURCE_DIR}/raw/hts1a.raw t.raw; \
                             valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./freedv_rx 1600 t.raw /dev/null"
              WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/src
              )
              set_tests_properties(test_memory_leak_FreeDV_1600_rx PROPERTIES PASS_REGULAR_EXPRESSION "ERROR SUMMARY: 0 errors")
 
      add_test(NAME test_memory_leak_FreeDV_700D_tx
-             COMMAND sh -c " valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./freedv_tx 700D ../../raw/hts1a.raw /dev/null"
+             COMMAND sh -c " valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./freedv_tx 700D ${CMAKE_CURRENT_SOURCE_DIR}/raw/hts1a.raw /dev/null"
              WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/src
              )
              set_tests_properties(test_memory_leak_FreeDV_700D_tx PROPERTIES PASS_REGULAR_EXPRESSION "ERROR SUMMARY: 0 errors")
 
      add_test(NAME test_memory_leak_FreeDV_700D_rx
-             COMMAND sh -c "./freedv_tx 1600 ../../raw/hts1a.raw t.raw; \
+             COMMAND sh -c "./freedv_tx 1600 ${CMAKE_CURRENT_SOURCE_DIR}/raw/hts1a.raw t.raw; \
                             valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./freedv_rx 700D t.raw /dev/null"
              WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/src
              )
              set_tests_properties(test_memory_leak_FreeDV_700D_rx PROPERTIES PASS_REGULAR_EXPRESSION "ERROR SUMMARY: 0 errors")
+endif(NOT APPLE)
 
      add_test(NAME test_mode_dot_c2
-             COMMAND sh -c "./c2enc 700C ../../raw/hts1a.raw hts1a.c2 && ./c2dec 1600 hts1a.c2 /dev/null"
+             COMMAND sh -c "./c2enc 700C ${CMAKE_CURRENT_SOURCE_DIR}/raw/hts1a.raw hts1a.c2 && ./c2dec 1600 hts1a.c2 /dev/null"
              WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/src
              )
              set_tests_properties(test_mode_dot_c2 PROPERTIES PASS_REGULAR_EXPRESSION "mode 8")
 
      add_test(NAME test_mode_3200
-             COMMAND sh -c "./c2enc 3200 ../../raw/hts1a.raw - | ./c2dec 3200 - - | sox -t .s16 -r 8000 - hts1a_3200.wav"
+             COMMAND sh -c "./c2enc 3200 ${CMAKE_CURRENT_SOURCE_DIR}/raw/hts1a.raw - | ./c2dec 3200 - - | sox -t .s16 -r 8000 - hts1a_3200.wav"
              WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/src
              )
      add_test(NAME test_mode_2400
-             COMMAND sh -c "./c2enc 2400 ../../raw/hts1a.raw - | ./c2dec 2400 - - | sox -t .s16 -r 8000 - hts1a_2400.wav"
+             COMMAND sh -c "./c2enc 2400 ${CMAKE_CURRENT_SOURCE_DIR}/raw/hts1a.raw - | ./c2dec 2400 - - | sox -t .s16 -r 8000 - hts1a_2400.wav"
              WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/src
              )
      add_test(NAME test_mode_1400
-             COMMAND sh -c "./c2enc 1400 ../../raw/hts1a.raw - | ./c2dec 1400 - - | sox -t .s16 -r 8000 - hts1a_1400.wav"
+             COMMAND sh -c "./c2enc 1400 ${CMAKE_CURRENT_SOURCE_DIR}/raw/hts1a.raw - | ./c2dec 1400 - - | sox -t .s16 -r 8000 - hts1a_1400.wav"
              WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/src
              )
      add_test(NAME test_mode_1300
-             COMMAND sh -c "./c2enc 1300 ../../raw/hts1a.raw - | ./c2dec 1300 - - | sox -t .s16 -r 8000 - hts1a_1300.wav"
+             COMMAND sh -c "./c2enc 1300 ${CMAKE_CURRENT_SOURCE_DIR}/raw/hts1a.raw - | ./c2dec 1300 - - | sox -t .s16 -r 8000 - hts1a_1300.wav"
              WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/src
              )
      add_test(NAME test_mode_1200
-             COMMAND sh -c "./c2enc 1200 ../../raw/hts1a.raw - | ./c2dec 1200 - - | sox -t .s16 -r 8000 - hts1a_1200.wav"
+             COMMAND sh -c "./c2enc 1200 ${CMAKE_CURRENT_SOURCE_DIR}/raw/hts1a.raw - | ./c2dec 1200 - - | sox -t .s16 -r 8000 - hts1a_1200.wav"
              WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/src
              )
      add_test(NAME test_mode_700C
-             COMMAND sh -c "./c2enc 700C ../../raw/hts1a.raw - | ./c2dec 700C - - | sox -t .s16 -r 8000 - hts1a_700C.wav"
+             COMMAND sh -c "./c2enc 700C ${CMAKE_CURRENT_SOURCE_DIR}/raw/hts1a.raw - | ./c2dec 700C - - | sox -t .s16 -r 8000 - hts1a_700C.wav"
              WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/src
              )
      add_test(NAME test_mode_450
-             COMMAND sh -c "./c2enc 450 ../../raw/hts1a.raw - | ./c2dec 450 - - | sox -t .s16 -r 8000 - hts1a_450.wav"
+             COMMAND sh -c "./c2enc 450 ${CMAKE_CURRENT_SOURCE_DIR}/raw/hts1a.raw - | ./c2dec 450 - - | sox -t .s16 -r 8000 - hts1a_450.wav"
              WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/src
              )
      add_test(NAME test_mode_450PWB
-             COMMAND sh -c "./c2enc 450PWB ../../raw/hts1a.raw - | ./c2dec 450PWB - - | sox -t .s16 -r 16000 - hts1a_450PWB.wav"
+             COMMAND sh -c "./c2enc 450PWB ${CMAKE_CURRENT_SOURCE_DIR}/raw/hts1a.raw - | ./c2dec 450PWB - - | sox -t .s16 -r 16000 - hts1a_450PWB.wav"
              WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/src
              )
 
+     configure_file(unittest/est_n0.sh.in unittest/est_n0.sh)
      add_test(NAME test_est_n0
-             COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/unittest/est_n0.sh
+             COMMAND ${CMAKE_CURRENT_BINARY_DIR}/unittest/est_n0.sh
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/unittest
              )
      add_test(NAME test_vq_mbest
@@ -521,8 +529,9 @@ endif()
                             diff target.f32 out.f32"
              WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/unittest
              )
+     configure_file(unittest/test_700c_eq.sh.in unittest/test_700c_eq.sh)
      add_test(NAME test_700c_eq
-             COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/unittest/test_700c_eq.sh
+             COMMAND ${CMAKE_CURRENT_BINARY_DIR}/unittest/test_700c_eq.sh
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/unittest
              )
 
