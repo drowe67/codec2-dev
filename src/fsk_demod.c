@@ -162,9 +162,9 @@ int main(int argc,char *argv[]){
         fprintf(stderr, "Too many arguments\n");
         helpmsg:
         fprintf(stderr,"usage: %s [-l] [-p P]  [-s] [(-c|-d)] [-t [r]] [-f] (2|4) SampleRate SymbolRate InputModemRawFile OutputFile\n",argv[0]);
-        fprintf(stderr," -lP --conv=P      -  P specifies the rate at which symbols are down-converted before further processing\n");
+        fprintf(stderr," -p P --conv=P     -  P specifies the rate at which symbols are down-converted before further processing\n");
         fprintf(stderr,"                        P must be divisible by the symbol size. Smaller P values will result in faster\n");
-        fprintf(stderr,"                        processing but lower demodulation preformance. If no P value is specified,\n");
+        fprintf(stderr,"                        processing but lower demodulation performance. If no P value is specified,\n");
         fprintf(stderr,"                        P will default to it's highes possible value\n");
         fprintf(stderr," -c --cs16         -  The raw input file will be in complex signed 16 bit format.\n");
         fprintf(stderr," -d --cu8          -  The raw input file will be in complex unsigned 8 bit format.\n");

@@ -1,15 +1,15 @@
 /*---------------------------------------------------------------------------*\
 
   FILE........: fsk.c
-  AUTHOR......: Brady O'Brien
+  AUTHOR......: Brady O'Brien & David Rowe
   DATE CREATED: 7 January 2016
 
-  C Implementation of 2/4FSK modulator/demodulator, based on octave/fsk_horus.m
+  C Implementation of 2/4FSK modulator/demodulator, based on octave/fsk_lib.m
 
 \*---------------------------------------------------------------------------*/
 
 /*
-  Copyright (C) 2016 David Rowe
+  Copyright (C) 2016-2020 David Rowe
 
   All rights reserved.
 
@@ -31,8 +31,13 @@
 
 \*---------------------------------------------------------------------------*/
 
+/* defaults for Project Horus RTTY telemetry */
+#define HORUS_MIN 300
+#define HORUS_MAX 2800
+#define HORUS_MIN_SPACING 100
+
 /* P oversampling rate constant -- should probably be init-time configurable */
-#define horus_P 8
+#define DEFAULT_P 8
 
 /* Define this to enable EbNodB estimate */
 /* This needs square roots, may take more cpu time than it's worth */
@@ -101,25 +106,20 @@ static void fsk_generate_hann_table(struct FSK* fsk){
 }
 #endif
 
-
-
-#define HORUS_MIN 300
-#define HORUS_MAX 2800
-#define HORUS_MIN_SPACING 100
-
 /*---------------------------------------------------------------------------*\
 
-  FUNCTION....: fsk_create
+  FUNCTION....: fsk_create_core
   AUTHOR......: Brady O'Brien
   DATE CREATED: 7 January 2016
   
-  Create and initialize an instance of the FSK modem. Returns a pointer
-  to the modem state/config struct. One modem config struct may be used
-  for both mod and demod. returns NULL on failure.
+  In this version of the demod the stdanard/hbr modes have been
+  largely combined at they shared so much common code.  The
+  fsk_create/fsk_create_hbr function interface has been retained to
+  maximise compatability with existing applications.
 
 \*---------------------------------------------------------------------------*/
 
-struct FSK * fsk_create(int Fs, int Rs,int M, int tx_f1, int tx_fs)
+struct FSK * fsk_create_core(int Fs, int Rs, int P, int M, int tx_f1, int tx_fs)
 {
     struct FSK *fsk;
     int i;
@@ -129,11 +129,11 @@ struct FSK * fsk_create(int Fs, int Rs,int M, int tx_f1, int tx_fs)
     assert(Rs > 0 );
     assert(tx_f1 > 0);
     assert(tx_fs > 0);
-    assert(horus_P > 0);
+    assert(P > 0);
     /* Ts (Fs/Rs) must be an integer */
     assert( (Fs%Rs) == 0 );
     /* Ts/P (Fs/Rs/P) must be an integer */
-    assert( ((Fs/Rs)%horus_P) == 0 );
+    assert( ((Fs/Rs)%P) == 0 );
     assert( M==2 || M==4);
     
     fsk = (struct FSK*) malloc(sizeof(struct FSK)); assert(fsk != NULL);
@@ -148,7 +148,7 @@ struct FSK * fsk_create(int Fs, int Rs,int M, int tx_f1, int tx_fs)
     fsk->Rs = Rs;
     fsk->Ts = Fs/Rs;
     fsk->burst_mode = 0;
-    fsk->P = horus_P;
+    fsk->P = P;
     fsk->Nsym = 50;
     fsk->N = fsk->Ts*fsk->Nsym;
     fsk->Ndft = Ndft;
@@ -207,6 +207,21 @@ struct FSK * fsk_create(int Fs, int Rs,int M, int tx_f1, int tx_fs)
     return fsk;
 }
 
+/*---------------------------------------------------------------------------* \
+
+  FUNCTION....: fsk_create
+  AUTHOR......: Brady O'Brien
+  DATE CREATED: 7 January 2016
+  
+  Create and initialize an instance of the FSK modem. Returns a pointer
+  to the modem state/config struct. One modem config struct may be used
+  for both mod and demod.
+
+\*---------------------------------------------------------------------------*/
+
+struct FSK * fsk_create(int Fs, int Rs, int M, int tx_f1, int tx_fs) {
+    return fsk_create_core(Fs, Rs, DEFAULT_P, M, tx_f1, tx_fs);
+}
 
 /*---------------------------------------------------------------------------*\
 
@@ -214,101 +229,25 @@ struct FSK * fsk_create(int Fs, int Rs,int M, int tx_f1, int tx_fs)
   AUTHOR......: Brady O'Brien
   DATE CREATED: 11 February 2016
   
-  Create and initialize an instance of the FSK modem. Returns a pointer
-  to the modem state/config struct. One modem config struct may be used
-  for both mod and demod. returns NULL on failure.
+  Alternate version of create allows user defined decimation P.  In
+  the current version of the demod it's simply an alias for the
+  default core function.
 
 \*---------------------------------------------------------------------------*/
 
-struct FSK * fsk_create_hbr(int Fs, int Rs,int P,int M, int tx_f1, int tx_fs)
-{
-    struct FSK *fsk;
-    int i;
-    int Ndft = 0;
-    /* Number of symbols in a processing frame */
-    int nsyms = 48;
-    /* Check configuration validity */
-    assert(Fs > 0 );
-    assert(Rs > 0 );
-    assert(tx_f1 > 0);
-    assert(tx_fs > 0);
-    assert(P > 0);
-    /* Ts (Fs/Rs) must be an integer */
-    assert( (Fs%Rs) == 0 );
-    /* Ts/P (Fs/Rs/P) must be an integer */
-    assert( ((Fs/Rs)%P) == 0 );
-    assert( M==2 || M==4);
-    
-    fsk = (struct FSK*) malloc(sizeof(struct FSK)); assert(fsk != NULL);
-    
-    /* Set constant config parameters */
-    fsk->Fs = Fs;
-    fsk->Rs = Rs;
-    fsk->Ts = Fs/Rs;
-    fsk->burst_mode = 0;
-    fsk->N = fsk->Ts*nsyms;
-    fsk->P = P;
-    fsk->Nsym = nsyms;
-    fsk->Nmem = fsk->N+(2*fsk->Ts);
-    fsk->f1_tx = tx_f1;
-    fsk->fs_tx = tx_fs;
-    fsk->nin = fsk->N;
-    fsk->lock_nin = 0;
-    fsk->mode = M==2 ? MODE_2FSK : MODE_4FSK;
-    fsk->Nbits = M==2 ? fsk->Nsym : fsk->Nsym*2;
-    
-    /* Find smallest 2^N value that fits Fs for efficient FFT */
-    /* It would probably be better to use KISS-FFt's routine here */
-    for(i=1; i; i<<=1)
-        if((fsk->N)&i)
-            Ndft = i;
-    
-    fsk->Ndft = Ndft;
-    
-    fsk->est_min = Rs/4;
-    if(fsk->est_min<0) fsk->est_min = 0;
-    
-    fsk->est_max = (Fs/2)-Rs/4;
-    fsk->est_space = Rs-(Rs/5);
-    
-    /* Set up rx state */
-    
-    for( i=0; i<M; i++)
-        fsk->phi_c[i] = comp_exp_j(0);
-    
-    fsk->fft_cfg = kiss_fft_alloc(fsk->Ndft,0,NULL,NULL); assert(fsk->fft_cfg != NULL);
-    fsk->fft_est = (float*)malloc(sizeof(float)*fsk->Ndft); assert(fsk->fft_est != NULL);
-    
-    #ifdef USE_HANN_TABLE
-        #ifdef GENERATE_HANN_TABLE_RUNTIME
-           fsk->hann_table = (float*)malloc(sizeof(float)*fsk->Ndft); assert(fsk->hann_table != NULL);
-           fsk_generate_hann_table(fsk);
-        #else
-            fsk->hann_table = NULL;
-        #endif
-    #endif
-    
-    for(i=0;i<fsk->Ndft;i++) fsk->fft_est[i] = 0;
-    
-    fsk->norm_rx_timing = 0;
-    
-    /* Set up tx state */
-    fsk->tx_phase_c = comp_exp_j(0);
-    
-    /* Set up demod stats */
-    fsk->EbNodB = 0;
-    
-    for( i=0; i<M; i++)
-        fsk->f_est[i] = 0;
-    
-    fsk->ppm = 0;
-
-    fsk->stats = (struct MODEM_STATS*)malloc(sizeof(struct MODEM_STATS)); assert(fsk->stats != NULL);
-    stats_init(fsk);
-    fsk->normalise_eye = 1;
-
-    return fsk;
+struct FSK * fsk_create_hbr(int Fs, int Rs, int P, int M, int tx_f1, int tx_fs) {
+    return fsk_create_core(Fs, Rs, P, M, tx_f1, tx_fs);
 }
+
+/*---------------------------------------------------------------------------*\
+
+  FUNCTION....: fsk_destroy
+  AUTHOR......: Brady O'Brien
+  DATE CREATED: 11 February 2016
+  
+  Call this to free all memory and shut down the modem.
+
+\*---------------------------------------------------------------------------*/
 
 void fsk_destroy(struct FSK *fsk){
     free(fsk->f_dc);
@@ -318,131 +257,179 @@ void fsk_destroy(struct FSK *fsk){
     free(fsk);
 }
 
-/* make sure stats have known values in case monitoring process reads stats before they are set */
+/*---------------------------------------------------------------------------*\
 
-static void stats_init(struct FSK *fsk) {
-    /* Take a sample for the eye diagrams */
-    int i,j,m;
-    int P = fsk->P;
+  FUNCTION....: fsk_mod
+  AUTHOR......: Brady O'Brien
+  DATE CREATED: 11 February 2016
+  
+  FSK modulator function, real valued output samples.
+
+\*---------------------------------------------------------------------------*/
+
+void fsk_mod(struct FSK *fsk,float fsk_out[],uint8_t tx_bits[]){
+    COMP tx_phase_c = fsk->tx_phase_c; /* Current complex TX phase */
+    int f1_tx = fsk->f1_tx;         /* '0' frequency */
+    int fs_tx = fsk->fs_tx;         /* space between frequencies */
+    int Ts = fsk->Ts;               /* samples-per-symbol */
+    int Fs = fsk->Fs;               /* sample freq */
     int M = fsk->mode;
+    COMP dosc_f[M];                 /* phase shift per sample */
+    COMP dph;                       /* phase shift of current bit */
+    size_t i,j,m,bit_i,sym;
+    
+    /* Init the per sample phase shift complex numbers */
+    for( m=0; m<M; m++){
+        dosc_f[m] = comp_exp_j(2*M_PI*((float)(f1_tx+(fs_tx*m))/(float)(Fs)));
+    }
+    
+    bit_i = 0;
+    for( i=0; i<fsk->Nsym; i++){
+        sym = 0;
+        /* Pack the symbol number from the bit stream */
+        for( m=M; m>>=1; ){
+            uint8_t bit = tx_bits[bit_i];
+            bit = (bit==1)?1:0;
+            sym = (sym<<1)|bit;
+            bit_i++;
+        }
+        /* Look up symbol phase shift */
+        dph = dosc_f[sym];
+        /* Spin the oscillator for a symbol period */
+        for(j=0; j<Ts; j++){
+            tx_phase_c = cmult(tx_phase_c,dph);
+            fsk_out[i*Ts+j] = 2*tx_phase_c.real;
+        }
+    
+    }
+    
+    /* Normalize TX phase to prevent drift */
+    tx_phase_c = comp_normalize(tx_phase_c);
+    
+    /* save TX phase */
+    fsk->tx_phase_c = tx_phase_c;
+    
+}
 
-    /* due to oversample rate P, we have too many samples for eye
-       trace.  So lets output a decimated version */
+/*---------------------------------------------------------------------------*\
 
-    /* asserts below as we found some problems over-running eye matrix */
+  FUNCTION....: fsk_mod_c
+  AUTHOR......: Brady O'Brien
+  DATE CREATED: 11 February 2016
+  
+  FSK modulator function, complex valued output samples.
+
+\*---------------------------------------------------------------------------*/
+
+void fsk_mod_c(struct FSK *fsk,COMP fsk_out[],uint8_t tx_bits[]){
+    COMP tx_phase_c = fsk->tx_phase_c; /* Current complex TX phase */
+    int f1_tx = fsk->f1_tx;         /* '0' frequency */
+    int fs_tx = fsk->fs_tx;         /* space between frequencies */
+    int Ts = fsk->Ts;               /* samples-per-symbol */
+    int Fs = fsk->Fs;               /* sample freq */
+    int M = fsk->mode;
+    COMP dosc_f[M];                 /* phase shift per sample */
+    COMP dph;                       /* phase shift of current bit */
+    size_t i,j,bit_i,sym;
+    int m;
     
-    /* TODO: refactor eye tracing code here and in fsk_demod */
+    /* Init the per sample phase shift complex numbers */
+    for( m=0; m<M; m++){
+        dosc_f[m] = comp_exp_j(2*M_PI*((float)(f1_tx+(fs_tx*m))/(float)(Fs)));
+    }
     
-    int neyesamp_dec = ceil(((float)P*2)/MODEM_STATS_EYE_IND_MAX);
-    int neyesamp = (P*2)/neyesamp_dec;
-    assert(neyesamp <= MODEM_STATS_EYE_IND_MAX);
-    fsk->stats->neyesamp = neyesamp;
-    
-    int eye_traces = MODEM_STATS_ET_MAX/M;
-   
-    fsk->stats->neyetr = fsk->mode*eye_traces;
-    for(i=0; i<eye_traces; i++) {
-        for (m=0; m<M; m++){
-            for(j=0; j<neyesamp; j++) {
-                assert((i*M+m) < MODEM_STATS_ET_MAX);
-                fsk->stats->rx_eye[i*M+m][j] = 0;
-           }
+    bit_i = 0;
+    for( i=0; i<fsk->Nsym; i++){
+        sym = 0;
+        /* Pack the symbol number from the bit stream */
+        for( m=M; m>>=1; ){
+            uint8_t bit = tx_bits[bit_i];
+            bit = (bit==1)?1:0;
+            sym = (sym<<1)|bit;
+            bit_i++;
+        }
+        /* Look up symbol phase shift */
+        dph = dosc_f[sym];
+        /* Spin the oscillator for a symbol period */
+        for(j=0; j<Ts; j++){
+            tx_phase_c = cmult(tx_phase_c,dph);
+            fsk_out[i*Ts+j] = fcmult(2,tx_phase_c);
         }
     }
-
-    fsk->stats->rx_timing = fsk->stats->snr_est = 0;
+    
+    /* Normalize TX phase to prevent drift */
+    tx_phase_c = comp_normalize(tx_phase_c);
+    
+    /* save TX phase */
+    fsk->tx_phase_c = tx_phase_c;
     
 }
 
 
-void fsk_set_nsym(struct FSK *fsk,int nsyms){
-    assert(nsyms>0);
-    int Ndft,i;
-    Ndft = 0;
-    
-    /* Set constant config parameters */
-    fsk->N = fsk->Ts*nsyms;
-    fsk->Nsym = nsyms;
-    fsk->Nmem = fsk->N+(2*fsk->Ts);
-    fsk->nin = fsk->N;
-    fsk->Nbits = fsk->mode==2 ? fsk->Nsym : fsk->Nsym*2;
-    
-    /* Find smallest 2^N value that fits Fs for efficient FFT */
-    /* It would probably be better to use KISS-FFt's routine here */
-    for(i=1; i; i<<=1)
-        if((fsk->N)&i)
-            Ndft = i;
-    
-    fsk->Ndft = Ndft;
-    
-    free(fsk->fft_cfg);
-    free(fsk->fft_est);
-    
-    fsk->fft_cfg = kiss_fft_alloc(Ndft,0,NULL,NULL);
-    fsk->fft_est = (float*)malloc(sizeof(float)*fsk->Ndft/2);
-    
-    for(i=0;i<Ndft;i++)fsk->fft_est[i] = 0;
-    
-}
+/*---------------------------------------------------------------------------*\
 
-/* Set the FSK modem into burst demod mode */
+  FUNCTION....: fsk_mod_ext_vco
+  AUTHOR......: David Rowe
+  DATE CREATED: February 2018
+  
+  Modulator that assume an external VCO.  The output is a voltage
+  that changes for each symbol.
 
-void fsk_enable_burst_mode(struct FSK *fsk,int nsyms){
-    fsk_set_nsym(fsk,nsyms);
-    fsk->nin = fsk->N;
-    fsk->burst_mode = 1;
-}
+\*---------------------------------------------------------------------------*/
 
-void fsk_clear_estimators(struct FSK *fsk){
-    int i;
-    /* Clear freq estimator state */
-    for(i=0; i < (fsk->Ndft); i++){
-        fsk->fft_est[i] = 0;
+void fsk_mod_ext_vco(struct FSK *fsk, float vco_out[], uint8_t tx_bits[]) {
+    int f1_tx = fsk->f1_tx;         /* '0' frequency */
+    int fs_tx = fsk->fs_tx;         /* space between frequencies */
+    int Ts = fsk->Ts;               /* samples-per-symbol */
+    int M = fsk->mode;
+    int i, j, m, sym, bit_i;
+    
+    bit_i = 0;
+    for(i=0; i<fsk->Nsym; i++) {
+        /* generate the symbol number from the bit stream, 
+           e.g. 0,1 for 2FSK, 0,1,2,3 for 4FSK */
+
+        sym = 0;
+
+        /* unpack the symbol number from the bit stream */
+
+        for( m=M; m>>=1; ){
+            uint8_t bit = tx_bits[bit_i];
+            bit = (bit==1)?1:0;
+            sym = (sym<<1)|bit;
+            bit_i++;
+        }
+
+        /* 
+           Map 'sym' to VCO frequency
+           Note: drive is inverted, a higher tone drives VCO voltage lower
+         */
+
+        //fprintf(stderr, "i: %d sym: %d freq: %f\n", i, sym, f1_tx + fs_tx*(float)sym);
+        for(j=0; j<Ts; j++) {
+            vco_out[i*Ts+j] = f1_tx + fs_tx*(float)sym;
+        }
     }
-    /* Reset timing diff correction */
-    fsk->nin = fsk->N;
 }
+
+/*---------------------------------------------------------------------------*\
+
+  FUNCTION....: fsk_nin
+  AUTHOR......: Brady O'Brien
+  DATE CREATED: 11 February 2016
+  
+  Call me before each call to fsk_demod() to determine how many new
+  samples you should pass in.  the number of samples will vary due to
+  timing variations.
+
+\*---------------------------------------------------------------------------*/
 
 uint32_t fsk_nin(struct FSK *fsk){
     return (uint32_t)fsk->nin;
 }
 
-void fsk_get_demod_stats(struct FSK *fsk, struct MODEM_STATS *stats){
-    /* copy from internal stats, note we can't overwrite stats completely
-       as it has other states rqd by caller, also we want a consistent
-       interface across modem types for the freedv_api.
-    */
-
-    stats->clock_offset = fsk->stats->clock_offset;
-    stats->snr_est = fsk->stats->snr_est;           // TODO: make this SNR not Eb/No
-    stats->rx_timing = fsk->stats->rx_timing;
-    stats->foff = fsk->stats->foff;
-
-    stats->neyesamp = fsk->stats->neyesamp;
-    stats->neyetr = fsk->stats->neyetr;
-    memcpy(stats->rx_eye, fsk->stats->rx_eye, sizeof(stats->rx_eye));
-    memcpy(stats->f_est, fsk->stats->f_est, fsk->mode*sizeof(float));
-    
-    /* these fields not used for FSK so set to something sensible */
-
-    stats->sync = 0;
-    stats->nr = fsk->stats->nr;
-    stats->Nc = fsk->stats->Nc;
-}
-
 /*
- * Set the minimum and maximum frequencies at which the freq. estimator can find tones
- */
-void fsk_set_est_limits(struct FSK *fsk,int est_min, int est_max){
-    
-    fsk->est_min = est_min;
-    if(fsk->est_min<0) fsk->est_min = 0;
-    
-    fsk->est_max = est_max;
-}
-
-/*
- * Internal function to estimate the frequencies of the two tones within a block of samples.
+ * Internal function to estimate the frequencies of the FSK tones.
  * This is split off because it is fairly complicated, needs a bunch of memory, and probably
  * takes more cycles than the rest of the demod.
  * Parameters:
@@ -451,7 +438,7 @@ void fsk_set_est_limits(struct FSK *fsk,int est_min, int est_max){
  * freqs - Array for the estimated frequencies
  * M - number of frequency peaks to find
  */
-void fsk_demod_freq_est(struct FSK *fsk, COMP fsk_in[],float *freqs,int M){
+void fsk_demod_freq_est(struct FSK *fsk, COMP fsk_in[], float *freqs, int M) {
     int Ndft = fsk->Ndft;
     int Fs = fsk->Fs;
     int nin = fsk->nin;
@@ -591,9 +578,6 @@ void fsk_demod_core(struct FSK *fsk, uint8_t rx_bits[], float rx_sd[], COMP fsk_
     COMP dphift;
     float rx_timing,norm_rx_timing,old_norm_rx_timing,d_norm_rx_timing,appm;
 
-    //COMP* sample_src;
-    //COMP* f_intbuf_m;
-    
     float *f_est = fsk->f_est;
     float fc_avg,fc_tx;
     float meanebno,stdebno,eye_max;
@@ -887,18 +871,20 @@ void fsk_demod_core(struct FSK *fsk, uint8_t rx_bits[], float rx_sd[], COMP fsk_
     modem_probe_samp_f("t_EbNodB",&(fsk->EbNodB),1);
     modem_probe_samp_f("t_ppm",&(fsk->ppm),1);
     modem_probe_samp_f("t_rx_timing",&(rx_timing),1);
-    
-#ifdef TMP
-    #ifdef MODEMPROBE_ENABLE
-    for( m=0; m<M; m++){
-        snprintf(mp_name_tmp,19,"t_f%zd_int",m+1);
-        modem_probe_samp_c(mp_name_tmp,f_int[m],(nsym+1)*P);
-        snprintf(mp_name_tmp,19,"t_f%zd ",m+1);
-        modem_probe_samp_f(mp_name_tmp,&f_est[m],1);
-    }
-    #endif
-#endif    
 }
+
+/*---------------------------------------------------------------------------*\
+
+  FUNCTION....: fsk_demod/fsk_demod_sd
+  AUTHOR......: Brady O'Brien
+  DATE CREATED: 11 February 2016
+  
+  FSK demodulator functions:
+
+    fsk_demod...: complex samples in, bits out
+    fsk_demos_sd: complex samples in, soft decision symbols out
+
+\*---------------------------------------------------------------------------*/
 
 void fsk_demod(struct FSK *fsk, uint8_t rx_bits[], COMP fsk_in[]){
     fsk_demod_core(fsk,rx_bits,NULL,fsk_in);
@@ -908,131 +894,122 @@ void fsk_demod_sd(struct FSK *fsk, float rx_sd[], COMP fsk_in[]){
     fsk_demod_core(fsk,NULL,rx_sd,fsk_in);
 }
 
-void fsk_mod(struct FSK *fsk,float fsk_out[],uint8_t tx_bits[]){
-    COMP tx_phase_c = fsk->tx_phase_c; /* Current complex TX phase */
-    int f1_tx = fsk->f1_tx;         /* '0' frequency */
-    int fs_tx = fsk->fs_tx;         /* space between frequencies */
-    int Ts = fsk->Ts;               /* samples-per-symbol */
-    int Fs = fsk->Fs;               /* sample freq */
+/* make sure stats have known values in case monitoring process reads stats before they are set */
+static void stats_init(struct FSK *fsk) {
+    /* Take a sample for the eye diagrams */
+    int i,j,m;
+    int P = fsk->P;
     int M = fsk->mode;
-    COMP dosc_f[M];                 /* phase shift per sample */
-    COMP dph;                       /* phase shift of current bit */
-    size_t i,j,m,bit_i,sym;
-    
-    /* Init the per sample phase shift complex numbers */
-    for( m=0; m<M; m++){
-        dosc_f[m] = comp_exp_j(2*M_PI*((float)(f1_tx+(fs_tx*m))/(float)(Fs)));
-    }
-    
-    bit_i = 0;
-    for( i=0; i<fsk->Nsym; i++){
-        sym = 0;
-        /* Pack the symbol number from the bit stream */
-        for( m=M; m>>=1; ){
-            uint8_t bit = tx_bits[bit_i];
-            bit = (bit==1)?1:0;
-            sym = (sym<<1)|bit;
-            bit_i++;
-        }
-        /* Look up symbol phase shift */
-        dph = dosc_f[sym];
-        /* Spin the oscillator for a symbol period */
-        for(j=0; j<Ts; j++){
-            tx_phase_c = cmult(tx_phase_c,dph);
-            fsk_out[i*Ts+j] = 2*tx_phase_c.real;
-        }
-    
-    }
-    
-    /* Normalize TX phase to prevent drift */
-    tx_phase_c = comp_normalize(tx_phase_c);
-    
-    /* save TX phase */
-    fsk->tx_phase_c = tx_phase_c;
-    
-}
 
-void fsk_mod_c(struct FSK *fsk,COMP fsk_out[],uint8_t tx_bits[]){
-    COMP tx_phase_c = fsk->tx_phase_c; /* Current complex TX phase */
-    int f1_tx = fsk->f1_tx;         /* '0' frequency */
-    int fs_tx = fsk->fs_tx;         /* space between frequencies */
-    int Ts = fsk->Ts;               /* samples-per-symbol */
-    int Fs = fsk->Fs;               /* sample freq */
-    int M = fsk->mode;
-    COMP dosc_f[M];                 /* phase shift per sample */
-    COMP dph;                       /* phase shift of current bit */
-    size_t i,j,bit_i,sym;
-    int m;
+    /* due to oversample rate P, we have too many samples for eye
+       trace.  So lets output a decimated version */
+
+    /* asserts below as we found some problems over-running eye matrix */
     
-    /* Init the per sample phase shift complex numbers */
-    for( m=0; m<M; m++){
-        dosc_f[m] = comp_exp_j(2*M_PI*((float)(f1_tx+(fs_tx*m))/(float)(Fs)));
-    }
+    /* TODO: refactor eye tracing code here and in fsk_demod */
     
-    bit_i = 0;
-    for( i=0; i<fsk->Nsym; i++){
-        sym = 0;
-        /* Pack the symbol number from the bit stream */
-        for( m=M; m>>=1; ){
-            uint8_t bit = tx_bits[bit_i];
-            bit = (bit==1)?1:0;
-            sym = (sym<<1)|bit;
-            bit_i++;
-        }
-        /* Look up symbol phase shift */
-        dph = dosc_f[sym];
-        /* Spin the oscillator for a symbol period */
-        for(j=0; j<Ts; j++){
-            tx_phase_c = cmult(tx_phase_c,dph);
-            fsk_out[i*Ts+j] = fcmult(2,tx_phase_c);
+    int neyesamp_dec = ceil(((float)P*2)/MODEM_STATS_EYE_IND_MAX);
+    int neyesamp = (P*2)/neyesamp_dec;
+    assert(neyesamp <= MODEM_STATS_EYE_IND_MAX);
+    fsk->stats->neyesamp = neyesamp;
+    
+    int eye_traces = MODEM_STATS_ET_MAX/M;
+   
+    fsk->stats->neyetr = fsk->mode*eye_traces;
+    for(i=0; i<eye_traces; i++) {
+        for (m=0; m<M; m++){
+            for(j=0; j<neyesamp; j++) {
+                assert((i*M+m) < MODEM_STATS_ET_MAX);
+                fsk->stats->rx_eye[i*M+m][j] = 0;
+           }
         }
     }
-    
-    /* Normalize TX phase to prevent drift */
-    tx_phase_c = comp_normalize(tx_phase_c);
-    
-    /* save TX phase */
-    fsk->tx_phase_c = tx_phase_c;
+
+    fsk->stats->rx_timing = fsk->stats->snr_est = 0;
     
 }
 
 
-/* Modulator that assume an external VCO.  The output is a voltage
-   that changes for each symbol */
-
-void fsk_mod_ext_vco(struct FSK *fsk, float vco_out[], uint8_t tx_bits[]) {
-    int f1_tx = fsk->f1_tx;         /* '0' frequency */
-    int fs_tx = fsk->fs_tx;         /* space between frequencies */
-    int Ts = fsk->Ts;               /* samples-per-symbol */
-    int M = fsk->mode;
-    int i, j, m, sym, bit_i;
+void fsk_set_nsym(struct FSK *fsk,int nsyms){
+    assert(nsyms>0);
+    int Ndft,i;
+    Ndft = 0;
     
-    bit_i = 0;
-    for(i=0; i<fsk->Nsym; i++) {
-        /* generate the symbol number from the bit stream, 
-           e.g. 0,1 for 2FSK, 0,1,2,3 for 4FSK */
+    /* Set constant config parameters */
+    fsk->N = fsk->Ts*nsyms;
+    fsk->Nsym = nsyms;
+    fsk->Nmem = fsk->N+(2*fsk->Ts);
+    fsk->nin = fsk->N;
+    fsk->Nbits = fsk->mode==2 ? fsk->Nsym : fsk->Nsym*2;
+    
+    /* Find smallest 2^N value that fits Fs for efficient FFT */
+    /* It would probably be better to use KISS-FFt's routine here */
+    for(i=1; i; i<<=1)
+        if((fsk->N)&i)
+            Ndft = i;
+    
+    fsk->Ndft = Ndft;
+    
+    free(fsk->fft_cfg);
+    free(fsk->fft_est);
+    
+    fsk->fft_cfg = kiss_fft_alloc(Ndft,0,NULL,NULL);
+    fsk->fft_est = (float*)malloc(sizeof(float)*fsk->Ndft/2);
+    
+    for(i=0;i<Ndft;i++)fsk->fft_est[i] = 0;
+    
+}
 
-        sym = 0;
+/* Set the FSK modem into burst demod mode */
 
-        /* unpack the symbol number from the bit stream */
+void fsk_enable_burst_mode(struct FSK *fsk,int nsyms){
+    fsk_set_nsym(fsk,nsyms);
+    fsk->nin = fsk->N;
+    fsk->burst_mode = 1;
+}
 
-        for( m=M; m>>=1; ){
-            uint8_t bit = tx_bits[bit_i];
-            bit = (bit==1)?1:0;
-            sym = (sym<<1)|bit;
-            bit_i++;
-        }
-
-        /* 
-           Map 'sym' to VCO frequency
-           Note: drive is inverted, a higher tone drives VCO voltage lower
-         */
-
-        //fprintf(stderr, "i: %d sym: %d freq: %f\n", i, sym, f1_tx + fs_tx*(float)sym);
-        for(j=0; j<Ts; j++) {
-            vco_out[i*Ts+j] = f1_tx + fs_tx*(float)sym;
-        }
+void fsk_clear_estimators(struct FSK *fsk){
+    int i;
+    /* Clear freq estimator state */
+    for(i=0; i < (fsk->Ndft); i++){
+        fsk->fft_est[i] = 0;
     }
+    /* Reset timing diff correction */
+    fsk->nin = fsk->N;
+}
+
+void fsk_get_demod_stats(struct FSK *fsk, struct MODEM_STATS *stats){
+    /* copy from internal stats, note we can't overwrite stats completely
+       as it has other states rqd by caller, also we want a consistent
+       interface across modem types for the freedv_api.
+    */
+
+    stats->clock_offset = fsk->stats->clock_offset;
+    stats->snr_est = fsk->stats->snr_est;           // TODO: make this SNR not Eb/No
+    stats->rx_timing = fsk->stats->rx_timing;
+    stats->foff = fsk->stats->foff;
+
+    stats->neyesamp = fsk->stats->neyesamp;
+    stats->neyetr = fsk->stats->neyetr;
+    memcpy(stats->rx_eye, fsk->stats->rx_eye, sizeof(stats->rx_eye));
+    memcpy(stats->f_est, fsk->stats->f_est, fsk->mode*sizeof(float));
+    
+    /* these fields not used for FSK so set to something sensible */
+
+    stats->sync = 0;
+    stats->nr = fsk->stats->nr;
+    stats->Nc = fsk->stats->Nc;
+}
+
+/*
+ * Set the minimum and maximum frequencies at which the freq. estimator can find tones
+ */
+void fsk_set_est_limits(struct FSK *fsk,int est_min, int est_max){
+    
+    fsk->est_min = est_min;
+    if(fsk->est_min<0) fsk->est_min = 0;
+    
+    fsk->est_max = est_max;
 }
 
 void fsk_stats_normalise_eye(struct FSK *fsk, int normalise_enable) {
