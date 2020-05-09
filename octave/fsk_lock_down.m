@@ -41,7 +41,7 @@ end
 % set up "lock down" waveform
 function [states M bits_per_frame] = lock_down_init(Rs,Fs,df)
   M  = 4;
-  states = fsk_init(Fs,Rs,M,100);
+  states = fsk_init(Fs,Rs,M,P=8,nsym=100);
   bits_per_frame = 512;
   states.tx_real = 0; % complex signal
   states.tx_tone_separation = 250;
