@@ -1,20 +1,10 @@
 % tfsk.m
-% Author: Brady O'Brien 8 January 2016
-
-%   Copyright 2016 David Rowe
-%  
-%  All rights reserved.
+% Brady O'Brien 8 January 2016
+% David Rowe May 2020
 %
-%  This program is free software; you can redistribute it and/or modify
-%  it under the terms of the GNU Lesser General Public License version 2.1, as
-%  published by the Free Software Foundation.  This program is
-%  distributed in the hope that it will be useful, but WITHOUT ANY
-%  WARRANTY; without even the implied warranty of MERCHANTABILITY or
-%  FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public
-%  License for more details.
-%
-%  You should have received a copy of the GNU Lesser General Public License
-%  along with this program; if not, see <http://www.gnu.org/licenses/>.
+% Automatic testing of C port of FSK modem by comparing to Octave
+% Currently just a subset of tests enabled in order to run in a reasonable
+% amount of time as ctests.
 
 #{
 
@@ -172,8 +162,6 @@ function test_stats = fsk_demod_xt(Fs,Rs,f1,fsp,mod,tname,M=2,lock_nin=0)
         ninold = states.nin;
         states = est_freq(states, modin(1:states.nin), states.M);
         [bitbuf,states] = fsk_demod(states, modin(1:states.nin));
-
-        % constant nin greatly simplfiying comparisons as it is a feedback loop
         if lock_nin states.nin = states.N; end
 
         modin=modin(ninold+1:length(modin));
@@ -254,8 +242,8 @@ function [dmod,cmod,omod,pass] = fsk_mod_test(Fs,Rs,f1,fsp,bits,tname,M=2)
     states.ftx(2) = f1+fsp;
     
     if states.M == 4
-		states.ftx(3) = f1+fsp*2;
-		states.ftx(4) = f1+fsp*3;
+        states.ftx(3) = f1+fsp*2;
+        states.ftx(4) = f1+fsp*3;
     end
     
     states.dF = 0;
@@ -306,14 +294,14 @@ endfunction
 % This throws some channel imparment or another at the C and octave
 % modem so they may be compared.
 function stats = tfsk_run_sim(test_frame_mode,EbNodB,timing_offset,fading,df,M=2,frames=50,lock_nin=0)
-  global print_verbose;
-  #{
-  
+  #{  
   timing_offset [0|1]  enable a 1000ppm sample clock offset
   fading        [0|1]  modulates tx power at 2Hz with 20dB fade depth, 
                        e.g. to simulate balloon rotating at end of mission
   df                   tx tone freq drift in Hz/s
+  lock_nin      [0|1]  locks nin to a constant which makes tests much simpler by breaking feeback loop
   #}
+  global print_verbose;
   
   more off
   rand('state',1); 
@@ -592,17 +580,18 @@ endfunction
 
 % We kick off tests here ------------------------------------------------------
    
-pass = 0;
-pass += test_mod_horuscfg_randbits;
-pass += test_mod_horuscfgm4_randbits;
-stats = tfsk_run_sim(test_frame_mode=2,EbNodB=5,timing_offset=1,fading=0,df=1,M=4,frames=10,lock_nin=1);
+pass = 0; ntests = 0;
+pass += test_mod_horuscfg_randbits; ntests++;
+pass += test_mod_horuscfgm4_randbits; ntests++;
+stats = tfsk_run_sim(test_frame_mode=2,EbNodB=5,timing_offset=0,fading=0,df=1,M=4,frames=10,lock_nin=1); ntests++;
 if stats.pass
   print_result("Demod 10 frames nin locked", "OK");
-  pass += stats.pass;
+  pass += stats.pass; 
 end
-stats = tfsk_run_sim(test_frame_mode=2,EbNodB=5,timing_offset=1,fading=0,df=1,M=4,frames=10,lock_nin=0);
+stats = tfsk_run_sim(test_frame_mode=2,EbNodB=5,timing_offset=1,fading=0,df=1,M=4,frames=10,lock_nin=0); ntests++;
 if stats.pass
   print_result("Demod 10 frames", "OK");
   pass += stats.pass;
 end
-
+printf("tests: %d passed: %d ", ntests, pass);
+if ntests == pass printf("PASS\n"); else printf("FAIL\n"); end

@@ -533,6 +533,9 @@ endif()
      add_test(NAME test_fsk_horus
              COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/octave; DISPLAY=\"\" octave --no-gui -qf fsk_horus.m")
              set_tests_properties(test_fsk_horus PROPERTIES PASS_REGULAR_EXPRESSION "Received 3 packets")
+     add_test(NAME test_fsk_modem_octave_port
+             COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/octave; octave --no-gui -qf tfsk.m")
+             set_tests_properties(test_fsk_modem_octave_port PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
 
 
 endif(UNITTEST)
