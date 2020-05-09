@@ -402,7 +402,7 @@ void determine_phase(C2CONST *c2const, COMP H[], MODEL *model, int Nfft, codec2_
 
 void determine_autoc(C2CONST *c2const, float Rk[], int order, MODEL *model, int Nfft, codec2_fft_cfg fwd_cfg, codec2_fft_cfg inv_cfg)
 {
-    int i,m,b;
+    int i,m;
     int Ns = Nfft/2+1;
     float Gdbfk[Ns], sample_freqs_kHz[Ns];
     float AmdB[MAX_AMP+1], rate_L_sample_freqs_kHz[MAX_AMP+1];

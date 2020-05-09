@@ -295,7 +295,7 @@ int main(int argc, char *argv[]) {
     octave_save_complex(fout, "H_c", (COMP*)H, FRAMES, MAX_AMP, MAX_AMP);
     fclose(fout);
 
-    printf("Done! Now run\n  octave:1> tnewamp1(\"../build_linux/src/hts1a\")\n");
+    printf("Done! Now run\n  octave:1> tnewamp1(\"../path/to/build_linux/src/hts1a\", \"../path/to/build_linux/unittest\")\n");
     return 0;
 }
 

@@ -3,7 +3,7 @@
 # David Sep 2019
 # Tests 2020 OFDM modem fading channel performance in DPSK mode, using a simulated faster (2Hz) high SNR fading channel
 
-PATH=$PATH:../build_linux/src
+PATH=$PATH:@CMAKE_CURRENT_BINARY_DIR@/src
 RAW=$PWD/../raw
 results=$(mktemp)
 
