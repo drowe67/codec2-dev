@@ -671,7 +671,6 @@ void fsk_demod_core(struct FSK *fsk, uint8_t rx_bits[], float rx_sd[], COMP fsk_
         /* Spin the oscillator for the magic line shift */
         phi_ft = cmult(phi_ft,dphift);
     }
-    fprintf(stderr, "t_c: %f %f\n", t_c.real, t_c.imag);
 
     /* Check for NaNs in the fine timing estimate, return if found */
     /* otherwise segfaults happen */
@@ -706,9 +705,6 @@ void fsk_demod_core(struct FSK *fsk, uint8_t rx_bits[], float rx_sd[], COMP fsk_
             fsk->nin = N;
     }
 
-    // RM_EM lock nin for now for initial tests
-    fsk->nin=N;
-    
     modem_probe_samp_f("t_norm_rx_timing",&(norm_rx_timing),1);
     modem_probe_samp_i("t_nin",&(fsk->nin),1);
     

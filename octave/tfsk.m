@@ -57,14 +57,13 @@ end
 function mod = fsk_mod_c(Fs,Rs,f1,fsp,bits,M)
     global tfsk_location;
     %command to be run by system to launch the modulator
-    command = sprintf('%s M %d %d %d %d %d fsk_mod_ut_bitvec fsk_mod_ut_modvec fsk_mod_ut_log.txt',tfsk_location,M,f1,fsp,Fs,Rs);
+    command = sprintf('%s M %d %d %d %d %d 0 fsk_mod_ut_bitvec fsk_mod_ut_modvec fsk_mod_ut_log.txt',tfsk_location,M,f1,fsp,Fs,Rs);
     %save input bits into a file
     bitvecfile = fopen('fsk_mod_ut_bitvec','wb+');
     fwrite(bitvecfile,bits,'uint8');
     fclose(bitvecfile);
     
     %run the modulator
-    command
     system(command);
     
     modvecfile = fopen('fsk_mod_ut_modvec','rb');
@@ -103,7 +102,8 @@ function pass = vcompare(vc,voct,vname,tname,tol,pnum)
     
 endfunction
 
-function test_stats = fsk_demod_xt(Fs,Rs,f1,fsp,mod,tname,M=2)
+% Run C, then Octave verion of demod, and compare results
+function test_stats = fsk_demod_xt(Fs,Rs,f1,fsp,mod,tname,M=2,lock_nin=0)
     global print_verbose;
     global tfsk_location;
     %Name of executable containing the modulator
@@ -113,7 +113,7 @@ function test_stats = fsk_demod_xt(Fs,Rs,f1,fsp,mod,tname,M=2)
     tvecfilename = sprintf('fsk_demod_ut_tracevec_%d.txt',getpid());
     
     %command to be run by system to launch the demod
-    command = sprintf('%s D %d %d %d %d %d %s %s %s',tfsk_location,M,f1,fsp,Fs,Rs,modvecfilename,bitvecfilename,tvecfilename)
+    command = sprintf('%s D %d %d %d %d %d %d %s %s %s',tfsk_location,M,f1,fsp,Fs,Rs,lock_nin,modvecfilename,bitvecfilename,tvecfilename);
     
     %save modulated input into a file
     modvecfile = fopen(modvecfilename,'wb+');
@@ -121,7 +121,7 @@ function test_stats = fsk_demod_xt(Fs,Rs,f1,fsp,mod,tname,M=2)
     fclose(modvecfile);
     
     %run the modulator
-    system(command)
+    system(command);
     
     bitvecfile = fopen(bitvecfilename,'rb');
     bits = fread(bitvecfile,'uint8');
@@ -173,8 +173,10 @@ function test_stats = fsk_demod_xt(Fs,Rs,f1,fsp,mod,tname,M=2)
         ninold = states.nin;
         states = est_freq(states, modin(1:states.nin), states.M);
         [bitbuf,states] = fsk_demod(states, modin(1:states.nin));
-        % lock timing for now
-        states.nin = states.N;
+
+        % constant nin greatly simplfiying comparisons as it is a feedback loop
+        if lock_nin states.nin = states.N; end
+
         modin=modin(ninold+1:length(modin));
         obits = [obits bitbuf];
         
@@ -204,15 +206,15 @@ function test_stats = fsk_demod_xt(Fs,Rs,f1,fsp,mod,tname,M=2)
         
     assert(vcompare(o_Sf,  t_fft_est,'fft est',tname,.001,1));
     assert(vcompare(o_fest,  t_f_est,'f est',tname,.001,2));
-    assert(vcompare(o_f1_dc,      t_f1_dc,    'f1 dc',    tname,.005,8));
-    assert(vcompare(o_f2_dc,      t_f2_dc,    'f2 dc',    tname,.005,9));
-    assert(vcompare(o_f2_int,     t_f2_int,   'f2 int',   tname,.005,10));
-    assert(vcompare(o_f1_int,     t_f1_int,   'f1 int',   tname,.005,11));
+    assert(vcompare(o_f1_dc,      t_f1_dc,    'f1 dc',    tname,.01,8));
+    assert(vcompare(o_f2_dc,      t_f2_dc,    'f2 dc',    tname,.01,9));
+    assert(vcompare(o_f2_int,     t_f2_int,   'f2 int',   tname,.01,10));
+    assert(vcompare(o_f1_int,     t_f1_int,   'f1 int',   tname,.01,11));
     if M==4
-        assert(vcompare(o_f3_dc,      t_f3_dc,    'f3 dc',    tname,.005,4))
-        assert(vcompare(o_f4_dc,      t_f4_dc,    'f4 dc',    tname,.005,5));
-        assert(vcompare(o_f3_int,     t_f3_int,   'f3 int',   tname,.005,6));
-        assert(vcompare(o_f4_int,     t_f4_int,   'f4 int',   tname,.005,7));
+        assert(vcompare(o_f3_dc,      t_f3_dc,    'f3 dc',    tname,.01,4))
+        assert(vcompare(o_f4_dc,      t_f4_dc,    'f4 dc',    tname,.01,5));
+        assert(vcompare(o_f3_int,     t_f3_int,   'f3 int',   tname,.01,6));
+        assert(vcompare(o_f4_int,     t_f4_int,   'f4 int',   tname,.01,7));
     end
   
     assert(vcompare(o_rx_timing,  t_rx_timing,'rx timing',tname,.02,3));
@@ -239,8 +241,8 @@ function test_stats = fsk_demod_xt(Fs,Rs,f1,fsp,mod,tname,M=2)
     test_stats.diff = sum(xor(obits,bits'));
     test_stats.cbits = bits';
     test_stats.obits = obits;
-    
 endfunction
+
 
 function [dmod,cmod,omod,pass] = fsk_mod_test(Fs,Rs,f1,fsp,bits,tname,M=2)
     global mod_pass_fail_maxdiff;
@@ -262,8 +264,6 @@ function [dmod,cmod,omod,pass] = fsk_mod_test(Fs,Rs,f1,fsp,bits,tname,M=2)
     states.dF = 0;
     omod = fsk_mod(states,bits);
 
-    printf("cmod: %d omod: %d\n", length(cmod), length(omod));
-    
     dmod = cmod-omod;
     pass = max(dmod)<(mod_pass_fail_maxdiff*length(dmod));
     if !pass
@@ -305,12 +305,11 @@ function pass = test_mod_horuscfgm4_randbits
 endfunction
 
 
-% A big ol' channel impairment tester Shamlessly taken from fsk_horus
+% A big ol' channel impairment tester shamelessly taken from fsk_horus
 % This throws some channel imparment or another at the C and octave
 % modem so they may be compared.
-function stats = tfsk_run_sim(test_frame_mode,EbNodB,timing_offset,fading,df,dA,M=2)
+function stats = tfsk_run_sim(test_frame_mode,EbNodB,timing_offset,fading,df,dA,M=2,frames=50,lock_nin=0)
   global print_verbose;
-  frames = 3;
   %EbNodB = 10;
   %timing_offset = 2.0; % see resample() for clock offset below
   %fading = 0;          % modulates tx power at 2Hz with 20dB fade depth, 
@@ -356,7 +355,7 @@ function stats = tfsk_run_sim(test_frame_mode,EbNodB,timing_offset,fading,df,dA,
 
   % ----------------------------------------------------------------------
 
-  states.verbose = 0;%x1;
+  states.verbose = 0;
   N = states.N;
   P = states.P;
   Rs = states.Rs;
@@ -428,7 +427,7 @@ function stats = tfsk_run_sim(test_frame_mode,EbNodB,timing_offset,fading,df,dA,
   rx    = tx + noise;
   
   test_name = sprintf("tfsk run sim EbNodB:%d frames:%d timing_offset:%d fading:%d df:%d",EbNodB,frames,timing_offset,fading,df);
-  tstats = fsk_demod_xt(Fs,Rs,states.f1_tx,fsp,rx,test_name,M);
+  tstats = fsk_demod_xt(Fs,Rs,states.f1_tx,fsp,rx,test_name,M,lock_nin);
   
   pass = tstats.pass;
   obits = tstats.obits;
@@ -505,12 +504,11 @@ function pass = ebno_battery_test(timing_offset,fading,df,dA,M)
     dfv     = repmat(df,1,ebnodbs);
     dav     = repmat(dA,1,ebnodbs);
     mv      = repmat(M,1,ebnodbs);
-    %statv = pararrayfun(floor(1.25*nproc()),@tfsk_run_sim,modev,ebnodbrange,timingv,fadingv,dfv,dav,mv);
-    %statv = pararrayfun(1,@tfsk_run_sim,modev,ebnodbrange,timingv,fadingv,dfv,dav,mv);
-    
-    %statv = arrayfun(@tfsk_run_sim,modev,ebnodbrange,timingv,fadingv,dfv,dav,mv);
 
-    tfsk_run_sim(mode, ebnodbrange(1), timing_offset, fading, df, dA, M)
+    %statv = pararrayfun(floor(1.25*nproc()),@tfsk_run_sim,modev,ebnodbrange,timingv,fadingv,dfv,dav,mv);
+    stats = tfsk_run_sim(mode, ebnodbrange(1), timing_offset, fading, df, dA, M);
+    assert(stats.pass == 1);
+    xx
     
     passv = zeros(1,length(statv));
     for ii=(1:length(statv))
@@ -542,6 +540,7 @@ endfunction
 function pass = test_drift_var(M)
     pass = test_timing_var(1,1,M)
     assert(pass)
+    xx
     pass = pass && test_timing_var(0,1,M)
     assert(pass)
 endfunction
@@ -605,15 +604,12 @@ function plot_fsk_bers(M=2)
  
 endfunction
 
-% We kick off tests here ......
-
+% We kick off tests here ------------------------------------------------------
+   
 xpass = test_fsk_battery
-%plot_fsk_bers(2)
-plot_fsk_bers(4)
-
-if xpass
-    printf("***** All tests passed! *****\n");
-else
-    printf("***** Some test failed! Look back thorugh output to find failed test *****\n");
-end
+pass = 0;
+pass += test_mod_horuscfg_randbits;
+pass += test_mod_horuscfgm4_randbits;
+stats = tfsk_run_sim(mode=2, EbNodB=5, timing_offset=0, fading=0, df=0, dA=0, M=4, frame=10, lock_nin=1);
+pass += stats.pass;
 

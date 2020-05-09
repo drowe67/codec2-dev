@@ -53,7 +53,7 @@
 
 int main(int argc,char *argv[]){
     struct FSK *fsk;
-    int Fs,Rs,f1,fs,M;
+    int Fs,Rs,f1,fs,M, lock_nin;
     FILE *fin,*fout;
 
     uint8_t *bitbuf = NULL;
@@ -80,9 +80,10 @@ int main(int argc,char *argv[]){
         f1 = ST_F1;
         fs = ST_Fs;
         M = ST_M;
-    } else if (argc<9){
+        lock_nin = 0;
+    } else if (argc<10){
     /* Not running any test */
-        printf("Usage: %s [(M|D|DX) Mode TXFreq1 TXFreqSpace SampleRate BitRate InputFile OutputFile OctaveLogFile]\n",argv[0]);
+        printf("Usage: %s [(M|D|DX) Mode TXFreq1 TXFreqSpace SampleRate SymbolRate lock_nin InputFile OutputFile OctaveLogFile]\n",argv[0]);
         exit(1);
     } else {
     /* Running stim-drivin test */
@@ -106,17 +107,18 @@ int main(int argc,char *argv[]){
         fs = atoi(argv[4]);
         Fs = atoi(argv[5]);
         Rs = atoi(argv[6]);
+        lock_nin = atoi(argv[7]);
         
         /* Open files */
-        fin = fopen(argv[7],"r");
-        fout = fopen(argv[8],"w");
+        fin = fopen(argv[8],"r");
+        fout = fopen(argv[9],"w");
         
         if(fin == NULL || fout == NULL){
             printf("Couldn't open test vector files\n");
             exit(1);
         }
         /* Init modem probing */
-        modem_probe_init("fsk",argv[9]);
+        modem_probe_init("fsk",argv[10]);
         
     }
     
@@ -180,9 +182,6 @@ int main(int argc,char *argv[]){
         free(bitbuf);
     }
     
-    /* Add channel imp here */
-    
-    
     /* Now test the demod */
     if(test_type == TEST_DEMOD || test_type == TEST_SELF_FULL){
         free(modbuf);
@@ -191,8 +190,8 @@ int main(int argc,char *argv[]){
         /* Demod-only test */
         if(test_type == TEST_DEMOD){
             while( fread(modbuf,sizeof(float),fsk_nin(fsk),fin) == fsk_nin(fsk) ){
-                /* DR 21/11/16 temp code during port to complex */
-                int n = fsk_nin(fsk);
+                int n;
+                if (lock_nin) n = fsk->N; else n = fsk_nin(fsk);
                 COMP modbuf_comp[n];
                 for(i=0; i<n; i++) {
                     modbuf_comp[i].real = modbuf[i];
@@ -207,8 +206,8 @@ int main(int argc,char *argv[]){
             bitbufp = bitbuf;
             modbufp = modbuf;
             while( modbufp < modbuf + modbufsize){
-                /* DR 21/11/16 temp code during port to complex */
-                int n = fsk_nin(fsk);
+                int n;
+                if (lock_nin) n = fsk->N; else n = fsk_nin(fsk);
                 COMP modbuf_comp[n];
                 for(i=0; i<n; i++) {
                     modbuf_comp[i].real = modbuf[i];
