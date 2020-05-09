@@ -309,17 +309,20 @@ function [rx_bits states] = fsk_demod(states, sf)
   f_dc = states.f_dc; 
   f_dc(:,1:nold) = f_dc(:,Nmem-nold+1:Nmem);
 
-  % freq shift down to around DC, ensuring continuous phase from last frame
-
+  % freq shift down to around DC, ensuring continuous phase from last frame, as nin may vary
   for m=1:M
-    phi_vec = states.phi(m) + (0:nin-1)*2*pi*f(m)/Fs;
+    phi_vec = states.phi(m) + (1:nin)*2*pi*f(m)/Fs;
     f_dc(m,nold+1:Nmem) = sf .* exp(j*phi_vec)';
+    %f_dc(m,nold+1:Nmem) = exp(j*phi_vec)';
+
+    % store nomralised phases for next frame
+    states.phi(m)  = phi_vec(nin);
+    states.phi(m) -= 2*pi*floor(states.phi(m)/(2*pi));
+    printf("phi[%d] = %f %f\n", m, cos(states.phi(m)), sin(states.phi(m)));
   end
-
   % save filter (integrator) memory for next time
-
   states.f_dc = f_dc;
-
+  
   % integrate over symbol period, which is effectively a LPF, removing
   % the -2Fc frequency image.  Can also be interpreted as an ideal
   % integrate and dump, non-coherent demod.  We run the integrator at
@@ -328,6 +331,7 @@ function [rx_bits states] = fsk_demod(states, sf)
   % over nsym+1 symbols so we have extra samples for the fine timing
   % re-sampler at either end of the array.
 
+  f_int = zeros(M,(nsym+1)*P);
   for i=1:(nsym+1)*P
     st = 1 + (i-1)*Ts/P;
     en = st+Ts-1;
@@ -336,7 +340,7 @@ function [rx_bits states] = fsk_demod(states, sf)
     end
   end
   states.f_int = f_int;
-
+  
   % fine timing estimation -----------------------------------------------
 
   % Non linearity has a spectral line at Rs, with a phase

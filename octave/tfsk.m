@@ -78,7 +78,7 @@ endfunction
 function pass = vcompare(vc,voct,vname,tname,tol,pnum)
     global print_verbose;
     %Get delta of vectors
-    dvec = abs(abs(vc)-abs(voct));     
+    dvec = abs(abs(vc - voct));     
     
     %Normalize difference
     dvec = dvec ./ abs(max(abs(voct))+1e-8);
@@ -193,20 +193,18 @@ function test_stats = fsk_demod_xt(Fs,Rs,f1,fsp,mod,tname,M=2)
         o_fest = [o_fest states.f];
         o_nin = [o_nin states.nin];
         if M==4
-      			o_f3_dc = [o_f3_dc states.f_dc(3,:)];
-			o_f4_dc = [o_f4_dc states.f_dc(4,:)];
-			o_f3_int = [o_f3_int states.f_int(3,:)];
-			o_f4_int = [o_f4_int states.f_int(4,:)];
-			o_f3 = [o_f1 states.f(3)];
-			o_f4 = [o_f1 states.f(4)];
+            o_f3_dc = [o_f3_dc states.f_dc(3,:)];
+	    o_f4_dc = [o_f4_dc states.f_dc(4,:)];
+            o_f3_int = [o_f3_int states.f_int(3,:)];
+            o_f4_int = [o_f4_int states.f_int(4,:)];
+            o_f3 = [o_f1 states.f(3)];
+            o_f4 = [o_f1 states.f(4)];
         end
     end
         
     assert(vcompare(o_Sf,  t_fft_est,'fft est',tname,.001,1));
     assert(vcompare(o_fest,  t_f_est,'f est',tname,.001,2));
-       
     assert(vcompare(o_f1_dc,      t_f1_dc,    'f1 dc',    tname,.005,8));
-    xx
     assert(vcompare(o_f2_dc,      t_f2_dc,    'f2 dc',    tname,.005,9));
     assert(vcompare(o_f2_int,     t_f2_int,   'f2 int',   tname,.005,10));
     assert(vcompare(o_f1_int,     t_f1_int,   'f1 int',   tname,.005,11));
@@ -216,7 +214,8 @@ function test_stats = fsk_demod_xt(Fs,Rs,f1,fsp,mod,tname,M=2)
         assert(vcompare(o_f3_int,     t_f3_int,   'f3 int',   tname,.005,6));
         assert(vcompare(o_f4_int,     t_f4_int,   'f4 int',   tname,.005,7));
     end
-   
+    xx
+  
     assert(vcompare(o_rx_timing,  t_rx_timing,'rx timing',tname,.02,3));
 
     % Much larger tolerances on unimportant statistics
