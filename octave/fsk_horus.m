@@ -336,7 +336,6 @@ function run_sim(test_frame_mode, M=2, frames = 10, EbNodB = 100, filename="fsk_
   if test_frame_mode < 4
     % horus rtty config ---------------------
     states = fsk_horus_init(8000, 50, M);
-    %states = fsk_horus_init_hbr(8000, 10, 400, 4); % EME
   end
 
   if test_frame_mode == 4
@@ -357,7 +356,7 @@ function run_sim(test_frame_mode, M=2, frames = 10, EbNodB = 100, filename="fsk_
 
   if test_frame_mode == 6
     % horus high speed ---------------------
-    states = fsk_horus_init_hbr(9600, 8, 1200, 2, 16);
+    states = fsk_horus_init(Fs=9600, Rs=1200, M=2, P=8, nsym=16);
     states.tx_bits_file = "horus_high_speed.bin";
   end
 
@@ -631,7 +630,7 @@ function rx_bits_log = demod_file(filename, test_frame_mode=4, noplot=0, EbNodB=
 
   if test_frame_mode == 6
     % Horus high speed config --------------
-    states = fsk_horus_init_hbr(9600, 8, 1200, 2, 16);
+    states = fsk_horus_init(Fs=9600, Rs=1200, M=2,  P=8, nsym=16);
     states.tx_bits_file = "horus_high_speed.bin";
     states.verbose += 0x4;
     ftmp = fopen(states.tx_bits_file, "rb"); test_frame = fread(ftmp,Inf,"char")'; fclose(ftmp);
@@ -641,7 +640,7 @@ function rx_bits_log = demod_file(filename, test_frame_mode=4, noplot=0, EbNodB=
 
   if test_frame_mode == 7
     % 800XA 4FSK modem --------------
-    states = fsk_init_hbr(8000, 10, 400, 4, 256);
+    states = fsk_init(Fs=8000, Rs=400, M=4, P=10, nsym=256);
     states.tx_bits_file = "horus_high_speed.bin";
     states.verbose += 0x4;
     ftmp = fopen(states.tx_bits_file, "rb"); test_frame = fread(ftmp,Inf,"char")'; fclose(ftmp);
@@ -651,7 +650,7 @@ function rx_bits_log = demod_file(filename, test_frame_mode=4, noplot=0, EbNodB=
 
   if test_frame_mode == 8
     % test RS41 type balllon telemetry --------------
-    states = fsk_init_hbr(96000, 10, 4800, 2, 16);
+    states = fsk_init(96000, 4800, 2, 10, 16);
     states.fest_fmin = 1000;
     states.fest_fmax = 40000;
     states.fest_min_spacing = 1000;

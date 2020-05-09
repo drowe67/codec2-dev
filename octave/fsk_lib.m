@@ -12,7 +12,7 @@
 
 1;
 
-function states = fsk_init(Fs, Rs, M=2, nsym=50)
+function states = fsk_init(Fs, Rs, M=2, P=8, nsym=50)
   states.M = M;                    
   states.bitspersymbol = log2(M);
   states.Fs = Fs;
@@ -33,7 +33,7 @@ function states = fsk_init(Fs, Rs, M=2, nsym=50)
   Nmem = states.Nmem  = N+2*Ts;                   % two symbol memory in down converted signals to allow for timing adj
 
   states.f_dc = zeros(M,Nmem);
-  states.P = 8;                                   % oversample rate out of filter
+  states.P = P;                                   % oversample rate out of filter
   assert(Ts/states.P == floor(Ts/states.P), "Ts/P must be an integer");
 
   states.nin = N;                                 % can be N +/- Ts/P samples to adjust for sample clock offsets
@@ -65,70 +65,6 @@ function states = fsk_init(Fs, Rs, M=2, nsym=50)
 
   %printf("Octave: M: %d Fs: %d Rs: %d Ts: %d nsym: %d nbit: %d N: %d Ndft: %d fmin: %d fmax: %d\n",
   %       states.M, states.Fs, states.Rs, states.Ts, states.nsym, states.nbit, states.N, states.Ndft, states.fest_fmin, states.fest_fmax);
-
-endfunction
-
-
-% Alternative init function, useful for high speed (non telemetry) modems
-%   Allows fine grained control of decimation P
-%   Small, processing window nsym rather than nsym=Fs (1 second window)
-%   Wider freq est limits
-
-function states = fsk_init_hbr(Fs,P,Rs,M=2,nsym=48)
-    
-  states.M = M;                    
-  states.bitspersymbol = log2(M);
-  states.Fs = Fs;
-  states.Rs = Rs;
-  Ts = states.Ts = Fs/Rs;
-  assert(Ts == floor(Ts), "Fs/Rs must be an integer");
-  N = states.N = Ts*nsym;        % processing buffer nsym wide
-  states.nsym = N/Ts;            % number of symbols in one processing frame
-  states.nbit = states.nsym*states.bitspersymbol; % number of bits per processing frame
-
-  states.Ndft = min(1024, 2.^ceil(log2(N)))
-  states.Sf = zeros(states.Ndft,1); % current memory of dft mag samples
-  states.tc = 0.95;                 % no (very little) averaging, narrow freq est window, fast acquisition
-  
-  Nmem = states.Nmem  = N+2*Ts;  % two symbol memory in down converted signals to allow for timing adj
-
-  states.f_dc = zeros(M,Nmem);
-  states.P = P;                  % oversample rate out of filter
-  assert(Ts/states.P == floor(Ts/states.P), "Ts/P must be an integer");
-
-  states.nin = N;                % can be N +/- Ts/P samples to adjust for sample clock offsets
-  states.verbose = 0;
-
-  %printf("M: %d Fs: %d Rs: %d Ts: %d nsym: %d nbit: %d\n", states.M, states.Fs, states.Rs, states.Ts, states.nsym, states.nbit);
-
-  % Freq estimator limits
-
-  states.fest_fmax = (Fs/2)-Rs;
-  states.fest_fmin = Rs/2;
-  states.fest_min_spacing = 2*(Rs-(Rs/5));
-
-  % BER stats 
-
-  states.ber_state = 0;
-  states.Tbits = 0;
-  states.Terrs = 0;
-  states.nerr_log = 0;
-
-  states.tx_real = 1;
-  states.dA(1:M) = 1;
-  states.df(1:M) = 0;
-  states.f(1:M) = 0;
-  states.norm_rx_timing = 0;
-  states.ppm = 0;
-  states.prev_pkt = [];
- 
-  #{ 
-  TODO: fix me to resurect fsk_horus RTTY stuff, maybe call from 
-  % protocol specific states
-
-  states.rtty = fsk_horus_init_rtty_uw(states);
-  states.binary = fsk_horus_init_binary_uw;
-  #}
 
 endfunction
 
