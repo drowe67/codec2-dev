@@ -20,7 +20,7 @@
      $ make
 
   2 - Change tfsk_location below if required
-  3 - Ensure Octave packages signal and parallel are installed
+  3 - Ensure Octave packages are installed
   4 - Start Octave and run tfsk.m. It will perform all tests automatically
 
 #}
@@ -40,7 +40,8 @@ global mod_pass_fail_maxdiff = 1e-3/5000;
 fsk_horus_as_a_lib=1;
 fsk_horus;
 pkg load signal;
-pkg load parallel;
+% not needed unless parallel tests running
+%pkg load parallel;
 graphics_toolkit('gnuplot');
 
 function print_result(test_name, result)
