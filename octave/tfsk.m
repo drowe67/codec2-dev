@@ -2,9 +2,10 @@
 % Brady O'Brien 8 January 2016
 % David Rowe May 2020
 %
-% Automatic testing of C port of FSK modem by comparing to Octave
-% Currently just a subset of tests enabled in order to run in a reasonable
-% amount of time as ctests.
+% Automatic testing of C port of FSK modem by comparing to reference
+% Octave version. Currently just a subset of tests enabled in order to
+% run in a reasonable amount of time as ctests, but still trapping any
+% bit-rot.
 
 #{
 
@@ -25,7 +26,13 @@
 #}
 
 % tfsk executable path/file
-global tfsk_location = '../build_linux/unittest/tfsk';
+if getenv("PATH_TO_TFSK")
+  global tfsk_location = getenv("PATH_TO_TFSK")
+  printf("setting tfsk_location from env var: %s\n", getenv("PATH_TO_TFSK"));
+else
+  global tfsk_location = '../build_linux/unittest/tfsk';
+end
+
 % Set to 1 for verbose printouts
 global print_verbose = 0;
 global mod_pass_fail_maxdiff = 1e-3/5000;
