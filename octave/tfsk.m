@@ -165,7 +165,6 @@ function test_stats = fsk_demod_xt(Fs,Rs,f1,fsp,mod,tname,M=2,lock_nin=0)
     states.ftx(3) = f1+fsp*2;
     states.ftx(4) = f1+fsp*3;
     states.tx_tone_separation = fsp;
-    states.dA = 1;
     states.dF = 0;
     modin = mod;
     obits = [];
@@ -259,7 +258,6 @@ function [dmod,cmod,omod,pass] = fsk_mod_test(Fs,Rs,f1,fsp,bits,tname,M=2)
 		states.ftx(4) = f1+fsp*3;
     end
     
-    states.dA = [1 1 1 1]; 
     states.dF = 0;
     omod = fsk_mod(states,bits);
 
@@ -307,15 +305,16 @@ endfunction
 % A big ol' channel impairment tester shamelessly taken from fsk_horus
 % This throws some channel imparment or another at the C and octave
 % modem so they may be compared.
-function stats = tfsk_run_sim(test_frame_mode,EbNodB,timing_offset,fading,df,dA,M=2,frames=50,lock_nin=0)
+function stats = tfsk_run_sim(test_frame_mode,EbNodB,timing_offset,fading,df,M=2,frames=50,lock_nin=0)
   global print_verbose;
-  %EbNodB = 10;
-  %timing_offset = 2.0; % see resample() for clock offset below
-  %fading = 0;          % modulates tx power at 2Hz with 20dB fade depth, 
-                        % to simulate balloon rotating at end of mission
-  %df     = 0;          % tx tone freq drift in Hz/s
-  %dA     = 1;          % amplitude imbalance of tones (note this affects Eb so not a gd idea)
-
+  #{
+  
+  timing_offset [0|1]  enable a 1000ppm sample clock offset
+  fading        [0|1]  modulates tx power at 2Hz with 20dB fade depth, 
+                       e.g. to simulate balloon rotating at end of mission
+  df                   tx tone freq drift in Hz/s
+  #}
+  
   more off
   rand('state',1); 
   randn('state',1);
@@ -361,7 +360,6 @@ function stats = tfsk_run_sim(test_frame_mode,EbNodB,timing_offset,fading,df,dA,
   nsym = states.nsym;
   Fs = states.Fs;
   states.df = df;
-  states.dA = [dA dA dA dA];
   states.M = M;
 
   EbNo = 10^(EbNodB/10);
@@ -402,7 +400,6 @@ function stats = tfsk_run_sim(test_frame_mode,EbNodB,timing_offset,fading,df,dA,
   
   f1 = states.f1_tx;
   fsp = states.f2_tx-f1;
-  states.dA = [dA dA dA dA];
   states.ftx(1) = f1;
   states.ftx(2) = f1+fsp;
     
@@ -489,8 +486,8 @@ function stats = tfsk_run_sim(test_frame_mode,EbNodB,timing_offset,fading,df,dA,
   stats.pass = pass;
 endfunction
 
-
-function pass = ebno_battery_test(timing_offset,fading,df,dA,M)
+% run a bunch of tests at a range of EbNo's in parallel
+function pass = ebno_battery_test(timing_offset,fading,df,M)
     %Range of EbNodB over which to test
     ebnodbrange = (5:2:13);
     ebnodbs = length(ebnodbrange);
@@ -501,22 +498,9 @@ function pass = ebno_battery_test(timing_offset,fading,df,dA,M)
     timingv = repmat(timing_offset,1,ebnodbs);
     fadingv = repmat(fading,1,ebnodbs);
     dfv     = repmat(df,1,ebnodbs);
-    dav     = repmat(dA,1,ebnodbs);
     mv      = repmat(M,1,ebnodbs);
 
-    %statv = pararrayfun(floor(1.25*nproc()),@tfsk_run_sim,modev,ebnodbrange,timingv,fadingv,dfv,dav,mv);
-    %stats = tfsk_run_sim(mode, ebnodbrange(1), timing_offset, fading, df, dA, M);
-    mode
-    timing_offset
-    fading
-    df
-    dA
-    M
-    
-    %stats = tfsk_run_sim(mode, EbNodB=5, timing_offset, fading, df, dA, M);
-    assert(stats.pass == 1);
-    xx
-    
+    statv = pararrayfun(floor(1.25*nproc()),@tfsk_run_sim,modev,ebnodbrange,timingv,fadingv,dfv,mv);
     passv = zeros(1,length(statv));
     for ii=(1:length(statv))
         passv(ii)=statv(ii).pass;
@@ -536,18 +520,16 @@ function pass = ebno_battery_test(timing_offset,fading,df,dA,M)
 endfunction
 
 %Test with and without sample clock offset
-function pass = test_timing_var(df,dA,M)
-    pass = ebno_battery_test(1,0,df,dA,M)
+function pass = test_timing_var(df,M)
+    pass = ebno_battery_test(1,0,df,M)
     assert(pass)
-    pass = pass && ebno_battery_test(0,0,df,dA,M)
+    pass = pass && ebno_battery_test(0,0,df,M)
     assert(pass)
 endfunction
 
 %Test with and without 1 Hz/S freq drift
 function pass = test_drift_var(M)
     pass = test_timing_var(1,1,M)
-    assert(pass)
-    xx
     pass = pass && test_timing_var(0,1,M)
     assert(pass)
 endfunction
@@ -556,7 +538,6 @@ function pass = test_fsk_battery()
     pass = test_mod_horuscfg_randbits;
     pass = pass && test_mod_horuscfgm4_randbits;
     pass = pass && test_drift_var(4);
-    xx
     assert(pass)
     pass = pass && test_drift_var(2);
     assert(pass)
@@ -580,12 +561,10 @@ function plot_fsk_bers(M=2)
     timingv = repmat(1,1,ebnodbs);
     fadingv = repmat(0,1,ebnodbs);
     dfv     = repmat(1,1,ebnodbs);
-    dav     = repmat(1,1,ebnodbs);
     Mv     = repmat(M,1,ebnodbs);
-    
-    
-    statv = pararrayfun(floor(nproc()),@tfsk_run_sim,modev,ebnodbrange,timingv,fadingv,dfv,dav,Mv);
-    %statv = arrayfun(@tfsk_run_sim,modev,ebnodbrange,timingv,fadingv,dfv,dav,Mv);
+        
+    statv = pararrayfun(floor(nproc()),@tfsk_run_sim,modev,ebnodbrange,timingv,fadingv,dfv,Mv);
+    %statv = arrayfun(@tfsk_run_sim,modev,ebnodbrange,timingv,fadingv,dfv,Mv);
     
     for ii = (1:length(statv))
         stat = statv(ii);
@@ -613,16 +592,15 @@ endfunction
 
 % We kick off tests here ------------------------------------------------------
    
-%xpass = test_fsk_battery
 pass = 0;
 pass += test_mod_horuscfg_randbits;
 pass += test_mod_horuscfgm4_randbits;
-stats = tfsk_run_sim(test_frame_mode=2,EbNodB=5,timing_offset=1,fading=0,df=1,dA=1,M=4,frames=10,lock_nin=1);
+stats = tfsk_run_sim(test_frame_mode=2,EbNodB=5,timing_offset=1,fading=0,df=1,M=4,frames=10,lock_nin=1);
 if stats.pass
   print_result("Demod 10 frames nin locked", "OK");
   pass += stats.pass;
 end
-stats = tfsk_run_sim(test_frame_mode=2,EbNodB=5,timing_offset=1,fading=0,df=1,dA=1,M=4,frames=10,lock_nin=0);
+stats = tfsk_run_sim(test_frame_mode=2,EbNodB=5,timing_offset=1,fading=0,df=1,M=4,frames=10,lock_nin=0);
 if stats.pass
   print_result("Demod 10 frames", "OK");
   pass += stats.pass;
