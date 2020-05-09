@@ -214,10 +214,9 @@ function test_stats = fsk_demod_xt(Fs,Rs,f1,fsp,mod,tname,M=2)
         assert(vcompare(o_f3_int,     t_f3_int,   'f3 int',   tname,.005,6));
         assert(vcompare(o_f4_int,     t_f4_int,   'f4 int',   tname,.005,7));
     end
-    xx
   
     assert(vcompare(o_rx_timing,  t_rx_timing,'rx timing',tname,.02,3));
-
+ 
     % Much larger tolerances on unimportant statistics
     assert(vcompare(o_ppm   ,     t_ppm,      'ppm',      tname,.02,12));
     assert(vcompare(o_EbNodB,     t_EbNodB,'EbNodB',      tname,.02,13));

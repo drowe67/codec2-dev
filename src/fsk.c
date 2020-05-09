@@ -624,7 +624,6 @@ void fsk_demod_core(struct FSK *fsk, uint8_t rx_bits[], float rx_sd[], COMP fsk_
             //f_dc[m*Nmem+i] = cconj(phi_c[m]);
         }
         phi_c[m] = comp_normalize(phi_c[m]);
-        fprintf(stderr,"phi_c[%d] = %f %f\n", m, phi_c[m].real, phi_c[m].imag);
         #ifdef MODEMPROBE_ENABLE
         snprintf(mp_name_tmp,NMP_NAME,"t_f%zd_dc",m+1);
         modem_probe_samp_c(mp_name_tmp,&f_dc[m*Nmem],Nmem);
@@ -647,11 +646,9 @@ void fsk_demod_core(struct FSK *fsk, uint8_t rx_bits[], float rx_sd[], COMP fsk_
     for(m=0; m<M; m++) {
         snprintf(mp_name_tmp,NMP_NAME,"t_f%zd_int",m+1);
         modem_probe_samp_c(mp_name_tmp,&f_int[m][0],(nsym+1)*P);
-        //fprintf(stderr, "m: %d (nsym+1)*P: %d\n", m, (nsym+1)*P);
     }    
     #endif                       
         
-#ifdef TMP
     /* Fine Timing Estimation */
     /* Apply magic nonlinearity to f1_int and f2_int, shift down to 0, 
      * extract angle */
@@ -674,6 +671,7 @@ void fsk_demod_core(struct FSK *fsk, uint8_t rx_bits[], float rx_sd[], COMP fsk_
         /* Spin the oscillator for the magic line shift */
         phi_ft = cmult(phi_ft,dphift);
     }
+    fprintf(stderr, "t_c: %f %f\n", t_c.real, t_c.imag);
 
     /* Check for NaNs in the fine timing estimate, return if found */
     /* otherwise segfaults happen */
@@ -844,9 +842,6 @@ void fsk_demod_core(struct FSK *fsk, uint8_t rx_bits[], float rx_sd[], COMP fsk_
     assert(neyesamp <= MODEM_STATS_EYE_IND_MAX);
     fsk->stats->neyesamp = neyesamp;
 
-    #ifdef I_DONT_UNDERSTAND
-    neyeoffset = high_sample+1+(P*28); /* WTF this line? Where does "28" come from ?                           */
-    #endif                             /* ifdef-ed out as I am afraid it will index out of memory as P changes */
     neyeoffset = high_sample+1;
     
     int eye_traces = MODEM_STATS_ET_MAX/M;
@@ -895,11 +890,12 @@ void fsk_demod_core(struct FSK *fsk, uint8_t rx_bits[], float rx_sd[], COMP fsk_
     modem_probe_samp_f("t_ppm",&(fsk->ppm),1);
     modem_probe_samp_f("t_rx_timing",&(rx_timing),1);
     
+#ifdef TMP
     #ifdef MODEMPROBE_ENABLE
     for( m=0; m<M; m++){
         snprintf(mp_name_tmp,19,"t_f%zd_int",m+1);
         modem_probe_samp_c(mp_name_tmp,f_int[m],(nsym+1)*P);
-        snprintf(mp_name_tmp,19,"t_f%zd",m+1);
+        snprintf(mp_name_tmp,19,"t_f%zd ",m+1);
         modem_probe_samp_f(mp_name_tmp,&f_est[m],1);
     }
     #endif

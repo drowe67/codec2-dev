@@ -313,12 +313,8 @@ function [rx_bits states] = fsk_demod(states, sf)
   for m=1:M
     phi_vec = states.phi(m) + (1:nin)*2*pi*f(m)/Fs;
     f_dc(m,nold+1:Nmem) = sf .* exp(j*phi_vec)';
-    %f_dc(m,nold+1:Nmem) = exp(j*phi_vec)';
-
-    % store nomralised phases for next frame
     states.phi(m)  = phi_vec(nin);
     states.phi(m) -= 2*pi*floor(states.phi(m)/(2*pi));
-    printf("phi[%d] = %f %f\n", m, cos(states.phi(m)), sin(states.phi(m)));
   end
   % save filter (integrator) memory for next time
   states.f_dc = f_dc;
