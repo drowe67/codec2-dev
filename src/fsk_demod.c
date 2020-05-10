@@ -70,8 +70,10 @@ int main(int argc,char *argv[]){
     int testframe_mode = 0;
     P = 8;  /* default */
     M = 0;
-    int fsk_lower = -1;
-    int fsk_upper = -1;
+    int fsk_lower = 0;
+    int fsk_upper = 0;
+    int user_fsk_lower = 0;
+    int user_fsk_upper = 0;
          
     int o = 0;
     int opt_idx = 0;
@@ -119,14 +121,16 @@ int main(int argc,char *argv[]){
             P = atoi(optarg);
             break;
         case 'b':
-            if (optarg != NULL){
+            if (optarg != NULL) {
                 fsk_lower = atoi(optarg);
+                user_fsk_lower = 1;
             }
             break;
         case 'u':
             if (optarg != NULL){
                 fsk_upper = atoi(optarg);
-            }
+                 user_fsk_upper = 1;
+           }
             break;
         case 'h':
         case '?':
@@ -144,19 +148,21 @@ int main(int argc,char *argv[]){
     if( (argc - dx) > 5){
         fprintf(stderr, "Too many arguments\n");
     helpmsg:
-        fprintf(stderr,"usage: %s [-s] [(-c|-d)] [-t [r]] [-f] [-p P] (2|4) SampleRate SymbolRate InputModemRawFile OutputFile\n",argv[0]);
-        fprintf(stderr," -c --cs16         -  The raw input file will be in complex signed 16 bit format.\n");
-        fprintf(stderr," -d --cu8          -  The raw input file will be in complex unsigned 8 bit format.\n");
-        fprintf(stderr,"                        If neither -c nor -d are used, the input should be in signed 16 bit format.\n");
-        fprintf(stderr," -f --testframes   -  Testframe mode, prints stats to stderr when a testframe is detected, if -t (JSON) \n");
-        fprintf(stderr,"                        is enabled stats will be in JSON format\n");
-        fprintf(stderr," -t[r] --stats=[r] -  Print out modem statistics to stderr in JSON.\n");
-        fprintf(stderr,"                         r, if provided, sets the number of modem frames between statistic printouts.\n");
-        fprintf(stderr," -s --soft-dec     -  The output file will be in a soft-decision format, with one 32-bit float per bit.\n");
-        fprintf(stderr,"                        If -s is not used, the output will be in a 1 byte-per-bit format.\n");
-        fprintf(stderr," -p P              -  P specifies the rate at which symbols are down-converted before further processing\n");
-        fprintf(stderr,"                        P must be divisible by the symbol rate. Smaller P values will result in faster\n");
-        fprintf(stderr,"                        processing but lower demodulation performance. Default %d\n", FSK_DEFAULT_P);
+        fprintf(stderr,"usage: %s [options] (2|4) SampleRate SymbolRate InputModemRawFile OutputFile\n",argv[0]);
+        fprintf(stderr," -c --cs16         The raw input file will be in complex signed 16 bit format.\n");
+        fprintf(stderr," -d --cu8          The raw input file will be in complex unsigned 8 bit format.\n");
+        fprintf(stderr,"                   If neither -c nor -d are used, the input should be in signed 16 bit format.\n");
+        fprintf(stderr," -f --testframes   Testframe mode, prints stats to stderr when a testframe is detected, if -t (JSON) \n");
+        fprintf(stderr,"                   is enabled stats will be in JSON format\n");
+        fprintf(stderr," -t[r] --stats=[r] Print out modem statistics to stderr in JSON.\n");
+        fprintf(stderr,"                   r, if provided, sets the number of modem frames between statistic printouts.\n");
+        fprintf(stderr," -s --soft-dec     The output file will be in a soft-decision format, with one 32-bit float per bit.\n");
+        fprintf(stderr,"                   If -s is not used, the output will be in a 1 byte-per-bit format.\n");
+        fprintf(stderr," -p P              P specifies the rate at which symbols are down-converted before further processing\n");
+        fprintf(stderr,"                   P must be divisible by the symbol rate. Smaller P values will result in faster\n");
+        fprintf(stderr,"                   processing but lower demodulation performance. Default %d\n", FSK_DEFAULT_P);
+        fprintf(stderr," --fsk_lower       lower limit of freq estimator (default 0 for real input, -Fs/2  for complex input)\n");
+        fprintf(stderr," --fsk_upper       upper limit of freq estimator (default Fs/2)\n");
         exit(1);
     }
     
@@ -186,10 +192,19 @@ int main(int argc,char *argv[]){
     /* set up FSK */
     fsk = fsk_create_hbr(Fs,Rs,P,M,1200,400);
 
-    if(fsk_lower> 0 && fsk_upper > fsk_lower){
-        fsk_set_est_limits(fsk,fsk_lower,fsk_upper);
-        fprintf(stderr,"Setting estimator limits to %d to %d Hz.\n",fsk_lower, fsk_upper);
+    /* set freq estimator limits */
+    if (!user_fsk_lower) {
+        if (complex_input == 1)
+            fsk_lower = 0;
+        else
+            fsk_lower = -Fs/2;
     }
+    if (!user_fsk_upper) {
+        fsk_upper = Fs/2;
+    }
+    fprintf(stderr,"Setting estimator limits to %d to %d Hz.\n", fsk_lower, fsk_upper);
+
+    fsk_set_est_limits(fsk,fsk_lower,fsk_upper);
 
     if(fin==NULL || fout==NULL || fsk==NULL){
         fprintf(stderr,"Couldn't open files\n");

@@ -383,18 +383,6 @@ endif()
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/unittest
              )
            
-    add_test(NAME test_horus_binary
-             COMMAND sh -c "sox ${CMAKE_CURRENT_SOURCE_DIR}/wav/horus_binary_ebno_4.5db.wav -r 48000 -t raw - | $<TARGET_FILE:horus_demod> -m binary - -"
-             )
-             set_tests_properties(test_horus_binary PROPERTIES
-             PASS_REGULAR_EXPRESSION "1C9A9545")
-
-    add_test(NAME test_horus_binary_iq
-             COMMAND sh -c "cat ${CMAKE_CURRENT_SOURCE_DIR}/raw/horusb_iq_s16.raw | $<TARGET_FILE:horus_demod> -q -m binary --fsk_lower=1000 --fsk_upper=20000 - -"
-             )
-             set_tests_properties(test_horus_binary_iq PROPERTIES
-             PASS_REGULAR_EXPRESSION "000900071E2A000000000000000000000000259A6B14")
-
     # tests ldpc_enc/ldpc_noise/ldpc_dec
     add_test(NAME test_ldpc_enc_dec
              COMMAND sh -c "$<TARGET_FILE:ldpc_enc> /dev/zero - --sd --code HRA_112_112 --testframes 200 | $<TARGET_FILE:ldpc_noise> - - 0.5 | $<TARGET_FILE:ldpc_dec> - /dev/null --code HRA_112_112 --sd --testframes"
@@ -414,12 +402,6 @@ endif()
              WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/unittest
              )
              set_tests_properties(test_ldpc_check PROPERTIES PASS_REGULAR_EXPRESSION "PASSED")
-
-    # basic test of C utils
-    add_test(NAME test_FSK_modem_mod_demod
-             COMMAND sh -c "$<TARGET_FILE:fsk_get_test_bits> - 10000 | $<TARGET_FILE:fsk_mod> 2 8000 100 1200 100 - - | $<TARGET_FILE:fsk_demod> -l 2 8000 100 - - | $<TARGET_FILE:fsk_put_test_bits> -"
-             )
-             set_tests_properties(test_FSK_modem_mod_demod  PROPERTIES PASS_REGULAR_EXPRESSION "bits tested 9800, bit errors 0")
 
     add_test(NAME test_FreeDV_API_700D_backwards_compatability
              COMMAND sh -c "$<TARGET_FILE:freedv_rx> 700D ${CMAKE_CURRENT_SOURCE_DIR}/raw/testframes_700d.raw /dev/null --testframes --discard"
@@ -535,6 +517,10 @@ endif(NOT APPLE)
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/unittest
              )
 
+     # -------------------------------------------------------------------------
+     #                                FSK Modem      
+     # -------------------------------------------------------------------------
+           
      # Octave FSK Modem tests, to make sure we don't break reference simulations
      add_test(NAME test_fsk_lib
              COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/octave; DISPLAY=\"\" octave --no-gui -qf fsk_lib_demo.m")
@@ -546,20 +532,50 @@ endif(NOT APPLE)
              COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/octave; 
                             PATH_TO_TFSK=${CMAKE_CURRENT_BINARY_DIR}/unittest/tfsk octave --no-gui -qf tfsk.m")
              set_tests_properties(test_fsk_modem_octave_port PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
+
+     add_test(NAME test_FSK_modem_mod_demod
+             COMMAND sh -c "$<TARGET_FILE:fsk_get_test_bits> - 10000 | 
+                            $<TARGET_FILE:fsk_mod> 2 8000 100 1200 100 - - | 
+                            $<TARGET_FILE:fsk_demod> -l 2 8000 100 - - | 
+                            $<TARGET_FILE:fsk_put_test_bits> -"
+             )
+             set_tests_properties(test_FSK_modem_mod_demod  PROPERTIES PASS_REGULAR_EXPRESSION "bits tested 9800, bit errors 0")
+
      # 4FSK modem at Eb/No = 6dB, SNR = Eb/No+10log10(Rb/B) = 6 + 10log10(2*100/3000) = -5.7dB
      # Ideal BER = 0.016, set thresh 50% higher
      add_test(NAME test_fsk_4fsk_ber
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src; 
-                            ./fsk_get_test_bits - 10000 | ./fsk_mod 4 8000 100 1200 100 - - | 
+                            ./fsk_get_test_bits - 10000 | ./fsk_mod 4 8000 100 1000 100 - - | 
                             ./cohpsk_ch - - -26 --Fs 8000 | 
-                            ./fsk_demod 4 8000 100 - - | ./fsk_put_test_bits -b 0.025 -q - ")
+                            ./fsk_demod 4 8000 100 - - | ./fsk_put_test_bits -b 0.025 - ")
      # 2FSK modem at Eb/No = 9dB, SNR = Eb/No+10log10(Rb/B) = 9 + 10log10(100/3000) = -5.7dB
      # Ideal BER = 0.0094, set thresh 50% higher
      add_test(NAME test_fsk_2fsk_ber
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src; 
-                            ./fsk_get_test_bits - 10000 | ./fsk_mod 2 8000 100 1200 100 - - | 
+                            ./fsk_get_test_bits - 10000 | ./fsk_mod 2 8000 100 1000 100 - - | 
                             ./cohpsk_ch - - -26 --Fs 8000 | 
                             ./fsk_demod 2 8000 100 - - | ./fsk_put_test_bits -b 0.015 -q - ")
+     # shift FSK signal to -ve frequencies, note No 3dB higher as noise is single sided
+     add_test(NAME test_fsk_4fsk_ber_negative_freq
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src; 
+                            ./fsk_get_test_bits - 10000 | ./fsk_mod 4 8000 100 1000 200 - - | 
+                            ./cohpsk_ch - - -23 --Fs 8000 --ssbfilt 0 --complexout -f -4000 | 
+                            ./fsk_demod -c -p 8 4 8000 100 - - | 
+                            ./fsk_put_test_bits -b 0.025 -q - ")
+
+     add_test(NAME test_horus_binary
+             COMMAND sh -c "sox ${CMAKE_CURRENT_SOURCE_DIR}/wav/horus_binary_ebno_4.5db.wav -r 48000 -t raw - |
+                            $<TARGET_FILE:horus_demod> -m binary - -"
+             )
+             set_tests_properties(test_horus_binary PROPERTIES
+             PASS_REGULAR_EXPRESSION "1C9A9545")
+
+     add_test(NAME test_horus_binary_iq
+             COMMAND sh -c "cat ${CMAKE_CURRENT_SOURCE_DIR}/raw/horusb_iq_s16.raw | 
+                            $<TARGET_FILE:horus_demod> -q -m binary --fsk_lower=1000 --fsk_upper=20000 - -"
+             )
+             set_tests_properties(test_horus_binary_iq PROPERTIES
+             PASS_REGULAR_EXPRESSION "000900071E2A000000000000000000000000259A6B14")
 
 
 endif(UNITTEST)

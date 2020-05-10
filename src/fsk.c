@@ -1001,11 +1001,12 @@ void fsk_get_demod_stats(struct FSK *fsk, struct MODEM_STATS *stats){
 /*
  * Set the minimum and maximum frequencies at which the freq. estimator can find tones
  */
-void fsk_set_est_limits(struct FSK *fsk,int est_min, int est_max){
-    
+void fsk_set_est_limits(struct FSK *fsk, int est_min, int est_max){
+    assert(fsk != NULL);
+    assert(est_min >= -fsk->Fs/2);
+    assert(est_max <=  fsk->Fs/2);
+    assert(est_max > est_min);
     fsk->est_min = est_min;
-    if(fsk->est_min<0) fsk->est_min = 0;
-    
     fsk->est_max = est_max;
 }
 
