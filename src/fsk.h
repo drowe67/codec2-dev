@@ -41,6 +41,9 @@
 
 #define FSK_SCALE 16383
 
+/* default internal decimation rate */
+#define FSK_DEFAULT_P 8
+
 struct FSK {
     /*  Static parameters set up by fsk_init */
     int Ndft;               /* freq offset est fft */

@@ -27,9 +27,9 @@
   along with this program; if not, see <http://www.gnu.org/licenses/>.
 */
 
-
 #include <stdio.h>
 #include <string.h>
+#include <getopt.h>
 #include "fsk.h"
 
 #define TEST_FRAME_SIZE 100  /* must match fsk_get_test_bits.c */
@@ -40,33 +40,45 @@ int main(int argc,char *argv[]){
     int bitcnt,biterr,i,errs;
     int framesize = TEST_FRAME_SIZE;
     float threshold = FRAME_DETECTION_THRESHOLD;
+    float ber_thresh = 1.0;
     FILE *fin;
     uint8_t *bitbuf_tx, *bitbuf_rx, abit;
+    int verbose = 1;
     
-    if(argc < 2){
-        fprintf(stderr,"usage: %s InputBitsOnePerByte [framesize] [threshold] \n",argv[0]);
-        exit(1);
+    char usage[] = "usage: %s InputBitsOnePerByte [-f frameSizeBits] [-t VaildFrameBERThreshold] [-b berPassThreshold] InputFile\n";
+
+    int opt;
+    while ((opt = getopt(argc, argv, "f:t:b:hq")) != -1) {
+        switch (opt) {
+        case 'b':
+            ber_thresh = atof(optarg);
+            break;
+        case 'f':
+            framesize = atoi(optarg);
+            break;
+        case 't':
+            threshold = atof(optarg);
+            break;
+        case 'q':
+            verbose = 0;
+            break;
+        case 'h':
+        default:
+            fprintf(stderr, usage, argv[0]);
+            exit(1);
+        }
     }
 
-    if(argc > 2){
-        framesize = atoi(argv[2]);
-        fprintf(stderr, "Using custom framesize %d.\n", framesize);
-    }
-
-    if(argc > 3){
-        threshold = atof(argv[3]);
-        fprintf(stderr, "Using custom threshold %.2f.\n", threshold);
-    }
-    
-    if(strcmp(argv[1],"-")==0 || argc<2){
+    char *fname = argv[optind++];
+    if ((strcmp(fname,"-")==0) || (argc<2)){
         fin = stdin;
-    }else{
-        fin = fopen(argv[1],"r");
+    } else {
+        fin = fopen(fname,"r");
     }
     
     if(fin==NULL){
         fprintf(stderr,"Couldn't open input file: %s\n", argv[1]);
-        goto cleanup;
+        exit(1);
     }
 
     /* allocate buffers for processing */
@@ -82,6 +94,7 @@ int main(int argc,char *argv[]){
     
     bitcnt = 0;
     biterr = 0;
+    float ber = 0.5;
     
     while(fread(&abit,sizeof(uint8_t),1,fin)>0){
 
@@ -105,14 +118,23 @@ int main(int argc,char *argv[]){
             /* OK, we have a valid test frame sync, so lets count errors */
             bitcnt += framesize;
             biterr += errs;
-            fprintf(stderr,"errs: %d FSK BER %f, bits tested %d, bit errors %d\n",
-                    errs, ((float)biterr/(float)bitcnt),bitcnt,biterr);
+            ber =  (float)biterr/(float)bitcnt;
+            if (verbose) {
+                fprintf(stderr,"errs: %d FSK BER %f, bits tested %d, bit errors %d\n",
+                    errs, ber, bitcnt, biterr);
+            }
         }
     }
  
-    
- cleanup:
     fclose(fin);
 
-    return 0;
+    fprintf(stderr,"errs: %d FSK BER %f, bits tested %d, bit errors %d ", errs, ber, bitcnt, biterr);
+    if (ber < ber_thresh) {
+        fprintf(stderr,"PASS\n");
+        return 0;
+    }
+    else {
+        fprintf(stderr,"FAIL\n");
+        return 1;
+    }
 }

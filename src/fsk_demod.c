@@ -57,7 +57,6 @@ int main(int argc,char *argv[]){
     int Fs,Rs,M,P,stats_ctr,stats_loop;
     float loop_time;
     int enable_stats = 0;
-    int hbr = 1;
     FILE *fin,*fout;
     uint8_t *bitbuf = NULL;
     int16_t *rawbuf;
@@ -69,29 +68,16 @@ int main(int argc,char *argv[]){
     int complex_input = 1, bytes_per_sample = 2;
     int stats_rate = 8;
     int testframe_mode = 0;
-    P = 0;
+    P = 8;  /* default */
     M = 0;
     int fsk_lower = -1;
     int fsk_upper = -1;
-    
-    /* -m 2/4 --mode 2/4  - FSK mode
-     * -l --lbr      - Low bit rate mode
-     * -p n --conv n    - Downconverted symbol size
-     * If p is unspecified, it will default to Ts
-     * -c --cs16      - Complex (signed 16-bit)
-     * -d --cu8      - Complex (unsigned 8-bit)
-     * If neither -c or -d are specified, input will be real valued signed 16-bit
-     * -t --stats - dump demod statistics to stderr
-     * -s --soft-dec - ouput soft decision (float 32-bit)
-     */
-     /* usage: [-l] [-p P]  [-s] [(-c|-d)] [-t] (2|4) SampleRate SymbolRatez InputModemRawFile OutputOneBitPerCharFile */
-     
-     int o = 0;
-     int opt_idx = 0;
-     while( o != -1 ){
+         
+    int o = 0;
+    int opt_idx = 0;
+    while( o != -1 ){
         static struct option long_opts[] = {
             {"help",      no_argument,        0, 'h'},
-            {"lbr",       no_argument,        0, 'l'},
             {"conv",      required_argument,  0, 'p'},
             {"cs16",      no_argument,        0, 'c'},
             {"cu8",       no_argument,        0, 'd'},
@@ -106,49 +92,46 @@ int main(int argc,char *argv[]){
         o = getopt_long(argc,argv,"fhlp:cdt::sb:u:",long_opts,&opt_idx);
         
         switch(o){
-            case 'l':
-                hbr = 0;
-                break;
-            case 'c':
-                complex_input = 2;
-                bytes_per_sample = 2;
-                break;
-            case 'd':
-                complex_input = 2;
-                bytes_per_sample = 1;
-                break;
-            case 'f':
-                testframe_mode = 1;
-                break;
-            case 't':
-                enable_stats = 1;
-                if(optarg != NULL){
-                    stats_rate = atoi(optarg);
-                    if(stats_rate == 0){
-                        stats_rate = 8;
-                    }
+        case 'c':
+            complex_input = 2;
+            bytes_per_sample = 2;
+            break;
+        case 'd':
+            complex_input = 2;
+            bytes_per_sample = 1;
+            break;
+        case 'f':
+            testframe_mode = 1;
+            break;
+        case 't':
+            enable_stats = 1;
+            if(optarg != NULL){
+                stats_rate = atoi(optarg);
+                if(stats_rate == 0){
+                    stats_rate = 8;
                 }
-                break;
-            case 's':
-                soft_dec_mode = 1;
-                break;
-            case 'p':
-                P = atoi(optarg);
-                break;
-            case 'b':
-                if (optarg != NULL){
-                    fsk_lower = atoi(optarg);
-                }
-                break;
-            case 'u':
-                if (optarg != NULL){
-                    fsk_upper = atoi(optarg);
-                }
-                break;
-            case 'h':
-            case '?':
-                goto helpmsg;
-                break;
+            }
+            break;
+        case 's':
+            soft_dec_mode = 1;
+            break;
+        case 'p':
+            P = atoi(optarg);
+            break;
+        case 'b':
+            if (optarg != NULL){
+                fsk_lower = atoi(optarg);
+            }
+            break;
+        case 'u':
+            if (optarg != NULL){
+                fsk_upper = atoi(optarg);
+            }
+            break;
+        case 'h':
+        case '?':
+            goto helpmsg;
+            break;
         }
     }
     int dx = optind;
@@ -160,12 +143,8 @@ int main(int argc,char *argv[]){
     
     if( (argc - dx) > 5){
         fprintf(stderr, "Too many arguments\n");
-        helpmsg:
-        fprintf(stderr,"usage: %s [-l] [-p P]  [-s] [(-c|-d)] [-t [r]] [-f] (2|4) SampleRate SymbolRate InputModemRawFile OutputFile\n",argv[0]);
-        fprintf(stderr," -p P --conv=P     -  P specifies the rate at which symbols are down-converted before further processing\n");
-        fprintf(stderr,"                        P must be divisible by the symbol size. Smaller P values will result in faster\n");
-        fprintf(stderr,"                        processing but lower demodulation performance. If no P value is specified,\n");
-        fprintf(stderr,"                        P will default to it's highes possible value\n");
+    helpmsg:
+        fprintf(stderr,"usage: %s [-s] [(-c|-d)] [-t [r]] [-f] [-p P] (2|4) SampleRate SymbolRate InputModemRawFile OutputFile\n",argv[0]);
         fprintf(stderr," -c --cs16         -  The raw input file will be in complex signed 16 bit format.\n");
         fprintf(stderr," -d --cu8          -  The raw input file will be in complex unsigned 8 bit format.\n");
         fprintf(stderr,"                        If neither -c nor -d are used, the input should be in signed 16 bit format.\n");
@@ -175,6 +154,9 @@ int main(int argc,char *argv[]){
         fprintf(stderr,"                         r, if provided, sets the number of modem frames between statistic printouts.\n");
         fprintf(stderr," -s --soft-dec     -  The output file will be in a soft-decision format, with one 32-bit float per bit.\n");
         fprintf(stderr,"                        If -s is not used, the output will be in a 1 byte-per-bit format.\n");
+        fprintf(stderr," -p P              -  P specifies the rate at which symbols are down-converted before further processing\n");
+        fprintf(stderr,"                        P must be divisible by the symbol rate. Smaller P values will result in faster\n");
+        fprintf(stderr,"                        processing but lower demodulation performance. Default %d\n", FSK_DEFAULT_P);
         exit(1);
     }
     
@@ -182,10 +164,6 @@ int main(int argc,char *argv[]){
     M = atoi(argv[dx]);
     Fs = atoi(argv[dx + 1]);
     Rs = atoi(argv[dx + 2]);
-    
-    if( P == 0 ){
-        P = Fs/Rs;
-    }
     
     if( (M!=2) && (M!=4) ){
         fprintf(stderr,"Mode %d is not valid. Mode must be 2 or 4.\n",M);
@@ -205,14 +183,8 @@ int main(int argc,char *argv[]){
         fout = fopen(argv[dx + 4],"w");
     }
     
-    
     /* set up FSK */
-    if(!hbr) {
-        fsk = fsk_create(Fs,Rs,M,1200,400);
-    }
-    else {
-        fsk = fsk_create_hbr(Fs,Rs,P,M,1200,400);
-    }
+    fsk = fsk_create_hbr(Fs,Rs,P,M,1200,400);
 
     if(fsk_lower> 0 && fsk_upper > fsk_lower){
         fsk_set_est_limits(fsk,fsk_lower,fsk_upper);
@@ -271,7 +243,7 @@ int main(int argc,char *argv[]){
     while( fread(rawbuf,bytes_per_sample*complex_input,fsk_nin(fsk),fin) == fsk_nin(fsk) ){
         /* convert input to a buffer of floats.  Note scaling isn't really necessary for FSK */
 
-       if (complex_input == 1) {
+        if (complex_input == 1) {
             /* S16 real input */
             for(i=0;i<fsk_nin(fsk);i++){
                 modbuf[i].real = ((float)rawbuf[i])/FDMDV_SCALE;
@@ -305,7 +277,7 @@ int main(int argc,char *argv[]){
         testframe_detected = 0;
         if (testframe_mode) {
             /* attempt to find a testframe and update stats */
-                    /* update silding window of input bits */
+            /* update silding window of input bits */
 
             int errs;
             for(j=0; j<fsk->Nbits; j++) {
@@ -337,7 +309,7 @@ int main(int argc,char *argv[]){
                     biterr += errs;
                     if (enable_stats == 0) {
                         fprintf(stderr,"errs: %d FSK BER %f, bits tested %d, bit errors %d\n",
-                            errs, ((float)biterr/(float)bitcnt),bitcnt,biterr);
+                                errs, ((float)biterr/(float)bitcnt),bitcnt,biterr);
                     }
                 }
             }

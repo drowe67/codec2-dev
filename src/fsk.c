@@ -36,9 +36,6 @@
 #define HORUS_MAX 2800
 #define HORUS_MIN_SPACING 100
 
-/* P oversampling rate constant -- should probably be init-time configurable */
-#define DEFAULT_P 8
-
 /* Define this to enable EbNodB estimate */
 /* This needs square roots, may take more cpu time than it's worth */
 #define EST_EBNO
@@ -220,7 +217,7 @@ struct FSK * fsk_create_core(int Fs, int Rs, int P, int M, int tx_f1, int tx_fs)
 \*---------------------------------------------------------------------------*/
 
 struct FSK * fsk_create(int Fs, int Rs, int M, int tx_f1, int tx_fs) {
-    return fsk_create_core(Fs, Rs, DEFAULT_P, M, tx_f1, tx_fs);
+    return fsk_create_core(Fs, Rs, FSK_DEFAULT_P, M, tx_f1, tx_fs);
 }
 
 /*---------------------------------------------------------------------------*\

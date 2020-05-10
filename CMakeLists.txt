@@ -546,6 +546,20 @@ endif(NOT APPLE)
              COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/octave; 
                             PATH_TO_TFSK=${CMAKE_CURRENT_BINARY_DIR}/unittest/tfsk octave --no-gui -qf tfsk.m")
              set_tests_properties(test_fsk_modem_octave_port PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
+     # 4FSK modem at Eb/No = 6dB, SNR = Eb/No+10log10(Rb/B) = 6 + 10log10(2*100/3000) = -5.7dB
+     # Ideal BER = 0.016, set thresh 50% higher
+     add_test(NAME test_fsk_4fsk_ber
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src; 
+                            ./fsk_get_test_bits - 10000 | ./fsk_mod 4 8000 100 1200 100 - - | 
+                            ./cohpsk_ch - - -26 --Fs 8000 | 
+                            ./fsk_demod 4 8000 100 - - | ./fsk_put_test_bits -b 0.025 -q - ")
+     # 2FSK modem at Eb/No = 9dB, SNR = Eb/No+10log10(Rb/B) = 9 + 10log10(100/3000) = -5.7dB
+     # Ideal BER = 0.0094, set thresh 50% higher
+     add_test(NAME test_fsk_2fsk_ber
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src; 
+                            ./fsk_get_test_bits - 10000 | ./fsk_mod 2 8000 100 1200 100 - - | 
+                            ./cohpsk_ch - - -26 --Fs 8000 | 
+                            ./fsk_demod 2 8000 100 - - | ./fsk_put_test_bits -b 0.015 -q - ")
 
 
 endif(UNITTEST)

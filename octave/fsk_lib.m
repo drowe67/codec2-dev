@@ -12,7 +12,7 @@
 
 1;
 
-function states = fsk_init(Fs, Rs, M=2, P=8, nsym=48)
+function states = fsk_init(Fs, Rs, M=2, P=8, nsym=50)
   states.M = M;                    
   states.bitspersymbol = log2(M);
   states.Fs = Fs;
