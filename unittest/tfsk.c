@@ -125,7 +125,7 @@ int main(int argc,char *argv[]){
 	srand(1);
     /* set up FSK */
     if(test_type == TEST_DEMOD_H || test_type == TEST_MOD_H){
-        fsk = fsk_create_hbr(Fs,Rs,10,M,f1,fs);
+        fsk = fsk_create_hbr(Fs,Rs,M,10,FSK_DEFAULT_NSYM,f1,fs);
         if(test_type == TEST_DEMOD_H)
             test_type = TEST_DEMOD;
         else

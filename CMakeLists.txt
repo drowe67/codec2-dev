@@ -533,13 +533,13 @@ endif(NOT APPLE)
                             PATH_TO_TFSK=${CMAKE_CURRENT_BINARY_DIR}/unittest/tfsk octave --no-gui -qf tfsk.m")
              set_tests_properties(test_fsk_modem_octave_port PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
 
-     add_test(NAME test_FSK_modem_mod_demod
+     add_test(NAME test_fsk_modem_mod_demod
              COMMAND sh -c "$<TARGET_FILE:fsk_get_test_bits> - 10000 | 
                             $<TARGET_FILE:fsk_mod> 2 8000 100 1200 100 - - | 
                             $<TARGET_FILE:fsk_demod> -l 2 8000 100 - - | 
                             $<TARGET_FILE:fsk_put_test_bits> -"
              )
-             set_tests_properties(test_FSK_modem_mod_demod  PROPERTIES PASS_REGULAR_EXPRESSION "bits tested 9800, bit errors 0")
+             set_tests_properties(test_fsk_modem_mod_demod  PROPERTIES PASS_REGULAR_EXPRESSION "bits tested 9800, bit errors 0")
 
      # 4FSK modem at Eb/No = 6dB, SNR = Eb/No+10log10(Rb/B) = 6 + 10log10(2*100/3000) = -5.7dB
      # Ideal BER = 0.016, set thresh 50% higher

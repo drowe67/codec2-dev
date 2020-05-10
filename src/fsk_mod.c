@@ -30,6 +30,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <getopt.h>
 #include "fsk.h"
 #include "codec2_fdmdv.h"
 
@@ -37,40 +38,58 @@ int main(int argc,char *argv[]){
     struct FSK *fsk;
     int Fs,Rs,f1,fs,M;
     int i;
-    int p;
+    int p, user_p = 0;
     FILE *fin,*fout;
     uint8_t *bitbuf;
     int16_t *rawbuf;
     float *modbuf;
     
-    if(argc<8){
-        fprintf(stderr,"usage: %s Mode SampleFreq SymbolFreq TxFreq1 TxFreqSpace InputOneBitPerCharFile OutputModRawFile\n",argv[0]);
+    char usage[] = "usage: %s [-p P] Mode SampleFreq SymbolFreq TxFreq1 TxFreqSpace InputOneBitPerCharFile OutputModRawFile\n";
+
+    int opt;
+    while ((opt = getopt(argc, argv, "p:")) != -1) {
+        switch (opt) {
+        case 'p':
+            p = atoi(optarg);
+            user_p = 1;
+            break;
+        default:
+            fprintf(stderr, usage, argv[0]);
+            exit(1);
+        }
+    }
+
+    if (argc<8){
+        fprintf(stderr, usage, argv[0]);
         exit(1);
     }
     
     /* Extract parameters */
-    M = atoi(argv[1]);
-    Fs = atoi(argv[2]);
-    Rs = atoi(argv[3]);
-    f1 = atoi(argv[4]);
-    fs = atoi(argv[5]);
+    M = atoi(argv[optind++]);
+    Fs = atoi(argv[optind++]);
+    Rs = atoi(argv[optind++]);
+    f1 = atoi(argv[optind++]);
+    fs = atoi(argv[optind++]);
     
-    if(strcmp(argv[6],"-")==0){
-		fin = stdin;
-	}else{
-		fin = fopen(argv[6],"r");
-	}
-	
-	if(strcmp(argv[7],"-")==0){
-		fout = stdout;
-	}else{
-		fout = fopen(argv[7],"w");
-	}
+    if(strcmp(argv[optind],"-")==0){
+        fin = stdin;
+    }else{
+        fin = fopen(argv[optind],"r");
+    }
+    optind++;
     
-    p = Fs/Rs;
+    if(strcmp(argv[optind],"-")==0){
+        fout = stdout;
+    }else{
+        fout = fopen(argv[optind],"w");
+    }
+
+    /* p is not actually used for the modulator, but we need to set it for fsk_create() to be happy */    
+    if (!user_p)
+        p = Fs/Rs;
     
     /* set up FSK */
-    fsk = fsk_create_hbr(Fs,Rs,p,M,f1,fs);
+    fsk = fsk_create_hbr(Fs,Rs,M,p,FSK_DEFAULT_NSYM,f1,fs);
     
     if(fin==NULL || fout==NULL || fsk==NULL){
         fprintf(stderr,"Couldn't open test vector files\n");

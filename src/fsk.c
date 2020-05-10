@@ -116,7 +116,7 @@ static void fsk_generate_hann_table(struct FSK* fsk){
 
 \*---------------------------------------------------------------------------*/
 
-struct FSK * fsk_create_core(int Fs, int Rs, int P, int M, int tx_f1, int tx_fs)
+struct FSK * fsk_create_core(int Fs, int Rs, int M, int P, int Nsym, int tx_f1, int tx_fs)
 {
     struct FSK *fsk;
     int i;
@@ -127,6 +127,7 @@ struct FSK * fsk_create_core(int Fs, int Rs, int P, int M, int tx_f1, int tx_fs)
     assert(tx_f1 > 0);
     assert(tx_fs > 0);
     assert(P > 0);
+    assert(Nsym > 0);
     /* Ts (Fs/Rs) must be an integer */
     assert( (Fs%Rs) == 0 );
     /* Ts/P (Fs/Rs/P) must be an integer */
@@ -146,7 +147,7 @@ struct FSK * fsk_create_core(int Fs, int Rs, int P, int M, int tx_f1, int tx_fs)
     fsk->Ts = Fs/Rs;
     fsk->burst_mode = 0;
     fsk->P = P;
-    fsk->Nsym = 50;
+    fsk->Nsym = Nsym;
     fsk->N = fsk->Ts*fsk->Nsym;
     fsk->Ndft = Ndft;
     fsk->tc = 0.1;
@@ -217,7 +218,7 @@ struct FSK * fsk_create_core(int Fs, int Rs, int P, int M, int tx_f1, int tx_fs)
 \*---------------------------------------------------------------------------*/
 
 struct FSK * fsk_create(int Fs, int Rs, int M, int tx_f1, int tx_fs) {
-    return fsk_create_core(Fs, Rs, FSK_DEFAULT_P, M, tx_f1, tx_fs);
+    return fsk_create_core(Fs, Rs, M, FSK_DEFAULT_P, FSK_DEFAULT_NSYM, tx_f1, tx_fs);
 }
 
 /*---------------------------------------------------------------------------*\
@@ -226,14 +227,18 @@ struct FSK * fsk_create(int Fs, int Rs, int M, int tx_f1, int tx_fs) {
   AUTHOR......: Brady O'Brien
   DATE CREATED: 11 February 2016
   
-  Alternate version of create allows user defined decimation P.  In
-  the current version of the demod it's simply an alias for the
-  default core function.
+  Alternate version of create allows user defined decimation P and
+  Nsym.  In the current version of the demod it's simply an alias for
+  the default core function.
+
+  P is the decimation rate, so the intermal demod processing happens
+  at Fs/P Hz.  Nsym is the number of symbols we average demod
+  parameters like symbol timing over.
 
 \*---------------------------------------------------------------------------*/
 
-struct FSK * fsk_create_hbr(int Fs, int Rs, int P, int M, int tx_f1, int tx_fs) {
-    return fsk_create_core(Fs, Rs, P, M, tx_f1, tx_fs);
+struct FSK * fsk_create_hbr(int Fs, int Rs, int M, int P, int Nsym, int tx_f1, int tx_fs) {
+    return fsk_create_core(Fs, Rs, M, P, Nsym, tx_f1, tx_fs);
 }
 
 /*---------------------------------------------------------------------------*\
@@ -927,40 +932,9 @@ static void stats_init(struct FSK *fsk) {
 }
 
 
-void fsk_set_nsym(struct FSK *fsk,int nsyms){
-    assert(nsyms>0);
-    int Ndft,i;
-    Ndft = 0;
-    
-    /* Set constant config parameters */
-    fsk->N = fsk->Ts*nsyms;
-    fsk->Nsym = nsyms;
-    fsk->Nmem = fsk->N+(2*fsk->Ts);
-    fsk->nin = fsk->N;
-    fsk->Nbits = fsk->mode==2 ? fsk->Nsym : fsk->Nsym*2;
-    
-    /* Find smallest 2^N value that fits Fs for efficient FFT */
-    /* It would probably be better to use KISS-FFt's routine here */
-    for(i=1; i; i<<=1)
-        if((fsk->N)&i)
-            Ndft = i;
-    
-    fsk->Ndft = Ndft;
-    
-    free(fsk->fft_cfg);
-    free(fsk->fft_est);
-    
-    fsk->fft_cfg = kiss_fft_alloc(Ndft,0,NULL,NULL);
-    fsk->fft_est = (float*)malloc(sizeof(float)*fsk->Ndft/2);
-    
-    for(i=0;i<Ndft;i++)fsk->fft_est[i] = 0;
-    
-}
-
 /* Set the FSK modem into burst demod mode */
 
-void fsk_enable_burst_mode(struct FSK *fsk,int nsyms){
-    fsk_set_nsym(fsk,nsyms);
+void fsk_enable_burst_mode(struct FSK *fsk){
     fsk->nin = fsk->N;
     fsk->burst_mode = 1;
 }

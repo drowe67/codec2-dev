@@ -439,7 +439,7 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
         if(f->deframer == NULL)
             return NULL;
   
-        f->fsk = fsk_create_hbr(48000,1200,10,4,1200,1200);
+        f->fsk = fsk_create_hbr(48000,1200,4,10,FSK_DEFAULT_NSYM,1200,1200);
         
         /* Note: fsk expects tx/rx bits as an array of uint8_ts, not ints */
         f->tx_bits = (int*)MALLOC(f->fsk->Nbits*sizeof(uint8_t));
@@ -491,8 +491,7 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
         if(f->deframer == NULL)
             return NULL;
   
-        f->fsk = fsk_create_hbr(8000,400,10,4,800,400);
-        fsk_set_nsym(f->fsk,32);
+        f->fsk = fsk_create_hbr(8000,400,4,10,32,800,400);
         
         /* Note: fsk expects tx/rx bits as an array of uint8_ts, not ints */
         f->tx_bits = (int*)MALLOC(f->fsk->Nbits*sizeof(uint8_t));
@@ -2884,7 +2883,7 @@ int freedv_set_alt_modem_samp_rate(struct freedv *f, int samp_rate){
 	if (FDV_MODE_ACTIVE( FREEDV_MODE_2400A, f->mode)){ 
 		if(samp_rate == 24000 || samp_rate == 48000 || samp_rate == 96000){
 			fsk_destroy(f->fsk);
-			f->fsk = fsk_create_hbr(samp_rate,1200,10,4,1200,1200);
+			f->fsk = fsk_create_hbr(samp_rate,1200,4,10,FSK_DEFAULT_NSYM,1200,1200);
         
 			FREE(f->tx_bits);
 			/* Note: fsk expects tx/rx bits as an array of uint8_ts, not ints */

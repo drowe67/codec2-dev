@@ -41,8 +41,9 @@
 
 #define FSK_SCALE 16383
 
-/* default internal decimation rate */
+/* default internal parameters */
 #define FSK_DEFAULT_P 8
+#define FSK_DEFAULT_NSYM 50
 
 struct FSK {
     /*  Static parameters set up by fsk_init */
@@ -109,12 +110,7 @@ struct FSK * fsk_create(int Fs, int Rs, int M, int tx_f1, int tx_fs);
  * int tx_f1 - '0' frequency
  * int tx_fs - frequency spacing
  */
-struct FSK * fsk_create_hbr(int Fs, int Rs, int P, int M, int tx_f1, int tx_fs);
-
-/* 
- * Set a new number of symbols per processing frame
- */
-void fsk_set_nsym(struct FSK *fsk,int nsym);
+struct FSK * fsk_create_hbr(int Fs, int Rs, int M, int P, int Nsym, int tx_f1, int tx_fs);
 
 /*
  * Set the minimum and maximum frequencies at which the freq. estimator can find tones
@@ -201,6 +197,6 @@ void fsk_stats_normalise_eye(struct FSK *fsk, int normalise_enable);
 
 /* Set the FSK modem into burst demod mode */
 
-void fsk_enable_burst_mode(struct FSK *fsk,int nsyms);
+void fsk_enable_burst_mode(struct FSK *fsk);
 
 #endif

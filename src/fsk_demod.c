@@ -37,7 +37,6 @@
 #include <signal.h>
 #include <unistd.h>
 
-
 #include "fsk.h"
 #include "codec2_fdmdv.h"
 #include "modem_stats.h"
@@ -74,7 +73,8 @@ int main(int argc,char *argv[]){
     int fsk_upper = 0;
     int user_fsk_lower = 0;
     int user_fsk_upper = 0;
-         
+    int nsym = FSK_DEFAULT_NSYM;
+    
     int o = 0;
     int opt_idx = 0;
     while( o != -1 ){
@@ -88,6 +88,7 @@ int main(int argc,char *argv[]){
             {"stats",     optional_argument,  0, 't'},
             {"soft-dec",  no_argument,        0, 's'},
             {"testframes",no_argument,        0, 'f'},
+            {"nsym",      required_argument,  0, 'n'},
             {0, 0, 0, 0}
         };
         
@@ -130,7 +131,12 @@ int main(int argc,char *argv[]){
             if (optarg != NULL){
                 fsk_upper = atoi(optarg);
                  user_fsk_upper = 1;
-           }
+            }
+            break;
+        case 'n':
+            if (optarg != NULL) {
+                nsym = atoi(optarg);
+            }
             break;
         case 'h':
         case '?':
@@ -158,11 +164,12 @@ int main(int argc,char *argv[]){
         fprintf(stderr,"                   r, if provided, sets the number of modem frames between statistic printouts.\n");
         fprintf(stderr," -s --soft-dec     The output file will be in a soft-decision format, with one 32-bit float per bit.\n");
         fprintf(stderr,"                   If -s is not used, the output will be in a 1 byte-per-bit format.\n");
-        fprintf(stderr," -p P              P specifies the rate at which symbols are down-converted before further processing\n");
+        fprintf(stderr," -p P              The demod internals operate at a rate of Fs/P.\n");
         fprintf(stderr,"                   P must be divisible by the symbol rate. Smaller P values will result in faster\n");
         fprintf(stderr,"                   processing but lower demodulation performance. Default %d\n", FSK_DEFAULT_P);
-        fprintf(stderr," --fsk_lower       lower limit of freq estimator (default 0 for real input, -Fs/2  for complex input)\n");
-        fprintf(stderr," --fsk_upper       upper limit of freq estimator (default Fs/2)\n");
+        fprintf(stderr," --fsk_lower freq  lower limit of freq estimator (default 0 for real input, -Fs/2  for complex input)\n");
+        fprintf(stderr," --fsk_upper freq  upper limit of freq estimator (default Fs/2)\n");
+        fprintf(stderr," --nsym Nsym       number of symbols used for estimators. Default %d\n", FSK_DEFAULT_NSYM);
         exit(1);
     }
     
@@ -188,9 +195,9 @@ int main(int argc,char *argv[]){
     }else{
         fout = fopen(argv[dx + 4],"w");
     }
-    
+
     /* set up FSK */
-    fsk = fsk_create_hbr(Fs,Rs,P,M,1200,400);
+    fsk = fsk_create_hbr(Fs,Rs,M,P,nsym,1200,400);
 
     /* set freq estimator limits */
     if (!user_fsk_lower) {
