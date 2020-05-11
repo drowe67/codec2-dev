@@ -354,12 +354,17 @@ int main(int argc,char *argv[]){
                 time_t seconds  = time(NULL);
 
                 fprintf(stderr,"\"secs\": %ld, \"EbNodB\": %5.1f, \"ppm\": %4d,",seconds, stats.snr_est, (int)fsk->ppm);
-                fprintf(stderr," \"f1_est\":%.1f, \"f2_est\":%.1f",fsk->f_est[0],fsk->f_est[1]);
+                float *f_est;
+                if (fsk->freq_est_type)
+                    f_est = fsk->f2_est;
+                else
+                    f_est = fsk->f_est;
+                fprintf(stderr," \"f1_est\":%.1f, \"f2_est\":%.1f",f_est[0],f_est[1]);
 
                 /* Print 4FSK stats if in 4FSK mode */
 
                 if(fsk->mode == 4){
-                    fprintf(stderr,", \"f3_est\":%.1f, \"f4_est\":%.1f",fsk->f_est[2],fsk->f_est[3]);
+                    fprintf(stderr,", \"f3_est\":%.1f, \"f4_est\":%.1f",f_est[2],f_est[3]);
                 }
 	    
                 if (testframe_mode == 0) {

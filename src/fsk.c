@@ -576,9 +576,9 @@ void fsk_demod_freq_est(struct FSK *fsk, COMP fsk_in[], float *freqs, int M) {
         }
     }
     float foff = (b_max-Ndft/2)*Fs/Ndft;
-    for (int m=0; m<4; m++)
+    //fprintf(stderr, "fsk->fs_tx: %d\n",fsk->fs_tx);
+    for (int m=0; m<M; m++)
         fsk->f2_est[m] = foff + m*fsk->fs_tx;
-    fprintf(stderr, "fsk->fs_tx: %d\n",fsk->fs_tx);
     #ifdef MODEMPROBE_ENABLE
     modem_probe_samp_f("t_f2_est",fsk->f2_est,M);
     #endif
@@ -632,9 +632,7 @@ void fsk_demod_core(struct FSK *fsk, uint8_t rx_bits[], float rx_sd[], COMP fsk_
         f_est = fsk->f2_est;
     else
         f_est = fsk->f_est;
-    for(int m=0; m<M; m++)
-        fprintf(stderr, "f[%d] = %f\n", m, f_est[m]);
-        
+      
     /* update filter (integrator) memory by shifting in nin samples */
     for(m=0; m<M; m++) {
         for(i=0,j=Nmem-nold; i<nold; i++,j++)
@@ -850,8 +848,11 @@ void fsk_demod_core(struct FSK *fsk, uint8_t rx_bits[], float rx_sd[], COMP fsk_
     fsk->stats->rx_timing = (float)rx_timing;
         
     /* Estimate and save frequency offset */
-    fc_avg = (f_est[0]+f_est[1])/2;
-    fc_tx = (fsk->f1_tx+fsk->f1_tx+fsk->fs_tx)/2;
+    fc_avg = fc_tx = 0.0;
+    for(int m=0; m<M; m++) {
+        fc_avg += f_est[m]/M;
+        fc_tx  += (fsk->f1_tx + m*fsk->fs_tx)/M;
+    }
     fsk->stats->foff = fc_tx-fc_avg;
     
     /* Take a sample for the eye diagrams ---------------------------------- */
@@ -904,9 +905,8 @@ void fsk_demod_core(struct FSK *fsk, uint8_t rx_bits[], float rx_sd[], COMP fsk_
     fsk->stats->nr = 0;
     fsk->stats->Nc = 0;
 
-    for(i=0; i<M; i++) {
+    for(i=0; i<M; i++)
         fsk->stats->f_est[i] = f_est[i];
-    }
     
     /* Dump some internal samples */
     modem_probe_samp_f("t_EbNodB",&(fsk->EbNodB),1);
@@ -1003,7 +1003,7 @@ void fsk_get_demod_stats(struct FSK *fsk, struct MODEM_STATS *stats){
     stats->neyetr = fsk->stats->neyetr;
     memcpy(stats->rx_eye, fsk->stats->rx_eye, sizeof(stats->rx_eye));
     memcpy(stats->f_est, fsk->stats->f_est, fsk->mode*sizeof(float));
-    
+        
     /* these fields not used for FSK so set to something sensible */
 
     stats->sync = 0;

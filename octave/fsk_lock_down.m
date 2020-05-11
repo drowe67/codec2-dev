@@ -39,12 +39,12 @@ function rx_bits = simple_fsk_demod(states, rx, f)
 end
 
 % set up "lock down" waveform
-function [states M bits_per_frame] = lock_down_init(Rs,Fs,df)
+function [states M bits_per_frame] = lock_down_init(Rs,Fs,df,tx_tone_separation=250)
   M  = 4;
   states = fsk_init(Fs,Rs,M,P=8,nsym=100);
   bits_per_frame = 512;
   states.tx_real = 0; % complex signal
-  states.tx_tone_separation = 250;
+  states.tx_tone_separation = tx_tone_separation;
   states.ftx = -2.5*states.tx_tone_separation + states.tx_tone_separation*(1:M);
   states.fest_fmin = -Fs/2;
   states.fest_fmax = +Fs/2;
@@ -215,8 +215,8 @@ end
 % over so we get complete junk, we consider that case a packet error
 % and exclude it from the BER estimation.
 
-function [states ber per] = modem_run_test(EbNodB = 10, num_frames=10, Fs=8000, Rs=100, df=0, plots=0, spreadHz=0)
-  [states M bits_per_frame] = lock_down_init(Rs, Fs, df);
+function [states ber per] = modem_run_test(EbNodB = 10, num_frames=10, Fs=8000, Rs=100, df=0, plots=0, spreadHz=0,tx_tone_separation=250)
+  [states M bits_per_frame] = lock_down_init(Rs, Fs, df, tx_tone_separation);
   N = states.N;
   if plots; states.verbose = 0x4; end
   EbNo = 10^(EbNodB/10);
@@ -290,7 +290,7 @@ function [states ber per] = modem_run_test(EbNodB = 10, num_frames=10, Fs=8000, 
 end
 
 
-% run BER v Eb/No curves over a range of frequency offsets
+% run BER v Eb/No curves over a range of frequency rate/change
 function modem_run_curve(Fs, Rs, num_frames=100, dfmax=0.01)
   EbNodB = 0:9;
   m4fsk_ber_theory = [0.23 0.18 0.14 0.09772 0.06156 0.03395 0.01579 0.00591 0.00168 3.39E-4];
@@ -376,16 +376,17 @@ randn('state',1);
 
 % freq estimator tests (choose one)
 #freq_run_single(3,10)
-#freq_run_curve_peak_mask
+freq_run_curve_peak_mask
 #freq_run_curve_mask(8000,100)
 #freq_run_curve_mask(24000,25)
 #freq_run_curve_mask(8000,25)
 
 % complete modem tests (choose one)
 #modem_run_curve(24000,25,100)
-modem_run_curve(8000,25,50,0.05)
-#modem_run_test(6, 20, 2000, 25, 0, 1, 1);
+#modem_run_curve(8000,100,50,0.05)
 #modem_run_curve_spread(8000,25,50)
+#modem_run_test(1.5, 20, 8000, 100, 0, 1, 0, 400);
+#modem_run_curve(8000,100,20)
 
 % just print a table of code rates
 #code_rate_table

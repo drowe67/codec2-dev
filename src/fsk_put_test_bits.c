@@ -45,7 +45,7 @@ int main(int argc,char *argv[]){
     uint8_t *bitbuf_tx, *bitbuf_rx, abit;
     int verbose = 1;
     
-    char usage[] = "usage: %s InputBitsOnePerByte [-f frameSizeBits] [-t VaildFrameBERThreshold] [-b berPassThreshold] InputFile\n";
+    char usage[] = "usage: %s [-f frameSizeBits] [-t VaildFrameBERThreshold] [-b berPassThreshold] InputOneBitPerByte\n";
 
     int opt;
     while ((opt = getopt(argc, argv, "f:t:b:hq")) != -1) {
@@ -68,7 +68,10 @@ int main(int argc,char *argv[]){
             exit(1);
         }
     }
-
+    if (argc == 1) {
+        fprintf(stderr, usage, argv[0]);
+        exit(1);
+    }
     char *fname = argv[optind++];
     if ((strcmp(fname,"-")==0) || (argc<2)){
         fin = stdin;
