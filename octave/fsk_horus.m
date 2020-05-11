@@ -19,8 +19,6 @@ function states = fsk_horus_init(Fs,Rs,M=2)
 
   states.fest_fmin = 300;
   states.fest_fmax = 2800;
-  states.fest_min_spacing = 100;
-
 endfunction
 
 

@@ -31,11 +31,6 @@
 
 \*---------------------------------------------------------------------------*/
 
-/* defaults for Project Horus RTTY telemetry */
-#define HORUS_MIN 300
-#define HORUS_MAX 2800
-#define HORUS_MIN_SPACING 100
-
 /* Define this to enable EbNodB estimate */
 /* This needs square roots, may take more cpu time than it's worth */
 #define EST_EBNO
@@ -158,9 +153,9 @@ struct FSK * fsk_create_core(int Fs, int Rs, int M, int P, int Nsym, int tx_f1, 
     fsk->lock_nin = 0;
     fsk->mode = M==2 ? MODE_2FSK : MODE_4FSK;
     fsk->Nbits = M==2 ? fsk->Nsym : fsk->Nsym*2;
-    fsk->est_min = HORUS_MIN;
-    fsk->est_max = HORUS_MAX;
-    fsk->est_space = HORUS_MIN_SPACING;
+    fsk->est_min = 0;
+    fsk->est_max = Fs;
+    fsk->est_space = 0.75*Rs;
     
     //printf("C.....: M: %d Fs: %d Rs: %d Ts: %d nsym: %d nbit: %d N: %d Ndft: %d fmin: %d fmax: %d\n",
     //       M, fsk->Fs, fsk->Rs, fsk->Ts, fsk->Nsym, fsk->Nbits, fsk->N, fsk->Ndft, fsk->est_min, fsk->est_max);

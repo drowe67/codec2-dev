@@ -562,14 +562,22 @@ endif(NOT APPLE)
                             ./cohpsk_ch - - -23 --Fs 8000 --ssbfilt 0 --complexout -f -4000 | 
                             ./fsk_demod -c -p 8 4 8000 100 - - | 
                             ./fsk_put_test_bits -b 0.025 -q - ")
+     # 800XA framer test
+     add_test(NAME test_fsk_vhf_framer
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src; 
+                            ./c2enc 700C ../../raw/ve9qrp_10s.raw - | 
+                            ./vhf_frame_c2 B - - | 
+                            ./fsk_mod -p 10 4 8000 400 400 400 - - | 
+                            ./fsk_demod -p 10 4 8000 400 - - | 
+                            ./vhf_deframe_c2 B - /dev/null")
+             set_tests_properties(test_fsk_vhf_framer PROPERTIES PASS_REGULAR_EXPRESSION "total_uw_err: 0")
 
+     # Horus telemetry waveforms             
      add_test(NAME test_horus_binary
              COMMAND sh -c "sox ${CMAKE_CURRENT_SOURCE_DIR}/wav/horus_binary_ebno_4.5db.wav -r 48000 -t raw - |
-                            $<TARGET_FILE:horus_demod> -m binary - -"
-             )
-             set_tests_properties(test_horus_binary PROPERTIES
-             PASS_REGULAR_EXPRESSION "1C9A9545")
-
+                             $<TARGET_FILE:horus_demod> -m binary - -"
+              )
+             set_tests_properties(test_horus_binary PROPERTIES PASS_REGULAR_EXPRESSION "1C9A9545")
      add_test(NAME test_horus_binary_iq
              COMMAND sh -c "cat ${CMAKE_CURRENT_SOURCE_DIR}/raw/horusb_iq_s16.raw | 
                             $<TARGET_FILE:horus_demod> -q -m binary --fsk_lower=1000 --fsk_upper=20000 - -"

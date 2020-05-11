@@ -177,7 +177,7 @@ uint32_t fsk_nin(struct FSK *fsk);
  * 
  * struct FSK *fsk - FSK config/state struct, set up by fsk_create
  * uint8_t rx_bits[] - Buffer for Nbits unpacked bits to be written
- * float fsk_in[] - nin samples of modualted FSK
+ * float fsk_in[] - nin samples of modulated FSK
  */
 void fsk_demod(struct FSK *fsk, uint8_t rx_bits[],COMP fsk_in[]);
 

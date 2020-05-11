@@ -1,17 +1,11 @@
+# README_fsk
 
-README_fsk.txt
-David Rowe
-Created Jan 2016
-
-A FSK modem with a non-coherent demodulator.  Performance is within a
-fraction of a dB of ideal.  The demodulator automagically estimates
-the tone frequencies and tracks frequency drift.
+A FSK modem with a non-coherent demodulator.  Performance is within a fraction of a dB of ideal.  The demodulator automagically estimates the tone frequencies and tracks frequency drift.
 
 Credits
 -------
 
-The Octave version of the modem was developed by David Rowe.  Brady
-O'Brien ported the modem to C, and wrote the C/Octave tests.
+The Octave version of the modem was developed by David Rowe.  Brady O'Brien ported the modem to C, and wrote the C/Octave tests.
 
 Quickstart
 ----------
@@ -81,3 +75,10 @@ Built as part of codec2-dev, see README for build instructions.
     $ octave
     octave:1> tfsk
 
+## Debugging
+
+You can visualise the C modem operation with a companion python script, for example:
+```
+./fsk_get_test_bits - 10000 | ./fsk_mod -p 10 4 8000 400 400 400 - - | ./fsk_demod -p 10 -t1 4 8000 400 - /dev/null 2>stats.txt
+python ../../octave/plot_fsk_demod_stats.py stats.txt
+```

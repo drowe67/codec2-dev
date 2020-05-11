@@ -133,6 +133,7 @@ int main(int argc,char *argv[]){
     }else{
         fsk = fsk_create(Fs,Rs,M,f1,fs);
     }
+    fsk_set_est_limits(fsk, 300, 2800);
     fsk->lock_nin = lock_nin;
     
     /* Modulate! */

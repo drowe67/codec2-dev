@@ -40,7 +40,7 @@ int main(int argc,char *argv[]){
     int bitcnt,biterr,i,errs;
     int framesize = TEST_FRAME_SIZE;
     float threshold = FRAME_DETECTION_THRESHOLD;
-    float ber_thresh = 1.0;
+    float ber_thresh = 0.5;
     FILE *fin;
     uint8_t *bitbuf_tx, *bitbuf_rx, abit;
     int verbose = 1;
@@ -120,15 +120,15 @@ int main(int argc,char *argv[]){
             biterr += errs;
             ber =  (float)biterr/(float)bitcnt;
             if (verbose) {
-                fprintf(stderr,"errs: %d FSK BER %f, bits tested %d, bit errors %d\n",
-                    errs, ber, bitcnt, biterr);
+                fprintf(stderr,"FSK BER %f, bits tested %d, bit errors %d errs: %d \n",
+                        ber, bitcnt, biterr, errs);
             }
         }
     }
  
     fclose(fin);
 
-    fprintf(stderr,"errs: %d FSK BER %f, bits tested %d, bit errors %d ", errs, ber, bitcnt, biterr);
+    fprintf(stderr,"FSK BER %f, bits tested %d, bit errors %d ", ber, bitcnt, biterr);
     if (ber < ber_thresh) {
         fprintf(stderr,"PASS\n");
         return 0;

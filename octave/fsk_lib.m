@@ -59,9 +59,9 @@ function states = fsk_init(Fs, Rs, M=2, P=8, nsym=50)
   states.prev_pkt = [];
  
   % Freq. estimator limits
-  states.fest_fmax = (Fs/2)-Rs;
-  states.fest_fmin = Rs/2;
-  states.fest_min_spacing = 2*(Rs-(Rs/5));
+  states.fest_fmax = Fs;
+  states.fest_fmin = 0;
+  states.fest_min_spacing = 0.75*Rs;
 
   %printf("Octave: M: %d Fs: %d Rs: %d Ts: %d nsym: %d nbit: %d N: %d Ndft: %d fmin: %d fmax: %d\n",
   %       states.M, states.Fs, states.Rs, states.Ts, states.nsym, states.nbit, states.N, states.Ndft, states.fest_fmin, states.fest_fmax);
@@ -161,7 +161,7 @@ function states = est_freq(states, sf, ntones)
     f = [f (tone_index-1-Ndft/2)*Fs/Ndft];
     a = [a tone_amp];
 
-    % zero out region min_tone_spacing/2 either side of max so we can find next highest peak
+    % zero out region min_tone_spacing either side of max so we can find next highest peak
     % closest spacing for non-coh mFSK is Rs
 
     stz = tone_index - floor((min_tone_spacing)*Ndft/Fs);
