@@ -545,6 +545,44 @@ void fsk_demod_freq_est(struct FSK *fsk, COMP fsk_in[], float *freqs, int M) {
     for(i=0; i<M; i++){
         freqs[i] = (float)(freqi[i])*((float)Fs/(float)Ndft);
     }
+
+    /* Search for each tone method 2 - correlate with mask with non-zero entries at tone spacings ----- */
+
+    /* construct mask */
+    float mask[Ndft];
+    for(i=0; i<Ndft; i++) mask[i] = 0.0;
+    for(i=0;i<3; i++) mask[i] = 1.0;
+    int bin=0;
+    for(int m=1; m<=M-1; m++) {
+        bin = round((float)m*fsk->fs_tx*Ndft/Fs)-1;
+        for(i=bin; i<=bin+2; i++) mask[i] = 1.0;
+    }
+    int len_mask = bin+2+1;
+
+    #ifdef MODEMPROBE_ENABLE
+    modem_probe_samp_f("t_mask",mask,len_mask);
+    #endif
+
+    /* drag mask over Sf, looking for peak in correlation */
+    int b_max = st; float corr_max = 0.0;
+    float *Sf = fsk->fft_est;
+    for (int b=st; b<en-len_mask; b++) {
+        float corr = 0.0;
+        for(i=0; i<len_mask; i++)
+            corr += mask[i] * Sf[b+i];
+        if (corr > corr_max) {
+            corr_max = corr;
+            b_max = b;
+        }
+    }
+    float foff = (b_max-Ndft/2)*Fs/Ndft;
+    for (int m=0; m<4; m++)
+        fsk->f2_est[m] = foff + m*fsk->fs_tx;
+    fprintf(stderr, "fsk->fs_tx: %d\n",fsk->fs_tx);
+    #ifdef MODEMPROBE_ENABLE
+    modem_probe_samp_f("t_f2_est",fsk->f2_est,M);
+    #endif
+
     #ifndef DEMOD_ALLOC_STACK
     free(fftin);
     free(fftout);
@@ -575,7 +613,6 @@ void fsk_demod_core(struct FSK *fsk, uint8_t rx_bits[], float rx_sd[], COMP fsk_
     COMP dphift;
     float rx_timing,norm_rx_timing,old_norm_rx_timing,d_norm_rx_timing,appm;
 
-    float *f_est = fsk->f_est;
     float fc_avg,fc_tx;
     float meanebno,stdebno,eye_max;
     int neyesamp,neyeoffset;
@@ -586,11 +623,18 @@ void fsk_demod_core(struct FSK *fsk, uint8_t rx_bits[], float rx_sd[], COMP fsk_
     #endif
 
     /* Estimate tone frequencies */
-    fsk_demod_freq_est(fsk,fsk_in,f_est,M);
+    fsk_demod_freq_est(fsk,fsk_in,fsk->f_est,M);
     #ifdef MODEMPROBE_ENABLE
-    modem_probe_samp_f("t_f_est",f_est,M);
+    modem_probe_samp_f("t_f_est",fsk->f_est,M);
     #endif
-    
+    float *f_est;
+    if (fsk->freq_est_type)
+        f_est = fsk->f2_est;
+    else
+        f_est = fsk->f_est;
+    for(int m=0; m<M; m++)
+        fprintf(stderr, "f[%d] = %f\n", m, f_est[m]);
+        
     /* update filter (integrator) memory by shifting in nin samples */
     for(m=0; m<M; m++) {
         for(i=0,j=Nmem-nold; i<nold; i++,j++)
@@ -970,7 +1014,7 @@ void fsk_get_demod_stats(struct FSK *fsk, struct MODEM_STATS *stats){
 /*
  * Set the minimum and maximum frequencies at which the freq. estimator can find tones
  */
-void fsk_set_est_limits(struct FSK *fsk, int est_min, int est_max){
+void fsk_set_freq_est_limits(struct FSK *fsk, int est_min, int est_max){
     assert(fsk != NULL);
     assert(est_min >= -fsk->Fs/2);
     assert(est_max <=  fsk->Fs/2);
@@ -980,7 +1024,13 @@ void fsk_set_est_limits(struct FSK *fsk, int est_min, int est_max){
 }
 
 void fsk_stats_normalise_eye(struct FSK *fsk, int normalise_enable) {
+    assert(fsk != NULL);
     fsk->normalise_eye = normalise_enable;
+}
+
+void fsk_set_freq_est_alg(struct FSK *fsk, int est_type) {
+    assert(fsk != NULL);
+    fsk->freq_est_type = est_type;
 }
 
 

@@ -185,7 +185,8 @@ function states = est_freq(states, sf, ntones)
     mask(bin:bin+2) = 1;
   end
   mask = mask(1:bin+2);
-
+  states.mask = mask;
+  
   % drag mask over Sf, looking for peak in correlation
   bmax = st; corr_max = 0;
   Sf = states.Sf; corr_log = [];

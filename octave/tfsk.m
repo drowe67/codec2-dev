@@ -149,7 +149,7 @@ function test_stats = fsk_demod_xt(Fs,Rs,f1,fsp,mod,tname,M=2,lock_nin=0)
     o_EbNodB = [];
     o_ppm = [];
     o_Sf = [];
-    o_fest = [];
+    o_fest = []; o_mask = []; o_fest2 = [];
     o_rx_timing = [];
     o_norm_rx_timing = [];
     o_nin = [];
@@ -188,6 +188,8 @@ function test_stats = fsk_demod_xt(Fs,Rs,f1,fsp,mod,tname,M=2,lock_nin=0)
         o_f1 = [o_f1 states.f(1)];
         o_f2 = [o_f1 states.f(2)];
         o_fest = [o_fest states.f];
+        o_mask = [o_mask states.mask];
+        o_fest2 = [o_fest2 states.f2];
         o_nin = [o_nin states.nin];
         if M==4
             o_f3_dc = [o_f3_dc states.f_dc(3,:)];
@@ -201,6 +203,10 @@ function test_stats = fsk_demod_xt(Fs,Rs,f1,fsp,mod,tname,M=2,lock_nin=0)
         
     assert(vcompare(o_Sf,  t_fft_est,'fft est',tname,.001,1));
     assert(vcompare(o_fest,  t_f_est,'f est',tname,.001,2));
+    assert(vcompare(o_mask,  t_mask,'f2 mask',tname,.001,3));
+    assert(vcompare(o_fest2,  t_f2_est,'f2 est',tname,.001,16));
+    o_fest2(1:12)
+    t_f2_est(1:12)
     assert(vcompare(o_f1_dc,      t_f1_dc,    'f1 dc',    tname,.01,8));
     assert(vcompare(o_f2_dc,      t_f2_dc,    'f2 dc',    tname,.01,9));
     assert(vcompare(o_f2_int,     t_f2_int,   'f2 int',   tname,.01,10));

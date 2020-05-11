@@ -74,6 +74,7 @@ int main(int argc,char *argv[]){
     int user_fsk_lower = 0;
     int user_fsk_upper = 0;
     int nsym = FSK_DEFAULT_NSYM;
+    int mask = 0;
     
     int o = 0;
     int opt_idx = 0;
@@ -89,10 +90,11 @@ int main(int argc,char *argv[]){
             {"soft-dec",  no_argument,        0, 's'},
             {"testframes",no_argument,        0, 'f'},
             {"nsym",      required_argument,  0, 'n'},
+            {"mask",      no_argument,        0, 'm'},
             {0, 0, 0, 0}
         };
         
-        o = getopt_long(argc,argv,"fhlp:cdt::sb:u:",long_opts,&opt_idx);
+        o = getopt_long(argc,argv,"fhlp:cdt::sb:u:m",long_opts,&opt_idx);
         
         switch(o){
         case 'c':
@@ -138,6 +140,9 @@ int main(int argc,char *argv[]){
                 nsym = atoi(optarg);
             }
             break;
+        case 'm':
+            mask = 1;
+            break;
         case 'h':
         case '?':
             goto helpmsg;
@@ -170,6 +175,7 @@ int main(int argc,char *argv[]){
         fprintf(stderr," --fsk_lower freq  lower limit of freq estimator (default 0 for real input, -Fs/2  for complex input)\n");
         fprintf(stderr," --fsk_upper freq  upper limit of freq estimator (default Fs/2)\n");
         fprintf(stderr," --nsym Nsym       number of symbols used for estimators. Default %d\n", FSK_DEFAULT_NSYM);
+        fprintf(stderr," --mask            use \"mask\" freq estimator (default is \"peak\" estimator)\n");
         exit(1);
     }
     
@@ -210,9 +216,10 @@ int main(int argc,char *argv[]){
         fsk_upper = Fs/2;
     }
     fprintf(stderr,"Setting estimator limits to %d to %d Hz.\n", fsk_lower, fsk_upper);
+    fsk_set_freq_est_limits(fsk,fsk_lower,fsk_upper);
 
-    fsk_set_est_limits(fsk,fsk_lower,fsk_upper);
-
+    fsk_set_freq_est_alg(fsk, mask);
+    
     if(fin==NULL || fout==NULL || fsk==NULL){
         fprintf(stderr,"Couldn't open files\n");
         exit(1);
