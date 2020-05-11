@@ -34,30 +34,30 @@
 
 #define TEST_FRAME_SIZE 100  /* must match fsk_get_test_bits.c */
 
-#define FRAME_DETECTION_THRESHOLD 0.1
+#define PACKET_DETECTION_THRESHOLD 0.1
 
 int main(int argc,char *argv[]){
-    int bitcnt,biterr,i,errs;
+    int bitcnt,biterr,i,errs,packetcnt;
     int framesize = TEST_FRAME_SIZE;
-    float threshold = FRAME_DETECTION_THRESHOLD;
-    float ber_thresh = 0.5;
+    float ber_valid_packet = PACKET_DETECTION_THRESHOLD;
+    int packet_pass_thresh = 0;
     FILE *fin;
     uint8_t *bitbuf_tx, *bitbuf_rx, abit;
     int verbose = 1;
     
-    char usage[] = "usage: %s [-f frameSizeBits] [-t VaildFrameBERThreshold] [-b berPassThreshold] InputOneBitPerByte\n";
+    char usage[] = "usage: %s [-f frameSizeBits] [-t VaildFrameBERThreshold] [-b BERValidPacket] [-p numPacketspass] InputOneBitPerByte\n";
 
     int opt;
-    while ((opt = getopt(argc, argv, "f:t:b:hq")) != -1) {
+    while ((opt = getopt(argc, argv, "f:b:p:hq")) != -1) {
         switch (opt) {
         case 'b':
-            ber_thresh = atof(optarg);
+            ber_valid_packet = atof(optarg);
+            break;
+        case 'p':
+            packet_pass_thresh = atoi(optarg);
             break;
         case 'f':
             framesize = atoi(optarg);
-            break;
-        case 't':
-            threshold = atof(optarg);
             break;
         case 'q':
             verbose = 0;
@@ -95,13 +95,12 @@ int main(int argc,char *argv[]){
 	bitbuf_rx[i] = 0;
     }
     
-    bitcnt = 0;
-    biterr = 0;
+    bitcnt = 0; biterr = 0; packetcnt = 0;
     float ber = 0.5;
     
     while(fread(&abit,sizeof(uint8_t),1,fin)>0){
 
-        /* update silding window of input bits */
+        /* update sliding window of input bits */
 
         for(i=0; i<framesize-1; i++) {
             bitbuf_rx[i] = bitbuf_rx[i+1];
@@ -117,22 +116,23 @@ int main(int argc,char *argv[]){
                 errs++;
             }
         }
-        if (errs < threshold * framesize) {
-            /* OK, we have a valid test frame sync, so lets count errors */
+        if (errs < ber_valid_packet * framesize) {
+            /* OK, we have a valid packet, so lets count errors */
+            packetcnt++;
             bitcnt += framesize;
             biterr += errs;
             ber =  (float)biterr/(float)bitcnt;
             if (verbose) {
-                fprintf(stderr,"FSK BER %f, bits tested %d, bit errors %d errs: %d \n",
-                        ber, bitcnt, biterr, errs);
+                fprintf(stderr,"[%04d] BER %5.3f, bits tested %6d, bit errors %6d errs: %4d \n",
+                        packetcnt, ber, bitcnt, biterr, errs);
             }
         }
     }
  
     fclose(fin);
 
-    fprintf(stderr,"FSK BER %f, bits tested %d, bit errors %d ", ber, bitcnt, biterr);
-    if (ber < ber_thresh) {
+    fprintf(stderr,"[%04d] BER %5.3f, bits tested %6d, bit errors %4d ", packetcnt, ber, bitcnt, biterr);
+    if (packetcnt >= packet_pass_thresh) {
         fprintf(stderr,"PASS\n");
         return 0;
     }

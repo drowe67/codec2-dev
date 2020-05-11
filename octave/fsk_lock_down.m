@@ -376,7 +376,7 @@ randn('state',1);
 
 % freq estimator tests (choose one)
 #freq_run_single(3,10)
-freq_run_curve_peak_mask
+#freq_run_curve_peak_mask
 #freq_run_curve_mask(8000,100)
 #freq_run_curve_mask(24000,25)
 #freq_run_curve_mask(8000,25)
@@ -385,8 +385,8 @@ freq_run_curve_peak_mask
 #modem_run_curve(24000,25,100)
 #modem_run_curve(8000,100,50,0.05)
 #modem_run_curve_spread(8000,25,50)
-#modem_run_test(1.5, 20, 8000, 100, 0, 1, 0, 400);
 #modem_run_curve(8000,100,20)
+modem_run_test(2, 20, 8000, 25, 0, 1, 0, 270);
 
 % just print a table of code rates
 #code_rate_table

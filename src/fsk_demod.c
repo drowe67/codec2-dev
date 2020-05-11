@@ -75,6 +75,7 @@ int main(int argc,char *argv[]){
     int user_fsk_upper = 0;
     int nsym = FSK_DEFAULT_NSYM;
     int mask = 0;
+    int tx_tone_separation = 100;
     
     int o = 0;
     int opt_idx = 0;
@@ -90,7 +91,7 @@ int main(int argc,char *argv[]){
             {"soft-dec",  no_argument,        0, 's'},
             {"testframes",no_argument,        0, 'f'},
             {"nsym",      required_argument,  0, 'n'},
-            {"mask",      no_argument,        0, 'm'},
+            {"mask",      required_argument,  0, 'm'},
             {0, 0, 0, 0}
         };
         
@@ -142,6 +143,7 @@ int main(int argc,char *argv[]){
             break;
         case 'm':
             mask = 1;
+            tx_tone_separation = atoi(optarg);
             break;
         case 'h':
         case '?':
@@ -160,22 +162,22 @@ int main(int argc,char *argv[]){
         fprintf(stderr, "Too many arguments\n");
     helpmsg:
         fprintf(stderr,"usage: %s [options] (2|4) SampleRate SymbolRate InputModemRawFile OutputFile\n",argv[0]);
-        fprintf(stderr," -c --cs16         The raw input file will be in complex signed 16 bit format.\n");
-        fprintf(stderr," -d --cu8          The raw input file will be in complex unsigned 8 bit format.\n");
-        fprintf(stderr,"                   If neither -c nor -d are used, the input should be in signed 16 bit format.\n");
-        fprintf(stderr," -f --testframes   Testframe mode, prints stats to stderr when a testframe is detected, if -t (JSON) \n");
-        fprintf(stderr,"                   is enabled stats will be in JSON format\n");
-        fprintf(stderr," -t[r] --stats=[r] Print out modem statistics to stderr in JSON.\n");
-        fprintf(stderr,"                   r, if provided, sets the number of modem frames between statistic printouts.\n");
-        fprintf(stderr," -s --soft-dec     The output file will be in a soft-decision format, with one 32-bit float per bit.\n");
-        fprintf(stderr,"                   If -s is not used, the output will be in a 1 byte-per-bit format.\n");
-        fprintf(stderr," -p P              The demod internals operate at a rate of Fs/P.\n");
-        fprintf(stderr,"                   P must be divisible by the symbol rate. Smaller P values will result in faster\n");
-        fprintf(stderr,"                   processing but lower demodulation performance. Default %d\n", FSK_DEFAULT_P);
-        fprintf(stderr," --fsk_lower freq  lower limit of freq estimator (default 0 for real input, -Fs/2  for complex input)\n");
-        fprintf(stderr," --fsk_upper freq  upper limit of freq estimator (default Fs/2)\n");
-        fprintf(stderr," --nsym Nsym       number of symbols used for estimators. Default %d\n", FSK_DEFAULT_NSYM);
-        fprintf(stderr," --mask            use \"mask\" freq estimator (default is \"peak\" estimator)\n");
+        fprintf(stderr," -c --cs16          The raw input file will be in complex signed 16 bit format.\n");
+        fprintf(stderr," -d --cu8           The raw input file will be in complex unsigned 8 bit format.\n");
+        fprintf(stderr,"                    If neither -c nor -d are used, the input should be in signed 16 bit format.\n");
+        fprintf(stderr," -f --testframes    Testframe mode, prints stats to stderr when a testframe is detected, if -t (JSON) \n");
+        fprintf(stderr,"                    is enabled stats will be in JSON format\n");
+        fprintf(stderr," -t[r] --stats=[r]  Print out modem statistics to stderr in JSON.\n");
+        fprintf(stderr,"                    r, if provided, sets the number of modem frames between statistic printouts.\n");
+        fprintf(stderr," -s --soft-dec      The output file will be in a soft-decision format, with one 32-bit float per bit.\n");
+        fprintf(stderr,"                    If -s is not used, the output will be in a 1 byte-per-bit format.\n");
+        fprintf(stderr," -p P               The demod internals operate at a rate of Fs/P.\n");
+        fprintf(stderr,"                    P must be divisible by the symbol rate. Smaller P values will result in faster\n");
+        fprintf(stderr,"                    processing but lower demodulation performance. Default %d\n", FSK_DEFAULT_P);
+        fprintf(stderr," --fsk_lower freq   lower limit of freq estimator (default 0 for real input, -Fs/2  for complex input)\n");
+        fprintf(stderr," --fsk_upper freq   upper limit of freq estimator (default Fs/2)\n");
+        fprintf(stderr," --nsym Nsym        number of symbols used for estimators. Default %d\n", FSK_DEFAULT_NSYM);
+        fprintf(stderr," --mask TxFreqSpace Use \"mask\" freq estimator (default is \"peak\" estimator)\n");
         exit(1);
     }
     
@@ -203,7 +205,8 @@ int main(int argc,char *argv[]){
     }
 
     /* set up FSK */
-    fsk = fsk_create_hbr(Fs,Rs,M,P,nsym,1200,400);
+    #define UNUSED 1000
+    fsk = fsk_create_hbr(Fs,Rs,M,P,nsym,UNUSED,tx_tone_separation);
 
     /* set freq estimator limits */
     if (!user_fsk_lower) {
