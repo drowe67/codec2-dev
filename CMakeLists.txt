@@ -537,17 +537,9 @@ endif(NOT APPLE)
              COMMAND sh -c "$<TARGET_FILE:fsk_get_test_bits> - 10000 | 
                             $<TARGET_FILE:fsk_mod> 2 8000 100 1200 100 - - | 
                             $<TARGET_FILE:fsk_demod> -l 2 8000 100 - - | 
-                            $<TARGET_FILE:fsk_put_test_bits> -"
+                            $<TARGET_FILE:fsk_put_test_bits> -p 99 -q -"
              )
-             set_tests_properties(test_fsk_modem_mod_demod  PROPERTIES PASS_REGULAR_EXPRESSION "bits tested 9800, bit errors 0")
-
-     # 4FSK modem at Eb/No = 6dB, SNR = Eb/No+10log10(Rb/B) = 6 + 10*log10(2*100/3000) = -5.7dB
-     # Ideal BER = 0.016, set thresh 50% higher
-     add_test(NAME test_fsk_4fsk_ber
-             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src; 
-                            ./fsk_get_test_bits - 10000 | ./fsk_mod 4 8000 100 1000 100 - - | 
-                            ./cohpsk_ch - - -26 --Fs 8000 | 
-                            ./fsk_demod 4 8000 100 - - | ./fsk_put_test_bits -b 0.025 - ")
+ 
      # 2FSK modem at Eb/No = 9dB, SNR = Eb/No+10log10(Rb/B) = 9 + 10*log10(100/3000) = -5.7dB
      # Ideal BER = 0.0094, set thresh 50% higher
      add_test(NAME test_fsk_2fsk_ber
@@ -555,6 +547,13 @@ endif(NOT APPLE)
                             ./fsk_get_test_bits - 10000 | ./fsk_mod 2 8000 100 1000 100 - - | 
                             ./cohpsk_ch - - -26 --Fs 8000 | 
                             ./fsk_demod 2 8000 100 - - | ./fsk_put_test_bits -b 0.015 -q - ")
+     # 4FSK modem at Eb/No = 6dB, SNR = Eb/No+10log10(Rb/B) = 6 + 10*log10(2*100/3000) = -5.7dB
+     # Ideal BER = 0.016, set thresh 50% higher
+     add_test(NAME test_fsk_4fsk_ber
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src; 
+                            ./fsk_get_test_bits - 10000 | ./fsk_mod 4 8000 100 1000 100 - - | 
+                            ./cohpsk_ch - - -26 --Fs 8000 | 
+                            ./fsk_demod 4 8000 100 - - | ./fsk_put_test_bits -b 0.025 - ")
      # shift FSK signal to -ve frequencies, note No 3dB higher as noise is single sided
      add_test(NAME test_fsk_4fsk_ber_negative_freq
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src; 
@@ -562,8 +561,21 @@ endif(NOT APPLE)
                             ./cohpsk_ch - - -23 --Fs 8000 --ssbfilt 0 --complexout -f -4000 | 
                             ./fsk_demod -c -p 8 4 8000 100 - - | 
                             ./fsk_put_test_bits -b 0.025 -q - ")
-     # 800XA framer test
-     add_test(NAME test_fsk_vhf_framer
+     # Horus "lock down" uncoded PER/BER test:
+     # 4FSK modem at Eb/No = 2dB, SNR = Eb/No+10log10(Rb/B) = 6 + 10*log10(2*100/3000) = -15.7dB
+     # Theoretical BER is 0.14.  As it's singlesided noise cohpsk_ch reports 3dB less (-18.7dB)
+     # Pass condition is 10% PER
+     add_test(NAME test_fsk_4fsk_lockdown
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src; 
+                            bits=512; tx_packets=20; rx_packets=18; tx_tone_sep=270; Rs=25; 
+                            ./fsk_get_test_bits - $(($bits*$tx_packets)) $bits | 
+                            ./fsk_mod 4 8000 $Rs 1000 $tx_tone_sep - - | 
+                            ./cohpsk_ch - - -13 --Fs 8000 --ssbfilt 0 -f -3000 --complexout | 
+                            ./fsk_demod -c -p 8 --mask $tx_tone_sep -t1 --nsym 100 4 8000 $Rs - - 2>stats.txt | 
+                            ./fsk_put_test_bits -t 0.25 -b 0.20 -p $rx_packets -f $bits -q -")
+           
+      # 800XA framer test
+      add_test(NAME test_fsk_vhf_framer
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src; 
                             ./c2enc 700C ../../raw/ve9qrp_10s.raw - | 
                             ./vhf_frame_c2 B - - | 

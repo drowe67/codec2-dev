@@ -299,6 +299,7 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
 
 #ifndef __EMBEDDED__
         /* tx BPF off on embedded platforms, as it consumes significant CPU */
+        assert(f->ofdm != NULL);
         ofdm_set_tx_bpf(f->ofdm, 1);
 #endif
 

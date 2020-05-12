@@ -34,24 +34,28 @@
 
 #define TEST_FRAME_SIZE 100  /* must match fsk_get_test_bits.c */
 
-#define PACKET_DETECTION_THRESHOLD 0.1
+#define VALID_PACKET_BER_THRESH 0.1
 
 int main(int argc,char *argv[]){
     int bitcnt,biterr,i,errs,packetcnt;
     int framesize = TEST_FRAME_SIZE;
-    float ber_valid_packet = PACKET_DETECTION_THRESHOLD;
+    float valid_packet_ber_thresh = VALID_PACKET_BER_THRESH;
     int packet_pass_thresh = 0;
+    float ber_pass_thresh = 0;
     FILE *fin;
     uint8_t *bitbuf_tx, *bitbuf_rx, abit;
     int verbose = 1;
     
-    char usage[] = "usage: %s [-f frameSizeBits] [-t VaildFrameBERThreshold] [-b BERValidPacket] [-p numPacketspass] InputOneBitPerByte\n";
+    char usage[] = "usage: %s [-f frameSizeBits] [-t VaildFrameBERThreshold] [-b BERPass] [-p numPacketsPass] InputOneBitPerByte\n";
 
     int opt;
-    while ((opt = getopt(argc, argv, "f:b:p:hq")) != -1) {
+    while ((opt = getopt(argc, argv, "f:b:p:hqt:")) != -1) {
         switch (opt) {
-        case 'b':
-            ber_valid_packet = atof(optarg);
+        case 't':
+            valid_packet_ber_thresh = atof(optarg);
+            break;
+          case 'b':
+            ber_pass_thresh = atof(optarg);
             break;
         case 'p':
             packet_pass_thresh = atoi(optarg);
@@ -116,7 +120,7 @@ int main(int argc,char *argv[]){
                 errs++;
             }
         }
-        if (errs < ber_valid_packet * framesize) {
+        if (errs < valid_packet_ber_thresh * framesize) {
             /* OK, we have a valid packet, so lets count errors */
             packetcnt++;
             bitcnt += framesize;
@@ -131,8 +135,8 @@ int main(int argc,char *argv[]){
  
     fclose(fin);
 
-    fprintf(stderr,"[%04d] BER %5.3f, bits tested %6d, bit errors %4d ", packetcnt, ber, bitcnt, biterr);
-    if (packetcnt >= packet_pass_thresh) {
+    fprintf(stderr,"[%04d] BER %5.3f, bits tested %6d, bit errors %4d\n", packetcnt, ber, bitcnt, biterr);
+    if ((packetcnt >= packet_pass_thresh) && (ber <= ber_pass_thresh)) {
         fprintf(stderr,"PASS\n");
         return 0;
     }
