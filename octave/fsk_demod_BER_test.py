@@ -35,7 +35,6 @@ import scipy.interpolate
 # Default: 0 through 5 dB in 0.5 db steps, then up to 20 db in 1db steps.
 EBNO_RANGE = np.append(np.arange(0, 5, 0.5), np.arange(5, 20.5, 1))
 
-
 # Baud rates to test:
 BAUD_RATES = [100, 50, 25]
 
@@ -57,7 +56,7 @@ FRAME_THRESHOLD = 0.4
 FRAME_IGNORE = FRAME_LENGTH
 
 # IF sample rate
-SAMPLE_RATE = 12000
+SAMPLE_RATE = 48000
 
 # Frequency estimator limits
 ESTIMATOR_LOWER_LIMIT = 100
@@ -67,11 +66,13 @@ ESTIMATOR_UPPER_LIMIT = int(SAMPLE_RATE/2 - 1000)
 LOW_TONE = 2000
 
 # Tone spacing (Hz)
-TONE_SPACING = 250
+TONE_SPACING = 270
 
+# Mask Estimator
+MASK_ESTIMATOR = True
 
 # Switch to 'Low Bit-Rate' mode below this baud rate.
-LBR_BREAK_POINT = 600
+#LBR_BREAK_POINT = 600 # No more LBR mode
 
 # Halt simulation for a particular baud rate when the BER drops below this level.
 BER_BREAK_POINT = 1e-4
@@ -315,10 +316,12 @@ def process_fsk(
 ):
     """ Run a fsk file through fsk_demod """
 
-    if baud < LBR_BREAK_POINT:
-        _lbr = "--lbr -b %d -u %d " % (ESTIMATOR_LOWER_LIMIT, ESTIMATOR_UPPER_LIMIT)
+    _estim_limits = "-b %d -u %d " % (ESTIMATOR_LOWER_LIMIT, ESTIMATOR_UPPER_LIMIT)
+
+    if MASK_ESTIMATOR:
+        _mask = "--mask %d " % TONE_SPACING
     else:
-        _lbr = ""
+        _mask = ""
 
     if complex_samples:
         _cpx = "--cs16 "
@@ -332,10 +335,11 @@ def process_fsk(
         _stats = ""
         _stats_file = None
 
-    _cmd = "cat %s | csdr convert_f_s16 | %s/fsk_demod %s%s%s%d %d %d - - " % (
+    _cmd = "cat %s | csdr convert_f_s16 | %s/fsk_demod %s%s%s%s%d %d %d - - " % (
         filename,
         CODEC2_UTILS,
-        _lbr,
+        _mask,
+        _estim_limits,
         _cpx,
         _stats,
         FSK_ORDER,
@@ -346,7 +350,7 @@ def process_fsk(
     if stats:
         _cmd += "2> %s" % _stats_file
 
-    _cmd += "| %s/fsk_put_test_bits - %d %.2f 2>&1" % (
+    _cmd += "| %s/fsk_put_test_bits -f %d -t %.2f - 2>&1" % (
         CODEC2_UTILS,
         FRAME_LENGTH,
         FRAME_THRESHOLD,
@@ -361,8 +365,10 @@ def process_fsk(
         _start = time.time()
         _output = subprocess.check_output(_cmd, shell=True)
         _output = _output.decode()
+    except subprocess.CalledProcessError as e:
+        _output = e.output.decode()
     except:
-        # traceback.print_exc()
+        traceback.print_exc()
         _output = "error"
         print("Run failed!")
         return (-1, _stats_file)
@@ -371,7 +377,7 @@ def process_fsk(
 
     # Try to grab last line of the stderr outout
     try:
-        _last_line = _output.split("\n")[-2]
+        _last_line = _output.split("\n")[-3]
     except:
         # Lack of a line indicates that we have decoded no data. return a BER of 1.
         print("No bits decoded.")
@@ -383,14 +389,17 @@ def process_fsk(
         return (1.0, _stats_file)
 
     # Example line:
-    # errs: 0 FSK BER 0.000000, bits tested 5800, bit errors 0
+    # [0009] BER 0.000, bits tested  18000, bit errors      0 errs:    0
+    # [0009] BER 0.000, bits tested  18000, bit errors    0
+    # PASS
+    #
 
     # split into fields
-    _fields = _last_line.split(" ")
+    _fields = _last_line.split()
 
     # Extract number of bits and errors
-    _bits = float(_fields[7][:-1])  # remove the trailing comma
-    _errors = float(_fields[10])
+    _bits = float(_fields[5][:-1])  # remove the trailing comma
+    _errors = float(_fields[8])
 
     print("Bits: %d, Errors: %d, Raw BER: %.8f" % (_bits, _errors, _errors / _bits))
 
