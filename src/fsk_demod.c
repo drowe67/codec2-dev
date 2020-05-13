@@ -171,7 +171,7 @@ int main(int argc,char *argv[]){
         fprintf(stderr,"                    r, if provided, sets the number of modem frames between statistic printouts.\n");
         fprintf(stderr," -s --soft-dec      The output file will be in a soft-decision format, with one 32-bit float per bit.\n");
         fprintf(stderr,"                    If -s is not used, the output will be in a 1 byte-per-bit format.\n");
-        fprintf(stderr," -p P               The demod internals operate at a rate of Fs/P.\n");
+        fprintf(stderr," -p P               The demod internals operate at a rate of Fs/P, default %d\n", FSK_DEFAULT_P);
         fprintf(stderr,"                    P must be divisible by the symbol rate. Smaller P values will result in faster\n");
         fprintf(stderr,"                    processing but lower demodulation performance. Default %d\n", FSK_DEFAULT_P);
         fprintf(stderr," --fsk_lower freq   lower limit of freq estimator (default 0 for real input, -Fs/2  for complex input)\n");
