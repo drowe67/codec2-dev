@@ -596,6 +596,24 @@ endif(NOT APPLE)
              )
              set_tests_properties(test_horus_binary_iq PROPERTIES
              PASS_REGULAR_EXPRESSION "000900071E2A000000000000000000000000259A6B14")
+    
+     # Wenet
+     # Using Mask estimator (Assuming ~120 kHz tone spacing)
+     add_test(NAME test_wenet_mask
+        COMMAND sh -c "cat ${CMAKE_CURRENT_SOURCE_DIR}/raw/wenet_sample.c8 | 
+                        $<TARGET_FILE:fsk_demod> --cu8 -s --mask=120000 2 921416 115177 - - |
+                        $<TARGET_FILE:drs232_ldpc> - - 2>&1 | strings"
+        )
+        set_tests_properties(test_wenet_mask PROPERTIES
+        PASS_REGULAR_EXPRESSION "packet_errors: 0 PER: 0.000")
 
+     # Using regular frequency estimator
+     add_test(NAME test_wenet_nomask
+        COMMAND sh -c "cat ${CMAKE_CURRENT_SOURCE_DIR}/raw/wenet_sample.c8 | 
+                        $<TARGET_FILE:fsk_demod> --cu8 -s 2 921416 115177 - - |
+                        $<TARGET_FILE:drs232_ldpc> - - 2>&1 | strings"
+        )
+        set_tests_properties(test_wenet_nomask PROPERTIES
+        PASS_REGULAR_EXPRESSION "packet_errors: 0 PER: 0.000")
 
 endif(UNITTEST)
