@@ -218,7 +218,7 @@ function [bps Rs Tcp Ns Nc] = ofdm_init_mode(mode="700D")
   elseif strcmp(mode,"2200")
     Tframe = 0.175; Ts = Tframe/Ns; Nc = 37;
   elseif strcmp(mode,"QAM16")
-    Tframe = 0.175; Ts = Tframe/Ns; Nc = 37; bps=4;
+    Ns=4; Tcp = 0.004; Tframe = 0.08; Ts = Tframe/Ns; Nc = 37; bps=4;
   else
     % try to parse mode string for user defined mode
     vec = sscanf(mode, "Ts=%f Nc=%d Ncp=%f");
@@ -277,9 +277,9 @@ function states = ofdm_init(bps, Rs, Tcp, Ns, Nc)
   states.uw_ind = states.uw_ind_sym = [];
   for i=1:states.Nuwbits/bps
     ind_sym = floor(i*(Nc+1)/bps+1);
-    states.uw_ind_sym = [states.uw_ind_sym ind_sym];             % symbol index
+    states.uw_ind_sym = [states.uw_ind_sym ind_sym];   % symbol index
     for b=bps-1:-1:0
-      states.uw_ind = [states.uw_ind bps*ind_sym-b];        % bit index
+      states.uw_ind = [states.uw_ind bps*ind_sym-b];   % bit index
     end  
   end
 
@@ -843,7 +843,7 @@ function modem_frame = assemble_modem_frame_symbols(states, payload_syms, txt_sy
 
   Nsymsperframe = Nbitsperframe/bps;
   Nuwsyms = Nuwbits/bps;
-  Ntxtsyms = Ntxtbits/txt_bps;
+  Ntxtsyms = Ntxtbits/bps;
   modem_frame = zeros(1,Nsymsperframe);
   p = 1; u = 1;
 
