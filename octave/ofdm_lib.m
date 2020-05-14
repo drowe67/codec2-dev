@@ -262,8 +262,8 @@ function states = ofdm_init(bps, Rs, Tcp, Ns, Nc)
   states.Nrowsperframe = states.Nbitsperframe/(Nc*bps);
   states.Nsamperframe =  (states.Nrowsperframe+1)*(states.M+states.Ncp);
   states.Ntxtbits = 4;   % reserved bits/frame for auxillary text information
-  states.Nuwbits  = 10;  % fix UW at 10 bits
-
+  states.Nuwbits  = bps*5;   % Let use 5 symbols for the UW, note longer for QAM
+  
   % some basic sanity checks
   assert(floor(states.M) == states.M);
   test_qam16();
@@ -275,17 +275,18 @@ function states = ofdm_init(bps, Rs, Tcp, Ns, Nc)
   % bits.
   
   states.uw_ind = states.uw_ind_sym = [];
-  for i=1:states.Nuwbits/2
-    ind_sym = floor(i*(Nc+1)/2+1);
-    states.uw_ind_sym = [states.uw_ind_sym ind_sym];        % symbol index
-    states.uw_ind = [states.uw_ind 2*ind_sym-1 2*ind_sym];  % bit index
-    % states.uw_ind = [states.uw_ind 1+i*(Nc+1) 2+i*(Nc+1)];
-    % states.uw_ind_sym = [states.uw_ind_sym i*(Nc+1)/2+1];
+  for i=1:states.Nuwbits/bps
+    ind_sym = floor(i*(Nc+1)/bps+1);
+    states.uw_ind_sym = [states.uw_ind_sym ind_sym];             % symbol index
+    for b=bps-1:-1:0
+      states.uw_ind = [states.uw_ind bps*ind_sym-b];        % bit index
+    end  
   end
-  states.tx_uw = [0 0 0 0 0 0 0 0 0 0];       
+
+  states.tx_uw = zeros(1,states.Nuwbits);       
   assert(length(states.tx_uw) == states.Nuwbits);
   tx_uw_syms = [];
-  for b=1:2:states.Nuwbits
+  for b=1:bps:states.Nuwbits
     tx_uw_syms = [tx_uw_syms qpsk_mod(states.tx_uw(b:b+1))];
   end
   states.tx_uw_syms = tx_uw_syms;
@@ -818,7 +819,7 @@ function modem_frame = assemble_modem_frame(states, payload_bits, txt_bits)
 
   modem_frame = zeros(1,Nbitsperframe);
   p = 1; u = 1;
-
+ 
   for b=1:Nbitsperframe-Ntxtbits;
     if (u <= Nuwbits) && (b == uw_ind(u))
       modem_frame(b) = tx_uw(u++);
@@ -841,7 +842,7 @@ function modem_frame = assemble_modem_frame_symbols(states, payload_syms, txt_sy
   ofdm_load_const;
 
   Nsymsperframe = Nbitsperframe/bps;
-  Nuwsyms = Nuwbits/uw_bps;
+  Nuwsyms = Nuwbits/bps;
   Ntxtsyms = Ntxtbits/txt_bps;
   modem_frame = zeros(1,Nsymsperframe);
   p = 1; u = 1;
