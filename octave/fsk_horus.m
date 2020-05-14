@@ -601,15 +601,15 @@ function run_sim(test_frame_mode, M=2, frames = 10, EbNodB = 100, filename="fsk_
  endfunction
 
 
-% demodulate a file of 8kHz 16bit short samples --------------------------------
+% ---------------------------------------------------------------------
+% demodulate from a user-supplied file
+% ---------------------------------------------------------------------
 
 function rx_bits_log = demod_file(filename, test_frame_mode=4, noplot=0, EbNodB=100)
   fin = fopen(filename,"rb"); 
   more off;
-  read_complex = 0; shift_fs_on_4 = 0;
+  read_complex = 0; sample_size = 'int16'; shift_fs_on_4 = 0;
   
-  %states = fsk_horus_init(96000, 1200);
-
   if test_frame_mode == 4
     % horus rtty config ---------------------
     states = fsk_horus_init(8000, 100, 2);
@@ -662,6 +662,17 @@ function rx_bits_log = demod_file(filename, test_frame_mode=4, noplot=0, EbNodB=
     shift_fs_on_4 = 1; % get samples into range of current freq estimator
   end
 
+  if test_frame_mode == 9
+    % Wenet high speed SSTV, we can just check raw demo here ---------------------
+    % despite the high sample rate the modem sees this as a 8:1 Fs/Rs configuration
+    states = fsk_init(8000, 1000, 2);
+    states.tx_tone_separation = 1000;
+    states.ntestframebits = (256+2+65)*8+40; % from src/drs232_lpc.c
+    states.freq_est_type = 'mask';
+    read_complex=1; sample_size = 'uint8'; 
+    printf("Wenet mode: ntestframebits: %d freq_est_type: %s\n", states.ntestframebits, states.freq_est_type);
+  end
+                               
   N = states.N;
   P = states.P;
   Rs = states.Rs;
@@ -680,13 +691,12 @@ function rx_bits_log = demod_file(filename, test_frame_mode=4, noplot=0, EbNodB=
   rx_bits_buf = zeros(1,nbit + states.ntestframebits);
 
   % optional noise.  Useful for testing performance of waveforms from real world modulators
-
+  % we need to pre-read the file to estimate the signal power
+  ftmp = fopen(filename,"rb"); s = fread(ftmp,Inf,sample_size); fclose(ftmp);
+  if sample_size == "uint8" s = (s - 127)/128; end
+  if read_complex s = s(1:2:end) + j*s(2:2:end); end
+  tx_pwr = var(s);
   EbNo = 10^(EbNodB/10);
-  ftmp = fopen(filename,"rb"); s = fread(ftmp,Inf,"short");
-  if read_complex
-    s = s(1:2:end) + j*s(2:2:end);
-  end
-  fclose(ftmp); tx_pwr = var(s);
   variance = (tx_pwr/2)*states.Fs/(states.Rs*EbNo*states.bitspersymbol);
 
   % First extract raw bits from samples ------------------------------------------------------
@@ -700,7 +710,8 @@ function rx_bits_log = demod_file(filename, test_frame_mode=4, noplot=0, EbNodB=
 
     nin = states.nin;
     if read_complex
-      [sf count] = fread(fin, 2*nin, "short");
+      [sf count] = fread(fin, 2*nin, sample_size);
+      if sample_size == "uint8" sf = (sf - 127)/128; end
       sf = sf(1:2:end) + j*sf(2:2:end);
       count /= 2;
       if shift_fs_on_4
@@ -728,7 +739,7 @@ function rx_bits_log = demod_file(filename, test_frame_mode=4, noplot=0, EbNodB=
       % demodulate to stream of bits
 
       states = est_freq(states, sf, states.M);
-      %states.f = [1450 1590 1710 1850];
+      if states.freq_est_type == 'mask' states.f = states.f2; end
       [rx_bits states] = fsk_demod(states, sf);
 
       rx_bits_buf(1:states.ntestframebits) = rx_bits_buf(nbit+1:states.ntestframebits+nbit);

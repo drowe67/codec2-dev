@@ -62,6 +62,7 @@ function states = fsk_init(Fs, Rs, M=2, P=8, nsym=50)
   states.fest_fmax = Fs;
   states.fest_fmin = 0;
   states.fest_min_spacing = 0.75*Rs;
+  states.freq_est_type = 'peak';
 
   %printf("Octave: M: %d Fs: %d Rs: %d Ts: %d nsym: %d nbit: %d N: %d Ndft: %d fmin: %d fmax: %d\n",
   %       states.M, states.Fs, states.Rs, states.Ts, states.nsym, states.nbit, states.N, states.Ndft, states.fest_fmin, states.fest_fmax);
