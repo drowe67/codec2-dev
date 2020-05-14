@@ -389,7 +389,7 @@ int main(int argc,char *argv[]){
                     fprintf(stderr,"\"samp_fft\":[");
                     Ndft = fsk->Ndft/2;
                     for(i=0; i<Ndft; i++){
-                        fprintf(stderr,"%f ",(fsk->fft_est)[i]);
+                        fprintf(stderr,"%f ",(fsk->Sf)[i]);
                         if(i<Ndft-1) fprintf(stderr,",");
                     }
                     fprintf(stderr,"]");

@@ -201,7 +201,7 @@ function test_stats = fsk_demod_xt(Fs,Rs,f1,fsp,mod,tname,M=2,lock_nin=0)
         end
     end
         
-    assert(vcompare(o_Sf,  t_fft_est,'fft est',tname,.001,1));
+    assert(vcompare(o_Sf,  t_Sf,'fft est',tname,.001,1));
     assert(vcompare(o_fest,  t_f_est,'f est',tname,.001,2));
     assert(vcompare(o_mask,  t_mask,'f2 mask',tname,.001,3));
     assert(vcompare(o_fest2,  t_f2_est,'f2 est',tname,.001,16));

@@ -66,7 +66,7 @@ struct FSK {
     float* hann_table;	    /* Precomputed or runtime computed hann window table */
     
     /*  Parameters used by demod */
-    float* fft_est;	    /* Freq est FFT magnitude */
+    float* Sf;	            /* Average of magnitude spectrum */
     COMP phi_c[MODE_M_MAX]; /* phase of each demod local oscillator */
     COMP *f_dc;             /* down converted samples               */
     

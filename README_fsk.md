@@ -65,6 +65,13 @@ The Octave version of the modem was developed by David Rowe.  Brady O'Brien port
    python ../../octave/plot_fsk_demod_stats.py stats.txt
    ```
 
+1. Send some digital voice using FSK at 800 bits/s, the try the two 2400 bits/s FSK modes:
+   ```
+   ./freedv_tx 800XA ../../raw/ve9qrp.raw - | ./freedv_rx 800XA - - -vv | aplay -f S16_LE
+   ./freedv_tx 2400A ../../raw/ve9qrp.raw - | ./freedv_rx 2400A - - -vv | aplay -f S16_LE
+   ./freedv_tx 2400B ../../raw/ve9qrp.raw - | ./freedv_rx 2400B - - -vv | aplay -f S16_LE
+   ```
+   
 1. FSK modem C files in ```codec2/src```:
 
    | File | Description |
@@ -120,5 +127,5 @@ The Octave version of the modem was developed by David Rowe.  Brady O'Brien port
    1. [Wenet](https://github.com/projecthorus/wenet) - high speed SSTV images from balloons at the edge of space
    1. [Wenet High speed SSTV images](http://www.rowetel.com/?p=5344)
    1. [FreeDV 2400A and 2400B](http://www.rowetel.com/?p=5219), digital speech for VHF/UHF radios.
-   1. [HF FSK with Rpitx](http://www.rowetel.com/?p=6317)
-   
+   1. [HF FSK with Rpitx](http://www.rowetel.com/?p=6317), a zero hardware FSK transmitter using a Pi
+   1. [Eb/No and SNR worked Example](http://www.rowetel.com/wordpress/?p=4621)

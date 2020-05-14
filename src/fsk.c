@@ -167,7 +167,7 @@ struct FSK * fsk_create_core(int Fs, int Rs, int M, int P, int Nsym, int tx_f1, 
         fsk->f_dc[i] = comp0();
         
     fsk->fft_cfg = kiss_fft_alloc(Ndft,0,NULL,NULL); assert(fsk->fft_cfg != NULL);    
-    fsk->fft_est = (float*)malloc(sizeof(float)*fsk->Ndft); assert(fsk->fft_est != NULL);
+    fsk->Sf = (float*)malloc(sizeof(float)*fsk->Ndft); assert(fsk->Sf != NULL);
     
     #ifdef USE_HANN_TABLE
         #ifdef GENERATE_HANN_TABLE_RUNTIME
@@ -178,7 +178,7 @@ struct FSK * fsk_create_core(int Fs, int Rs, int M, int P, int Nsym, int tx_f1, 
         #endif
     #endif
     
-    for(i=0;i<Ndft;i++)fsk->fft_est[i] = 0;
+    for(i=0;i<Ndft;i++)fsk->Sf[i] = 0;
     
     fsk->norm_rx_timing = 0;
     
@@ -497,12 +497,12 @@ void fsk_demod_freq_est(struct FSK *fsk, COMP fsk_in[], float *freqs, int M) {
         /* Copy new fft est into imag of fftout for frequency divination below */
         float tc = fsk->tc;
         for(i=0; i<Ndft; i++){
-            fsk->fft_est[i] = (fsk->fft_est[i]*(1-tc)) + (sqrtf(fftout[i].r)*tc);
-            fftout[i].i = fsk->fft_est[i];
+            fsk->Sf[i] = (fsk->Sf[i]*(1-tc)) + (sqrtf(fftout[i].r)*tc);
+            fftout[i].i = fsk->Sf[i];
         }
     }
     
-    modem_probe_samp_f("t_fft_est",fsk->fft_est,Ndft);
+    modem_probe_samp_f("t_Sf",fsk->Sf,Ndft);
     
     max = 0;
     /* Find the M frequency peaks here */
@@ -565,7 +565,7 @@ void fsk_demod_freq_est(struct FSK *fsk, COMP fsk_in[], float *freqs, int M) {
 
     /* drag mask over Sf, looking for peak in correlation */
     int b_max = st; float corr_max = 0.0;
-    float *Sf = fsk->fft_est;
+    float *Sf = fsk->Sf;
     for (int b=st; b<en-len_mask; b++) {
         float corr = 0.0;
         for(i=0; i<len_mask; i++)
@@ -982,7 +982,7 @@ void fsk_clear_estimators(struct FSK *fsk){
     int i;
     /* Clear freq estimator state */
     for(i=0; i < (fsk->Ndft); i++){
-        fsk->fft_est[i] = 0;
+        fsk->Sf[i] = 0;
     }
     /* Reset timing diff correction */
     fsk->nin = fsk->N;
