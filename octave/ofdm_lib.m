@@ -11,7 +11,6 @@
 1;
 
 % Gray coded QPSK modulation function
-
 function symbol = qpsk_mod(two_bits)
     two_bits_decimal = sum(two_bits .* [2 1]); 
     switch(two_bits_decimal)
@@ -22,13 +21,48 @@ function symbol = qpsk_mod(two_bits)
     endswitch
 endfunction
 
-
 % Gray coded QPSK demodulation function
-
 function two_bits = qpsk_demod(symbol)
     bit0 = real(symbol*exp(j*pi/4)) < 0;
     bit1 = imag(symbol*exp(j*pi/4)) < 0;
     two_bits = [bit1 bit0];
+endfunction
+
+global qam16_symbols = [
+ 1 + j,  1 + j*3,  3 + j,  3 + j*3;
+ 1 - j,  1 - j*3,  3 - j,  3 - j*3;
+-1 + j, -1 + j*3, -3 + j, -3 + j*3;
+-1 - j, -1 - j*3, -3 - j, -3 - j*3];
+ 
+function symbol = qam16_mod(four_bits)
+    global qam16_symbols;
+    bits_decimal = sum(four_bits .* [8 4 2 1]);
+    symbol = qam16_symbols(bits_decimal+1)/3;
+    % same convention as QPSK mapping above
+    symbol *= exp(-j*pi/4);
+endfunction
+
+function four_bits = qam16_demod(symbol)
+    global qam16_symbols;
+    symbol *= exp(j*pi/4);
+    dist = abs(3*symbol - qam16_symbols(1:16));
+    [tmp decimal] = min(dist);
+    four_bits = zeros(1,4);
+    for i=1:4
+      four_bits(1,5-i) = bitand(bitshift(decimal-1,1-i),1);
+    end
+endfunction
+
+function test_qam16()
+    for decimal=0:15
+      tx_bits = zeros(1,4);
+      for i=1:4
+        tx_bits(1,5-i) = bitand(bitshift(decimal-1,1-i),1);
+      end
+      symbol = qam16_mod(tx_bits);
+      rx_bits = qam16_demod(symbol);
+      assert(tx_bits == rx_bits);
+    end
 endfunction
 
 function out = freq_shift(in, foff, Fs)
@@ -183,6 +217,8 @@ function [bps Rs Tcp Ns Nc] = ofdm_init_mode(mode="700D")
     Ts = 0.0205; Nc = 31;
   elseif strcmp(mode,"2200")
     Tframe = 0.175; Ts = Tframe/Ns; Nc = 37;
+  elseif strcmp(mode,"QAM16")
+    Tframe = 0.175; Ts = Tframe/Ns; Nc = 37; bps=4;
   else
     % try to parse mode string for user defined mode
     vec = sscanf(mode, "Ts=%f Nc=%d Ncp=%f");
@@ -230,7 +266,8 @@ function states = ofdm_init(bps, Rs, Tcp, Ns, Nc)
 
   % some basic sanity checks
   assert(floor(states.M) == states.M);
-
+  test_qam16();
+  
   % UW symbol placement, designed to get no false syncs at any freq
   % offset.  Use ofdm_dev.m, debug_false_sync() to test.  Note we need
   % to pair the UW bits so the fit into symbols.  The LDPC decoder
@@ -375,6 +412,11 @@ function tx = ofdm_mod(states, tx_bits)
   if bps == 2
     for s=1:Nbitsperframe/bps
       tx_sym_lin(s) = qpsk_mod(tx_bits(2*(s-1)+1:2*s));
+    end
+  end  
+  if bps == 4
+    for s=1:Nbitsperframe/bps
+      tx_sym_lin(s) = qam16_mod(tx_bits(4*(s-1)+1:4*s));
     end
   end
 
@@ -692,6 +734,9 @@ function [rx_bits states aphase_est_pilot_log rx_np rx_amp] = ofdm_demod(states,
       if bps == 2
         abit = qpsk_demod(rx_corr);
       end
+      if bps == 4
+        abit = qam16_demod(rx_corr);
+      end
       rx_bits = [rx_bits abit];
     end % c=2:Nc+1
     aphase_est_pilot_log = [aphase_est_pilot_log; aphase_est_pilot(2:Nc+1)];
@@ -796,8 +841,8 @@ function modem_frame = assemble_modem_frame_symbols(states, payload_syms, txt_sy
   ofdm_load_const;
 
   Nsymsperframe = Nbitsperframe/bps;
-  Nuwsyms = Nuwbits/bps;
-  Ntxtsyms = Ntxtbits/bps;
+  Nuwsyms = Nuwbits/uw_bps;
+  Ntxtsyms = Ntxtbits/txt_bps;
   modem_frame = zeros(1,Nsymsperframe);
   p = 1; u = 1;
 
