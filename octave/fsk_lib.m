@@ -200,11 +200,12 @@ function states = est_freq(states, sf, ntones)
     end
   end
   foff = ((b_max-1)-Ndft/2)*Fs/Ndft;
-  %states.verbose = 0x8;
+  
   if bitand(states.verbose, 0x8)
-    figure(1); clf; subplot(211); plot(Sf);
-    hold on; plot(100*[zeros(1,b_max) mask],'g'); hold off;
-    subplot(212); plot(corr_log);
+    % enable this to single step through frames
+    figure(1); clf; subplot(211); plot(Sf,'b;sf;'); 
+    hold on; plot(max(Sf)*[zeros(1,b_max) mask],'g;mask;'); hold off;
+    subplot(212); plot(corr_log); ylabel('corr against f');
     printf("foff: %4.0f\n", foff);
     kbhit;
   end

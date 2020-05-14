@@ -85,8 +85,8 @@ int main(int argc,char *argv[]){
             {"conv",      required_argument,  0, 'p'},
             {"cs16",      no_argument,        0, 'c'},
             {"cu8",       no_argument,        0, 'd'},
-            {"fsk_lower", optional_argument,  0, 'b'},
-            {"fsk_upper", optional_argument,  0, 'u'},
+            {"fsk_lower", required_argument,  0, 'b'},
+            {"fsk_upper", required_argument,  0, 'u'},
             {"stats",     optional_argument,  0, 't'},
             {"soft-dec",  no_argument,        0, 's'},
             {"testframes",no_argument,        0, 'f'},
@@ -158,7 +158,7 @@ int main(int argc,char *argv[]){
         goto helpmsg;
     }
     
-    if( (argc - dx) > 5){
+    if( (argc - dx) > 5) {
         fprintf(stderr, "Too many arguments\n");
     helpmsg:
         fprintf(stderr,"usage: %s [options] (2|4) SampleRate SymbolRate InputModemRawFile OutputFile\n",argv[0]);

@@ -605,10 +605,11 @@ function run_sim(test_frame_mode, M=2, frames = 10, EbNodB = 100, filename="fsk_
 % demodulate from a user-supplied file
 % ---------------------------------------------------------------------
 
-function rx_bits_log = demod_file(filename, test_frame_mode=4, noplot=0, EbNodB=100)
+function rx_bits_log = demod_file(filename, test_frame_mode=4, noplot=0, EbNodB=100, max_frames=1E32)
   fin = fopen(filename,"rb"); 
   more off;
   read_complex = 0; sample_size = 'int16'; shift_fs_on_4 = 0;
+  max_frames
   
   if test_frame_mode == 4
     % horus rtty config ---------------------
@@ -671,6 +672,7 @@ function rx_bits_log = demod_file(filename, test_frame_mode=4, noplot=0, EbNodB=
     states.freq_est_type = 'mask';
     read_complex=1; sample_size = 'uint8'; 
     printf("Wenet mode: ntestframebits: %d freq_est_type: %s\n", states.ntestframebits, states.freq_est_type);
+    %states.verbose = 0x8;
   end
                                
   N = states.N;
@@ -687,7 +689,8 @@ function rx_bits_log = demod_file(filename, test_frame_mode=4, noplot=0, EbNodB=
   f_int_resample_log = [];
   EbNodB_log = [];
   ppm_log = [];
-  f_log = [];
+  f_log = []; Sf_log = [];
+  
   rx_bits_buf = zeros(1,nbit + states.ntestframebits);
 
   % optional noise.  Useful for testing performance of waveforms from real world modulators
@@ -752,7 +755,8 @@ function rx_bits_log = demod_file(filename, test_frame_mode=4, noplot=0, EbNodB=
       EbNodB_log = [EbNodB_log states.EbNodB];
       ppm_log = [ppm_log states.ppm];
       f_log = [f_log; states.f];
-
+      Sf_log = [Sf_log; states.Sf'];
+      
       if (test_frame_mode == 1)
         states = ber_counter(states, test_frame, rx_bits_buf);
         if states.ber_state == 1
@@ -765,6 +769,9 @@ function rx_bits_log = demod_file(filename, test_frame_mode=4, noplot=0, EbNodB=
      else      
       finished = 1;
     end
+
+    if frames > max_frames finished=1; end
+      
   end
   printf("frames: %d\n", frames);
   fclose(fin);
@@ -772,7 +779,7 @@ function rx_bits_log = demod_file(filename, test_frame_mode=4, noplot=0, EbNodB=
   if noplot == 0
     printf("plotting...\n");
 
-    figure(1);
+    figure(1); clf;
     plot(f_log);
     title('Tone Freq Estimates');
     
@@ -780,8 +787,7 @@ function rx_bits_log = demod_file(filename, test_frame_mode=4, noplot=0, EbNodB=
     plot(f_int_resample_log','+')
     title('Integrator outputs for each tone');
 
-    figure(3)
-    clf
+    figure(3); clf
     subplot(211)
     plot(norm_rx_timing_log)
     axis([1 frames -0.5 0.5])
@@ -790,32 +796,32 @@ function rx_bits_log = demod_file(filename, test_frame_mode=4, noplot=0, EbNodB=
     plot(states.nerr_log)
     title('num bit errors each frame')
  
-    figure(4)
-    clf
+    figure(4); clf
     plot(EbNodB_log);
     title('Eb/No estimate')
 
-    figure(5)
-    clf
-    rx_nowave = rx(1000:length(rx));
+    figure(5); clf
+    rx_nowave = rx(1000:length(rx)); % skip past wav header if it's a wave file
     subplot(211)
     plot(real(rx_nowave));
     title('input signal to demod (1 sec)')
     xlabel('Time (samples)');
     %axis([1 states.Fs -35000 35000])
 
-    % normalise spectrum to 0dB full scale with a 32767 sine wave input
-
-    subplot(212)
-    RxdBFS = 20*log10(abs(fft(rx_nowave(1:states.Fs)))) - 20*log10((states.Fs/2)*32767);
+    % normalise spectrum to 0dB full scale with sine wave input
+    subplot(212);
+    if sample_size == "int16" max_value = 32767; end
+    if sample_size == "uint8" max_value = 127; end
+    RxdBFS = 20*log10(abs(fft(rx_nowave(1:states.Fs)))) - 20*log10((states.Fs/2)*max_value);
     plot(RxdBFS)
     axis([1 states.Fs/2 -80 0])
     xlabel('Frequency (Hz)');
 
-    figure(6);
-    clf
+    figure(6); clf
     plot(ppm_log)
     title('Sample clock (baud rate) offset in PPM');
+
+    figure(7); clf; mesh(Sf_log(1:10,:));
   end
 
   if (test_frame_mode == 1) || (test_frame_mode == 6)

@@ -115,6 +115,24 @@ The Octave version of the modem was developed by David Rowe.  Brady O'Brien port
    9/9 Test #47: test_fsk_vhf_framer ...............   Passed    0.06 sec
    ```
    These are written in ```codec2/CmakeLists.txt```, inspect them to find out how we test the modem.
+
+1. The Octave version is useful for peering inside the modem, for example when debugging.  Here is an example of debugging a Wenet sample:
+   ```
+   $ octave --no-gui
+   octave:1> fsk_horus_as_a_lib=1; fsk_horus; demod_file("../raw/wenet_sample.c8",test_frame_mode=9, 0, 100, max_frames=50);
+   ```
+   Running this pops up a bunch of plots. Here is the 3D plot the modem spectrum evolving over time, using a 128 point FFT:
+   ![Wenet spectrum 3D](doc/wenet_spectrum_3d.png)
+
+   This is a 2FSK signal so we should see two tones.  However there are three tones. The lowest one is a "DC line" common in signals from RTL-SDRs or those with coarse quantisation.  This DC tone was confusing the "peak" frequency estimator.
+
+   To work around this problem we can tell the C version of the modem to ignore low frequency tones with the ```fsk_lower``` option:
+   ```
+   $ cd ~/codec2/build_linux/src
+   $ cat /home/david/codec2/raw/wenet_sample.c8 | ./fsk_demod --cu8 --fsk_lower 500 -s 2 8000 1000 - - | ./drs232_ldpc - /dev/null
+   packets: 17 packet_errors: 0 PER: 0.000
+   ```
+   This successfully decodes all 17 packets in the sample with no errors, yayyy!
    
 ## Further Reading
 

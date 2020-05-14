@@ -607,11 +607,11 @@ endif(NOT APPLE)
         set_tests_properties(test_wenet_mask PROPERTIES
         PASS_REGULAR_EXPRESSION "packet_errors: 0 PER: 0.000")
 
-     # Using regular frequency estimator
+     # Using regular frequency estimator, tell freq est to avoid first 100 kHz due to a DC line 
      add_test(NAME test_wenet_nomask
         COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src; 
                        cat ${CMAKE_CURRENT_SOURCE_DIR}/raw/wenet_sample.c8 | 
-                       ./fsk_demod> --cu8 -s 2 921416 115177 - - |
+                       ./fsk_demod --cu8 -s --fsk_lower 100000 2 921416 115177 - - |
                        ./drs232_ldpc - - 2>&1 | strings"
         )
         set_tests_properties(test_wenet_nomask PROPERTIES
