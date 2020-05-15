@@ -2194,17 +2194,27 @@ static int freedv_comp_short_rx_700d(struct freedv *f, void *demod_in_8kHz, int 
     f->nin = ofdm_get_nin(ofdm);
     ofdm_sync_state_machine(ofdm, rx_uw);
 
-    /* check if OFDM modem has sync */    
-    bool sync = ((ofdm->sync_state == synced) || (ofdm->sync_state == trial));
+    /* If it's a trial sync_state we need a perfect LPDC decode to
+       output any audio to reduce burble due to accidental sync.  Not
+       sure if this may truncate audio at start of over.
 
-    /* if LDPC code has too many errors it may be the end of an over, a spurious sync, or a very deep fade */
-    bool ldpc_decode_ok = parityCheckCount > 0.8*ldpc->NumberParityBits;
+       If we have moved to "synced" we decode anything to ride through
+       fades without squelch cycling in and out. Unfortunately this
+       also "runs" on at the end of an over. 
+    */    
+    bool sync = ((ofdm->sync_state == trial) && (parityCheckCount == ldpc->NumberParityBits)) || (ofdm->sync_state == synced);
 
-    if (sync && ldpc_decode_ok) {
+    if (sync) {
         if (f->squelch_en && (f->snr_est < f->snr_squelch_thresh)) 
             *valid = 0; /* squelch if in sync but SNR too low */
-        else
-            *valid = 1; /* let decoded audio throogh if squelch disabled */
+        else {
+            if (!f->squelch_en || (parityCheckCount == ldpc->NumberParityBits))
+                *valid = 1; 
+            else {
+                /* let decoded audio through with reduced gain, as we may be end of over or in a fade */
+                *valid = 2; 
+            }
+        }
     }
     else {
         /* pass through off air samples if squelch is disabled */
@@ -2217,10 +2227,10 @@ static int freedv_comp_short_rx_700d(struct freedv *f, void *demod_in_8kHz, int 
     }
     
     if ((f->verbose && (ofdm->last_sync_state == search)) || (f->verbose == 2)) {
-        fprintf(stderr, "%3d nin: %4d st: %-6s euw: %2d %1d f: %5.1f phbw: %d ist: %-6s %2d eraw: %3d ecdd: %3d iter: %3d pcc: %3d vld: %d, nout: %4d\n",
+        fprintf(stderr, "%3d nin: %4d st: %-6s euw: %2d %1d f: %5.1f phbw: %d snr: %4.1f %2d eraw: %3d ecdd: %3d iter: %3d pcc: %3d vld: %d, nout: %4d\n",
                 f->frames++, ofdm->nin, statemode[ofdm->last_sync_state], ofdm->uw_errors, ofdm->sync_counter, 
 		(double)ofdm->foff_est_hz, ofdm->phase_est_bandwidth,
-                statemode[ofdm->last_sync_state_interleaver], ofdm->frame_count_interleaver,
+                f->snr_est, ofdm->frame_count_interleaver,
                 Nerrs_raw, Nerrs_coded, iter, parityCheckCount, *valid, nout);
     }
     
@@ -2246,8 +2256,6 @@ static int freedv_comprx_2020(struct freedv *f, COMP demod_in[], int *valid) {
     COMP  payload_syms[coded_syms_per_frame];
     float payload_amps[coded_syms_per_frame];
    
-    // pass through is too noisey ....
-    //nout = f->n_speech_samples;
     nout = 0;
     
     int Nerrs_raw = 0;
@@ -2362,10 +2370,7 @@ static int freedv_comprx_2020(struct freedv *f, COMP demod_in[], int *valid) {
             } /* for interleave frames ... */
                    
             nout = f->n_speech_samples;                  
-
-            if (f->squelch_en && (f->stats.snr_est < f->snr_squelch_thresh)) {
-                *valid = 0;
-            }
+            *valid = 1;
             
         } /* if interleaver synced ..... */
 
@@ -2390,40 +2395,45 @@ static int freedv_comprx_2020(struct freedv *f, COMP demod_in[], int *valid) {
         }
         f->total_bits += ofdm_nuwbits;          
 
-    } /* if modem synced .... */ else {
-        *valid = -1;
     }
 
     /* iterate state machine and update nin for next call */
     
     f->nin = ofdm_get_nin(ofdm);
-    //fprintf(stderr, "nin: %d\n", ofdm_get_nin(ofdm));
     ofdm_sync_state_machine(ofdm, rx_uw);
 
+    /* TODO: same sync logic as 700D - be useful to refactor/combine common code */
+    bool sync = ((ofdm->sync_state == trial) && (parityCheckCount == ldpc->NumberParityBits)) || (ofdm->sync_state == synced);
+    if (sync) {
+        if (f->squelch_en && (f->snr_est < f->snr_squelch_thresh)) 
+            *valid = 0; /* squelch if in sync but SNR too low */
+        else {
+            if (!f->squelch_en || (parityCheckCount == ldpc->NumberParityBits))
+                *valid = 1; 
+            else {
+                /* let decoded audio through with reduced gain, as we may be end of over or in a fade */
+                *valid = 2; 
+            }
+        }
+    }
+    else {
+        /* pass through off air samples if squelch is disabled */
+        if (f->squelch_en)
+            *valid = 0;
+        else {
+            nout = f->nin;
+            *valid = -1;
+        }
+    }
+
     if ((f->verbose && (ofdm->last_sync_state == search)) || (f->verbose == 2)) {
-        fprintf(stderr, "%3d st: %-6s euw: %2d %1d f: %5.1f pbw: %d ist: %-6s %2d eraw: %3d ecdd: %3d iter: %3d pcc: %3d vld: %d, nout: %4d\n",
+        fprintf(stderr, "%3d st: %-6s euw: %2d %1d f: %5.1f pbw: %d snr: %4.1f %2d eraw: %3d ecdd: %3d iter: %3d pcc: %3d vld: %d, nout: %4d\n",
                 f->frames++, statemode[ofdm->last_sync_state], ofdm->uw_errors, ofdm->sync_counter, 
 		(double)ofdm->foff_est_hz, ofdm->phase_est_bandwidth,
-                statemode[ofdm->last_sync_state_interleaver], ofdm->frame_count_interleaver,
+                f->snr_est, ofdm->frame_count_interleaver,
                 Nerrs_raw, Nerrs_coded, iter, parityCheckCount, *valid, nout);
     }
-    
-    /* check if OFDM modem has sync */    
-    bool sync = ((ofdm->sync_state == synced) || (ofdm->sync_state == trial));
-
-    /* if LDPC code has too many errors it may be the end of an over or a very deep fade */
-    bool ldpc_decode_ok = parityCheckCount > 0.8*ldpc->NumberParityBits;
-
-    /* squelch if out of sync or too many LDPC decode errors */
-    if ((sync == false) || (ldpc_decode_ok == false)) {
-         if (f->squelch_en == true) {
- 	    *valid = 0;
-         }
-         //f->snr_est = 0.0;
-    }
-    
-    //fprintf(stderr, "sync: %d valid: %d snr: %3.2f\n", f->sync, *valid, f->snr_est);
-    
+        
     return nout;
 }
 #endif
@@ -2451,7 +2461,6 @@ int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]) {
 
     if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode)) {
         nout = freedv_comp_short_rx_700d(f, (void*)demod_in, 0, 1.0, &valid);
-        gain = 0.1; /* channel noise can be a bit loud in this mode */
     }
     
     if (FDV_MODE_ACTIVE( FREEDV_MODE_2020, f->mode)) {
@@ -2466,8 +2475,10 @@ int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]) {
             speech_out[i] = 0;
     }
     else if (valid < 0) {
-        /* we havent got sync so play undemodulated audio from radio.  This might
-           not work for all modes due to nin bouncing about */
+        /* we havent got sync so play undemodulated audio from
+           radio. channel noise can be a bit loud, so lets
+           attenuate the level a bit */
+        gain = 0.1;
         for (i = 0; i < nout; i++)
             speech_out[i] = gain*demod_in[i].real;
     }
@@ -2489,6 +2500,12 @@ int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]) {
                 nout = f->n_speech_samples;
                 for (i = 0; i < frames; i++) {
                     lpcnet_dec(f->lpcnet, (char*)f->packed_codec_bits + (i + frames*f->modem_frame_count_rx)* bits_per_codec_frame, speech_out);
+                        if (valid == 2) {
+                            /* we're in sync, not squelched but quite a few bit errors, so lets the audio volume */
+                            float gain = 0.5;
+                            for(int j=0; j<lpcnet_samples_per_frame(f->lpcnet); j++)
+                                speech_out[j] *= gain;
+                        }
                     speech_out += lpcnet_samples_per_frame(f->lpcnet);
                 }
                 f->modem_frame_count_rx++;
@@ -2510,6 +2527,12 @@ int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]) {
                     //fprintf(stderr, "modem_frame_count_rx: %d nout: %d\n", f->modem_frame_count_rx, nout);
                     for (i = 0; i < frames; i++) {
                         codec2_decode(f->codec2, speech_out, f->packed_codec_bits + (i + frames*f->modem_frame_count_rx)* bytes_per_codec_frame);
+                        if (valid == 2) {
+                            /* we're in sync, not squelched but quite a few bit errors, so lets the audio volume */
+                            float gain = 0.5;
+                            for(int j=0; j<codec2_samples_per_frame(f->codec2); j++)
+                                speech_out[j] *= gain;
+                        }
                         speech_out += codec2_samples_per_frame(f->codec2);
                     }
                     f->modem_frame_count_rx++;
@@ -2558,8 +2581,7 @@ int freedv_shortrx(struct freedv *f, short speech_out[], short demod_in[], float
             speech_out[i] = 0;
     }
     else if (valid < 0) {
-        /* we havent got sync so play audio from radio.  This might
-           not work for all modes due to nin bouncing about */
+        /* we havent got sync so play audio from radio, attenuate as noise can be a bit loud */
         for (i = 0; i < nout; i++)
             speech_out[i] = 0.1*demod_in[i];
     }
@@ -2575,6 +2597,11 @@ int freedv_shortrx(struct freedv *f, short speech_out[], short demod_in[], float
             //fprintf(stderr, "modem_frame_count_rx: %d nout: %d\n", f->modem_frame_count_rx, nout);
             for (i = 0; i < frames; i++) {
                 codec2_decode(f->codec2, speech_out, f->packed_codec_bits + (i + frames*f->modem_frame_count_rx)* bytes_per_codec_frame);
+                if (valid == 2) {
+                    float gain = 0.5;
+                    for(int j=0; j<codec2_samples_per_frame(f->codec2); j++)
+                        speech_out[j] *= gain;
+                }
                 speech_out += codec2_samples_per_frame(f->codec2);
             }
             f->modem_frame_count_rx++;
