@@ -4,7 +4,7 @@
 
 # Getting Started
 
-1. Connect 12V, set the volume to half way and power on.  You will hear morse playing the firmware version number (e.g. "V3") and the current mode.
+1. Connect 12V, set the volume to half way and power on.  You will hear morse playing the firmware version number (e.g. "V4") and the current mode.
 
 1. The SELECT button steps through the mode:
    + Analog pass through (ANA)
@@ -105,6 +105,7 @@ You can program the flash memory on your SM1000 via USB using a Windows or Linux
    1   | May 2015 | [sm1000.bin](http://www.rowetel.com/downloads/codec2/smartmic/sm1000.bin) | | Original release with FreeDV 1600
    2   | July 2019 | [sm1000v2.bin](http://www.rowetel.com/downloads/codec2/smartmic/sm1000v2.bin) |  [sm1000v2.dfu](http://www.rowetel.com/downloads/codec2/smartmic/sm1000v2.dfu) | FreeDV 700D and morse menus
    3   | March 2020 | [sm1000v3.bin](http://www.rowetel.com/downloads/codec2/smartmic/sm1000v3.bin) |  [sm1000v3.dfu](http://www.rowetel.com/downloads/codec2/smartmic/sm1000v3.dfu) | Menu bug fixes, 700D modem improvements & automatic Mic EQ
+   4   | May 2020 | [sm1000v4.bin](http://www.rowetel.com/downloads/codec2/smartmic/sm1000v4.bin) |  [sm1000v4.dfu](http://www.rowetel.com/downloads/codec2/smartmic/sm1000v3.dfu) | 700D sync logic to reduce stop burbling with no signal
    
 ## Windows
 
@@ -131,7 +132,7 @@ Power cycle the SM1000 and the new firmware will run.
 1. To flash the SM1000
    ```
    $ sudo apt-get install dfu-util
-   $ sudo dfu-util -d 0483:df11 -c 1 -i 0 -a 0 -s 0x08000000 -D sm1000v3.bin
+   $ sudo dfu-util -d 0483:df11 -c 1 -i 0 -a 0 -s 0x08000000 -D sm1000v4.bin
    ```
    After about 10 seconds you will be returned to the command line.
 1. Power cycle the SM1000 and the new firmware will run.
