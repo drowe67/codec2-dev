@@ -219,6 +219,8 @@ function [bps Rs Tcp Ns Nc] = ofdm_init_mode(mode="700D")
     Tframe = 0.175; Ts = Tframe/Ns; Nc = 37;
   elseif strcmp(mode,"QAM16")
     Ns=4; Tcp = 0.004; Tframe = 0.08; Ts = Tframe/Ns; Nc = 37; bps=4;
+  elseif strcmp(mode,"1")
+    Ns=100; Tcp = 0; Tframe = 0.1; Ts = Tframe/Ns; Nc = 1; bps=2;
   else
     % try to parse mode string for user defined mode
     vec = sscanf(mode, "Ts=%f Nc=%d Ncp=%f");
