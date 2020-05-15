@@ -399,6 +399,10 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
 
         f->tx_bits = NULL; /* not used for 2020 */
 
+        /* storage for pass through audio interpolating filter */
+        f->passthrough_2020 = CALLOC(1, sizeof(float)*(FDMDV_OS_TAPS_16K + ofdm_get_max_samples_per_frame()));
+        assert(f->passthrough_2020 != NULL);
+        
 	if (f->interleave_frames > 1) {
             /* only allocate this array for interleaver sizes > 1 to save memory on SM1000 port */
             f->mod_out = (COMP*)MALLOC(sizeof(COMP)*f->interleave_frames*f->n_nat_modem_samples);
@@ -685,6 +689,7 @@ void freedv_close(struct freedv *freedv) {
         FREE(freedv->codeword_symbols);
         FREE(freedv->codeword_amps);
         FREE(freedv->ldpc);
+        FREE(freedv->passthrough_2020);
         ofdm_destroy(freedv->ofdm);
 #ifdef __LPCNET__
         lpcnet_freedv_destroy(freedv->lpcnet);
@@ -2465,7 +2470,7 @@ int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]) {
     
     if (FDV_MODE_ACTIVE( FREEDV_MODE_2020, f->mode)) {
 #ifdef __LPCNET__
-        freedv_comprx_2020(f, demod_in, &valid);
+        nout = freedv_comprx_2020(f, demod_in, &valid);
 #endif
     }
     
@@ -2476,11 +2481,21 @@ int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]) {
     }
     else if (valid < 0) {
         /* we havent got sync so play undemodulated audio from
-           radio. channel noise can be a bit loud, so lets
-           attenuate the level a bit */
+           radio. This requires resampling to 16 kHz.  Channel noise
+           can be a bit loud, so lets attenuate the level. */        
+        for(i=0; i<nout; i++)
+            f->passthrough_2020[FDMDV_OS_TAPS_16K+i] = demod_in[i].real;
+        assert(nout <= ofdm_get_max_samples_per_frame());
+        float tmp[2*nout];
+        fdmdv_8_to_16(tmp, &f->passthrough_2020[FDMDV_OS_TAPS_16K], nout);
         gain = 0.1;
-        for (i = 0; i < nout; i++)
-            speech_out[i] = gain*demod_in[i].real;
+        /* we need a constant number of output samples, but nout can vary */
+        for (i = 0; i < f->n_speech_samples; i++)
+            if (i < 2*nout)
+                speech_out[i] = gain*tmp[i];
+            else
+                speech_out[i] = 0;
+        nout = f->n_speech_samples;
     }
     else {
         /* decode audio  -----------------------------------------------*/

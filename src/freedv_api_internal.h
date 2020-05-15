@@ -127,7 +127,8 @@ struct freedv {
     int                  nin;
     int                  verbose;
     int                  ext_vco;                            /* 2400A/800XA use external VCO flag */
-
+    float               *passthrough_2020;                   /* 2020 interpolating filter */
+    
     /* Varicode txt channel states ----------------------------------------------------------------------*/
     
     struct VARICODE_DEC  varicode_dec_states;
