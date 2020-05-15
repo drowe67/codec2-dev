@@ -2480,19 +2480,26 @@ int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]) {
             speech_out[i] = 0;
     }
     else if (valid < 0) {
-        /* we havent got sync so play undemodulated audio from
-           radio. This requires resampling to 16 kHz.  Channel noise
-           can be a bit loud, so lets attenuate the level. */        
-        for(i=0; i<nout; i++)
-            f->passthrough_2020[FDMDV_OS_TAPS_16K+i] = demod_in[i].real;
-        assert(nout <= ofdm_get_max_samples_per_frame());
+        float *samples = &demod_in[0].real;
         float tmp[2*nout];
-        fdmdv_8_to_16(tmp, &f->passthrough_2020[FDMDV_OS_TAPS_16K], nout);
+        if (f->mode == FREEDV_MODE_2020) {           
+            /* we havent got sync so play undemodulated audio from
+               radio. This requires resampling to 16 kHz. */        
+            for(i=0; i<nout; i++)
+                f->passthrough_2020[FDMDV_OS_TAPS_16K+i] = demod_in[i].real;
+            assert(nout <= ofdm_get_max_samples_per_frame());
+            fdmdv_8_to_16(tmp, &f->passthrough_2020[FDMDV_OS_TAPS_16K], nout);
+            samples = tmp;
+            nout *= 2;
+        }
+
+        /* we need a constant number of output samples, but nout can
+           vary. Channel noise can be a bit loud, so lets attenuate
+           the level. */
         gain = 0.1;
-        /* we need a constant number of output samples, but nout can vary */
         for (i = 0; i < f->n_speech_samples; i++)
-            if (i < 2*nout)
-                speech_out[i] = gain*tmp[i];
+            if (i < nout)
+                speech_out[i] = gain*samples[i];
             else
                 speech_out[i] = 0;
         nout = f->n_speech_samples;
@@ -2597,8 +2604,13 @@ int freedv_shortrx(struct freedv *f, short speech_out[], short demod_in[], float
     }
     else if (valid < 0) {
         /* we havent got sync so play audio from radio, attenuate as noise can be a bit loud */
-        for (i = 0; i < nout; i++)
-            speech_out[i] = 0.1*demod_in[i];
+        gain = 0.1;
+        for (i = 0; i < f->n_speech_samples; i++)
+            if (i < nout)
+                speech_out[i] = gain*demod_in[i];
+            else
+                speech_out[i] = 0;
+        nout = f->n_speech_samples;
     }
     else {
         /* decoded audio to play */
