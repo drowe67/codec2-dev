@@ -807,6 +807,10 @@ int main(void) {
         }
     }
     fclose(f);
+    for(i=0; i<num_tx_data_bytes; i++) {
+        fprintf(stdout,"%02X", tx[i]);
+    }
+    fprintf(stdout, "\n");
 
     return 0;
 }
