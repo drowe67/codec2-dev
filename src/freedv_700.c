@@ -31,6 +31,7 @@
 #include "gp_interleaver.h"
 #include "interldpc.h"
 #include "debug_alloc.h"
+#include "filter.h"
 
 extern char *ofdm_statemode[];
 
@@ -49,6 +50,11 @@ void freedv_700c_open(struct freedv *f, int nbit) {
     assert(f->tx_bits != NULL);
     f->sz_error_pattern = cohpsk_error_pattern_size();
     f->test_frames_diversity = 1;
+
+    f->ptFilter7500to8000 = (struct quisk_cfFilter *)MALLOC(sizeof(struct quisk_cfFilter));
+    f->ptFilter8000to7500 = (struct quisk_cfFilter *)MALLOC(sizeof(struct quisk_cfFilter));
+    quisk_filt_cfInit(f->ptFilter8000to7500, quiskFilt120t480, sizeof(quiskFilt120t480)/sizeof(float));
+    quisk_filt_cfInit(f->ptFilter7500to8000, quiskFilt120t480, sizeof(quiskFilt120t480)/sizeof(float));
 }
 
 void freedv_comptx_700(struct freedv *f, COMP mod_out[]) {

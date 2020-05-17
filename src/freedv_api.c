@@ -44,7 +44,6 @@
 #include "freedv_api_internal.h"
 #include "freedv_vhf_framing.h"
 #include "comp_prim.h"
-#include "filter.h"
 
 #include "codec2_ofdm.h"
 #include "ofdm_internal.h"
@@ -246,18 +245,6 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
     if (f->packed_codec_bits == NULL) {
         if (f->codec_bits != NULL) {FREE(f->codec_bits); f->codec_bits = NULL; }
         return NULL;
-    }
-
-    /* Sample rate conversion for modes using COHPSK */
-    
-    if (FDV_MODE_ACTIVE( FREEDV_MODE_700C, mode) ) { 
-        f->ptFilter7500to8000 = (struct quisk_cfFilter *)MALLOC(sizeof(struct quisk_cfFilter));
-        f->ptFilter8000to7500 = (struct quisk_cfFilter *)MALLOC(sizeof(struct quisk_cfFilter));
-        quisk_filt_cfInit(f->ptFilter8000to7500, quiskFilt120t480, sizeof(quiskFilt120t480)/sizeof(float));
-        quisk_filt_cfInit(f->ptFilter7500to8000, quiskFilt120t480, sizeof(quiskFilt120t480)/sizeof(float));
-    } else {
-        f->ptFilter7500to8000 = NULL;
-        f->ptFilter8000to7500 = NULL;
     }
 
     /* Varicode low bit rate text states */
