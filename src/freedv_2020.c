@@ -1,10 +1,10 @@
 /*---------------------------------------------------------------------------*\
 
-  FILE........: freedv_700.c
+  FILE........: freedv_2020.c
   AUTHOR......: David Rowe
   DATE CREATED: May 2020
 
-  Functions that implement the various FreeDv 700 modes.
+  Functions that implement the FreeDV 2020 mode.
 
 \*---------------------------------------------------------------------------*/
 
@@ -15,16 +15,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
-
-#ifdef TT
-#if defined(__APPLE__)
-#include <malloc/malloc.h>
-#elif defined(__OpenBSD__) || defined(__NetBSD__) || defined(__FreeBSD__)
-#include <sys/malloc.h>
-#else
-#include <malloc.h>
-#endif /* __APPLE__ */
-#endif
 
 #include "fsk.h"
 #include "fmfsk.h"
@@ -40,8 +30,104 @@
 #include "mpdecode_core.h"
 #include "gp_interleaver.h"
 #include "interldpc.h"
+#include "debug_alloc.h"
 
 extern char *ofdm_statemode[];
+
+void freedv_2020_open(struct freedv *f, struct freedv_advanced *adv) {
+    f->speech_sample_rate = FREEDV_FS_16000;
+    f->snr_squelch_thresh = 4.0;
+    f->squelch_en = 0;
+        
+    f->ofdm_config = (struct OFDM_CONFIG *) CALLOC(1, sizeof (struct OFDM_CONFIG));
+    assert(f->ofdm_config != NULL);
+        
+    f->ofdm = ofdm_create(f->ofdm_config);
+    FREE(f->ofdm_config);
+
+    /* Get a copy of the 700D modem config as template then modify for 2020 */
+    f->ofdm_config = ofdm_get_config_param();
+    ofdm_destroy(f->ofdm);
+    f->ofdm_config->nc = 31; int data_bits_per_frame = 312;
+    f->ofdm_config->ts = 0.0205;
+    f->ofdm = ofdm_create(f->ofdm_config);
+            
+    f->ldpc = (struct LDPC*)MALLOC(sizeof(struct LDPC));
+    assert(f->ldpc != NULL);
+        
+    set_up_hra_504_396(f->ldpc, f->ofdm_config);
+    set_data_bits_per_frame(f->ldpc, data_bits_per_frame, f->ofdm_config->bps);
+    int coded_syms_per_frame = f->ldpc->coded_syms_per_frame;
+        
+    f->ofdm_bitsperframe = ofdm_get_bits_per_frame();
+    f->ofdm_nuwbits = (f->ofdm_config->ns - 1) * f->ofdm_config->bps - f->ofdm_config->txtbits;
+    f->ofdm_ntxtbits = f->ofdm_config->txtbits;
+    assert(f->ofdm_nuwbits == 10);
+    assert(f->ofdm_ntxtbits == 4);
+    if (f->verbose) {
+        fprintf(stderr, "ldpc_data_bits_per_frame = %d\n", f->ldpc->ldpc_data_bits_per_frame);
+        fprintf(stderr, "ldpc_coded_bits_per_frame  = %d\n", f->ldpc->ldpc_coded_bits_per_frame);
+        fprintf(stderr, "data_bits_per_frame = %d\n", data_bits_per_frame);
+        fprintf(stderr, "coded_bits_per_frame  = %d\n", f->ldpc->coded_bits_per_frame);
+        fprintf(stderr, "coded_syms_per_frame  = %d\n", f->ldpc->coded_syms_per_frame);
+        fprintf(stderr, "ofdm_bits_per_frame  = %d\n", f->ofdm_bitsperframe);
+        fprintf(stderr, "interleave_frames: %d\n", f->interleave_frames);
+    }
+        
+    if (adv == NULL) {
+        f->interleave_frames = 1;
+    } else {
+        assert((adv->interleave_frames >= 0) && (adv->interleave_frames <= 16));
+        f->interleave_frames = adv->interleave_frames;
+    }
+
+    /* We only support one interleave frame for 2020 at present.  Rest
+       of interleaver code below is boiler plate in case we decide to
+       go there in future */
+    assert(f->interleave_frames == 1);
+    
+    f->modem_frame_count_tx = f->modem_frame_count_rx = 0;
+        
+    f->codeword_symbols = (COMP*)MALLOC(sizeof(COMP)*f->interleave_frames*coded_syms_per_frame);
+    assert(f->codeword_symbols != NULL);
+
+    f->codeword_amps = (float*)MALLOC(sizeof(float)*f->interleave_frames*coded_syms_per_frame);
+    assert(f->codeword_amps != NULL);
+
+    for (int i=0; i<f->interleave_frames*coded_syms_per_frame; i++) {
+        f->codeword_symbols[i].real = 0.0;
+        f->codeword_symbols[i].imag = 0.0;
+        f->codeword_amps[i] = 0.0;
+    }
+
+    f->nin = ofdm_get_samples_per_frame();
+    f->n_nat_modem_samples = ofdm_get_samples_per_frame();
+    f->n_nom_modem_samples = ofdm_get_samples_per_frame();
+    f->n_max_modem_samples = ofdm_get_max_samples_per_frame();
+    f->modem_sample_rate = f->ofdm_config->fs;
+    f->clip = 0;
+    f->sz_error_pattern = f->ofdm_bitsperframe;
+    f->tx_bits = NULL; 
+    f->codec_bits = NULL;
+
+    /* storage for pass through audio interpolating filter */
+    f->passthrough_2020 = CALLOC(1, sizeof(float)*(FDMDV_OS_TAPS_16K + ofdm_get_max_samples_per_frame()));
+    assert(f->passthrough_2020 != NULL);
+        
+    if (f->interleave_frames > 1) {
+        /* only allocate this array for interleaver sizes > 1 to save memory on SM1000 port */
+        f->mod_out = (COMP*)MALLOC(sizeof(COMP)*f->interleave_frames*f->n_nat_modem_samples);
+        assert(f->mod_out != NULL);
+
+        for (int i=0; i<f->interleave_frames*f->n_nat_modem_samples; i++) {
+            f->mod_out[i].real = 0.0;
+            f->mod_out[i].imag = 0.0;
+        }
+    }
+        
+    /* TODO: tx BPF off by default, as we need new filter coeffs for FreeDV 2020 waveform */
+    ofdm_set_tx_bpf(f->ofdm, 0);
+}
 
 #ifdef __LPCNET__
 void freedv_comptx_2020(struct freedv *f, COMP mod_out[]) {

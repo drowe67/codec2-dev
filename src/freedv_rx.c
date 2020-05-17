@@ -304,6 +304,11 @@ int main(int argc, char *argv[]) {
         if (fin == stdin) fflush(stdin);
     }
 
+    fclose(ftxt);
+    fclose(fin);
+    fclose(fout);
+    fprintf(stderr, "frames decoded: %d\n", frame);
+
     if (freedv_get_test_frames(freedv)) {
         int Tbits = freedv_get_total_bits(freedv);
         int Terrs = freedv_get_total_bit_errors(freedv);
@@ -325,11 +330,7 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    fclose(ftxt);
     freedv_close(freedv);
-    fclose(fin);
-    fclose(fout);
-    
     return 0;
 }
 

@@ -438,11 +438,24 @@ if(LPCNET)
              COMMAND sh -c "$<TARGET_FILE:freedv_tx> 2020 ~/LPCNet/wav/all.wav - --testframes | $<TARGET_FILE:ofdm_demod> --ts 0.0205 --nc 31 --verbose 1 --ldpc 2 -p 312 --testframes > /dev/null"
              )
 
-    add_test(NAME test_ofdm_mod_to_FreeDV_API_2020
+    add_test(NAME test_FreeDV_API_2020_from_ofdm_mod
              COMMAND sh -c "$<TARGET_FILE:ofdm_mod> --in /dev/zero --ts 0.0205 --nc 31 --verbose 1 --ldpc 2 -p 312 --testframes 10 | $<TARGET_FILE:freedv_rx> 2020 - /dev/null --testframes"
              )
 endif()
            
+     add_test(NAME test_FreeDV_API_2400A
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            ./freedv_tx 2400A ../../raw/ve9qrp_10s.raw - | ./freedv_rx 2400A - /dev/null")
+             set_tests_properties(test_FreeDV_API_2400A PROPERTIES PASS_REGULAR_EXPRESSION "frames decoded: 250")
+     add_test(NAME test_FreeDV_API_2400B
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            ./freedv_tx 2400B ../../raw/ve9qrp_10s.raw - | ./freedv_rx 2400B - /dev/null")
+             set_tests_properties(test_FreeDV_API_2400B PROPERTIES PASS_REGULAR_EXPRESSION "frames decoded: 250")
+     add_test(NAME test_FreeDV_API_800XA
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            ./freedv_tx 800XA ../../raw/ve9qrp_10s.raw - | ./freedv_rx 800XA - /dev/null")
+             set_tests_properties(test_FreeDV_API_800XA PROPERTIES PASS_REGULAR_EXPRESSION "frames decoded: 125")
+
      add_test(NAME test_fifo
              COMMAND $<TARGET_FILE:tfifo>
              )

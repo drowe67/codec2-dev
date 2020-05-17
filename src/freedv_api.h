@@ -49,6 +49,8 @@
 #define FREEDV_MODE_700D        7
 #define FREEDV_MODE_2020        8
 
+#define FREEDV_FS_8000          8000
+#define FREEDV_FS_16000         16000
 
 #ifndef FREEDV_MODE_EN_DEFAULT
 #define FREEDV_MODE_EN_DEFAULT 1

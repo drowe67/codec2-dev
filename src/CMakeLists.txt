@@ -183,6 +183,7 @@ set(CODEC2_SRCS
     freedv_api.c
     freedv_700.c
     freedv_2020.c
+    freedv_fsk.c
     freedv_vhf_framing.c
     freedv_data_channel.c
     varicode.c

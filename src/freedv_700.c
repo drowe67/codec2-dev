@@ -4,7 +4,7 @@
   AUTHOR......: David Rowe
   DATE CREATED: May 2020
 
-  Functions that implement the various FreeDv 700 modes.
+  Functions that implement the various FreeDV 700 modes.
 
 \*---------------------------------------------------------------------------*/
 
@@ -15,16 +15,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
-
-#ifdef TT
-#if defined(__APPLE__)
-#include <malloc/malloc.h>
-#elif defined(__OpenBSD__) || defined(__NetBSD__) || defined(__FreeBSD__)
-#include <sys/malloc.h>
-#else
-#include <malloc.h>
-#endif /* __APPLE__ */
-#endif
 
 #include "fsk.h"
 #include "fmfsk.h"
@@ -50,14 +40,15 @@ void freedv_700c_open(struct freedv *f, int nbit) {
 
     f->cohpsk = cohpsk_create();
     f->nin = COHPSK_NOM_SAMPLES_PER_FRAME;
-    f->n_nat_modem_samples = COHPSK_NOM_SAMPLES_PER_FRAME;                // native modem samples as used by the modem
-    f->n_nom_modem_samples = f->n_nat_modem_samples * FS_700C / COHPSK_FS;// number of samples after native samples are interpolated to 8000 sps
-    f->n_max_modem_samples = COHPSK_MAX_SAMPLES_PER_FRAME * FS_700C / COHPSK_FS + 1;
-    f->modem_sample_rate = FS_700C;                                       // note weird sample rate tamed by resampling
+    f->n_nat_modem_samples = COHPSK_NOM_SAMPLES_PER_FRAME;                       // native modem samples as used by the modem
+    f->n_nom_modem_samples = f->n_nat_modem_samples * FREEDV_FS_8000 / COHPSK_FS;// number of samples after native samples are interpolated to 8000 sps
+    f->n_max_modem_samples = COHPSK_MAX_SAMPLES_PER_FRAME * FREEDV_FS_8000 / COHPSK_FS + 1;
+    f->modem_sample_rate = FREEDV_FS_8000;                                       // note weird sample rate tamed by resampling
     f->clip = 1;
     f->tx_bits = (int*)MALLOC(nbit*sizeof(int));
     assert(f->tx_bits != NULL);
     f->sz_error_pattern = cohpsk_error_pattern_size();
+    f->test_frames_diversity = 1;
 }
 
 void freedv_comptx_700(struct freedv *f, COMP mod_out[]) {
