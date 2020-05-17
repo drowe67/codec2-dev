@@ -175,6 +175,8 @@ void freedv_comptx_700(struct freedv *f, COMP mod_out[]);
 void freedv_comptx_700d(struct freedv *f, COMP mod_out[]);
 int freedv_comprx_700(struct freedv *f, COMP demod_in_8kHz[], int *valid);
 int freedv_comp_short_rx_700d(struct freedv *f, void *demod_in_8kHz, int demod_in_is_short, float gain, int *valid);
+void freedv_comptx_2020(struct freedv *f, COMP mod_out[]);
+int freedv_comprx_2020(struct freedv *f, COMP demod_in[], int *valid);
 
 #ifdef __cplusplus
 }
