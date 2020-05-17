@@ -181,6 +181,7 @@ set(CODEC2_SRCS
     codebooknewamp2_energy.c
     golay23.c
     freedv_api.c
+    freedv_700.c
     freedv_vhf_framing.c
     freedv_data_channel.c
     varicode.c

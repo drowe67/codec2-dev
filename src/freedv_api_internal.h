@@ -160,6 +160,17 @@ struct freedv {
     int n_protocol_bits;
 };
 
+/* experimentally derived fudge factors to normalise power across modes */
+
+#define NORM_PWR_COHPSK  1.74   
+#define NORM_PWR_FSK     0.193 
+#define NORM_PWR_OFDM    1.00
+
+void freedv_comptx_700(struct freedv *f, COMP mod_out[]);
+void freedv_comptx_700d(struct freedv *f, COMP mod_out[]);
+int freedv_comprx_700(struct freedv *f, COMP demod_in_8kHz[], int *valid);
+int freedv_comp_short_rx_700d(struct freedv *f, void *demod_in_8kHz, int demod_in_is_short, float gain, int *valid);
+
 #ifdef __cplusplus
 }
 #endif
