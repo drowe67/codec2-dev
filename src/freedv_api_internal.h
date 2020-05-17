@@ -47,7 +47,7 @@
   extern "C" {
 #endif
 
-// identifiers for no- Codec2 Speech codecs, make sure no overlpa with CODEC2_XXX modes
+// identifiers for no-n Codec 2 Speech codecs, make sure no overlap with CODEC2_XXX modes
 #define CODEC_MODE_LPCNET_1733 100
       
 struct freedv {
@@ -61,6 +61,7 @@ struct freedv {
     struct FSK          *fsk;
     struct FMFSK        *fmfsk;
     struct OFDM         *ofdm;
+    struct OFDM_CONFIG  *ofdm_config;
     struct LDPC         *ldpc;
     struct MODEM_STATS   stats;
 #ifdef __LPCNET__
@@ -128,6 +129,10 @@ struct freedv {
     int                  verbose;
     int                  ext_vco;                            /* 2400A/800XA use external VCO flag */
     float               *passthrough_2020;                   /* 2020 interpolating filter */
+
+    int                  ofdm_bitsperframe;
+    int                  ofdm_nuwbits;
+    int                  ofdm_ntxtbits;
     
     /* Varicode txt channel states ----------------------------------------------------------------------*/
     

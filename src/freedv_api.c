@@ -80,13 +80,7 @@
  *              Removed 700 and 700B modes
  */
 
-struct OFDM_CONFIG *ofdm_config;
-
-int ofdm_bitsperframe;
-int ofdm_nuwbits;
-int ofdm_ntxtbits;
-
-char *statemode[] = {
+char *ofdm_statemode[] = {
     "search",
     "trial",
     "synced"
@@ -205,7 +199,7 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
         f->squelch_en = 0;
         codec2_mode = CODEC2_MODE_700C;
 
-        if ((ofdm_config = (struct OFDM_CONFIG *) CALLOC(1, sizeof (struct OFDM_CONFIG))) == NULL) {
+        if ((f->ofdm_config = (struct OFDM_CONFIG *) CALLOC(1, sizeof (struct OFDM_CONFIG))) == NULL) {
             if (f->tx_bits != NULL) {
               FREE(f->tx_bits);
               f->tx_bits = NULL;
@@ -217,16 +211,16 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
             return NULL;
         }
 
-        f->ofdm = ofdm_create(ofdm_config);
+        f->ofdm = ofdm_create(f->ofdm_config);
 	assert(f->ofdm != NULL);
-        FREE(ofdm_config);
+        FREE(f->ofdm_config);
 
         /* Get a copy of the actual modem config */
-        ofdm_config = ofdm_get_config_param();
+        f->ofdm_config = ofdm_get_config_param();
 
-        ofdm_bitsperframe = ofdm_get_bits_per_frame();
-        ofdm_nuwbits = (ofdm_config->ns - 1) * ofdm_config->bps - ofdm_config->txtbits;
-        ofdm_ntxtbits = ofdm_config->txtbits;
+        f->ofdm_bitsperframe = ofdm_get_bits_per_frame();
+        f->ofdm_nuwbits = (f->ofdm_config->ns - 1) * f->ofdm_config->bps - f->ofdm_config->txtbits;
+        f->ofdm_ntxtbits = f->ofdm_config->txtbits;
 
         f->ldpc = (struct LDPC*)MALLOC(sizeof(struct LDPC));
 
@@ -234,7 +228,7 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
             return NULL;
         }
 
-        set_up_hra_112_112(f->ldpc, ofdm_config);
+        set_up_hra_112_112(f->ldpc, f->ofdm_config);
 #ifdef __EMBEDDED__
 	f->ldpc->max_iter = 10;
 #endif	
@@ -270,10 +264,10 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
         f->n_nat_modem_samples = ofdm_get_samples_per_frame();
         f->n_nom_modem_samples = ofdm_get_samples_per_frame();
         f->n_max_modem_samples = ofdm_get_max_samples_per_frame();
-        f->modem_sample_rate = ofdm_config->fs;
+        f->modem_sample_rate = f->ofdm_config->fs;
         f->clip = 0;
 
-        nbit = f->sz_error_pattern = ofdm_bitsperframe;
+        nbit = f->sz_error_pattern = f->ofdm_bitsperframe;
 
         f->tx_bits = NULL; /* not used for 700D */
 
@@ -305,7 +299,7 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
         f->squelch_en = 0;
         codec2_mode = CODEC_MODE_LPCNET_1733;
         
-        if ((ofdm_config = (struct OFDM_CONFIG *) CALLOC(1, sizeof (struct OFDM_CONFIG))) == NULL) {
+        if ((f->ofdm_config = (struct OFDM_CONFIG *) CALLOC(1, sizeof (struct OFDM_CONFIG))) == NULL) {
             // TODO: do we need this code? Can these actually be allocated before now?
             if (f->tx_bits != NULL) {
               FREE(f->tx_bits);
@@ -325,39 +319,39 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
             f->interleave_frames = adv->interleave_frames;
         }
 
-        f->ofdm = ofdm_create(ofdm_config);
-        FREE(ofdm_config);
+        f->ofdm = ofdm_create(f->ofdm_config);
+        FREE(f->ofdm_config);
 
         /* Get a copy of the 700D modem config as template then modify for 2020 */
-        ofdm_config = ofdm_get_config_param();
+        f->ofdm_config = ofdm_get_config_param();
         ofdm_destroy(f->ofdm);
-        ofdm_config->nc = 31; int data_bits_per_frame = 312;
-        ofdm_config->ts = 0.0205;
-        f->ofdm = ofdm_create(ofdm_config);
+        f->ofdm_config->nc = 31; int data_bits_per_frame = 312;
+        f->ofdm_config->ts = 0.0205;
+        f->ofdm = ofdm_create(f->ofdm_config);
             
         f->ldpc = (struct LDPC*)MALLOC(sizeof(struct LDPC));
         if (f->ldpc == NULL) {
             return NULL;
         }
         
-        set_up_hra_504_396(f->ldpc, ofdm_config);
-        set_data_bits_per_frame(f->ldpc, data_bits_per_frame, ofdm_config->bps);
+        set_up_hra_504_396(f->ldpc, f->ofdm_config);
+        set_data_bits_per_frame(f->ldpc, data_bits_per_frame, f->ofdm_config->bps);
         int coded_syms_per_frame = f->ldpc->coded_syms_per_frame;
         
         // TODO: not sure if these are set up correctly, in Octave we
         // hard code num UW and txt bits, have added asserts to check
-        ofdm_bitsperframe = ofdm_get_bits_per_frame();
-        ofdm_nuwbits = (ofdm_config->ns - 1) * ofdm_config->bps - ofdm_config->txtbits;
-        ofdm_ntxtbits = ofdm_config->txtbits;
-        assert(ofdm_nuwbits == 10);
-        assert(ofdm_ntxtbits == 4);
+        f->ofdm_bitsperframe = ofdm_get_bits_per_frame();
+        f->ofdm_nuwbits = (f->ofdm_config->ns - 1) * f->ofdm_config->bps - f->ofdm_config->txtbits;
+        f->ofdm_ntxtbits = f->ofdm_config->txtbits;
+        assert(f->ofdm_nuwbits == 10);
+        assert(f->ofdm_ntxtbits == 4);
         if (f->verbose) {
             fprintf(stderr, "ldpc_data_bits_per_frame = %d\n", f->ldpc->ldpc_data_bits_per_frame);
             fprintf(stderr, "ldpc_coded_bits_per_frame  = %d\n", f->ldpc->ldpc_coded_bits_per_frame);
             fprintf(stderr, "data_bits_per_frame = %d\n", data_bits_per_frame);
             fprintf(stderr, "coded_bits_per_frame  = %d\n", f->ldpc->coded_bits_per_frame);
             fprintf(stderr, "coded_syms_per_frame  = %d\n", f->ldpc->coded_syms_per_frame);
-            fprintf(stderr, "ofdm_bits_per_frame  = %d\n", ofdm_bitsperframe);
+            fprintf(stderr, "ofdm_bits_per_frame  = %d\n", f->ofdm_bitsperframe);
             fprintf(stderr, "interleave_frames: %d\n", f->interleave_frames);
         }
         
@@ -386,10 +380,10 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
         f->n_nat_modem_samples = ofdm_get_samples_per_frame();
         f->n_nom_modem_samples = ofdm_get_samples_per_frame();
         f->n_max_modem_samples = ofdm_get_max_samples_per_frame();
-        f->modem_sample_rate = ofdm_config->fs;
+        f->modem_sample_rate = f->ofdm_config->fs;
         f->clip = 0;
 
-        nbit = f->sz_error_pattern = ofdm_bitsperframe;
+        nbit = f->sz_error_pattern = f->ofdm_bitsperframe;
 
         f->tx_bits = NULL; /* not used for 2020 */
 
@@ -1057,7 +1051,7 @@ static void freedv_comptx_2020(struct freedv *f, COMP mod_out[]) {
     // after Unique Word (UW).  Txt bits aren't protected by FEC, and need to be
     // added to each frame after interleaver as done it's thing
 
-    nspare = ofdm_ntxtbits*f->interleave_frames;
+    nspare = f->ofdm_ntxtbits*f->interleave_frames;
     uint8_t txt_bits[nspare];
 
     for(k=0; k<nspare; k++) {
@@ -1094,7 +1088,7 @@ static void freedv_comptx_2020(struct freedv *f, COMP mod_out[]) {
     complex float tx_sams[f->interleave_frames*f->n_nat_modem_samples];
     COMP asam;
     
-    ofdm_ldpc_interleave_tx(f->ofdm, f->ldpc, tx_sams, tx_bits, txt_bits, f->interleave_frames, ofdm_config);
+    ofdm_ldpc_interleave_tx(f->ofdm, f->ldpc, tx_sams, tx_bits, txt_bits, f->interleave_frames, f->ofdm_config);
 
     for(i=0; i<f->interleave_frames*f->n_nat_modem_samples; i++) {
         asam.real = crealf(tx_sams[i]);
@@ -1661,8 +1655,8 @@ static int freedv_comprx_2020(struct freedv *f, COMP demod_in[], int *valid) {
     int    interleave_frames = f->interleave_frames;
     COMP  *codeword_symbols = f->codeword_symbols;
     float *codeword_amps = f->codeword_amps;
-    int    rx_bits[ofdm_bitsperframe];
-    short txt_bits[ofdm_ntxtbits];
+    int    rx_bits[f->ofdm_bitsperframe];
+    short txt_bits[f->ofdm_ntxtbits];
     COMP  payload_syms[coded_syms_per_frame];
     float payload_amps[coded_syms_per_frame];
    
@@ -1672,7 +1666,7 @@ static int freedv_comprx_2020(struct freedv *f, COMP demod_in[], int *valid) {
     int Nerrs_coded = 0;
     int iter = 0;
     int parityCheckCount = 0;
-    uint8_t rx_uw[ofdm_nuwbits];
+    uint8_t rx_uw[f->ofdm_nuwbits];
 
     /* echo samples back out as default (say if sync not found) */
     
@@ -1700,7 +1694,7 @@ static int freedv_comprx_2020(struct freedv *f, COMP demod_in[], int *valid) {
         ofdm_get_demod_stats(f->ofdm, &f->stats);
         f->snr_est = f->stats.snr_est;
         
-        assert((ofdm_nuwbits+ofdm_ntxtbits+coded_bits_per_frame) == ofdm_bitsperframe);
+        assert((f->ofdm_nuwbits+f->ofdm_ntxtbits+coded_bits_per_frame) == f->ofdm_bitsperframe);
 
         /* now we need to buffer for de-interleaving -------------------------------------*/
                 
@@ -1729,7 +1723,7 @@ static int freedv_comprx_2020(struct freedv *f, COMP demod_in[], int *valid) {
         float llr[coded_bits_per_frame];
         uint8_t out_char[coded_bits_per_frame];
 
-        interleaver_sync_state_machine(ofdm, ldpc, ofdm_config, codeword_symbols_de, codeword_amps_de, EsNo,
+        interleaver_sync_state_machine(ofdm, ldpc, f->ofdm_config, codeword_symbols_de, codeword_amps_de, EsNo,
                                        interleave_frames, &iter, &parityCheckCount, &Nerrs_coded);
                                          
         if ((ofdm->sync_state_interleaver == synced) && (ofdm->frame_count_interleaver == interleave_frames)) {
@@ -1737,9 +1731,9 @@ static int freedv_comprx_2020(struct freedv *f, COMP demod_in[], int *valid) {
 
             if (f->test_frames) {
                 int tmp[interleave_frames];
-                Nerrs_raw = count_uncoded_errors(ldpc, ofdm_config, tmp, interleave_frames, codeword_symbols_de);
+                Nerrs_raw = count_uncoded_errors(ldpc, f->ofdm_config, tmp, interleave_frames, codeword_symbols_de);
                 f->total_bit_errors += Nerrs_raw;
-                f->total_bits       += ofdm_bitsperframe*interleave_frames;
+                f->total_bits       += f->ofdm_bitsperframe*interleave_frames;
             }
 
             f->modem_frame_count_rx = 0;
@@ -1786,7 +1780,7 @@ static int freedv_comprx_2020(struct freedv *f, COMP demod_in[], int *valid) {
 
         /* If modem is synced we can decode txt bits */
         
-        for(k=0; k<ofdm_ntxtbits; k++)  { 
+        for(k=0; k<f->ofdm_ntxtbits; k++)  { 
             //fprintf(stderr, "txt_bits[%d] = %d\n", k, rx_bits[i]);
             n_ascii = varicode_decode(&f->varicode_dec_states, &ascii_out, &txt_bits[k], 1, 1);
             if (n_ascii && (f->freedv_put_next_rx_char != NULL)) {
@@ -1798,12 +1792,12 @@ static int freedv_comprx_2020(struct freedv *f, COMP demod_in[], int *valid) {
            probably be estimated as half of all failed LDPC parity
            checks */
 
-        for(i=0; i<ofdm_nuwbits; i++) {         
+        for(i=0; i<f->ofdm_nuwbits; i++) {         
             if (rx_uw[i] != ofdm->tx_uw[i]) {
                 f->total_bit_errors++;
             }
         }
-        f->total_bits += ofdm_nuwbits;          
+        f->total_bits += f->ofdm_nuwbits;          
 
     }
 
@@ -1838,7 +1832,7 @@ static int freedv_comprx_2020(struct freedv *f, COMP demod_in[], int *valid) {
 
     if ((f->verbose && (ofdm->last_sync_state == search)) || (f->verbose == 2)) {
         fprintf(stderr, "%3d st: %-6s euw: %2d %1d f: %5.1f pbw: %d snr: %4.1f %2d eraw: %3d ecdd: %3d iter: %3d pcc: %3d vld: %d, nout: %4d\n",
-                f->frames++, statemode[ofdm->last_sync_state], ofdm->uw_errors, ofdm->sync_counter, 
+                f->frames++, ofdm_statemode[ofdm->last_sync_state], ofdm->uw_errors, ofdm->sync_counter, 
 		(double)ofdm->foff_est_hz, ofdm->phase_est_bandwidth,
                 f->snr_est, ofdm->frame_count_interleaver,
                 Nerrs_raw, Nerrs_coded, iter, parityCheckCount, *valid, nout);

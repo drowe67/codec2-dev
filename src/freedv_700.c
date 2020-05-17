@@ -41,15 +41,7 @@
 #include "gp_interleaver.h"
 #include "interldpc.h"
 
-/* TODO - do these need to be statics? Will this break if we have parallel instances? */
-
-extern struct OFDM_CONFIG *ofdm_config;
-
-extern int ofdm_bitsperframe;
-extern int ofdm_nuwbits;
-extern int ofdm_ntxtbits;
-
-extern char *statemode[];
+extern char *ofdm_statemode[];
 
 void freedv_comptx_700(struct freedv *f, COMP mod_out[]) {
     int    bit, byte, i, j, k;
@@ -183,7 +175,7 @@ void freedv_comptx_700d(struct freedv *f, COMP mod_out[]) {
     // after Unique Word (UW).  Txt bits aren't protected by FEC, and need to be
     // added to each frame after interleaver as done it's thing
 
-    nspare = ofdm_ntxtbits*f->interleave_frames;
+    nspare = f->ofdm_ntxtbits*f->interleave_frames;
     uint8_t txt_bits[nspare];
 
     for(k=0; k<nspare; k++) {
@@ -220,7 +212,7 @@ void freedv_comptx_700d(struct freedv *f, COMP mod_out[]) {
     complex float tx_sams[f->interleave_frames*f->n_nat_modem_samples];
     COMP asam;
     
-    ofdm_ldpc_interleave_tx(f->ofdm, f->ldpc, tx_sams, tx_bits, txt_bits, f->interleave_frames, ofdm_config);
+    ofdm_ldpc_interleave_tx(f->ofdm, f->ldpc, tx_sams, tx_bits, txt_bits, f->interleave_frames, f->ofdm_config);
 
     for(i=0; i<f->interleave_frames*f->n_nat_modem_samples; i++) {
         asam.real = crealf(tx_sams[i]);
@@ -430,8 +422,8 @@ int freedv_comp_short_rx_700d(struct freedv *f, void *demod_in_8kHz, int demod_i
     int    interleave_frames = f->interleave_frames;
     COMP  *codeword_symbols = f->codeword_symbols;
     float *codeword_amps = f->codeword_amps;
-    int    rx_bits[ofdm_bitsperframe];
-    short txt_bits[ofdm_ntxtbits];
+    int    rx_bits[f->ofdm_bitsperframe];
+    short txt_bits[f->ofdm_ntxtbits];
     COMP  payload_syms[coded_syms_per_frame];
     float payload_amps[coded_syms_per_frame];
    
@@ -443,7 +435,7 @@ int freedv_comp_short_rx_700d(struct freedv *f, void *demod_in_8kHz, int demod_i
     int Nerrs_coded = 0;
     int iter = 0;
     int parityCheckCount = 0;
-    uint8_t rx_uw[ofdm_nuwbits];
+    uint8_t rx_uw[f->ofdm_nuwbits];
 
     float new_gain = gain / OFDM_AMP_SCALE;
     
@@ -479,7 +471,7 @@ int freedv_comp_short_rx_700d(struct freedv *f, void *demod_in_8kHz, int demod_i
         ofdm_get_demod_stats(f->ofdm, &f->stats);
         f->snr_est = f->stats.snr_est;
 
-        assert((ofdm_nuwbits+ofdm_ntxtbits+coded_bits_per_frame) == ofdm_bitsperframe);
+        assert((f->ofdm_nuwbits+f->ofdm_ntxtbits+coded_bits_per_frame) == f->ofdm_bitsperframe);
 
         /* now we need to buffer for de-interleaving -------------------------------------*/
                 
@@ -508,7 +500,7 @@ int freedv_comp_short_rx_700d(struct freedv *f, void *demod_in_8kHz, int demod_i
         float llr[coded_bits_per_frame];
         uint8_t out_char[coded_bits_per_frame];
 
-        interleaver_sync_state_machine(ofdm, ldpc, ofdm_config, codeword_symbols_de, codeword_amps_de, EsNo,
+        interleaver_sync_state_machine(ofdm, ldpc, f->ofdm_config, codeword_symbols_de, codeword_amps_de, EsNo,
                                        interleave_frames, &iter, &parityCheckCount, &Nerrs_coded);
                                          
         if ((ofdm->sync_state_interleaver == synced) && (ofdm->frame_count_interleaver == interleave_frames)) {
@@ -516,9 +508,9 @@ int freedv_comp_short_rx_700d(struct freedv *f, void *demod_in_8kHz, int demod_i
 
             if (f->test_frames) {
                 int tmp[interleave_frames];
-                Nerrs_raw = count_uncoded_errors(ldpc, ofdm_config, tmp, interleave_frames, codeword_symbols_de);
+                Nerrs_raw = count_uncoded_errors(ldpc, f->ofdm_config, tmp, interleave_frames, codeword_symbols_de);
                 f->total_bit_errors += Nerrs_raw;
-                f->total_bits       += ofdm_bitsperframe*interleave_frames;
+                f->total_bits       += f->ofdm_bitsperframe*interleave_frames;
             }
 
             memset(f->packed_codec_bits, 0, bytes_per_codec_frame * frames);
@@ -571,7 +563,7 @@ int freedv_comp_short_rx_700d(struct freedv *f, void *demod_in_8kHz, int demod_i
 
         /* If modem is synced we can decode txt bits */
         
-        for(k=0; k<ofdm_ntxtbits; k++)  { 
+        for(k=0; k<f->ofdm_ntxtbits; k++)  { 
             //fprintf(stderr, "txt_bits[%d] = %d\n", k, rx_bits[i]);
             n_ascii = varicode_decode(&f->varicode_dec_states, &ascii_out, &txt_bits[k], 1, 1);
             if (n_ascii && (f->freedv_put_next_rx_char != NULL)) {
@@ -583,12 +575,12 @@ int freedv_comp_short_rx_700d(struct freedv *f, void *demod_in_8kHz, int demod_i
            probably be estimated as half of all failed LDPC parity
            checks */
 
-        for(i=0; i<ofdm_nuwbits; i++) {         
+        for(i=0; i<f->ofdm_nuwbits; i++) {         
             if (rx_uw[i] != ofdm->tx_uw[i]) {
                 f->total_bit_errors++;
             }
         }
-        f->total_bits += ofdm_nuwbits;          
+        f->total_bits += f->ofdm_nuwbits;          
 
     }
     
@@ -631,7 +623,7 @@ int freedv_comp_short_rx_700d(struct freedv *f, void *demod_in_8kHz, int demod_i
     
     if ((f->verbose && (ofdm->last_sync_state == search)) || (f->verbose == 2)) {
         fprintf(stderr, "%3d nin: %4d st: %-6s euw: %2d %1d f: %5.1f phbw: %d snr: %4.1f %2d eraw: %3d ecdd: %3d iter: %3d pcc: %3d vld: %d, nout: %4d\n",
-                f->frames++, ofdm->nin, statemode[ofdm->last_sync_state], ofdm->uw_errors, ofdm->sync_counter, 
+                f->frames++, ofdm->nin, ofdm_statemode[ofdm->last_sync_state], ofdm->uw_errors, ofdm->sync_counter, 
 		(double)ofdm->foff_est_hz, ofdm->phase_est_bandwidth,
                 f->snr_est, ofdm->frame_count_interleaver,
                 Nerrs_raw, Nerrs_coded, iter, parityCheckCount, *valid, nout);
