@@ -135,6 +135,83 @@ void freedv_comptx_700(struct freedv *f, COMP mod_out[]) {
 
 }
 
+void freedv_700d_open(struct freedv *f, struct freedv_advanced *adv) {
+        f->snr_squelch_thresh = 0.0;
+        f->squelch_en = 0;
+
+        f->ofdm_config = (struct OFDM_CONFIG *) CALLOC(1, sizeof (struct OFDM_CONFIG));
+        assert(f->ofdm_config != NULL);
+
+        f->ofdm = ofdm_create(f->ofdm_config);
+	assert(f->ofdm != NULL);
+        FREE(f->ofdm_config);
+        
+        /* Get a copy of the actual modem config */
+        f->ofdm_config = ofdm_get_config_param();
+
+        f->ofdm_bitsperframe = ofdm_get_bits_per_frame();
+        f->ofdm_nuwbits = (f->ofdm_config->ns - 1) * f->ofdm_config->bps - f->ofdm_config->txtbits;
+        f->ofdm_ntxtbits = f->ofdm_config->txtbits;
+
+        f->ldpc = (struct LDPC*)MALLOC(sizeof(struct LDPC));
+        assert(f->ldpc != NULL);
+
+        set_up_hra_112_112(f->ldpc, f->ofdm_config);
+#ifdef __EMBEDDED__
+	f->ldpc->max_iter = 10; /* limit LDPC decoder iterations to limit CPU load */
+#endif	
+	/* Code length 224 divided by 2 bits per symbol = 112 symbols per frame */
+        int coded_syms_per_frame = f->ldpc->coded_syms_per_frame;
+        
+        if (adv == NULL) {
+            f->interleave_frames = 1;
+        } else {
+            assert((adv->interleave_frames >= 0) && (adv->interleave_frames <= 16));
+            f->interleave_frames = adv->interleave_frames;
+        }
+
+        f->modem_frame_count_tx = f->modem_frame_count_rx = 0;
+        
+        f->codeword_symbols = (COMP*)MALLOC(sizeof(COMP)*f->interleave_frames*coded_syms_per_frame);
+        assert(f->codeword_symbols != NULL);
+
+        f->codeword_amps = (float*)MALLOC(sizeof(float)*f->interleave_frames*coded_syms_per_frame);
+        assert(f->codeword_amps != NULL);
+
+        for (int i=0; i<f->interleave_frames*coded_syms_per_frame; i++) {
+            f->codeword_symbols[i].real = 0.0;
+            f->codeword_symbols[i].imag = 0.0;
+            f->codeword_amps[i] = 0.0;
+        }
+
+        f->nin = ofdm_get_samples_per_frame();
+        f->n_nat_modem_samples = ofdm_get_samples_per_frame();
+        f->n_nom_modem_samples = ofdm_get_samples_per_frame();
+        f->n_max_modem_samples = ofdm_get_max_samples_per_frame();
+        f->modem_sample_rate = f->ofdm_config->fs;
+        f->clip = 0;
+        f->sz_error_pattern = f->ofdm_bitsperframe;
+
+        f->tx_bits = NULL; /* not used for 700D */
+
+	if (f->interleave_frames > 1) {
+            /* only allocate this array for interleaver sizes > 1 to save memory on SM1000 port */
+            f->mod_out = (COMP*)MALLOC(sizeof(COMP)*f->interleave_frames*f->n_nat_modem_samples);
+            assert(f->mod_out != NULL);
+
+            for (int i=0; i<f->interleave_frames*f->n_nat_modem_samples; i++) {
+                f->mod_out[i].real = 0.0;
+                f->mod_out[i].imag = 0.0;
+            }
+	}
+
+#ifndef __EMBEDDED__
+        /* tx BPF off on embedded platforms, as it consumes significant CPU */
+        ofdm_set_tx_bpf(f->ofdm, 1);
+#endif
+}
+
+
 /*
   Ok so when interleaved, we take the interleaver length of input samples,
   and output that many modem samples, e.g. for interleaver of length 4:

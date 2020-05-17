@@ -180,6 +180,7 @@ int freedv_comp_short_rx_700d(struct freedv *f, void *demod_in_8kHz, int demod_i
 void freedv_comptx_2020(struct freedv *f, COMP mod_out[]);
 int freedv_comprx_2020(struct freedv *f, COMP demod_in[], int *valid);
 void freedv_700c_open(struct freedv *f, int nbit);
+void freedv_700d_open(struct freedv *f, struct freedv_advanced *adv);
       
 #ifdef __cplusplus
 }

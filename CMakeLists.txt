@@ -468,11 +468,24 @@ if (NOT APPLE)
              set_tests_properties(test_memory_leak_FreeDV_700D_tx PROPERTIES PASS_REGULAR_EXPRESSION "ERROR SUMMARY: 0 errors")
 
      add_test(NAME test_memory_leak_FreeDV_700D_rx
-             COMMAND sh -c "./freedv_tx 1600 ${CMAKE_CURRENT_SOURCE_DIR}/raw/hts1a.raw t.raw; \
+             COMMAND sh -c "./freedv_tx 700D ${CMAKE_CURRENT_SOURCE_DIR}/raw/hts1a.raw t.raw; \
                             valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./freedv_rx 700D t.raw /dev/null"
              WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/src
              )
              set_tests_properties(test_memory_leak_FreeDV_700D_rx PROPERTIES PASS_REGULAR_EXPRESSION "ERROR SUMMARY: 0 errors")
+
+     add_test(NAME test_memory_leak_FreeDV_700C_tx
+             COMMAND sh -c " valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./freedv_tx 700C ${CMAKE_CURRENT_SOURCE_DIR}/raw/hts1a.raw /dev/null"
+             WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/src
+             )
+             set_tests_properties(test_memory_leak_FreeDV_700C_tx PROPERTIES PASS_REGULAR_EXPRESSION "ERROR SUMMARY: 0 errors")
+
+     add_test(NAME test_memory_leak_FreeDV_700C_rx
+             COMMAND sh -c "./freedv_tx 700C ${CMAKE_CURRENT_SOURCE_DIR}/raw/hts1a.raw t.raw; \
+                            valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./freedv_rx 700C t.raw /dev/null"
+             WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/src
+             )
+             set_tests_properties(test_memory_leak_FreeDV_700C_rx PROPERTIES PASS_REGULAR_EXPRESSION "ERROR SUMMARY: 0 errors")
 endif(NOT APPLE)
 
      add_test(NAME test_codec2_mode_dot_c2

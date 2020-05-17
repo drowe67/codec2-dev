@@ -172,107 +172,15 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
     }
 
     if (FDV_MODE_ACTIVE( FREEDV_MODE_700C, mode)) {
+        nbit = COHPSK_BITS_PER_FRAME;
         freedv_700c_open(f, nbit);
         codec2_mode = CODEC2_MODE_700C;
-        nbit = COHPSK_BITS_PER_FRAME;
     }
    
     if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, mode) ) {
-        f->snr_squelch_thresh = 0.0;
-        f->squelch_en = 0;
+        freedv_700d_open(f, adv);
         codec2_mode = CODEC2_MODE_700C;
-
-        if ((f->ofdm_config = (struct OFDM_CONFIG *) CALLOC(1, sizeof (struct OFDM_CONFIG))) == NULL) {
-            if (f->tx_bits != NULL) {
-              FREE(f->tx_bits);
-              f->tx_bits = NULL;
-            }
-            if (f->rx_bits != NULL) {
-              FREE(f->rx_bits);
-              f->rx_bits = NULL;
-            }
-            return NULL;
-        }
-
-        f->ofdm = ofdm_create(f->ofdm_config);
-	assert(f->ofdm != NULL);
-        FREE(f->ofdm_config);
-
-        /* Get a copy of the actual modem config */
-        f->ofdm_config = ofdm_get_config_param();
-
-        f->ofdm_bitsperframe = ofdm_get_bits_per_frame();
-        f->ofdm_nuwbits = (f->ofdm_config->ns - 1) * f->ofdm_config->bps - f->ofdm_config->txtbits;
-        f->ofdm_ntxtbits = f->ofdm_config->txtbits;
-
-        f->ldpc = (struct LDPC*)MALLOC(sizeof(struct LDPC));
-
-        if (f->ldpc == NULL) {
-            return NULL;
-        }
-
-        set_up_hra_112_112(f->ldpc, f->ofdm_config);
-#ifdef __EMBEDDED__
-	f->ldpc->max_iter = 10;
-#endif	
-	/*
-	 * Code length 224 divided by 2 bits per symbol = 112 symbols per frame
-	 */
-        int coded_syms_per_frame = f->ldpc->coded_syms_per_frame;
-        
-        if (adv == NULL) {
-            f->interleave_frames = 1;
-        } else {
-            assert((adv->interleave_frames >= 0) && (adv->interleave_frames <= 16));
-            f->interleave_frames = adv->interleave_frames;
-        }
-
-        f->modem_frame_count_tx = f->modem_frame_count_rx = 0;
-        
-        f->codeword_symbols = (COMP*)MALLOC(sizeof(COMP)*f->interleave_frames*coded_syms_per_frame);
-
-        if (f->codeword_symbols == NULL) {return NULL;}
-
-        f->codeword_amps = (float*)MALLOC(sizeof(float)*f->interleave_frames*coded_syms_per_frame);
-
-        if (f->codeword_amps == NULL) {FREE(f->codeword_symbols); return NULL;}
-
-        for (int i=0; i<f->interleave_frames*coded_syms_per_frame; i++) {
-            f->codeword_symbols[i].real = 0.0;
-            f->codeword_symbols[i].imag = 0.0;
-            f->codeword_amps[i] = 0.0;
-        }
-
-        f->nin = ofdm_get_samples_per_frame();
-        f->n_nat_modem_samples = ofdm_get_samples_per_frame();
-        f->n_nom_modem_samples = ofdm_get_samples_per_frame();
-        f->n_max_modem_samples = ofdm_get_max_samples_per_frame();
-        f->modem_sample_rate = f->ofdm_config->fs;
-        f->clip = 0;
-
-        nbit = f->sz_error_pattern = f->ofdm_bitsperframe;
-
-        f->tx_bits = NULL; /* not used for 700D */
-
-	if (f->interleave_frames > 1) {
-            /* only allocate this array for interleaver sizes > 1 to save memory on SM1000 port */
-            f->mod_out = (COMP*)MALLOC(sizeof(COMP)*f->interleave_frames*f->n_nat_modem_samples);
-            if (f->mod_out == NULL) {
-                if (f->codeword_symbols != NULL) { FREE (f->codeword_symbols); }
-                return NULL;
-            }
-
-            for (int i=0; i<f->interleave_frames*f->n_nat_modem_samples; i++) {
-                f->mod_out[i].real = 0.0;
-                f->mod_out[i].imag = 0.0;
-            }
-	}
-
-#ifndef __EMBEDDED__
-        /* tx BPF off on embedded platforms, as it consumes significant CPU */
-        ofdm_set_tx_bpf(f->ofdm, 1);
-#endif
-
+        nbit = f->ofdm_bitsperframe;
     }
         
 #ifdef __LPCNET__
