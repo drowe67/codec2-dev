@@ -40,8 +40,25 @@
 #include "mpdecode_core.h"
 #include "gp_interleaver.h"
 #include "interldpc.h"
+#include "debug_alloc.h"
 
 extern char *ofdm_statemode[];
+
+void freedv_700c_open(struct freedv *f, int nbit) {
+    f->snr_squelch_thresh = 0.0;
+    f->squelch_en = 0;
+
+    f->cohpsk = cohpsk_create();
+    f->nin = COHPSK_NOM_SAMPLES_PER_FRAME;
+    f->n_nat_modem_samples = COHPSK_NOM_SAMPLES_PER_FRAME;                // native modem samples as used by the modem
+    f->n_nom_modem_samples = f->n_nat_modem_samples * FS_700C / COHPSK_FS;// number of samples after native samples are interpolated to 8000 sps
+    f->n_max_modem_samples = COHPSK_MAX_SAMPLES_PER_FRAME * FS_700C / COHPSK_FS + 1;
+    f->modem_sample_rate = FS_700C;                                       // note weird sample rate tamed by resampling
+    f->clip = 1;
+    f->tx_bits = (int*)MALLOC(nbit*sizeof(int));
+    assert(f->tx_bits != NULL);
+    f->sz_error_pattern = cohpsk_error_pattern_size();
+}
 
 void freedv_comptx_700(struct freedv *f, COMP mod_out[]) {
     int    bit, byte, i, j, k;

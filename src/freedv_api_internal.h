@@ -47,8 +47,10 @@
   extern "C" {
 #endif
 
-// identifiers for no-n Codec 2 Speech codecs, make sure no overlap with CODEC2_XXX modes
+// identifiers for non Codec 2 Speech codecs, make sure no overlap with CODEC2_XXX modes
 #define CODEC_MODE_LPCNET_1733 100
+
+#define FS_700C 8000  /* 700C sample rate exposed by freedv_api */
       
 struct freedv {
     int                  mode;
@@ -177,7 +179,8 @@ int freedv_comprx_700(struct freedv *f, COMP demod_in_8kHz[], int *valid);
 int freedv_comp_short_rx_700d(struct freedv *f, void *demod_in_8kHz, int demod_in_is_short, float gain, int *valid);
 void freedv_comptx_2020(struct freedv *f, COMP mod_out[]);
 int freedv_comprx_2020(struct freedv *f, COMP demod_in[], int *valid);
-
+void freedv_700c_open(struct freedv *f, int nbit);
+      
 #ifdef __cplusplus
 }
 #endif

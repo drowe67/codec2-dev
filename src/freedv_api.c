@@ -112,6 +112,8 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
     {
         return NULL;
     }
+
+    /* TODO make this a calloc to set everythign to zero */
     
     f = (struct freedv*)MALLOC(sizeof(struct freedv));
     if (f == NULL)
@@ -170,28 +172,9 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
     }
 
     if (FDV_MODE_ACTIVE( FREEDV_MODE_700C, mode)) {
-        f->snr_squelch_thresh = 0.0;
-        f->squelch_en = 0;
-        switch(mode) {
-        case FREEDV_MODE_700C:
-            codec2_mode = CODEC2_MODE_700C;
-            break;
-        default:
-            assert(0);
-        }
-
-        f->cohpsk = cohpsk_create();
-        f->nin = COHPSK_NOM_SAMPLES_PER_FRAME;
-        f->n_nat_modem_samples = COHPSK_NOM_SAMPLES_PER_FRAME;             // native modem samples as used by the modem
-        f->n_nom_modem_samples = f->n_nat_modem_samples * FS / COHPSK_FS;  // number of samples after native samples are interpolated to 8000 sps
-        f->n_max_modem_samples = COHPSK_MAX_SAMPLES_PER_FRAME * FS / COHPSK_FS + 1;
-        f->modem_sample_rate = FS;                                         /* note wierd sample rate tamed by interpolator */
-        f->clip = 1;
+        freedv_700c_open(f, nbit);
+        codec2_mode = CODEC2_MODE_700C;
         nbit = COHPSK_BITS_PER_FRAME;
-        f->tx_bits = (int*)MALLOC(nbit*sizeof(int));
-        if (f->tx_bits == NULL)
-            return NULL;
-        f->sz_error_pattern = cohpsk_error_pattern_size();
     }
    
     if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, mode) ) {
