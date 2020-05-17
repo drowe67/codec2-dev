@@ -171,18 +171,24 @@ struct freedv {
 #define NORM_PWR_FSK     0.193 
 #define NORM_PWR_OFDM    1.00
 
-void freedv_comptx_700(struct freedv *f, COMP mod_out[]);
-void freedv_comptx_700d(struct freedv *f, COMP mod_out[]);
-int freedv_comprx_700(struct freedv *f, COMP demod_in_8kHz[], int *valid);
-int freedv_comp_short_rx_700d(struct freedv *f, void *demod_in_8kHz, int demod_in_is_short, float gain, int *valid);
-void freedv_comptx_2020(struct freedv *f, COMP mod_out[]);
-int freedv_comprx_2020(struct freedv *f, COMP demod_in[], int *valid);
+void freedv_1600_open(struct freedv *f);
 void freedv_700c_open(struct freedv *f, int nbit);
 void freedv_700d_open(struct freedv *f, struct freedv_advanced *adv);
 void freedv_2020_open(struct freedv *f, struct freedv_advanced *adv);
 void freedv_2400a_open(struct freedv *f);
 void freedv_2400b_open(struct freedv *f);
 void freedv_800xa_open(struct freedv *f);
+
+void freedv_comptx_fdmdv_1600(struct freedv *f, COMP mod_out[]);
+int freedv_comprx_fdmdv_1600(struct freedv *f, COMP demod_in[], int *valid);
+      
+void freedv_comptx_700(struct freedv *f, COMP mod_out[]);
+void freedv_comptx_700d(struct freedv *f, COMP mod_out[]);
+int freedv_comprx_700(struct freedv *f, COMP demod_in_8kHz[], int *valid);
+int freedv_comp_short_rx_700d(struct freedv *f, void *demod_in_8kHz, int demod_in_is_short, float gain, int *valid);
+void freedv_comptx_2020(struct freedv *f, COMP mod_out[]);
+int freedv_comprx_2020(struct freedv *f, COMP demod_in[], int *valid);
+
 void freedv_comptx_fsk_voice(struct freedv *f, COMP mod_out[]);
 void freedv_tx_fsk_voice(struct freedv *f, short mod_out[]);
 void freedv_tx_fsk_data(struct freedv *f, short mod_out[]);

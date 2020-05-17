@@ -181,6 +181,7 @@ set(CODEC2_SRCS
     codebooknewamp2_energy.c
     golay23.c
     freedv_api.c
+    freedv_1600.c
     freedv_700.c
     freedv_2020.c
     freedv_fsk.c

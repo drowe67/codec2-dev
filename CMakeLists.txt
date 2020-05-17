@@ -417,6 +417,11 @@ endif()
              )
              set_tests_properties(test_FSK_modem_mod_demod  PROPERTIES PASS_REGULAR_EXPRESSION "bits tested 9800, bit errors 0")
 
+     add_test(NAME test_FreeDV_API_1600
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            ./freedv_tx 1600 ../../raw/ve9qrp_10s.raw - | ./freedv_rx 1600 - /dev/null")
+             set_tests_properties(test_FreeDV_API_1600 PROPERTIES PASS_REGULAR_EXPRESSION "frames decoded: 503")
+           
     add_test(NAME test_FreeDV_API_700D_backwards_compatability
              COMMAND sh -c "$<TARGET_FILE:freedv_rx> 700D ${CMAKE_CURRENT_SOURCE_DIR}/raw/testframes_700d.raw /dev/null --testframes --discard"
              )
