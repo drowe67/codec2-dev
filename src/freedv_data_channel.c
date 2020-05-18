@@ -212,8 +212,10 @@ void freedv_data_channel_rx_frame(struct freedv_data_channel *fdc, unsigned char
 		memcpy(fdc->packet_rx + 6, tmp, 6);
 		
 		size_t size = fdc->packet_rx_cnt - 2;
-                if (size < 12)
+                if (size < 12) {
                     size = 12;
+		    memcpy(fdc->packet_rx, fdc_header_bcast, 6);
+		}
                 fdc->cb_rx(fdc->cb_rx_state, fdc->packet_rx, size);
             }
         }    

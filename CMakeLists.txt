@@ -567,4 +567,9 @@ endif(NOT APPLE)
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/unittest
              )
 
+    add_test(NAME test_freedv_data_channel
+             COMMAND sh -c "./tfreedv_data_channel"
+             WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/unittest
+             )
+
 endif(UNITTEST)

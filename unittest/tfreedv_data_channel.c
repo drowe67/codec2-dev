@@ -32,6 +32,7 @@
 #include <string.h>
 
 unsigned char test_header[] = { 0x11, 0x22, 0x33, 0x44, 0x55, 0x66 };
+unsigned char bcast_header[] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
 
 
 struct testvec {
@@ -195,6 +196,10 @@ void tfreedv_data_callback_rx(void *arg, unsigned char *packet, size_t size)
             printf("FAIL: Received header is not 12 bytes: %zd\n", size);
             ret++;
         } else {
+            if (memcmp(packet, bcast_header, 6)) {
+                printf("FAIL: Header is not a broadcast!\n");
+                ret++;
+	    }
             if (memcmp(packet+6, test_header, 6)) {
                 printf("FAIL: Header does not match!\n");
                 ret++;
