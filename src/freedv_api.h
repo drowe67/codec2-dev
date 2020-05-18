@@ -41,6 +41,7 @@
   extern "C" {
 #endif
 
+// available modes
 #define FREEDV_MODE_1600        0
 #define FREEDV_MODE_2400A       3
 #define FREEDV_MODE_2400B       4
@@ -49,6 +50,7 @@
 #define FREEDV_MODE_700D        7
 #define FREEDV_MODE_2020        8
 
+// Sample rates used
 #define FREEDV_FS_8000          8000
 #define FREEDV_FS_16000         16000
 
@@ -56,13 +58,10 @@
 #define FREEDV_MODE_EN_DEFAULT 1
 #endif
 
-// by default we enable all modes
-// disable during compile time with -DFREEDV_MODE_1600_EN=0
-// all butFreeDV 1600
-
-//or the other way round
-// -DFREEDV_MODE_EN_DEFAULT=0 -DFREEDV_MODE_1600_EN=1
-// only FreeDV 1600
+// By default we enable all modes.  Disable during compile time e.g
+// -DFREEDV_MODE_1600_EN=0 will enable all but FreeDV 1600.  Or the
+// other way round -DFREEDV_MODE_EN_DEFAULT=0 -DFREEDV_MODE_1600_EN=1
+// will enable only FreeDV 1600
 
 #if !defined(FREEDV_MODE_1600_EN)
         #define FREEDV_MODE_1600_EN FREEDV_MODE_EN_DEFAULT
@@ -88,37 +87,36 @@
 
 #define FDV_MODE_ACTIVE(mode_name, var)  ((mode_name##_EN) == 0 ? 0: (var) == mode_name)
 
-/* operator control of 700D state machine */
-      
-#define FREEDV_SYNC_UNSYNC 0                 /* force sync state machine to lose sync, and search for new sync */
-#define FREEDV_SYNC_AUTO   1                 /* falls out of sync automatically */
-#define FREEDV_SYNC_MANUAL 2                 /* fall out of sync only under operator control */
+// optional operator control of 700D state machine
+#define FREEDV_SYNC_UNSYNC 0                 // force sync state machine to lose sync, and search for new sync
+#define FREEDV_SYNC_AUTO   1                 // falls out of sync automatically
+#define FREEDV_SYNC_MANUAL 2                 // fall out of sync only under operator control
 
+// struct that hold state information for one freedv instance
 struct freedv;
 
-/* advanced freedv open options rqd by some modes */
-
+// advanced freedv open options rqd by some modes
 struct freedv_advanced {
     int interleave_frames;
 };
       
-/* Called when text message char is decoded */
+// Called when text message char is decoded
 typedef void (*freedv_callback_rx)(void *, char);
-/* Called when new text message char is needed */
+// Called when new text message char is needed
 typedef char (*freedv_callback_tx)(void *);
 typedef void (*freedv_calback_error_pattern)
        (void *error_pattern_callback_state, short error_pattern[], int sz_error_pattern);
 
-/* Protocol bits are packed MSB-first */
-/* Called when a frame containing protocol data is decoded */
+// Protocol bits are packed MSB-first
+// Called when a frame containing protocol data is decoded
 typedef void (*freedv_callback_protorx)(void *, char *);
-/* Called when a frame containing protocol data is to be sent */
+// Called when a frame containing protocol data is to be sent
 typedef void (*freedv_callback_prototx)(void *, char *);
 
-/* Data packet callbacks */
-/* Called when a packet has been received */
+// Data packet callbacks
+// Called when a packet has been received
 typedef void (*freedv_callback_datarx)(void *, unsigned char *packet, size_t size);
-/* Called when a new packet can be send */
+// Called when a new packet can be send
 typedef void (*freedv_callback_datatx)(void *, unsigned char *packet, size_t *size);
 
 

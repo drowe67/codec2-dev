@@ -57,7 +57,7 @@ void freedv_700c_open(struct freedv *f, int nbit) {
     quisk_filt_cfInit(f->ptFilter7500to8000, quiskFilt120t480, sizeof(quiskFilt120t480)/sizeof(float));
 }
 
-void freedv_comptx_700(struct freedv *f, COMP mod_out[]) {
+void freedv_comptx_700c(struct freedv *f, COMP mod_out[]) {
     int    bit, byte, i, j, k;
     int    bits_per_codec_frame, bits_per_modem_frame;
     int    data_flag_index, nspare;
@@ -317,7 +317,7 @@ void freedv_comptx_700d(struct freedv *f, COMP mod_out[]) {
     }
 }
 
-int freedv_comprx_700(struct freedv *f, COMP demod_in_8kHz[], int *valid) {
+int freedv_comprx_700c(struct freedv *f, COMP demod_in_8kHz[], int *valid) {
     int                 bits_per_codec_frame, bytes_per_codec_frame;
     int                 i, j, bit, byte, nout, k;
     int                 data_flag_index, n_ascii, nspare;
@@ -652,8 +652,7 @@ int freedv_comp_short_rx_700d(struct freedv *f, void *demod_in_8kHz, int demod_i
             
         } /* if interleaver synced ..... */
 
-        /* If modem is synced we can decode txt bits */
-        
+        /* If modem is synced we can decode txt bits */        
         for(k=0; k<f->ofdm_ntxtbits; k++)  { 
             //fprintf(stderr, "txt_bits[%d] = %d\n", k, rx_bits[i]);
             n_ascii = varicode_decode(&f->varicode_dec_states, &ascii_out, &txt_bits[k], 1, 1);
@@ -662,10 +661,7 @@ int freedv_comp_short_rx_700d(struct freedv *f, void *demod_in_8kHz, int demod_i
             }
         }
 
-        /* estimate uncoded BER from UW.  Coded bit errors could
-           probably be estimated as half of all failed LDPC parity
-           checks */
-
+        /* estimate uncoded BER from UW */
         for(i=0; i<f->ofdm_nuwbits; i++) {         
             if (rx_uw[i] != ofdm->tx_uw[i]) {
                 f->total_bit_errors++;
