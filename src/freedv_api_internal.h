@@ -47,14 +47,18 @@
   extern "C" {
 #endif
 
+// Experimentally derived fudge factors to normalise Tx power across modes
+#define NORM_PWR_COHPSK  1.74   
+#define NORM_PWR_FSK     0.193 
+#define NORM_PWR_OFDM    1.00
+
 // identifiers for non Codec 2 Speech codecs, make sure no overlap with CODEC2_XXX modes
 #define CODEC_MODE_LPCNET_1733 100
 
 struct freedv {
     int                  mode;
 
-    /* states for various modems we support */
-    
+    // states for various modems we support
     struct CODEC2       *codec2;
     struct FDMDV        *fdmdv;
     struct COHPSK       *cohpsk;
@@ -165,12 +169,8 @@ struct freedv {
     int n_protocol_bits;
 };
 
-/* experimentally derived fudge factors to normalise power across modes */
-
-#define NORM_PWR_COHPSK  1.74   
-#define NORM_PWR_FSK     0.193 
-#define NORM_PWR_OFDM    1.00
-
+// open function for each mode
+      
 void freedv_1600_open(struct freedv *f);
 void freedv_700c_open(struct freedv *f, int nbit);
 void freedv_700d_open(struct freedv *f, struct freedv_advanced *adv);
@@ -179,13 +179,17 @@ void freedv_2400a_open(struct freedv *f);
 void freedv_2400b_open(struct freedv *f);
 void freedv_800xa_open(struct freedv *f);
 
+// each mode has tx and rx functions in various flavours for real and complex valued samples
+
 void freedv_comptx_fdmdv_1600(struct freedv *f, COMP mod_out[]);
 int freedv_comprx_fdmdv_1600(struct freedv *f, COMP demod_in[], int *valid);
       
-void freedv_comptx_700(struct freedv *f, COMP mod_out[]);
+void freedv_comptx_700c(struct freedv *f, COMP mod_out[]);
+int freedv_comprx_700c(struct freedv *f, COMP demod_in_8kHz[], int *valid);
+
 void freedv_comptx_700d(struct freedv *f, COMP mod_out[]);
-int freedv_comprx_700(struct freedv *f, COMP demod_in_8kHz[], int *valid);
 int freedv_comp_short_rx_700d(struct freedv *f, void *demod_in_8kHz, int demod_in_is_short, float gain, int *valid);
+
 void freedv_comptx_2020(struct freedv *f, COMP mod_out[]);
 int freedv_comprx_2020(struct freedv *f, COMP demod_in[], int *valid);
 

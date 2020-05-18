@@ -420,7 +420,7 @@ void freedv_comptx(struct freedv *f, COMP mod_out[], short speech_in[]) {
             codec2_encode(f->codec2, f->packed_codec_bits + j * bytes_per_codec_frame, speech_in);
             speech_in += codec2_samples_per_frame(f->codec2);
         }
-        freedv_comptx_700(f, mod_out);
+        freedv_comptx_700c(f, mod_out);
     }
 
     /* special treatment due to interleaver */
@@ -526,7 +526,7 @@ void freedv_codectx(struct freedv *f, short mod_out[], unsigned char *packed_cod
             freedv_comptx_fdmdv_1600(f, tx_fdm);
             break;
         case FREEDV_MODE_700C:
-            freedv_comptx_700(f, tx_fdm);
+            freedv_comptx_700c(f, tx_fdm);
             break;
         case FREEDV_MODE_700D: {
             /* special treatment due to interleaver */
@@ -694,7 +694,7 @@ int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]) {
         nout = freedv_comprx_fdmdv_1600(f, demod_in, &valid);
     }
     if (FDV_MODE_ACTIVE( FREEDV_MODE_700C, f->mode)) {
-        nout = freedv_comprx_700(f, demod_in, &valid);
+        nout = freedv_comprx_700c(f, demod_in, &valid);
     }
 
     if( (FDV_MODE_ACTIVE( FREEDV_MODE_2400A, f->mode)) || (FDV_MODE_ACTIVE( FREEDV_MODE_2400B, f->mode)) || (FDV_MODE_ACTIVE( FREEDV_MODE_800XA, f->mode))){
@@ -813,7 +813,7 @@ int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]) {
     return nout;
 }
 
-/* memory efficient real short version - just for 700D  */
+/* memory efficient real short version - just for 700D on the SM1000 */
 int freedv_shortrx(struct freedv *f, short speech_out[], short demod_in[], float gain) {
     assert(f != NULL);
     int                 bits_per_codec_frame, bytes_per_codec_frame;
@@ -900,7 +900,7 @@ int freedv_codecrx(struct freedv *f, unsigned char *packed_codec_bits, short dem
         }
 
         if (FDV_MODE_ACTIVE( FREEDV_MODE_700C, f->mode)) {
-            freedv_comprx_700(f, rx_fdm, &valid);
+            freedv_comprx_700c(f, rx_fdm, &valid);
         }
 
         if( FDV_MODE_ACTIVE( FREEDV_MODE_2400A, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_2400B, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_800XA, f->mode)){

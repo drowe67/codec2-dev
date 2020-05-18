@@ -127,7 +127,6 @@ void freedv_comptx_fdmdv_1600(struct freedv *f, COMP mod_out[]) {
     if (f->test_frames) {
         fdmdv_get_test_bits(f->fdmdv, f->tx_bits);
         fdmdv_get_test_bits(f->fdmdv, &f->tx_bits[bits_per_modem_frame]);
-        //fprintf(stderr, "test frames on tx\n");
     }
 
     /* modulate even and odd frames */
@@ -200,9 +199,6 @@ int freedv_comprx_fdmdv_1600(struct freedv *f, COMP demod_in[], int *valid) {
                 f->total_bit_errors += golay23_count_errors(recd_codeword, codeword1);
                 f->total_bits       += 23;
 
-                //codeword1 = recd_codeword;
-                //fprintf(stderr, "received codeword1: 0x%x  decoded codeword1: 0x%x\n", recd_codeword, codeword1);
-
                 for(i=0; i<bits_per_codec_frame; i++)
                     f->codec_bits[i] = f->rx_bits[i];
 
@@ -269,8 +265,6 @@ int freedv_comprx_fdmdv_1600(struct freedv *f, COMP demod_in[], int *valid) {
                             f->test_frame_count = 0;
                     }
 
-                    //fprintf(stderr, "test_frame_sync: %d test_frame_sync_state: %d bit_errors: %d ntest_bits: %d\n",
-                    //        test_frame_sync, f->test_frame_sync_state, bit_errors, ntest_bits);
                 }
             }
 
@@ -278,12 +272,10 @@ int freedv_comprx_fdmdv_1600(struct freedv *f, COMP demod_in[], int *valid) {
             /* squelch if beneath SNR threshold or test frames enabled */
 
             if ((f->squelch_en && (f->stats.snr_est < f->snr_squelch_thresh)) || f->test_frames) {
-                //fprintf(stderr,"squelch %f %f !\n", f->stats.snr_est, f->snr_squelch_thresh);
                 *valid = 0;
             }
 
             nout = f->n_speech_samples;
-
         }
 
         /* note this freewheels if reliable sync dissapears on bad channels */
@@ -292,14 +284,11 @@ int freedv_comprx_fdmdv_1600(struct freedv *f, COMP demod_in[], int *valid) {
             f->evenframe = 0;
         else
             f->evenframe = 1;
-        //fprintf(stderr,"%d\n",  f->evenframe);
 
     } /* if (sync) .... */
     else {
         /* if not in sync pass through analog samples */
         /* this lets us "hear" whats going on, e.g. during tuning */
-
-        //fprintf(stderr, "out of sync\n");
 
         if (f->squelch_en == 0) {
 	    *valid = -1;
@@ -307,7 +296,6 @@ int freedv_comprx_fdmdv_1600(struct freedv *f, COMP demod_in[], int *valid) {
         else {
 	    *valid = 0;
         }
-        //fprintf(stderr, "%d %d %d\n", nin_prev, speech_out[0], speech_out[nin_prev-1]);
         nout = nin_prev;
     }
     return nout;
