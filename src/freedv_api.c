@@ -260,7 +260,7 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
   AUTHOR......: David Rowe
   DATE CREATED: 3 August 2014
 
-  Frees up memory.
+  Call to shut down a freedv instance and free memory.
 
 \*---------------------------------------------------------------------------*/
 
@@ -271,12 +271,21 @@ void freedv_close(struct freedv *freedv) {
     FREE(freedv->codec_bits);
     FREE(freedv->tx_bits);
     FREE(freedv->rx_bits);
+    codec2_destroy(freedv->codec2);
+
     if (FDV_MODE_ACTIVE(FREEDV_MODE_1600, freedv->mode)) {
         FREE(freedv->fdmdv_bits);
         fdmdv_destroy(freedv->fdmdv);
     }
-    if (FDV_MODE_ACTIVE( FREEDV_MODE_700C, freedv->mode))
+
+    if (FDV_MODE_ACTIVE( FREEDV_MODE_700C, freedv->mode)) {
         cohpsk_destroy(freedv->cohpsk);
+        quisk_filt_destroy(freedv->ptFilter8000to7500);
+        FREE(freedv->ptFilter8000to7500);
+        quisk_filt_destroy(freedv->ptFilter7500to8000);
+        FREE(freedv->ptFilter7500to8000);
+    }
+
     if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, freedv->mode)) {
         FREE(freedv->packed_codec_bits_tx);
         if (freedv->interleave_frames > 1)
@@ -286,6 +295,7 @@ void freedv_close(struct freedv *freedv) {
         FREE(freedv->ldpc);
         ofdm_destroy(freedv->ofdm);
     }
+
     if (FDV_MODE_ACTIVE( FREEDV_MODE_2020, freedv->mode)) {
         if (freedv->interleave_frames > 1)
             FREE(freedv->mod_out);
@@ -298,6 +308,7 @@ void freedv_close(struct freedv *freedv) {
         lpcnet_freedv_destroy(freedv->lpcnet);
 #endif        
     }
+
     if (FDV_MODE_ACTIVE( FREEDV_MODE_2400A, freedv->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_800XA, freedv->mode)){
         fsk_destroy(freedv->fsk);
         fvhff_destroy_deframer(freedv->deframer);
@@ -308,18 +319,6 @@ void freedv_close(struct freedv *freedv) {
 		fvhff_destroy_deframer(freedv->deframer);
     }
     
-    if (freedv->codec2)
-        codec2_destroy(freedv->codec2);
-    if (freedv->ptFilter8000to7500) {
-        quisk_filt_destroy(freedv->ptFilter8000to7500);
-        FREE(freedv->ptFilter8000to7500);
-        freedv->ptFilter8000to7500 = NULL;
-    }
-    if (freedv->ptFilter7500to8000) {
-        quisk_filt_destroy(freedv->ptFilter7500to8000);
-        FREE(freedv->ptFilter7500to8000);
-        freedv->ptFilter7500to8000 = NULL;
-    }
     FREE(freedv);
 }
 
@@ -338,30 +337,29 @@ void freedv_close(struct freedv *freedv) {
   should be such that the peak speech level is between +/- 16384 and
   +/- 32767.
 
-  The FDM modem signal mod_out[] is sampled at 8000 Hz and is
+  The FDM modem signal mod_out[] is sampled at
+  freedv_get_modem_sample_rate() and is always exactly
   freedv_get_n_nom_modem_samples() long.  mod_out[] will be scaled
   such that the peak level is just less than +/-32767.
 
-  The complex-valued output can directly drive an I/Q modulator to
-  produce a single sideband signal.  To generate the other sideband,
-  take the complex conjugate of mod_out[].
+  The FreeDV 1600/700C/700D/2020 waveform has a crest factor of around
+  10dB, similar to SSB.  These modes are usually operated at a
+  "backoff" of 8dB.  Adjust the power amplifier drive so that the
+  average power is 8dB less than the peak power of the PA.  For
+  example, on a radio rated at 100W PEP for SSB, the average FreeDV
+  power is typically 20W.
 
-  The FreeDV 1600 modem has a high crest factor (around 12dB), however
-  the energy and duration of the peaks is small.  FreeDV 1600 is
-  usually operated at a "backoff" of 8dB.  Adjust the power amplifier
-  drive so that the average power is 8dB less than the peak power of
-  the PA.  For example, on a radio rated at 100W PEP for SSB, the
-  average FreeDV power is typically 20W.
+  Caution - some PAs cannot handle a high continuous power.  A
+  conservative level is 20W average for a 100W PEP rated PA.
 
-  The FreeDV 700 modem has a crest factor of about 8dB (with
-  f->clip=1, the default), so if your PA can handle it, it can be
-  driven harder than FreeDV 1600.  Caution - some PAs cannot handle a
-  high continuous power.  A conservative level is 20W average for a
-  100W PEP rated PA.
+  The FreeDV 2400A/800XA modes are constant amplitude, designed for
+  Class C PAs.  If using a SSB PA, adjust the drive so you average
+  power is wthin the limist of your PA (e.g. 20W average for a 100W
+  PA).
 
 \*---------------------------------------------------------------------------*/
 
-/* real-valued short sample output, useful for going straight to DAC */
+/* real-valued short output */
 
 void freedv_tx(struct freedv *f, short mod_out[], short speech_in[]) {
     assert(f != NULL);
@@ -392,6 +390,7 @@ void freedv_tx(struct freedv *f, short mod_out[], short speech_in[]) {
     }
 }
 
+/* complex ouput samples */
 
 void freedv_comptx(struct freedv *f, COMP mod_out[], short speech_in[]) {
     assert(f != NULL);
@@ -569,14 +568,14 @@ void freedv_codectx(struct freedv *f, short mod_out[], unsigned char *packed_cod
         mod_out[i] = tx_fdm[i].real;
 }
 
-void freedv_datatx  (struct freedv *f, short mod_out[]){
+void freedv_datatx (struct freedv *f, short mod_out[]) {
     assert(f != NULL);
     if (FDV_MODE_ACTIVE( FREEDV_MODE_2400A, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_2400B, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_800XA, f->mode)) {
-            freedv_tx_fsk_data(f, mod_out);
+        freedv_tx_fsk_data(f, mod_out);
     }
 }
 
-int  freedv_data_ntxframes (struct freedv *f){
+int  freedv_data_ntxframes (struct freedv *f) {
     assert(f != NULL);
     if (FDV_MODE_ACTIVE( FREEDV_MODE_2400A, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_2400B, f->mode)) {
         if (f->deframer->fdc)
@@ -642,9 +641,6 @@ int freedv_nin(struct freedv *f) {
 
 \*---------------------------------------------------------------------------*/
 
-
-// short version
-
 int freedv_rx(struct freedv *f, short speech_out[], short demod_in[]) {
     assert(f != NULL);
     int i;
@@ -685,10 +681,6 @@ int freedv_rx(struct freedv *f, short speech_out[], short demod_in[]) {
 }
 
 
-// complex input samples version
-
-
-/* complex input rx API function */
 int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]) {
     assert(f != NULL);
     int bits_per_codec_frame, bytes_per_codec_frame;
@@ -951,8 +943,8 @@ int freedv_codecrx(struct freedv *f, unsigned char *packed_codec_bits, short dem
   AUTHOR......: Jim Ahlstrom
   DATE CREATED: 28 July 2015
 
-  Return the version of the FreeDV API.  This is meant to help API users determine when
-  incompatible changes have occurred.
+  Return the version of the FreeDV API.  This is meant to help API
+  users determine when incompatible changes have occurred.
 
 \*---------------------------------------------------------------------------*/
 
@@ -1024,7 +1016,9 @@ void freedv_set_callback_protocol(struct freedv *f, freedv_callback_protorx rx, 
   transmission of a new packet can begin.
   If the returned size of the datatx callback is zero the data frame is still
   generated, but will contain only a header update.
+
 \*---------------------------------------------------------------------------*/
+
 void freedv_set_callback_data(struct freedv *f, freedv_callback_datarx datarx, freedv_callback_datatx datatx, void *callback_state) {
     if ((FDV_MODE_ACTIVE( FREEDV_MODE_2400A, f->mode)) || (FDV_MODE_ACTIVE( FREEDV_MODE_2400B, f->mode)) || (FDV_MODE_ACTIVE( FREEDV_MODE_800XA, f->mode))){
         if (!f->deframer->fdc)
@@ -1048,6 +1042,7 @@ void freedv_set_callback_data(struct freedv *f, freedv_callback_datarx datarx, f
   The header will also be used for fill packets when a data frame is requested
   without a packet available.
 \*---------------------------------------------------------------------------*/
+
 void freedv_set_data_header(struct freedv *f, unsigned char *header)
 {
     if ((FDV_MODE_ACTIVE( FREEDV_MODE_2400A, f->mode)) || (FDV_MODE_ACTIVE( FREEDV_MODE_2400B, f->mode)) || (FDV_MODE_ACTIVE( FREEDV_MODE_800XA, f->mode))){
@@ -1093,8 +1088,8 @@ void freedv_get_modem_stats(struct freedv *f, int *sync, float *snr_est)
   AUTHOR......: Jim Ahlstrom
   DATE CREATED: 28 July 2015
 
-  Set some parameters used by FreeDV.  It is possible to write a macro using ## for
-  this, but I wasn't sure it would be 100% portable.
+  Set some parameters used by FreeDV.  It is possible to write a macro
+  using ## for this, but I wasn't sure it would be 100% portable.
 
 \*---------------------------------------------------------------------------*/
 
@@ -1172,9 +1167,6 @@ void freedv_set_carrier_ampl(struct freedv *f, int c, float ampl) {
    2400A - 48000, 96000
    2400B - 48000, 96000
   
-  TODO: Implement 2400B rate changing, allow other rate changing.
-   
-
 \*---------------------------------------------------------------------------*/
 
 int freedv_set_alt_modem_samp_rate(struct freedv *f, int samp_rate){
