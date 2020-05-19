@@ -198,7 +198,7 @@ void freedv_comptx_2020(struct freedv *f, COMP mod_out[]) {
 
 #ifdef __LPCNET__
 int freedv_comprx_2020(struct freedv *f, COMP demod_in[]) {
-    int   i, j, nout, k;
+    int   i, j, k;
     int   n_ascii;
     char  ascii_out;
     struct OFDM *ofdm = f->ofdm;
@@ -358,11 +358,11 @@ int freedv_comprx_2020(struct freedv *f, COMP demod_in[]) {
     ofdm_sync_state_machine(ofdm, rx_uw);
 
     if ((f->verbose && (ofdm->last_sync_state == search)) || (f->verbose == 2)) {
-        fprintf(stderr, "%3d st: %-6s euw: %2d %1d f: %5.1f pbw: %d snr: %4.1f %2d eraw: %3d ecdd: %3d iter: %3d pcc: %3d rxst: %d, nout: %4d\n",
+        fprintf(stderr, "%3d st: %-6s euw: %2d %1d f: %5.1f pbw: %d snr: %4.1f %2d eraw: %3d ecdd: %3d iter: %3d pcc: %3d rxst: %d\n",
                 f->frames++, ofdm_statemode[ofdm->last_sync_state], ofdm->uw_errors, ofdm->sync_counter, 
 		(double)ofdm->foff_est_hz, ofdm->phase_est_bandwidth,
                 f->snr_est, ofdm->frame_count_interleaver,
-                Nerrs_raw, Nerrs_coded, iter, parityCheckCount, rx_status, nout);
+                Nerrs_raw, Nerrs_coded, iter, parityCheckCount, rx_status);
     }
         
     return rx_status;

@@ -485,7 +485,7 @@ int freedv_comprx_700c(struct freedv *f, COMP demod_in_8kHz[]) {
 
 int freedv_comp_short_rx_700d(struct freedv *f, void *demod_in_8kHz, int demod_in_is_short, float gain) {
     int   bits_per_codec_frame, bytes_per_codec_frame;
-    int   i, j, bit, byte, nout, k;
+    int   i, j, bit, byte, k;
     int   n_ascii;
     char  ascii_out;
     int   frames;
@@ -663,11 +663,11 @@ int freedv_comp_short_rx_700d(struct freedv *f, void *demod_in_8kHz, int demod_i
     ofdm_sync_state_machine(ofdm, rx_uw);
    
     if ((f->verbose && (ofdm->last_sync_state == search)) || (f->verbose == 2)) {
-        fprintf(stderr, "%3d nin: %4d st: %-6s euw: %2d %1d f: %5.1f phbw: %d snr: %4.1f %2d eraw: %3d ecdd: %3d iter: %3d pcc: %3d rxst: %d, nout: %4d\n",
+        fprintf(stderr, "%3d nin: %4d st: %-6s euw: %2d %1d f: %5.1f phbw: %d snr: %4.1f %2d eraw: %3d ecdd: %3d iter: %3d pcc: %3d rxst: %d\n",
                 f->frames++, ofdm->nin, ofdm_statemode[ofdm->last_sync_state], ofdm->uw_errors, ofdm->sync_counter, 
 		(double)ofdm->foff_est_hz, ofdm->phase_est_bandwidth,
                 f->snr_est, ofdm->frame_count_interleaver,
-                Nerrs_raw, Nerrs_coded, iter, parityCheckCount, rx_status, nout);
+                Nerrs_raw, Nerrs_coded, iter, parityCheckCount, rx_status);
     }
     
     return rx_status;
