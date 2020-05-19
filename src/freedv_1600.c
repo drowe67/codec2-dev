@@ -34,7 +34,7 @@ void freedv_1600_open(struct freedv *f) {
     f->fdmdv = fdmdv_create(Nc);
     assert(f->fdmdv != NULL);
     golay23_init();
-    f->nin = FDMDV_NOM_SAMPLES_PER_FRAME;
+    f->nin = f->nin_prev = FDMDV_NOM_SAMPLES_PER_FRAME;
     f->n_nom_modem_samples = 2*FDMDV_NOM_SAMPLES_PER_FRAME;
     f->n_nat_modem_samples = f->n_nom_modem_samples;
     f->n_max_modem_samples = FDMDV_NOM_SAMPLES_PER_FRAME+FDMDV_MAX_SAMPLES_PER_FRAME;
@@ -144,25 +144,24 @@ void freedv_comptx_fdmdv_1600(struct freedv *f, COMP mod_out[]) {
 }
 
 
-int freedv_comprx_fdmdv_1600(struct freedv *f, COMP demod_in[], int *valid) {
+int freedv_comprx_fdmdv_1600(struct freedv *f, COMP demod_in[]) {
     int                 bits_per_codec_frame, bytes_per_codec_frame, bits_per_fdmdv_frame;
-    int                 i, j, bit, byte, nin_prev, nout;
+    int                 i, j, bit, byte;
     int                 recd_codeword, codeword1, data_flag_index, n_ascii;
     short               abit[1];
     char                ascii_out;
     int                 reliable_sync_bit;
-
+    int                 rx_status = 0;
+    
     bits_per_codec_frame  = codec2_bits_per_frame(f->codec2);
     bytes_per_codec_frame = (bits_per_codec_frame + 7) / 8;
-    nout = f->n_speech_samples;
-
+    
     COMP ademod_in[f->nin];
     for(i=0; i<f->nin; i++)
         ademod_in[i] = fcmult(1.0/FDMDV_SCALE, demod_in[i]);
 
     bits_per_fdmdv_frame  = fdmdv_bits_per_frame(f->fdmdv);
 
-    nin_prev = f->nin;
     fdmdv_demod(f->fdmdv, f->fdmdv_bits, &reliable_sync_bit, ademod_in, &f->nin);
     fdmdv_get_demod_stats(f->fdmdv, &f->stats);
     f->sync = f->fdmdv->sync;
@@ -172,11 +171,11 @@ int freedv_comprx_fdmdv_1600(struct freedv *f, COMP demod_in[], int *valid) {
         f->evenframe = 1;
     }
 
-    if (f->stats.sync) {
+    if (f->sync) {
+        rx_status = RX_SYNC;
+
         if (f->evenframe == 0) {
             memcpy(f->rx_bits, f->fdmdv_bits, bits_per_fdmdv_frame*sizeof(int));
-            nout = 0;
-	    *valid = 0;
         }
         else {
             memcpy(&f->rx_bits[bits_per_fdmdv_frame], f->fdmdv_bits, bits_per_fdmdv_frame*sizeof(int));
@@ -236,7 +235,7 @@ int freedv_comprx_fdmdv_1600(struct freedv *f, COMP demod_in[], int *valid) {
                         byte++;
                     }
                 }
-                *valid = 1;
+                rx_status |= RX_BITS;
             }
             else {
                 int   test_frame_sync, bit_errors, ntest_bits, k;
@@ -266,16 +265,7 @@ int freedv_comprx_fdmdv_1600(struct freedv *f, COMP demod_in[], int *valid) {
                     }
 
                 }
-            }
-
-
-            /* squelch if beneath SNR threshold or test frames enabled */
-
-            if ((f->squelch_en && (f->stats.snr_est < f->snr_squelch_thresh)) || f->test_frames) {
-                *valid = 0;
-            }
-
-            nout = f->n_speech_samples;
+            } /* if (test_frames == 0) .... */
         }
 
         /* note this freewheels if reliable sync dissapears on bad channels */
@@ -286,18 +276,7 @@ int freedv_comprx_fdmdv_1600(struct freedv *f, COMP demod_in[], int *valid) {
             f->evenframe = 1;
 
     } /* if (sync) .... */
-    else {
-        /* if not in sync pass through analog samples */
-        /* this lets us "hear" whats going on, e.g. during tuning */
 
-        if (f->squelch_en == 0) {
-	    *valid = -1;
-        }
-        else {
-	    *valid = 0;
-        }
-        nout = nin_prev;
-    }
-    return nout;
+    return rx_status;
 }
 

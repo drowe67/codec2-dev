@@ -179,29 +179,40 @@ void freedv_set_eq                      (struct freedv *f, int val);
       
 // Get parameters -------------------------------------------------------------------------
 
+
 struct MODEM_STATS;
+
 int freedv_get_version(void);
 int freedv_get_mode                 (struct freedv *freedv);
 void freedv_get_modem_stats         (struct freedv *freedv, int *sync, float *snr_est);
 void freedv_get_modem_extended_stats(struct freedv *freedv, struct MODEM_STATS *stats);
 int freedv_get_test_frames	    (struct freedv *freedv);
+
+int freedv_get_speech_sample_rate   (struct freedv *freedv);
 int freedv_get_n_speech_samples	    (struct freedv *freedv);
+int freedv_get_n_max_speech_samples (struct freedv *freedv);
+
 int freedv_get_modem_sample_rate    (struct freedv *freedv);
 int freedv_get_modem_symbol_rate    (struct freedv *freedv);
 int freedv_get_n_max_modem_samples  (struct freedv *freedv);
 int freedv_get_n_nom_modem_samples  (struct freedv *freedv);
+
+// bit error rate stats
 int freedv_get_total_bits	    (struct freedv *freedv);
 int freedv_get_total_bit_errors	    (struct freedv *freedv);
 int freedv_get_total_bits_coded     (struct freedv *freedv);
 int freedv_get_total_bit_errors_coded(struct freedv *freedv);
+
 int freedv_get_sync		    (struct freedv *freedv);
 int freedv_get_sync_interleaver	    (struct freedv *freedv);
+
+// access to speech codec states
 struct FSK * freedv_get_fsk         (struct freedv *f);
 struct CODEC2 *freedv_get_codec2    (struct freedv *freedv);
+
 int freedv_get_n_codec_bits         (struct freedv *freedv);
 int freedv_get_sz_error_pattern     (struct freedv *freedv);
 int freedv_get_protocol_bits        (struct freedv *freedv);
-int freedv_get_speech_sample_rate   (struct freedv *freedv);
 
 #ifdef __cplusplus
 }

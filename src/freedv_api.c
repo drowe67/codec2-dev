@@ -53,7 +53,7 @@
 
 #include "debug_alloc.h"
 
-#define VERSION     13    /* The API version number.  The first version
+#define VERSION     14    /* The API version number.  The first version
                            is 10.  Increment if the API changes in a
                            way that would require changes by the API
                            user. */
@@ -66,6 +66,9 @@
  *              Added OFDM configuration switch structure
  * Version 13   November 2019
  *              Removed 700 and 700B modes
+ * Version 14   May 2020
+ *              Number of returned speech samples can vary, use freedv_get_n_max_speech_samples() to allocate
+ *              buffers.
  */
 
 char *ofdm_statemode[] = {
@@ -332,18 +335,18 @@ void freedv_close(struct freedv *freedv) {
   produce a frame of modem samples that can be sent to the
   transmitter.  See freedv_tx.c for an example.
 
-  speech_in[] is sampled at 8000 Hz, and the user must supply a block
-  of exactly freedv_get_n_speech_samples(). The speech_in[] level
-  should be such that the peak speech level is between +/- 16384 and
-  +/- 32767.
+  speech_in[] is sampled at freedv_get_speech_sample_rate() Hz, and the
+  user must supply a block of exactly
+  freedv_get_n_speech_samples(). The speech_in[] level should be such
+  that the peak speech level is between +/- 16384 and +/- 32767.
 
   The FDM modem signal mod_out[] is sampled at
   freedv_get_modem_sample_rate() and is always exactly
   freedv_get_n_nom_modem_samples() long.  mod_out[] will be scaled
   such that the peak level is just less than +/-32767.
 
-  The FreeDV 1600/700C/700D/2020 waveform has a crest factor of around
-  10dB, similar to SSB.  These modes are usually operated at a
+  The FreeDV 1600/700C/700D/2020 waveforms have a crest factor of
+  around 10dB, similar to SSB.  These modes are usually operated at a
   "backoff" of 8dB.  Adjust the power amplifier drive so that the
   average power is 8dB less than the peak power of the PA.  For
   example, on a radio rated at 100W PEP for SSB, the average FreeDV
@@ -353,9 +356,9 @@ void freedv_close(struct freedv *freedv) {
   conservative level is 20W average for a 100W PEP rated PA.
 
   The FreeDV 2400A/800XA modes are constant amplitude, designed for
-  Class C PAs.  If using a SSB PA, adjust the drive so you average
-  power is wthin the limist of your PA (e.g. 20W average for a 100W
-  PA).
+  Class C PAs.  They have a crest factor of 3dB. If using a SSB PA,
+  adjust the drive so you average power is within the limits of your PA
+  (e.g. 20W average for a 100W PA).
 
 \*---------------------------------------------------------------------------*/
 
@@ -390,7 +393,7 @@ void freedv_tx(struct freedv *f, short mod_out[], short speech_in[]) {
     }
 }
 
-/* complex ouput samples */
+/* complex float output samples */
 
 void freedv_comptx(struct freedv *f, COMP mod_out[], short speech_in[]) {
     assert(f != NULL);
@@ -438,7 +441,6 @@ void freedv_comptx(struct freedv *f, COMP mod_out[], short speech_in[]) {
             codec2_encode(f->codec2, f->packed_codec_bits_tx + (f->modem_frame_count_tx*codec_frames+j)*bytes_per_codec_frame, speech_in);
             speech_in += codec2_samples_per_frame(f->codec2);
         }
-
 
 	/* Only use extra local buffer if needed for interleave > 1 */
 	if (f->interleave_frames == 1) {
@@ -602,42 +604,53 @@ int freedv_nin(struct freedv *f) {
   AUTHOR......: David Rowe
   DATE CREATED: 3 August 2014
 
-  Takes a frame of samples from the radio receiver, demodulates and
-  decodes them, producing a frame of decoded speech samples.  See
-  freedv_rx.c for an example.
+  Takes samples from the radio receiver, demodulates and FEC decodes
+  them, producing a frame of decoded speech samples.  See freedv_rx.c
+  for an example.
 
-  demod_in[] is a block of received samples sampled at 8000 Hz.
-  To account for difference in the transmit and receive sample clock
-  frequencies, the number of demod_in[] samples is time varying. You
-  MUST call freedv_nin() BEFORE each call to freedv_rx() and pass
-  exactly that many samples to this function.
+  demod_in[] is a block of received samples sampled at
+  freedv_get_modem_sample_rate().  To account for difference in the
+  transmit and receive sample clock frequencies, the number of
+  demod_in[] samples is time varying. You MUST call freedv_nin()
+  BEFORE EACH call to freedv_rx() and pass exactly that many samples
+  to this function:
+
+  short demod_in[freedv_get_n_max_modem_samples(f)];
+  short speech_out[freedv_get_n_max_speech_samples(f)];
+
+  nin = freedv_nin(f);
+  while(fread(demod_in, sizeof(short), nin, fin) == nin) {
+      nout = freedv_rx(f, speech_out, demod_in);
+      fwrite(speech_out, sizeof(short), nout, fout);
+      nin = freedv_nin(f);
+  }
 
   To help set your buffer sizes, The maximum value of freedv_nin() is
   freedv_get_n_max_modem_samples().
 
   freedv_rx() returns the number of output speech samples available in
-  speech_out[], which is sampled at 8000 Hz.  You should ALWAYS check
-  the return value of freedv_rx(), and read EXACTLY that number of
-  speech samples from speech_out[].
+  speech_out[], which is sampled at freedv_get_speech_sample_rate(f).
+  You should ALWAYS check the return value of freedv_rx(), and read
+  EXACTLY that number of speech samples from speech_out[].  
+
+  Not every call to freedv_rx will return speech samples; in some
+  modes several modem frames are processed before speech samples are
+  returned.  When squelch is active, zero samples may be returned.
 
   1600 and 700D mode: When out of sync, the number of output speech
   samples returned will be freedv_nin(). When in sync to a valid
   FreeDV 1600 signal, the number of output speech samples will
   alternate between freedv_get_n_speech_samples() and 0.
 
-  700 .. 700C modes: The number of output speech samples returned will
-  always be freedv_get_n_speech_samples(), regardless of sync.
-
   The peak level of demod_in[] is not critical, as the demod works
   well over a wide range of amplitude scaling.  However avoid clipping
   (overload, or samples pinned to +/- 32767).  speech_out[] will peak
   at just less than +/-32767.
 
-  When out of sync, this function echoes the demod_in[] samples to
-  speech_out[].  This allows the user to listen to the channel, which
-  is useful for tuning FreeDV signals or reception of non-FreeDV
-  signals.  Setting the squelch with freedv_set_squelch_en(1) will
-  return zero-valued samples instead.
+  When squelch is disabled, this function echoes the demod_in[]
+  samples to speech_out[].  This allows the user to listen to the
+  channel, which is useful for tuning FreeDV signals or reception of
+  non-FreeDV signals.
 
 \*---------------------------------------------------------------------------*/
 
@@ -645,6 +658,7 @@ int freedv_rx(struct freedv *f, short speech_out[], short demod_in[]) {
     assert(f != NULL);
     int i;
     int nin = freedv_nin(f);
+    f->nin_prev = nin;
 
     assert(nin <= f->n_max_modem_samples);
        
@@ -677,73 +691,149 @@ int freedv_rx(struct freedv *f, short speech_out[], short demod_in[]) {
         return freedv_shortrx(f, speech_out, demod_in, gain);
     }
     
-    return 0; /* should never get here */
+    assert(1); /* should never get here */
+    return 0;
 }
 
+/* complex sample input version from the radio */
 
 int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]) {
-    assert(f != NULL);
-    int bits_per_codec_frame, bytes_per_codec_frame;
-    int i, nout = 0;
-    int valid = 0;
-    float gain = 1.0;
-    
+    assert(f != NULL);    
     assert(f->nin <= f->n_max_modem_samples);
-
+    int rx_status = 0;
+    f->nin_prev = f->nin;
+   
     if (FDV_MODE_ACTIVE( FREEDV_MODE_1600, f->mode)) {
-        nout = freedv_comprx_fdmdv_1600(f, demod_in, &valid);
+        rx_status = freedv_comprx_fdmdv_1600(f, demod_in);
     }
     if (FDV_MODE_ACTIVE( FREEDV_MODE_700C, f->mode)) {
-        nout = freedv_comprx_700c(f, demod_in, &valid);
+        rx_status = freedv_comprx_700c(f, demod_in);
     }
 
     if( (FDV_MODE_ACTIVE( FREEDV_MODE_2400A, f->mode)) || (FDV_MODE_ACTIVE( FREEDV_MODE_2400B, f->mode)) || (FDV_MODE_ACTIVE( FREEDV_MODE_800XA, f->mode))){
-        nout = freedv_comprx_fsk(f, demod_in, &valid);
+        rx_status = freedv_comprx_fsk(f, demod_in);
     }
 
     if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode)) {
-        nout = freedv_comp_short_rx_700d(f, (void*)demod_in, 0, 1.0, &valid);
+        rx_status = freedv_comp_short_rx_700d(f, (void*)demod_in, 0, 1.0);
     }
     
     if (FDV_MODE_ACTIVE( FREEDV_MODE_2020, f->mode)) {
 #ifdef __LPCNET__
-        nout = freedv_comprx_2020(f, demod_in, &valid);
+        rx_status = freedv_comprx_2020(f, demod_in);
 #endif
     }
+
+    short demod_in_short[f->nin_prev];
+    for(int i=0; i<f->nin_prev; i++)
+        demod_in_short[i] = demod_in[i].real;
+    return freedv_bits_to_speech(f, speech_out, demod_in_short, rx_status);
+}
+
+/* memory efficient real short version - just for 700D on the SM1000 */
+
+int freedv_shortrx(struct freedv *f, short speech_out[], short demod_in[], float gain) {
+    assert(f != NULL);
+    int rx_status;
+    f->nin_prev = f->nin;
+
+    // At this stage short interface only supported for 700D, to help
+    // memory requirements on stm32
+    assert(f->mode == FREEDV_MODE_700D);
+    assert(f->nin <= f->n_max_modem_samples);
+
+    if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode)) {
+        rx_status = freedv_comp_short_rx_700d(f, (void*)demod_in, 1, gain);
+    }
     
-    if (valid == 0) {
-        /* squelch */
-        for (i = 0; i < nout; i++)
-            speech_out[i] = 0;
-    }
-    else if (valid < 0) {
-        float *samples = &demod_in[0].real;
-        float tmp[2*nout];
-        if (f->mode == FREEDV_MODE_2020) {           
-            /* we havent got sync so play undemodulated audio from
-               radio. This requires resampling to 16 kHz. */        
-            for(i=0; i<nout; i++)
-                f->passthrough_2020[FDMDV_OS_TAPS_16K+i] = demod_in[i].real;
-            assert(nout <= ofdm_get_max_samples_per_frame());
-            fdmdv_8_to_16(tmp, &f->passthrough_2020[FDMDV_OS_TAPS_16K], nout);
-            samples = tmp;
-            nout *= 2;
+    return freedv_bits_to_speech(f, speech_out, demod_in, rx_status);
+}
+
+/*---------------------------------------------------------------------------*\
+
+  FUNCTION....: freedv_rx_bits_to_speech
+  AUTHOR......: David Rowe
+  DATE CREATED: May 2020
+
+  The *_rx functions takes off air samples, demodulate and (for some
+  modes) FEC decode, giving us a frame of bits.
+
+  This function captures a lot of tricky logic that has been distilled
+  through experience:
+
+  There may not be a frame of bits returned on every call freedv_*rx* call.
+  When there are valid bits we need to run the speech decoder.
+  We may not have demod sync, so various pass through options may happen
+  with the input samples.  
+  We may squelch based on SNR.
+  Need to handle various codecs, and varying number of codec frames per modem frame
+  Squelch audio if test frames are being sent
+  Determine how many speech samples to return, which will vary if in sync/out of sync
+  Work with real and complex inputs (complex wrapper)
+  Attenuate audio on pass through
+  Deal with 700D first frame burble, and different sync states from OFDM modes like 700D
+  Output no samples if squelched, we assume it's OK for the audio sink to run dry
+  A FIFO required on output to smooth sample flow to audio sink
+
+\*---------------------------------------------------------------------------*/
+
+int freedv_bits_to_speech(struct freedv *f, short speech_out[], short demod_in[], int rx_status) {
+    int nout = 0;
+    int decode_speech = 0;
+   
+    if ((rx_status & RX_SYNC) == 0) {
+
+        if (f->squelch_en == 0) {
+
+            /* attenuate audio 12dB bit as channel noise isn't that pleasant */
+            float passthrough_gain = 0.25;
+            
+            /* pass through received samples so we can hear what's going on, e.g. during tuning */
+
+            if (f->mode == FREEDV_MODE_2020) {           
+                /* 8kHz modem sample rate but 16 kHz speech sample
+                   rate, so we need to resample */
+                nout = 2*f->nin_prev;
+                assert(nout <= ofdm_get_max_samples_per_frame());
+                float tmp[nout];
+                for(int i=0; i<nout; i++)
+                    f->passthrough_2020[FDMDV_OS_TAPS_16K+i] = demod_in[i];
+                fdmdv_8_to_16(tmp, &f->passthrough_2020[FDMDV_OS_TAPS_16K], nout);
+                for(int i=0; i<nout; i++)
+                    speech_out[i] = passthrough_gain*tmp[i];
+            } else {
+               for(int i=0; i<nout; i++)
+                   speech_out[i] = passthrough_gain*demod_in[i];
+           }
         }
-
-        /* we need a constant number of output samples, but nout can
-           vary. Channel noise can be a bit loud, so lets attenuate
-           the level. */
-        gain = 0.1;
-        for (i = 0; i < f->n_speech_samples; i++)
-            if (i < nout)
-                speech_out[i] = gain*samples[i];
-            else
-                speech_out[i] = 0;
-        nout = f->n_speech_samples;
     }
-    else {
-        /* decode audio  -----------------------------------------------*/
 
+    if (rx_status & RX_SYNC) {
+       /* following logic is tricky so spell it out clearly, see table
+          in: https://github.com/drowe67/codec2/pull/111 */
+        
+       if (f->squelch_en == 0) {
+           decode_speech = 1;
+       }
+       else {
+           /* squelch is enabled */
+           
+           /* anti-burble case - don't decode on trial sync unless the
+              frame has no bit errors.  This prevents short lived trial
+              sync cases generating random bursts of audio */
+           if (rx_status & RX_TRIAL_SYNC) {
+               if (rx_status & RX_BITS)
+                   decode_speech = 1;
+           }
+           else {
+               /* sync is solid - decode even through fades as there is still some speech info there */
+               if (f->stats.snr_est > f->snr_squelch_thresh)
+                   decode_speech = 1;
+           }
+       }
+    }
+   
+    if (decode_speech) {
         if(FDV_MODE_ACTIVE( FREEDV_MODE_2020, f->mode)) {
 #ifdef __LPCNET__
             /* LPCNet decoder */
@@ -751,20 +841,10 @@ int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]) {
             int data_bits_per_frame = f->ldpc->data_bits_per_frame;
             int frames = data_bits_per_frame/bits_per_codec_frame;            
         
-            /*
-              fprintf(stderr, "  modem_frame_count_rx: %d nout: %d frames: %d data_bits_per_frame: %d interleave_frames: %d\n",
-                    f->modem_frame_count_rx, nout, frames, data_bits_per_frame, f->interleave_frames);
-            */
             if (f->modem_frame_count_rx < f->interleave_frames) {
                 nout = f->n_speech_samples;
-                for (i = 0; i < frames; i++) {
+                for (int i = 0; i < frames; i++) {
                     lpcnet_dec(f->lpcnet, (char*)f->packed_codec_bits + (i + frames*f->modem_frame_count_rx)* bits_per_codec_frame, speech_out);
-                        if (valid == 2) {
-                            /* we're in sync, not squelched but quite a few bit errors, so lets the audio volume */
-                            float gain = 0.5;
-                            for(int j=0; j<lpcnet_samples_per_frame(f->lpcnet); j++)
-                                speech_out[j] *= gain;
-                        }
                     speech_out += lpcnet_samples_per_frame(f->lpcnet);
                 }
                 f->modem_frame_count_rx++;
@@ -772,8 +852,9 @@ int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]) {
  #endif          
         }
         else {
-            bits_per_codec_frame  = codec2_bits_per_frame(f->codec2);
-            bytes_per_codec_frame = (bits_per_codec_frame + 7) / 8;
+            /* codec 2 decoder */
+            int bits_per_codec_frame  = codec2_bits_per_frame(f->codec2);
+            int bytes_per_codec_frame = (bits_per_codec_frame + 7) / 8;
 
             if(FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode)) {
 
@@ -783,15 +864,8 @@ int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]) {
                     int data_bits_per_frame = f->ldpc->data_bits_per_frame;
                     int frames = data_bits_per_frame/bits_per_codec_frame;            
                     nout = f->n_speech_samples;
-                    //fprintf(stderr, "modem_frame_count_rx: %d nout: %d\n", f->modem_frame_count_rx, nout);
-                    for (i = 0; i < frames; i++) {
+                    for (int i = 0; i < frames; i++) {
                         codec2_decode(f->codec2, speech_out, f->packed_codec_bits + (i + frames*f->modem_frame_count_rx)* bytes_per_codec_frame);
-                        if (valid == 2) {
-                            /* we're in sync, not squelched but quite a few bit errors, so lets the audio volume */
-                            float gain = 0.5;
-                            for(int j=0; j<codec2_samples_per_frame(f->codec2); j++)
-                                speech_out[j] *= gain;
-                        }
                         speech_out += codec2_samples_per_frame(f->codec2);
                     }
                     f->modem_frame_count_rx++;
@@ -799,79 +873,17 @@ int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]) {
             } else { 
                 /* non-interleaved Codec 2 modes */
                 
+                nout = f->n_speech_samples;
                 int frames = f->n_codec_bits / bits_per_codec_frame;
-                //fprintf(stderr, "frames: %d\n", frames);
-                for (i = 0; i < frames; i++) {
+                for (int i = 0; i < frames; i++) {
                     codec2_decode(f->codec2, speech_out, f->packed_codec_bits + i * bytes_per_codec_frame);
                     speech_out += codec2_samples_per_frame(f->codec2);
                 }
             }
         }
     }
-
-    //fprintf(stderr,"freedv_nin(f): %d nout: %d valid: %d\n", freedv_nin(f), nout, valid);
-    return nout;
-}
-
-/* memory efficient real short version - just for 700D on the SM1000 */
-int freedv_shortrx(struct freedv *f, short speech_out[], short demod_in[], float gain) {
-    assert(f != NULL);
-    int                 bits_per_codec_frame, bytes_per_codec_frame;
-    int                 i, nout = 0;
-    int valid = 0;
-
-    // At this stage short interface only supported for 700D, to help
-    // memory requirements on stm32
-    assert(f->mode == FREEDV_MODE_700D);
     
-    assert(f->nin <= f->n_max_modem_samples);
-
-    bits_per_codec_frame  = codec2_bits_per_frame(f->codec2);
-    bytes_per_codec_frame = (bits_per_codec_frame + 7) / 8;
-
-    if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode)) {
-        nout = freedv_comp_short_rx_700d(f, (void*)demod_in, 1, gain, &valid);
-    }
-    
-    if (valid == 0) {
-        /* squelch */
-        
-        for (i = 0; i < nout; i++)
-            speech_out[i] = 0;
-    }
-    else if (valid < 0) {
-        /* we havent got sync so play audio from radio, attenuate as noise can be a bit loud */
-        gain = 0.1;
-        for (i = 0; i < f->n_speech_samples; i++)
-            if (i < nout)
-                speech_out[i] = gain*demod_in[i];
-            else
-                speech_out[i] = 0;
-        nout = f->n_speech_samples;
-    }
-    else {
-        /* decoded audio to play */
-        
-        int data_bits_per_frame = f->ldpc->data_bits_per_frame;
-        int frames = data_bits_per_frame/bits_per_codec_frame;
-            
-        nout = 0;
-        if (f->modem_frame_count_rx < f->interleave_frames) {
-            nout = f->n_speech_samples;
-            //fprintf(stderr, "modem_frame_count_rx: %d nout: %d\n", f->modem_frame_count_rx, nout);
-            for (i = 0; i < frames; i++) {
-                codec2_decode(f->codec2, speech_out, f->packed_codec_bits + (i + frames*f->modem_frame_count_rx)* bytes_per_codec_frame);
-                if (valid == 2) {
-                    float gain = 0.5;
-                    for(int j=0; j<codec2_samples_per_frame(f->codec2); j++)
-                        speech_out[j] *= gain;
-                }
-                speech_out += codec2_samples_per_frame(f->codec2);
-            }
-            f->modem_frame_count_rx++;
-        }
-    }
-
+    assert(nout <= freedv_get_n_max_speech_samples(f));    
     return nout;
 }
 
@@ -881,12 +893,13 @@ int freedv_codecrx(struct freedv *f, unsigned char *packed_codec_bits, short dem
     assert(f != NULL);
     int i;
     int nin = freedv_nin(f);
-    int valid;
     int ret = 0;
     int bits_per_codec_frame = codec2_bits_per_frame(f->codec2);
-
+    int rx_status = 0;
+    
     assert(nin <= f->n_max_modem_samples);
-
+    f->nin_prev = nin;
+    
     if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode) == false) {
         COMP rx_fdm[f->n_max_modem_samples];
     
@@ -896,27 +909,27 @@ int freedv_codecrx(struct freedv *f, unsigned char *packed_codec_bits, short dem
         }
 
         if (FDV_MODE_ACTIVE( FREEDV_MODE_1600, f->mode)) {
-            freedv_comprx_fdmdv_1600(f, rx_fdm, &valid);
+            rx_status = freedv_comprx_fdmdv_1600(f, rx_fdm);
         }
 
         if (FDV_MODE_ACTIVE( FREEDV_MODE_700C, f->mode)) {
-            freedv_comprx_700c(f, rx_fdm, &valid);
+            rx_status = freedv_comprx_700c(f, rx_fdm);
         }
 
         if( FDV_MODE_ACTIVE( FREEDV_MODE_2400A, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_2400B, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_800XA, f->mode)){
-            freedv_comprx_fsk(f, rx_fdm, &valid);
+            rx_status = freedv_comprx_fsk(f, rx_fdm);
         }
     }
 
     int bytes_per_codec_frame = (bits_per_codec_frame + 7) / 8;
 
     if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode)) {
-        freedv_comp_short_rx_700d(f, (void*)demod_in, 1, 1.0, &valid);
+        rx_status = freedv_comp_short_rx_700d(f, (void*)demod_in, 1, 1.0);
 
         int data_bits_per_frame = f->ldpc->data_bits_per_frame;
         int frames = data_bits_per_frame/bits_per_codec_frame;
             
-        if (valid == 1 && f->modem_frame_count_rx < f->interleave_frames) {
+        if ((rx_status & RX_BITS) && f->modem_frame_count_rx < f->interleave_frames) {
              for (i = 0; i < frames; i++) {
                  memcpy(packed_codec_bits, f->packed_codec_bits + (i + frames*f->modem_frame_count_rx)* bytes_per_codec_frame, bytes_per_codec_frame);
                  packed_codec_bits += bytes_per_codec_frame;
@@ -927,7 +940,7 @@ int freedv_codecrx(struct freedv *f, unsigned char *packed_codec_bits, short dem
 	return ret;
     }
 
-    if (valid == 1) {
+    if (rx_status & RX_BITS) {
         int codec_frames = f->n_codec_bits / bits_per_codec_frame;
 
         memcpy(packed_codec_bits, f->packed_codec_bits, bytes_per_codec_frame * codec_frames);
@@ -994,6 +1007,7 @@ void freedv_set_callback_txt(struct freedv *f, freedv_callback_rx rx, freedv_cal
   atop VHF freedv, much like those present in DMR.
    Protocol bits are to be passed in an msb-first char array
    The number of protocol bits are findable with freedv_get_protocol_bits
+
 \*---------------------------------------------------------------------------*/
 
 void freedv_set_callback_protocol(struct freedv *f, freedv_callback_protorx rx, freedv_callback_prototx tx, void *callback_state){
@@ -1232,15 +1246,14 @@ struct FSK * freedv_get_fsk(struct freedv *f){
   AUTHOR......: Jim Ahlstrom
   DATE CREATED: 28 July 2015
 
-  Get some parameters from FreeDV.  It is possible to write a macro using ## for
-  this, but I wasn't sure it would be 100% portable.
+  Get some parameters from FreeDV.
 
 \*---------------------------------------------------------------------------*/
 
-// Get integers
 int freedv_get_protocol_bits              (struct freedv *f) {return f->n_protocol_bits;}
 int freedv_get_mode                       (struct freedv *f) {return f->mode;}
 int freedv_get_test_frames                (struct freedv *f) {return f->test_frames;}
+int freedv_get_speech_sample_rate         (struct freedv *f) {return f-> speech_sample_rate;}
 int freedv_get_n_speech_samples           (struct freedv *f) {return f->n_speech_samples;}
 int freedv_get_modem_sample_rate          (struct freedv *f) {return f->modem_sample_rate;}
 int freedv_get_modem_symbol_rate          (struct freedv *f) {return f->modem_symbol_rate;}
@@ -1251,7 +1264,20 @@ int freedv_get_total_bit_errors           (struct freedv *f) {return f->total_bi
 int freedv_get_total_bits_coded           (struct freedv *f) {return f->total_bits_coded;}
 int freedv_get_total_bit_errors_coded     (struct freedv *f) {return f->total_bit_errors_coded;}
 int freedv_get_sync                       (struct freedv *f) {return f->stats.sync;}
-int freedv_get_speech_sample_rate         (struct freedv *f) {return f->speech_sample_rate;}
+struct CODEC2 *freedv_get_codec2	  (struct freedv *f){return  f->codec2;}
+int freedv_get_n_codec_bits               (struct freedv *f){return f->n_codec_bits;}
+
+int freedv_get_n_max_speech_samples(struct freedv *f) {
+    /* When "passing through" demod samples to the speech output
+       (e.g. no sync and squeclh off) f->nin bounces around with
+       timing variations.  So is is possible we may return
+       freedv_get_n_max_modem_samples() via the speech_output[]
+       array */
+    if (freedv_get_n_max_modem_samples(f) > f->n_speech_samples)
+        return freedv_get_n_max_modem_samples(f);
+    else
+        return f->n_speech_samples;
+}
 
 int freedv_get_sync_interleaver(struct freedv *f) {
     if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_2020, f->mode)) {
@@ -1271,11 +1297,6 @@ int freedv_get_sz_error_pattern(struct freedv *f)
         return f->sz_error_pattern;
     }
 }
-
-// Get floats
-
-struct CODEC2 *freedv_get_codec2	(struct freedv *f){return  f->codec2;}
-int freedv_get_n_codec_bits             (struct freedv *f){return f->n_codec_bits;}
 
 // Get modem status
 

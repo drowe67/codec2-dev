@@ -40,7 +40,7 @@ void freedv_2400a_open(struct freedv *f) {
     f->n_nom_modem_samples = f->fsk->N;
     f->n_max_modem_samples = f->fsk->N + (f->fsk->Ts);
     f->n_nat_modem_samples = f->fsk->N;
-    f->nin = fsk_nin(f->fsk);
+    f->nin = f->nin_prev = fsk_nin(f->fsk);
     f->modem_sample_rate = 48000;
     f->modem_symbol_rate = 1200;
 }
@@ -59,7 +59,7 @@ void freedv_2400b_open(struct freedv *f) {
     f->n_nom_modem_samples = f->fmfsk->N;
     f->n_max_modem_samples = f->fmfsk->N + (f->fmfsk->Ts);
     f->n_nat_modem_samples = f->fmfsk->N;
-    f->nin = fmfsk_nin(f->fmfsk);
+    f->nin = f->nin_prev = fmfsk_nin(f->fmfsk);
     f->modem_sample_rate = 48000;
 }
 
@@ -76,7 +76,7 @@ void freedv_800xa_open(struct freedv *f) {
     f->n_nom_modem_samples = f->fsk->N;
     f->n_max_modem_samples = f->fsk->N + (f->fsk->Ts);
     f->n_nat_modem_samples = f->fsk->N;
-    f->nin = fsk_nin(f->fsk);
+    f->nin = f->nin_prev = fsk_nin(f->fsk);
     f->modem_sample_rate = 8000;
     f->modem_symbol_rate = 400;
     fsk_stats_normalise_eye(f->fsk, 0);
@@ -246,7 +246,7 @@ void freedv_tx_fsk_data(struct freedv *f, short mod_out[]) {
 
 
 // float input samples version
-int freedv_comprx_fsk(struct freedv *f, COMP demod_in[], int *valid) {
+int freedv_comprx_fsk(struct freedv *f, COMP demod_in[]) {
     /* Varicode and protocol bits */
     uint8_t vc_bits[2];
     uint8_t proto_bits[3];
@@ -254,7 +254,8 @@ int freedv_comprx_fsk(struct freedv *f, COMP demod_in[], int *valid) {
     int i;
     int n_ascii;
     char ascii_out;
-
+    int rx_status = 0;
+    
     if(FDV_MODE_ACTIVE( FREEDV_MODE_2400A, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_800XA, f->mode)){        
 	fsk_demod(f->fsk,(uint8_t*)f->tx_bits,demod_in);
         f->nin = fsk_nin(f->fsk);
@@ -286,23 +287,12 @@ int freedv_comprx_fsk(struct freedv *f, COMP demod_in[], int *valid) {
         if( f->freedv_put_next_proto != NULL){
             (*f->freedv_put_next_proto)(f->proto_callback_state,(char*)proto_bits);
         }
-        *valid = 1;
-
-        /* squelch if in sync but SNR too low */
-        if (f->squelch_en && (f->snr_est < f->snr_squelch_thresh)) {
-            *valid = 0;
-        }
-    } else {
-        /* squelch if out of sync, or echo input of squelch off */
-        if (f->squelch_en) 
-            *valid = 0;
-        else
-            *valid = -1;
-    }
+        rx_status = RX_SYNC | RX_BITS;
+    } 
     f->sync = f->deframer->state;
     f->stats.sync = f->deframer->state;
 
-    return f->n_speech_samples;
+    return rx_status;
 }
 
 

@@ -100,7 +100,7 @@ void freedv_2020_open(struct freedv *f, struct freedv_advanced *adv) {
         f->codeword_amps[i] = 0.0;
     }
 
-    f->nin = ofdm_get_samples_per_frame();
+    f->nin = f->nin_prev = ofdm_get_samples_per_frame();
     f->n_nat_modem_samples = ofdm_get_samples_per_frame();
     f->n_nom_modem_samples = ofdm_get_samples_per_frame();
     f->n_max_modem_samples = ofdm_get_max_samples_per_frame();
@@ -196,7 +196,7 @@ void freedv_comptx_2020(struct freedv *f, COMP mod_out[]) {
 #endif
 
 #ifdef __LPCNET__
-int freedv_comprx_2020(struct freedv *f, COMP demod_in[], int *valid) {
+int freedv_comprx_2020(struct freedv *f, COMP demod_in[]) {
     int   i, j, nout, k;
     int   n_ascii;
     char  ascii_out;
@@ -214,7 +214,7 @@ int freedv_comprx_2020(struct freedv *f, COMP demod_in[], int *valid) {
     COMP  payload_syms[coded_syms_per_frame];
     float payload_amps[coded_syms_per_frame];
    
-    nout = 0;
+    int rx_status = 0;
     
     int Nerrs_raw = 0;
     int Nerrs_coded = 0;
@@ -222,13 +222,8 @@ int freedv_comprx_2020(struct freedv *f, COMP demod_in[], int *valid) {
     int parityCheckCount = 0;
     uint8_t rx_uw[f->ofdm_nuwbits];
 
-    /* echo samples back out as default (say if sync not found) */
-    
-    *valid = 1;
     f->sync = f->stats.sync = 0;
     
-    /* TODO estimate this properly from signal */
-
     // TODO: should be higher for 2020?
     float EsNo = 3.0;
     
@@ -241,6 +236,9 @@ int freedv_comprx_2020(struct freedv *f, COMP demod_in[], int *valid) {
     /* OK modem is in sync */
     
     if ((ofdm->sync_state == synced) || (ofdm->sync_state == trial)) {
+        rx_status |= RX_SYNC;
+        if (ofdm->sync_state == trial) rx_status |= RX_TRIAL_SYNC;
+
         ofdm_demod(ofdm, rx_bits, demod_in);
         ofdm_disassemble_modem_frame(ofdm, rx_uw, payload_syms, payload_amps, txt_bits);
 
@@ -295,8 +293,9 @@ int freedv_comprx_2020(struct freedv *f, COMP demod_in[], int *valid) {
             for (j=0; j<interleave_frames; j++) {
                 symbols_to_llrs(llr, &codeword_symbols_de[j * coded_syms_per_frame],
                                 &codeword_amps_de[j * coded_syms_per_frame],
-                                EsNo, ofdm->mean_amp, coded_syms_per_frame);                           
-               if (ldpc->data_bits_per_frame == ldpc->ldpc_data_bits_per_frame) {
+                                EsNo, ofdm->mean_amp, coded_syms_per_frame);
+                /* LDPC decoder */
+                if (ldpc->data_bits_per_frame == ldpc->ldpc_data_bits_per_frame) {
                     /* all data bits in code word used */
                     iter = run_ldpc_decoder(ldpc, out_char, llr, &parityCheckCount);
                 } else {
@@ -327,9 +326,7 @@ int freedv_comprx_2020(struct freedv *f, COMP demod_in[], int *valid) {
                 }
             } /* for interleave frames ... */
                    
-            nout = f->n_speech_samples;                  
-            *valid = 1;
-            
+            rx_status |= RX_BITS;
         } /* if interleaver synced ..... */
 
         /* If modem is synced we can decode txt bits */
@@ -352,7 +349,6 @@ int freedv_comprx_2020(struct freedv *f, COMP demod_in[], int *valid) {
             }
         }
         f->total_bits += f->ofdm_nuwbits;          
-
     }
 
     /* iterate state machine and update nin for next call */
@@ -360,38 +356,14 @@ int freedv_comprx_2020(struct freedv *f, COMP demod_in[], int *valid) {
     f->nin = ofdm_get_nin(ofdm);
     ofdm_sync_state_machine(ofdm, rx_uw);
 
-    /* TODO: same sync logic as 700D - be useful to refactor/combine common code */
-    bool sync = ((ofdm->sync_state == trial) && (parityCheckCount == ldpc->NumberParityBits)) || (ofdm->sync_state == synced);
-    if (sync) {
-        if (f->squelch_en && (f->snr_est < f->snr_squelch_thresh)) 
-            *valid = 0; /* squelch if in sync but SNR too low */
-        else {
-            if (!f->squelch_en || (parityCheckCount == ldpc->NumberParityBits))
-                *valid = 1; 
-            else {
-                /* let decoded audio through with reduced gain, as we may be end of over or in a fade */
-                *valid = 2; 
-            }
-        }
-    }
-    else {
-        /* pass through off air samples if squelch is disabled */
-        if (f->squelch_en)
-            *valid = 0;
-        else {
-            nout = f->nin;
-            *valid = -1;
-        }
-    }
-
     if ((f->verbose && (ofdm->last_sync_state == search)) || (f->verbose == 2)) {
-        fprintf(stderr, "%3d st: %-6s euw: %2d %1d f: %5.1f pbw: %d snr: %4.1f %2d eraw: %3d ecdd: %3d iter: %3d pcc: %3d vld: %d, nout: %4d\n",
+        fprintf(stderr, "%3d st: %-6s euw: %2d %1d f: %5.1f pbw: %d snr: %4.1f %2d eraw: %3d ecdd: %3d iter: %3d pcc: %3d rxst: %d, nout: %4d\n",
                 f->frames++, ofdm_statemode[ofdm->last_sync_state], ofdm->uw_errors, ofdm->sync_counter, 
 		(double)ofdm->foff_est_hz, ofdm->phase_est_bandwidth,
                 f->snr_est, ofdm->frame_count_interleaver,
-                Nerrs_raw, Nerrs_coded, iter, parityCheckCount, *valid, nout);
+                Nerrs_raw, Nerrs_coded, iter, parityCheckCount, rx_status, nout);
     }
         
-    return nout;
+    return rx_status;
 }
 #endif
