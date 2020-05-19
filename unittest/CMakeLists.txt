@@ -10,6 +10,8 @@ target_link_libraries(tcohpsk codec2)
 add_executable(tfsk tfsk.c ../src/kiss_fft.c ../src/kiss_fftr.c ../src/octave.c ../src/modem_probe.c)
 target_link_libraries(tfsk m)
 
+add_executable(tfreedv_data_channel tfreedv_data_channel.c ../src/freedv_data_channel.c)
+
 add_executable(tfmfsk tfmfsk.c ../src/octave.c ../src/modem_probe.c)
 target_link_libraries(tfmfsk m)
 
