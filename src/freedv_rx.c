@@ -88,7 +88,7 @@ void my_datatx(void *callback_state, unsigned char *packet, size_t *size) {
 int main(int argc, char *argv[]) {
     FILE                      *fin, *fout, *ftxt;
     struct freedv             *freedv;
-    int                        nin, nout, frame = 0;
+    int                        nin, nout, nout_total = 0, frame = 0;
     struct my_callback_state   my_cb_state;
     struct MODEM_STATS         stats = {0};
     int                        mode;
@@ -288,8 +288,9 @@ int main(int argc, char *argv[]) {
             freedv_set_total_bits_coded(freedv, 0); freedv_set_total_bit_errors_coded(freedv, 0);
         }
 
-       fwrite(speech_out, sizeof(short), nout, fout);
-           
+        fwrite(speech_out, sizeof(short), nout, fout);
+        nout_total += nout;
+        
         /* log some side info to the txt file */
 
         if (ftxt != NULL) {
@@ -307,7 +308,7 @@ int main(int argc, char *argv[]) {
     fclose(ftxt);
     fclose(fin);
     fclose(fout);
-    fprintf(stderr, "frames decoded: %d\n", frame);
+    fprintf(stderr, "frames decoded: %d  output speech samples: %d\n", frame, nout_total);
 
     if (freedv_get_test_frames(freedv)) {
         int Tbits = freedv_get_total_bits(freedv);

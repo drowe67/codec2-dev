@@ -822,7 +822,7 @@ int freedv_bits_to_speech(struct freedv *f, short speech_out[], short demod_in[]
               frame has no bit errors.  This prevents short lived trial
               sync cases generating random bursts of audio */
            if (rx_status & RX_TRIAL_SYNC) {
-               if (rx_status & RX_BITS)
+               if ((rx_status & RX_BIT_ERRORS) == 0)
                    decode_speech = 1;
            }
            else {

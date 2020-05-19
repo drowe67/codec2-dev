@@ -425,11 +425,19 @@ endif()
     add_test(NAME test_FreeDV_API_700C
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
                             ./freedv_tx 700C ../../raw/ve9qrp_10s.raw - | ./freedv_rx 700C - /dev/null")
-            set_tests_properties(test_FreeDV_API_700C PROPERTIES PASS_REGULAR_EXPRESSION "frames decoded: 125")
+             set_tests_properties(test_FreeDV_API_700C PROPERTIES PASS_REGULAR_EXPRESSION "frames decoded: 125")
            
     add_test(NAME test_FreeDV_API_700D_backwards_compatability
              COMMAND sh -c "$<TARGET_FILE:freedv_rx> 700D ${CMAKE_CURRENT_SOURCE_DIR}/raw/testframes_700d.raw /dev/null --testframes --discard"
              )
+
+    # no random speech output due to trial sync when listening to noise
+    add_test(NAME test_FreeDV_API_700D_burble
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            ./freedv_tx 700D ../../raw/ve9qrp.raw - | 
+                            ./cohpsk_ch - - -10 --Fs 8000 | 
+                            ./freedv_rx 700D - /dev/null --squelch -2")
+             set_tests_properties(test_FreeDV_API_700D_burble PROPERTIES PASS_REGULAR_EXPRESSION "frames decoded: 746  output_speech_samples: 0")
            
     add_test(NAME test_FreeDV_API_700D_AWGN_BER
              COMMAND sh -c "dd bs=2560 count=120 if=/dev/zero | $<TARGET_FILE:freedv_tx> 700D - - --testframes | $<TARGET_FILE:cohpsk_ch> - - -20 --Fs 8000 -f -10 | $<TARGET_FILE:freedv_rx> 700D - /dev/null --testframes --discard"

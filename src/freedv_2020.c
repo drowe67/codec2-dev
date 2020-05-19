@@ -316,6 +316,8 @@ int freedv_comprx_2020(struct freedv *f, COMP demod_in[]) {
                     iter = run_ldpc_decoder(ldpc, out_char, llr_full_codeword, &parityCheckCount);
                 }
                             
+                if (parityCheckCount != ldpc->NumberParityBits) rx_status |= RX_BIT_ERRORS;
+                
                 if (f->test_frames) {
                     uint8_t payload_data_bits[data_bits_per_frame];
                     ofdm_generate_payload_data_bits(payload_data_bits, data_bits_per_frame);

@@ -600,6 +600,8 @@ int freedv_comp_short_rx_700d(struct freedv *f, void *demod_in_8kHz, int demod_i
                                 EsNo, ofdm->mean_amp, coded_syms_per_frame);               
                 iter = run_ldpc_decoder(ldpc, out_char, llr, &parityCheckCount);
 
+                if (parityCheckCount != ldpc->NumberParityBits) rx_status |= RX_BIT_ERRORS;
+                
                 if (f->test_frames) {
                     uint8_t payload_data_bits[data_bits_per_frame];
                     ofdm_generate_payload_data_bits(payload_data_bits, data_bits_per_frame);
@@ -635,7 +637,7 @@ int freedv_comp_short_rx_700d(struct freedv *f, void *demod_in_8kHz, int demod_i
             assert(byte <= f->nbyte_packed_codec_bits);
                    
             rx_status |= RX_BITS;
-            
+
         } /* if interleaver synced ..... */
 
         /* If modem is synced we can decode txt bits */        
@@ -661,7 +663,7 @@ int freedv_comp_short_rx_700d(struct freedv *f, void *demod_in_8kHz, int demod_i
     
     f->nin = ofdm_get_nin(ofdm);
     ofdm_sync_state_machine(ofdm, rx_uw);
-   
+
     if ((f->verbose && (ofdm->last_sync_state == search)) || (f->verbose == 2)) {
         fprintf(stderr, "%3d nin: %4d st: %-6s euw: %2d %1d f: %5.1f phbw: %d snr: %4.1f %2d eraw: %3d ecdd: %3d iter: %3d pcc: %3d rxst: %d\n",
                 f->frames++, ofdm->nin, ofdm_statemode[ofdm->last_sync_state], ofdm->uw_errors, ofdm->sync_counter, 
