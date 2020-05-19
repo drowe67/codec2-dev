@@ -213,7 +213,7 @@ int main(int argc, char *argv[]) {
     }
     freedv_set_dpsk(freedv, use_dpsk);
 
-    short speech_out[freedv_get_n_speech_samples(freedv)];
+    short speech_out[freedv_get_n_max_speech_samples(freedv)];
     short demod_in[freedv_get_n_max_modem_samples(freedv)];
 
     ftxt = fopen("freedv_rx_log.txt","wt");

@@ -274,7 +274,7 @@ void freedv_close(struct freedv *freedv) {
     FREE(freedv->codec_bits);
     FREE(freedv->tx_bits);
     FREE(freedv->rx_bits);
-    codec2_destroy(freedv->codec2);
+    if (freedv->codec2) codec2_destroy(freedv->codec2);
 
     if (FDV_MODE_ACTIVE(FREEDV_MODE_1600, freedv->mode)) {
         FREE(freedv->fdmdv_bits);
@@ -794,11 +794,11 @@ int freedv_bits_to_speech(struct freedv *f, short speech_out[], short demod_in[]
                 /* 8kHz modem sample rate but 16 kHz speech sample
                    rate, so we need to resample */
                 nout = 2*f->nin_prev;
-                assert(nout <= ofdm_get_max_samples_per_frame());
+                assert(nout <= freedv_get_n_max_speech_samples(f));
                 float tmp[nout];
-                for(int i=0; i<nout; i++)
+                for(int i=0; i<nout/2; i++)
                     f->passthrough_2020[FDMDV_OS_TAPS_16K+i] = demod_in[i];
-                fdmdv_8_to_16(tmp, &f->passthrough_2020[FDMDV_OS_TAPS_16K], nout);
+                fdmdv_8_to_16(tmp, &f->passthrough_2020[FDMDV_OS_TAPS_16K], nout/2);
                 for(int i=0; i<nout; i++)
                     speech_out[i] = passthrough_gain*tmp[i];
             } else {
@@ -808,7 +808,7 @@ int freedv_bits_to_speech(struct freedv *f, short speech_out[], short demod_in[]
         }
     }
 
-    if (rx_status & RX_SYNC) {
+    if ((rx_status & RX_SYNC) && (rx_status & RX_BITS)) {
        /* following logic is tricky so spell it out clearly, see table
           in: https://github.com/drowe67/codec2/pull/111 */
         

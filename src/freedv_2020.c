@@ -110,8 +110,9 @@ void freedv_2020_open(struct freedv *f, struct freedv_advanced *adv) {
     f->tx_bits = NULL; 
     f->codec_bits = NULL;
 
-    /* storage for pass through audio interpolating filter */
-    f->passthrough_2020 = CALLOC(1, sizeof(float)*(FDMDV_OS_TAPS_16K + ofdm_get_max_samples_per_frame()));
+    /* storage for pass through audio interpolating filter.  These are
+       the rate FREEDV_FS_8000 modem input samples before interpolation */
+    f->passthrough_2020 = CALLOC(1, sizeof(float)*(FDMDV_OS_TAPS_16K + freedv_get_n_max_modem_samples(f)));
     assert(f->passthrough_2020 != NULL);
         
     if (f->interleave_frames > 1) {
