@@ -172,6 +172,7 @@ void freedv_data_channel_rx_frame(struct freedv_data_channel *fdc, unsigned char
             unsigned char calc_crc = fdc_crc4(data, size);
             if (calc_crc == end_bits) {
 	        /* It is a single header field, remember it for later */
+                memcpy(fdc->rx_header, data, 6);
                 memcpy(fdc->packet_rx + 6, data, 6);
 		memcpy(fdc->packet_rx, fdc_header_bcast, 6);
                 if (fdc->cb_rx) {
