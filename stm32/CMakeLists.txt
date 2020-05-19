@@ -168,6 +168,10 @@ ${CODEC2_SRC}/dump.c
 ${CODEC2_SRC}/cohpsk.c
 ${CODEC2_SRC}/fdmdv.c
 ${CODEC2_SRC}/freedv_api.c
+${CODEC2_SRC}/freedv_1600.c
+${CODEC2_SRC}/freedv_700.c
+${CODEC2_SRC}/freedv_2020.c
+${CODEC2_SRC}/freedv_fsk.c
 ${CODEC2_SRC}/filter.c
 ${CODEC2_SRC}/varicode.c
 ${CODEC2_SRC}/golay23.c
