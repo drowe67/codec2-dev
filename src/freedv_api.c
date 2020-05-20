@@ -701,7 +701,7 @@ int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]) {
     assert(f != NULL);    
     assert(f->nin <= f->n_max_modem_samples);
     int rx_status = 0;
-    f->nin_prev = f->nin;
+    f->nin_prev = freedv_nin(f);
    
     if (FDV_MODE_ACTIVE( FREEDV_MODE_1600, f->mode)) {
         rx_status = freedv_comprx_fdmdv_1600(f, demod_in);
@@ -802,7 +802,7 @@ int freedv_bits_to_speech(struct freedv *f, short speech_out[], short demod_in[]
                 for(int i=0; i<nout; i++)
                     speech_out[i] = passthrough_gain*tmp[i];
             } else {
-                nout = f->nin_prev;
+                nout = f->nin_prev;                    
                 for(int i=0; i<nout; i++)
                     speech_out[i] = passthrough_gain*demod_in[i];
            }
@@ -1155,6 +1155,9 @@ void freedv_set_eq(struct freedv *f, int val) {
 
 void freedv_set_verbose(struct freedv *f, int verbosity) {
     f->verbose = verbosity;
+    if (FDV_MODE_ACTIVE( FREEDV_MODE_700C, f->mode)) {
+        cohpsk_set_verbose(f->cohpsk, f->verbose);
+    }
     if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode)) {
         ofdm_set_verbose(f->ofdm, f->verbose);
     }

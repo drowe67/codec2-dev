@@ -335,15 +335,16 @@ int freedv_comprx_700c(struct freedv *f, COMP demod_in_8kHz[]) {
     rx_status = 0;
     
     // quisk_cfInterpDecim() modifies input data so lets make a copy just in case there
-    // is no sync and we need to echo inout to output
+    // is no sync and we need to echo inpout to output
 
+    // freedv_nin(f): input samples at Fs=8000 Hz
+    // f->nin: input samples at Fs=7500 Hz
+    
     COMP demod_in[freedv_nin(f)];
     for(i=0; i<freedv_nin(f); i++)
         demod_in[i] = demod_in_8kHz[i];
 
     i = quisk_cfInterpDecim((complex float *)demod_in, freedv_nin(f), f->ptFilter8000to7500, 15, 16);
-    //if (i != f->nin)
-    //    printf("freedv_comprx decimation: input %d output %d\n", freedv_nin(f), i);
 
     for(i=0; i<f->nin; i++)
         demod_in[i] = fcmult(1.0/FDMDV_SCALE, demod_in[i]);
