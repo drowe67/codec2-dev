@@ -1012,7 +1012,7 @@ static int ofdm_sync_search_core(struct OFDM *ofdm) {
     PROFILE_SAMPLE_AND_LOG2(freq_start, "  freq");
 
     if (ofdm->verbose != 0) {
-        fprintf(stderr, "   ct_est: %4d foff_est: %4.1f timing_valid: %d timing_mx: %5.4f\n",
+        fprintf(stderr, "    ct_est: %4d foff_est: %4.1f timing_valid: %d timing_mx: %5.4f\n",
                 ct_est, (double) ofdm->coarse_foff_est_hz, timing_valid,
                 (double)timing_mx);
     }

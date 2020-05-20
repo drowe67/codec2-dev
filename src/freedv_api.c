@@ -802,8 +802,9 @@ int freedv_bits_to_speech(struct freedv *f, short speech_out[], short demod_in[]
                 for(int i=0; i<nout; i++)
                     speech_out[i] = passthrough_gain*tmp[i];
             } else {
-               for(int i=0; i<nout; i++)
-                   speech_out[i] = passthrough_gain*demod_in[i];
+                nout = f->nin_prev;
+                for(int i=0; i<nout; i++)
+                    speech_out[i] = passthrough_gain*demod_in[i];
            }
         }
     }
@@ -881,6 +882,10 @@ int freedv_bits_to_speech(struct freedv *f, short speech_out[], short demod_in[]
                 }
             }
         }
+    }
+
+    if (f->verbose == 2) {
+        fprintf(stderr, "    sqen: %d nout: %d decsp: %d\n", f->squelch_en, nout, decode_speech);
     }
     
     assert(nout <= freedv_get_n_max_speech_samples(f));    
