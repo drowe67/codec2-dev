@@ -47,20 +47,31 @@
   extern "C" {
 #endif
 
-// identifiers for no- Codec2 Speech codecs, make sure no overlpa with CODEC2_XXX modes
+// Experimentally derived fudge factors to normalise Tx power across modes
+#define NORM_PWR_COHPSK  1.74   
+#define NORM_PWR_FSK     0.193 
+#define NORM_PWR_OFDM    1.00
+
+// identifiers for non Codec 2 Speech codecs, make sure no overlap with CODEC2_XXX modes
 #define CODEC_MODE_LPCNET_1733 100
+
+// Return code flags for freedv_*rx* functions
+#define RX_TRIAL_SYNC       0x1       // set if demodulator has trial sync
+#define RX_SYNC             0x2       // set if demodulator has sync
+#define RX_BITS             0x4       // set if data bits have been returned
+#define RX_BIT_ERRORS       0x8       // set if there are some uncorrectable errors in the data bits
       
 struct freedv {
     int                  mode;
 
-    /* states for various modems we support */
-    
+    // states for various modems we support
     struct CODEC2       *codec2;
     struct FDMDV        *fdmdv;
     struct COHPSK       *cohpsk;
     struct FSK          *fsk;
     struct FMFSK        *fmfsk;
     struct OFDM         *ofdm;
+    struct OFDM_CONFIG  *ofdm_config;
     struct LDPC         *ldpc;
     struct MODEM_STATS   stats;
 #ifdef __LPCNET__
@@ -124,10 +135,15 @@ struct freedv {
     float                snr_est;
     float                snr_squelch_thresh;
     int                  squelch_en;
-    int                  nin;
+    int                  nin, nin_prev;
     int                  verbose;
     int                  ext_vco;                            /* 2400A/800XA use external VCO flag */
+    float               *passthrough_2020;                   /* 2020 interpolating filter */
 
+    int                  ofdm_bitsperframe;
+    int                  ofdm_nuwbits;
+    int                  ofdm_ntxtbits;
+    
     /* Varicode txt channel states ----------------------------------------------------------------------*/
     
     struct VARICODE_DEC  varicode_dec_states;
@@ -159,6 +175,38 @@ struct freedv {
     int n_protocol_bits;
 };
 
+// open function for each mode
+      
+void freedv_1600_open(struct freedv *f);
+void freedv_700c_open(struct freedv *f, int nbit);
+void freedv_700d_open(struct freedv *f, struct freedv_advanced *adv);
+void freedv_2020_open(struct freedv *f, struct freedv_advanced *adv);
+void freedv_2400a_open(struct freedv *f);
+void freedv_2400b_open(struct freedv *f);
+void freedv_800xa_open(struct freedv *f);
+
+// each mode has tx and rx functions in various flavours for real and complex valued samples
+
+void freedv_comptx_fdmdv_1600(struct freedv *f, COMP mod_out[]);
+int freedv_comprx_fdmdv_1600(struct freedv *f, COMP demod_in[]);
+      
+void freedv_comptx_700c(struct freedv *f, COMP mod_out[]);
+int freedv_comprx_700c(struct freedv *f, COMP demod_in_8kHz[]);
+
+void freedv_comptx_700d(struct freedv *f, COMP mod_out[]);
+int freedv_comp_short_rx_700d(struct freedv *f, void *demod_in_8kHz, int demod_in_is_short, float gain);
+
+void freedv_comptx_2020(struct freedv *f, COMP mod_out[]);
+int freedv_comprx_2020(struct freedv *f, COMP demod_in[]);
+
+void freedv_comptx_fsk_voice(struct freedv *f, COMP mod_out[]);
+void freedv_tx_fsk_voice(struct freedv *f, short mod_out[]);
+void freedv_tx_fsk_data(struct freedv *f, short mod_out[]);
+int freedv_comprx_fsk(struct freedv *f, COMP demod_in[]);
+int freedv_floatrx(struct freedv *f, short speech_out[], float demod_in[]);
+      
+int freedv_bits_to_speech(struct freedv *f, short speech_out[], short demod_in[], int rx_status);
+      
 #ifdef __cplusplus
 }
 #endif

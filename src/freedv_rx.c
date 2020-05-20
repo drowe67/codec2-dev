@@ -88,7 +88,7 @@ void my_datatx(void *callback_state, unsigned char *packet, size_t *size) {
 int main(int argc, char *argv[]) {
     FILE                      *fin, *fout, *ftxt;
     struct freedv             *freedv;
-    int                        nin, nout, frame = 0;
+    int                        nin, nout, nout_total = 0, frame = 0;
     struct my_callback_state   my_cb_state;
     struct MODEM_STATS         stats = {0};
     int                        mode;
@@ -96,6 +96,8 @@ int main(int argc, char *argv[]) {
     float                      snr_est;
     float                      clock_offset;
     int                        use_codecrx, use_testframes, interleave_frames, verbose, discard, use_complex, use_dpsk;
+    int                        use_squelch;
+    float                      squelch = 0;
     struct CODEC2             *c2 = NULL;
     int                        i;
 
@@ -106,7 +108,7 @@ int main(int argc, char *argv[]) {
         sprintf(f2020,"|2020");
         #endif     
 	printf("usage: %s 1600|700C|700D|2400A|2400B|800XA%s InputModemSpeechFile OutputSpeechRawFile\n"
-               " [--testframes] [--interleaver depth] [--codecrx] [-v] [--discard] [--usecomplex] [--dpsk]\n", argv[0],f2020);
+               " [--testframes] [--interleaver depth] [--codecrx] [-v] [--discard] [--usecomplex] [--dpsk] [--squelch leveldB]\n", argv[0],f2020);
 	printf("e.g    %s 1600 hts1a_fdmdv.raw hts1a_out.raw\n", argv[0]);
 	exit(1);
     }
@@ -145,7 +147,8 @@ int main(int argc, char *argv[]) {
     }
 
     use_codecrx = 0; use_testframes = 0; interleave_frames = 1; verbose = 0; discard = 0; use_complex = 0; use_dpsk = 0;
-
+    use_squelch = 0;
+    
     if (argc > 4) {
         for (i = 4; i < argc; i++) {
             if (strcmp(argv[i], "--testframes") == 0) {
@@ -181,6 +184,10 @@ int main(int argc, char *argv[]) {
                 fprintf(stderr, "using complex!\n");
                 use_complex = 1;
             }
+            if (strcmp(argv[i], "--squelch") == 0) {
+                squelch = atof(argv[i+1]);
+                use_squelch = 1;
+            }
             if (strcmp(argv[i], "--dpsk") == 0) {
                 use_dpsk = 1;
             }
@@ -200,11 +207,13 @@ int main(int argc, char *argv[]) {
     freedv_set_test_frames(freedv, use_testframes);
     freedv_set_verbose(freedv, verbose);
 
-    freedv_set_snr_squelch_thresh(freedv, -100.0);
-    freedv_set_squelch_en(freedv, 0);
+    if (use_squelch) {
+        freedv_set_snr_squelch_thresh(freedv, squelch);
+        freedv_set_squelch_en(freedv, 1);
+    }
     freedv_set_dpsk(freedv, use_dpsk);
 
-    short speech_out[freedv_get_n_speech_samples(freedv)];
+    short speech_out[freedv_get_n_max_speech_samples(freedv)];
     short demod_in[freedv_get_n_max_modem_samples(freedv)];
 
     ftxt = fopen("freedv_rx_log.txt","wt");
@@ -268,24 +277,26 @@ int main(int argc, char *argv[]) {
 
         nin = freedv_nin(freedv);
 
-        fwrite(speech_out, sizeof(short), nout, fout);
         freedv_get_modem_stats(freedv, &sync, &snr_est);
         freedv_get_modem_extended_stats(freedv, &stats);
         int total_bit_errors = freedv_get_total_bit_errors(freedv);
         clock_offset = stats.clock_offset;
 
-       if (discard && (sync == 0)) {
+        if (discard && (sync == 0)) {
             // discard BER results if we get out of sync, helps us get sensible BER results
             freedv_set_total_bits(freedv, 0); freedv_set_total_bit_errors(freedv, 0);
             freedv_set_total_bits_coded(freedv, 0); freedv_set_total_bit_errors_coded(freedv, 0);
         }
 
+        fwrite(speech_out, sizeof(short), nout, fout);
+        nout_total += nout;
+        
         /* log some side info to the txt file */
 
         if (ftxt != NULL) {
             fprintf(ftxt, "frame: %d  demod sync: %d  nin: %d demod snr: %3.2f dB  bit errors: %d clock_offset: %f\n",
                     frame, sync, nin, snr_est, total_bit_errors, clock_offset);
-       }
+        }
 
 	/* if this is in a pipeline, we probably don't want the usual
            buffering to occur */
@@ -293,6 +304,11 @@ int main(int argc, char *argv[]) {
         if (fout == stdout) fflush(stdout);
         if (fin == stdin) fflush(stdin);
     }
+
+    fclose(ftxt);
+    fclose(fin);
+    fclose(fout);
+    fprintf(stderr, "frames decoded: %d  output speech samples: %d\n", frame, nout_total);
 
     if (freedv_get_test_frames(freedv)) {
         int Tbits = freedv_get_total_bits(freedv);
@@ -315,11 +331,7 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    fclose(ftxt);
     freedv_close(freedv);
-    fclose(fin);
-    fclose(fout);
-    
     return 0;
 }
 
