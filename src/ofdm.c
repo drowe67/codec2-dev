@@ -84,11 +84,11 @@ static const int8_t pilotvalues[] = {
    1, 1, 1, 1,-1, 1,-1, 1
 };
 
-/* static variables - used as storage for constants that are unchanged after init-time */
+/* constants that define modem waveform, unchanged after init-time,
+   but may vary for each instance of the modem */
 
-static struct OFDM_CONFIG ofdm_config;
+#define ofdm_tx_centre (ofdm->config.tx_centre)
 
-static float ofdm_tx_centre; /* TX Center frequency */
 static float ofdm_rx_centre; /* RX Center frequency */
 static float ofdm_fs; /* Sample rate */
 static float ofdm_ts; /* Symbol cycle time */
@@ -167,13 +167,10 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     float tval;
     int i, j;
 
-    /* Check if called correctly */
+    ofdm = (struct OFDM *) MALLOC(sizeof (struct OFDM));
+    assert(ofdm != NULL);
 
     if (config == NULL) {
-        return NULL;
-    }
-
-    if (config->nc == 0) {
         /* Fill in default values */
 
         ofdm_nc = 17; /* Number of carriers */
@@ -215,20 +212,20 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     ofdm_ncp = (int) (ofdm_tcp * ofdm_fs); /* 16 */
     ofdm_inv_m = (1.0f / (float) ofdm_m);
 
-    /* Copy structure into global */
+    /* Copy constants into states */
 
-    ofdm_config.tx_centre = ofdm_tx_centre;
-    ofdm_config.rx_centre = ofdm_rx_centre;
-    ofdm_config.fs = ofdm_fs;
-    ofdm_config.rs = ofdm_rs;
-    ofdm_config.ts = ofdm_ts;
-    ofdm_config.tcp = ofdm_tcp;
-    ofdm_config.ofdm_timing_mx_thresh = ofdm_timing_mx_thresh;
-    ofdm_config.nc = ofdm_nc;
-    ofdm_config.ns = ofdm_ns;
-    ofdm_config.bps = ofdm_bps;
-    ofdm_config.txtbits = ofdm_ntxtbits;
-    ofdm_config.ftwindowwidth = ofdm_ftwindowwidth;
+    ofdm->config.tx_centre = ofdm_tx_centre;
+    ofdm->config.rx_centre = ofdm_rx_centre;
+    ofdm->config.fs = ofdm_fs;
+    ofdm->config.rs = ofdm_rs;
+    ofdm->config.ts = ofdm_ts;
+    ofdm->config.tcp = ofdm_tcp;
+    ofdm->config.ofdm_timing_mx_thresh = ofdm_timing_mx_thresh;
+    ofdm->config.nc = ofdm_nc;
+    ofdm->config.ns = ofdm_ns;
+    ofdm->config.bps = ofdm_bps;
+    ofdm->config.txtbits = ofdm_ntxtbits;
+    ofdm->config.ftwindowwidth = ofdm_ftwindowwidth;
 
     /* Calculate sizes from config param */
 
@@ -239,10 +236,6 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     ofdm_rxbuf = 3 * ofdm_samplesperframe + 3 * (ofdm_m + ofdm_ncp);
     ofdm_nuwbits = (ofdm_ns - 1) * ofdm_bps - ofdm_ntxtbits;    // 10
     
-    /* Were ready to start filling in the OFDM structure now */
-    ofdm = (struct OFDM *) MALLOC(sizeof (struct OFDM));
-    assert(ofdm != NULL);
-
     ofdm->pilot_samples = MALLOC(sizeof (complex float) * (ofdm_m + ofdm_ncp));
     assert(ofdm->pilot_samples != NULL);
 
@@ -818,29 +811,12 @@ void ofdm_txframe(struct OFDM *ofdm, complex float *tx, complex float *tx_sym_li
     }
 }
 
-struct OFDM_CONFIG *ofdm_get_config_param() {
-    return &ofdm_config;
-}
-
-int ofdm_get_nin(struct OFDM *ofdm) {
-    return ofdm->nin;
-}
-
-int ofdm_get_samples_per_frame() {
-    return ofdm_samplesperframe;
-}
-
-int ofdm_get_max_samples_per_frame() {
-    return ofdm_max_samplesperframe;
-}
-
-int ofdm_get_bits_per_frame() {
-    return ofdm_bitsperframe;
-}
-
-void ofdm_set_verbose(struct OFDM *ofdm, int level) {
-    ofdm->verbose = level;
-}
+struct OFDM_CONFIG *ofdm_get_config_param(struct OFDM *ofdm) { return &ofdm->config; }
+int ofdm_get_nin(struct OFDM *ofdm) {return ofdm->nin;}
+int ofdm_get_samples_per_frame(struct OFDM *ofdm) { return ofdm_samplesperframe;}
+int ofdm_get_max_samples_per_frame(struct OFDM *ofdm) {return ofdm_max_samplesperframe; }
+int ofdm_get_bits_per_frame(struct OFDM *ofdm) {return  ofdm_bitsperframe; }
+void ofdm_set_verbose(struct OFDM *ofdm, int level) { ofdm->verbose = level; }
 
 void ofdm_set_timing_enable(struct OFDM *ofdm, bool val) {
     ofdm->timing_en = val;

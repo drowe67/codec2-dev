@@ -89,9 +89,13 @@ struct OFDM_CONFIG {
     int bps;   /* Bits per Symbol */
     int txtbits; /* number of auxiliary data bits */
     int ftwindowwidth;
+
+    int samples_per_frame;
 };
 
 struct OFDM {
+    struct OFDM_CONFIG config;
+    
     // Pointers
 
     struct quisk_cfFilter *ofdm_tx_bpf;

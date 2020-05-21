@@ -136,17 +136,11 @@ void freedv_700d_open(struct freedv *f, struct freedv_advanced *adv) {
         f->snr_squelch_thresh = 0.0;
         f->squelch_en = 0;
 
-        f->ofdm_config = (struct OFDM_CONFIG *) CALLOC(1, sizeof (struct OFDM_CONFIG));
-        assert(f->ofdm_config != NULL);
-
-        f->ofdm = ofdm_create(f->ofdm_config);
+        f->ofdm = ofdm_create(NULL);
 	assert(f->ofdm != NULL);
-        FREE(f->ofdm_config);
         
-        /* Get a copy of the actual modem config */
-        f->ofdm_config = ofdm_get_config_param();
-
-        f->ofdm_bitsperframe = ofdm_get_bits_per_frame();
+        f->ofdm_config = ofdm_get_config_param(f->ofdm);
+        f->ofdm_bitsperframe = ofdm_get_bits_per_frame(f->ofdm);
         f->ofdm_nuwbits = (f->ofdm_config->ns - 1) * f->ofdm_config->bps - f->ofdm_config->txtbits;
         f->ofdm_ntxtbits = f->ofdm_config->txtbits;
 
@@ -181,10 +175,10 @@ void freedv_700d_open(struct freedv *f, struct freedv_advanced *adv) {
             f->codeword_amps[i] = 0.0;
         }
 
-        f->nin = f->nin_prev = ofdm_get_samples_per_frame();
-        f->n_nat_modem_samples = ofdm_get_samples_per_frame();
-        f->n_nom_modem_samples = ofdm_get_samples_per_frame();
-        f->n_max_modem_samples = ofdm_get_max_samples_per_frame();
+        f->nin = f->nin_prev = ofdm_get_samples_per_frame(f->ofdm);
+        f->n_nat_modem_samples = ofdm_get_samples_per_frame(f->ofdm);
+        f->n_nom_modem_samples = ofdm_get_samples_per_frame(f->ofdm);
+        f->n_max_modem_samples = ofdm_get_max_samples_per_frame(f->ofdm);
         f->modem_sample_rate = f->ofdm_config->fs;
         f->clip = 0;
         f->sz_error_pattern = f->ofdm_bitsperframe;
