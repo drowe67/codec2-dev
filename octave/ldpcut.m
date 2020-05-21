@@ -196,7 +196,7 @@ function test3_curves
   EbNodB = sim_in.EbNodBvec;
   uncoded_awgn_ber_theory = 0.5*erfc(sqrt(10.^(EbNodB/10)));
 
-  figure(1); clf
+  figure(1); clf; title('Test3 Wimax LPC code');
   semilogy(EbNodB, uncoded_awgn_ber_theory,'r-+;AWGN;')
   hold on;
   semilogy(EbNodB, sim_out.BER+1E-10,'g-+;AWGN LDPC;');
@@ -205,7 +205,7 @@ function test3_curves
   xlabel('Eb/No (dB)')
   ylabel('BER')
   axis([min(EbNodB) max(EbNodB) 1E-3 1])
-  legend('boxoff')
+  legend('boxoff'); 
 end
 
 function test4_qam16
@@ -240,17 +240,17 @@ function test4_qam16
       Tbits += code_param.ldpc_data_bits_per_frame; Terrs += Nerr;
       if Nerr Perrs++; end
     end
-    figure(1); clf; plot(rx_symbols_log,"+"); axis([-1.5 1.5 -1.5 1.5]); drawnow;
+    figure(2); clf; plot(rx_symbols_log,"."); axis([-1.5 1.5 -1.5 1.5]); drawnow;
     printf("EbNodB: %4.1f Tbits: %6d Terrs: %6d Perrs: %6d CBER: %5.2f CPER: %5.2f\n",
     EbNodB, Tbits, Terrs, Perrs, Terrs/Tbits, Perrs/Ntrials);
     cber(i) = Terrs/Tbits; cper(i) = Perrs/Ntrials;
   end
   print("qam64_scatter.png","-dpng");
-  figure(2); clf; title('QAM16 with LDPC (504,396)'); 
+  figure(3); clf; title('QAM16 with LDPC (504,396)'); 
   semilogy(EbNodBvec,cber+1E-10,'b+-;QAM16 coded BER;','markersize', 10, 'linewidth', 2); hold on;
   semilogy(EbNodBvec,cper+1E-10,'g+-;QAM16 coded PER;','markersize', 10, 'linewidth', 2); hold off;
   grid; axis([min(EbNodBvec) max(EbNodBvec) 1E-5 1]); xlabel('Eb/No (dB)');
-  figure(3); clf; title('QAM16 with LDPC (504,396)'); 
+  figure(4); clf; title('QAM16 with LDPC (504,396)'); 
   semilogy(EsNodBvec,cber+1E-10,'b+-;QAM16 coded BER;','markersize', 10, 'linewidth', 2); hold on;
   semilogy(EsNodBvec,cper+1E-10,'g+-;QAM16 coded PER;','markersize', 10, 'linewidth', 2); hold off;
   grid; axis([min(EsNodBvec) max(EsNodBvec) 1E-5 1]); xlabel('Es/No (dB)');
@@ -272,6 +272,7 @@ format;
 init_cml('~/cml/');
 
 if getenv("SHORT_VERSION_FOR_CTEST")
+  test1_single
   return;
 end
 if exist("qam16")
