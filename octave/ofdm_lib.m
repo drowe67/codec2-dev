@@ -10,6 +10,207 @@
 
 1;
 
+%-------------------------------------------------------------
+% ofdm_init
+%-------------------------------------------------------------
+
+#{
+  Frame has Ns-1 data symbols between pilots, e.g. for Ns=3: 
+  
+    PPP
+    DDD
+    DDD
+    PPP
+#}
+
+function states = ofdm_init(bps, Rs, Tcp, Ns, Nc)
+  states.Fs = 8000;
+  states.bps = bps;
+  states.Rs = Rs;
+  states.Tcp = Tcp;
+  states.Ns = Ns;       % step size for pilots
+  states.Nc = Nc;       % Number of cols, aka number of carriers
+  states.M  = states.Fs/Rs; 
+  states.Ncp = Tcp*states.Fs;
+  states.Nbitsperframe = (Ns-1)*Nc*bps;
+  states.Nrowsperframe = states.Nbitsperframe/(Nc*bps);
+  states.Nsamperframe =  (states.Nrowsperframe+1)*(states.M+states.Ncp);
+  states.Ntxtbits = 4;   % reserved bits/frame for auxillary text information
+  states.Nuwbits  = bps*5;   % Let use 5 symbols for the UW, note longer for QAM
+  states.qam16 = [
+    1 + j,  1 + j*3,  3 + j,  3 + j*3;
+    1 - j,  1 - j*3,  3 - j,  3 - j*3;
+   -1 + j, -1 + j*3, -3 + j, -3 + j*3;
+   -1 - j, -1 - j*3, -3 - j, -3 - j*3]/3;
+   
+  % some basic sanity checks
+  assert(floor(states.M) == states.M);
+  test_qam16(states.qam16);
+  
+  % UW symbol placement, designed to get no false syncs at any freq
+  % offset.  Use ofdm_dev.m, debug_false_sync() to test.  Note we need
+  % to pair the UW bits so the fit into symbols.  The LDPC decoder
+  % works on symbols so we can't break up any symbols into UW/LDPC
+  % bits.
+  
+  states.uw_ind = states.uw_ind_sym = [];
+  for i=1:states.Nuwbits/bps
+    ind_sym = floor(i*(Nc+1)/bps+1);
+    states.uw_ind_sym = [states.uw_ind_sym ind_sym];   % symbol index
+    for b=bps-1:-1:0
+      states.uw_ind = [states.uw_ind bps*ind_sym-b];   % bit index
+    end  
+  end
+
+  states.tx_uw = zeros(1,states.Nuwbits);       
+  assert(length(states.tx_uw) == states.Nuwbits);
+  tx_uw_syms = [];
+  for b=1:bps:states.Nuwbits
+    tx_uw_syms = [tx_uw_syms qpsk_mod(states.tx_uw(b:b+1))];
+  end
+  states.tx_uw_syms = tx_uw_syms;
+  
+  % use this to scale tx output to 16 bit short.  Adjusted by experiment
+  % to have same RMS power as FDMDV waveform
+  
+  states.amp_scale = 2E5*1.1491/1.06;
+
+  % this is used to scale inputs to LDPC decoder to make it amplitude indep
+  
+  states.mean_amp = 0;
+
+  % generate same pilots each time
+
+  rand('seed',1);
+  states.pilots = 1 - 2*(rand(1,Nc+2) > 0.5);
+  %printf("number of pilots total: %d\n", length(states.pilots));
+  
+  % carrier tables for up and down conversion
+
+  fcentre = 1500;
+  alower = fcentre - Rs * (Nc/2);  % approx frequency of lowest carrier
+  Nlower = round(alower / Rs) - 1; % round this to nearest integer multiple from 0Hz to keep DFT happy
+  %printf("  fcentre: %f alower: %f alower/Rs: %f Nlower: %d\n", fcentre, alower, alower/Rs, Nlower);
+  w = (Nlower:Nlower+Nc+1)*2*pi/(states.Fs/Rs);
+  W = zeros(Nc+2,states.M);
+  for c=1:Nc+2
+    W(c,:) = exp(j*w(c)*(0:states.M-1));
+  end
+  states.w = w;
+  states.W = W;
+
+  % fine timing search +/- window_width/2 from current timing instant
+
+  states.ftwindow_width = 11; 
+ 
+  % Receive buffer: D P DDD P DDD P DDD P D
+  %                         ^
+  % also see ofdm_demod() ...
+
+  states.Nrxbuf = 3*states.Nsamperframe+states.M+states.Ncp + 2*(states.M + states.Ncp);
+  states.rxbuf = zeros(1, states.Nrxbuf);
+ 
+  % default settings on a bunch of options and states
+
+  states.verbose = 0;
+  states.timing_en = 1;
+  states.foff_est_en = 1;
+  states.phase_est_en = 1;
+  states.phase_est_bandwidth = "high";
+  states.dpsk = 0;
+  
+  states.foff_est_gain = 0.1;
+  states.foff_est_hz = 0;
+  states.sample_point = states.timing_est = 1;
+  states.nin = states.Nsamperframe;
+  states.timing_valid = 0;
+  states.timing_mx = 0;
+  states.coarse_foff_est_hz = 0;
+
+  states.foff_metric = 0;
+  
+  % generate OFDM pilot symbol, used for timing and freq offset est
+
+  rate_fs_pilot_samples = states.pilots * W/states.M;
+
+  % During tuning it was found that not including the cyc prefix in
+  % rate_fs_pilot_samples produced better fest results
+  
+  %states.rate_fs_pilot_samples = [rate_fs_pilot_samples(states.M-states.Ncp+1:states.M) rate_fs_pilot_samples];
+  states.rate_fs_pilot_samples = [zeros(1,states.Ncp) rate_fs_pilot_samples];
+
+  % pre-compute a constant used to detect valid modem frames
+
+  Npsam = length(states.rate_fs_pilot_samples);
+  states.timing_norm = Npsam*(states.rate_fs_pilot_samples * states.rate_fs_pilot_samples');
+  % printf("timing_norm: %f\n", states.timing_norm)
+
+  % sync state machine
+
+  states.sync_state = states.last_sync_state = 'search'; 
+  states.uw_errors = 0;
+  states.sync_counter = 0;
+  states.frame_count = 0;
+  states.sync_start = 0;
+  states.sync_end = 0;
+  states.sync_state_interleaver = 'search';
+  states.last_sync_state_interleaver = 'search';
+  states.frame_count_interleaver = 0;
+   
+  % LDPC code is optionally enabled
+
+  states.rate = 1.0;
+  states.ldpc_en = 0;
+
+  % init some output states for logging
+  
+  states.rx_sym = zeros(1+Ns+1+1, Nc+2);
+
+  % Es/No (SNR) est states
+  
+  states.noise_var = 0;
+  states.sig_var = 0;
+
+  states.clock_offset_est = 0;
+endfunction
+
+
+%
+%  Helper function to set up modems for various FreeDV modes, and parse mode string
+%
+% usage: ofdm_init_mode("Ts=0.018 Nc=17 Ncp=0.002")
+
+function [bps Rs Tcp Ns Nc] = ofdm_init_mode(mode="700D")
+  bps = 2; Tcp = 0.002; Ns=8;
+
+  % some "canned" modes
+  if strcmp(mode,"700D")
+    Ts = 0.018; Nc = 17;
+  elseif strcmp(mode,"2020")
+    Ts = 0.0205; Nc = 31;
+  elseif strcmp(mode,"2200")
+    Tframe = 0.175; Ts = Tframe/Ns; Nc = 37;
+  elseif strcmp(mode,"QAM16")
+    Ns=4; Tcp = 0.004; Tframe = 0.08; Ts = Tframe/Ns; Nc = 37; bps=4;
+  elseif strcmp(mode,"1")
+    Ns=100; Tcp = 0; Tframe = 0.1; Ts = Tframe/Ns; Nc = 1; bps=2;
+  else
+    % try to parse mode string for user defined mode
+    vec = sscanf(mode, "Ts=%f Nc=%d Ncp=%f");
+    Ts=vec(1); Nc=vec(2); Ncp=vec(3);
+  end
+  Rs=1/Ts;
+end
+
+
+function print_config(states)
+  ofdm_load_const;
+  printf("Rs=%5.2f Nc=%d Tcp=%4.3f ", Rs, Nc, Tcp);
+  printf("Nbitsperframe: %d Nrowsperframe: %d Ntxtbits: %d Nuwbits: %d ",
+          Nbitsperframe, Nrowsperframe, Ntxtbits, Nuwbits);
+  printf("bits/s: %4.1f\n",  Nbitsperframe*Rs/Ns);
+end
+
 % Gray coded QPSK modulation function
 function symbol = qpsk_mod(two_bits)
     two_bits_decimal = sum(two_bits .* [2 1]); 
@@ -28,24 +229,16 @@ function two_bits = qpsk_demod(symbol)
     two_bits = [bit1 bit0];
 endfunction
 
-global qam16_symbols = [
- 1 + j,  1 + j*3,  3 + j,  3 + j*3;
- 1 - j,  1 - j*3,  3 - j,  3 - j*3;
--1 + j, -1 + j*3, -3 + j, -3 + j*3;
--1 - j, -1 - j*3, -3 - j, -3 - j*3];
- 
-function symbol = qam16_mod(four_bits)
-    global qam16_symbols;
+function symbol = qam16_mod(constellation, four_bits)
     bits_decimal = sum(four_bits .* [8 4 2 1]);
-    symbol = qam16_symbols(bits_decimal+1)/3;
+    symbol = constellation(bits_decimal+1);
     % same convention as QPSK mapping above
     symbol *= exp(-j*pi/4);
 endfunction
 
-function four_bits = qam16_demod(symbol)
-    global qam16_symbols;
+function four_bits = qam16_demod(constellation, symbol)
     symbol *= exp(j*pi/4);
-    dist = abs(3*symbol - qam16_symbols(1:16));
+    dist = abs(symbol - constellation(1:16));
     [tmp decimal] = min(dist);
     four_bits = zeros(1,4);
     for i=1:4
@@ -53,14 +246,14 @@ function four_bits = qam16_demod(symbol)
     end
 endfunction
 
-function test_qam16()
+function test_qam16(constellation)
     for decimal=0:15
       tx_bits = zeros(1,4);
       for i=1:4
         tx_bits(1,5-i) = bitand(bitshift(decimal-1,1-i),1);
       end
-      symbol = qam16_mod(tx_bits);
-      rx_bits = qam16_demod(symbol);
+      symbol = qam16_mod(constellation, tx_bits);
+      rx_bits = qam16_demod(constellation,symbol);
       assert(tx_bits == rx_bits);
     end
 endfunction
@@ -202,203 +395,6 @@ function foff_est = est_freq_offset_pilot_corr(states, rx, rate_fs_pilot_samples
 endfunction
 
 
-%
-%  Helper function to set up modems for various FreeDV modes, and parse mode string
-%
-% usage: ofdm_init_mode("Ts=0.018 Nc=17 Ncp=0.002")
-
-function [bps Rs Tcp Ns Nc] = ofdm_init_mode(mode="700D")
-  bps = 2; Tcp = 0.002; Ns=8;
-
-  % some "canned" modes
-  if strcmp(mode,"700D")
-    Ts = 0.018; Nc = 17;
-  elseif strcmp(mode,"2020")
-    Ts = 0.0205; Nc = 31;
-  elseif strcmp(mode,"2200")
-    Tframe = 0.175; Ts = Tframe/Ns; Nc = 37;
-  elseif strcmp(mode,"QAM16")
-    Ns=4; Tcp = 0.004; Tframe = 0.08; Ts = Tframe/Ns; Nc = 37; bps=4;
-  elseif strcmp(mode,"1")
-    Ns=100; Tcp = 0; Tframe = 0.1; Ts = Tframe/Ns; Nc = 1; bps=2;
-  else
-    % try to parse mode string for user defined mode
-    vec = sscanf(mode, "Ts=%f Nc=%d Ncp=%f");
-    Ts=vec(1); Nc=vec(2); Ncp=vec(3);
-  end
-  Rs=1/Ts;
-end
-
-
-%-------------------------------------------------------------
-% ofdm_init
-%-------------------------------------------------------------
-
-#{
-  Frame has Ns-1 data symbols between pilots, e.g. for Ns=3: 
-  
-    PPP
-    DDD
-    DDD
-    PPP
-#}
-
-function print_config(states)
-  ofdm_load_const;
-  printf("Rs=%5.2f Nc=%d Tcp=%4.3f ", Rs, Nc, Tcp);
-  printf("Nbitsperframe: %d Nrowsperframe: %d Ntxtbits: %d Nuwbits: %d ",
-          Nbitsperframe, Nrowsperframe, Ntxtbits, Nuwbits);
-  printf("bits/s: %4.1f\n",  Nbitsperframe*Rs/Ns);
-end
-
-function states = ofdm_init(bps, Rs, Tcp, Ns, Nc)
-  states.Fs = 8000;
-  states.bps = bps;
-  states.Rs = Rs;
-  states.Tcp = Tcp;
-  states.Ns = Ns;       % step size for pilots
-  states.Nc = Nc;       % Number of cols, aka number of carriers
-  states.M  = states.Fs/Rs; 
-  states.Ncp = Tcp*states.Fs;
-  states.Nbitsperframe = (Ns-1)*Nc*bps;
-  states.Nrowsperframe = states.Nbitsperframe/(Nc*bps);
-  states.Nsamperframe =  (states.Nrowsperframe+1)*(states.M+states.Ncp);
-  states.Ntxtbits = 4;   % reserved bits/frame for auxillary text information
-  states.Nuwbits  = bps*5;   % Let use 5 symbols for the UW, note longer for QAM
-  
-  % some basic sanity checks
-  assert(floor(states.M) == states.M);
-  test_qam16();
-  
-  % UW symbol placement, designed to get no false syncs at any freq
-  % offset.  Use ofdm_dev.m, debug_false_sync() to test.  Note we need
-  % to pair the UW bits so the fit into symbols.  The LDPC decoder
-  % works on symbols so we can't break up any symbols into UW/LDPC
-  % bits.
-  
-  states.uw_ind = states.uw_ind_sym = [];
-  for i=1:states.Nuwbits/bps
-    ind_sym = floor(i*(Nc+1)/bps+1);
-    states.uw_ind_sym = [states.uw_ind_sym ind_sym];   % symbol index
-    for b=bps-1:-1:0
-      states.uw_ind = [states.uw_ind bps*ind_sym-b];   % bit index
-    end  
-  end
-
-  states.tx_uw = zeros(1,states.Nuwbits);       
-  assert(length(states.tx_uw) == states.Nuwbits);
-  tx_uw_syms = [];
-  for b=1:bps:states.Nuwbits
-    tx_uw_syms = [tx_uw_syms qpsk_mod(states.tx_uw(b:b+1))];
-  end
-  states.tx_uw_syms = tx_uw_syms;
-  
-  % use this to scale tx output to 16 bit short.  Adjusted by experiment
-  % to have same RMS power as FDMDV waveform
-  
-  states.amp_scale = 2E5*1.1491/1.06;
-
-  % this is used to scale inputs to LDPC decoder to make it amplitude indep
-  
-  states.mean_amp = 0;
-
-  % generate same pilots each time
-
-  rand('seed',1);
-  states.pilots = 1 - 2*(rand(1,Nc+2) > 0.5);
-  %printf("number of pilots total: %d\n", length(states.pilots));
-  
-  % carrier tables for up and down conversion
-
-  fcentre = 1500;
-  alower = fcentre - Rs * (Nc/2);  % approx frequency of lowest carrier
-  Nlower = round(alower / Rs) - 1; % round this to nearest integer multiple from 0Hz to keep DFT happy
-  %printf("  fcentre: %f alower: %f alower/Rs: %f Nlower: %d\n", fcentre, alower, alower/Rs, Nlower);
-  w = (Nlower:Nlower+Nc+1)*2*pi/(states.Fs/Rs);
-  W = zeros(Nc+2,states.M);
-  for c=1:Nc+2
-    W(c,:) = exp(j*w(c)*(0:states.M-1));
-  end
-  states.w = w;
-  states.W = W;
-
-  % fine timing search +/- window_width/2 from current timing instant
-
-  states.ftwindow_width = 11; 
- 
-  % Receive buffer: D P DDD P DDD P DDD P D
-  %                         ^
-  % also see ofdm_demod() ...
-
-  states.Nrxbuf = 3*states.Nsamperframe+states.M+states.Ncp + 2*(states.M + states.Ncp);
-  states.rxbuf = zeros(1, states.Nrxbuf);
- 
-  % default settings on a bunch of options and states
-
-  states.verbose = 0;
-  states.timing_en = 1;
-  states.foff_est_en = 1;
-  states.phase_est_en = 1;
-  states.phase_est_bandwidth = "high";
-  states.dpsk = 0;
-  
-  states.foff_est_gain = 0.1;
-  states.foff_est_hz = 0;
-  states.sample_point = states.timing_est = 1;
-  states.nin = states.Nsamperframe;
-  states.timing_valid = 0;
-  states.timing_mx = 0;
-  states.coarse_foff_est_hz = 0;
-
-  states.foff_metric = 0;
-  
-  % generate OFDM pilot symbol, used for timing and freq offset est
-
-  rate_fs_pilot_samples = states.pilots * W/states.M;
-
-  % During tuning it was found that not including the cyc prefix in
-  % rate_fs_pilot_samples produced better fest results
-  
-  %states.rate_fs_pilot_samples = [rate_fs_pilot_samples(states.M-states.Ncp+1:states.M) rate_fs_pilot_samples];
-  states.rate_fs_pilot_samples = [zeros(1,states.Ncp) rate_fs_pilot_samples];
-
-  % pre-compute a constant used to detect valid modem frames
-
-  Npsam = length(states.rate_fs_pilot_samples);
-  states.timing_norm = Npsam*(states.rate_fs_pilot_samples * states.rate_fs_pilot_samples');
-  % printf("timing_norm: %f\n", states.timing_norm)
-
-  % sync state machine
-
-  states.sync_state = states.last_sync_state = 'search'; 
-  states.uw_errors = 0;
-  states.sync_counter = 0;
-  states.frame_count = 0;
-  states.sync_start = 0;
-  states.sync_end = 0;
-  states.sync_state_interleaver = 'search';
-  states.last_sync_state_interleaver = 'search';
-  states.frame_count_interleaver = 0;
-   
-  % LDPC code is optionally enabled
-
-  states.rate = 1.0;
-  states.ldpc_en = 0;
-
-  % init some output states for logging
-  
-  states.rx_sym = zeros(1+Ns+1+1, Nc+2);
-
-  % Es/No (SNR) est states
-  
-  states.noise_var = 0;
-  states.sig_var = 0;
-
-  states.clock_offset_est = 0;
-endfunction
-
-
-
 % --------------------------------------
 % ofdm_mod - modulates one frame of bits
 % --------------------------------------
@@ -419,7 +415,7 @@ function tx = ofdm_mod(states, tx_bits)
   end  
   if bps == 4
     for s=1:Nbitsperframe/bps
-      tx_sym_lin(s) = qam16_mod(tx_bits(4*(s-1)+1:4*s));
+      tx_sym_lin(s) = qam16_mod(states.qam16,tx_bits(4*(s-1)+1:4*s));
     end
   end
 
@@ -738,7 +734,7 @@ function [rx_bits states aphase_est_pilot_log rx_np rx_amp] = ofdm_demod(states,
         abit = qpsk_demod(rx_corr);
       end
       if bps == 4
-        abit = qam16_demod(rx_corr);
+        abit = qam16_demod(states.qam16, rx_corr);
       end
       rx_bits = [rx_bits abit];
     end % c=2:Nc+1

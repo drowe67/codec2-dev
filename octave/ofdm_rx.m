@@ -141,8 +141,8 @@ function ofdm_rx(filename, mode="700D", error_pattern_filename)
   printf("Es/No est dB: % -4.1f SNR3k: %3.2f %f %f\n", EsNo_estdB, SNR_estdB, mean(sig_var_log), mean(noise_var_log));
   
   figure(1); clf; 
-  plot(rx_np_log,'+');
-  plot(rx_np_log(floor(end/2):end),'+');
+  %plot(rx_np_log,'+');
+  plot(exp(j*pi/4)*rx_np_log(floor(end/2):end),'+');
   mx = 2*max(abs(rx_np_log));
   axis([-mx mx -mx mx]);
   title('Scatter');
