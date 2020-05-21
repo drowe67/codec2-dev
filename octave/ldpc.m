@@ -47,7 +47,7 @@ endfunction
 
 % init using user supplied code
 
-function [code_param framesize rate] = ldpc_init_user(HRA, modulation, mod_order, mapping)
+function [code_param framesize rate] = ldpc_init_user(HRA, modulation, mod_order, mapping, constellation)
     [Nr Nc] = size(HRA);  
     rate = (Nc-Nr)/Nc;
     framesize = Nc;
@@ -55,11 +55,15 @@ function [code_param framesize rate] = ldpc_init_user(HRA, modulation, mod_order
     code_param.H_rows = H_rows; 
     code_param.H_cols = H_cols;
     code_param.P_matrix = [];
-    if length(mapping) == 0
-      code_param.S_matrix = CreateConstellation( modulation, mod_order);
+    if nargin == 5
+      code_param.S_matrix = constellation;
     else
-      code_param.S_matrix = CreateConstellation( modulation, mod_order, mapping );
-    end    
+      if length(mapping) == 0
+        code_param.S_matrix = CreateConstellation( modulation, mod_order);
+      else
+        code_param.S_matrix = CreateConstellation( modulation, mod_order, mapping );
+      end
+    end  
     code_param.bits_per_symbol = log2(mod_order);
 
     code_param.ldpc_data_bits_per_frame = length(code_param.H_cols) - length(code_param.P_matrix);
