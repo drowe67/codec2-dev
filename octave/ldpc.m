@@ -55,7 +55,11 @@ function [code_param framesize rate] = ldpc_init_user(HRA, modulation, mod_order
     code_param.H_rows = H_rows; 
     code_param.H_cols = H_cols;
     code_param.P_matrix = [];
-    code_param.S_matrix = CreateConstellation( modulation, mod_order, mapping );
+    if length(mapping) == 0
+      code_param.S_matrix = CreateConstellation( modulation, mod_order);
+    else
+      code_param.S_matrix = CreateConstellation( modulation, mod_order, mapping );
+    end    
     code_param.bits_per_symbol = log2(mod_order);
 
     code_param.ldpc_data_bits_per_frame = length(code_param.H_cols) - length(code_param.P_matrix);

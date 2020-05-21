@@ -132,6 +132,100 @@ function sim_out = run_simulation(sim_in)
 
 endfunction
 
+% ---------------------------------------------------------------------------------
+% 1/ Simplest possible one frame simulation
+% ---------------------------------------------------------------------------------
+
+function test1_single
+  printf("\nTest 1:Single\n------\n");
+
+  mod_order = 4; 
+  modulation = 'QPSK';
+  mapping = 'gray';
+  demod_type = 0;
+  decoder_type = 0;
+  max_iterations = 100;
+
+  framesize = 576*2;       % CML library has a bunch of different framesizes available
+  rate = 1/2;
+  code_param = ldpc_init_wimax(rate, framesize, modulation, mod_order, mapping);
+
+  EsNo = 10;               % decoder needs an estimated channel EsNo (linear ratio, not dB)
+
+  tx_bits = round(rand(1, code_param.ldpc_data_bits_per_frame));
+  [tx_codeword, qpsk_symbols] = ldpc_enc(tx_bits, code_param);
+  rx_codeword = ldpc_dec(code_param, max_iterations, demod_type, decoder_type, qpsk_symbols, EsNo, ones(1,length(qpsk_symbols)));
+
+  errors_positions = xor(tx_bits, rx_codeword(1:framesize*rate));
+  Nerr = sum(errors_positions);
+  printf("Nerr: %d\n\n", Nerr);
+endfunction
+
+% ---------------------------------------------------------------------------------
+% 2/ Run a bunch of trials at just one EsNo point
+% ---------------------------------------------------------------------------------
+
+function test2_multiple
+  printf("Test 2: Multiple\n------\n");
+
+  % these are inputs for Wimax mode, e.g. framesize defines code used
+
+  sim_in.rate = 0.5; 
+  sim_in.framesize = 576*4;  % long codes smooth over fades but increase latency
+
+  sim_in.verbose = 2;
+  sim_in.Ntrials = 100;
+  sim_in.EbNodBvec = 9;
+  run_simulation(sim_in);
+end
+
+% ---------------------------------------------------------------------------------
+% 3/ Lets draw some Eb/No versus BER curves 
+% ---------------------------------------------------------------------------------
+
+function test3_curves
+  printf("\n\nTest 3: Curves\n------\n");
+
+  sim_in.rate = 0.5; 
+  sim_in.framesize = 576*4;  % long codes smooth over fades but increase latency
+  sim_in.verbose = 2;
+  sim_in.Ntrials = 100;
+  sim_in.EbNodBvec = -2:10;
+  sim_out = run_simulation(sim_in);
+
+  EbNodB = sim_in.EbNodBvec;
+  uncoded_awgn_ber_theory = 0.5*erfc(sqrt(10.^(EbNodB/10)));
+
+  figure(1); clf
+  semilogy(EbNodB, uncoded_awgn_ber_theory,'r-+;AWGN;')
+  hold on;
+  semilogy(EbNodB, sim_out.BER+1E-10,'g-+;AWGN LDPC;');
+  hold off;
+  grid('minor')
+  xlabel('Eb/No (dB)')
+  ylabel('BER')
+  axis([min(EbNodB) max(EbNodB) 1E-3 1])
+  legend('boxoff')
+end
+
+function test4_qam16
+  printf("\nTest 4: QAM16\n------\n");
+
+  mod_order = 16;  modulation = 'QAM'; mapping = ""; demod_type = 0; decoder_type = 0;
+  max_iterations = 100; EsNo = 10;
+
+  load HRA_504_396.txt
+  code_param = ldpc_init_user(HRA_504_396, modulation, mod_order, mapping);
+
+  tx_bits = round(rand(1, code_param.ldpc_data_bits_per_frame));
+  [tx_codeword, symbols] = ldpc_enc(tx_bits, code_param);
+  rx_codeword = ldpc_dec(code_param, max_iterations, demod_type, decoder_type, symbols, EsNo, ones(1,length(symbols)));
+
+  errors_positions = xor(tx_bits, rx_codeword(1:code_param.ldpc_data_bits_per_frame));
+  Nerr = sum(errors_positions);
+  printf("Nerr: %d\n\n", Nerr);
+endfunction
+
 % --------------------------------------------------------------------------------
 % START SIMULATIONS
 % --------------------------------------------------------------------------------
@@ -145,74 +239,10 @@ format;
 
 init_cml('~/cml/');
 
-% ---------------------------------------------------------------------------------
-% 1/ Simplest possible one frame simulation
-% ---------------------------------------------------------------------------------
-
-printf("\nTest 1\n------\n");
-
-mod_order = 4; 
-modulation = 'QPSK';
-mapping = 'gray';
-demod_type = 0;
-decoder_type = 0;
-max_iterations = 100;
-
-framesize = 576*2;       % CML library has a bunch of different framesizes available
-rate = 1/2;
-code_param = ldpc_init_wimax(rate, framesize, modulation, mod_order, mapping);
-
-EsNo = 10;               % decoder needs an estimated channel EsNo (linear ratio, not dB)
-
-tx_bits = round(rand(1, code_param.ldpc_data_bits_per_frame));
-[tx_codeword, qpsk_symbols] = ldpc_enc(tx_bits, code_param);
-rx_codeword = ldpc_dec(code_param, max_iterations, demod_type, decoder_type, qpsk_symbols, EsNo, ones(1,length(qpsk_symbols)));
-
-errors_positions = xor(tx_bits, rx_codeword(1:framesize*rate));
-Nerr = sum(errors_positions);
-printf("Nerr: %d\n\n", Nerr);
-
+test1_single
 if getenv("SHORT_VERSION_FOR_CTEST")
   return;
 end
-
-% ---------------------------------------------------------------------------------
-% 2/ Run a bunch of trials at just one EsNo point
-% ---------------------------------------------------------------------------------
-
-printf("Test 2\n------\n");
-
-% these are inputs for Wimax mode, e.g. framesize defines code used
-
-sim_in.rate = 0.5; 
-sim_in.framesize = 576*4;  % long codes smooth over fades but increase latency
-
-sim_in.verbose = 2;
-sim_in.Ntrials = 100;
-sim_in.EbNodBvec = 9;
-run_simulation(sim_in);
-
-% ---------------------------------------------------------------------------------
-% 3/ Lets draw some Eb/No versus BER curves 
-% ---------------------------------------------------------------------------------
-
-printf("\n\nTest 3\n------\n");
-
-sim_in.EbNodBvec = -2:10;
-sim_out = run_simulation(sim_in);
-
-EbNodB = sim_in.EbNodBvec;
-uncoded_awgn_ber_theory = 0.5*erfc(sqrt(10.^(EbNodB/10)));
-
-figure(1)
-clf
-semilogy(EbNodB, uncoded_awgn_ber_theory,'r-+;AWGN;')
-hold on;
-semilogy(EbNodB, sim_out.BER+1E-10,'g-+;AWGN LDPC;');
-hold off;
-grid('minor')
-xlabel('Eb/No (dB)')
-ylabel('BER')
-axis([min(EbNodB) max(EbNodB) 1E-3 1])
-legend('boxoff')
-
+test2_multiple
+test3_curves
+test4_qam16

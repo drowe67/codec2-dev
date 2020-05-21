@@ -15,12 +15,14 @@
 %-------------------------------------------------------------
 
 #{
-  Frame has Ns-1 data symbols between pilots, e.g. for Ns=3: 
+  Frame has Ns-1 data symbols between pilots, e.g. for Ns=3, Nc=3: 
   
-    PPP
+   PPPPP
     DDD
     DDD
-    PPP
+   PPPPP
+
+  Time flows down, freq across
 #}
 
 function states = ofdm_init(bps, Rs, Tcp, Ns, Nc)
@@ -191,7 +193,10 @@ function [bps Rs Tcp Ns Nc] = ofdm_init_mode(mode="700D")
   elseif strcmp(mode,"2200")
     Tframe = 0.175; Ts = Tframe/Ns; Nc = 37;
   elseif strcmp(mode,"QAM16")
-    Ns=4; Tcp = 0.004; Tframe = 0.08; Ts = Tframe/Ns; Nc = 37; bps=4;
+    # Ns=5, Rs=50, so Rs/Ns=10 -> +/- 5Hz doppler tracking bandwidth
+    # For (504,296) LDPC code we want 504+5*4+4=528 uncoded bits/frame
+    # Rs*Nc=1650, so fits easily in 2000 Hz
+    Ns=5; Tcp = 0.004; Tframe = 0.1; Ts = Tframe/Ns; Nc = 33; bps=4;
   elseif strcmp(mode,"1")
     Ns=100; Tcp = 0; Tframe = 0.1; Ts = Tframe/Ns; Nc = 1; bps=2;
   else
