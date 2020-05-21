@@ -214,9 +214,20 @@ function test4_qam16
   mod_order = 16; bps = log2(mod_order);
   modulation = 'QAM'; mapping = ""; demod_type = 0; decoder_type = 0;
   max_iterations = 100; EsNo_dec = 10;
-
+  qam16 = [
+    1 + j,  1 + j*3,  3 + j,  3 + j*3;
+    1 - j,  1 - j*3,  3 - j,  3 - j*3;
+   -1 + j, -1 + j*3, -3 + j, -3 + j*3;
+   -1 - j, -1 - j*3, -3 - j, -3 - j*3];
+  qam16 = qam16/std(qam16(:));
+  constellation_source = 'custom';
+   
   load HRA_504_396.txt
-  code_param = ldpc_init_user(HRA_504_396, modulation, mod_order, mapping);
+  if strcmp(constellation_source,'cml')
+    code_param = ldpc_init_user(HRA_504_396, modulation, mod_order, mapping);
+  else
+    code_param = ldpc_init_user(HRA_504_396, modulation, mod_order, mapping, reshape(qam16,1,16));
+  end
   rate = code_param.ldpc_data_bits_per_frame/code_param.ldpc_coded_bits_per_frame;
    
   EbNodBvec = 3:10; Ntrials = 1000;
@@ -229,7 +240,6 @@ function test4_qam16
     for nn = 1:Ntrials        
       tx_bits = round(rand(1, code_param.ldpc_data_bits_per_frame));
       [tx_codeword, tx_symbols] = ldpc_enc(tx_bits, code_param);
-
       noise = sqrt(variance*0.5)*(randn(1,length(tx_symbols)) + j*randn(1,length(tx_symbols)));
       rx_symbols = tx_symbols + noise;
       rx_symbols_log = [rx_symbols_log rx_symbols];
