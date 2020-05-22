@@ -121,7 +121,7 @@ typedef void (*freedv_callback_datatx)(void *, unsigned char *packet, size_t *si
 
 
 /*---------------------------------------------------------------------------*\
-
+ 
                                  FreeDV API functions
 
 \*---------------------------------------------------------------------------*/
@@ -134,20 +134,20 @@ void freedv_close   (struct freedv *freedv);
 
 // Transmit -------------------------------------------------------------------
 
-void freedv_tx      (struct freedv *freedv, short mod_out[], short speech_in[]);
-void freedv_comptx  (struct freedv *freedv, COMP  mod_out[], short speech_in[]);
-void freedv_codectx (struct freedv *f, short mod_out[], unsigned char *packed_codec_bits);
-void freedv_datatx  (struct freedv *f, short mod_out[]);
+void freedv_tx        (struct freedv *freedv, short mod_out[], short speech_in[]);
+void freedv_comptx    (struct freedv *freedv, COMP  mod_out[], short speech_in[]);
+void freedv_rawdatatx (struct freedv *f, short mod_out[], unsigned char *packed_codec_bits);
+void freedv_datatx    (struct freedv *f, short mod_out[]);
 int  freedv_data_ntxframes (struct freedv *freedv);
 
 // Receive -------------------------------------------------------------------
 
-int freedv_nin      (struct freedv *freedv);
-int freedv_rx       (struct freedv *freedv, short speech_out[], short demod_in[]);
-int freedv_shortrx  (struct freedv *freedv, short speech_out[], short demod_in[], float gain);
-int freedv_floatrx  (struct freedv *freedv, short speech_out[], float demod_in[]);
-int freedv_comprx   (struct freedv *freedv, short speech_out[], COMP  demod_in[]);
-int freedv_codecrx  (struct freedv *freedv, unsigned char *packed_codec_bits, short demod_in[]);
+int freedv_nin       (struct freedv *freedv);
+int freedv_rx        (struct freedv *freedv, short speech_out[], short demod_in[]);
+int freedv_shortrx   (struct freedv *freedv, short speech_out[], short demod_in[], float gain);
+int freedv_floatrx   (struct freedv *freedv, short speech_out[], float demod_in[]);
+int freedv_comprx    (struct freedv *freedv, short speech_out[], COMP  demod_in[]);
+int freedv_rawdatarx (struct freedv *freedv, unsigned char *packed_codec_bits, short demod_in[]);
 
 // Set parameters ------------------------------------------------------------
 
@@ -202,6 +202,7 @@ int freedv_get_total_bits	    (struct freedv *freedv);
 int freedv_get_total_bit_errors	    (struct freedv *freedv);
 int freedv_get_total_bits_coded     (struct freedv *freedv);
 int freedv_get_total_bit_errors_coded(struct freedv *freedv);
+int freedv_get_uncorrected_errors   (struct freedv *freedv);
 
 int freedv_get_sync		    (struct freedv *freedv);
 int freedv_get_sync_interleaver	    (struct freedv *freedv);

@@ -1,6 +1,6 @@
 /*---------------------------------------------------------------------------*\
 
-  FILE........: freedv_tx_mixed.c
+  FILE........: freedv_mixed_tx.c
   AUTHOR......: Jeroen Vreeken & David Rowe
   DATE CREATED: May 2020
 
@@ -263,7 +263,7 @@ int main(int argc, char *argv[]) {
                 freedv_datatx(freedv, mod_out);
             } else {
                 /* Use the freedv_api to modulate already encoded frames */
-                freedv_codectx(freedv, mod_out, encoded);
+                freedv_rawdatatx(freedv, mod_out, encoded);
             }
         }
 

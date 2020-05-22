@@ -297,17 +297,23 @@ target_link_libraries(freedv_tx ${CMAKE_REQUIRED_LIBRARIES} codec2)
 add_executable(freedv_rx freedv_rx.c)
 target_link_libraries(freedv_rx ${CMAKE_REQUIRED_LIBRARIES} codec2)
 
+add_executable(freedv_data_raw_tx freedv_data_raw_tx.c)
+target_link_libraries(freedv_data_raw_tx ${CMAKE_REQUIRED_LIBRARIES} codec2)
+
+add_executable(freedv_data_raw_rx freedv_data_raw_rx.c)
+target_link_libraries(freedv_data_raw_rx ${CMAKE_REQUIRED_LIBRARIES} codec2)
+
 add_executable(freedv_data_tx freedv_data_tx.c)
 target_link_libraries(freedv_data_tx ${CMAKE_REQUIRED_LIBRARIES} codec2)
 
 add_executable(freedv_data_rx freedv_data_rx.c)
 target_link_libraries(freedv_data_rx ${CMAKE_REQUIRED_LIBRARIES} codec2)
 
-add_executable(freedv_tx_mixed freedv_tx_mixed.c)
-target_link_libraries(freedv_tx_mixed ${CMAKE_REQUIRED_LIBRARIES} codec2)
+add_executable(freedv_mixed_tx freedv_mixed_tx.c)
+target_link_libraries(freedv_mixed_tx ${CMAKE_REQUIRED_LIBRARIES} codec2)
 
-add_executable(freedv_rx_mixed freedv_rx_mixed.c)
-target_link_libraries(freedv_rx_mixed ${CMAKE_REQUIRED_LIBRARIES} codec2)
+add_executable(freedv_mixed_rx freedv_mixed_rx.c)
+target_link_libraries(freedv_mixed_rx ${CMAKE_REQUIRED_LIBRARIES} codec2)
 
 add_executable(fsk_mod fsk_mod.c)
 target_link_libraries(fsk_mod ${CMAKE_REQUIRED_LIBRARIES} codec2)

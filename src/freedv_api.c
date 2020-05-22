@@ -510,7 +510,8 @@ void freedv_comptx(struct freedv *f, COMP mod_out[], short speech_in[]) {
     }
 }
 
-void freedv_codectx(struct freedv *f, short mod_out[], unsigned char *packed_codec_bits) {
+/* a way to send raw frames of bytes, or speech data that was compressed externally */
+void freedv_rawdatatx(struct freedv *f, short mod_out[], unsigned char *packed_codec_bits) {
     assert(f != NULL);
     COMP tx_fdm[f->n_nom_modem_samples];
     int bits_per_codec_frame;
@@ -570,6 +571,7 @@ void freedv_codectx(struct freedv *f, short mod_out[], unsigned char *packed_cod
         mod_out[i] = tx_fdm[i].real;
 }
 
+/* VHF packet data tx function */
 void freedv_datatx (struct freedv *f, short mod_out[]) {
     assert(f != NULL);
     if (FDV_MODE_ACTIVE( FREEDV_MODE_2400A, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_2400B, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_800XA, f->mode)) {
@@ -577,6 +579,8 @@ void freedv_datatx (struct freedv *f, short mod_out[]) {
     }
 }
 
+
+/* VHF packet data: how many tx frames are queued up but not sent yet.  */
 int  freedv_data_ntxframes (struct freedv *f) {
     assert(f != NULL);
     if (FDV_MODE_ACTIVE( FREEDV_MODE_2400A, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_2400B, f->mode)) {
@@ -591,8 +595,8 @@ int  freedv_data_ntxframes (struct freedv *f) {
 
 int freedv_nin(struct freedv *f) {
     if (FDV_MODE_ACTIVE( FREEDV_MODE_700C, f->mode))
-        // For mode 700, the input rate is 8000 sps, but the modem rate is 7500 sps
-        // For mode 700, we request a larger number of Rx samples that will be decimated to f->nin samples
+        // For mode 700C, the input rate is 8000 sps, but the modem rate is 7500 sps
+        // For mode 700C, we request a larger number of Rx samples that will be decimated to f->nin samples
         return (16 * f->nin + f->ptFilter8000to7500->decim_index) / 15;
     else
         return f->nin;
@@ -888,12 +892,14 @@ int freedv_bits_to_speech(struct freedv *f, short speech_out[], short demod_in[]
         fprintf(stderr, "    sqen: %d nout: %d decsp: %d\n", f->squelch_en, nout, decode_speech);
     }
     
+    f->rx_status= rx_status;
     assert(nout <= freedv_get_n_max_speech_samples(f));    
     return nout;
 }
 
 
-int freedv_codecrx(struct freedv *f, unsigned char *packed_codec_bits, short demod_in[])
+/* a way to receive raw frames of bytes, or speech data that will be decompressed externally */
+int freedv_rawdatarx(struct freedv *f, unsigned char *packed_codec_bits, short demod_in[])
 {
     assert(f != NULL);
     int i;
@@ -951,11 +957,15 @@ int freedv_codecrx(struct freedv *f, unsigned char *packed_codec_bits, short dem
         memcpy(packed_codec_bits, f->packed_codec_bits, bytes_per_codec_frame * codec_frames);
 	ret = bytes_per_codec_frame * codec_frames;
     }
+
+    /* might want to check this for errors, e.g. if reliable data is important */
+    f->rx_status= rx_status;
     
     return ret;
 }
 
-/*---------------------------------------------------------------------------*\
+
+/*---------------------------------------------------------------------------* \
 
   FUNCTION....: freedv_get_version
   AUTHOR......: Jim Ahlstrom
@@ -977,12 +987,14 @@ int freedv_get_version(void)
   AUTHOR......: Jim Ahlstrom
   DATE CREATED: 28 July 2015
 
-  Set the callback functions and the callback state pointer that will be used
-  for the aux txt channel.  The freedv_callback_rx is a function pointer that
-  will be called to return received characters.  The freedv_callback_tx is a
-  function pointer that will be called to send transmitted characters.  The callback
-  state is a user-defined void pointer that will be passed to the callback functions.
-  Any or all can be NULL, and the default is all NULL.
+  Set the callback functions and the callback state pointer that will
+  be used for the aux txt channel.  The freedv_callback_rx is a
+  function pointer that will be called to return received characters.
+  The freedv_callback_tx is a function pointer that will be called to
+  send transmitted characters.  The callback state is a user-defined
+  void pointer that will be passed to the callback functions.  Any or
+  all can be NULL, and the default is all NULL.
+
   The function signatures are:
     void receive_char(void *callback_state, char c);
     char transmit_char(void *callback_state);
@@ -1004,14 +1016,17 @@ void freedv_set_callback_txt(struct freedv *f, freedv_callback_rx rx, freedv_cal
   AUTHOR......: Brady OBrien
   DATE CREATED: 21 February 2016
 
-  Set the callback functions and callback pointer that will be used for the
-  protocol data channel. freedv_callback_protorx will be called when a frame
-  containing protocol data arrives. freedv_callback_prototx will be called
-  when a frame containing protocol information is being generated. Protocol
-  information is intended to be used to develop protocols and fancy features
-  atop VHF freedv, much like those present in DMR.
-   Protocol bits are to be passed in an msb-first char array
-   The number of protocol bits are findable with freedv_get_protocol_bits
+  VHF packet data function.
+
+  Set the callback functions and callback pointer that will be used
+  for the protocol data channel. freedv_callback_protorx will be
+  called when a frame containing protocol data
+  arrives. freedv_callback_prototx will be called when a frame
+  containing protocol information is being generated. Protocol
+  information is intended to be used to develop protocols and fancy
+  features atop VHF freedv, much like those present in DMR.  Protocol
+  bits are to be passed in an msb-first char array The number of
+  protocol bits are findable with freedv_get_protocol_bits
 
 \*---------------------------------------------------------------------------*/
 
@@ -1029,11 +1044,13 @@ void freedv_set_callback_protocol(struct freedv *f, freedv_callback_protorx rx, 
   AUTHOR......: Jeroen Vreeken
   DATE CREATED: 04 March 2016
 
-  Set the callback functions and callback pointer that will be used for the
-  data channel. freedv_callback_datarx will be called when a packet has been
-  successfully received. freedv_callback_data_tx will be called when 
-  transmission of a new packet can begin.
-  If the returned size of the datatx callback is zero the data frame is still
+  VHF packet data function.
+
+  Set the callback functions and callback pointer that will be used
+  for the data channel. freedv_callback_datarx will be called when a
+  packet has been successfully received. freedv_callback_data_tx will
+  be called when transmission of a new packet can begin.  If the
+  returned size of the datatx callback is zero the data frame is still
   generated, but will contain only a header update.
 
 \*---------------------------------------------------------------------------*/
@@ -1056,10 +1073,13 @@ void freedv_set_callback_data(struct freedv *f, freedv_callback_datarx datarx, f
   AUTHOR......: Jeroen Vreeken
   DATE CREATED: 04 March 2016
 
-  Set the data header for the data channel.
-  Header compression will be used whenever packets from this header are sent.
-  The header will also be used for fill packets when a data frame is requested
-  without a packet available.
+  VHF packet data function.
+
+  Set the data header for the data channel.  Header compression will
+  be used whenever packets from this header are sent.  The header will
+  also be used for fill packets when a data frame is requested without
+  a packet available.
+
 \*---------------------------------------------------------------------------*/
 
 void freedv_set_data_header(struct freedv *f, unsigned char *header)
@@ -1080,8 +1100,8 @@ void freedv_set_data_header(struct freedv *f, unsigned char *header)
   AUTHOR......: Jim Ahlstrom
   DATE CREATED: 28 July 2015
 
-  Return data from the modem.  The arguments are pointers to the data items.  The
-  pointers can be NULL if the data item is not wanted.
+  Return data from the modem.  The arguments are pointers to the data
+  items.  The pointers can be NULL if the data item is not wanted.
 
 \*---------------------------------------------------------------------------*/
 
@@ -1112,7 +1132,6 @@ void freedv_get_modem_stats(struct freedv *f, int *sync, float *snr_est)
 
 \*---------------------------------------------------------------------------*/
 
-// Set integers
 void freedv_set_test_frames               (struct freedv *f, int val) {f->test_frames = val;}
 void freedv_set_test_frames_diversity	  (struct freedv *f, int val) {f->test_frames_diversity = val;}
 void freedv_set_squelch_en                (struct freedv *f, int val) {f->squelch_en = val;}
@@ -1123,7 +1142,7 @@ void freedv_set_total_bits_coded          (struct freedv *f, int val) {f->total_
 void freedv_set_clip                      (struct freedv *f, int val) {f->clip = val;}
 void freedv_set_varicode_code_num         (struct freedv *f, int val) {varicode_set_code_num(&f->varicode_dec_states, val);}
 void freedv_set_ext_vco                   (struct freedv *f, int val) {f->ext_vco = val;}
-
+void freedv_set_snr_squelch_thresh        (struct freedv *f, float val) {f->snr_squelch_thresh = val;}
 
 /* Band Pass Filter to cleanup OFDM tx waveform, only supported by FreeDV 700D */
 
@@ -1163,10 +1182,7 @@ void freedv_set_verbose(struct freedv *f, int verbosity) {
     }
 }
 
-// Set floats
-void freedv_set_snr_squelch_thresh        (struct freedv *f, float val) {f->snr_squelch_thresh = val;}
-
-void freedv_set_callback_error_pattern    (struct freedv *f, freedv_calback_error_pattern cb, void *state)
+void freedv_set_callback_error_pattern(struct freedv *f, freedv_calback_error_pattern cb, void *state)
 {
     f->freedv_put_error_pattern = cb;
     f->error_pattern_callback_state = state;
@@ -1184,7 +1200,7 @@ void freedv_set_carrier_ampl(struct freedv *f, int c, float ampl) {
   DATE CREATED: 25 June 2016
 
   Attempt to set the alternative sample rate on the modem side of the api. Only
-   a few alternative sample rates are supported. Please see below.
+  a few alternative sample rates are supported. Please see below.
    
    2400A - 48000, 96000
    2400B - 48000, 96000
@@ -1232,7 +1248,7 @@ int freedv_set_alt_modem_samp_rate(struct freedv *f, int samp_rate){
 
   So with this API call we allow some operator assistance.
 
-  Ensure this is called inthe same thread as freedv_rx().
+  Ensure this is called in the same thread as freedv_rx().
 
 \*---------------------------------------------------------------------------*/
 
@@ -1274,10 +1290,11 @@ int freedv_get_total_bit_errors_coded     (struct freedv *f) {return f->total_bi
 int freedv_get_sync                       (struct freedv *f) {return f->stats.sync;}
 struct CODEC2 *freedv_get_codec2	  (struct freedv *f){return  f->codec2;}
 int freedv_get_n_codec_bits               (struct freedv *f){return f->n_codec_bits;}
+int freedv_get_uncorrected_errors          (struct freedv *f) {return f->rx_status & RX_BIT_ERRORS;}
 
 int freedv_get_n_max_speech_samples(struct freedv *f) {
     /* When "passing through" demod samples to the speech output
-       (e.g. no sync and squeclh off) f->nin bounces around with
+       (e.g. no sync and squelch off) f->nin bounces around with
        timing variations.  So is is possible we may return
        freedv_get_n_max_modem_samples() via the speech_output[]
        array */
@@ -1306,8 +1323,7 @@ int freedv_get_sz_error_pattern(struct freedv *f)
     }
 }
 
-// Get modem status
-
+// Get modem status, scatter/eye diagram for plotting, other goodies
 void freedv_get_modem_extended_stats(struct freedv *f, struct MODEM_STATS *stats)
 {
     if (FDV_MODE_ACTIVE( FREEDV_MODE_1600, f->mode))

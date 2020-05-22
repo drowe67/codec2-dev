@@ -8,7 +8,7 @@
 
   Example usage (all one line):
 
-    $ cd codec2-dev/build_linux/src
+    $ cd codec2/build_linux/src
     $ ./freedv_tx 1600 ../../raw/ve9qrp_10s.raw - | ./freedv_rx 1600 - - | aplay -f S16
 
 \*---------------------------------------------------------------------------*/

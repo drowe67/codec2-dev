@@ -143,6 +143,7 @@ struct freedv {
     int                  ofdm_bitsperframe;
     int                  ofdm_nuwbits;
     int                  ofdm_ntxtbits;
+    int                  rx_status;
     
     /* Varicode txt channel states ----------------------------------------------------------------------*/
     

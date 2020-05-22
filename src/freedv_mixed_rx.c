@@ -1,6 +1,6 @@
 /*---------------------------------------------------------------------------*\
 
-  FILE........: freedv_rx.c
+  FILE........: freedv_mixed_rx.c
   AUTHOR......: Jeroen Vreeken & David Rowe
   DATE CREATED: May 2020
 
@@ -253,7 +253,7 @@ int main(int argc, char *argv[]) {
             unsigned char encoded[bytes_per_codec_frame * codec_frames];
 
             /* Use the freedv_api to demodulate only */
-            nout = freedv_codecrx(freedv, encoded, demod_in);
+            nout = freedv_rawdatarx(freedv, encoded, demod_in);
 
             /* decode the speech ourself (or send it to elsewhere, e.g. network) */
             if (nout) {
