@@ -417,9 +417,27 @@ endif()
              )
              set_tests_properties(test_FSK_modem_mod_demod  PROPERTIES PASS_REGULAR_EXPRESSION "bits tested 9800, bit errors 0")
 
+    add_test(NAME test_FreeDV_API_1600
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            ./freedv_tx 1600 ../../raw/ve9qrp_10s.raw - | ./freedv_rx 1600 - /dev/null")
+             set_tests_properties(test_FreeDV_API_1600 PROPERTIES PASS_REGULAR_EXPRESSION "frames decoded: 503")
+           
+    add_test(NAME test_FreeDV_API_700C
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            ./freedv_tx 700C ../../raw/ve9qrp_10s.raw - | ./freedv_rx 700C - /dev/null")
+             set_tests_properties(test_FreeDV_API_700C PROPERTIES PASS_REGULAR_EXPRESSION "frames decoded: 125")
+           
     add_test(NAME test_FreeDV_API_700D_backwards_compatability
              COMMAND sh -c "$<TARGET_FILE:freedv_rx> 700D ${CMAKE_CURRENT_SOURCE_DIR}/raw/testframes_700d.raw /dev/null --testframes --discard"
              )
+
+    # no random speech output due to trial sync when listening to noise
+    add_test(NAME test_FreeDV_API_700D_burble
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            ./freedv_tx 700D ../../raw/ve9qrp.raw - | 
+                            ./cohpsk_ch - - -10 --Fs 8000 | 
+                            ./freedv_rx 700D - /dev/null --squelch -2")
+             set_tests_properties(test_FreeDV_API_700D_burble PROPERTIES PASS_REGULAR_EXPRESSION "frames decoded: 746  output speech samples: 0")
            
     add_test(NAME test_FreeDV_API_700D_AWGN_BER
              COMMAND sh -c "dd bs=2560 count=120 if=/dev/zero | $<TARGET_FILE:freedv_tx> 700D - - --testframes | $<TARGET_FILE:cohpsk_ch> - - -20 --Fs 8000 -f -10 | $<TARGET_FILE:freedv_rx> 700D - /dev/null --testframes --discard"
@@ -438,11 +456,24 @@ if(LPCNET)
              COMMAND sh -c "$<TARGET_FILE:freedv_tx> 2020 ~/LPCNet/wav/all.wav - --testframes | $<TARGET_FILE:ofdm_demod> --ts 0.0205 --nc 31 --verbose 1 --ldpc 2 -p 312 --testframes > /dev/null"
              )
 
-    add_test(NAME test_ofdm_mod_to_FreeDV_API_2020
+    add_test(NAME test_FreeDV_API_2020_from_ofdm_mod
              COMMAND sh -c "$<TARGET_FILE:ofdm_mod> --in /dev/zero --ts 0.0205 --nc 31 --verbose 1 --ldpc 2 -p 312 --testframes 10 | $<TARGET_FILE:freedv_rx> 2020 - /dev/null --testframes"
              )
 endif()
            
+     add_test(NAME test_FreeDV_API_2400A
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            ./freedv_tx 2400A ../../raw/ve9qrp_10s.raw - | ./freedv_rx 2400A - /dev/null")
+             set_tests_properties(test_FreeDV_API_2400A PROPERTIES PASS_REGULAR_EXPRESSION "frames decoded: 250")
+     add_test(NAME test_FreeDV_API_2400B
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            ./freedv_tx 2400B ../../raw/ve9qrp_10s.raw - | ./freedv_rx 2400B - /dev/null")
+             set_tests_properties(test_FreeDV_API_2400B PROPERTIES PASS_REGULAR_EXPRESSION "frames decoded: 250")
+     add_test(NAME test_FreeDV_API_800XA
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            ./freedv_tx 800XA ../../raw/ve9qrp_10s.raw - | ./freedv_rx 800XA - /dev/null")
+             set_tests_properties(test_FreeDV_API_800XA PROPERTIES PASS_REGULAR_EXPRESSION "frames decoded: 125")
+
      add_test(NAME test_fifo
              COMMAND $<TARGET_FILE:tfifo>
              )
@@ -468,48 +499,61 @@ if (NOT APPLE)
              set_tests_properties(test_memory_leak_FreeDV_700D_tx PROPERTIES PASS_REGULAR_EXPRESSION "ERROR SUMMARY: 0 errors")
 
      add_test(NAME test_memory_leak_FreeDV_700D_rx
-             COMMAND sh -c "./freedv_tx 1600 ${CMAKE_CURRENT_SOURCE_DIR}/raw/hts1a.raw t.raw; \
+             COMMAND sh -c "./freedv_tx 700D ${CMAKE_CURRENT_SOURCE_DIR}/raw/hts1a.raw t.raw; \
                             valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./freedv_rx 700D t.raw /dev/null"
              WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/src
              )
              set_tests_properties(test_memory_leak_FreeDV_700D_rx PROPERTIES PASS_REGULAR_EXPRESSION "ERROR SUMMARY: 0 errors")
+
+     add_test(NAME test_memory_leak_FreeDV_700C_tx
+             COMMAND sh -c " valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./freedv_tx 700C ${CMAKE_CURRENT_SOURCE_DIR}/raw/hts1a.raw /dev/null"
+             WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/src
+             )
+             set_tests_properties(test_memory_leak_FreeDV_700C_tx PROPERTIES PASS_REGULAR_EXPRESSION "ERROR SUMMARY: 0 errors")
+
+     add_test(NAME test_memory_leak_FreeDV_700C_rx
+             COMMAND sh -c "./freedv_tx 700C ${CMAKE_CURRENT_SOURCE_DIR}/raw/hts1a.raw t.raw; \
+                            valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./freedv_rx 700C t.raw /dev/null"
+             WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/src
+             )
+             set_tests_properties(test_memory_leak_FreeDV_700C_rx PROPERTIES PASS_REGULAR_EXPRESSION "ERROR SUMMARY: 0 errors")
 endif(NOT APPLE)
 
-     add_test(NAME test_mode_dot_c2
+     add_test(NAME test_codec2_mode_dot_c2
              COMMAND sh -c "./c2enc 700C ${CMAKE_CURRENT_SOURCE_DIR}/raw/hts1a.raw hts1a.c2 && ./c2dec 1600 hts1a.c2 /dev/null"
              WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/src
              )
-             set_tests_properties(test_mode_dot_c2 PROPERTIES PASS_REGULAR_EXPRESSION "mode 8")
+             set_tests_properties(test_codec2_mode_dot_c2 PROPERTIES PASS_REGULAR_EXPRESSION "mode 8")
 
-     add_test(NAME test_mode_3200
+     add_test(NAME test_codec2_mode_3200
              COMMAND sh -c "./c2enc 3200 ${CMAKE_CURRENT_SOURCE_DIR}/raw/hts1a.raw - | ./c2dec 3200 - - | sox -t .s16 -r 8000 - hts1a_3200.wav"
              WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/src
              )
-     add_test(NAME test_mode_2400
+     add_test(NAME test_codec2_mode_2400
              COMMAND sh -c "./c2enc 2400 ${CMAKE_CURRENT_SOURCE_DIR}/raw/hts1a.raw - | ./c2dec 2400 - - | sox -t .s16 -r 8000 - hts1a_2400.wav"
              WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/src
              )
-     add_test(NAME test_mode_1400
+     add_test(NAME test_codec2_mode_1400
              COMMAND sh -c "./c2enc 1400 ${CMAKE_CURRENT_SOURCE_DIR}/raw/hts1a.raw - | ./c2dec 1400 - - | sox -t .s16 -r 8000 - hts1a_1400.wav"
              WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/src
              )
-     add_test(NAME test_mode_1300
+     add_test(NAME test_codec2_mode_1300
              COMMAND sh -c "./c2enc 1300 ${CMAKE_CURRENT_SOURCE_DIR}/raw/hts1a.raw - | ./c2dec 1300 - - | sox -t .s16 -r 8000 - hts1a_1300.wav"
              WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/src
              )
-     add_test(NAME test_mode_1200
+     add_test(NAME test_codec2_mode_1200
              COMMAND sh -c "./c2enc 1200 ${CMAKE_CURRENT_SOURCE_DIR}/raw/hts1a.raw - | ./c2dec 1200 - - | sox -t .s16 -r 8000 - hts1a_1200.wav"
              WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/src
              )
-     add_test(NAME test_mode_700C
+     add_test(NAME test_codec2_mode_700C
              COMMAND sh -c "./c2enc 700C ${CMAKE_CURRENT_SOURCE_DIR}/raw/hts1a.raw - | ./c2dec 700C - - | sox -t .s16 -r 8000 - hts1a_700C.wav"
              WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/src
              )
-     add_test(NAME test_mode_450
+     add_test(NAME test_codec2_mode_450
              COMMAND sh -c "./c2enc 450 ${CMAKE_CURRENT_SOURCE_DIR}/raw/hts1a.raw - | ./c2dec 450 - - | sox -t .s16 -r 8000 - hts1a_450.wav"
              WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/src
              )
-     add_test(NAME test_mode_450PWB
+     add_test(NAME test_codec2_mode_450PWB
              COMMAND sh -c "./c2enc 450PWB ${CMAKE_CURRENT_SOURCE_DIR}/raw/hts1a.raw - | ./c2dec 450PWB - - | sox -t .s16 -r 16000 - hts1a_450PWB.wav"
              WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/src
              )
@@ -529,6 +573,11 @@ endif(NOT APPLE)
      add_test(NAME test_700c_eq
              COMMAND ${CMAKE_CURRENT_BINARY_DIR}/unittest/test_700c_eq.sh
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/unittest
+             )
+
+    add_test(NAME test_freedv_data_channel
+             COMMAND sh -c "./tfreedv_data_channel"
+             WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/unittest
              )
 
 endif(UNITTEST)
