@@ -303,6 +303,12 @@ target_link_libraries(freedv_data_tx ${CMAKE_REQUIRED_LIBRARIES} codec2)
 add_executable(freedv_data_rx freedv_data_rx.c)
 target_link_libraries(freedv_data_rx ${CMAKE_REQUIRED_LIBRARIES} codec2)
 
+add_executable(freedv_tx_mixed freedv_tx_mixed.c)
+target_link_libraries(freedv_tx_mixed ${CMAKE_REQUIRED_LIBRARIES} codec2)
+
+add_executable(freedv_rx_mixed freedv_rx_mixed.c)
+target_link_libraries(freedv_rx_mixed ${CMAKE_REQUIRED_LIBRARIES} codec2)
+
 add_executable(fsk_mod fsk_mod.c)
 target_link_libraries(fsk_mod ${CMAKE_REQUIRED_LIBRARIES} codec2)
 

@@ -4,7 +4,7 @@
   AUTHOR......: Jeroen Vreeken
   DATE CREATED: May 2020
 
-  Demo data transmit program for FreeDV API functions.
+  Demo VHF packet data transmit program for FreeDV API functions.
 
 \*---------------------------------------------------------------------------*/
 

@@ -2,7 +2,7 @@
 
 ## Introduction
 
-Documentation for FreeDV data channel.
+Documentation for FreeDV VHF packet data channel, developed by Jeroen Vreeken.
 
 ## Quickstart
 
@@ -33,7 +33,7 @@ Documentation for FreeDV data channel.
 
 ## Packets
 
-The FreeDV data channel operates on a packet level. The FreeDV modems however typically operate on a fixed frame base. This means that data packets have to be send in multiple frames.
+The FreeDV VHF data channel operates on a packet level. The FreeDV modems however typically operate on a fixed frame base. This means that data packets have to be send in multiple frames.
 
 The packet format is modelled after EtherNet. As a result any protocol that is compatible with EtherNet can potentially be used over a FreeDV data link. (There are of course practical limits. Browsing the world wide web with just a few hundred bits per second will not be a pleasant experience.)
 
