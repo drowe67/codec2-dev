@@ -95,163 +95,28 @@ struct freedv *freedv_open(int mode) {
 
 struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
     struct freedv *f;
-    int            codec2_mode, nbit = 0, nbyte = 0;
     
     if (false == (FDV_MODE_ACTIVE( FREEDV_MODE_1600,mode) || FDV_MODE_ACTIVE( FREEDV_MODE_2400A,mode) || 
 		FDV_MODE_ACTIVE( FREEDV_MODE_2400B,mode) || FDV_MODE_ACTIVE( FREEDV_MODE_800XA,mode) || 
 		FDV_MODE_ACTIVE( FREEDV_MODE_700C,mode) || FDV_MODE_ACTIVE( FREEDV_MODE_700D,mode)  ||
-                  FDV_MODE_ACTIVE( FREEDV_MODE_2020,mode)) )
-    {
-        return NULL;
-    }
+                  FDV_MODE_ACTIVE( FREEDV_MODE_2020,mode)) ) return NULL;
 
     /* set everything to zero just in case */
     f = (struct freedv*)CALLOC(1, sizeof(struct freedv));
-    if (f == NULL)
-        return NULL;
+    if (f == NULL) return NULL;
 
     f->mode = mode;
-    f->speech_sample_rate = FREEDV_FS_8000;
-    
-    /* -----------------------------------------------------------------------------------------------*\
-                                       Init Modem and FEC
-    \*------------------------------------------------------------------------------------------------*/
-    
-    if (FDV_MODE_ACTIVE( FREEDV_MODE_1600, f->mode)) {
-        codec2_mode = CODEC2_MODE_1300;
-        freedv_1600_open(f);
-    }
 
-    if (FDV_MODE_ACTIVE( FREEDV_MODE_700C, mode)) {
-        nbit = COHPSK_BITS_PER_FRAME;
-        freedv_700c_open(f, nbit);
-        codec2_mode = CODEC2_MODE_700C;
-    }
-   
-    if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, mode) ) {
-        freedv_700d_open(f, adv);
-        codec2_mode = CODEC2_MODE_700C;
-        nbit = f->ofdm_bitsperframe;
-    }
-        
+    if (FDV_MODE_ACTIVE( FREEDV_MODE_1600, mode)) freedv_1600_open(f);
+    if (FDV_MODE_ACTIVE( FREEDV_MODE_700C, mode)) freedv_700c_open(f);
+    if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, mode)) freedv_700d_open(f, adv);
 #ifdef __LPCNET__
-    if (FDV_MODE_ACTIVE( FREEDV_MODE_2020, mode) ) {
-        codec2_mode = CODEC_MODE_LPCNET_1733;
-        freedv_2020_open(f, adv);
-        nbit = f->ofdm_bitsperframe;
-     }
-#endif
-    
-    if (FDV_MODE_ACTIVE( FREEDV_MODE_2400A, mode)) {
-        codec2_mode = CODEC2_MODE_1300;
-        freedv_2400a_open(f);
-    }
-    
-    if (FDV_MODE_ACTIVE( FREEDV_MODE_2400B, mode) ) {
-        codec2_mode = CODEC2_MODE_1300;
-        freedv_2400b_open(f);
-    }
-    
-    if (FDV_MODE_ACTIVE( FREEDV_MODE_800XA, mode)) {
-        codec2_mode = CODEC2_MODE_700C;
-        freedv_800xa_open(f);
-    }
+    if (FDV_MODE_ACTIVE( FREEDV_MODE_2020, mode)) freedv_2020_open(f, adv);
+#endif    
+    if (FDV_MODE_ACTIVE( FREEDV_MODE_2400A, mode)) freedv_2400a_open(f);
+    if (FDV_MODE_ACTIVE( FREEDV_MODE_2400B, mode) ) freedv_2400b_open(f);
+    if (FDV_MODE_ACTIVE( FREEDV_MODE_800XA, mode)) freedv_800xa_open(f);
 
-    /* -----------------------------------------------------------------------------------------------*\
-                                            Init Speech Codec
-    \*------------------------------------------------------------------------------------------------*/
-
-    if (codec2_mode == CODEC_MODE_LPCNET_1733) {
-#ifdef __LPCNET__
-        f->lpcnet = lpcnet_freedv_create(1);
-#endif
-        f->codec2 = NULL;
-    }
-    else {
-        f->codec2 = codec2_create(codec2_mode);
-        if (f->codec2 == NULL)
-            return NULL;
-    }
-    
-    /* work out how many codec 2 frames per mode frame, and number of
-       bytes of storage for packed and unpacked bits.  TODO: do we really
-       need to work in packed bits at all?  It's messy, chars would probably
-       be OK.... */
-    
-    if (FDV_MODE_ACTIVE( FREEDV_MODE_1600, mode) || FDV_MODE_ACTIVE( FREEDV_MODE_2400A, mode) || FDV_MODE_ACTIVE( FREEDV_MODE_2400B, mode)) {
-        f->n_speech_samples = codec2_samples_per_frame(f->codec2);
-        f->n_codec_bits = codec2_bits_per_frame(f->codec2);
-        nbit = f->n_codec_bits;
-        nbyte = (nbit + 7) / 8;
-    } else if (FDV_MODE_ACTIVE( FREEDV_MODE_800XA, mode) ) {
-        f->n_speech_samples = 2*codec2_samples_per_frame(f->codec2);
-        f->n_codec_bits = codec2_bits_per_frame(f->codec2);
-        nbit = f->n_codec_bits;
-        nbyte = (nbit + 7) / 8;
-        nbyte = nbyte*2;
-        nbit = 8*nbyte;
-        f->n_codec_bits = nbit;
-    } else if FDV_MODE_ACTIVE( FREEDV_MODE_700C, mode) {
-        f->n_speech_samples = 2*codec2_samples_per_frame(f->codec2);
-        f->n_codec_bits = 2*codec2_bits_per_frame(f->codec2);
-        nbit = f->n_codec_bits;
-        nbyte = 2*((codec2_bits_per_frame(f->codec2) + 7) / 8);
-        } else if (FDV_MODE_ACTIVE(FREEDV_MODE_700D, mode)) /* mode == FREEDV_MODE_700D */ {
-
-        /* should be exactly an integer number of Codec 2 frames in a OFDM modem frame */
-
-        assert((f->ldpc->data_bits_per_frame % codec2_bits_per_frame(f->codec2)) == 0);
-
-        int Ncodec2frames = f->ldpc->data_bits_per_frame/codec2_bits_per_frame(f->codec2);
-
-        f->n_speech_samples = Ncodec2frames*codec2_samples_per_frame(f->codec2);
-        f->n_codec_bits = f->interleave_frames*Ncodec2frames*codec2_bits_per_frame(f->codec2);
-        nbit = codec2_bits_per_frame(f->codec2);
-        nbyte = (nbit + 7) / 8;
-        nbyte = nbyte*Ncodec2frames*f->interleave_frames;
-        f->nbyte_packed_codec_bits = nbyte;
-
-        //fprintf(stderr, "Ncodec2frames: %d n_speech_samples: %d n_codec_bits: %d nbit: %d  nbyte: %d\n",
-        //        Ncodec2frames, f->n_speech_samples, f->n_codec_bits, nbit, nbyte);
-
-        f->packed_codec_bits_tx = (unsigned char*)MALLOC(nbyte*sizeof(char));
-        if (f->packed_codec_bits_tx == NULL) return(NULL);
-        f->codec_bits = NULL;
-    } else if (FDV_MODE_ACTIVE(FREEDV_MODE_2020, mode)) {
-#ifdef __LPCNET__
-        /* should be exactly an integer number of Codec frames in a OFDM modem frame */
-
-        assert((f->ldpc->data_bits_per_frame % lpcnet_bits_per_frame(f->lpcnet)) == 0);
-
-        int Ncodecframes = f->ldpc->data_bits_per_frame/lpcnet_bits_per_frame(f->lpcnet);
-
-        f->n_speech_samples = Ncodecframes*lpcnet_samples_per_frame(f->lpcnet);
-        f->n_codec_bits = f->interleave_frames*Ncodecframes*lpcnet_bits_per_frame(f->lpcnet);
-        nbit = f->n_codec_bits;
-
-        // we actually have unpacked data but uses this as it's convenient
-        nbyte = nbit;
-#endif
-    }
-    
-    f->packed_codec_bits = (unsigned char*)MALLOC(nbyte*sizeof(char));
-    if (f->packed_codec_bits == NULL) return(NULL);
-
-    if (FDV_MODE_ACTIVE( FREEDV_MODE_1600, mode))
-        f->codec_bits = (int*)MALLOC(nbit*sizeof(int));
-
-    if (FDV_MODE_ACTIVE( FREEDV_MODE_700C, mode))
-        f->codec_bits = (int*)MALLOC(COHPSK_BITS_PER_FRAME*sizeof(int));
-        
-    /* Note: VHF Framer/deframer goes directly from packed codec/vc/proto bits to filled frame */
-
-    if (f->packed_codec_bits == NULL) {
-        if (f->codec_bits != NULL) {FREE(f->codec_bits); f->codec_bits = NULL; }
-        return NULL;
-    }
-
-    /* Varicode low bit rate text states */
-    
     varicode_decode_init(&f->varicode_dec_states, 1);
 
     return f;
