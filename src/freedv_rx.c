@@ -40,7 +40,6 @@
 
 #include "freedv_api.h"
 #include "modem_stats.h"
-#include "codec2.h"
 
 #define NDISCARD 5                /* BER measure optionally discards first few frames after sync */
 

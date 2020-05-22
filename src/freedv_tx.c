@@ -32,72 +32,12 @@
 #include <errno.h>
 
 #include "freedv_api.h"
-#include "codec2.h"
-
-
-struct my_callback_state {
-    char  tx_str[80];
-    char *ptx_str;
-    int calls;
-};
-
-char my_get_next_tx_char(void *callback_state) {
-    struct my_callback_state* pstate = (struct my_callback_state*)callback_state;
-    char  c = *pstate->ptx_str++;
-
-    //fprintf(stderr, "my_get_next_tx_char: %c\n", c);
-
-    if (*pstate->ptx_str == 0) {
-        pstate->ptx_str = pstate->tx_str;
-    }
-
-    return c;
-}
-
-void my_get_next_proto(void *callback_state,char *proto_bits){
-    struct my_callback_state* cb_states = (struct my_callback_state*)(callback_state);
-    snprintf(proto_bits,3,"%2d",cb_states->calls);
-    cb_states->calls = cb_states->calls + 1;
-}
-
-/* Called when a packet has been received */
-void my_datarx(void *callback_state, unsigned char *packet, size_t size) {
-    /* This should not happen while sending... */
-    fprintf(stderr, "datarx callback called, this should not happen!\n");    
-}
-
-/* Called when a new packet can be send */
-void my_datatx(void *callback_state, unsigned char *packet, size_t *size) {
-    static int data_toggle;
-    
-    /* Data could come from a network interface, here we just make up some */
-    
-    data_toggle = !data_toggle;
-    if (data_toggle) {
-        /* Send a packet with data */
-        int i;
-	for (i = 0; i < 64; i++)
-	    packet[i] = i;
-        *size = i;
-    } else {
-        /* set size to zero, the freedv api will insert a header frame */
-        *size = 0;
-    }
-}
-
 
 int main(int argc, char *argv[]) {
     FILE                     *fin, *fout;
-    short                    *speech_in;
-    short                    *mod_out;
     struct freedv            *freedv;
-    struct my_callback_state  my_cb_state;
     int                       mode;
-    int                       n_speech_samples;
-    int                       n_nom_modem_samples;
-    int                       use_codectx, use_datatx, use_testframes, interleave_frames, use_clip, use_txbpf;
-    int                       use_ext_vco, use_dpsk;
-    struct CODEC2             *c2;
+    int                       use_testframes, interleave_frames, use_clip, use_txbpf, use_dpsk;
     int                       i;
 
     if (argc < 4) {
@@ -106,7 +46,7 @@ int main(int argc, char *argv[]) {
         sprintf(f2020,"|2020");
         #endif     
         printf("usage: %s 1600|700C|700D|2400A|2400B|800XA%s InputRawSpeechFile OutputModemRawFile\n"
-               " [--testframes] [--interleave depth] [--codectx] [--datatx] [--clip 0|1] [--txbpf 0|1] [--extvco] [--dpsk]\n", argv[0], f2020);
+               " [--testframes] [--interleave depth] [--codectx] [--datatx] [--clip 0|1] [--txbpf 0|1] [--dpsk]\n", argv[0], f2020);
         printf("e.g    %s 1600 hts1a.raw hts1a_fdmdv.raw\n", argv[0]);
         exit(1);
     }
@@ -146,158 +86,62 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
-    use_codectx = 0; use_datatx = 0; use_testframes = 0; interleave_frames = 1; use_clip = 0; use_txbpf = 1;
+    use_testframes = 0; interleave_frames = 1; use_clip = 0; use_txbpf = 1;
     use_ext_vco = 0; use_dpsk = 0;
     
     if (argc > 4) {
         for (i = 4; i < argc; i++) {
-            if (strcmp(argv[i], "--testframes") == 0) {
-                use_testframes = 1;
-            }
-            if (strcmp(argv[i], "--codectx") == 0) {
-                int c2_mode;
-                
-                if ((mode == FREEDV_MODE_700C) || (mode == FREEDV_MODE_700D) || (mode == FREEDV_MODE_800XA)) {
-                    c2_mode = CODEC2_MODE_700C;
-                } else {
-                    c2_mode = CODEC2_MODE_1300;
-                }
-                use_codectx = 1;
-                c2 = codec2_create(c2_mode);
-                assert(c2 != NULL);
-            }
-            if (strcmp(argv[i], "--datatx") == 0) {
-                use_datatx = 1;
-            }
-            if (strcmp(argv[i], "--interleave") == 0) {
-                interleave_frames = atoi(argv[i+1]);
-            }
-            if (strcmp(argv[i], "--clip") == 0) {
-                use_clip = atoi(argv[i+1]);
-            }
-            if (strcmp(argv[i], "--txbpf") == 0) {
-                use_txbpf = atoi(argv[i+1]);
-            }
-            if (strcmp(argv[i], "--extvco") == 0) {
-                use_ext_vco = 1;
-            }
-            if (strcmp(argv[i], "--dpsk") == 0) {
-                use_dpsk = 1;
+            if (strcmp(argv[i], "--testframes") == 0) use_testframes = 1;
+            else if (strcmp(argv[i], "--interleave") == 0) { interleave_frames = atoi(argv[i+1]); i++; }
+            else if (strcmp(argv[i], "--clip") == 0) { use_clip = atoi(argv[i+1]); i++; }
+            else if (strcmp(argv[i], "--txbpf") == 0) { use_txbpf = atoi(argv[i+1]); i++ }
+            else if (strcmp(argv[i], "--dpsk") == 0) use_dpsk = 1;
+            else {
+                fprintf(stderr, "unkown option: %s\n", argv[i]);
+                exit(1);
             }
         }
     }
 
+    /* freedv_open_advanced() for non-standard start up */ 
     if ((mode == FREEDV_MODE_700D) || (mode == FREEDV_MODE_2020)) {
         struct freedv_advanced adv;
         adv.interleave_frames = interleave_frames;
         freedv = freedv_open_advanced(mode, &adv);
     }
     else {
+        /* Just use this normally */
         freedv = freedv_open(mode);
     }
     assert(freedv != NULL);
 
-    if (use_datatx) {
-        unsigned char header[6] = { 0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc };
-        freedv_set_data_header(freedv, header);
-    }
-    freedv_set_test_frames(freedv, use_testframes);
-
-    freedv_set_snr_squelch_thresh(freedv, -100.0);
-    freedv_set_squelch_en(freedv, 1);
+    /* these are all optional ------------------ */
     freedv_set_clip(freedv, use_clip);
     freedv_set_tx_bpf(freedv, use_txbpf);
     freedv_set_dpsk(freedv, use_dpsk);
     freedv_set_ext_vco(freedv, use_ext_vco);
     freedv_set_verbose(freedv, 1);
-    
-    n_speech_samples = freedv_get_n_speech_samples(freedv);
-    n_nom_modem_samples = freedv_get_n_nom_modem_samples(freedv);
-    speech_in = (short*)malloc(sizeof(short)*n_speech_samples);
-    assert(speech_in != NULL);
-    mod_out = (short*)malloc(sizeof(short)*n_nom_modem_samples);
-    assert(mod_out != NULL);
-    //fprintf(stderr, "n_speech_samples: %d n_nom_modem_samples: %d\n", n_speech_samples, n_nom_modem_samples);
 
-    /* set up callback for txt msg chars */
-    sprintf(my_cb_state.tx_str, "cq cq cq hello world\r");
-    my_cb_state.ptx_str = my_cb_state.tx_str;
-    my_cb_state.calls = 0;
-    freedv_set_callback_txt(freedv, NULL, &my_get_next_tx_char, &my_cb_state);
-    
-    /* set up callback for protocol bits */
-    freedv_set_callback_protocol(freedv, NULL, &my_get_next_proto, &my_cb_state);
+    /* handy functions to set buffer sizes, note tx/modulator always
+       returns freedv_get_n_nom_modem_samples() (unlike rx side) */
+    short speech_in[freedv_get_n_speech_samples(freedv)];
+    short mod_out[freedv_get_n_nom_modem_samples(freedv)];
 
-    /* set up callback for data packets */
-    freedv_set_callback_data(freedv, my_datarx, my_datatx, &my_cb_state);
-
-    /* OK main loop */
+    /* OK main loop  --------------------------------------- */
 
     while(fread(speech_in, sizeof(short), n_speech_samples, fin) == n_speech_samples) {
-        if (use_codectx == 0) {
-            /* Use the freedv_api to do everything: speech encoding, modulating */
-            freedv_tx(freedv, mod_out, speech_in);
-        } else {
-            int bits_per_codec_frame = codec2_bits_per_frame(c2);
-            int bytes_per_codec_frame = (bits_per_codec_frame + 7) / 8;
-            int codec_frames = freedv_get_n_codec_bits(freedv) / bits_per_codec_frame;
-            int samples_per_frame = codec2_samples_per_frame(c2);
-            unsigned char encoded[bytes_per_codec_frame * codec_frames];
-            unsigned char *enc_frame = encoded;
-            short *speech_frame = speech_in;
-            float energy = 0;
-
-            /* Encode the speech ourself (or get it from elsewhere, e.g. network) */
-            for (i = 0; i < codec_frames; i++) {
-                codec2_encode(c2, enc_frame, speech_frame);
-                energy += codec2_get_energy(c2, enc_frame);
-                enc_frame += bytes_per_codec_frame;
-                speech_frame += samples_per_frame;
-            }
-            energy /= codec_frames;
-            
-            /* Is the audio fragment quiet? */
-            if (use_datatx && energy < 1.0) {
-                /* Insert a frame with data instead of speech */
-                freedv_datatx(freedv, mod_out);
-            } else {
-                /* Use the freedv_api to modulate already encoded frames */
-                freedv_codectx(freedv, mod_out, encoded);
-            }
-        }
-
-        if (use_ext_vco) {
-            /* decimate sample rate down to symbol rate when driving an external VCO */
-            int Fs = freedv_get_modem_sample_rate(freedv);
-            int Rs = freedv_get_modem_symbol_rate(freedv);
-            int M = Fs/Rs;
-            assert((Fs % Rs) == 0);
-            for(i=0; i<n_nom_modem_samples; i+=M) {
-                fwrite(&mod_out[i], sizeof(short), 1, fout);
-                //fprintf(stderr, "%d\n",mod_out[i]);
-            }
-        }
-        else {
-            fwrite(mod_out, sizeof(short), n_nom_modem_samples, fout);
-        }
-
-        
-        /* if this is in a pipeline, we probably don't want the usual
-           buffering to occur */
+        freedv_tx(freedv, mod_out, speech_in);
+        fwrite(mod_out, sizeof(short), n_nom_modem_samples, fout);
+    
+        /* if using pipes we don't want the usual buffering to occur */
         if (fout == stdout) fflush(stdout);
         if (fin == stdin) fflush(stdin);
-
     }
 
-    free(speech_in);
-    free(mod_out);
     freedv_close(freedv);
     fclose(fin);
     fclose(fout);
-
-    fclose(stdin);
-    fclose(stderr);
-
+    
     return 0;
 }
 
