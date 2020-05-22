@@ -179,7 +179,7 @@ struct freedv {
 // open function for each mode
       
 void freedv_1600_open(struct freedv *f);
-void freedv_700c_open(struct freedv *f, int nbit);
+void freedv_700c_open(struct freedv *f);
 void freedv_700d_open(struct freedv *f, struct freedv_advanced *adv);
 void freedv_2020_open(struct freedv *f, struct freedv_advanced *adv);
 void freedv_2400a_open(struct freedv *f);

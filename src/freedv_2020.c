@@ -34,6 +34,7 @@
 
 extern char *ofdm_statemode[];
 
+#ifdef __LPCNET__
 void freedv_2020_open(struct freedv *f, struct freedv_advanced *adv) {
     f->speech_sample_rate = FREEDV_FS_16000;
     f->snr_squelch_thresh = 4.0;
@@ -128,7 +129,26 @@ void freedv_2020_open(struct freedv *f, struct freedv_advanced *adv) {
         
     /* TODO: tx BPF off by default, as we need new filter coeffs for FreeDV 2020 waveform */
     ofdm_set_tx_bpf(f->ofdm, 0);
+
+    f->lpcnet = lpcnet_freedv_create(1); assert(f->lpcnet != NULL);
+    f->codec2 = NULL;
+
+    /* should be exactly an integer number of Codec frames in a OFDM modem frame */
+    assert((f->ldpc->data_bits_per_frame % lpcnet_bits_per_frame(f->lpcnet)) == 0);
+
+    int Ncodecframes = f->ldpc->data_bits_per_frame/lpcnet_bits_per_frame(f->lpcnet);
+
+    f->n_speech_samples = Ncodecframes*lpcnet_samples_per_frame(f->lpcnet);
+    f->n_codec_bits = f->interleave_frames*Ncodecframes*lpcnet_bits_per_frame(f->lpcnet);
+
+    // note these are actually unpacked, but we store them in
+    // f->packed_codec_bits as thats the covention for passing compressed
+    // speech around
+    f->packed_codec_bits = (unsigned char*)MALLOC(f->n_codec_bits*sizeof(char));
+    assert(f->packed_codec_bits != NULL);
+    f->codec_bits = NULL;
 }
+#endif
 
 #ifdef __LPCNET__
 void freedv_comptx_2020(struct freedv *f, COMP mod_out[]) {

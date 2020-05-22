@@ -43,6 +43,16 @@ void freedv_2400a_open(struct freedv *f) {
     f->nin = f->nin_prev = fsk_nin(f->fsk);
     f->modem_sample_rate = 48000;
     f->modem_symbol_rate = 1200;
+
+    f->speech_sample_rate = FREEDV_FS_8000;
+    f->codec2 = codec2_create(CODEC2_MODE_1300); assert(f->codec2 != NULL);
+    f->n_speech_samples = codec2_samples_per_frame(f->codec2);
+    f->n_codec_bits = codec2_bits_per_frame(f->codec2);
+    int nbit = f->n_codec_bits;
+    int nbyte = (nbit + 7) / 8;
+    f->packed_codec_bits = (unsigned char*)MALLOC(nbyte*sizeof(char));
+    assert(f->packed_codec_bits != NULL);
+    f->codec_bits = NULL;
 }
 
 void freedv_2400b_open(struct freedv *f) {
@@ -61,6 +71,16 @@ void freedv_2400b_open(struct freedv *f) {
     f->n_nat_modem_samples = f->fmfsk->N;
     f->nin = f->nin_prev = fmfsk_nin(f->fmfsk);
     f->modem_sample_rate = 48000;
+
+    f->speech_sample_rate = FREEDV_FS_8000;
+    f->codec2 = codec2_create(CODEC2_MODE_1300); assert(f->codec2 != NULL);
+    f->n_speech_samples = codec2_samples_per_frame(f->codec2);
+    f->n_codec_bits = codec2_bits_per_frame(f->codec2);
+    int nbit = f->n_codec_bits;
+    int nbyte = (nbit + 7) / 8;
+    f->packed_codec_bits = (unsigned char*)MALLOC(nbyte*sizeof(char));
+    assert(f->packed_codec_bits != NULL);
+    f->codec_bits = NULL;
 }
 
 void freedv_800xa_open(struct freedv *f) {
@@ -80,6 +100,15 @@ void freedv_800xa_open(struct freedv *f) {
     f->modem_sample_rate = 8000;
     f->modem_symbol_rate = 400;
     fsk_stats_normalise_eye(f->fsk, 0);
+
+    f->codec2 = codec2_create(CODEC2_MODE_700C); assert(f->codec2 != NULL);
+    f->speech_sample_rate = FREEDV_FS_8000;
+    f->n_speech_samples = 2*codec2_samples_per_frame(f->codec2);
+    f->n_codec_bits = 2*codec2_bits_per_frame(f->codec2);
+    int nbit = f->n_codec_bits;
+    int nbyte = (nbit + 7) / 8;
+    f->packed_codec_bits = (unsigned char*)MALLOC(nbyte*sizeof(char));
+    assert(f->packed_codec_bits != NULL);
 }
 
 /* TX routines for 2400 FSK modes, after codec2 encoding */

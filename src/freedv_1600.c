@@ -48,6 +48,18 @@ void freedv_1600_open(struct freedv *f) {
     assert(f->tx_bits != NULL); assert(f->rx_bits != NULL);
     f->evenframe = 0;
     f->sz_error_pattern = fdmdv_error_pattern_size(f->fdmdv);
+
+    f->speech_sample_rate = FREEDV_FS_8000;
+    f->codec2 = codec2_create(CODEC2_MODE_1300); assert(f->codec2 != NULL);
+    f->n_speech_samples = codec2_samples_per_frame(f->codec2);
+    f->n_codec_bits = codec2_bits_per_frame(f->codec2);
+
+    /* storage for packed and unpacked bits */
+    int nbyte = (f->n_codec_bits + 7) / 8;
+    f->packed_codec_bits = (unsigned char*)MALLOC(nbyte*sizeof(char));
+    assert(f->packed_codec_bits != NULL);
+    f->codec_bits = (int*)MALLOC(f->n_codec_bits*sizeof(int));
+    assert(f->codec_bits != NULL);  
 }
 
 
