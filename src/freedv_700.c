@@ -283,6 +283,7 @@ void freedv_comptx_700d(struct freedv *f, COMP mod_out[]) {
             txt_bits[k] = f->tx_varicode_bits[f->varicode_bit_index++];
             f->nvaricode_bits--;
         }
+        else txt_bits[k] = 0;
     }
 
     /* optionally replace codec payload bits with test frames known to rx */
