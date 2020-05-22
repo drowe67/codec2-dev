@@ -31,61 +31,172 @@
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
+#include <ctype.h>
 
 #include "freedv_api.h"
 #include "codec2.h"
 
+/**********************************************************
+	Encoding an ITU callsign (and 4 bit secondary station ID to a valid MAC address.
+	http://dmlinking.net/eth_ar.html
+ */
 
-struct my_callback_state {
-    char  tx_str[80];
-    char *ptx_str;
-    int calls;
+// Lookup table for valid callsign characters
+static char alnum2code[37] = {
+	'0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+	'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
+	'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 
+	0
 };
 
-char my_get_next_tx_char(void *callback_state) {
-    struct my_callback_state* pstate = (struct my_callback_state*)callback_state;
-    char  c = *pstate->ptx_str++;
+// Encode a callsign and ssid into a valid MAC address
+static int eth_ar_call2mac(uint8_t mac[6], char *callsign, int ssid, bool multicast)
+{
+	uint64_t add = 0;
+	int i;
+	
+	if (ssid > 15 || ssid < 0)
+		return -1;
+	
+	for (i = 7; i >= 0; i--) {
+		char c;
+		
+		if (i >= strlen(callsign)) {
+			c = 0;
+		} else {
+			c = toupper(callsign[i]);
+		}
+		
+		int j;
+		
+		for (j = 0; j < sizeof(alnum2code); j++) {
+			if (alnum2code[j] == c)
+				break;
+		}
+		if (j == sizeof(alnum2code))
+			return -1;
+		
+		add *= 37;
+		add += j;
+	}
+	
+	mac[0] = ((add >> (40 - 6)) & 0xc0) | (ssid << 2) | 0x02 | multicast;
+	mac[1] = (add >> 32) & 0xff;
+	mac[2] = (add >> 24) & 0xff;
+	mac[3] = (add >> 16) & 0xff;
+	mac[4] = (add >> 8) & 0xff;
+	mac[5] = add & 0xff;
 
-    //fprintf(stderr, "my_get_next_tx_char: %c\n", c);
-
-    if (*pstate->ptx_str == 0) {
-        pstate->ptx_str = pstate->tx_str;
-    }
-
-    return c;
+	return 0;
 }
 
-void my_get_next_proto(void *callback_state,char *proto_bits){
-    struct my_callback_state* cb_states = (struct my_callback_state*)(callback_state);
-    snprintf(proto_bits,3,"%2d",cb_states->calls);
-    cb_states->calls = cb_states->calls + 1;
-}
 
-/* Called when a packet has been received */
-void my_datarx(void *callback_state, unsigned char *packet, size_t size) {
+/**********************************************************
+	Data channel callback functions
+ */
+
+
+struct my_callback_state {
+    int calls;
+    
+    unsigned char mac[6];
+};
+
+/*
+	Called when a packet has been received 
+	Should not be called in this tx-only test program
+ */
+void my_datarx(void *callback_state, unsigned char *packet, size_t size) 
+{
     /* This should not happen while sending... */
     fprintf(stderr, "datarx callback called, this should not happen!\n");    
 }
 
-/* Called when a new packet can be send */
-void my_datatx(void *callback_state, unsigned char *packet, size_t *size) {
-    static int data_toggle;
+
+/* 
+	Called when a new packet can be send.
+	
+	callback_state	Private state variable, not touched by freedv.
+	packet		Data array where new packet data is expected
+	size		Available size in packet. On return the actual size of the packet
+ */
+void my_datatx(void *callback_state, unsigned char *packet, size_t *size) 
+{
+    static int data_type;
+    struct my_callback_state *my_cb_state = callback_state;
+    my_cb_state->calls++;
     
     /* Data could come from a network interface, here we just make up some */
     
-    data_toggle = !data_toggle;
-    if (data_toggle) {
+    if (data_type % 4 == 1) {
+        /* 
+	    Generate a packet with simple test pattern (counting
+	 */
+    
         /* Send a packet with data */
         int i;
+
+	/* Destination: broadcast */
+	memset(packet, 0xff, 6);
+	/* Source: our eth_ar encoded callsign+ssid */
+	memcpy(packet+6, my_cb_state->mac, 6);
+	/* Ether type: experimental (since this is just a test pattern) */
+	packet[12] = 0x01;
+	packet[13] = 0x01;
+
 	for (i = 0; i < 64; i++)
-	    packet[i] = i;
-        *size = i;
+	    packet[i + 14] = i;
+        *size = i + 14;
+    } else if (data_type % 4 == 2) {
+        /*
+	    Generate an FPRS position report
+	 */
+	 
+	/* Destination: broadcast */
+	memset(packet, 0xff, 6);
+	/* Source: our eth_ar encoded callsign+ssid */
+	memcpy(packet+6, my_cb_state->mac, 6);
+	/* Ether type: FPRS */
+	packet[12] = 0x73;
+	packet[13] = 0x70;
+    
+        packet[14] = 0x07; // Position element Lon 86.925026 Lat 27.987850
+	packet[15] = 0x3d; // 
+	packet[16] = 0xd0;
+	packet[17] = 0x37;
+	packet[18] = 0xd0 | 0x08 | 0x01;
+	packet[19] = 0x3e;
+	packet[20] = 0x70;
+	packet[21] = 0x85;
+    
+        *size = 22;
     } else {
-        /* set size to zero, the freedv api will insert a header frame */
+        /* 
+	   Set size to zero, the freedv api will insert a header frame 
+	   This is usefull for identifying ourselves 
+	 */
         *size = 0;
     }
+
+    data_type++;
 }
 
+
+/* Determine the amount of 'energy' in the samples by squaring them 
+   This is not a perfect VAD as noise may trigger it, but works well for demonstrations.
+ */
+static float samples_get_energy(short *samples, int nr)
+{
+	float e = 0;
+	int i;
+	
+	for (i = 0; i < nr; i++) {
+		e += (float)(samples[i] * samples[i]) /  (8192);
+	}
+	e /= nr;
+	
+	return e;
+}
 
 int main(int argc, char *argv[]) {
     FILE                     *fin, *fout;
@@ -96,40 +207,28 @@ int main(int argc, char *argv[]) {
     int                       mode;
     int                       n_speech_samples;
     int                       n_nom_modem_samples;
-    int                       use_codectx, use_datatx, use_testframes, interleave_frames, use_clip, use_txbpf;
-    int                       use_ext_vco, use_dpsk;
+    char                     *callsign = "NOCALL";
+    int                       ssid = 0;
+    bool                      multicast = false;
+    int                       use_codectx;
     struct CODEC2             *c2;
     int                       i;
+    float                     data_threshold = 15;
 
     if (argc < 4) {
-        char f2020[80] = {0};
-        #ifdef __LPCNET__
-        sprintf(f2020,"|2020");
-        #endif     
-        printf("usage: %s 1600|700C|700D|2400A|2400B|800XA%s InputRawSpeechFile OutputModemRawFile\n"
-               " [--testframes] [--interleave depth] [--codectx] [--datatx] [--clip 0|1] [--txbpf 0|1] [--extvco] [--dpsk]\n", argv[0], f2020);
-        printf("e.g    %s 1600 hts1a.raw hts1a_fdmdv.raw\n", argv[0]);
+        printf("usage: %s 2400A|2400B|800XA InputRawSpeechFile OutputModemRawFile\n"
+               " [--codectx]  [--callsign callsign] [--ssid ssid] [--mac-multicast 0|1] [--data-threshold val]\n", argv[0]);
+        printf("e.g    %s 2400A hts1a.raw hts1a_fdmdv.raw\n", argv[0]);
         exit(1);
     }
 
     mode = -1;
-    if (!strcmp(argv[1],"1600"))
-        mode = FREEDV_MODE_1600;
-    if (!strcmp(argv[1],"700C"))
-        mode = FREEDV_MODE_700C;
-    if (!strcmp(argv[1],"700D"))
-        mode = FREEDV_MODE_700D;
-    if (!strcmp(argv[1],"2400A")){
+    if (!strcmp(argv[1],"2400A"))
         mode = FREEDV_MODE_2400A;
-	}
     if (!strcmp(argv[1],"2400B"))
         mode = FREEDV_MODE_2400B;
     if (!strcmp(argv[1],"800XA"))
         mode = FREEDV_MODE_800XA;
-    #ifdef __LPCNET__
-    if (!strcmp(argv[1],"2020"))
-        mode = FREEDV_MODE_2020;
-    #endif
     if (mode == -1) {
         fprintf(stderr, "Error in mode: %s\n", argv[1]);
         exit(0);
@@ -147,14 +246,10 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
-    use_codectx = 0; use_datatx = 0; use_testframes = 0; interleave_frames = 1; use_clip = 0; use_txbpf = 1;
-    use_ext_vco = 0; use_dpsk = 0;
+    use_codectx = 0;
     
     if (argc > 4) {
         for (i = 4; i < argc; i++) {
-            if (strcmp(argv[i], "--testframes") == 0) {
-                use_testframes = 1;
-            }
             if (strcmp(argv[i], "--codectx") == 0) {
                 int c2_mode;
                 
@@ -167,49 +262,29 @@ int main(int argc, char *argv[]) {
                 c2 = codec2_create(c2_mode);
                 assert(c2 != NULL);
             }
-            if (strcmp(argv[i], "--datatx") == 0) {
-                use_datatx = 1;
+            if (strcmp(argv[i], "--callsign") == 0) {
+                callsign = argv[i+1];
             }
-            if (strcmp(argv[i], "--interleave") == 0) {
-                interleave_frames = atoi(argv[i+1]);
+            if (strcmp(argv[i], "--ssid") == 0) {
+                ssid = atoi(argv[i+1]);
             }
-            if (strcmp(argv[i], "--clip") == 0) {
-                use_clip = atoi(argv[i+1]);
+            if (strcmp(argv[i], "--mac-multicast") == 0) {
+                multicast = atoi(argv[i+1]);
             }
-            if (strcmp(argv[i], "--txbpf") == 0) {
-                use_txbpf = atoi(argv[i+1]);
-            }
-            if (strcmp(argv[i], "--extvco") == 0) {
-                use_ext_vco = 1;
-            }
-            if (strcmp(argv[i], "--dpsk") == 0) {
-                use_dpsk = 1;
+            if (strcmp(argv[i], "--data-threshold") == 0) {
+                data_threshold = atof(argv[i+1]);
             }
         }
     }
 
-    if ((mode == FREEDV_MODE_700D) || (mode == FREEDV_MODE_2020)) {
-        struct freedv_advanced adv;
-        adv.interleave_frames = interleave_frames;
-        freedv = freedv_open_advanced(mode, &adv);
-    }
-    else {
-        freedv = freedv_open(mode);
-    }
+    freedv = freedv_open(mode);
     assert(freedv != NULL);
 
-    if (use_datatx) {
-        unsigned char header[6] = { 0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc };
-        freedv_set_data_header(freedv, header);
-    }
-    freedv_set_test_frames(freedv, use_testframes);
+    /* Generate our address */
+    eth_ar_call2mac(my_cb_state.mac, callsign, ssid, multicast);
 
-    freedv_set_snr_squelch_thresh(freedv, -100.0);
-    freedv_set_squelch_en(freedv, 1);
-    freedv_set_clip(freedv, use_clip);
-    freedv_set_tx_bpf(freedv, use_txbpf);
-    freedv_set_dpsk(freedv, use_dpsk);
-    freedv_set_ext_vco(freedv, use_ext_vco);
+    freedv_set_data_header(freedv, my_cb_state.mac);
+
     freedv_set_verbose(freedv, 1);
     
     n_speech_samples = freedv_get_n_speech_samples(freedv);
@@ -220,15 +295,6 @@ int main(int argc, char *argv[]) {
     assert(mod_out != NULL);
     //fprintf(stderr, "n_speech_samples: %d n_nom_modem_samples: %d\n", n_speech_samples, n_nom_modem_samples);
 
-    /* set up callback for txt msg chars */
-    sprintf(my_cb_state.tx_str, "cq cq cq hello world\r");
-    my_cb_state.ptx_str = my_cb_state.tx_str;
-    my_cb_state.calls = 0;
-    freedv_set_callback_txt(freedv, NULL, &my_get_next_tx_char, &my_cb_state);
-    
-    /* set up callback for protocol bits */
-    freedv_set_callback_protocol(freedv, NULL, &my_get_next_proto, &my_cb_state);
-
     /* set up callback for data packets */
     freedv_set_callback_data(freedv, my_datarx, my_datatx, &my_cb_state);
 
@@ -236,9 +302,24 @@ int main(int argc, char *argv[]) {
 
     while(fread(speech_in, sizeof(short), n_speech_samples, fin) == n_speech_samples) {
         if (use_codectx == 0) {
-            /* Use the freedv_api to do everything: speech encoding, modulating */
-            freedv_tx(freedv, mod_out, speech_in);
+	    /* Use the freedv_api to do everything: speech encoding, modulating 
+	     */
+            float energy = samples_get_energy(speech_in, n_speech_samples);
+
+           /* Is the audio fragment quiet? */
+            if (energy < data_threshold) {
+                /* Insert a frame with data instead of speech */
+                freedv_datatx(freedv, mod_out);
+            } else {
+	        /* transmit voice frame */
+                freedv_tx(freedv, mod_out, speech_in);
+            }
         } else {
+	    /* Use the freedv_api to do the modem part, encode ourselves
+	       - First encode the frames
+	       - Get activity from codec2 api
+	       - Based on activity either send encoded voice or data
+	     */
             int bits_per_codec_frame = codec2_bits_per_frame(c2);
             int bytes_per_codec_frame = (bits_per_codec_frame + 7) / 8;
             int codec_frames = freedv_get_n_codec_bits(freedv) / bits_per_codec_frame;
@@ -258,7 +339,7 @@ int main(int argc, char *argv[]) {
             energy /= codec_frames;
             
             /* Is the audio fragment quiet? */
-            if (use_datatx && energy < 1.0) {
+            if (energy < data_threshold) {
                 /* Insert a frame with data instead of speech */
                 freedv_datatx(freedv, mod_out);
             } else {
@@ -267,21 +348,7 @@ int main(int argc, char *argv[]) {
             }
         }
 
-        if (use_ext_vco) {
-            /* decimate sample rate down to symbol rate when driving an external VCO */
-            int Fs = freedv_get_modem_sample_rate(freedv);
-            int Rs = freedv_get_modem_symbol_rate(freedv);
-            int M = Fs/Rs;
-            assert((Fs % Rs) == 0);
-            for(i=0; i<n_nom_modem_samples; i+=M) {
-                fwrite(&mod_out[i], sizeof(short), 1, fout);
-                //fprintf(stderr, "%d\n",mod_out[i]);
-            }
-        }
-        else {
-            fwrite(mod_out, sizeof(short), n_nom_modem_samples, fout);
-        }
-
+        fwrite(mod_out, sizeof(short), n_nom_modem_samples, fout);
         
         /* if this is in a pipeline, we probably don't want the usual
            buffering to occur */
