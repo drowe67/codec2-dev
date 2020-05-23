@@ -52,26 +52,18 @@ int main(int argc, char *argv[]) {
     }
 
     mode = -1;
-    if (!strcmp(argv[1],"1600"))
-        mode = FREEDV_MODE_1600;
-    if (!strcmp(argv[1],"700C"))
-        mode = FREEDV_MODE_700C;
-    if (!strcmp(argv[1],"700D"))
-        mode = FREEDV_MODE_700D;
-    if (!strcmp(argv[1],"2400A")){
-        mode = FREEDV_MODE_2400A;
-	}
-    if (!strcmp(argv[1],"2400B"))
-        mode = FREEDV_MODE_2400B;
-    if (!strcmp(argv[1],"800XA"))
-        mode = FREEDV_MODE_800XA;
+    if (!strcmp(argv[1],"1600")) mode = FREEDV_MODE_1600;
+    if (!strcmp(argv[1],"700C")) mode = FREEDV_MODE_700C;
+    if (!strcmp(argv[1],"700D")) mode = FREEDV_MODE_700D;
+    if (!strcmp(argv[1],"2400A")) mode = FREEDV_MODE_2400A;
+    if (!strcmp(argv[1],"2400B")) mode = FREEDV_MODE_2400B;
+    if (!strcmp(argv[1],"800XA")) mode = FREEDV_MODE_800XA;
     #ifdef __LPCNET__
-    if (!strcmp(argv[1],"2020"))
-        mode = FREEDV_MODE_2020;
+    if (!strcmp(argv[1],"2020"))  mode = FREEDV_MODE_2020;
     #endif
     if (mode == -1) {
         fprintf(stderr, "Error in mode: %s\n", argv[1]);
-        exit(0);
+        exit(1);
     }
 
     if (strcmp(argv[2], "-")  == 0) fin = stdin;
@@ -138,7 +130,7 @@ int main(int argc, char *argv[]) {
         if (fout == stdout) fflush(stdout);
         if (fin == stdin) fflush(stdin);
     }
-
+    
     freedv_close(freedv);
     fclose(fin);
     fclose(fout);

@@ -38,7 +38,7 @@ int main(int argc, char *argv[]) {
     FILE                     *fin, *fout;
     struct freedv            *freedv;
     int                       mode;
-    int                       interleave_frames, use_clip, use_txbpf;
+    int                       use_clip, use_txbpf;
     int                       i;
 
     if (argc < 4) {
@@ -46,33 +46,22 @@ int main(int argc, char *argv[]) {
         #ifdef __LPCNET__
         sprintf(f2020,"|2020");
         #endif     
-        printf("usage: %s 1600|700C|700D|2400A|2400B|800XA%s InputBinaryDataFile OutputModemRawFile\n"
-               " [--interleave depth] [--clip 0|1] [--txbpf 0|1]\n", argv[0], f2020);
+        printf("usage: %s 700C|700D|800XA%s InputBinaryDataFile OutputModemRawFile\n"
+               "  [--clip 0|1] [--txbpf 0|1]\n", argv[0], f2020);
         printf("e.g    %s 700D dataBytes.bin dataBytes_700d.raw\n", argv[0]);
         exit(1);
     }
 
     mode = -1;
-    if (!strcmp(argv[1],"1600"))
-        mode = FREEDV_MODE_1600;
-    if (!strcmp(argv[1],"700C"))
-        mode = FREEDV_MODE_700C;
-    if (!strcmp(argv[1],"700D"))
-        mode = FREEDV_MODE_700D;
-    if (!strcmp(argv[1],"2400A")){
-        mode = FREEDV_MODE_2400A;
-	}
-    if (!strcmp(argv[1],"2400B"))
-        mode = FREEDV_MODE_2400B;
-    if (!strcmp(argv[1],"800XA"))
-        mode = FREEDV_MODE_800XA;
+    if (!strcmp(argv[1],"700C")) mode = FREEDV_MODE_700C;
+    if (!strcmp(argv[1],"700D")) mode = FREEDV_MODE_700D;
+    if (!strcmp(argv[1],"800XA")) mode = FREEDV_MODE_800XA;
     #ifdef __LPCNET__
-    if (!strcmp(argv[1],"2020"))
-        mode = FREEDV_MODE_2020;
+    if (!strcmp(argv[1],"2020")) mode = FREEDV_MODE_2020;
     #endif
     if (mode == -1) {
         fprintf(stderr, "Error in mode: %s\n", argv[1]);
-        exit(0);
+        exit(1);
     }
 
     if (strcmp(argv[2], "-")  == 0) fin = stdin;
@@ -87,12 +76,11 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
-    interleave_frames = 1; use_clip = 0; use_txbpf = 1;
+    use_clip = 0; use_txbpf = 0;
     
     if (argc > 4) {
         for (i = 4; i < argc; i++) {
-            if (strcmp(argv[i], "--interleave") == 0) { interleave_frames = atoi(argv[i+1]); i++; }
-            else if (strcmp(argv[i], "--clip") == 0) { use_clip = atoi(argv[i+1]); i++; }
+            if (strcmp(argv[i], "--clip") == 0) { use_clip = atoi(argv[i+1]); i++; }
             else if (strcmp(argv[i], "--txbpf") == 0) { use_txbpf = atoi(argv[i+1]); i++; }
             else {
                 fprintf(stderr, "unkown option: %s\n", argv[i]);
@@ -101,42 +89,38 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    /* freedv_open_advanced() for non-standard start up */ 
-    if ((mode == FREEDV_MODE_700D) || (mode == FREEDV_MODE_2020)) {
-        struct freedv_advanced adv;
-        adv.interleave_frames = interleave_frames;
-        freedv = freedv_open_advanced(mode, &adv);
-    }
-    else {
-        /* Just use this normally */
-        freedv = freedv_open(mode);
-    }
+    freedv = freedv_open(mode);
     assert(freedv != NULL);
 
-    /* these are all optional ------------------ */
+    /* these are optional ------------------ */
     freedv_set_clip(freedv, use_clip);
     freedv_set_tx_bpf(freedv, use_txbpf);
 
-    /* handy functions to set buffer sizes, note tx/modulator always
-       returns freedv_get_n_nom_modem_samples() (unlike rx side) */
-    if (freedv_get_n_codec_bits(freedv) % 8) {
-        fprintf(stderr, "This FreeDV mode has frames of %d bits, which is not divisible by 8.  Try 700D or 2020\n", freedv_get_n_codec_bits(freedv));
-        exit(1);
-    }
-    int bytes_per_frame = freedv_get_n_codec_bits(freedv)/8;
-    uint8_t bytes_in[bytes_per_frame];
-    short   mod_out[freedv_get_n_nom_modem_samples(freedv)];
+    /* for streaming bytes it's much easier to use modes that have a multiple of 8 payload bits/frame */
+    assert((freedv_get_n_codec_bits(freedv) % 8) == 0);
+    int bytes_per_modem_frame = freedv_get_n_codec_bits(freedv)/8;
+    int n_mod_out = freedv_get_n_nom_modem_samples(freedv);
+    fprintf(stderr, "bytes_per_modem_frame: %d\n", bytes_per_modem_frame);
+    uint8_t bytes_in[bytes_per_modem_frame];
+    short   mod_out[n_mod_out];
 
     /* OK main loop  --------------------------------------- */
 
-    while(fread(bytes_in, sizeof(uint8_t), bytes_per_frame, fin) == bytes_per_frame) {
+    for(int i=0; i< n_mod_out; i++) mod_out[i] = 0;
+    fwrite(mod_out, sizeof(short), n_mod_out, fout);
+    fwrite(mod_out, sizeof(short), n_mod_out, fout);
+    while(fread(bytes_in, sizeof(uint8_t), bytes_per_modem_frame, fin) == bytes_per_modem_frame) {
         freedv_rawdatatx(freedv, mod_out, bytes_in);
-        fwrite(mod_out, sizeof(short), freedv_get_n_nom_modem_samples(freedv),fout);
+        fwrite(mod_out, sizeof(short), n_mod_out, fout);
     
         /* if using pipes we don't want the usual buffering to occur */
         if (fout == stdout) fflush(stdout);
         if (fin == stdin) fflush(stdin);
     }
+
+    for(int i=0; i< n_mod_out; i++) mod_out[i] = 0;
+    fwrite(mod_out, sizeof(short), n_mod_out, fout);
+    fwrite(mod_out, sizeof(short), n_mod_out, fout);
 
     freedv_close(freedv);
     fclose(fin);

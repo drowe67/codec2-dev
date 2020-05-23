@@ -41,7 +41,7 @@ int main(int argc, char *argv[]) {
     struct freedv             *freedv;
     int                        nin, nbytes, nbytes_total = 0, frame = 0;
     int                        mode;
-    int                        interleave_frames, verbose;
+    int                        verbose;
     int                        i;
     
     if (argc < 4) {
@@ -49,30 +49,23 @@ int main(int argc, char *argv[]) {
         #ifdef __LPCNET__
         sprintf(f2020,"|2020");
         #endif     
-	printf("usage: %s 1600|700C|700D|2400A|2400B|800XA%s InputModemSpeechFile OutputSpeechRawFile\n"
-               " [--interleaver depth] [-v] \n", argv[0],f2020);
+	printf("usage: %s 700C|700D|800XA%s InputModemSpeechFile OutputSpeechRawFile\n"
+               " [-v] \n", argv[0],f2020);
 	printf("e.g    %s 700D dataBytes_700d.raw dataBytes_rx.bin\n", argv[0]);
 	exit(1);
     }
 
     mode = -1;
-    if (!strcmp(argv[1],"1600"))
-        mode = FREEDV_MODE_1600;
-    if (!strcmp(argv[1],"700C"))
-        mode = FREEDV_MODE_700C;
-    if (!strcmp(argv[1],"700D"))
-        mode = FREEDV_MODE_700D;
-    if (!strcmp(argv[1],"2400A"))
-        mode = FREEDV_MODE_2400A;
-    if (!strcmp(argv[1],"2400B"))
-        mode = FREEDV_MODE_2400B;
-    if (!strcmp(argv[1],"800XA"))
-        mode = FREEDV_MODE_800XA;
+    if (!strcmp(argv[1],"700C")) mode = FREEDV_MODE_700C;
+    if (!strcmp(argv[1],"700D")) mode = FREEDV_MODE_700D;
+    if (!strcmp(argv[1],"800XA")) mode = FREEDV_MODE_800XA;
     #ifdef __LPCNET__
-    if (!strcmp(argv[1],"2020"))
-        mode = FREEDV_MODE_2020;
+    if (!strcmp(argv[1],"2020")) mode = FREEDV_MODE_2020;
     #endif
-    assert(mode != -1);
+    if (mode == -1) {
+        fprintf(stderr, "Error in mode: %s\n", argv[1]);
+        exit(1);
+    }
 
     if (strcmp(argv[2], "-")  == 0) fin = stdin;
     else if ( (fin = fopen(argv[2],"rb")) == NULL ) {
@@ -88,12 +81,11 @@ int main(int argc, char *argv[]) {
 	exit(1);
     }
 
-    interleave_frames = 1; verbose = 0;
+    verbose = 0;
     
     if (argc > 4) {
         for (i = 4; i < argc; i++) {
-            if (strcmp(argv[i], "--interleave") == 0) { interleave_frames = atoi(argv[i+1]); i++; }
-            else if (strcmp(argv[i], "-v") == 0) verbose = 1;
+            if (strcmp(argv[i], "-v") == 0) verbose = 1;
             else if (strcmp(argv[i], "-vv") == 0) verbose = 2;
             else {
                 fprintf(stderr, "unkown option: %s\n", argv[i]);
@@ -102,29 +94,15 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    /* use the "advanced" version of freedv_open to provide a little
-       extra info, in this case the interleaver depth */
-    if ((mode == FREEDV_MODE_700D) || (mode == FREEDV_MODE_2020)) {
-        struct freedv_advanced adv;
-        adv.interleave_frames = interleave_frames;
-        freedv = freedv_open_advanced(mode, &adv);
-    }
-    else {
-        /* however this is how we start FreeDV most of the time */
-        freedv = freedv_open(mode);
-    }
+    freedv = freedv_open(mode);
     assert(freedv != NULL);
-
     freedv_set_verbose(freedv, verbose);
 
-    /* note use of API functions to tell us how big our buffers need to be -----*/
-    
-    if (freedv_get_n_codec_bits(freedv) % 8) {
-        fprintf(stderr, "This FreeDV mode has frames of %d bits, which is not divisible by 8.  Try 700D or 2020\n", freedv_get_n_codec_bits(freedv));
-        exit(1);
-    }
-    int bytes_per_frame = freedv_get_n_codec_bits(freedv)/8;
-    uint8_t bytes_out[bytes_per_frame];
+    /* for streaming bytes it's much easier use the modes that have a multiple of 8 payload bits/frame */
+    assert((freedv_get_n_codec_bits(freedv) % 8) == 0);
+    int bytes_per_modem_frame = freedv_get_n_codec_bits(freedv)/8;
+    fprintf(stderr, "bytes_per_modem_frame: %d\n", bytes_per_modem_frame);
+    uint8_t bytes_out[bytes_per_modem_frame];
     short  demod_in[freedv_get_n_max_modem_samples(freedv)];
 
     /* We need to work out how many samples the demod needs on each
