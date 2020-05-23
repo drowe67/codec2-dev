@@ -12,7 +12,7 @@
    $ octave --no-gui
    octave:1> fsk_demod_file("fsk.s16",format="s16",8000,100,2)
 
-   Same thing but complex )single sided):
+   Same thing but complex (single sided):
    
    $ ./fsk_get_test_bits - 1000 | ./fsk_mod 2 8000 100 1000 1000 - - | ./cohpsk_ch - fsk.cs16 -100 --FS 8000 --complexout
    octave:2> fsk_demod_file("fsk.cs16",format="cs16",8000,100,2)
