@@ -89,6 +89,7 @@ The Octave version of the modem was developed by David Rowe.  Brady O'Brien port
    | ---  | --- |
    | fsk_lib.m | Core FSK modem library |
    | fsk_lib_demo.m | A demonstration of fsk_lib, runs a single point BER test |
+   | fsk_demod_file.m | Demodulates FSK signals from a file, useful for debugging FSK waveforms |
    | fsk_horus.m | Project Horus High Altitude Balloon (HAB) FSK demodulator |
    | fsk_horus_stream.m | Real time application for Project Horus |
    | fsk_lock_down.m | simulations to support the "lock down" waveform |
