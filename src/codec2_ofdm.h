@@ -74,7 +74,7 @@ void ofdm_sync_state_machine(struct OFDM *, uint8_t *);
 
 /* getters */
     
-    struct OFDM_CONFIG *ofdm_get_config_param(struct OFDM *ofdm);
+struct OFDM_CONFIG *ofdm_get_config_param(struct OFDM *ofdm);
 int ofdm_get_nin(struct OFDM *);
 int ofdm_get_samples_per_frame(struct OFDM *ofdm);
 int ofdm_get_max_samples_per_frame(struct OFDM *ofdm);
