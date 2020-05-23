@@ -99,8 +99,8 @@ int main(int argc, char *argv[]) {
     freedv_set_verbose(freedv, verbose);
 
     /* for streaming bytes it's much easier use the modes that have a multiple of 8 payload bits/frame */
-    assert((freedv_get_n_codec_bits(freedv) % 8) == 0);
-    int bytes_per_modem_frame = freedv_get_n_codec_bits(freedv)/8;
+    assert((freedv_get_bits_per_modem_frame(freedv) % 8) == 0);
+    int bytes_per_modem_frame = freedv_get_bits_per_modem_frame(freedv)/8;
     fprintf(stderr, "bytes_per_modem_frame: %d\n", bytes_per_modem_frame);
     uint8_t bytes_out[bytes_per_modem_frame];
     short  demod_in[freedv_get_n_max_modem_samples(freedv)];

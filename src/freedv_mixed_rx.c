@@ -248,7 +248,7 @@ int main(int argc, char *argv[]) {
             /* demo of codecrx mode - separate demodulation and speech decoding */
             int bits_per_codec_frame = codec2_bits_per_frame(c2);
             int bytes_per_codec_frame = (bits_per_codec_frame + 7) / 8;
-            int codec_frames = freedv_get_n_codec_bits(freedv) / bits_per_codec_frame;
+            int codec_frames = freedv_get_bits_per_modem_frame(freedv) / bits_per_codec_frame;
             int samples_per_frame = codec2_samples_per_frame(c2);
             unsigned char encoded[bytes_per_codec_frame * codec_frames];
 

@@ -575,9 +575,19 @@ endif(NOT APPLE)
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/unittest
              )
 
+    # VHF Ethernet-style packet system
     add_test(NAME test_freedv_data_channel
              COMMAND sh -c "./tfreedv_data_channel"
              WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/unittest
+             )
+           
+    # using FreeDV API/codec 2 modems to send raw data frames
+    add_test(NAME test_freedv_data_raw
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            head -c 140 </dev/urandom > binaryIn.bin;
+                            ./freedv_data_raw_tx 700D binaryIn.bin - | 
+                            ./freedv_data_raw_rx 700D - - -v | 
+                            diff /dev/stdin binaryIn.bin"
              )
 
 endif(UNITTEST)

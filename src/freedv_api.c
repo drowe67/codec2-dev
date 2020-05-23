@@ -798,6 +798,8 @@ int freedv_rawdatarx(struct freedv *f, unsigned char *packed_payload_bits, short
 
     if (rx_status & RX_BITS) {
 
+	ret = (f->bits_per_modem_frame+7)/8;
+        memset(packed_payload_bits, 0, ret);
         /* pack bits */
         int bit = 7, byte = 0;
         for(int i=0; i<f->bits_per_modem_frame; i++) {
@@ -808,7 +810,6 @@ int freedv_rawdatarx(struct freedv *f, unsigned char *packed_payload_bits, short
                 byte++;
             }
         }
-	ret = f->bits_per_modem_frame;
     }
 
     /* might want to check this for errors, e.g. if reliable data is important */
@@ -1101,7 +1102,8 @@ int freedv_get_total_bits_coded           (struct freedv *f) {return f->total_bi
 int freedv_get_total_bit_errors_coded     (struct freedv *f) {return f->total_bit_errors_coded;}
 int freedv_get_sync                       (struct freedv *f) {return f->stats.sync;}
 struct CODEC2 *freedv_get_codec2	  (struct freedv *f){return  f->codec2;}
-int freedv_get_n_codec_bits               (struct freedv *f){return f->bits_per_codec_frame;}
+int freedv_get_bits_per_codec_frame       (struct freedv *f){return f->bits_per_codec_frame;}
+int freedv_get_bits_per_modem_frame       (struct freedv *f){return f->bits_per_modem_frame;}
 int freedv_get_uncorrected_errors          (struct freedv *f) {return f->rx_status & RX_BIT_ERRORS;}
 
 int freedv_get_n_max_speech_samples(struct freedv *f) {

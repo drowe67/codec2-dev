@@ -97,18 +97,15 @@ int main(int argc, char *argv[]) {
     freedv_set_tx_bpf(freedv, use_txbpf);
 
     /* for streaming bytes it's much easier to use modes that have a multiple of 8 payload bits/frame */
-    assert((freedv_get_n_codec_bits(freedv) % 8) == 0);
-    int bytes_per_modem_frame = freedv_get_n_codec_bits(freedv)/8;
+    int bytes_per_modem_frame = freedv_get_bits_per_modem_frame(freedv)/8;
+    fprintf(stderr, "bits_per_modem_frame: %d bytes_per_modem_frame: %d\n", freedv_get_bits_per_modem_frame(freedv), bytes_per_modem_frame);
+    assert((freedv_get_bits_per_modem_frame(freedv) % 8) == 0);
     int n_mod_out = freedv_get_n_nom_modem_samples(freedv);
-    fprintf(stderr, "bytes_per_modem_frame: %d\n", bytes_per_modem_frame);
     uint8_t bytes_in[bytes_per_modem_frame];
     short   mod_out[n_mod_out];
 
     /* OK main loop  --------------------------------------- */
 
-    for(int i=0; i< n_mod_out; i++) mod_out[i] = 0;
-    fwrite(mod_out, sizeof(short), n_mod_out, fout);
-    fwrite(mod_out, sizeof(short), n_mod_out, fout);
     while(fread(bytes_in, sizeof(uint8_t), bytes_per_modem_frame, fin) == bytes_per_modem_frame) {
         freedv_rawdatatx(freedv, mod_out, bytes_in);
         fwrite(mod_out, sizeof(short), n_mod_out, fout);
@@ -118,6 +115,7 @@ int main(int argc, char *argv[]) {
         if (fin == stdin) fflush(stdin);
     }
 
+    /* A few extra output buffers so demod can complete */
     for(int i=0; i< n_mod_out; i++) mod_out[i] = 0;
     fwrite(mod_out, sizeof(short), n_mod_out, fout);
     fwrite(mod_out, sizeof(short), n_mod_out, fout);

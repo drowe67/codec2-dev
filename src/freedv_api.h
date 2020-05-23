@@ -210,7 +210,8 @@ int freedv_get_sync_interleaver	    (struct freedv *freedv);
 struct FSK * freedv_get_fsk         (struct freedv *f);
 struct CODEC2 *freedv_get_codec2    (struct freedv *freedv);
 
-int freedv_get_n_codec_bits         (struct freedv *freedv);
+int freedv_get_bits_per_codec_frame (struct freedv *freedv);
+int freedv_get_bits_per_modem_frame (struct freedv *freedv);
 int freedv_get_sz_error_pattern     (struct freedv *freedv);
 int freedv_get_protocol_bits        (struct freedv *freedv);
 
