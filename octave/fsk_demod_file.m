@@ -6,10 +6,16 @@
 
 #{
    Sample usage to explore demodulator operation with a 100 bits/s 2FSK signal:
-   $ cd ~/codec2/octave
-   $ ../build_linux/src/fsk_get_test_bits - 1000 | ./fsk_mod 2 8000 100 1000 1000 - fsk.s16
+
+   $ cd ~/codec2/build_linux/src
+   $ ./fsk_get_test_bits - 1000 | ./fsk_mod 2 8000 100 1000 1000 - ../../octave/fsk.s16
    $ octave --no-gui
    octave:1> fsk_demod_file("fsk.s16",format="s16",8000,100,2)
+
+   Same thing but complex )single sided):
+   
+   $ ./fsk_get_test_bits - 1000 | ./fsk_mod 2 8000 100 1000 1000 - - | ./cohpsk_ch - fsk.cs16 -100 --FS 8000 --complexout
+   octave:2> fsk_demod_file("fsk.cs16",format="cs16",8000,100,2)
 #}
 
 function fsk_demod_file(filename, format="s16", Fs=8000, Rs=50, M=2, max_secs=1E32)
@@ -19,7 +25,7 @@ function fsk_demod_file(filename, format="s16", Fs=8000, Rs=50, M=2, max_secs=1E
   if strcmp(format,"s16")
     read_complex = 0; sample_size = 'int16'; shift_fs_on_4=0;
   elseif strcmp(format,"cs16")
-    read_complex = 0; sample_size = 'int16'; shift_fs_on_4=0;
+    read_complex = 1; sample_size = 'int16'; shift_fs_on_4=0;
   else
     printf("Error in format: %s\n", format);
     return;
