@@ -4,6 +4,14 @@
 % Demodulate a file of off air samples and plot a bunch of internal
 % states. Useful for debugging the FSK demod configuration
 
+#{
+   Sample usage to explore demodulator operation with a 100 bits/s 2FSK signal:
+   $ cd ~/codec2/octave
+   $ ../build_linux/src/fsk_get_test_bits - 1000 | ./fsk_mod 2 8000 100 1000 1000 - fsk.s16
+   $ octave --no-gui
+   octave:1> fsk_demod_file("fsk.s16",format="s16",8000,100,2)
+#}
+
 function fsk_demod_file(filename, format="s16", Fs=8000, Rs=50, M=2, max_frames=1E32)
   more off;
   fsk_lib;
@@ -77,7 +85,7 @@ function fsk_demod_file(filename, format="s16", Fs=8000, Rs=50, M=2, max_frames=
     printf("plotting...\n");
 
     figure(1); clf;
-    plot(f_log);
+    plot(f_log,'+-');
     title('Tone Freq Estimates');
     
     figure(2);
@@ -118,7 +126,7 @@ function fsk_demod_file(filename, format="s16", Fs=8000, Rs=50, M=2, max_frames=
     plot(ppm_log)
     title('Sample clock (baud rate) offset in PPM');
 
-    figure(7); clf; mesh(Sf_log(1:10,:));
+    figure(7); clf; mesh(Sf_log(1:10,:)); title('Freq Est Sf over time');
   end
 
 endfunction
