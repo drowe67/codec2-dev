@@ -12,13 +12,22 @@
    octave:1> fsk_demod_file("fsk.s16",format="s16",8000,100,2)
 #}
 
-function fsk_demod_file(filename, format="s16", Fs=8000, Rs=50, M=2, max_frames=1E32)
+function fsk_demod_file(filename, format="s16", Fs=8000, Rs=50, M=2, max_secs=1E32)
   more off;
   fsk_lib;
-  fin = fopen(filename,"rb"); 
-  read_complex = 0; sample_size = 'int16'; plot_en = 1;
-  if strcmp(format,"cs16") read_complex = 1; end
+  plot_en = 1;
+  if strcmp(format,"s16")
+    read_complex = 0; sample_size = 'int16'; shift_fs_on_4=0;
+  elseif strcmp(format,"cs16")
+    read_complex = 0; sample_size = 'int16'; shift_fs_on_4=0;
+  else
+    printf("Error in format: %s\n", format);
+    return;
+  end
 
+  fin = fopen(filename,"rb");
+  if fin == -1 printf("Error opneing file: %s\n",filename); return; end
+  
   states = fsk_init(Fs, Rs, M);
   nbit = states.nbit;
 
@@ -31,7 +40,7 @@ function fsk_demod_file(filename, format="s16", Fs=8000, Rs=50, M=2, max_frames=
 
   printf("demod of raw bits....\n");
 
-  finished = 0; ph = 1;
+  finished = 0; ph = 1; secs = 0;
   while (finished == 0)
 
     % read nin samples from input file
@@ -75,7 +84,8 @@ function fsk_demod_file(filename, format="s16", Fs=8000, Rs=50, M=2, max_frames=
       finished = 1;
     end
 
-    if frames > max_frames finished=1; end
+    secs += nin/Fs;
+    if secs > max_secs finished=1; end
       
   end
   printf("frames: %d\n", frames);
@@ -85,48 +95,27 @@ function fsk_demod_file(filename, format="s16", Fs=8000, Rs=50, M=2, max_frames=
     printf("plotting...\n");
 
     figure(1); clf;
-    plot(f_log,'+-');
-    title('Tone Freq Estimates');
-    
-    figure(2);
-    plot(f_int_resample_log','+')
-    title('Integrator outputs for each tone');
-
-    figure(3); clf
-    subplot(211)
-    plot(norm_rx_timing_log)
-    axis([1 frames -0.5 0.5])
-    title('norm fine timing')
-    subplot(212)
-    plot(states.nerr_log)
-    title('num bit errors each frame')
- 
-    figure(4); clf
-    plot(EbNodB_log);
-    title('Eb/No estimate')
-
-    figure(5); clf
     rx_nowave = rx(1000:length(rx)); % skip past wav header if it's a wave file
     subplot(211)
     plot(real(rx_nowave));
     title('input signal to demod (1 sec)')
     xlabel('Time (samples)');
-    %axis([1 states.Fs -35000 35000])
-
-    % normalise spectrum to 0dB full scale with sine wave input
     subplot(212);
-    if sample_size == "int16" max_value = 32767; end
-    if sample_size == "uint8" max_value = 127; end
-    RxdBFS = 20*log10(abs(fft(rx_nowave(1:states.Fs)))) - 20*log10((states.Fs/2)*max_value);
-    plot(RxdBFS)
-    axis([1 states.Fs/2 -80 0])
+    last = min(length(rx_nowave),states.Fs);
+    RxdBFS = 20*log10(abs(fft(rx_nowave(1:last))));
+    mx = 10*ceil(max(RxdBFS/10));
+    plot(RxdBFS);
+    axis([1 length(RxdBFS) mx-80 mx])
     xlabel('Frequency (Hz)');
 
-    figure(6); clf
-    plot(ppm_log)
-    title('Sample clock (baud rate) offset in PPM');
+    figure(2); plot_specgram(rx,Fs);
+    figure(3); clf; plot(f_log,'+-'); axis([1 length(f_log) -Fs/2 Fs/2]); title('Tone Freq Estimates');    
+    figure(4); clf; mesh(Sf_log(1:10,:)); title('Freq Est Sf over time');
+    figure(5); clf; plot(f_int_resample_log','+'); title('Integrator outputs for each tone');
+    figure(6); clf; plot(norm_rx_timing_log); axis([1 frames -0.5 0.5]); title('norm fine timing')
+    figure(7); clf; plot(EbNodB_log); title('Eb/No estimate')
+    figure(8); clf; plot(ppm_log); title('Sample clock (baud rate) offset in PPM');
 
-    figure(7); clf; mesh(Sf_log(1:10,:)); title('Freq Est Sf over time');
   end
 
 endfunction
