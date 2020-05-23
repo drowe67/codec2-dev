@@ -318,7 +318,7 @@ int main(int argc, char *argv[]) {
     ofdm_config->txtbits = 4; /* number of auxiliary data bits */
 
     ofdm_config->ftwindowwidth = 11;
-    ofdm_config->ofdm_timing_mx_thresh = 0.30f;
+    ofdm_config->timing_mx_thresh = 0.30f;
 
     struct OFDM *ofdm = ofdm_create(ofdm_config);
     assert(ofdm != NULL);

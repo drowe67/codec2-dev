@@ -205,7 +205,7 @@ int main(int argc, char *argv[])
     ofdm_ts = ofdm_config->ts;
     ofdm_rs = ofdm_config->rs;
     ofdm_tcp = ofdm_config->tcp;
-    ofdm_timing_mx_thresh = ofdm_config->ofdm_timing_mx_thresh;
+    ofdm_timing_mx_thresh = ofdm_config->timing_mx_thresh;
     ofdm_nc = ofdm_config->nc;
     ofdm_ns = ofdm_config->ns;
     ofdm_bps = ofdm_config->bps;

@@ -248,7 +248,7 @@ int main(int argc, char *argv[]) {
     }
 
     ofdm_config->fs = 8000.0f; /* Sample Frequency */
-    ofdm_config->ofdm_timing_mx_thresh = 0.30f;
+    ofdm_config->timing_mx_thresh = 0.30f;
     ofdm_config->ftwindowwidth = 11;
     ofdm_config->bps = 2; /* Bits per Symbol */
     ofdm_config->txtbits = 4; /* number of auxiliary data bits */
