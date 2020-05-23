@@ -407,7 +407,6 @@ endif()
     add_test(NAME test_FSK_modem_mod_demod
              COMMAND sh -c "$<TARGET_FILE:fsk_get_test_bits> - 10000 | $<TARGET_FILE:fsk_mod> 2 8000 100 1200 100 - - | $<TARGET_FILE:fsk_demod> -l 2 8000 100 - - | $<TARGET_FILE:fsk_put_test_bits> -"
              )
-             set_tests_properties(test_FSK_modem_mod_demod  PROPERTIES PASS_REGULAR_EXPRESSION "bits tested 9800, bit errors 0")
 
     add_test(NAME test_FreeDV_API_1600
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
