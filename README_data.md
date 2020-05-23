@@ -170,7 +170,7 @@ A combination of the two methods may also be used. Send data when no voice is ac
 
 The demo programs [freedv_data_raw_tx.c](src/freedv_data_raw_tx.c) and [freedv_data_raw_rx.c](src/freedv_data_raw_rx.c) show how to use the the raw data API.
 
-The following FreeDV modes are reccomended.  Other modes could be used, but don't offer FEC and but may have frame lengths that are not an integer numbers of bytes.
+The following FreeDV modes are reccomended.  Other modes could be used, but don't offer FEC and may have frame lengths that are not an integer numbers of bytes.
 
 | FreeDV Mode | RF bandwidth (Hz) | Payload data rate bits/s | bytes/frame | FEC | Min SNR (dB, AWGN) |
 | :-: | :-: | :-: | :-: | :-: | :-: |
