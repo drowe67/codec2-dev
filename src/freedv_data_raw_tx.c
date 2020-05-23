@@ -55,7 +55,6 @@ int main(int argc, char *argv[]) {
     mode = -1;
     if (!strcmp(argv[1],"700C")) mode = FREEDV_MODE_700C;
     if (!strcmp(argv[1],"700D")) mode = FREEDV_MODE_700D;
-    if (!strcmp(argv[1],"800XA")) mode = FREEDV_MODE_800XA;
     #ifdef __LPCNET__
     if (!strcmp(argv[1],"2020")) mode = FREEDV_MODE_2020;
     #endif

@@ -1,62 +1,86 @@
 # README_data.md
 
-## Introduction
+# Introduction
 
-Documentation for FreeDV VHF packet data channel, developed by Jeroen Vreeken.
+FreeDV can be used to packet data over radio channels.  Two APis are support:
++ VHF packet data channel which uses Ethernet style framing.
++ Raw frames of modem data
+
+## Credits
+
+The VHF data channel was developed by Jeroen Vreeken.
 
 ## Quickstart
 
-1. Simple test using mode 2400A
+VHF packet data API:
 
-  ```
+1. Simple test using mode 2400A and VHF packet data
+
+   ```sh
+   $ cd ~/codec2/build_linux
    $ ./src/freedv_data_tx 2400A - --frames 15 | ./src/freedv_data_rx 2400A -  
 
-  ```
-
+   ```
+   You can listen to the modem signal using:
+   ```sh
+   $ ./src/freedv_data_tx 2400A - --frames 15 | aplay -f S16_LE -r 48000
+   
+   ```
+  
 2. Same for 2400B and 800XA
 
-  ```
+   ```sh
    $ ./src/freedv_data_tx 2400B - --frames 15 | ./src/freedv_data_rx 2400B -  
-
-  ```
-
-  ```
    $ ./src/freedv_data_tx 800XA - --frames 15 | ./src/freedv_data_rx 800XA -  
 
-  ```
+   ```
 
 3. Using a different callsign and secondary station id
 
-  ```
+   ```sh
    $ ./src/freedv_data_tx 2400A - --callsign T3ST --ssid 15 --frames 15 | src/freedv_data_rx 2400A -  
-  ```
+   ```
 
-## Packets
+Raw modem frame API:
+
+1. Lets send two modem frames of 14 bytes usng FreeDV 700D:
+   ```sh
+   $ head -c 28 </dev/urandom > binaryIn.bin
+   $ ./src/freedv_data_raw_tx 700D binaryIn.bin - |  ./src/freedv_data_raw_rx 700D - - 2>/dev/null | hexdump
+   bits_per_modem_frame: 112 bytes_per_modem_frame: 14
+   0000000 4325 0363 ce1f fb88 8102 7d76 c487 e092
+   0000010 2ded bc06 7689 eb67 5dfe 43df          
+   $ hexdump binaryIn.bin 
+   0000000 4325 0363 ce1f fb88 8102 7d76 c487 e092
+   0000010 2ded bc06 7689 eb67 5dfe 43df          
+   ```
+   
+# VHF Packet Data Channel
 
 The FreeDV VHF data channel operates on a packet level. The FreeDV modems however typically operate on a fixed frame base. This means that data packets have to be send in multiple frames.
 
 The packet format is modelled after EtherNet. As a result any protocol that is compatible with EtherNet can potentially be used over a FreeDV data link. (There are of course practical limits. Browsing the world wide web with just a few hundred bits per second will not be a pleasant experience.)
 
-### Header optimization
+## Header optimization
 
 When there are no packets available for transmission small 'filler' packet with just the sender's address will be send.
 When there is a packet available not all of the header needs to be send. The sender's address can often be left out if it was already send in a previous frame. Likewise when the packet has no specific destination but is targeted at a multicast address, this can also be transmitted in a single bit as oposed to a 6 byte broadcast address.
 
-### Addressing
+## Addressing
 
 Since the format is based on EtherNet a 6 byte sender and destination address is used. It is possible to encode a ITU compatible callsign in these bytes. See http://dmlinking.net/eth_ar.html for more info. Or have a look at freedv_data_tx.c and freedv_data_rx.c for an actual implementation.
 
-### Packet types
+## Packet types
 
 The 2 byte EtherType field is used to distinguish between various protocols.
 
-### Checks
+## Checks
 
-Not all channels are perfect and especially since a packet is split up over multiple frames bits might get lost. Each packet therefore has a CRC which is checked before it is accepted.
+Not all channels are perfect and especially since a packet is split up over multiple frames bits might get lost. Each packet therefore has a CRC which is checked before it is accepted.  Note there is No FEC on 2400A/2400B/800XA.
 
 ## Available modes
 
-The data channel is available for modes 2400A, 2400B and 800Xa.
+The data channel is available for modes 2400A, 2400B and 800XA.
 
 ## API
 
@@ -135,12 +159,26 @@ An example of how this is done is provided in freedv_mixed_rx
    $ ./src/freedv_mixed_tx 2400A ../raw/hts1a.raw - | src/freedv_mixed_rx 2400A - ./hts1a_out.raw
   ```
 
-
-#### Insert a data frame periodically
+### Insert a data frame periodically
 
 This is a very simple method, simply insert a data frame every n frames, (e.g. once every 10 seconds). Since single FreeDV frames are relativly short (tens of milliseconds) the effect on received audio will be minor. The advantage of this method is that one can create a guaranteed amount of data bandwidth. A drawback is some interruption in the audio that may be noticed.
 
-#### Combination of the above.
+### Combination of the above.
 
 A combination of the two methods may also be used. Send data when no voice is active and insert a frame when this does not occur for a long time.
 
+# Raw Data using the FreeDV API
+
+The demo programs [freedv_data_raw_tx.c](src/freedv_data_raw_tx.c) and [freedv_data_raw_rx.c](src/freedv_data_raw_rx.c) show how to use the the raw data API.
+
+The following FreeDV modes are reccomended.  Other modes could be used, but don't offer FEC and but may have frame lengths that are not an integer numbers of bytes.
+
+| FreeDV Mode | RF bandwidth (Hz) | Payload data rate bits/s | bytes/frame | FEC | Min SNR (dB, AWGN) |
+| --- | --- | --- | --- | --- | --- |
+| 700C | 1100 | 700C | 7 | none | 2 |
+| 700D | 1100 | 700D | 14 | rate 0.8 | -2 |
+| 2200 | 1500 | 1733 | 39 | rate 0.6 | 2 |
+
+The API can signal if there were uncorrected bit errors in the frame returned using ```freedv_get_uncorrected_errors(freedv)```, these frames are usually discarded in data applications.
+
+The raw data API may lose frames due to channel impairments, loss of sync, or acquisition delays.  The caller must handle these situations.  The caller is also responsible for segmentation/re-assembly of the modem frames into larger blocks of data.

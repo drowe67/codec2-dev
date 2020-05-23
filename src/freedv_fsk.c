@@ -51,7 +51,7 @@ void freedv_2400a_open(struct freedv *f) {
     f->n_codec_frames = 1;
     f->bits_per_codec_frame = codec2_bits_per_frame(f->codec2);
     f->bits_per_modem_frame = f->bits_per_codec_frame;
-    int n_packed_bytes = (f->bits_per_codec_frame + 7)/8;
+    int n_packed_bytes = (f->bits_per_modem_frame + 7)/8;
     f->tx_payload_bits = MALLOC(n_packed_bytes); assert(f->tx_payload_bits != NULL);  
     f->rx_payload_bits = MALLOC(n_packed_bytes); assert(f->rx_payload_bits != NULL);  
 }
@@ -80,7 +80,7 @@ void freedv_2400b_open(struct freedv *f) {
     f->n_codec_frames = 1;
     f->bits_per_codec_frame = codec2_bits_per_frame(f->codec2);
     f->bits_per_modem_frame = f->bits_per_codec_frame;
-    int n_packed_bytes = (f->bits_per_codec_frame + 7)/8;
+    int n_packed_bytes = (f->bits_per_modem_frame + 7)/8;
     f->tx_payload_bits = MALLOC(n_packed_bytes); assert(f->tx_payload_bits != NULL);  
     f->rx_payload_bits = MALLOC(n_packed_bytes); assert(f->rx_payload_bits != NULL);  
 }
@@ -105,11 +105,13 @@ void freedv_800xa_open(struct freedv *f) {
 
     f->codec2 = codec2_create(CODEC2_MODE_700C); assert(f->codec2 != NULL);
     f->speech_sample_rate = FREEDV_FS_8000;
-    f->n_speech_samples = 2*codec2_samples_per_frame(f->codec2);
+    f->n_codec_frames = 2;
+    f->n_speech_samples = f->n_codec_frames*codec2_samples_per_frame(f->codec2);
 
     f->bits_per_codec_frame = codec2_bits_per_frame(f->codec2);
     f->bits_per_modem_frame = f->n_codec_frames*f->bits_per_codec_frame;
-    int n_packed_bytes = (f->bits_per_codec_frame + 7)/8;
+    int n_packed_bytes = (f->bits_per_modem_frame + 7)/8;
+    fprintf(stderr,"%d %d %d\n", f->bits_per_codec_frame, f->bits_per_modem_frame, n_packed_bytes);
     f->tx_payload_bits = MALLOC(n_packed_bytes); assert(f->tx_payload_bits != NULL);  
     f->rx_payload_bits = MALLOC(n_packed_bytes); assert(f->rx_payload_bits != NULL);  
 }

@@ -4,13 +4,13 @@ Codec 2 is an open source (LGPL 2.1) low bit rate speech codec: http://rowetel.c
 
 Also included:
 
-  + FreeDV API source code.  FreeDV is an open source digital voice
-    protocol that integrates the modems, codecs, and FEC
-  + FDMDV DPSK modem [README_fdmdv](README_fdmdv.txt) for HF channels
+  + The FreeDV API for digital voice over radio. FreeDV is an open source digital voice protocol that integrates modems, codecs, and FEC
+  + APIs for raw and Ethernet packet data over radio [README_data](README_data.md)
+  + High performance Coherent OFDM modem for HF channels [README_ofdm](README_ofdm.txt)
+  + High performance Non-coherent FSK modem [README_fsk](README_fsk.md)
+  + High Altitude Balloon image and telemetry reception protocol and modem software (Horus and Wenet).
   + Coherent PSK [README_cohpsk](README_cohpsk.md) for HF channels
-  + Non-coherent FSK modem [README_fsk](README_fsk.md)
-  + Coherent OFDM modem for HF channels [README_ofdm](README_ofdm.txt)
-  + software for High Altitude Balloon image and telemetry reception
+  + FDMDV DPSK modem [README_fdmdv](README_fdmdv.txt) for HF channels
 
 ## Quickstart
 
@@ -65,26 +65,17 @@ $ ./src/c2enc 450 ../raw/ve9qrp.raw - | ./src/c2dec 450PWB - - | play -t raw -r 
 ```
 ## Programs
 
-+ c2demo encodes a file of speech samples, then decodes them and
-  saves the result.
++ c2demo encodes a file of speech samples, then decodes them and saves the result.
 
-+ c2enc encodes a file of speech samples to a compressed file of
-  encoded bits.  c2dec decodes a compressed file of bits to a file of
-  speech samples.
++ c2enc encodes a file of speech samples to a compressed file of encoded bits.  c2dec decodes a compressed file of bits to a file of speech samples.
 
-+ c2sim is a simulation/development version of Codec 2.  It allows
-  selective use of the various Codec 2 algorithms.  For example
-  switching phase modelling or LSP quantisation on and off.
++ c2sim is a simulation/development version of Codec 2.  It allows selective use of the various Codec 2 algorithms.  For example switching phase modelling or LSP quantisation on and off.
 
-+ freedv_tx/freedv_rx are command line implementations of the FreeDV
-  protocol, which combines Codec 2, modems, and Forward Error
-  Correction (FEC).
++ freedv_tx/freedv_rx are command line implementations of the FreeDV protocol, which combines Codec 2, modems, and Forward Error Correction (FEC).
   
 + cohpsk_* are coherent PSK (COHPSK) HF modem command line programs.
 
-+ drs232, drs232_ldpc, and horus_demod are used for receiving images
-  and telemetry from high altitude balloons (Project Horus Wenet,
-  Horus Binary protocol)
++ drs232, drs232_ldpc, and horus_demod are used for receiving images and telemetry from high altitude balloons (Project Horus Wenet, Horus Binary protocol)
 
 + fdmdv_* are differential PSK HF modem command line programs (README_fdmdv).
 
@@ -96,8 +87,7 @@ $ ./src/c2enc 450 ../raw/ve9qrp.raw - | ./src/c2dec 450PWB - - | play -t raw -r 
 
 ## FreeDV 2020 support (building with LPCNet)
 
-NOTE: Instructions assume you are creating a build_linux directory from within
-      the source directory. Adjust paths as needed if this is not the case.
+NOTE: Instructions assume you are creating a build_linux directory from within the source directory. Adjust paths as needed if this is not the case.
 
 1. Build codec2 initially without LPCNet
    ```
@@ -272,8 +262,7 @@ $ sudo apt install octave octave-control octave-parallel octave-signal octave-sp
 ```
 ## FreeDV API
 
-See freedv_api.h and freedv_api.c, and the demo programs freedv_tx &
-freedv_rx.  Quickstart demo using FreeDV 1600:
+See freedv_api.h and freedv_api.c, and the demo programs freedv_tx & freedv_rx.  Quickstart demo using FreeDV 1600:
 ```
 $ ./freedv_tx 1600 ../../raw/hts1.raw - | ./freedv_rx 1600 - - | play -t raw -r 8000 -s -2 -q -
 $ cat freedv_rx_log.txt
