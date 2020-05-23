@@ -108,8 +108,6 @@ void freedv_2020_open(struct freedv *f, struct freedv_advanced *adv) {
     f->modem_sample_rate = f->ofdm_config->fs;
     f->clip = 0;
     f->sz_error_pattern = f->ofdm_bitsperframe;
-    f->tx_bits = NULL; 
-    f->codec_bits = NULL;
 
     /* storage for pass through audio interpolating filter.  These are
        the rate FREEDV_FS_8000 modem input samples before interpolation */
@@ -136,17 +134,15 @@ void freedv_2020_open(struct freedv *f, struct freedv_advanced *adv) {
     /* should be exactly an integer number of Codec frames in a OFDM modem frame */
     assert((f->ldpc->data_bits_per_frame % lpcnet_bits_per_frame(f->lpcnet)) == 0);
 
-    int Ncodecframes = f->ldpc->data_bits_per_frame/lpcnet_bits_per_frame(f->lpcnet);
+    f->n_codec_frames = f->ldpc->data_bits_per_frame/lpcnet_bits_per_frame(f->lpcnet);
+    f->n_speech_samples = f->n_codec_frames*lpcnet_samples_per_frame(f->lpcnet);
+    f->bits_per_codec_frame = lpcnet_bits_per_frame(f->lpcnet);
+    f->bits_per_modem_frame = f->n_codec_frames*f->bits_per_codec_frame;
 
-    f->n_speech_samples = Ncodecframes*lpcnet_samples_per_frame(f->lpcnet);
-    f->n_codec_bits = f->interleave_frames*Ncodecframes*lpcnet_bits_per_frame(f->lpcnet);
-
-    // note these are actually unpacked, but we store them in
-    // f->packed_codec_bits as thats the covention for passing compressed
-    // speech around
-    f->packed_codec_bits = (unsigned char*)MALLOC(f->n_codec_bits*sizeof(char));
-    assert(f->packed_codec_bits != NULL);
-    f->codec_bits = NULL;
+    f->tx_payload_bits = (unsigned char*)MALLOC(f->interleave_frames*f->bits_per_modem_frame);
+    assert(f->tx_payload_bits != NULL);
+    f->rx_payload_bits = (unsigned char*)MALLOC(f->interleave_frames*f->bits_per_modem_frame);
+    assert(f->rx_payload_bits != NULL);
 }
 #endif
 
@@ -159,7 +155,7 @@ void freedv_comptx_2020(struct freedv *f, COMP mod_out[]) {
     int bits_per_interleaved_frame = f->interleave_frames*data_bits_per_frame;
     uint8_t tx_bits[bits_per_interleaved_frame];
 
-    memcpy(tx_bits, f->packed_codec_bits, bits_per_interleaved_frame);
+    memcpy(tx_bits, f->tx_payload_bits, bits_per_interleaved_frame);
     
     // Generate Varicode txt bits. Txt bits in OFDM frame come just
     // after Unique Word (UW).  Txt bits aren't protected by FEC, and need to be
@@ -345,7 +341,7 @@ int freedv_comprx_2020(struct freedv *f, COMP demod_in[]) {
                     f->total_bit_errors_coded += Nerrs_coded;
                     f->total_bits_coded       += data_bits_per_frame;
                 } else {
-                    memcpy(f->packed_codec_bits+j*data_bits_per_frame, out_char, data_bits_per_frame);
+                    memcpy(f->rx_payload_bits+j*data_bits_per_frame, out_char, data_bits_per_frame);
                 }
             } /* for interleave frames ... */
                    

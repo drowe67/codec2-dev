@@ -93,21 +93,19 @@ struct freedv {
     int                  modem_sample_rate;      // Caller is responsible for meeting this
     int                  modem_symbol_rate;      // Useful for ext_vco operation on 2400A and 800XA
     int                  speech_sample_rate;     // 8 kHz or 16 kHz (high fidelity)
-    int                  clip;                   // non-zero for cohpsk modem output clipping for low PAPR
 
-    unsigned char       *packed_codec_bits;
-    unsigned char       *packed_codec_bits_tx;    // for 700D we separate packed bits to maintain state due to interleaving
-    int                  nbyte_packed_codec_bits; // keep track of size of above arrays in 700D 
-    int                 *codec_bits;
-    int                 *tx_bits;
-    int                 *fdmdv_bits;
-    int                 *rx_bits;
-    int                  n_codec_bits;           // number of codec bits in a frame
+    int                  bits_per_codec_frame;   // one of modem codec frames per modem frame
+    int                  bits_per_modem_frame;   // number of modem payload bits in each modem frame (usually compressed speech)
+    int                  n_codec_frames;         // number of codec frames in each modem frame
+    uint8_t             *tx_payload_bits;        // payload bits (usually compressed speech) for a modem frame ...
+    uint8_t             *rx_payload_bits;        // ... one bit per char for some modes, packed for others
 
-    int                  tx_sync_bit;
-    int                  smooth_symbols;
-    int                  frames;
+    /* FDMDV buffers for FreeDV 1600 -------------------------------------------------------------*/
     
+    int                 *fdmdv_bits;
+    int                 *fdmdv_tx_bits;
+    int                 *fdmdv_rx_bits;
+
     /* test frame states -------------------------------------------------------------------------*/
     
     int                 *ptest_bits_coh;
@@ -131,6 +129,10 @@ struct freedv {
 
     /* Misc ---------------------------------------------------------------------------------------------*/
 
+    int                 *tx_bits;                            /* FSK modem frame under construction */
+    int                  tx_sync_bit;
+    int                  frames;
+    int                  clip;                               /* non-zero for cohpsk modem output clipping for low PAPR */
     int                  sync;
     int                  evenframe;
     float                snr_est;
