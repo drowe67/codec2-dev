@@ -46,10 +46,9 @@ Raw modem frame API:
 1. Lets send two modem frames of 14 bytes usng FreeDV 700D:
    ```sh
    $ head -c 28 </dev/urandom > binaryIn.bin
-   $ ./src/freedv_data_raw_tx 700D binaryIn.bin - |  ./src/freedv_data_raw_rx 700D - - 2>/dev/null | hexdump
+   $ ./src/freedv_data_raw_tx 700D binaryIn.bin - |  ./src/freedv_data_raw_rx 700D - - | hexdump
    bits_per_modem_frame: 112 bytes_per_modem_frame: 14
-   0000000 4325 0363 ce1f fb88 8102 7d76 c487 e092
-   0000010 2ded bc06 7689 eb67 5dfe 43df          
+   frames processed: 4  output bytes: 28
    $ hexdump binaryIn.bin 
    0000000 4325 0363 ce1f fb88 8102 7d76 c487 e092
    0000010 2ded bc06 7689 eb67 5dfe 43df          

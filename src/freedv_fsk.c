@@ -111,7 +111,6 @@ void freedv_800xa_open(struct freedv *f) {
     f->bits_per_codec_frame = codec2_bits_per_frame(f->codec2);
     f->bits_per_modem_frame = f->n_codec_frames*f->bits_per_codec_frame;
     int n_packed_bytes = (f->bits_per_modem_frame + 7)/8;
-    fprintf(stderr,"%d %d %d\n", f->bits_per_codec_frame, f->bits_per_modem_frame, n_packed_bytes);
     f->tx_payload_bits = MALLOC(n_packed_bytes); assert(f->tx_payload_bits != NULL);  
     f->rx_payload_bits = MALLOC(n_packed_bytes); assert(f->rx_payload_bits != NULL);  
 }
