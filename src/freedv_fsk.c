@@ -302,7 +302,8 @@ int freedv_comprx_fsk(struct freedv *f, COMP demod_in[]) {
         f->nin = fmfsk_nin(f->fmfsk);
     }
     
-    if(fvhff_deframe_bits(f->deframer,f->packed_codec_bits,proto_bits,vc_bits,(uint8_t*)f->tx_bits)){
+    rx_status = fvhff_deframe_bits(f->deframer,f->packed_codec_bits,proto_bits,vc_bits,(uint8_t*)f->tx_bits);
+    if((rx_status & RX_SYNC) && (rx_status & RX_BITS)){
         /* Decode varicode text */
         for(i=0; i<2; i++){
             /* Note: deframe_bits spits out bits in uint8_ts while varicode_decode expects shorts */
@@ -316,7 +317,6 @@ int freedv_comprx_fsk(struct freedv *f, COMP demod_in[]) {
         if( f->freedv_put_next_proto != NULL){
             (*f->freedv_put_next_proto)(f->proto_callback_state,(char*)proto_bits);
         }
-        rx_status = RX_SYNC | RX_BITS;
     } 
     f->sync = f->deframer->state;
     f->stats.sync = f->deframer->state;

@@ -671,9 +671,11 @@ int freedv_bits_to_speech(struct freedv *f, short speech_out[], short demod_in[]
                 for(int i=0; i<nout; i++)
                     speech_out[i] = passthrough_gain*tmp[i];
             } else {
-                nout = f->nin_prev;                    
+	        /* Speech and modem rates might be different */
+	        int rate_factor = f->modem_sample_rate / f-> speech_sample_rate;
+                nout = f->nin_prev / rate_factor;
                 for(int i=0; i<nout; i++)
-                    speech_out[i] = passthrough_gain*demod_in[i];
+                    speech_out[i] = passthrough_gain*demod_in[i * rate_factor];
            }
         }
     }

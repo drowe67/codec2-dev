@@ -42,6 +42,7 @@
 #ifdef __LPCNET__
 #include "lpcnet_freedv.h"
 #endif
+#include "freedv_api.h"
 
 #ifdef __cplusplus
   extern "C" {

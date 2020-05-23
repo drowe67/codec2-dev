@@ -123,6 +123,19 @@ When it is possible to determine activity in the voice signal (and it almost alw
 
 The advantage of this method is that the audio is not distorted, there was nothing (or near nothing) to distort. A drawback is that constant voice activity may mean there are insufficient frames for data.
 
+### Receiving mixed voice and data
+
+Receiving and decoding a mixed voice and data is (almost) as easy as receiving a regular voice-only transmission.
+One simply uses the regular API calls for reception of speech samples. In addition the callback functions are used for data.
+There is one caveat though: when a data frame is received the API functions (like freedv_rx) will return zero as this is the amount of codec/voice data received.
+For proper playback silence (or comfort noise) should be inserted for the duration of a frame to restore the timing of the original source speech samples.
+An example of how this is done is provided in freedv_mixed_rx
+
+  ```
+   $ ./src/freedv_mixed_tx 2400A ../raw/hts1a.raw - | src/freedv_mixed_rx 2400A - ./hts1a_out.raw
+  ```
+
+
 #### Insert a data frame periodically
 
 This is a very simple method, simply insert a data frame every n frames, (e.g. once every 10 seconds). Since single FreeDV frames are relativly short (tens of milliseconds) the effect on received audio will be minor. The advantage of this method is that one can create a guaranteed amount of data bandwidth. A drawback is some interruption in the audio that may be noticed.
