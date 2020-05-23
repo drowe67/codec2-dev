@@ -44,7 +44,7 @@
 #include "menu.h"
 #include "tot.h"
 
-#define VERSION         "V3"
+#define VERSION         "V4"
 #define FORTY_MS_16K    (0.04*16000)         /* 40ms of samples at 16 kHz */
 #define FREEDV_NSAMPLES_16K (2*FREEDV_NSAMPLES)
 #define CCM             (void*)0x10000000    /* start of 64k CCM memory   */
@@ -299,7 +299,9 @@ struct freedv *set_freedv_mode(int op_mode, int *n_samples) {
         usart_printf("FreeDV 700D\n");
         f = freedv_open(FREEDV_MODE_700D);
         assert(f != NULL);
-        freedv_set_eq(f, 1); /* equaliser on by default */
+        freedv_set_snr_squelch_thresh(f, -2.0);  /* squelch at -2.0 dB      */
+        freedv_set_squelch_en(f, 1);
+        freedv_set_eq(f, 1);                     /* equaliser on by default */
         *n_samples = freedv_get_n_speech_samples(f);
         break;
     }

@@ -168,6 +168,10 @@ ${CODEC2_SRC}/dump.c
 ${CODEC2_SRC}/cohpsk.c
 ${CODEC2_SRC}/fdmdv.c
 ${CODEC2_SRC}/freedv_api.c
+${CODEC2_SRC}/freedv_1600.c
+${CODEC2_SRC}/freedv_700.c
+${CODEC2_SRC}/freedv_2020.c
+${CODEC2_SRC}/freedv_fsk.c
 ${CODEC2_SRC}/filter.c
 ${CODEC2_SRC}/varicode.c
 ${CODEC2_SRC}/golay23.c
@@ -404,11 +408,11 @@ src/memtools.c
 list(APPEND SM1000_SRCS ${CODEC2_SRCS})
 
 
-add_mapped_executable(sm1000v3 ${SM1000_SRCS} ${SYSTEM_SRCS})
-target_link_libraries(sm1000v3 stm32f4_adac stm32f4 CMSIS)
-target_compile_options(sm1000v3 PRIVATE "-O3")
-elf2bin(sm1000v3)
-elf2dfu(sm1000v3)
+add_mapped_executable(sm1000v4 ${SM1000_SRCS} ${SYSTEM_SRCS})
+target_link_libraries(sm1000v4 stm32f4_adac stm32f4 CMSIS)
+target_compile_options(sm1000v4 PRIVATE "-O3")
+elf2bin(sm1000v4)
+elf2dfu(sm1000v4)
 
 set(FREEDV_TX_PROFILE_SRCS
 src/freedv_tx_profile.c
