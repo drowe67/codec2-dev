@@ -2,7 +2,7 @@
 
 # Introduction
 
-FreeDV can be used to packet data over radio channels.  Two APis are support:
+FreeDV can be used to send data over radio channels.  Two APis are support:
 + VHF packet data channel which uses Ethernet style framing.
 + Raw frames of modem data
 
@@ -173,7 +173,7 @@ The demo programs [freedv_data_raw_tx.c](src/freedv_data_raw_tx.c) and [freedv_d
 The following FreeDV modes are reccomended.  Other modes could be used, but don't offer FEC and but may have frame lengths that are not an integer numbers of bytes.
 
 | FreeDV Mode | RF bandwidth (Hz) | Payload data rate bits/s | bytes/frame | FEC | Min SNR (dB, AWGN) |
-| --- | --- | --- | --- | --- | --- |
+| :-: | :-: | :-: | :-: | :-: | :-: |
 | 700C | 1100 | 700C | 7 | none | 2 |
 | 700D | 1100 | 700D | 14 | rate 0.8 | -2 |
 | 2200 | 1500 | 1733 | 39 | rate 0.6 | 2 |
