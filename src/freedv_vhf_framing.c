@@ -472,6 +472,7 @@ static int fvhff_match_uw(struct freedv_vhf_deframer * def,uint8_t bits[],int to
             if(ibit >= frame_size) ibit = 0;
         }
         match[i] = diff[i] <= tol;
+        //fprintf(stderr, "diff[%d]: %d tol: %d\n", i, diff[i], tol);
     }
     /* Pick the best matching UW */
 
@@ -771,12 +772,13 @@ int fvhff_deframe_bits(struct freedv_vhf_deframer * def,uint8_t codec2_out[],uin
         uw_sync_tol = 3;    /* The UW bit error tolerance for frames after sync */
         miss_tol = 4;       /* How many UWs may be missed before going into the de-synced state */
     }else if(frame_type == FREEDV_HF_FRAME_B){
-        uw_first_tol = 0;   /* The UW bit-error tolerance for the first frame */
-        uw_sync_tol = 1;    /* The UW bit error tolerance for frames after sync */
+        uw_first_tol = 1;   /* The UW bit-error tolerance for the first frame */
+        uw_sync_tol = 2;    /* The UW bit error tolerance for frames after sync */
         miss_tol = 3;       /* How many UWs may be missed before going into the de-synced state */
     }else{
         return 0;
     }
+    
     /* Skip N bits for multi-bit symbol modems */
     for(i=0; i<frame_size; i++){
         /* Put a bit in the buffer */

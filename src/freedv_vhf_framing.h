@@ -14,6 +14,7 @@
   *  - 4 spare bits at front and end of frame (8 total) for padding
   *  - 20 'protocol' bits, either for higher layers of 'protocol' or
   *  - 18 'protocol' bits and 2 vericode sidechannel bits
+
 \*---------------------------------------------------------------------------*/
 
 /*
@@ -39,8 +40,8 @@
 #include "freedv_data_channel.h"
 
 /* Standard frame type */
-#define FREEDV_VHF_FRAME_A 1    /* 2400A/B Frame */
-#define FREEDV_HF_FRAME_B 2     /* 800XA Frame */
+#define FREEDV_VHF_FRAME_A  1   /* 2400A/B Frame */
+#define FREEDV_HF_FRAME_B   2   /* 800XA Frame */
 #define FREEDV_VHF_FRAME_AT 3   /* 4800T Frame */
 
 struct freedv_vhf_deframer {

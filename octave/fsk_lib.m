@@ -10,41 +10,40 @@
 % Handles frequency offsets, performance right on ideal, C implementation
 % in codec2-dev/src
 
-% NOTE: DR is in the process of refactoring this Octave code, pls email me 
-%       if something is broken
-
 1;
 
-function states = fsk_init(Fs, Rs, M=2)
+function states = fsk_init(Fs, Rs, M=2, P=8, nsym=50)
   states.M = M;                    
   states.bitspersymbol = log2(M);
   states.Fs = Fs;
   states.Rs = Rs;
 
-  states.nsym = 50;                               % need enough symbols for good timing and freq offset est
+  states.nsym = nsym;                             % need enough symbols for good timing est
   Ts = states.Ts = Fs/Rs;                         % number of samples per symbol
   assert(Ts == floor(Ts), "Fs/Rs must be an integer");
 
   N = states.N = Ts*states.nsym;                  % processing buffer size, nice big window for timing est
-  states.Ndft = min(1024, 2.^ceil(log2(N)));      % find nearest power of 2 for efficient FFT
+  bin_width_Hz = 0.1*Rs;                          % we want enough DFT bins to get within 10% of the tones centre
+  Ndft = Fs/bin_width_Hz;
+  states.Ndft = 2.^ceil(log2(Ndft));              % round to nearest power of 2 for efficent FFT
+  states.Sf = zeros(states.Ndft,1);               % current memory of dft mag samples
+  states.tc = 0.1;                                % average DFT over longtime window, accurate at low Eb/No, but slow
+  
   states.nbit = states.nsym*states.bitspersymbol; % number of bits per processing frame
-
   Nmem = states.Nmem  = N+2*Ts;                   % two symbol memory in down converted signals to allow for timing adj
 
-  states.Sf = zeros(states.Ndft/2,1);             % current memory of dft mag samples
   states.f_dc = zeros(M,Nmem);
-  states.P = 8;                                   % oversample rate out of filter
+  states.P = P;                                   % oversample rate out of filter
   assert(Ts/states.P == floor(Ts/states.P), "Ts/P must be an integer");
 
   states.nin = N;                                 % can be N +/- Ts/P samples to adjust for sample clock offsets
   states.verbose = 0;
   states.phi = zeros(1, M);                       % keep down converter osc phase continuous
 
-  %printf("M: %d Fs: %d Rs: %d Ts: %d nsym: %d nbit: %d\n", states.M, states.Fs, states.Rs, states.Ts, states.nsym, states.nbit);
-
   % BER stats 
 
   states.ber_state = 0;
+  states.ber_valid_thresh = 0.05;  states.ber_invalid_thresh = 0.1; 
   states.Tbits = 0;
   states.Terrs = 0;
   states.nerr_log = 0;
@@ -59,82 +58,21 @@ function states = fsk_init(Fs, Rs, M=2)
   states.ppm = 0;
   states.prev_pkt = [];
  
-  % Freq. estimator limits - keep these narrow to stop errors with low SNR 4FSK
-  % todo: make this Fs indep
+  % Freq. estimator limits
+  states.fest_fmax = Fs;
+  states.fest_fmin = 0;
+  states.fest_min_spacing = 0.75*Rs;
+  states.freq_est_type = 'peak';
 
-  states.fest_fmin = 800;
-  states.fest_fmax = 2500;
-  states.fest_min_spacing = 200;
-endfunction
-
-
-% Alternative init function, useful for high speed (non telemetry) modems
-%   Allows fine grained control of decimation P
-%   Small, processing window nsym rather than nsym=Fs (1 second window)
-%   Wider freq est limits
-
-function states = fsk_init_hbr(Fs,P,Rs,M=2,nsym=48)
-    
-  states.M = M;                    
-  states.bitspersymbol = log2(M);
-  states.Fs = Fs;
-  states.Rs = Rs;
-  Ts = states.Ts = Fs/Rs;
-  assert(Ts == floor(Ts), "Fs/Rs must be an integer");
-  N = states.N = Ts*nsym;        % processing buffer nsym wide
-  states.nsym = N/Ts;            % number of symbols in one processing frame
-  states.nbit = states.nsym*states.bitspersymbol; % number of bits per processing frame
-
-  states.Ndft = (2.^ceil(log2(N)))/2;  % find nearest power of 2 for efficient FFT
-
-  Nmem = states.Nmem  = N+2*Ts;  % two symbol memory in down converted signals to allow for timing adj
-
-  states.Sf = zeros(states.Ndft/2,1); % currentmemory of dft mag samples
-  states.f_dc = zeros(M,Nmem);
-  states.P = P;                  % oversample rate out of filter
-  assert(Ts/states.P == floor(Ts/states.P), "Ts/P must be an integer");
-
-  states.nin = N;                % can be N +/- Ts/P samples to adjust for sample clock offsets
-  states.verbose = 0;
-  states.phi = zeros(1, M);      % keep down converter osc phase continuous
-
-  %printf("M: %d Fs: %d Rs: %d Ts: %d nsym: %d nbit: %d\n", states.M, states.Fs, states.Rs, states.Ts, states.nsym, states.nbit);
-
-  % Freq estimator limits
-
-  states.fest_fmax = (Fs/2)-Rs;
-  states.fest_fmin = Rs/2;
-  states.fest_min_spacing = 2*(Rs-(Rs/5));
-
-  % BER stats 
-
-  states.ber_state = 0;
-  states.Tbits = 0;
-  states.Terrs = 0;
-  states.nerr_log = 0;
-
-  states.tx_real = 1;
-  states.dA(1:M) = 1;
-  states.df(1:M) = 0;
-  states.f(1:M) = 0;
-  states.norm_rx_timing = 0;
-  states.ppm = 0;
-  states.prev_pkt = [];
- 
-  #{ 
-  TODO: fix me to resurect fsk_horus RTTY stuff, maybe call from 
-  % protocol specific states
-
-  states.rtty = fsk_horus_init_rtty_uw(states);
-  states.binary = fsk_horus_init_binary_uw;
-  #}
+  %printf("Octave: M: %d Fs: %d Rs: %d Ts: %d nsym: %d nbit: %d N: %d Ndft: %d fmin: %d fmax: %d\n",
+  %       states.M, states.Fs, states.Rs, states.Ts, states.nsym, states.nbit, states.N, states.Ndft, states.fest_fmin, states.fest_fmax);
 
 endfunction
 
 
 % modulator function
 
-function tx  = fsk_mod(states, tx_bits)
+function tx = fsk_mod(states, tx_bits)
 
     M  = states.M;
     Ts = states.Ts;
@@ -174,7 +112,7 @@ endfunction
 
 
 % Estimate the frequency of the FSK tones.  In some applications (such
-% as balloon telemtry) these may not be well controlled by the
+% as balloon telemetry) these may not be well controlled by the
 % transmitter, so we have to try to estimate them.
 
 function states = est_freq(states, sf, ntones)
@@ -191,50 +129,87 @@ function states = est_freq(states, sf, ntones)
 
   fmin = states.fest_fmin;
   fmax = states.fest_fmax;
-  st = floor(fmin*Ndft/Fs);
-  en = floor(fmax*Ndft/Fs);
-
-  % scale averaging time constant based on number of samples 
-
-  tc = 0.95*Ndft/Fs;
-  %tc = .95;
+  % note 0 Hz is mapped to Ndft/2+1 via fftshift
+  st = floor(fmin*Ndft/Fs) + Ndft/2;  st = max(1,st);
+  en = floor(fmax*Ndft/Fs) + Ndft/2;  en = min(Ndft,en);
+  
+  #printf("Fs: %f Ndft: %d fmin: %f fmax: %f st: %d en: %d\n",Fs, Ndft,  fmin, fmax, st, en)
+  
   % Update mag DFT  ---------------------------------------------
 
-  numffts = floor(length(sf)/Ndft);
+  % we break up input buffer to a series of overlapping Ndft sequences
+  numffts = floor(length(sf)/(Ndft/2)) - 1;
   h = hanning(Ndft);
   for i=1:numffts
-    a = (i-1)*Ndft+1; b = i*Ndft;
-    Sf = abs(fft(sf(a:b) .* h, Ndft));
-    Sf(1:st) = 0; Sf(en:Ndft/2) = 0;
-    states.Sf = (1-tc)*states.Sf + tc*Sf(1:Ndft/2);
+    a = (i-1)*Ndft/2+1; b = a + Ndft - 1;
+    Sf = abs(fftshift(fft(sf(a:b) .* h, Ndft)));
+
+    % Smooth DFT mag spectrum, slower to respond to changes but more
+    % accurate.  Single order IIR filter is an exponentially weighted
+    % moving average.  This means the freq est window is wider than
+    % timing est window
+    tc = states.tc; states.Sf = (1-tc)*states.Sf + tc*Sf;
   end
+
+  % Search for each tone method 1 - peak pick each tone location ----------------------------------
 
   f = []; a = [];
   Sf = states.Sf;
-
-  %figure(8)
-  %clf
-  %plot(Sf(1:Ndft/2));
-
-  % Search for each tone --------------------------------------------------------
-
   for m=1:ntones
-    [tone_amp tone_index] = max(Sf(1:Ndft/2));
-
-    f = [f (tone_index-1)*Fs/Ndft];
+    [tone_amp tone_index] = max(Sf(st:en));
+    tone_index += st - 1;
+    
+    f = [f (tone_index-1-Ndft/2)*Fs/Ndft];
     a = [a tone_amp];
 
-    % zero out region min_tone_spacing/2 either side of max so we can find next highest peak
+    % zero out region min_tone_spacing either side of max so we can find next highest peak
     % closest spacing for non-coh mFSK is Rs
 
-    st = tone_index - floor((min_tone_spacing/2)*Ndft/Fs);
-    st = max(1,st);
-    en = tone_index + floor((min_tone_spacing/2)*Ndft/Fs);
-    en = min(Ndft/2,en);
-    Sf(st:en) = 0;
+    stz = tone_index - floor((min_tone_spacing)*Ndft/Fs);
+    stz = max(1,stz);
+    enz = tone_index + floor((min_tone_spacing)*Ndft/Fs);
+    enz = min(Ndft,enz);
+    Sf(stz:enz) = 0;
   end
 
   states.f = sort(f);
+  
+  % Search for each tone method 2 - correlate with mask with non-zero entries at tone spacings -----
+
+  % Create a mask with non-zero entries at tone spacing.  Might be
+  % smarter to use the DFT of a hanning window as mask
+  
+  mask = zeros(1,Ndft);
+  mask(1:3) = 1;
+  for m=1:ntones-1
+    bin = round(m*states.tx_tone_separation*Ndft/Fs);
+    mask(bin:bin+2) = 1;
+  end
+  mask = mask(1:bin+2);
+  states.mask = mask;
+  
+  % drag mask over Sf, looking for peak in correlation
+  bmax = st; corr_max = 0;
+  Sf = states.Sf; corr_log = [];
+  for b=st:en-length(mask)
+    corr = mask * Sf(b:b+length(mask)-1);
+    corr_log = [corr_log corr];
+    if corr > corr_max
+      corr_max = corr;
+      b_max = b;
+    end
+  end
+  foff = ((b_max-1)-Ndft/2)*Fs/Ndft;
+  
+  if bitand(states.verbose, 0x8)
+    % enable this to single step through frames
+    figure(1); clf; subplot(211); plot(Sf,'b;sf;'); 
+    hold on; plot(max(Sf)*[zeros(1,b_max) mask],'g;mask;'); hold off;
+    subplot(212); plot(corr_log); ylabel('corr against f');
+    printf("foff: %4.0f\n", foff);
+    kbhit;
+  end
+  states.f2 = foff + (0:ntones-1)*states.tx_tone_separation;
 end
 
 
@@ -273,19 +248,16 @@ function [rx_bits states] = fsk_demod(states, sf)
   f_dc = states.f_dc; 
   f_dc(:,1:nold) = f_dc(:,Nmem-nold+1:Nmem);
 
-  % freq shift down to around DC, ensuring continuous phase from last frame
-
+  % freq shift down to around DC, ensuring continuous phase from last frame, as nin may vary
   for m=1:M
     phi_vec = states.phi(m) + (1:nin)*2*pi*f(m)/Fs;
     f_dc(m,nold+1:Nmem) = sf .* exp(j*phi_vec)';
     states.phi(m)  = phi_vec(nin);
     states.phi(m) -= 2*pi*floor(states.phi(m)/(2*pi));
   end
-
   % save filter (integrator) memory for next time
-
   states.f_dc = f_dc;
-
+  
   % integrate over symbol period, which is effectively a LPF, removing
   % the -2Fc frequency image.  Can also be interpreted as an ideal
   % integrate and dump, non-coherent demod.  We run the integrator at
@@ -294,6 +266,7 @@ function [rx_bits states] = fsk_demod(states, sf)
   % over nsym+1 symbols so we have extra samples for the fine timing
   % re-sampler at either end of the array.
 
+  f_int = zeros(M,(nsym+1)*P);
   for i=1:(nsym+1)*P
     st = 1 + (i-1)*Ts/P;
     en = st+Ts-1;
@@ -302,7 +275,7 @@ function [rx_bits states] = fsk_demod(states, sf)
     end
   end
   states.f_int = f_int;
-
+  
   % fine timing estimation -----------------------------------------------
 
   % Non linearity has a spectral line at Rs, with a phase
@@ -398,7 +371,7 @@ endfunction
 % BER counter and test frame sync logic -------------------------------------------
 
 function states = ber_counter(states, test_frame, rx_bits_buf)
-  nbit = states.nbit;
+  nbit = length(test_frame);
   state = states.ber_state;
   next_state = state;
 
@@ -408,8 +381,6 @@ function states = ber_counter(states, test_frame, rx_bits_buf)
 
     nerrs_min = nbit;
     for i=1:nbit
-      size(rx_bits_buf(i:nbit+i-1))
-      size(test_frame)
       error_positions = xor(rx_bits_buf(i:nbit+i-1), test_frame);
       nerrs = sum(error_positions);
       if nerrs < nerrs_min
@@ -417,12 +388,13 @@ function states = ber_counter(states, test_frame, rx_bits_buf)
         states.coarse_offset = i;
       end
     end
-    if nerrs_min/nbit < 0.05 
+    if nerrs_min/nbit < states.ber_valid_thresh
       next_state = 1;
     end
     if bitand(states.verbose,0x4)
       printf("coarse offset: %d nerrs_min: %d next_state: %d\n", states.coarse_offset, nerrs_min, next_state);
     end
+    states.nerr = nerrs_min;
   end
 
   if state == 1  
@@ -431,13 +403,17 @@ function states = ber_counter(states, test_frame, rx_bits_buf)
 
     error_positions = xor(rx_bits_buf(states.coarse_offset:states.coarse_offset+nbit-1), test_frame);
     nerrs = sum(error_positions);
-    if nerrs/nbit > 0.1
+    if nerrs/nbit > states.ber_invalid_thresh
       next_state = 0;
+      if bitand(states.verbose,0x4)
+        printf("coarse offset: %d nerrs: %d next_state: %d\n", states.coarse_offset, nerrs, next_state);
+      end
     else
       states.Terrs += nerrs;
       states.Tbits += nbit;
       states.nerr_log = [states.nerr_log nerrs];
     end
+    states.nerr = nerrs;
   end
 
   states.ber_state = next_state;

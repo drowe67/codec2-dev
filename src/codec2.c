@@ -2171,7 +2171,7 @@ int codec2_get_spare_bit_index(struct CODEC2 *c2)
    for convenience.
 */
 
-int codec2_rebuild_spare_bit(struct CODEC2 *c2, int unpacked_bits[])
+int codec2_rebuild_spare_bit(struct CODEC2 *c2, char unpacked_bits[])
 {
     int v1,v3;
 

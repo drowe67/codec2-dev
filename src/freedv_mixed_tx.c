@@ -1,15 +1,16 @@
 /*---------------------------------------------------------------------------*\
 
-  FILE........: freedv_data_tx.c
-  AUTHOR......: Jeroen Vreeken
+  FILE........: freedv_mixed_tx.c
+  AUTHOR......: Jeroen Vreeken & David Rowe
   DATE CREATED: May 2020
 
-  Demo VHF packet data transmit program for FreeDV API functions.
+  Demo transmit program for FreeDV API that demonstrates shows mixed
+  VHF packet data and speech frames.
 
 \*---------------------------------------------------------------------------*/
 
 /*
-  Copyright (C) 2020 Jeroen Vreeken
+  Copyright (C) 2014 David Rowe
 
   All rights reserved.
 
@@ -34,7 +35,6 @@
 
 #include "freedv_api.h"
 #include "codec2.h"
-
 
 /**********************************************************
 	Encoding an ITU callsign (and 4 bit secondary station ID to a valid MAC address.
@@ -182,23 +182,43 @@ void my_datatx(void *callback_state, unsigned char *packet, size_t *size)
 }
 
 
+/* Determine the amount of 'energy' in the samples by squaring them 
+   This is not a perfect VAD as noise may trigger it, but works well for demonstrations.
+ */
+static float samples_get_energy(short *samples, int nr)
+{
+	float e = 0;
+	int i;
+	
+	for (i = 0; i < nr; i++) {
+		e += (float)(samples[i] * samples[i]) /  (8192);
+	}
+	e /= nr;
+	
+	return e;
+}
+
 int main(int argc, char *argv[]) {
-    FILE                     *fout;
+    FILE                     *fin, *fout;
+    short                    *speech_in;
     short                    *mod_out;
     struct freedv            *freedv;
     struct my_callback_state  my_cb_state;
     int                       mode;
+    int                       n_speech_samples;
     int                       n_nom_modem_samples;
-    int                       i;
-    int                       n_packets = 20;
     char                     *callsign = "NOCALL";
     int                       ssid = 0;
     bool                      multicast = false;
+    int                       use_codectx;
+    struct CODEC2             *c2;
+    int                       i;
+    float                     data_threshold = 15;
 
-    if (argc < 3) {
-        printf("usage: %s 2400A|2400B|800XA OutputModemRawFile\n"
-	       " [--frames nr] [--callsign callsign] [--ssid ssid] [--mac-multicast 0|1]\n", argv[0]);
-        printf("e.g    %s 2400A data_fdmdv.raw\n", argv[0]);
+    if (argc < 4) {
+        printf("usage: %s 2400A|2400B|800XA InputRawSpeechFile OutputModemRawFile\n"
+               " [--codectx]  [--callsign callsign] [--ssid ssid] [--mac-multicast 0|1] [--data-threshold val]\n", argv[0]);
+        printf("e.g    %s 2400A hts1a.raw hts1a_fdmdv.raw\n", argv[0]);
         exit(1);
     }
 
@@ -214,16 +234,33 @@ int main(int argc, char *argv[]) {
         exit(0);
     }
 
-    if (strcmp(argv[2], "-") == 0) fout = stdout;
+    if (strcmp(argv[2], "-")  == 0) fin = stdin;
+    else if ( (fin = fopen(argv[2],"rb")) == NULL ) {
+        fprintf(stderr, "Error opening input raw speech sample file: %s: %s.\n", argv[2], strerror(errno));
+        exit(1);
+    }
+
+    if (strcmp(argv[3], "-") == 0) fout = stdout;
     else if ( (fout = fopen(argv[3],"wb")) == NULL ) {
         fprintf(stderr, "Error opening output modem sample file: %s: %s.\n", argv[3], strerror(errno));
         exit(1);
     }
 
-    if (argc > 3) {
-        for (i = 3; i < argc; i++) {
-            if (strcmp(argv[i], "--packets") == 0) {
-                n_packets = atoi(argv[i+1]);
+    use_codectx = 0;
+    
+    if (argc > 4) {
+        for (i = 4; i < argc; i++) {
+            if (strcmp(argv[i], "--codectx") == 0) {
+                int c2_mode;
+                
+                if ((mode == FREEDV_MODE_700C) || (mode == FREEDV_MODE_700D) || (mode == FREEDV_MODE_800XA)) {
+                    c2_mode = CODEC2_MODE_700C;
+                } else {
+                    c2_mode = CODEC2_MODE_1300;
+                }
+                use_codectx = 1;
+                c2 = codec2_create(c2_mode);
+                assert(c2 != NULL);
             }
             if (strcmp(argv[i], "--callsign") == 0) {
                 callsign = argv[i+1];
@@ -234,7 +271,10 @@ int main(int argc, char *argv[]) {
             if (strcmp(argv[i], "--mac-multicast") == 0) {
                 multicast = atoi(argv[i+1]);
             }
-	}
+            if (strcmp(argv[i], "--data-threshold") == 0) {
+                data_threshold = atof(argv[i+1]);
+            }
+        }
     }
 
     freedv = freedv_open(mode);
@@ -247,32 +287,80 @@ int main(int argc, char *argv[]) {
 
     freedv_set_verbose(freedv, 1);
     
+    n_speech_samples = freedv_get_n_speech_samples(freedv);
     n_nom_modem_samples = freedv_get_n_nom_modem_samples(freedv);
+    speech_in = (short*)malloc(sizeof(short)*n_speech_samples);
+    assert(speech_in != NULL);
     mod_out = (short*)malloc(sizeof(short)*n_nom_modem_samples);
     assert(mod_out != NULL);
+    //fprintf(stderr, "n_speech_samples: %d n_nom_modem_samples: %d\n", n_speech_samples, n_nom_modem_samples);
 
     /* set up callback for data packets */
     freedv_set_callback_data(freedv, my_datarx, my_datatx, &my_cb_state);
 
     /* OK main loop */
 
-    /* We will loop untill the tx callback has been called n_packets times
-       After that we continue untill everything is transmitted, as a data 
-       packet might be transmitted in multiple freedv frames.
-     */
-    while (my_cb_state.calls <= n_packets || freedv_data_ntxframes(freedv)) {
-        freedv_datatx(freedv, mod_out);
+    while(fread(speech_in, sizeof(short), n_speech_samples, fin) == n_speech_samples) {
+        if (use_codectx == 0) {
+	    /* Use the freedv_api to do everything: speech encoding, modulating 
+	     */
+            float energy = samples_get_energy(speech_in, n_speech_samples);
+
+           /* Is the audio fragment quiet? */
+            if (energy < data_threshold) {
+                /* Insert a frame with data instead of speech */
+                freedv_datatx(freedv, mod_out);
+            } else {
+	        /* transmit voice frame */
+                freedv_tx(freedv, mod_out, speech_in);
+            }
+        } else {
+	    /* Use the freedv_api to do the modem part, encode ourselves
+	       - First encode the frames
+	       - Get activity from codec2 api
+	       - Based on activity either send encoded voice or data
+	     */
+            int bits_per_codec_frame = codec2_bits_per_frame(c2);
+            int bytes_per_codec_frame = (bits_per_codec_frame + 7) / 8;
+            int codec_frames = freedv_get_bits_per_codec_frame(freedv) / bits_per_codec_frame;
+            int samples_per_frame = codec2_samples_per_frame(c2);
+            unsigned char encoded[bytes_per_codec_frame * codec_frames];
+            unsigned char *enc_frame = encoded;
+            short *speech_frame = speech_in;
+            float energy = 0;
+
+            /* Encode the speech ourself (or get it from elsewhere, e.g. network) */
+            for (i = 0; i < codec_frames; i++) {
+                codec2_encode(c2, enc_frame, speech_frame);
+                energy += codec2_get_energy(c2, enc_frame);
+                enc_frame += bytes_per_codec_frame;
+                speech_frame += samples_per_frame;
+            }
+            energy /= codec_frames;
+            
+            /* Is the audio fragment quiet? */
+            if (energy < data_threshold) {
+                /* Insert a frame with data instead of speech */
+                freedv_datatx(freedv, mod_out);
+            } else {
+                /* Use the freedv_api to modulate already encoded frames */
+                freedv_rawdatatx(freedv, mod_out, encoded);
+            }
+        }
 
         fwrite(mod_out, sizeof(short), n_nom_modem_samples, fout);
-
         
         /* if this is in a pipeline, we probably don't want the usual
            buffering to occur */
         if (fout == stdout) fflush(stdout);
+        if (fin == stdin) fflush(stdin);
+
     }
 
+    free(speech_in);
     free(mod_out);
     freedv_close(freedv);
+    fclose(fin);
     fclose(fout);
 
     fclose(stdin);

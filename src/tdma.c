@@ -70,9 +70,9 @@ tdma_t * tdma_create(struct TDMA_MODE_SETTINGS mode){
     u32 pilot_nsyms = slot_size/2;
 
     /* Set up pilot modem */
-    fsk_t * pilot = fsk_create_hbr(Fs,Rs,P,M,Rs,Rs);
+    fsk_t * pilot = fsk_create_hbr(Fs,Rs,M,P,pilot_nsyms,Rs,Rs);
     if(pilot == NULL) goto cleanup_bad_alloc;
-    fsk_enable_burst_mode(pilot,pilot_nsyms);
+    fsk_enable_burst_mode(pilot);
     tdma->fsk_pilot = pilot;
     tdma->settings = mode;
     tdma->state = no_sync;
@@ -116,10 +116,10 @@ tdma_t * tdma_create(struct TDMA_MODE_SETTINGS mode){
         slot->single_tx = true;
         slot->bad_uw_count = 0;
         slot->master_count = 0;
-        slot_fsk = fsk_create_hbr(Fs,Rs,P,M,Rs,Rs);
+        slot_fsk = fsk_create_hbr(Fs,Rs,M,P,slot_size+1,Rs,Rs);
         
         if(slot_fsk == NULL) goto cleanup_bad_alloc;
-        fsk_enable_burst_mode(slot_fsk, slot_size+1);
+        fsk_enable_burst_mode(slot_fsk);
         
         slot->fsk = slot_fsk;
         last_slot = slot;

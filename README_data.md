@@ -2,7 +2,7 @@
 
 ## Introduction
 
-Documentation for FreeDV data channel.
+Documentation for FreeDV VHF packet data channel, developed by Jeroen Vreeken.
 
 ## Quickstart
 
@@ -33,7 +33,7 @@ Documentation for FreeDV data channel.
 
 ## Packets
 
-The FreeDV data channel operates on a packet level. The FreeDV modems however typically operate on a fixed frame base. This means that data packets have to be send in multiple frames.
+The FreeDV VHF data channel operates on a packet level. The FreeDV modems however typically operate on a fixed frame base. This means that data packets have to be send in multiple frames.
 
 The packet format is modelled after EtherNet. As a result any protocol that is compatible with EtherNet can potentially be used over a FreeDV data link. (There are of course practical limits. Browsing the world wide web with just a few hundred bits per second will not be a pleasant experience.)
 
@@ -114,10 +114,11 @@ Another method is to generate a mixed stream of frames. Compared to a small burs
 
 #### Detect voice activity
 
-When it is possible to determine activity in the voice signal (and it almost always is) this presence can be used to insert a data frame by calling freedv_datatx() instead of freedv_tx()/freedv_codectx(). This method is used in th freedv_tx demo program when the options --codectx and --datatx are given.
+When it is possible to determine activity in the voice signal (and it almost always is) this presence can be used to insert a data frame by calling freedv_datatx() instead of freedv_tx()/freedv_codectx(). This method is used in the freedv_mixed_tx demo program. When the option --codectx is given the codec2 library is used to determine the activity.
 
   ```
-   $ ./src/freedv_tx 2400A ../raw/hts1a.raw - --codectx --datatx | src/freedv_data_rx 2400A -
+   $ ./src/freedv_mixed_tx 2400A ../raw/hts1a.raw - --codectx | src/freedv_data_rx 2400A -
+   $ ./src/freedv_mixed_tx 2400A ../raw/hts1a.raw - | src/freedv_data_rx 2400A -
   ```
 
 The advantage of this method is that the audio is not distorted, there was nothing (or near nothing) to distort. A drawback is that constant voice activity may mean there are insufficient frames for data.

@@ -37,20 +37,26 @@
 
 int main(int argc,char *argv[]){
     int bitcnt, framecnt;
+    int framesize = TEST_FRAME_SIZE;
     int i;
     FILE *fout;
     uint8_t *bitbuf;
     
-    if(argc != 3){
-        fprintf(stderr,"usage: %s OutputBitsOnePerByte numBits\n",argv[0]);
+    if(argc < 3){
+        fprintf(stderr,"usage: %s OutputBitsOnePerByte numBits [framesize]\n",argv[0]);
         exit(1);
+    }
+
+    if (argc == 4){
+        framesize = atoi(argv[3]);
+        fprintf(stderr, "Using custom frame size of %d bits\n", framesize);
     }
     
     /* Extract parameters */
     bitcnt = atoi(argv[2]);
-    framecnt = bitcnt/TEST_FRAME_SIZE;
+    framecnt = bitcnt/framesize;
     if (framecnt == 0) {
-        fprintf(stderr,"Need a minimum of %d bits\n", TEST_FRAME_SIZE);
+        fprintf(stderr,"Need a minimum of %d bits\n", framesize);
         exit(1);
     }
 
@@ -66,18 +72,18 @@ int main(int argc,char *argv[]){
     }
     
     /* allocate buffers for processing */
-    bitbuf = (uint8_t*)alloca(sizeof(uint8_t)*TEST_FRAME_SIZE);
+    bitbuf = (uint8_t*)alloca(sizeof(uint8_t)*framesize);
     
     /* Generate buffer of test frame bits from known seed */
     srand(158324);
-    for(i=0; i<TEST_FRAME_SIZE; i++){
+    for(i=0; i<framesize; i++){
 	bitbuf[i] = rand()&0x1;
     }
         
     /* Output test frames */
     srand(158324);
     for(i=0; i<framecnt; i++){
-	fwrite(bitbuf,sizeof(uint8_t),TEST_FRAME_SIZE,fout);
+	fwrite(bitbuf,sizeof(uint8_t),framesize,fout);
 	if(fout == stdout){
 	    fflush(fout);
 	}
