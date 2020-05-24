@@ -27,6 +27,7 @@
 
 #include <stdio.h>
 #include "freedv_api.h"
+#include "assert.h"
 
 int main(int argc, char **argv)
 {
@@ -37,58 +38,37 @@ int main(int argc, char **argv)
 
     printf("freedv_open(FREEDV_MODE_800XA) ");
     f = freedv_open(FREEDV_MODE_800XA);
-    if (!f) {
-        printf("Failed to open\n");
-        goto fail;
-    }
+    assert(f != NULL);
     printf("Passed\n");
 
     printf("freedv_get_mode() ");
     int mode = freedv_get_mode(f);
-    if (mode != FREEDV_MODE_800XA) {
-        printf("mode %d does not match FREEDV_MODE_800XA %d\n", mode, FREEDV_MODE_800XA);
-        goto fail;
-    }
+    assert(mode == FREEDV_MODE_800XA);
     printf("Passed\n");
 
     printf("freedv_get_n_max_modem_samples() ");
     int max_samples = freedv_get_n_max_modem_samples(f);
-    if (max_samples != 660) {
-        printf("modem max samples %d != 660\n", max_samples);
-        goto fail;
-    }
+    assert(max_samples == 660);
     printf("%d Passed\n", max_samples);
 
     printf("freedv_get_n_nom_modem_samples() ");
     int nom_samples = freedv_get_n_nom_modem_samples(f);
-    if (nom_samples != 640) {
-        printf("modem nom samples %d != 640\n", nom_samples);
-        goto fail;
-    }
+    assert(nom_samples == 640);
     printf("%d Passed\n", nom_samples);
 
     printf("freedv_get_n_speech_samples() ");
     int speech_samples = freedv_get_n_speech_samples(f);
-    if (speech_samples != 640) {
-        printf("Expected 640 speech samples, got %d\n", speech_samples);
-        goto fail;
-    }
+    assert(speech_samples == 640);
     printf("%d Passed\n", speech_samples);
 
     printf("freedv_get_n_bits_per_codec_frame() ");
     int codec_bits = freedv_get_bits_per_codec_frame(f);
-    if (codec_bits != 28) {
-        printf("Expected 28 codec bits, got %d\n", codec_bits);
-	goto fail;
-    }
+    assert(codec_bits == 28);
     printf("%d Passed\n", codec_bits);
 
     printf("freedv_get_n_bits_per_modem_frame() ");
     int frame_bits = freedv_get_bits_per_modem_frame(f);
-    if (frame_bits != 56) {
-        printf("Expected 56 codec bits, got %d\n", frame_bits);
-	goto fail;
-    }
+    assert(frame_bits == 56);
     printf("%d Passed\n", frame_bits);
 
     printf("freedv_rawdatatx()/freedv_rawdatarx() ");
