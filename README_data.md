@@ -2,7 +2,7 @@
 
 # Introduction
 
-FreeDV can be used to send data over radio channels.  Two APis are support:
+FreeDV can be used to send data over radio channels.  Two APis are supported:
 + VHF packet data channel which uses Ethernet style framing.
 + Raw frames of modem data
 
@@ -43,7 +43,7 @@ VHF packet data API:
 
 Raw modem frame API:
 
-1. Lets send two modem frames of 14 bytes usng FreeDV 700D:
+1. Let's send two modem frames of 14 bytes using FreeDV 700D:
    ```sh
    $ head -c 28 </dev/urandom > binaryIn.bin
    $ ./src/freedv_data_raw_tx 700D binaryIn.bin - |  ./src/freedv_data_raw_rx 700D - - | hexdump
@@ -53,21 +53,22 @@ Raw modem frame API:
    0000000 4325 0363 ce1f fb88 8102 7d76 c487 e092
    0000010 2ded bc06 7689 eb67 5dfe 43df          
    ```
-   
+
 # VHF Packet Data Channel
 
-The FreeDV VHF data channel operates on a packet level. The FreeDV modems however typically operate on a fixed frame base. This means that data packets have to be send in multiple frames.
+The FreeDV VHF data channel operates on a packet level. The FreeDV modems however typically operate on a fixed frame base. This means that data packets have to be sent in multiple frames.
 
-The packet format is modelled after EtherNet. As a result any protocol that is compatible with EtherNet can potentially be used over a FreeDV data link. (There are of course practical limits. Browsing the world wide web with just a few hundred bits per second will not be a pleasant experience.)
+The packet format is modeled after Ethernet. As a result, any protocol that is compatible with Ethernet can potentially be used over a FreeDV data link. (There are of course practical limits. Browsing the world wide web with just a few hundred bits per second will not be a pleasant experience.)
 
 ## Header optimization
 
-When there are no packets available for transmission small 'filler' packet with just the sender's address will be send.
-When there is a packet available not all of the header needs to be send. The sender's address can often be left out if it was already send in a previous frame. Likewise when the packet has no specific destination but is targeted at a multicast address, this can also be transmitted in a single bit as oposed to a 6 byte broadcast address.
+When there are no packets available for transmission a small 'filler' packet with just the sender's address will be sent.
+When there is a packet available not all of the header needs to be sent. The sender's address can often be left out if it was already sent in a previous frame. Likewise when the packet has no specific destination but is targeted at a multicast address, this can also be transmitted in a single bit as opposed to a 6 byte broadcast address.
+
 
 ## Addressing
 
-Since the format is based on EtherNet a 6 byte sender and destination address is used. It is possible to encode a ITU compatible callsign in these bytes. See http://dmlinking.net/eth_ar.html for more info. Or have a look at freedv_data_tx.c and freedv_data_rx.c for an actual implementation.
+Since the format is based on Ethernet, a 6 byte sender and destination address is used. It is possible to encode an ITU compatible callsign in these bytes. See http://dmlinking.net/eth_ar.html for more info. Or have a look at freedv_data_tx.c and freedv_data_rx.c for an actual implementation.
 
 ## Packet types
 
@@ -75,7 +76,7 @@ The 2 byte EtherType field is used to distinguish between various protocols.
 
 ## Checks
 
-Not all channels are perfect and especially since a packet is split up over multiple frames bits might get lost. Each packet therefore has a CRC which is checked before it is accepted.  Note there is No FEC on 2400A/2400B/800XA.
+Not all channels are perfect, and especially since a packet is split up over multiple frames, bits might get lost. Each packet therefore has a CRC which is checked before it is accepted.  Note there is No FEC on 2400A/2400B/800XA.
 
 ## Available modes
 
@@ -83,7 +84,7 @@ The data channel is available for modes 2400A, 2400B and 800XA.
 
 ## API
 
-The data channel is part of the regular FreeDV API
+The data channel is part of the regular FreeDV API.
 
 ### Initialization
 
@@ -109,7 +110,7 @@ Using freedv_set_callback_data() two callback functions can be provided. The dat
    void freedv_datatx  (struct freedv *f, short mod_out[]);
   ```
 
-During normal operation the freedv_datatx() function can be used whenever a data frame has to be sent. If no data is available it will request new data using the datatx callback. The callback function is allowed to set 'size' to zero if no data is available or if it whishes to send an address frame.
+During normal operation the freedv_datatx() function can be used whenever a data frame has to be sent. If no data is available it will request new data using the datatx callback. The callback function is allowed to set 'size' to zero if no data is available or if it wishes to send an address frame.
 
 For reception the regular freedv_rx() functions can be used as received data will automatically be reported using the datarx callback. Be aware that these functions return the actual number of received speech samples. When a data frame is received the return value will be zero. This may lead to 'gaps' in the audio stream which will have to be filled with silence.
 
@@ -122,18 +123,18 @@ The freedv_data_tx and freedv_data_rx test programs implement the minimum needed
 Encoding only voice data is easy with the FreeDV API. Simply use the freedv_tx() function and provide it with speech samples.
 Likewise encoding only data is also easy. Make sure to provide a source of data frames using the freedv_set_callback_data() function, and use the freedv_datatx() function to generate frames.
 
-However there are many usecases where one would like to transmit a mix of voice and data. For example one might want to transmit their callsign in a machine readable format, or a short position report. There are a few ways to do this:
+However there are many use cases where one would like to transmit a mix of voice and data. For example one might want to transmit their callsign in a machine readable format, or a short position report. There are a few ways to do this:
 
 ### Data bursts at start and/or end of transmission
 
 This method simply transmits voice frames during the transmission, except for a few moments. For example when the user keys the radio the software uses the freedv_datatx() function for a number of frames before switching to regular voice frames.
 Likewise when the user releases the key the software may hold it for a number of frames to transmit data before it releases the actual radio.
 
-Be carefull though: depending on your setup (radio, pc, soundcard, etc) the generated frames and the keying of your radio might not be perfectly in sync and the first or last frames might be lost in the actual transmission. Make sure to take this into account when using this method.
+Be careful though: depending on your setup (radio, PC, soundcard, etc) the generated frames and the keying of your radio might not be perfectly in sync and the first or last frames might be lost in the actual transmission. Make sure to take this into account when using this method.
 
 ### Data and voice interleaved
 
-Another method is to generate a mixed stream of frames. Compared to a small burst at begin or end a lot more data can be send. We only need a way to choose between voice or data such that the recovered speech at the other side is not impacted.
+Another method is to generate a mixed stream of frames. Compared to a small burst at the beginning or end a lot more data can be sent. We only need a way to choose between voice or data such that the recovered speech at the other side is not impacted.
 
 #### Detect voice activity
 
@@ -148,8 +149,8 @@ The advantage of this method is that the audio is not distorted, there was nothi
 
 ### Receiving mixed voice and data
 
-Receiving and decoding a mixed voice and data is (almost) as easy as receiving a regular voice-only transmission.
-One simply uses the regular API calls for reception of speech samples. In addition the callback functions are used for data.
+Receiving and decoding a mixed voice and data stream is (almost) as easy as receiving a regular voice-only transmission.
+One simply uses the regular API calls for reception of speech samples. In addition, the callback functions are used for data.
 There is one caveat though: when a data frame is received the API functions (like freedv_rx) will return zero as this is the amount of codec/voice data received.
 For proper playback silence (or comfort noise) should be inserted for the duration of a frame to restore the timing of the original source speech samples.
 An example of how this is done is provided in freedv_mixed_rx
@@ -160,7 +161,7 @@ An example of how this is done is provided in freedv_mixed_rx
 
 ### Insert a data frame periodically
 
-This is a very simple method, simply insert a data frame every n frames, (e.g. once every 10 seconds). Since single FreeDV frames are relativly short (tens of milliseconds) the effect on received audio will be minor. The advantage of this method is that one can create a guaranteed amount of data bandwidth. A drawback is some interruption in the audio that may be noticed.
+This is a very simple method, simply insert a data frame every n frames, (e.g. once every 10 seconds). Since single FreeDV frames are relatively short (tens of milliseconds) the effect on received audio will be minor. The advantage of this method is that one can create a guaranteed amount of data bandwidth. A drawback is some interruption in the audio that may be noticed.
 
 ### Combination of the above.
 
@@ -168,9 +169,9 @@ A combination of the two methods may also be used. Send data when no voice is ac
 
 # Raw Data using the FreeDV API
 
-The demo programs [freedv_data_raw_tx.c](src/freedv_data_raw_tx.c) and [freedv_data_raw_rx.c](src/freedv_data_raw_rx.c) show how to use the the raw data API.
+The demo programs [freedv_data_raw_tx.c](src/freedv_data_raw_tx.c) and [freedv_data_raw_rx.c](src/freedv_data_raw_rx.c) show how to use the raw data API.
 
-The following FreeDV modes are reccomended.  Other modes could be used, but don't offer FEC and may have frame lengths that are not an integer numbers of bytes.
+The following FreeDV modes are recommended.  Other modes could be used, but don't offer FEC and may have frame lengths that are not an integer numbers of bytes.
 
 | FreeDV Mode | RF bandwidth (Hz) | Payload data rate bits/s | bytes/frame | FEC | Min SNR (dB, AWGN) |
 | :-: | :-: | :-: | :-: | :-: | :-: |
