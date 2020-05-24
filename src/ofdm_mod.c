@@ -45,8 +45,6 @@
 
 #define IS_DIR_SEPARATOR(c)     ((c) == '/')
 
-static struct OFDM_CONFIG *ofdm_config;
-
 static int ofdm_bitsperframe;
 static int ofdm_nuwbits;
 static int ofdm_ntxtbits;
@@ -241,13 +239,16 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    /* set up custom config for ofdm_create() ..... */
+    
+    struct OFDM_CONFIG *ofdm_config;
     if ((ofdm_config = (struct OFDM_CONFIG *) calloc(1, sizeof (struct OFDM_CONFIG))) == NULL) {
         fprintf(stderr, "Out of Memory\n");
         exit(-1);
     }
 
     ofdm_config->fs = 8000.0f; /* Sample Frequency */
-    ofdm_config->ofdm_timing_mx_thresh = 0.30f;
+    ofdm_config->timing_mx_thresh = 0.30f;
     ofdm_config->ftwindowwidth = 11;
     ofdm_config->bps = 2; /* Bits per Symbol */
     ofdm_config->txtbits = 4; /* number of auxiliary data bits */
@@ -266,10 +267,10 @@ int main(int argc, char *argv[]) {
 
     free(ofdm_config);
 
-    /* Get a copy of the actual modem config */
-    ofdm_config = ofdm_get_config_param();
+    /* Get a copy of the completed modem config (ofdm_create() fills in more parameters) */
+    ofdm_config = ofdm_get_config_param(ofdm);
 
-    ofdm_bitsperframe = ofdm_get_bits_per_frame();
+    ofdm_bitsperframe = ofdm_get_bits_per_frame(ofdm);
     ofdm_nuwbits = (ofdm_config->ns - 1) * ofdm_config->bps - ofdm_config->txtbits;
     ofdm_ntxtbits = ofdm_config->txtbits;
 
@@ -314,7 +315,7 @@ int main(int argc, char *argv[]) {
         Nbitsperframe = ofdm_bitsperframe;
     }
 
-    int Nsamperframe = ofdm_get_samples_per_frame();
+    int Nsamperframe = ofdm_get_samples_per_frame(ofdm);
 
     if (verbose) {
         ofdm_set_verbose(ofdm, verbose);

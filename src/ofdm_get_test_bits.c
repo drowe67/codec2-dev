@@ -60,21 +60,14 @@ int main(int argc, char *argv[])
          argv[1], strerror(errno));
 	exit(1);
     }
-
-    if ((ofdm_config = (struct OFDM_CONFIG *) calloc(1, sizeof (struct OFDM_CONFIG))) == NULL) {
-	printf("Out of Memory");
-	exit(1);
-    }
-
-    ofdm = ofdm_create(ofdm_config);
+    
+    ofdm = ofdm_create(NULL);
     assert(ofdm != NULL);
 
-    free(ofdm_config);
+    /* Get a ptr to the actual modem config */
+    ofdm_config = ofdm_get_config_param(ofdm);
 
-    /* Get a copy of the actual modem config */
-    ofdm_config = ofdm_get_config_param();
-
-    ofdm_bitsperframe = ofdm_get_bits_per_frame();
+    ofdm_bitsperframe = ofdm_get_bits_per_frame(ofdm);
     ofdm_nuwbits = (ofdm_config->ns - 1) * ofdm_config->bps - ofdm_config->txtbits;
     ofdm_ntxtbits = ofdm_config->txtbits;
 
