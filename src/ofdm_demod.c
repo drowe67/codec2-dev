@@ -58,8 +58,6 @@
 #define NDISCARD 20                /* BER2 measure discards first 20 frames   */
 #define FS       8000.0f
 
-static struct OFDM_CONFIG *ofdm_config;
-
 static int ofdm_bitsperframe;
 static int ofdm_rowsperframe;
 static int ofdm_nuwbits;
@@ -301,6 +299,9 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    /* set up custom config for ofdm_create() ..... */
+
+    struct OFDM_CONFIG *ofdm_config;
     if ((ofdm_config = (struct OFDM_CONFIG *) calloc(1, sizeof (struct OFDM_CONFIG))) == NULL) {
         fprintf(stderr, "Out of Memory\n");
         exit(-1);
@@ -317,7 +318,7 @@ int main(int argc, char *argv[]) {
     ofdm_config->txtbits = 4; /* number of auxiliary data bits */
 
     ofdm_config->ftwindowwidth = 11;
-    ofdm_config->ofdm_timing_mx_thresh = 0.30f;
+    ofdm_config->timing_mx_thresh = 0.30f;
 
     struct OFDM *ofdm = ofdm_create(ofdm_config);
     assert(ofdm != NULL);
@@ -327,10 +328,10 @@ int main(int argc, char *argv[]) {
     ofdm_set_phase_est_bandwidth_mode(ofdm, phase_est_bandwidth_mode);
     ofdm_set_dpsk(ofdm, dpsk);
     
-    /* Get a copy of the actual modem config */
-    ofdm_config = ofdm_get_config_param();
+    /* Get a copy of the actual modem config (ofdm_create() fills in more parameters) */
+    ofdm_config = ofdm_get_config_param(ofdm);
 
-    ofdm_bitsperframe = ofdm_get_bits_per_frame();
+    ofdm_bitsperframe = ofdm_get_bits_per_frame(ofdm);
     ofdm_rowsperframe = ofdm_bitsperframe / (ofdm_config->nc * ofdm_config->bps);
     ofdm_nuwbits = (ofdm_config->ns - 1) * ofdm_config->bps - ofdm_config->txtbits;
     ofdm_ntxtbits = ofdm_config->txtbits;
@@ -422,7 +423,7 @@ int main(int argc, char *argv[]) {
     }
 
     int Nbitsperframe = ofdm_bitsperframe;
-    int Nmaxsamperframe = ofdm_get_max_samples_per_frame();
+    int Nmaxsamperframe = ofdm_get_max_samples_per_frame(ofdm);
     // TODO: these constants come up a lot so might be best placed in ofdm_create()
     int Npayloadbitsperframe = ofdm_bitsperframe - ofdm_nuwbits - ofdm_ntxtbits;
     int Npayloadsymsperframe = Npayloadbitsperframe/ofdm_config->bps;
@@ -697,7 +698,7 @@ int main(int argc, char *argv[]) {
             /* detect a sucessful sync for time to sync tests */
             if ((time_to_sync < 0) && ((ofdm->sync_state == synced) || (ofdm->sync_state == trial)))          
                 if ((parityCheckCount[r] > 80) && (iter[r] != 100))
-                    time_to_sync = (float)(f+1)*ofdm_get_samples_per_frame()/FS;
+                    time_to_sync = (float)(f+1)*ofdm_get_samples_per_frame(ofdm)/FS;
 
         }
 
@@ -738,13 +739,13 @@ int main(int argc, char *argv[]) {
         }
 
         if (len_secs != 0.0) {
-            float secs = (float)f*ofdm_get_samples_per_frame()/FS;
+            float secs = (float)f*ofdm_get_samples_per_frame(ofdm)/FS;
             if (secs >= len_secs) finish = 1;
         }
         
         if (skip_secs != 0.0) {
             /* big nasty timing error */
-            float secs = (float)f*ofdm_get_samples_per_frame()/FS;
+            float secs = (float)f*ofdm_get_samples_per_frame(ofdm)/FS;
             if (secs >= skip_secs) {
                 assert(fread(rx_scaled, sizeof (short), nin_frame/2, fin) == nin_frame/2);
                 fprintf(stderr,"  Skip!  Just introduced a nasty big timing slip\n");

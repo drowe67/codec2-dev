@@ -82,19 +82,55 @@ struct OFDM_CONFIG {
     float rs;  /* Modulation Symbol Rate */
     float ts;  /* symbol duration */
     float tcp; /* Cyclic Prefix duration */
-    float ofdm_timing_mx_thresh;
+    float timing_mx_thresh;
 
     int nc;  /* Number of carriers */
     int ns;  /* Number of Symbol frames */
     int bps;   /* Bits per Symbol */
     int txtbits; /* number of auxiliary data bits */
     int ftwindowwidth;
+
+    int samples_per_frame;
 };
 
 struct OFDM {
+    struct OFDM_CONFIG config;
+    
+    /*
+     * See 700D Part 4 Acquisition blog post and ofdm_dev.m routines
+     * for how this was set
+     */
+    float timing_mx_thresh;
+    
+    int nc;
+    int ns;	/* NS-1 = data symbols between pilots  */
+    int bps; 	/* Bits per symbol */
+    int m; 	/* duration of each symbol in samples */
+    int ncp; 	/* duration of CP in samples */
+
+    int ftwindowwidth;
+    int bitsperframe;
+    int rowsperframe;
+    int samplesperframe;
+    int max_samplesperframe;
+    int nrxbuf;
+    int ntxtbits; /* reserve bits/frame for aux text information */
+    int nuwbits; /* Unique word used for positive indication of lock */
+
+    float tx_centre; /* TX Center frequency */
+    float rx_centre; /* RX Center frequency */
+    float fs; /* Sample rate */
+    float ts; /* Symbol cycle time */
+    float rs; /* Symbol rate */
+    float tcp; /* Cyclic prefix duration */
+    float inv_m; /* 1/m */
+    float tx_nlower; /* TX lowest carrier freq */
+    float rx_nlower; /* RX lowest carrier freq */
+    float doc; /* division of radian circle */
+    
     // Pointers
 
-    struct quisk_cfFilter *ofdm_tx_bpf;
+    struct quisk_cfFilter *tx_bpf;
     
     complex float *pilot_samples;
     complex float *rxbuf;

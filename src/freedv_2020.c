@@ -40,18 +40,15 @@ void freedv_2020_open(struct freedv *f, struct freedv_advanced *adv) {
     f->snr_squelch_thresh = 4.0;
     f->squelch_en = 0;
         
-    f->ofdm_config = (struct OFDM_CONFIG *) CALLOC(1, sizeof (struct OFDM_CONFIG));
-    assert(f->ofdm_config != NULL);
-        
-    f->ofdm = ofdm_create(f->ofdm_config);
-    FREE(f->ofdm_config);
-
     /* Get a copy of the 700D modem config as template then modify for 2020 */
-    f->ofdm_config = ofdm_get_config_param();
+    f->ofdm = ofdm_create(NULL);
+    struct OFDM_CONFIG ofdm_config;
+    memcpy(&ofdm_config, ofdm_get_config_param(f->ofdm), sizeof(ofdm_config));
     ofdm_destroy(f->ofdm);
-    f->ofdm_config->nc = 31; int data_bits_per_frame = 312;
-    f->ofdm_config->ts = 0.0205;
-    f->ofdm = ofdm_create(f->ofdm_config);
+    
+    ofdm_config.nc = 31; int data_bits_per_frame = 312;
+    ofdm_config.ts = 0.0205;
+    f->ofdm = ofdm_create(&ofdm_config);
             
     f->ldpc = (struct LDPC*)MALLOC(sizeof(struct LDPC));
     assert(f->ldpc != NULL);
@@ -60,7 +57,7 @@ void freedv_2020_open(struct freedv *f, struct freedv_advanced *adv) {
     set_data_bits_per_frame(f->ldpc, data_bits_per_frame, f->ofdm_config->bps);
     int coded_syms_per_frame = f->ldpc->coded_syms_per_frame;
         
-    f->ofdm_bitsperframe = ofdm_get_bits_per_frame();
+    f->ofdm_bitsperframe = ofdm_get_bits_per_frame(f->ofdm);
     f->ofdm_nuwbits = (f->ofdm_config->ns - 1) * f->ofdm_config->bps - f->ofdm_config->txtbits;
     f->ofdm_ntxtbits = f->ofdm_config->txtbits;
     assert(f->ofdm_nuwbits == 10);
@@ -101,10 +98,10 @@ void freedv_2020_open(struct freedv *f, struct freedv_advanced *adv) {
         f->codeword_amps[i] = 0.0;
     }
 
-    f->nin = f->nin_prev = ofdm_get_samples_per_frame();
-    f->n_nat_modem_samples = ofdm_get_samples_per_frame();
-    f->n_nom_modem_samples = ofdm_get_samples_per_frame();
-    f->n_max_modem_samples = ofdm_get_max_samples_per_frame();
+    f->nin = f->nin_prev = ofdm_get_samples_per_frame(f->ofdm);
+    f->n_nat_modem_samples = ofdm_get_samples_per_frame(f->ofdm);
+    f->n_nom_modem_samples = ofdm_get_samples_per_frame(f->ofdm);
+    f->n_max_modem_samples = ofdm_get_max_samples_per_frame(f->ofdm);
     f->modem_sample_rate = f->ofdm_config->fs;
     f->clip = 0;
     f->sz_error_pattern = f->ofdm_bitsperframe;

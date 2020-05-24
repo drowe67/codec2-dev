@@ -62,10 +62,7 @@ static COMP S_matrix[] = {
     {-1.0f,  0.0f}
 };
          
-/* static variables */
-
-static struct OFDM *ofdm;
-static struct OFDM_CONFIG *ofdm_config;
+/* constants we use a lot and don't want to have to deference all the time  */
 
 static float ofdm_tx_centre;        /* TX Center frequency */
 static float ofdm_rx_centre;        /* RX Center frequency */
@@ -157,6 +154,8 @@ int main(int argc, char *argv[])
 {
     int opt_Nc = 0;
     int ldpc_enable = 1;
+    struct OFDM *ofdm;
+    struct OFDM_CONFIG *ofdm_config;
    
     static struct option long_options[] = {
         {"nc",       required_argument, 0, 'n'},
@@ -184,30 +183,20 @@ int main(int argc, char *argv[])
     
     // init once to get a copy of default config params
 
-    // start off with NULL config
-    struct OFDM_CONFIG *ofdm_config_default;
-    if ((ofdm_config_default = (struct OFDM_CONFIG *) calloc(1, sizeof (struct OFDM_CONFIG))) == NULL) {
-        fprintf(stderr, "Out of Memory\n");
-        exit(1);
-    }
-
-    //printf("ofdm_create() 1\n");
-    ofdm_config_default->nc = 0;                  // signal ofdm_create we want defaults
-    ofdm = ofdm_create(ofdm_config_default);
-    assert(ofdm != NULL);
-    
-    /* Get a copy of the default modem config */
-    memcpy(ofdm_config_default, ofdm_get_config_param(), sizeof(struct OFDM_CONFIG));
+    ofdm = ofdm_create(NULL);
+    assert(ofdm != NULL);    
+    struct OFDM_CONFIG ofdm_config_default;
+    memcpy(&ofdm_config_default, ofdm_get_config_param(ofdm), sizeof(struct OFDM_CONFIG));
     ofdm_destroy(ofdm);
 
     // now do a little customisation on default config, and re-create modem instance
            
     if (opt_Nc)
-       ofdm_config_default->nc = opt_Nc;
+       ofdm_config_default.nc = opt_Nc;
     //printf("ofdm_create() 2\n");
-    ofdm = ofdm_create(ofdm_config_default);
+    ofdm = ofdm_create(&ofdm_config_default);
     assert(ofdm != NULL);
-    ofdm_config = ofdm_get_config_param();
+    ofdm_config = ofdm_get_config_param(ofdm);
     
     // make local copies for convenience
     ofdm_tx_centre = ofdm_config->tx_centre;
@@ -216,17 +205,17 @@ int main(int argc, char *argv[])
     ofdm_ts = ofdm_config->ts;
     ofdm_rs = ofdm_config->rs;
     ofdm_tcp = ofdm_config->tcp;
-    ofdm_timing_mx_thresh = ofdm_config->ofdm_timing_mx_thresh;
+    ofdm_timing_mx_thresh = ofdm_config->timing_mx_thresh;
     ofdm_nc = ofdm_config->nc;
     ofdm_ns = ofdm_config->ns;
     ofdm_bps = ofdm_config->bps;
     ofdm_m = (int) (ofdm_config->fs / ofdm_config->rs);
     ofdm_ncp = (int) (ofdm_config->tcp * ofdm_config->fs);
     ofdm_ftwindowwidth = ofdm_config->ftwindowwidth;
-    ofdm_bitsperframe = ofdm_get_bits_per_frame();
+    ofdm_bitsperframe = ofdm_get_bits_per_frame(ofdm);
     ofdm_rowsperframe = ofdm_bitsperframe / (ofdm_config->nc * ofdm_config->bps);
-    ofdm_samplesperframe = ofdm_get_samples_per_frame();
-    ofdm_max_samplesperframe = ofdm_get_max_samples_per_frame();
+    ofdm_samplesperframe = ofdm_get_samples_per_frame(ofdm);
+    ofdm_max_samplesperframe = ofdm_get_max_samples_per_frame(ofdm);
     ofdm_rxbuf = 3 * ofdm_samplesperframe + 3 * (ofdm_m + ofdm_ncp);
     ofdm_ntxtbits = ofdm_config->txtbits;
     ofdm_nuwbits = (ofdm_config->ns - 1) * ofdm_config->bps - ofdm_config->txtbits;

@@ -140,22 +140,11 @@ int main(int argc, char *argv[])
     if (verbose)
         fprintf(stderr, "Nframes: %d\n", Nframes);
 
-    // Build Default OFDM and LDPC to get sizes
-
-    if ((ofdm_config = (struct OFDM_CONFIG *) calloc(1, sizeof (struct OFDM_CONFIG))) == NULL) {
-	printf("Out of Memory");
-	exit(-1);
-    }
-
-    ofdm = ofdm_create(ofdm_config);
+    ofdm = ofdm_create(NULL);
     assert(ofdm != NULL);
+    ofdm_config = ofdm_get_config_param(ofdm);
 
-    free(ofdm_config);
-
-    /* Get a copy of the actual modem config */
-    ofdm_config = ofdm_get_config_param();
-
-    ofdm_bitsperframe = ofdm_get_bits_per_frame();
+    ofdm_bitsperframe = ofdm_get_bits_per_frame(ofdm);
     ofdm_nuwbits = (ofdm_config->ns - 1) * ofdm_config->bps - ofdm_config->txtbits;
     ofdm_ntxtbits = ofdm_config->txtbits;
 
