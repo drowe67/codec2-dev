@@ -18,9 +18,7 @@ function states = fsk_horus_init(Fs,Rs,M=2)
   % Freq. estimator limits - keep these narrow to stop errors with low SNR 4FSK
 
   states.fest_fmin = 300;
-  states.fest_fmax = 2200;
-  states.fest_min_spacing = 100;
-
+  states.fest_fmax = 2800;
 endfunction
 
 
@@ -336,7 +334,6 @@ function run_sim(test_frame_mode, M=2, frames = 10, EbNodB = 100, filename="fsk_
   if test_frame_mode < 4
     % horus rtty config ---------------------
     states = fsk_horus_init(8000, 50, M);
-    %states = fsk_horus_init_hbr(8000, 10, 400, 4); % EME
   end
 
   if test_frame_mode == 4
@@ -357,22 +354,15 @@ function run_sim(test_frame_mode, M=2, frames = 10, EbNodB = 100, filename="fsk_
 
   if test_frame_mode == 6
     % horus high speed ---------------------
-    states = fsk_horus_init_hbr(9600, 8, 1200, 2, 16);
+    states = fsk_horus_init(Fs=9600, Rs=1200, M=2, P=8, nsym=16);
     states.tx_bits_file = "horus_high_speed.bin";
   end
 
   % Tones must be at least Rs apart for ideal non-coherent FSK
 
-  #{
-  if states.M == 2
-    states.ftx = 1200 + [ 0 2*states.Rs ];
-  else
-    states.ftx = 1200 + 2*states.Rs*(1:4);
-    %states.ftx = 200 + states.Rs*(1:4); % EME
-  end
-  #}
   states.ftx = 900 + 2*states.Rs*(1:states.M);
-
+  states.tx_tone_separation = states.ftx(2) - states.ftx(1);
+  
   % ----------------------------------------------------------------------
 
   states.verbose = 0x1;
@@ -611,15 +601,16 @@ function run_sim(test_frame_mode, M=2, frames = 10, EbNodB = 100, filename="fsk_
  endfunction
 
 
-% demodulate a file of 8kHz 16bit short samples --------------------------------
+% ---------------------------------------------------------------------
+% demodulate from a user-supplied file
+% ---------------------------------------------------------------------
 
-function rx_bits_log = demod_file(filename, test_frame_mode=4, noplot=0, EbNodB=100)
+function rx_bits_log = demod_file(filename, test_frame_mode=4, noplot=0, EbNodB=100, max_frames=1E32)
   fin = fopen(filename,"rb"); 
   more off;
-  read_complex = 0; shift_fs_on_4 = 0;
+  read_complex = 0; sample_size = 'int16'; shift_fs_on_4 = 0;
+  max_frames
   
-  %states = fsk_horus_init(96000, 1200);
-
   if test_frame_mode == 4
     % horus rtty config ---------------------
     states = fsk_horus_init(8000, 100, 2);
@@ -638,7 +629,7 @@ function rx_bits_log = demod_file(filename, test_frame_mode=4, noplot=0, EbNodB=
 
   if test_frame_mode == 6
     % Horus high speed config --------------
-    states = fsk_horus_init_hbr(9600, 8, 1200, 2, 16);
+    states = fsk_horus_init(Fs=9600, Rs=1200, M=2,  P=8, nsym=16);
     states.tx_bits_file = "horus_high_speed.bin";
     states.verbose += 0x4;
     ftmp = fopen(states.tx_bits_file, "rb"); test_frame = fread(ftmp,Inf,"char")'; fclose(ftmp);
@@ -648,7 +639,7 @@ function rx_bits_log = demod_file(filename, test_frame_mode=4, noplot=0, EbNodB=
 
   if test_frame_mode == 7
     % 800XA 4FSK modem --------------
-    states = fsk_init_hbr(8000, 10, 400, 4, 256);
+    states = fsk_init(Fs=8000, Rs=400, M=4, P=10, nsym=256);
     states.tx_bits_file = "horus_high_speed.bin";
     states.verbose += 0x4;
     ftmp = fopen(states.tx_bits_file, "rb"); test_frame = fread(ftmp,Inf,"char")'; fclose(ftmp);
@@ -658,7 +649,7 @@ function rx_bits_log = demod_file(filename, test_frame_mode=4, noplot=0, EbNodB=
 
   if test_frame_mode == 8
     % test RS41 type balllon telemetry --------------
-    states = fsk_init_hbr(96000, 10, 4800, 2, 16);
+    states = fsk_init(96000, 4800, 2, 10, 16);
     states.fest_fmin = 1000;
     states.fest_fmax = 40000;
     states.fest_min_spacing = 1000;
@@ -672,6 +663,18 @@ function rx_bits_log = demod_file(filename, test_frame_mode=4, noplot=0, EbNodB=
     shift_fs_on_4 = 1; % get samples into range of current freq estimator
   end
 
+  if test_frame_mode == 9
+    % Wenet high speed SSTV, we can just check raw demo here ---------------------
+    % despite the high sample rate the modem sees this as a 8:1 Fs/Rs configuration
+    states = fsk_init(8000, 1000, 2);
+    states.tx_tone_separation = 1000;
+    states.ntestframebits = (256+2+65)*8+40; % from src/drs232_lpc.c
+    states.freq_est_type = 'mask';
+    read_complex=1; sample_size = 'uint8'; 
+    printf("Wenet mode: ntestframebits: %d freq_est_type: %s\n", states.ntestframebits, states.freq_est_type);
+    %states.verbose = 0x8;
+  end
+                               
   N = states.N;
   P = states.P;
   Rs = states.Rs;
@@ -686,17 +689,17 @@ function rx_bits_log = demod_file(filename, test_frame_mode=4, noplot=0, EbNodB=
   f_int_resample_log = [];
   EbNodB_log = [];
   ppm_log = [];
-  f_log = [];
+  f_log = []; Sf_log = [];
+  
   rx_bits_buf = zeros(1,nbit + states.ntestframebits);
 
   % optional noise.  Useful for testing performance of waveforms from real world modulators
-
+  % we need to pre-read the file to estimate the signal power
+  ftmp = fopen(filename,"rb"); s = fread(ftmp,Inf,sample_size); fclose(ftmp);
+  if sample_size == "uint8" s = (s - 127)/128; end
+  if read_complex s = s(1:2:end) + j*s(2:2:end); end
+  tx_pwr = var(s);
   EbNo = 10^(EbNodB/10);
-  ftmp = fopen(filename,"rb"); s = fread(ftmp,Inf,"short");
-  if read_complex
-    s = s(1:2:end) + j*s(2:2:end);
-  end
-  fclose(ftmp); tx_pwr = var(s);
   variance = (tx_pwr/2)*states.Fs/(states.Rs*EbNo*states.bitspersymbol);
 
   % First extract raw bits from samples ------------------------------------------------------
@@ -710,7 +713,8 @@ function rx_bits_log = demod_file(filename, test_frame_mode=4, noplot=0, EbNodB=
 
     nin = states.nin;
     if read_complex
-      [sf count] = fread(fin, 2*nin, "short");
+      [sf count] = fread(fin, 2*nin, sample_size);
+      if sample_size == "uint8" sf = (sf - 127)/128; end
       sf = sf(1:2:end) + j*sf(2:2:end);
       count /= 2;
       if shift_fs_on_4
@@ -738,7 +742,7 @@ function rx_bits_log = demod_file(filename, test_frame_mode=4, noplot=0, EbNodB=
       % demodulate to stream of bits
 
       states = est_freq(states, sf, states.M);
-      %states.f = [1450 1590 1710 1850];
+      if states.freq_est_type == 'mask' states.f = states.f2; end
       [rx_bits states] = fsk_demod(states, sf);
 
       rx_bits_buf(1:states.ntestframebits) = rx_bits_buf(nbit+1:states.ntestframebits+nbit);
@@ -751,7 +755,8 @@ function rx_bits_log = demod_file(filename, test_frame_mode=4, noplot=0, EbNodB=
       EbNodB_log = [EbNodB_log states.EbNodB];
       ppm_log = [ppm_log states.ppm];
       f_log = [f_log; states.f];
-
+      Sf_log = [Sf_log; states.Sf'];
+      
       if (test_frame_mode == 1)
         states = ber_counter(states, test_frame, rx_bits_buf);
         if states.ber_state == 1
@@ -764,6 +769,9 @@ function rx_bits_log = demod_file(filename, test_frame_mode=4, noplot=0, EbNodB=
      else      
       finished = 1;
     end
+
+    if frames > max_frames finished=1; end
+      
   end
   printf("frames: %d\n", frames);
   fclose(fin);
@@ -771,7 +779,7 @@ function rx_bits_log = demod_file(filename, test_frame_mode=4, noplot=0, EbNodB=
   if noplot == 0
     printf("plotting...\n");
 
-    figure(1);
+    figure(1); clf;
     plot(f_log);
     title('Tone Freq Estimates');
     
@@ -779,8 +787,7 @@ function rx_bits_log = demod_file(filename, test_frame_mode=4, noplot=0, EbNodB=
     plot(f_int_resample_log','+')
     title('Integrator outputs for each tone');
 
-    figure(3)
-    clf
+    figure(3); clf
     subplot(211)
     plot(norm_rx_timing_log)
     axis([1 frames -0.5 0.5])
@@ -789,32 +796,32 @@ function rx_bits_log = demod_file(filename, test_frame_mode=4, noplot=0, EbNodB=
     plot(states.nerr_log)
     title('num bit errors each frame')
  
-    figure(4)
-    clf
+    figure(4); clf
     plot(EbNodB_log);
     title('Eb/No estimate')
 
-    figure(5)
-    clf
-    rx_nowave = rx(1000:length(rx));
+    figure(5); clf
+    rx_nowave = rx(1000:length(rx)); % skip past wav header if it's a wave file
     subplot(211)
     plot(real(rx_nowave));
     title('input signal to demod (1 sec)')
     xlabel('Time (samples)');
     %axis([1 states.Fs -35000 35000])
 
-    % normalise spectrum to 0dB full scale with a 32767 sine wave input
-
-    subplot(212)
-    RxdBFS = 20*log10(abs(fft(rx_nowave(1:states.Fs)))) - 20*log10((states.Fs/2)*32767);
+    % normalise spectrum to 0dB full scale with sine wave input
+    subplot(212);
+    if sample_size == "int16" max_value = 32767; end
+    if sample_size == "uint8" max_value = 127; end
+    RxdBFS = 20*log10(abs(fft(rx_nowave(1:states.Fs)))) - 20*log10((states.Fs/2)*max_value);
     plot(RxdBFS)
     axis([1 states.Fs/2 -80 0])
     xlabel('Frequency (Hz)');
 
-    figure(6);
-    clf
+    figure(6); clf
     plot(ppm_log)
     title('Sample clock (baud rate) offset in PPM');
+
+    figure(7); clf; mesh(Sf_log(1:10,:));
   end
 
   if (test_frame_mode == 1) || (test_frame_mode == 6)
@@ -846,7 +853,7 @@ endfunction
 % Over the years this modem has been used for many different FSK signals ...
 
 if exist("fsk_horus_as_a_lib") == 0
-  %run_sim(4, 2, 30, 10);
+  run_sim(test_frame_mode=4, M=2, frames=30, EbNodB = 20);
   %run_sim(5, 4, 30, 100);
   %rx_bits = demod_file("~/Desktop/115.wav",6,0,90);
   %rx_bits = demod_file("~/Desktop/fsk_800xa_rx_hackrf.wav",7);
@@ -865,5 +872,5 @@ if exist("fsk_horus_as_a_lib") == 0
   %rx_bits = demod_file("mp.raw",4);
   %rx_bits = demod_file("~/Desktop/launchbox_v2_landing_8KHz_final.wav",4);
   %rx_bits = demod_file("~/Desktop/fsk_800xa.wav",7);
-  rx_bits = demod_file("~/Desktop/rs41_96k_10s.iq16",8);
+  %rx_bits = demod_file("~/Desktop/rs41_96k_10s.iq16",8);
 end

@@ -75,14 +75,14 @@ int8_t uw_horus_binary[] = {
     0,0,1,0,0,1,0,0 
 };
 
-struct horus *horus_open (int mode) {
+struct horus *horus_open (int mode, int Rs) {
     int i;
     assert((mode == HORUS_MODE_RTTY) || (mode == HORUS_MODE_BINARY));
 
     struct horus *hstates = (struct horus *)malloc(sizeof(struct horus));
     assert(hstates != NULL);
 
-    hstates->Fs = 48000; hstates->Rs = 100; hstates->verbose = 0; hstates->mode = mode;
+    hstates->Fs = 48000; hstates->Rs = Rs; hstates->verbose = 0; hstates->mode = mode;
 
     if (mode == HORUS_MODE_RTTY) {
         hstates->mFSK = 2;
@@ -372,8 +372,7 @@ int horus_rx(struct horus *hstates, char ascii_out[], short demod_in[], int quad
     /* demodulate latest bits */
 
     /* Note: allocating this array as an automatic variable caused OSX to
-       "Bus Error 10" (segfault), so lets malloc() it. TODO: A real
-       short sample option for fsk_demod() would be useful */
+       "Bus Error 10" (segfault), so lets malloc() it. */
     
     COMP *demod_in_comp = (COMP*)malloc(sizeof(COMP)*hstates->fsk->nin);
     
@@ -451,6 +450,7 @@ int horus_get_max_ascii_out_len(struct horus *hstates) {
     }
     if (hstates->mode == HORUS_MODE_BINARY) {
         return (HORUS_BINARY_NUM_PAYLOAD_BYTES*2+1);     /* Hexadecimal encoded */
+        //return HORUS_BINARY_NUM_PAYLOAD_BYTES;
     }
     assert(0); /* should never get here */
     return 0;
@@ -510,7 +510,6 @@ void horus_set_total_payload_bits(struct horus *hstates, int val) {
 
 void horus_set_freq_est_limits(struct horus *hstates, float fsk_lower, float fsk_upper) {
     assert(hstates != NULL);
-    assert(fsk_lower> 0);
     assert(fsk_upper > fsk_lower);
     hstates->fsk->est_min = fsk_lower;
     hstates->fsk->est_max = fsk_upper;    

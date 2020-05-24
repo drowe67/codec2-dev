@@ -13,9 +13,6 @@
 
 #define MAX_ERRORS        32
 
-static struct OFDM        *ofdm;
-static struct OFDM_CONFIG *ofdm_config;
-
 static int ofdm_bitsperframe;
 static int ofdm_rowsperframe;
 static int ofdm_nuwbits;
@@ -29,7 +26,7 @@ static int ofdm_m;
 static int ofdm_ncp;
 
 // Forwards
-void run_modem();
+void run_modem(struct OFDM *ofdm, int tx_bits[], int rx_bits[], COMP tx_rx[]);
 void dummy_code();
 
 /////////////////////////////////////////////////////////////
@@ -40,27 +37,22 @@ int main(int argc, char *argv[]) {
     int dummy = 0;  // flag to use dummy code
     int frames = 1; // how many frames
     int print = 0;  // flag to print all bits
+    struct OFDM        *ofdm;
+    struct OFDM_CONFIG *ofdm_config;
 
-    if ((ofdm_config = (struct OFDM_CONFIG *) calloc(1, sizeof (struct OFDM_CONFIG))) == NULL) {
-        fprintf(stderr, "Out of Memory\n");
-        exit(1);
-    }
-
-    ofdm = ofdm_create(ofdm_config);
+    ofdm = ofdm_create(NULL);
     assert(ofdm != NULL);
-
-    free(ofdm_config);
 
     /* Get a copy of the actual modem config */
 
-    ofdm_config = ofdm_get_config_param();
+    ofdm_config = ofdm_get_config_param(ofdm);
 
     ofdm_m = (int) (ofdm_config->fs / ofdm_config->rs);
     ofdm_ncp = (int) (ofdm_config->tcp * ofdm_config->fs);
-    ofdm_bitsperframe = ofdm_get_bits_per_frame();
+    ofdm_bitsperframe = ofdm_get_bits_per_frame(ofdm);
     ofdm_rowsperframe = ofdm_bitsperframe / (ofdm_config->nc * ofdm_config->bps);
-    ofdm_samplesperframe = ofdm_get_samples_per_frame();
-    ofdm_max_samplesperframe = ofdm_get_max_samples_per_frame();
+    ofdm_samplesperframe = ofdm_get_samples_per_frame(ofdm);
+    ofdm_max_samplesperframe = ofdm_get_max_samples_per_frame(ofdm);
     ofdm_rxbuf = 3 * ofdm_samplesperframe + 3 * (ofdm_m + ofdm_ncp);
     ofdm_nuwbits = (ofdm_config->ns - 1) * ofdm_config->bps - ofdm_config->txtbits;
     ofdm_ntxtbits = ofdm_config->txtbits;
@@ -101,7 +93,7 @@ int main(int argc, char *argv[]) {
         if (dummy) {
             dummy_code(tx_bits, rx_bits);
         } else {
-            run_modem(tx_bits, rx_bits, tx_rx);
+            run_modem(ofdm, tx_bits, rx_bits, tx_rx);
         }
 
         ////////
@@ -143,7 +135,7 @@ int main(int argc, char *argv[]) {
 
 
 //////////////////////////////////
-void run_modem(int tx_bits[], int rx_bits[], COMP tx_rx[]) {
+void run_modem(struct OFDM *ofdm, int tx_bits[], int rx_bits[], COMP tx_rx[]) {
     int mod_bits[ofdm_samplesperframe];
     int i, j;
 

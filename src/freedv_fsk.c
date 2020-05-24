@@ -30,7 +30,7 @@ void freedv_2400a_open(struct freedv *f) {
     f->n_protocol_bits = 20;
     f->deframer = fvhff_create_deframer(FREEDV_VHF_FRAME_A,0);
     assert(f->deframer != NULL);  
-    f->fsk = fsk_create_hbr(48000,1200,10,4,1200,1200);
+    f->fsk = fsk_create_hbr(48000,1200,4,10,FSK_DEFAULT_NSYM,1200,1200);
     assert(f->fsk != NULL);
         
     /* Note: fsk expects tx/rx bits as an array of uint8_ts, not ints */
@@ -88,9 +88,8 @@ void freedv_2400b_open(struct freedv *f) {
 void freedv_800xa_open(struct freedv *f) {
     f->deframer = fvhff_create_deframer(FREEDV_HF_FRAME_B,0);
     assert(f->deframer != NULL);
-    f->fsk = fsk_create_hbr(8000,400,10,4,800,400);
+    f->fsk = fsk_create_hbr(8000,400,4,10,32,800,400);
     assert(f->fsk != NULL);
-    fsk_set_nsym(f->fsk,32);
         
     f->tx_bits = (int*)MALLOC(f->fsk->Nbits*sizeof(uint8_t));
     assert(f->fsk != NULL);

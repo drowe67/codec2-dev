@@ -5,17 +5,7 @@
   DATE CREATED: May 2015
 
   Channel impairment program for testing command line versions of
-  cohpsk modem.
-
-  TODO:
-    [ ] measure and prints pwrs to check, prints warning
-    [ ] SNR in 3000Hz input
-    [ ] example operation with sox for sample rate change
-    [ ] way to calibrate for different input pwrs
-    [ ] HT to do real->complex
-        [ ] check no BER hit just through HT
-        [ ] unit test HT
-    [ ] clipping detect
+  cohpsk (and other) modems.
 
 \*---------------------------------------------------------------------------*/
 
@@ -94,8 +84,8 @@ int main(int argc, char *argv[])
     float          htbuf[HT_N+BUF_N];
     COMP           ch_in[BUF_N];
     COMP           ch_fdm[BUF_N];
-    float          ssbfiltbuf[SSBFILT_N+BUF_N];
-    float          ssbfiltout[BUF_N];
+    COMP           ssbfiltbuf[SSBFILT_N+BUF_N];
+    COMP           ssbfiltout[BUF_N];
 
     COMP           phase_ch;
     int            noise_r, noise_end;
@@ -104,7 +94,7 @@ int main(int argc, char *argv[])
     float          hf_gain;
     COMP          *ch_fdm_delay = NULL, aspread, aspread_2ms, delayed, direct;
     float          tx_pwr, tx_pwr_fade, noise_pwr;
-    int            frames, i, j, k, arg, Fs, ret, clipped, ssbfilt_en;
+    int            frames, i, j, k, arg, Fs, ret, clipped, ssbfilt_en, complex_out;
     float          sam, peak, inclip, papr, CNo, snr3k;
   
     if (argc > 3) {
@@ -151,6 +141,10 @@ int main(int argc, char *argv[])
         if ((arg = opt_exists(argv, argc, "--ssbfilt"))) {
             ssbfilt_en = atof(argv[arg+1]);
         }
+        complex_out = 0;
+        if ((arg = opt_exists(argv, argc, "--complexout"))) {
+            complex_out = 1;
+        }
         raw_dir = strdup(DEFAULT_RAW_DIR);
         if ((arg = opt_exists(argv, argc, "--raw_dir"))) {
 	    FREE(raw_dir);
@@ -159,12 +153,12 @@ int main(int argc, char *argv[])
     }
     else {
         fprintf(stderr, "usage: %s InputRealModemRawFile OutputRealModemRawFile No(dB/Hz) [--Fs SampleRateHz]"
-                        " [-f FoffHz] [--slow] [--fast] [--faster] [--clip 0to1] [--ssbfilt 0|1] [--raw_dir Path]\n", argv[0]);
+                        " [-f FoffHz] [--slow] [--fast] [--faster] [--clip 0to1] [--ssbfilt 0|1] [--raw_dir Path] [--complexout]\n", argv[0]);
         exit(1);
     }
     fprintf(stderr, "cohpsk_ch ----------------------------------------------------------------------------------\n");
-    fprintf(stderr, "Fs: %d NodB: %4.2f foff: %4.2f Hz fading: %d inclip: %4.2f ssbfilt: %d\n",
-            Fs, NodB, foff_hz, fading_en, inclip, ssbfilt_en);
+    fprintf(stderr, "Fs: %d NodB: %4.2f foff: %4.2f Hz fading: %d inclip: %4.2f ssbfilt: %d complexout: %d\n",
+            Fs, NodB, foff_hz, fading_en, inclip, ssbfilt_en, complex_out);
     fprintf(stderr, "cohpsk_ch ----------------------------------------------------------------------------------\n");
 
     phase_ch.real = 1.0; phase_ch.imag = 0.0;
@@ -233,7 +227,7 @@ int main(int argc, char *argv[])
         htbuf[i] = 0.0;
     }
     for(i=0; i<SSBFILT_N; i++) {
-        ssbfiltbuf[i] = 0.0;
+        ssbfiltbuf[i].real = 0.0; ssbfiltbuf[i].imag = 0.0;
     }
 
     /* --------------------------------------------------------*\
@@ -354,40 +348,41 @@ int main(int argc, char *argv[])
            SSB sounds realistic. */
 
         for(i=0, j=SSBFILT_N; i<BUF_N; i++,j++) {
-            ssbfiltbuf[j] = ch_fdm[i].real;
+            ssbfiltbuf[j] = ch_fdm[i];
             if (ssbfilt_en) {
-                ssbfiltout[i] = 0.0;
+                ssbfiltout[i].real = 0.0; ssbfiltout[i].imag = 0.0;
                 for(k=0; k<SSBFILT_N; k++) {
-                    ssbfiltout[i] += ssbfiltbuf[j-k]*ssbfilt_coeff[k];
+                    ssbfiltout[i].real += ssbfiltbuf[j-k].real*ssbfilt_coeff[k];
+                    ssbfiltout[i].imag += ssbfiltbuf[j-k].imag*ssbfilt_coeff[k];
                 }
             }
             else {
-                ssbfiltout[i] = ch_fdm[i].real;
+                ssbfiltout[i] = ch_fdm[i];
             }
         }
 
         /* update SSB filter memory */
-
         for(i=0; i<SSBFILT_N; i++)
            ssbfiltbuf[i] = ssbfiltbuf[i+BUF_N];
 
 	/* scale and save to disk as shorts */
-
+        int nout = (complex_out+1)*BUF_N;
+        short bufout[nout], *pout=bufout;
 	for(i=0; i<BUF_N; i++) {
-            sam = FDMDV_SCALE * ssbfiltout[i];
-            if (sam > 32767.0) {
-                clipped++;
-                sam = 32767.0;
+            sam = FDMDV_SCALE * ssbfiltout[i].real;
+            if (sam >  32767.0) { clipped++; sam = 32767.0; }
+            if (sam < -32767.0) { clipped++; sam = -32767.0; }
+	    *pout++ = sam;
+            if (complex_out) {
+                sam = FDMDV_SCALE * ssbfiltout[i].imag;
+                if (sam >  32767.0) { clipped++; sam = 32767.0; }
+                if (sam < -32767.0) { clipped++; sam = -32767.0; }
+                *pout++ = sam;
             }
-            if (sam < -32767.0) {
-                clipped++;
-                sam = -32767.0;
-            }
-	    buf[i] = sam;
         }
 
- 	fwrite(buf, sizeof(short), BUF_N, fout);
-
+ 	fwrite(bufout, sizeof(short), nout, fout);
+        
 	/* if this is in a pipeline, we probably don't want the usual
 	   buffering to occur */
 

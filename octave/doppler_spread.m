@@ -9,16 +9,16 @@ function [spread_FsHz states] = doppler_spread(dopplerSpreadHz, FsHz, Nsam)
   % start with low Fs so we can work with a reasonable filter length
 
   sigma = dopplerSpreadHz/2;
-  lowFs = 10*dopplerSpreadHz;
+  lowFs = ceil(10*dopplerSpreadHz);
   Ntaps = 100;
   Nsam_low = Nsam*lowFs/FsHz + Ntaps; % fill filter memory
 
   % generate gaussian freq response and design filter
 
-  x = 0:0.1:lowFs/2;
+  x = 0:lowFs/100:lowFs/2;
   y = (1/(sigma*sqrt(2*pi)))*exp(-(x.^2)/(2*sigma*sigma));
   b = fir2(Ntaps-1, x/(lowFs/2), y);
-
+  
   % generate the spreading samples
 
   spread_lowFs = filter(b,1,randn(1,Nsam_low) + j*randn(1,Nsam_low));

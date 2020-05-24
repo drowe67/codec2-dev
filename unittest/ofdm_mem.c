@@ -36,27 +36,16 @@
 #include "codec2_ofdm.h"
 #include "ofdm_internal.h"
 
-static struct OFDM_CONFIG *ofdm_config;
-static struct OFDM *ofdm;
-
 int main()
 {
-    /*
-     * This should create a config of defaults
-     */
+    struct OFDM_CONFIG *ofdm_config;
+    struct OFDM *ofdm;
 
-    if ((ofdm_config = (struct OFDM_CONFIG *) calloc(1, sizeof (struct OFDM_CONFIG))) == NULL) {
-        fprintf(stderr, "Out of Memory\n");
-        exit(1);
-    }
-
-    ofdm = ofdm_create(ofdm_config);
+    ofdm = ofdm_create(NULL);
     assert(ofdm != NULL);
 
-    free(ofdm_config);
-
     /* Get a copy of the actual modem config */
-    ofdm_config = ofdm_get_config_param();
+    ofdm_config = ofdm_get_config_param(ofdm);
 
     int ofdm_m = (int) (ofdm_config->fs / ofdm_config->rs); /* 144 */
     int ofdm_ncp = (int) (ofdm_config->tcp * ofdm_config->fs); /* 16 */
