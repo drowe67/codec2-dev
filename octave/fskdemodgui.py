@@ -9,14 +9,41 @@
 #	updates at about 10Hz. Anything faster will fill up the input queue and be discarded.
 #
 #	Call using: 
-#	<producer>| ./fsk_demod 2X 8 923096 115387 - - S 2> >(python ~/Dev/codec2-dev/octave/fskdemodgui.py) | <consumer>
+#	<producer>| ./fsk_demod --cu8 -s --stats=100 2 $SDR_RATE $BAUD_RATE - - 2> >(python fskdemodgui.py --wide) | <consumer>
+#
+#	Dependencies:
+#	* Python (written for 2.7, only tested recently on 3+)
+#	* numpy
+#	* pyqtgraph
+#	* PyQt5 (Or some Qt5 backend compatible with pyqtgraph)
 #
 #
-import sys, time, json, Queue, argparse
+import sys, time, json, argparse
 from threading import Thread
-from pyqtgraph.Qt import QtGui, QtCore
-import numpy as np
-import pyqtgraph as pg
+try:
+	from pyqtgraph.Qt import QtGui, QtCore
+except ImportError:
+	print("Could not import PyQt5 - is it installed?")
+	sys.exit(1)
+
+try:
+	import numpy as np
+except ImportError:
+	print("Could not import numpy - is it installed?")
+	sys.exit(1)
+
+try:
+	import pyqtgraph as pg
+except ImportError:
+	print("Could not import pyqtgraph - is it installed?")
+	sys.exit(1)
+
+try:
+    # Python 2
+    from Queue import Queue
+except ImportError:
+    # Python 3
+    from queue import Queue
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--wide", action="store_true", default=False, help="Alternate wide arrangement of widgets, for placement at bottom of 4:3 screen.")
@@ -28,7 +55,7 @@ history_size = 100 # 10 seconds at 10Hz...
 history_scale = np.linspace((-1*history_size+1)/float(update_rate),0,history_size)
 
 # Input queue
-in_queue = Queue.Queue(1) # 1-element FIFO... 
+in_queue = Queue(1) # 1-element FIFO... 
 
 win = pg.GraphicsWindow()
 win.setWindowTitle('FSK Demodulator Modem Statistics')
@@ -51,7 +78,7 @@ spec_plot.setLabel('bottom','FFT Bin')
 # Configure plot labels and scales.
 ebno_plot.setLabel('left','Eb/No (dB)')
 ebno_plot.setLabel('bottom','Time (seconds)')
-ebno_plot.setYRange(0,25)
+ebno_plot.setYRange(0,30)
 ppm_plot.setLabel('left','Clock Offset (ppm)')
 ppm_plot.setLabel('bottom','Time (seconds)')
 fest_plot.setLabel('left','Frequency (Hz)')
@@ -62,9 +89,9 @@ eye_plot.setXRange(0,15)
 eye_xr = 15
 
 # Data arrays...
-ebno_data = np.zeros(history_size)*np.nan
-ppm_data = np.zeros(history_size)*np.nan
-fest_data = np.zeros((4,history_size))*np.nan
+ebno_data = np.zeros(history_size)
+ppm_data = np.zeros(history_size)
+fest_data = np.zeros((4,history_size))
 
 # Curve objects, so we can update them...
 spec_curve = spec_plot.plot([0])
@@ -122,6 +149,7 @@ def update_plots():
 	fest_data[0,-1] = new_fest1
 	fest_data[1,-1] = new_fest2
 
+
 	# Update plots
 	spec_data_log = 20*np.log10(np.array(new_spec)+0.01)
 	spec_curve.setData(spec_data_log)
@@ -165,6 +193,8 @@ def read_input():
 
 	while True:
 		in_line = sys.stdin.readline()
+		if type(in_line) == bytes:
+			in_line = in_line.decode()
 
 		# Only push actual data into the queue...
 		# This stops sending heaps of empty strings into the queue when fsk_demod closes.
@@ -174,6 +204,7 @@ def read_input():
 
 		if not in_queue.full():
 			in_queue.put_nowait(in_line)
+
 
 read_thread = Thread(target=read_input)
 read_thread.daemon = True # Set as daemon, so when all other threads die, this one gets killed too.

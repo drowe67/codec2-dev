@@ -53,8 +53,9 @@ int main(int argc, char *argv[]) {
     float    loop_time;
     int      enable_stats = 0;
     int      quadrature = 0;
-    int     fsk_lower = -1;
-    int     fsk_upper = -1;
+    int fsk_lower = -1;
+    int fsk_upper = -1;
+    int Rs = 100;
 
     stats_loop = 0;
     stats_rate = 8;
@@ -67,9 +68,10 @@ int main(int argc, char *argv[]) {
         static struct option long_opts[] = {
             {"help",      no_argument,        0, 'h'},
             {"mode",      required_argument,  0, 'm'},
+            {"rate",      optional_argument,  0, 'r'},
             {"stats",     optional_argument,  0, 't'},
-            {"fsk_lower", required_argument,  0, 'b'},
-            {"fsk_upper", required_argument,  0, 'u'},
+            {"fsk_lower", optional_argument,  0, 'b'},
+            {"fsk_upper", optional_argument,  0, 'u'},
             {0, 0, 0, 0}
         };
         
@@ -120,6 +122,11 @@ int main(int argc, char *argv[]) {
                     fsk_upper = atoi(optarg);
                 }
                 break;
+            case 'r':
+                if (optarg != NULL){
+                    Rs = atoi(optarg);
+                }
+                break;
             break;
         }
     }
@@ -131,20 +138,19 @@ int main(int argc, char *argv[]) {
         goto helpmsg;
     }
     
-    if( (argc - dx) > 7) {
+    if( (argc - dx) > 5) {
         fprintf(stderr, "Too many arguments\n");
     helpmsg:
-        fprintf(stderr,"usage: %s -m RTTY|binary [-q] [-v] [-c] [-t [r]] [--fsk_lower FREQ] [--fsk_upper FREQ] InputModemRawFile OutputAsciiFile\n",argv[0]);
+        fprintf(stderr,"usage: %s -m RTTY|binary [-q] [-v] [-c] [-t [r]] InputModemRawFile OutputAsciiFile\n",argv[0]);
         fprintf(stderr,"\n");
         fprintf(stderr,"InputModemRawFile      48 kHz 16 bit shorts real modem signal from radio\n");
         fprintf(stderr," -m RTTY|binary\n"); 
         fprintf(stderr,"--mode=RTTY|binary     RTTY or binary Horus protcols\n");
+        fprintf(stderr,"--rate=[Rs]            Modem baud rate. Default: 100\n");
         fprintf(stderr," -t[r] --stats=[r]     Print out modem statistics to stderr in JSON.\n");
         fprintf(stderr,"                       r, if provided, sets the number of modem frames\n"
                        "                       between statistic printouts\n");
         fprintf(stderr," -q                    use stereo (IQ) input\n");
-        fprintf(stderr," --fsk_lower=FREQ      Set lower frequency estimator limit (Hz)\n");
-        fprintf(stderr," --fsk_upper=FREQ      Set upper frequency estimator limit (Hz)\n");
         fprintf(stderr," -v                    verbose debug info\n");
         fprintf(stderr," -c                    display CRC results for each packet\n");
         exit(1);
@@ -153,7 +159,7 @@ int main(int argc, char *argv[]) {
     /* Open files */
 
     if (verbose) {
-         fprintf(stderr, "mode: %d verbose: %d stats_loop: %d stats_rate: %d\n",mode, verbose, stats_loop, stats_rate);
+         fprintf(stderr, "mode: %d verbose: %d stats_loop: %d stats_rate: %d  Rs: %d\n",mode, verbose, stats_loop, stats_rate, Rs);
     }
     if (strcmp(argv[dx],"-")==0) {
         fin = stdin;
@@ -174,7 +180,7 @@ int main(int argc, char *argv[]) {
 
     /* end command line processing */
 
-    hstates = horus_open(mode);
+    hstates = horus_open(mode, Rs);
     horus_set_verbose(hstates, verbose);
     
     if (hstates == NULL) {

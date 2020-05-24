@@ -41,7 +41,6 @@
 #define NDISCARD   20
 
 static struct OFDM *ofdm;
-static struct OFDM_CONFIG *ofdm_config;
 
 int opt_exists(char *argv[], int argc, char opt[]) {
     int i;
@@ -79,20 +78,10 @@ int main(int argc, char *argv[])
         verbose = 1;
     }
 
-    if ((ofdm_config = (struct OFDM_CONFIG *) calloc(1, sizeof (struct OFDM_CONFIG))) == NULL) {
-	printf("Out of Memory");
-	exit(1);
-    }
-
-    ofdm = ofdm_create(ofdm_config);
+    ofdm = ofdm_create(NULL);
     assert(ofdm != NULL);
 
-    free(ofdm_config);
-
-    /* Get a copy of the actual modem config */
-    ofdm_config = ofdm_get_config_param();
-
-    int Nbitsperframe = ofdm_get_bits_per_frame();
+    int Nbitsperframe = ofdm_get_bits_per_frame(ofdm);
     char rx_bits[Nbitsperframe];
   
     f = Terrs = Tbits = Terrs2 = Tbits2 = 0;
