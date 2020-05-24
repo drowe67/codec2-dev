@@ -33,15 +33,22 @@
 
   3/ Generate some tx_bits as input for testing with fsk_horus:
  
-    $ gcc horus_l2.c golay23.c -o horus_l2 -Wall -DGEN_TX_BITS -DSCRAMBLER
+    $ gcc horus_l2.c golay23.c -o horus_l2 -Wall -DGEN_TX_BITS -DSCRAMBLER -DINTERLEAVER
     $ ./horus_l2
     $ more ../octave/horus_tx_bits_binary.txt
+
+  4/ Streaming test bits to stdout, for 'live' testing with fsk_mod and horus_demod:
+
+    $ gcc horus_l2.c golay23.c -o horus_l2 -Wall -DGEN_TX_BITSTREAM -DSCRAMBLER -DINTERLEAVER
+    $ cp horus_l2 ../build/src/
+    $ cd ../build/src/
+    $ ./horus_l2 100 | ./fsk_mod 4 48000 100 750 250 - - | ./horus_demod -m binary - -
    
-  4/ Unit testing interleaver:
+  5/ Unit testing interleaver:
 
     $ gcc horus_l2.c golay23.c -o horus_l2 -Wall -DINTERLEAVER -DTEST_INTERLEAVER -DSCRAMBLER
 
-  5/ Compile for use as decoder called by fsk_horus.m and fsk_horus_stream.m:
+  6/ Compile for use as decoder called by fsk_horus.m and fsk_horus_stream.m:
 
     $ gcc horus_l2.c golay23.c -o horus_l2 -Wall -DDEC_RX_BITS -DHORUS_L2_RX
 
@@ -800,6 +807,10 @@ int main(void) {
         }
     }
     fclose(f);
+    for(i=0; i<num_tx_data_bytes; i++) {
+        fprintf(stdout,"%02X", tx[i]);
+    }
+    fprintf(stdout, "\n");
 
     return 0;
 }
@@ -872,6 +883,48 @@ int main(void) {
     }
     fclose(fh);
     #endif
+
+    return 0;
+}
+#endif
+
+
+#ifdef GEN_TX_BITSTREAM
+/* Generate a stream of encoded Horus packets in a format suitable to feed into fsk_mod */
+
+int main(int argc,char *argv[]) {
+    int nbytes = sizeof(struct TBinaryPacket);
+    struct TBinaryPacket input_payload;
+    int num_tx_data_bytes = horus_l2_get_num_tx_data_bytes(nbytes);
+    unsigned char tx[num_tx_data_bytes];
+    int i, framecnt;
+
+    if(argc != 2){
+        fprintf(stderr,"usage: %s numFrames\n",argv[0]);
+        exit(1);
+    }
+
+    framecnt = atoi(argv[1]);
+
+    /* all zeros is nastiest sequence for demod before scrambling */
+
+    memset(&input_payload, 0, nbytes);
+    input_payload.Checksum = horus_l2_gen_crc16((unsigned char*)&input_payload, nbytes-2);
+
+    horus_l2_encode_tx_packet(tx, (unsigned char*)&input_payload, nbytes);
+
+    int b;
+    uint8_t tx_bit;
+    while(framecnt >= 0){
+        for(i=0; i<num_tx_data_bytes; i++) {
+            for(b=0; b<8; b++) {
+                tx_bit = (tx[i] >> (7-b)) & 0x1; /* msb first */
+                fwrite(&tx_bit,sizeof(uint8_t),1,stdout);
+                fflush(stdout);
+            }
+        }
+        framecnt -= 1;
+    }
 
     return 0;
 }

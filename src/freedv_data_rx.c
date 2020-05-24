@@ -4,7 +4,8 @@
   AUTHOR......: Jeroen Vreeken
   DATE CREATED: May 2020
 
-  Demo receive program for FreeDV API functions ignores everything but data
+  Demo receive program for FreeDV API functions ignores everything but
+  VHF packet data.
 
 \*---------------------------------------------------------------------------*/
 
@@ -204,7 +205,7 @@ int main(int argc, char *argv[]) {
 
     freedv_set_verbose(freedv, verbose);
 
-    short speech_out[freedv_get_n_speech_samples(freedv)];
+    short speech_out[freedv_get_n_max_speech_samples(freedv)];
     short demod_in[freedv_get_n_max_modem_samples(freedv)];
 
     freedv_set_callback_data(freedv, my_datarx, my_datatx, &my_cb_state);

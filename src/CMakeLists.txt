@@ -199,6 +199,7 @@ set(CODEC2_SRCS
     horus_l2.c
     HRA_112_112.c
     HRAb_396_504.c
+    H_256_768_22.c
     lpcnet_freq.c
 )
 
@@ -297,11 +298,23 @@ target_link_libraries(freedv_tx ${CMAKE_REQUIRED_LIBRARIES} codec2)
 add_executable(freedv_rx freedv_rx.c)
 target_link_libraries(freedv_rx ${CMAKE_REQUIRED_LIBRARIES} codec2)
 
+add_executable(freedv_data_raw_tx freedv_data_raw_tx.c)
+target_link_libraries(freedv_data_raw_tx ${CMAKE_REQUIRED_LIBRARIES} codec2)
+
+add_executable(freedv_data_raw_rx freedv_data_raw_rx.c)
+target_link_libraries(freedv_data_raw_rx ${CMAKE_REQUIRED_LIBRARIES} codec2)
+
 add_executable(freedv_data_tx freedv_data_tx.c)
 target_link_libraries(freedv_data_tx ${CMAKE_REQUIRED_LIBRARIES} codec2)
 
 add_executable(freedv_data_rx freedv_data_rx.c)
 target_link_libraries(freedv_data_rx ${CMAKE_REQUIRED_LIBRARIES} codec2)
+
+add_executable(freedv_mixed_tx freedv_mixed_tx.c)
+target_link_libraries(freedv_mixed_tx ${CMAKE_REQUIRED_LIBRARIES} codec2)
+
+add_executable(freedv_mixed_rx freedv_mixed_rx.c)
+target_link_libraries(freedv_mixed_rx ${CMAKE_REQUIRED_LIBRARIES} codec2)
 
 add_executable(fsk_mod fsk_mod.c)
 target_link_libraries(fsk_mod ${CMAKE_REQUIRED_LIBRARIES} codec2)
@@ -378,9 +391,18 @@ target_link_libraries(drs232 ${CMAKE_REQUIRED_LIBRARIES})
 add_executable(drs232_ldpc drs232_ldpc.c)
 target_link_libraries(drs232_ldpc ${CMAKE_REQUIRED_LIBRARIES} codec2)
 
+add_definitions(-DINTERLEAVER -DSCRAMBLER -DRUN_TIME_TABLES)
+add_executable(horus_gen_test_bits horus_gen_test_bits.c horus_l2.c golay23.c)
+target_link_libraries(horus_gen_test_bits m ${CMAKE_REQUIRED_LIBRARIES})
+
 add_definitions(-DHORUS_L2_RX -DINTERLEAVER -DSCRAMBLER -DRUN_TIME_TABLES)
 add_executable(horus_demod horus_demod.c horus_api.c horus_l2.c golay23.c fsk.c kiss_fft.c)
 target_link_libraries(horus_demod m ${CMAKE_REQUIRED_LIBRARIES})
+
+# Currently not working
+#add_definitions(-DGEN_TX_BITSTREAM -DINTERLEAVER -DSCRAMBLER)
+#add_executable(horus_generate horus_l2.c golay23.c)
+#target_link_libraries(horus_generate ${CMAKE_REQUIRED_LIBRARIES})
 
 install(TARGETS codec2 EXPORT codec2-config
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
