@@ -57,3 +57,6 @@ add_executable(tst_codec2_fft_init tst_codec2_fft_init.c)
 target_link_libraries(tst_codec2_fft_init m codec2)
 
 add_executable(tvq_mbest tvq_mbest.c)
+
+add_executable(tfreedv_mode_800XA tfreedv_mode_800XA.c)
+target_link_libraries(tfreedv_mode_800XA codec2)

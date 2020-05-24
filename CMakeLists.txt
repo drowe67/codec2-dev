@@ -681,4 +681,9 @@ endif(NOT APPLE)
                             diff /dev/stdin binaryIn.bin"
              )
 
+    add_test(NAME test_freedv_mode_800XA
+             COMMAND sh -c "./tfreedv_mode_800XA"
+             WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/unittest
+             )
+
 endif(UNITTEST)
