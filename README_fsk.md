@@ -14,7 +14,7 @@ This modem can demodulate FSK signals that sound like [this sample](doc/lockdown
 
 ## Credits
 
-The Octave version of the modem was developed by David Rowe.  Brady O'Brien ported the modem to C, and wrote the C/Octave tests.  The modem is being maintained by David Rowe.
+The Octave version of the modem was developed by David Rowe.  Brady O'Brien ported the modem to C, and wrote the C/Octave tests.  The modem is being maintained by David Rowe.  Mark Jessop has helped improve the modem operation by testing against various balloon telemtry waveforms.
 
 ## Quickstart
 
