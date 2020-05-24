@@ -686,4 +686,14 @@ endif(NOT APPLE)
              WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/unittest
              )
 
+    add_test(NAME test_freedv_mode_2400A
+             COMMAND sh -c "./tfreedv_mode_2400A"
+             WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/unittest
+             )
+
+    add_test(NAME test_freedv_mode_2400B
+             COMMAND sh -c "./tfreedv_mode_2400B"
+             WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/unittest
+             )
+
 endif(UNITTEST)

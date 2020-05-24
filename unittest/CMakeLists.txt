@@ -60,3 +60,9 @@ add_executable(tvq_mbest tvq_mbest.c)
 
 add_executable(tfreedv_mode_800XA tfreedv_mode_800XA.c)
 target_link_libraries(tfreedv_mode_800XA codec2)
+
+add_executable(tfreedv_mode_2400A tfreedv_mode_2400A.c)
+target_link_libraries(tfreedv_mode_2400A codec2)
+
+add_executable(tfreedv_mode_2400B tfreedv_mode_2400B.c)
+target_link_libraries(tfreedv_mode_2400B codec2)
