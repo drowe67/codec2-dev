@@ -22,10 +22,15 @@ function fsk_demod_file(filename, format="s16", Fs=8000, Rs=50, M=2, max_secs=1E
   more off;
   fsk_lib;
   plot_en = 1;
+  
+  states = fsk_init(Fs, Rs, M);
+  states.fest_min_spacing = 50000;
+  
   if strcmp(format,"s16")
     read_complex = 0; sample_size = 'int16'; shift_fs_on_4=0;
   elseif strcmp(format,"cs16")
     read_complex = 1; sample_size = 'int16'; shift_fs_on_4=0;
+    states.fest_fmin = -Fs/2; states.fest_fmax = Fs/2; 
   else
     printf("Error in format: %s\n", format);
     return;
@@ -34,7 +39,6 @@ function fsk_demod_file(filename, format="s16", Fs=8000, Rs=50, M=2, max_secs=1E
   fin = fopen(filename,"rb");
   if fin == -1 printf("Error opneing file: %s\n",filename); return; end
   
-  states = fsk_init(Fs, Rs, M);
   nbit = states.nbit;
 
   frames = 0;
@@ -107,16 +111,19 @@ function fsk_demod_file(filename, format="s16", Fs=8000, Rs=50, M=2, max_secs=1E
     title('input signal to demod (1 sec)')
     xlabel('Time (samples)');
     subplot(212);
-    last = min(length(rx_nowave),states.Fs);
-    RxdBFS = 20*log10(abs(fft(rx_nowave(1:last))));
-    mx = 10*ceil(max(RxdBFS/10));
-    plot(RxdBFS);
-    axis([1 length(RxdBFS) mx-80 mx])
+    last = min(length(rx_nowave),Fs);
+    Nfft = 2^(ceil(log2(last)));
+    Rx = fft(rx_nowave(1:last).*hanning(last),Nfft);
+    RxdB = 20*log10(abs(fftshift(Rx)));
+    mx = 10*ceil(max(RxdB/10));
+    f = -Nfft/2:Nfft/2-1;
+    plot(f, RxdB);
+    axis([-Fs/2 Fs/2 mx-80 mx])
     xlabel('Frequency (Hz)');
 
-    figure(2); plot_specgram(rx,Fs);
+    figure(2); specgram(rx,Fs);
     figure(3); clf; plot(f_log,'+-'); axis([1 length(f_log) -Fs/2 Fs/2]); title('Tone Freq Estimates');    
-    figure(4); clf; mesh(Sf_log(1:10,:)); title('Freq Est Sf over time');
+    figure(4); clf; mesh(Sf_log(1:end,:)); title('Freq Est Sf over time');
     figure(5); clf; plot(f_int_resample_log','+'); title('Integrator outputs for each tone');
     figure(6); clf; plot(norm_rx_timing_log); axis([1 frames -0.5 0.5]); title('norm fine timing')
     figure(7); clf; plot(EbNodB_log); title('Eb/No estimate')
