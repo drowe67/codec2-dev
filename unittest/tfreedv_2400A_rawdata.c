@@ -1,12 +1,13 @@
 /*---------------------------------------------------------------------------*\
 
-  FILE........: tfreedv_mode_2400A.c
+  FILE........: tfreedv_2400A_rawdata.c
   AUTHOR......: Jeroen Vreeken
   DATE CREATED: 24 May 2020
 
-  Tests specific for mode 2400A
+  FreeDV 2400A rawdata test.
 
 \*---------------------------------------------------------------------------*/
+
 /*
   Copyright (C) 2020 Jeroen Vreeken <jeroen@vreeken.net>
 
