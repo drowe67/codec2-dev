@@ -41,6 +41,7 @@
 #include <string.h>
 #include <assert.h>
 #include "freedv_vhf_framing.h"
+#include "freedv_api_internal.h"
 
 /* The voice UW of the VHF type A frame */
 static const uint8_t A_uw_v[] =    {0,1,1,0,0,1,1,1,
@@ -859,6 +860,7 @@ int fvhff_deframe_bits(struct freedv_vhf_deframer * def,uint8_t codec2_out[],uin
     def->last_uw = last_uw;
     def->miss_cnt = miss_cnt;
     def->on_inv_bits = on_inv_bits;
-    /* return zero for data frames, they are already handled by callback */
-    return extracted_frame && pt == FRAME_PAYLOAD_TYPE_VOICE;
+    /* return sync state and presence of extracted voice bits.
+       only sync for data frames, they are already handled by callback */
+    return (extracted_frame ? RX_SYNC : 0) | (pt == FRAME_PAYLOAD_TYPE_VOICE ? RX_BITS : 0);
 }

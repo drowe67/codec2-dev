@@ -618,7 +618,7 @@ void fsk_demod_core(struct FSK *fsk, uint8_t rx_bits[], float rx_sd[], COMP fsk_
     int neyesamp,neyeoffset;
     
     #ifdef MODEMPROBE_ENABLE
-    #define NMP_NAME 19
+    #define NMP_NAME 26
     char mp_name_tmp[NMP_NAME+1]; /* Temporary string for modem probe trace names */
     #endif
 
