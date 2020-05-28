@@ -264,6 +264,9 @@ export(TARGETS codec2
 add_executable(c2demo c2demo.c)
 target_link_libraries(c2demo ${CMAKE_REQUIRED_LIBRARIES} codec2)
 
+add_executable(c2server c2server.c)
+target_link_libraries(c2server ${CMAKE_REQUIRED_LIBRARIES} codec2)
+
 add_executable(c2enc c2enc.c)
 target_link_libraries(c2enc ${CMAKE_REQUIRED_LIBRARIES} codec2)
 
