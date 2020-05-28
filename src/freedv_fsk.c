@@ -51,7 +51,7 @@ void freedv_2400a_open(struct freedv *f) {
     f->n_codec_frames = 1;
     f->bits_per_codec_frame = codec2_bits_per_frame(f->codec2);
     f->bits_per_modem_frame = f->bits_per_codec_frame;
-    int n_packed_bytes = (f->bits_per_codec_frame + 7)/8;
+    int n_packed_bytes = (f->bits_per_modem_frame + 7)/8;
     f->tx_payload_bits = MALLOC(n_packed_bytes); assert(f->tx_payload_bits != NULL);  
     f->rx_payload_bits = MALLOC(n_packed_bytes); assert(f->rx_payload_bits != NULL);  
 }
@@ -80,7 +80,7 @@ void freedv_2400b_open(struct freedv *f) {
     f->n_codec_frames = 1;
     f->bits_per_codec_frame = codec2_bits_per_frame(f->codec2);
     f->bits_per_modem_frame = f->bits_per_codec_frame;
-    int n_packed_bytes = (f->bits_per_codec_frame + 7)/8;
+    int n_packed_bytes = (f->bits_per_modem_frame + 7)/8;
     f->tx_payload_bits = MALLOC(n_packed_bytes); assert(f->tx_payload_bits != NULL);  
     f->rx_payload_bits = MALLOC(n_packed_bytes); assert(f->rx_payload_bits != NULL);  
 }
@@ -104,11 +104,12 @@ void freedv_800xa_open(struct freedv *f) {
 
     f->codec2 = codec2_create(CODEC2_MODE_700C); assert(f->codec2 != NULL);
     f->speech_sample_rate = FREEDV_FS_8000;
-    f->n_speech_samples = 2*codec2_samples_per_frame(f->codec2);
+    f->n_codec_frames = 2;
+    f->n_speech_samples = f->n_codec_frames*codec2_samples_per_frame(f->codec2);
 
     f->bits_per_codec_frame = codec2_bits_per_frame(f->codec2);
     f->bits_per_modem_frame = f->n_codec_frames*f->bits_per_codec_frame;
-    int n_packed_bytes = (f->bits_per_codec_frame + 7)/8;
+    int n_packed_bytes = (f->bits_per_modem_frame + 7)/8;
     f->tx_payload_bits = MALLOC(n_packed_bytes); assert(f->tx_payload_bits != NULL);  
     f->rx_payload_bits = MALLOC(n_packed_bytes); assert(f->rx_payload_bits != NULL);  
 }
@@ -303,7 +304,8 @@ int freedv_comprx_fsk(struct freedv *f, COMP demod_in[]) {
         f->nin = fmfsk_nin(f->fmfsk);
     }
     
-    if(fvhff_deframe_bits(f->deframer,f->rx_payload_bits,proto_bits,vc_bits,(uint8_t*)f->tx_bits)){
+    rx_status = fvhff_deframe_bits(f->deframer,f->rx_payload_bits,proto_bits,vc_bits,(uint8_t*)f->tx_bits);
+    if((rx_status & RX_SYNC) && (rx_status & RX_BITS)){
         /* Decode varicode text */
         for(i=0; i<2; i++){
             /* Note: deframe_bits spits out bits in uint8_ts while varicode_decode expects shorts */
@@ -317,8 +319,6 @@ int freedv_comprx_fsk(struct freedv *f, COMP demod_in[]) {
         if( f->freedv_put_next_proto != NULL){
             (*f->freedv_put_next_proto)(f->proto_callback_state,(char*)proto_bits);
         }
-
-        rx_status = RX_SYNC | RX_BITS;
     } 
     f->sync = f->deframer->state;
     f->stats.sync = f->deframer->state;

@@ -408,62 +408,77 @@ endif()
              COMMAND sh -c "$<TARGET_FILE:fsk_get_test_bits> - 10000 | $<TARGET_FILE:fsk_mod> 2 8000 100 1200 100 - - | $<TARGET_FILE:fsk_demod> -l 2 8000 100 - - | $<TARGET_FILE:fsk_put_test_bits> -"
              )
 
-    add_test(NAME test_FreeDV_API_1600
+    add_test(NAME test_freedv_api_1600
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
                             ./freedv_tx 1600 ../../raw/ve9qrp_10s.raw - | ./freedv_rx 1600 - /dev/null")
-             set_tests_properties(test_FreeDV_API_1600 PROPERTIES PASS_REGULAR_EXPRESSION "frames decoded: 503")
+             set_tests_properties(test_freedv_api_1600 PROPERTIES PASS_REGULAR_EXPRESSION "frames decoded: 503")
            
-    add_test(NAME test_FreeDV_API_700C
+    add_test(NAME test_freedv_api_700C
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
                             ./freedv_tx 700C ../../raw/ve9qrp_10s.raw - | ./freedv_rx 700C - /dev/null")
-             set_tests_properties(test_FreeDV_API_700C PROPERTIES PASS_REGULAR_EXPRESSION "frames decoded: 125")
+             set_tests_properties(test_freedv_api_700C PROPERTIES PASS_REGULAR_EXPRESSION "frames decoded: 125")
            
-    add_test(NAME test_FreeDV_API_700D_backwards_compatability
+    add_test(NAME test_freedv_api_700D_backwards_compatability
              COMMAND sh -c "$<TARGET_FILE:freedv_rx> 700D ${CMAKE_CURRENT_SOURCE_DIR}/raw/testframes_700d.raw /dev/null --testframes --discard"
              )
 
     # no random speech output due to trial sync when listening to noise
-    add_test(NAME test_FreeDV_API_700D_burble
+    add_test(NAME test_freedv_api_700D_burble
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
                             ./freedv_tx 700D ../../raw/ve9qrp.raw - | 
                             ./cohpsk_ch - - -10 --Fs 8000 | 
                             ./freedv_rx 700D - /dev/null --squelch -2")
-             set_tests_properties(test_FreeDV_API_700D_burble PROPERTIES PASS_REGULAR_EXPRESSION "frames decoded: 746  output speech samples: 0")
+             set_tests_properties(test_freedv_api_700D_burble PROPERTIES PASS_REGULAR_EXPRESSION "frames decoded: 746  output speech samples: 0")
            
-    add_test(NAME test_FreeDV_API_700D_AWGN_BER
+    add_test(NAME test_freedv_api_700D_AWGN_BER
              COMMAND sh -c "dd bs=2560 count=120 if=/dev/zero | $<TARGET_FILE:freedv_tx> 700D - - --testframes | $<TARGET_FILE:cohpsk_ch> - - -20 --Fs 8000 -f -10 | $<TARGET_FILE:freedv_rx> 700D - /dev/null --testframes --discard"
              )
 
-    add_test(NAME test_FreeDV_API_700D_AWGN_BER_USECOMPLEX
+    add_test(NAME test_freedv_api_700D_AWGN_BER_USECOMPLEX
              COMMAND sh -c "dd bs=2560 count=120 if=/dev/zero | $<TARGET_FILE:freedv_tx> 700D - - --testframes | $<TARGET_FILE:cohpsk_ch> - - -20 --Fs 8000 -f -10 | $<TARGET_FILE:freedv_rx> 700D - /dev/null --testframes --discard --usecomplex"
              )
            
-    add_test(NAME test_FreeDV_API_700D_AWGN_BER_Interleave
+    add_test(NAME test_freedv_api_700D_AWGN_BER_Interleave
              COMMAND sh -c "dd bs=2560 count=120 if=/dev/zero | $<TARGET_FILE:freedv_tx> 700D - - --interleave 8 --testframes | $<TARGET_FILE:cohpsk_ch> - - -20 --Fs 8000 -f -10 | $<TARGET_FILE:freedv_rx> 700D - /dev/null --interleave 8 --testframes"
              )
 if(LPCNET)
 
-    add_test(NAME test_FreeDV_API_2020_to_ofdm_demod
+    add_test(NAME test_freedv_api_2020_to_ofdm_demod
              COMMAND sh -c "$<TARGET_FILE:freedv_tx> 2020 ~/LPCNet/wav/all.wav - --testframes | $<TARGET_FILE:ofdm_demod> --ts 0.0205 --nc 31 --verbose 1 --ldpc 2 -p 312 --testframes > /dev/null"
              )
 
-    add_test(NAME test_FreeDV_API_2020_from_ofdm_mod
+    add_test(NAME test_freedv_api_2020_from_ofdm_mod
              COMMAND sh -c "$<TARGET_FILE:ofdm_mod> --in /dev/zero --ts 0.0205 --nc 31 --verbose 1 --ldpc 2 -p 312 --testframes 10 | $<TARGET_FILE:freedv_rx> 2020 - /dev/null --testframes"
              )
 endif()
            
-     add_test(NAME test_FreeDV_API_2400A
+     add_test(NAME test_freedv_api_2400A
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
                             ./freedv_tx 2400A ../../raw/ve9qrp_10s.raw - | ./freedv_rx 2400A - /dev/null")
-             set_tests_properties(test_FreeDV_API_2400A PROPERTIES PASS_REGULAR_EXPRESSION "frames decoded: 250")
-     add_test(NAME test_FreeDV_API_2400B
+             set_tests_properties(test_freedv_api_2400A PROPERTIES PASS_REGULAR_EXPRESSION "frames decoded: 250")
+     add_test(NAME test_freedv_api_2400B
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
                             ./freedv_tx 2400B ../../raw/ve9qrp_10s.raw - | ./freedv_rx 2400B - /dev/null")
-             set_tests_properties(test_FreeDV_API_2400B PROPERTIES PASS_REGULAR_EXPRESSION "frames decoded: 250")
-     add_test(NAME test_FreeDV_API_800XA
+             set_tests_properties(test_freedv_api_2400B PROPERTIES PASS_REGULAR_EXPRESSION "frames decoded: 250")
+     add_test(NAME test_freedv_api_800XA
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
                             ./freedv_tx 800XA ../../raw/ve9qrp_10s.raw - | ./freedv_rx 800XA - /dev/null")
-             set_tests_properties(test_FreeDV_API_800XA PROPERTIES PASS_REGULAR_EXPRESSION "frames decoded: 125")
+             set_tests_properties(test_freedv_api_800XA PROPERTIES PASS_REGULAR_EXPRESSION "frames decoded: 125")
+
+     add_test(NAME test_freedv_api_rawdata_800XA
+             COMMAND sh -c "./tfreedv_800XA_rawdata"
+             WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/unittest
+             )
+
+     add_test(NAME test_freedv_api_rawdata_2400A
+             COMMAND sh -c "./tfreedv_2400A_rawdata"
+             WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/unittest
+             )
+
+     add_test(NAME test_freedv_api_rawdata_2400B
+             COMMAND sh -c "./tfreedv_2400B_rawdata"
+             WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/unittest
+             )
 
      add_test(NAME test_fifo
              COMMAND $<TARGET_FILE:tfifo>
