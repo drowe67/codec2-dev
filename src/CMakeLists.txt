@@ -158,7 +158,6 @@ set(CODEC2_SRCS
     fm.c
     fsk.c
     fmfsk.c
-    tdma.c
     kiss_fft.c
     kiss_fftr.c
     linreg.c
@@ -399,32 +398,9 @@ add_definitions(-DHORUS_L2_RX -DINTERLEAVER -DSCRAMBLER -DRUN_TIME_TABLES)
 add_executable(horus_demod horus_demod.c horus_api.c horus_l2.c golay23.c fsk.c kiss_fft.c)
 target_link_libraries(horus_demod m ${CMAKE_REQUIRED_LIBRARIES})
 
-# Currently not working
-#add_definitions(-DGEN_TX_BITSTREAM -DINTERLEAVER -DSCRAMBLER)
-#add_executable(horus_generate horus_l2.c golay23.c)
-#target_link_libraries(horus_generate ${CMAKE_REQUIRED_LIBRARIES})
-
 install(TARGETS codec2 EXPORT codec2-config
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
     PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/codec2
-)
-
-#install(EXPORT codec2-config
-#    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/codec2
-#)
-
-install(TARGETS
-    c2enc
-    c2dec
-    fdmdv_get_test_bits
-    fdmdv_mod fdmdv_demod
-    fm_demod
-    fsk_mod
-    fdmdv_put_test_bits
-    insert_errors
-    drs232
-    drs232_ldpc
-    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
