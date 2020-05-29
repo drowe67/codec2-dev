@@ -72,7 +72,6 @@ struct freedv {
     struct FSK          *fsk;
     struct FMFSK        *fmfsk;
     struct OFDM         *ofdm;
-    struct OFDM_CONFIG  *ofdm_config;
     struct LDPC         *ldpc;
     struct MODEM_STATS   stats;
 #ifdef __LPCNET__

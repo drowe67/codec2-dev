@@ -96,15 +96,15 @@ void freedv_700d_open(struct freedv *f, struct freedv_advanced *adv) {
     f->ofdm = ofdm_create(NULL);
     assert(f->ofdm != NULL);
         
-    f->ofdm_config = ofdm_get_config_param(f->ofdm);
+    struct OFDM_CONFIG *ofdm_config = ofdm_get_config_param(f->ofdm);
     f->ofdm_bitsperframe = ofdm_get_bits_per_frame(f->ofdm);
-    f->ofdm_nuwbits = (f->ofdm_config->ns - 1) * f->ofdm_config->bps - f->ofdm_config->txtbits;
-    f->ofdm_ntxtbits = f->ofdm_config->txtbits;
+    f->ofdm_nuwbits = (ofdm_config->ns - 1) * ofdm_config->bps - ofdm_config->txtbits;
+    f->ofdm_ntxtbits = ofdm_config->txtbits;
 
     f->ldpc = (struct LDPC*)MALLOC(sizeof(struct LDPC));
     assert(f->ldpc != NULL);
 
-    set_up_hra_112_112(f->ldpc, f->ofdm_config);
+    set_up_hra_112_112(f->ldpc, ofdm_config);
 #ifdef __EMBEDDED__
     f->ldpc->max_iter = 10; /* limit LDPC decoder iterations to limit CPU load */
 #endif	
@@ -130,7 +130,7 @@ void freedv_700d_open(struct freedv *f, struct freedv_advanced *adv) {
     f->n_nat_modem_samples = ofdm_get_samples_per_frame(f->ofdm);
     f->n_nom_modem_samples = ofdm_get_samples_per_frame(f->ofdm);
     f->n_max_modem_samples = ofdm_get_max_samples_per_frame(f->ofdm);
-    f->modem_sample_rate = f->ofdm_config->fs;
+    f->modem_sample_rate = f->ofdm->config.fs;
     f->clip = 0;
     f->sz_error_pattern = f->ofdm_bitsperframe;
 
@@ -240,7 +240,7 @@ void freedv_comptx_700d(struct freedv *f, COMP mod_out[]) {
     complex float tx_sams[f->interleave_frames*f->n_nat_modem_samples];
     COMP asam;
     
-    ofdm_ldpc_interleave_tx(f->ofdm, f->ldpc, tx_sams, f->tx_payload_bits, txt_bits, f->interleave_frames, f->ofdm_config);
+    ofdm_ldpc_interleave_tx(f->ofdm, f->ldpc, tx_sams, f->tx_payload_bits, txt_bits, f->interleave_frames, &f->ofdm->config);
 
     for(i=0; i<f->interleave_frames*f->n_nat_modem_samples; i++) {
         asam.real = crealf(tx_sams[i]);
@@ -448,7 +448,7 @@ int freedv_comp_short_rx_700d(struct freedv *f, void *demod_in_8kHz, int demod_i
         float llr[coded_bits_per_frame];
         uint8_t out_char[coded_bits_per_frame];
 
-        interleaver_sync_state_machine(ofdm, ldpc, f->ofdm_config, codeword_symbols_de, codeword_amps_de, EsNo,
+        interleaver_sync_state_machine(ofdm, ldpc, &f->ofdm->config, codeword_symbols_de, codeword_amps_de, EsNo,
                                        interleave_frames, &iter, &parityCheckCount, &Nerrs_coded);
                                          
         if ((ofdm->sync_state_interleaver == synced) && (ofdm->frame_count_interleaver == interleave_frames)) {
@@ -456,7 +456,7 @@ int freedv_comp_short_rx_700d(struct freedv *f, void *demod_in_8kHz, int demod_i
 
             if (f->test_frames) {
                 int tmp[interleave_frames];
-                Nerrs_raw = count_uncoded_errors(ldpc, f->ofdm_config, tmp, interleave_frames, codeword_symbols_de);
+                Nerrs_raw = count_uncoded_errors(ldpc, &f->ofdm->config, tmp, interleave_frames, codeword_symbols_de);
                 f->total_bit_errors += Nerrs_raw;
                 f->total_bits       += f->ofdm_bitsperframe*interleave_frames;
             }
