@@ -71,12 +71,22 @@
  *              buffers.
  */
 
-char *ofdm_statemode[] = {
-    "search",
-    "trial",
-    "synced"
-};
+char *ofdm_statemode[] = {"search","trial","synced"};
 
+char *rx_sync_flags_to_text[] = {
+    "----",
+    "---T",
+    "--S-",
+    "--ST",
+    "-B--",
+    "-B-T",
+    "-BS-",
+    "-BST",
+    "EB--",
+    "EB-T",
+    "EBS-",
+    "EBST"};   
+    
 /*---------------------------------------------------------------------------* \
 
   FUNCTION....: freedv_open

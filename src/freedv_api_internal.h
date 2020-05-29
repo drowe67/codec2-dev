@@ -61,6 +61,8 @@
 #define RX_SYNC             0x2       // set if demodulator has sync
 #define RX_BITS             0x4       // set if data bits have been returned
 #define RX_BIT_ERRORS       0x8       // set if there are some uncorrectable errors in the data bits
+
+extern char *rx_sync_flags_to_text[]; // converts flags above to more meaningful text
       
 struct freedv {
     int                  mode;

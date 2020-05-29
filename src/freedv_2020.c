@@ -286,17 +286,20 @@ int freedv_comprx_2020(struct freedv *f, COMP demod_in[]) {
         gp_deinterleave_comp (codeword_symbols_de, codeword_symbols, interleave_frames*coded_syms_per_frame);
         gp_deinterleave_float(codeword_amps_de   , codeword_amps   , interleave_frames*coded_syms_per_frame);
 
-        /* using LDPC decoder to determine if we have good sync early.
+        /* Using LDPC decoder to determine if we have good sync early.
+
            This call is causing valgrind to complain with the
            "test_memory_leak_FreeDV_2020_rx" ctest, I think because in
            2020 we only use part if the data symbols, so need to
-           prefill the rest of the codeword as per below..  This
-           function is not essential, so have left out for now, rather
-           than debug/add extra code.
+           prefill the rest of the codeword as per below.  This
+           function is not essential, as it falls through when
+           interleaving == 1, so have left out for now, rather than
+           debug/add extra code.
 
            interleaver_sync_state_machine(ofdm, ldpc, &f->ofdm->config, codeword_symbols_de, codeword_amps_de, EsNo,
                                        interleave_frames, &iter, &parityCheckCount, &Nerrs_coded);
         */
+        ofdm->sync_state_interleaver = synced;
         
         float llr[coded_bits_per_frame];
         uint8_t out_char[coded_bits_per_frame];
@@ -382,11 +385,11 @@ int freedv_comprx_2020(struct freedv *f, COMP demod_in[]) {
     ofdm_sync_state_machine(ofdm, rx_uw);
 
     if ((f->verbose && (ofdm->last_sync_state == search)) || (f->verbose == 2)) {
-        fprintf(stderr, "%3d st: %-6s euw: %2d %1d f: %5.1f pbw: %d snr: %4.1f %2d eraw: %3d ecdd: %3d iter: %3d pcc: %3d rxst: %d\n",
+        fprintf(stderr, "%3d st: %-6s euw: %2d %1d f: %5.1f pbw: %d snr: %4.1f %2d eraw: %3d ecdd: %3d iter: %3d pcc: %3d rxst: %s\n",
                 f->frames++, ofdm_statemode[ofdm->last_sync_state], ofdm->uw_errors, ofdm->sync_counter, 
 		(double)ofdm->foff_est_hz, ofdm->phase_est_bandwidth,
                 f->snr_est, ofdm->frame_count_interleaver,
-                Nerrs_raw, Nerrs_coded, iter, parityCheckCount, rx_status);
+                Nerrs_raw, Nerrs_coded, iter, parityCheckCount, rx_sync_flags_to_text[rx_status]);
     }
         
     return rx_status;
