@@ -203,7 +203,6 @@ set(CODEC2_SRCS
 )
 
 set(CODEC2_PUBLIC_HEADERS
-    golay23.h
     codec2.h
     codec2_fdmdv.h
     codec2_cohpsk.h
@@ -212,13 +211,8 @@ set(CODEC2_PUBLIC_HEADERS
     fsk.h
     codec2_fifo.h
     comp.h
-    comp_prim.h
     modem_stats.h
-    kiss_fft.h
     freedv_api.h
-    varicode.h
-    freedv_api_internal.h
-    filter.h
     horus_api.h
     ${CODEC2_VERSION_PATH}/version.h
 )
