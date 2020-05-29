@@ -4,12 +4,14 @@ env:
   - GCC_SHORT=8-2018q4
 sudo: required
 language: generic
-dist: focal
+dist: xenial
 addons:
   apt:
     packages: libc6-i386 octave octave-common octave-signal liboctave-dev gnuplot
               sox p7zip-full python3-numpy valgrind fonts-freefont-otf
-              
+              libspeexdsp-dev libsamplerate0-dev libwxgtk3.0-dev portaudio19-dev libhamlib-dev
+              libasound2-dev libao-dev libgsm1-dev libsndfile-dev
+             
 cache:
   directories:
   - "$HOME/$GCC_BASE"
