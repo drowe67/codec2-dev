@@ -55,13 +55,15 @@ function states = ofdm_init(bps, Rs, Tcp, Nf, Ns, Nc)
   states.bps = bps;
   states.Rs = Rs;
   states.Tcp = Tcp;
-  states.Nf = Nf;       % total (pilots+data) number of symbols/frame
-  states.Ns = Ns;       % step size for pilots
-  states.Nc = Nc;       % Number of carriers
+  states.Nf = Nf;                                   % total (pilots+data) number of symbols/frame
+  states.Ns = Ns;                                   % one pilot every Ns symbols, e.g. Ns=3, ...PDDDPDDDP...
+  states.Nc = Nc;                                   % Number of carriers
   states.M  = states.Fs/Rs; 
   states.Ncp = Tcp*states.Fs;
-  states.Nbitsperframe = (Ns-1)*(Nf/Ns)*Nc*bps;     % total bits in all data symbols, whatever they are used for
-  states.Nsamperframe =  Nf*(states.M+states.Ncp);
+  states.Nbitsperframe = (Ns-1)*(Nf/Ns)*Nc*bps;     % total bits in all data symbols in modem frame
+  states.Nsamperpilot  =  Ns*(states.M+states.Ncp); % number of samples in Ns symbols e.g. Ns=4 "PDDD"
+  states.Nsampersymbol =  states.M+states.Ncp;      % number of samples in a single symbol
+  states.Nsamperframe  =  Nf*(states.M+states.Ncp); % number of samples in Nf symbols e.g. Nf=8,Ns=4 "PDDDPDDD", a complete modem frame
   states.Ntxtbits = 4;                              % reserved bits/frame for auxillary text information
   states.Nuwbits  = bps*5;                          % Let use 5 symbols for the UW, note ths means longer for QAM that QPSK
   states.qam16 = [
@@ -125,12 +127,52 @@ function states = ofdm_init(bps, Rs, Tcp, Nf, Ns, Nc)
   % fine timing search +/- window_width/2 from current timing instant
 
   states.ftwindow_width = 11; 
- 
-  % Receive buffer: D P DDD P DDD P DDD P D
-  %                         ^
-  % also see ofdm_demod() ...
 
-  states.Nrxbuf = 3*states.Nsamperframe+states.M+states.Ncp + 2*(states.M + states.Ncp);
+
+  #{
+     Ns=4,Nf=8 (two pilots per modem frame)
+
+                             |----Nf---|
+                        
+     Receive buffer: D P DDD P DDD P DDD P DDD P D
+
+                             |-Ns--|
+
+     Figure 1: Relationship of Nf and Ns
+     -----------------------------------
+
+                             |----Nf---|
+                             
+     Receive buffer: D P DDD P DDD P DDD P DDD P D
+                       |     | ^^^ |     |
+                       Average Phase over 4 pilots
+                       
+     Receive buffer: D P DDD P DDD P DDD P DDD P D
+                             |     | ^^^ |     |
+                             Average Phase over 4 pilots
+
+     Note: Pilots used for phase est of D symbols ^
+           shifts in second half of modem frame
+     
+     Figure 2: Phase estimation
+     ---------------------------
+     
+     To allow timing adjustment/slip-------------\
+                     |                           |
+                    \|/                         \|/
+                     |                           |
+     Receive buffer: D P DDD P DDD P DDD P DDD P D
+                             ^
+                             |
+                    ideal timing instant
+
+     Fig 3: Timing adjustment
+    -------------------------
+  #}
+
+  % Based on receive buffer figure above, e.g. for Ns=4,Nf=8
+  %                      D                 PDDD                 PDDDPDDD                    PDDD                  D
+  states.Nrxbuf = states.Nsampersymbol + states.Nsamperpilot + states.Nsamperframe +  states.Nsampersymbol + states.Nsamperpilot;
   states.rxbuf = zeros(1, states.Nrxbuf);
  
   % default settings on a bunch of options and states
