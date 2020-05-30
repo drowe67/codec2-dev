@@ -32,6 +32,8 @@
 #include <string.h>
 #include <errno.h>
 #include <ctype.h>
+#include <stdint.h>
+#include <stdbool.h>
 
 #include "freedv_api.h"
 #include "codec2.h"

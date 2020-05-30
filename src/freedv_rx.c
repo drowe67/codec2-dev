@@ -174,7 +174,7 @@ int main(int argc, char *argv[]) {
             nout = freedv_rx(freedv, speech_out, demod_in);
         }
 
-        /* IMPORTANT: don't forget to do this in the while loop to
+       /* IMPORTANT: don't forget to do this in the while loop to
            ensure we fread the correct number of samples: ie update
            "nin" before every call to freedv_rx()/freedv_comprx() */
         nin = freedv_nin(freedv);
