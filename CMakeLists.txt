@@ -454,6 +454,14 @@ if(LPCNET)
                             ./ofdm_mod --in /dev/zero --ts 0.0205 --nc 31 --verbose 1 --ldpc 2 -p 312 --testframes 10 | 
                             ./freedv_rx 2020 - /dev/null --testframes"
              )
+
+    add_test(NAME test_freedv_api_2020_awgn
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            dd bs=32000 count=10 if=/dev/zero |
+                            ./freedv_tx 2020 - - --testframes | 
+                            ./cohpsk_ch - - -24 --Fs 8000 |
+                            ./freedv_rx 2020 - /dev/null --testframes"
+             )
 endif()
            
      add_test(NAME test_freedv_api_2400A
