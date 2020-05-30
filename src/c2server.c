@@ -4,6 +4,19 @@
   AUTHOR......: EA3IHI, David
   DATE CREATED: 28/05/2020
 
+  Creates a UDP server to encode/decode PCM to/from codec2 2400 bps.
+  
+  If the server receives 320 bytes of PCM data (160 samples) it encodes it and
+  returns 7 bytes of codec2 data (48bits codec2 + the prefix 0xC2).
+  
+  If the server receives 7 bytes of codec2 data (48bits codec2 + the prefix 0xC2)
+  it will return 320 bytes of PCM audio (160 samples).
+  
+  c2server can substitute md380-emu in dvswitch installations.
+  
+  Usage: c2server [OPTION]
+	 -S          udp port to listen to 
+	 -v          Verbose mode
   
 
 \*---------------------------------------------------------------------------*/
@@ -50,7 +63,7 @@ int verbosity=0;
 //Prints usage info.
 void usage(char *argv0){
   printf("Usage: %s [OPTION]\n"
-	 "\t-S          udp port to listen\n"
+	 "\t-S          udp port to listen to\n"
 	 "\t-v          Verbose mode.\n",
 	 argv0);
 }
