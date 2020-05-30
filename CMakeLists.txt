@@ -627,7 +627,7 @@ endif(NOT APPLE)
                  FAIL_REGULAR_EXPRESSION "caught signal"
                  PASS_REGULAR_EXPRESSION "PASS")
      add_test(NAME test_fsk_horus
-             COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/octave; DISPLAY=\"\" octave --no-gui -qf fsk_horus.m")
+             COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/octave; DISPLAY=\"\" octave-cli --no-gui -qf fsk_horus.m")
              set_tests_properties(test_fsk_horus PROPERTIES 
                  PASS_REGULAR_EXPRESSION "Received 3 packets"
                  FAIL_REGULAR_EXPRESSION "caught signal")
