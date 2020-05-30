@@ -55,7 +55,6 @@ int main(int argc, char *argv[]) {
     mode = -1;
     if (!strcmp(argv[1],"700C")) mode = FREEDV_MODE_700C;
     if (!strcmp(argv[1],"700D")) mode = FREEDV_MODE_700D;
-    if (!strcmp(argv[1],"800XA")) mode = FREEDV_MODE_800XA;
     #ifdef __LPCNET__
     if (!strcmp(argv[1],"2020")) mode = FREEDV_MODE_2020;
     #endif
@@ -101,12 +100,12 @@ int main(int argc, char *argv[]) {
     fprintf(stderr, "bits_per_modem_frame: %d bytes_per_modem_frame: %d\n", freedv_get_bits_per_modem_frame(freedv), bytes_per_modem_frame);
     assert((freedv_get_bits_per_modem_frame(freedv) % 8) == 0);
     int n_mod_out = freedv_get_n_nom_modem_samples(freedv);
-    uint8_t bytes_in[bytes_per_modem_frame];
+    u_char bytes_in[bytes_per_modem_frame];
     short   mod_out[n_mod_out];
 
     /* OK main loop  --------------------------------------- */
 
-    while(fread(bytes_in, sizeof(uint8_t), bytes_per_modem_frame, fin) == bytes_per_modem_frame) {
+    while(fread(bytes_in, 1, bytes_per_modem_frame, fin) == bytes_per_modem_frame) {
         freedv_rawdatatx(freedv, mod_out, bytes_in);
         fwrite(mod_out, sizeof(short), n_mod_out, fout);
     

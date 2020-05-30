@@ -71,12 +71,26 @@
  *              buffers.
  */
 
-char *ofdm_statemode[] = {
-    "search",
-    "trial",
-    "synced"
-};
+char *ofdm_statemode[] = {"search","trial","synced"};
 
+char *rx_sync_flags_to_text[] = {
+    "----",
+    "---T",
+    "--S-",
+    "--ST",
+    "-B--",
+    "-B-T",
+    "-BS-",
+    "-BST",
+    "E---",
+    "E--T",
+    "E-S-",
+    "E-ST",
+    "EB--",
+    "EB-T",
+    "EBS-",
+    "EBST"};
+    
 /*---------------------------------------------------------------------------* \
 
   FUNCTION....: freedv_open
@@ -379,8 +393,11 @@ void freedv_rawdatatx(struct freedv *f, short mod_out[], unsigned char *packed_p
     COMP tx_fdm[f->n_nom_modem_samples];
 
     /* FSK modes used packed bits */
-    if(FDV_MODE_ACTIVE( FREEDV_MODE_2400A, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_2400B, f->mode)) {
-        memcpy(f->tx_payload_bits, packed_payload_bits, (f->bits_per_codec_frame + 7) / 8);
+    if(FDV_MODE_ACTIVE( FREEDV_MODE_2400A, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_2400B, f->mode) ||
+       FDV_MODE_ACTIVE( FREEDV_MODE_800XA, f->mode) ) {
+        int bytes_per_codec_frame = (f->bits_per_codec_frame + 7) / 8;
+	int codec_frames = f->bits_per_modem_frame / f->bits_per_codec_frame;
+        memcpy(f->tx_payload_bits, packed_payload_bits, bytes_per_codec_frame * codec_frames);
         freedv_tx_fsk_voice(f, mod_out);
         return; /* output is already real */
     }
@@ -635,6 +652,7 @@ static void codec2_decode_upacked(struct freedv *f, short speech_out[], uint8_t 
   Deal with 700D first frame burble, and different sync states from OFDM modes like 700D
   Output no samples if squelched, we assume it's OK for the audio sink to run dry
   A FIFO required on output to smooth sample flow to audio sink
+  Don't decode when we are sendingtest frames
 
 \*---------------------------------------------------------------------------*/
 
@@ -663,14 +681,16 @@ int freedv_bits_to_speech(struct freedv *f, short speech_out[], short demod_in[]
                 for(int i=0; i<nout; i++)
                     speech_out[i] = passthrough_gain*tmp[i];
             } else {
-                nout = f->nin_prev;                    
+	        /* Speech and modem rates might be different */
+	        int rate_factor = f->modem_sample_rate / f-> speech_sample_rate;
+                nout = f->nin_prev / rate_factor;
                 for(int i=0; i<nout; i++)
-                    speech_out[i] = passthrough_gain*demod_in[i];
+                    speech_out[i] = passthrough_gain*demod_in[i * rate_factor];
            }
         }
     }
 
-    if ((rx_status & RX_SYNC) && (rx_status & RX_BITS)) {
+    if ((rx_status & RX_SYNC) && (rx_status & RX_BITS) && !f->test_frames) {
        /* following logic is tricky so spell it out clearly, see table
           in: https://github.com/drowe67/codec2/pull/111 */
         
@@ -699,6 +719,7 @@ int freedv_bits_to_speech(struct freedv *f, short speech_out[], short demod_in[]
         if(FDV_MODE_ACTIVE( FREEDV_MODE_2020, f->mode)) {
 #ifdef __LPCNET__
             /* LPCNet decoder */
+            
             int bits_per_codec_frame = lpcnet_bits_per_frame(f->lpcnet);
             int data_bits_per_frame = f->ldpc->data_bits_per_frame;
             int frames = data_bits_per_frame/bits_per_codec_frame;            
@@ -711,6 +732,7 @@ int freedv_bits_to_speech(struct freedv *f, short speech_out[], short demod_in[]
                 }
                 f->modem_frame_count_rx++;
             }
+          
  #endif          
         }
         else {
@@ -781,7 +803,9 @@ int freedv_rawdatarx(struct freedv *f, unsigned char *packed_payload_bits, short
         rx_status = freedv_comprx_fsk(f, rx_fdm);
         f->rx_status = rx_status;
         if (rx_status & RX_BITS) {
-            ret = (f->bits_per_codec_frame + 7)/8;
+            int bytes_per_codec_frame = (f->bits_per_codec_frame + 7) / 8;
+	    int codec_frames = f->bits_per_modem_frame / f->bits_per_codec_frame;
+            ret = bytes_per_codec_frame * codec_frames;
             memcpy(packed_payload_bits, f->rx_payload_bits, ret);
         }
         return ret;

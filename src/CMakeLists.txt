@@ -158,7 +158,6 @@ set(CODEC2_SRCS
     fm.c
     fsk.c
     fmfsk.c
-    tdma.c
     kiss_fft.c
     kiss_fftr.c
     linreg.c
@@ -204,7 +203,6 @@ set(CODEC2_SRCS
 )
 
 set(CODEC2_PUBLIC_HEADERS
-    golay23.h
     codec2.h
     codec2_fdmdv.h
     codec2_cohpsk.h
@@ -213,13 +211,8 @@ set(CODEC2_PUBLIC_HEADERS
     fsk.h
     codec2_fifo.h
     comp.h
-    comp_prim.h
     modem_stats.h
-    kiss_fft.h
     freedv_api.h
-    varicode.h
-    freedv_api_internal.h
-    filter.h
     horus_api.h
     ${CODEC2_VERSION_PATH}/version.h
 )
@@ -399,32 +392,9 @@ add_definitions(-DHORUS_L2_RX -DINTERLEAVER -DSCRAMBLER -DRUN_TIME_TABLES)
 add_executable(horus_demod horus_demod.c horus_api.c horus_l2.c golay23.c fsk.c kiss_fft.c)
 target_link_libraries(horus_demod m ${CMAKE_REQUIRED_LIBRARIES})
 
-# Currently not working
-#add_definitions(-DGEN_TX_BITSTREAM -DINTERLEAVER -DSCRAMBLER)
-#add_executable(horus_generate horus_l2.c golay23.c)
-#target_link_libraries(horus_generate ${CMAKE_REQUIRED_LIBRARIES})
-
 install(TARGETS codec2 EXPORT codec2-config
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
     PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/codec2
-)
-
-#install(EXPORT codec2-config
-#    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/codec2
-#)
-
-install(TARGETS
-    c2enc
-    c2dec
-    fdmdv_get_test_bits
-    fdmdv_mod fdmdv_demod
-    fm_demod
-    fsk_mod
-    fdmdv_put_test_bits
-    insert_errors
-    drs232
-    drs232_ldpc
-    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )

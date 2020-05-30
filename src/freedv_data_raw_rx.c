@@ -58,7 +58,6 @@ int main(int argc, char *argv[]) {
     mode = -1;
     if (!strcmp(argv[1],"700C")) mode = FREEDV_MODE_700C;
     if (!strcmp(argv[1],"700D")) mode = FREEDV_MODE_700D;
-    if (!strcmp(argv[1],"800XA")) mode = FREEDV_MODE_800XA;
     #ifdef __LPCNET__
     if (!strcmp(argv[1],"2020")) mode = FREEDV_MODE_2020;
     #endif
@@ -102,7 +101,7 @@ int main(int argc, char *argv[]) {
     assert((freedv_get_bits_per_modem_frame(freedv) % 8) == 0);
     int bytes_per_modem_frame = freedv_get_bits_per_modem_frame(freedv)/8;
     fprintf(stderr, "bytes_per_modem_frame: %d\n", bytes_per_modem_frame);
-    uint8_t bytes_out[bytes_per_modem_frame];
+    u_char bytes_out[bytes_per_modem_frame];
     short  demod_in[freedv_get_n_max_modem_samples(freedv)];
 
     /* We need to work out how many samples the demod needs on each
@@ -119,7 +118,7 @@ int main(int argc, char *argv[]) {
 
         /* we don't want to output any data if FEC decoding indicates it has known bit errors */
         if (!freedv_get_uncorrected_errors(freedv)) {
-            fwrite(bytes_out, sizeof(uint8_t), nbytes, fout);
+            fwrite(bytes_out, 1, nbytes, fout);
             nbytes_total += nbytes;
         }
         

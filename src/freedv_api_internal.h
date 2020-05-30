@@ -42,6 +42,7 @@
 #ifdef __LPCNET__
 #include "lpcnet_freedv.h"
 #endif
+#include "freedv_api.h"
 
 #ifdef __cplusplus
   extern "C" {
@@ -60,6 +61,8 @@
 #define RX_SYNC             0x2       // set if demodulator has sync
 #define RX_BITS             0x4       // set if data bits have been returned
 #define RX_BIT_ERRORS       0x8       // set if there are some uncorrectable errors in the data bits
+
+extern char *rx_sync_flags_to_text[]; // converts flags above to more meaningful text
       
 struct freedv {
     int                  mode;
@@ -71,7 +74,6 @@ struct freedv {
     struct FSK          *fsk;
     struct FMFSK        *fmfsk;
     struct OFDM         *ofdm;
-    struct OFDM_CONFIG  *ofdm_config;
     struct LDPC         *ldpc;
     struct MODEM_STATS   stats;
 #ifdef __LPCNET__

@@ -31,6 +31,8 @@
 #include <string.h>
 #include <errno.h>
 #include <ctype.h>
+#include <stdint.h>
+#include <stdbool.h>
 
 #include "freedv_api.h"
 #include "codec2.h"
@@ -215,7 +217,7 @@ int main(int argc, char *argv[]) {
     }
 
     if (strcmp(argv[2], "-") == 0) fout = stdout;
-    else if ( (fout = fopen(argv[3],"wb")) == NULL ) {
+    else if ( (fout = fopen(argv[2],"wb")) == NULL ) {
         fprintf(stderr, "Error opening output modem sample file: %s: %s.\n", argv[3], strerror(errno));
         exit(1);
     }
