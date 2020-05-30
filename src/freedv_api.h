@@ -35,7 +35,6 @@
 #include <sys/types.h>
 
 #include "comp.h"
-#include "codec2_ofdm.h"
 
 #ifdef __cplusplus
   extern "C" {

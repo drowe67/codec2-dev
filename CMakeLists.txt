@@ -275,7 +275,7 @@ if(WIN32)
     set(CPACK_PACKAGE_INSTALL_DIRECTORY "Codec2")
     set(CPACK_CREATE_DESKTOP_LINKS "")
     set(CPACK_NSIS_DISPLAY_NAME "${CPACK_PACKAGE_INSTALL_DIRECTORY}")
-    set(CPACK_NSIS_URL_INFO_ABOUT "http://codec2.org")
+    set(CPACK_NSIS_URL_INFO_ABOUT "http://rowetel.com/codec2.html")
     set(CPACK_NSIS_MODIFY_PATH ON)
     include(CPack)
 endif(WIN32)
@@ -444,11 +444,23 @@ endif()
 if(LPCNET)
 
     add_test(NAME test_freedv_api_2020_to_ofdm_demod
-             COMMAND sh -c "$<TARGET_FILE:freedv_tx> 2020 ~/LPCNet/wav/all.wav - --testframes | $<TARGET_FILE:ofdm_demod> --ts 0.0205 --nc 31 --verbose 1 --ldpc 2 -p 312 --testframes > /dev/null"
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                               ./freedv_tx 2020 ../../wav/wia_16kHz.wav - --testframes | 
+                               ./ofdm_demod --ts 0.0205 --nc 31 --verbose 1 --ldpc 2 -p 312 --testframes > /dev/null"
              )
 
     add_test(NAME test_freedv_api_2020_from_ofdm_mod
-             COMMAND sh -c "$<TARGET_FILE:ofdm_mod> --in /dev/zero --ts 0.0205 --nc 31 --verbose 1 --ldpc 2 -p 312 --testframes 10 | $<TARGET_FILE:freedv_rx> 2020 - /dev/null --testframes"
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            ./ofdm_mod --in /dev/zero --ts 0.0205 --nc 31 --verbose 1 --ldpc 2 -p 312 --testframes 10 | 
+                            ./freedv_rx 2020 - /dev/null --testframes"
+             )
+
+    add_test(NAME test_freedv_api_2020_awgn
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            dd bs=32000 count=10 if=/dev/zero |
+                            ./freedv_tx 2020 - - --testframes | 
+                            ./cohpsk_ch - - -24 --Fs 8000 |
+                            ./freedv_rx 2020 - /dev/null --testframes"
              )
 endif()
            
@@ -518,11 +530,26 @@ if (NOT APPLE)
              set_tests_properties(test_memory_leak_FreeDV_700C_tx PROPERTIES PASS_REGULAR_EXPRESSION "ERROR SUMMARY: 0 errors")
 
      add_test(NAME test_memory_leak_FreeDV_700C_rx
-             COMMAND sh -c "./freedv_tx 700C ${CMAKE_CURRENT_SOURCE_DIR}/raw/hts1a.raw t.raw; \
+             COMMAND sh -c "cd  ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            ./freedv_tx 700C ${CMAKE_CURRENT_SOURCE_DIR}/raw/hts1a.raw t.raw; \
                             valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./freedv_rx 700C t.raw /dev/null"
-             WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/src
              )
              set_tests_properties(test_memory_leak_FreeDV_700C_rx PROPERTIES PASS_REGULAR_EXPRESSION "ERROR SUMMARY: 0 errors")
+
+if(LPCNET)
+     add_test(NAME test_memory_leak_FreeDV_2020_tx
+             COMMAND sh -c "cd  ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./freedv_tx 2020 ../../wav/wia_16kHz.wav /dev/null"
+             )
+             set_tests_properties(test_memory_leak_FreeDV_2020_tx PROPERTIES PASS_REGULAR_EXPRESSION "ERROR SUMMARY: 0 errors")
+
+     add_test(NAME test_memory_leak_FreeDV_2020_rx
+             COMMAND sh -c "cd  ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            ./freedv_tx 2020 ../../wav/wia_16kHz.wav t.raw; \
+                            valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./freedv_rx 2020 t.raw /dev/null"
+             )
+             set_tests_properties(test_memory_leak_FreeDV_2020_rx PROPERTIES PASS_REGULAR_EXPRESSION "ERROR SUMMARY: 0 errors")
+endif(LPCNET)
 endif(NOT APPLE)
 
      add_test(NAME test_codec2_mode_dot_c2

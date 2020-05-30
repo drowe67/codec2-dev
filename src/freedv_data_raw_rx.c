@@ -101,7 +101,7 @@ int main(int argc, char *argv[]) {
     assert((freedv_get_bits_per_modem_frame(freedv) % 8) == 0);
     int bytes_per_modem_frame = freedv_get_bits_per_modem_frame(freedv)/8;
     fprintf(stderr, "bytes_per_modem_frame: %d\n", bytes_per_modem_frame);
-    uint8_t bytes_out[bytes_per_modem_frame];
+    u_char bytes_out[bytes_per_modem_frame];
     short  demod_in[freedv_get_n_max_modem_samples(freedv)];
 
     /* We need to work out how many samples the demod needs on each
@@ -118,7 +118,7 @@ int main(int argc, char *argv[]) {
 
         /* we don't want to output any data if FEC decoding indicates it has known bit errors */
         if (!freedv_get_uncorrected_errors(freedv)) {
-            fwrite(bytes_out, sizeof(uint8_t), nbytes, fout);
+            fwrite(bytes_out, 1, nbytes, fout);
             nbytes_total += nbytes;
         }
         

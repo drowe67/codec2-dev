@@ -53,13 +53,13 @@ void freedv_2020_open(struct freedv *f, struct freedv_advanced *adv) {
     f->ldpc = (struct LDPC*)MALLOC(sizeof(struct LDPC));
     assert(f->ldpc != NULL);
         
-    set_up_hra_504_396(f->ldpc, f->ofdm_config);
-    set_data_bits_per_frame(f->ldpc, data_bits_per_frame, f->ofdm_config->bps);
+    set_up_hra_504_396(f->ldpc, &f->ofdm->config);
+    set_data_bits_per_frame(f->ldpc, data_bits_per_frame, f->ofdm->config.bps);
     int coded_syms_per_frame = f->ldpc->coded_syms_per_frame;
         
     f->ofdm_bitsperframe = ofdm_get_bits_per_frame(f->ofdm);
-    f->ofdm_nuwbits = (f->ofdm_config->ns - 1) * f->ofdm_config->bps - f->ofdm_config->txtbits;
-    f->ofdm_ntxtbits = f->ofdm_config->txtbits;
+    f->ofdm_nuwbits = (f->ofdm->config.ns - 1) * f->ofdm->config.bps - f->ofdm->config.txtbits;
+    f->ofdm_ntxtbits = f->ofdm->config.txtbits;
     assert(f->ofdm_nuwbits == 10);
     assert(f->ofdm_ntxtbits == 4);
     if (f->verbose) {
@@ -102,7 +102,7 @@ void freedv_2020_open(struct freedv *f, struct freedv_advanced *adv) {
     f->n_nat_modem_samples = ofdm_get_samples_per_frame(f->ofdm);
     f->n_nom_modem_samples = ofdm_get_samples_per_frame(f->ofdm);
     f->n_max_modem_samples = ofdm_get_max_samples_per_frame(f->ofdm);
-    f->modem_sample_rate = f->ofdm_config->fs;
+    f->modem_sample_rate = f->ofdm->config.fs;
     f->clip = 0;
     f->sz_error_pattern = f->ofdm_bitsperframe;
 
@@ -160,7 +160,7 @@ void freedv_comptx_2020(struct freedv *f, COMP mod_out[]) {
 
     nspare = f->ofdm_ntxtbits*f->interleave_frames;
     uint8_t txt_bits[nspare];
-
+    
     for(k=0; k<nspare; k++) {
         if (f->nvaricode_bits == 0) {
             /* get new char and encode */
@@ -174,7 +174,7 @@ void freedv_comptx_2020(struct freedv *f, COMP mod_out[]) {
         if (f->nvaricode_bits) {
             txt_bits[k] = f->tx_varicode_bits[f->varicode_bit_index++];
             f->nvaricode_bits--;
-        }
+        } else txt_bits[k] = 0;
     }
 
     /* optionally replace codec payload bits with test frames known to rx */
@@ -195,7 +195,7 @@ void freedv_comptx_2020(struct freedv *f, COMP mod_out[]) {
     complex float tx_sams[f->interleave_frames*f->n_nat_modem_samples];
     COMP asam;
     
-    ofdm_ldpc_interleave_tx(f->ofdm, f->ldpc, tx_sams, tx_bits, txt_bits, f->interleave_frames, f->ofdm_config);
+    ofdm_ldpc_interleave_tx(f->ofdm, f->ldpc, tx_sams, tx_bits, txt_bits, f->interleave_frames, &f->ofdm->config);
 
     for(i=0; i<f->interleave_frames*f->n_nat_modem_samples; i++) {
         asam.real = crealf(tx_sams[i]);
@@ -248,7 +248,7 @@ int freedv_comprx_2020(struct freedv *f, COMP demod_in[]) {
     }
 
     /* OK modem is in sync */
-    
+
     if ((ofdm->sync_state == synced) || (ofdm->sync_state == trial)) {
         rx_status |= RX_SYNC;
         if (ofdm->sync_state == trial) rx_status |= RX_TRIAL_SYNC;
@@ -286,18 +286,30 @@ int freedv_comprx_2020(struct freedv *f, COMP demod_in[]) {
         gp_deinterleave_comp (codeword_symbols_de, codeword_symbols, interleave_frames*coded_syms_per_frame);
         gp_deinterleave_float(codeword_amps_de   , codeword_amps   , interleave_frames*coded_syms_per_frame);
 
+        /* Using LDPC decoder to determine if we have good sync early.
+
+           This call is causing valgrind to complain with the
+           "test_memory_leak_FreeDV_2020_rx" ctest, I think because in
+           2020 we only use part if the data symbols, so need to
+           prefill the rest of the codeword as per below.  This
+           function is not essential, as it falls through when
+           interleaving == 1, so have left out for now, rather than
+           debug/add extra code.
+
+           interleaver_sync_state_machine(ofdm, ldpc, &f->ofdm->config, codeword_symbols_de, codeword_amps_de, EsNo,
+                                       interleave_frames, &iter, &parityCheckCount, &Nerrs_coded);
+        */
+        ofdm->sync_state_interleaver = synced;
+        
         float llr[coded_bits_per_frame];
         uint8_t out_char[coded_bits_per_frame];
-
-        interleaver_sync_state_machine(ofdm, ldpc, f->ofdm_config, codeword_symbols_de, codeword_amps_de, EsNo,
-                                       interleave_frames, &iter, &parityCheckCount, &Nerrs_coded);
-                                         
+                                                
         if ((ofdm->sync_state_interleaver == synced) && (ofdm->frame_count_interleaver == interleave_frames)) {
             ofdm->frame_count_interleaver = 0;
 
             if (f->test_frames) {
                 int tmp[interleave_frames];
-                Nerrs_raw = count_uncoded_errors(ldpc, f->ofdm_config, tmp, interleave_frames, codeword_symbols_de);
+                Nerrs_raw = count_uncoded_errors(ldpc, &f->ofdm->config, tmp, interleave_frames, codeword_symbols_de);
                 f->total_bit_errors += Nerrs_raw;
                 f->total_bits       += f->ofdm_bitsperframe*interleave_frames;
             }
@@ -373,13 +385,14 @@ int freedv_comprx_2020(struct freedv *f, COMP demod_in[]) {
     ofdm_sync_state_machine(ofdm, rx_uw);
 
     if ((f->verbose && (ofdm->last_sync_state == search)) || (f->verbose == 2)) {
-        fprintf(stderr, "%3d st: %-6s euw: %2d %1d f: %5.1f pbw: %d snr: %4.1f %2d eraw: %3d ecdd: %3d iter: %3d pcc: %3d rxst: %d\n",
+        assert(rx_status <= 15);
+        fprintf(stderr, "%3d st: %-6s euw: %2d %1d f: %5.1f pbw: %d snr: %4.1f %2d eraw: %3d ecdd: %3d iter: %3d pcc: %3d rxst: %s\n",
                 f->frames++, ofdm_statemode[ofdm->last_sync_state], ofdm->uw_errors, ofdm->sync_counter, 
 		(double)ofdm->foff_est_hz, ofdm->phase_est_bandwidth,
                 f->snr_est, ofdm->frame_count_interleaver,
-                Nerrs_raw, Nerrs_coded, iter, parityCheckCount, rx_status);
+                Nerrs_raw, Nerrs_coded, iter, parityCheckCount, rx_sync_flags_to_text[rx_status]);
     }
-        
+       
     return rx_status;
 }
 #endif
