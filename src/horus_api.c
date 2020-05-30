@@ -36,9 +36,9 @@
 #include "horus_l2.h"
 
 #define MAX_UW_LENGTH                  100
-#define HORUS_API_VERSION                1    /* unique number that is bumped if API changes */
-#define HORUS_BINARY_NUM_BITS          360    /* fixed number of bytes in binary payload     */
-#define HORUS_BINARY_NUM_PAYLOAD_BYTES  22    /* fixed number of bytes in binary payload     */
+#define HORUS_API_VERSION                2    /* unique number that is bumped if API changes */
+
+
 
 struct horus {
     int         mode;
@@ -68,16 +68,44 @@ int8_t uw_horus_rtty[] = {
   0,0,1,0,0,1,0,1,1,0
 };
 
-/* Unique word for Horus Binary */
+/* Unique word for Horus Legacy Binary */
 
-int8_t uw_horus_binary[] = {
+int8_t uw_horus_legacy_binary[] = {
     0,0,1,0,0,1,0,0,
     0,0,1,0,0,1,0,0 
 };
 
-struct horus *horus_open (int mode, int Rs) {
-    int i;
-    assert((mode == HORUS_MODE_RTTY) || (mode == HORUS_MODE_BINARY));
+
+/* Unique word for Horus Binary 128/256 bit modes (Last row in the 32x32 Hadamard matrix) */
+
+int8_t uw_horus_binary_new[] = {
+    1, 0, 0, 1, 0, 1, 1, 0,  // 0x96
+    0, 1, 1, 0, 1, 0, 0, 1,  // 0x69
+    0, 1, 1, 0, 1, 0, 0, 1,  // 0x69
+    1, 0, 0, 1, 0, 1, 1, 0   // 0x96
+};
+
+
+struct horus *horus_open (int mode) {
+    assert((mode == HORUS_MODE_RTTY) || (mode == HORUS_MODE_BINARY) || (mode == HORUS_MODE_BINARY_256BIT) || (mode == HORUS_MODE_BINARY_128BIT));
+
+    if (mode == HORUS_MODE_RTTY){
+        // RTTY Mode defaults - 100 baud, no assumptions about tone spacing.
+        return horus_open_advanced(HORUS_MODE_RTTY, HORUS_RTTY_DEFAULT_BAUD, -1);
+    } else {
+        // Placeholder until we have more definition of the new modes.
+
+        // Legacy Horus Binary Mode defaults - 100 baud, 270 Hz Tone spacing (RS41HUP Transmitter)
+        return horus_open_advanced(HORUS_MODE_BINARY, HORUS_BINARY_DEFAULT_BAUD, HORUS_BINARY_DEFAULT_TONE_SPACING);
+    }
+
+
+}
+
+
+struct horus *horus_open_advanced (int mode, int Rs, int tx_tone_spacing) {
+    int i, mask;
+    assert((mode == HORUS_MODE_RTTY) || (mode == HORUS_MODE_BINARY) || (mode == HORUS_MODE_BINARY_256BIT) || (mode == HORUS_MODE_BINARY_128BIT));
 
     struct horus *hstates = (struct horus *)malloc(sizeof(struct horus));
     assert(hstates != NULL);
@@ -86,7 +114,20 @@ struct horus *horus_open (int mode, int Rs) {
 
     if (mode == HORUS_MODE_RTTY) {
         hstates->mFSK = 2;
-        hstates->max_packet_len = 1000;
+        hstates->max_packet_len = HORUS_RTTY_NUM_BITS;
+
+        // If baud rate not provided, use default
+        if (hstates->Rs == -1){
+            hstates->Rs = HORUS_RTTY_DEFAULT_BAUD;
+        }
+
+        if (tx_tone_spacing == -1){
+            // No tone spacing provided. Use dummy value to keep fsk modem happy, and disable mask estimation.
+            tx_tone_spacing = 2*hstates->Rs;
+            mask = 0;
+        } else {
+            mask = 1;
+        }
 
         /* map UW to make it easier to search for */
 
@@ -101,16 +142,34 @@ struct horus *horus_open (int mode, int Rs) {
     if (mode == HORUS_MODE_BINARY) {
         hstates->mFSK = 4;
         hstates->max_packet_len = HORUS_BINARY_NUM_BITS;
-        for (i=0; i<sizeof(uw_horus_binary); i++) {
-            hstates->uw[i] = 2*uw_horus_binary[i] - 1;
+
+        // If baud rate not provided, use default
+        if (hstates->Rs == -1){
+            hstates->Rs = HORUS_BINARY_DEFAULT_BAUD;
         }
-        hstates->uw_len = sizeof(uw_horus_binary);
-        hstates->uw_thresh = sizeof(uw_horus_binary) - 2; /* allow a few bit errors in UW detection */
+
+        if (tx_tone_spacing == -1){
+            // No tone spacing provided. Use the default value for this mode and enable mask estimation.
+            tx_tone_spacing = HORUS_BINARY_DEFAULT_TONE_SPACING;
+            mask = 1;
+        } else {
+            mask = 1;
+        }
+
+        for (i=0; i<sizeof(uw_horus_legacy_binary); i++) {
+            hstates->uw[i] = 2*uw_horus_legacy_binary[i] - 1;
+        }
+        hstates->uw_len = sizeof(uw_horus_legacy_binary);
+        hstates->uw_thresh = sizeof(uw_horus_legacy_binary) - 2; /* allow a few bit errors in UW detection */
         horus_l2_init();
         hstates->rx_bits_len = hstates->max_packet_len;
     }
-   
-    hstates->fsk = fsk_create(hstates->Fs, hstates->Rs, hstates->mFSK, 1000, 2*hstates->Rs);
+    // TODO: Horus 256/128-bit modes here.
+
+    hstates->fsk = fsk_create(hstates->Fs, hstates->Rs, hstates->mFSK, 1000, tx_tone_spacing);
+
+    // Set the mask estimator
+    fsk_set_freq_est_alg(hstates->fsk, mask);
 
     /* allocate enough room for two packets so we know there will be
        one complete packet if we find a UW at start */
@@ -275,7 +334,7 @@ int extract_horus_rtty(struct horus *hstates, char ascii_out[], int uw_loc) {
 }
 
 
-int extract_horus_binary(struct horus *hstates, char hex_out[], int uw_loc) {
+int extract_legacy_horus_binary(struct horus *hstates, char hex_out[], int uw_loc) {
     const int nfield = 8;                      /* 8 bit binary                   */
     int st = uw_loc;                           /* first bit of first char        */
     int en = uw_loc + hstates->max_packet_len; /* last bit of max length packet  */
@@ -377,13 +436,13 @@ int horus_rx(struct horus *hstates, char ascii_out[], short demod_in[], int quad
     COMP *demod_in_comp = (COMP*)malloc(sizeof(COMP)*hstates->fsk->nin);
     
     for (i=0; i<hstates->fsk->nin; i++) {
-	if (quadrature) {
-	    demod_in_comp[i].real = demod_in[i * 2];
-	    demod_in_comp[i].imag = demod_in[i * 2 + 1];
-	} else {
-	    demod_in_comp[i].real = demod_in[i];
-	    demod_in_comp[i].imag = 0;
-	}
+        if (quadrature) {
+            demod_in_comp[i].real = demod_in[i * 2];
+            demod_in_comp[i].imag = demod_in[i * 2 + 1];
+        } else {
+            demod_in_comp[i].real = demod_in[i];
+            demod_in_comp[i].imag = 0;
+        }
     }
     fsk_demod(hstates->fsk, &hstates->rx_bits[rx_bits_len-Nbits], demod_in_comp);
     free(demod_in_comp);
@@ -403,7 +462,7 @@ int horus_rx(struct horus *hstates, char ascii_out[], short demod_in[], int quad
             packet_detected = extract_horus_rtty(hstates, ascii_out, uw_loc);
         }
         if (hstates->mode == HORUS_MODE_BINARY) {
-            packet_detected = extract_horus_binary(hstates, ascii_out, uw_loc);
+            packet_detected = extract_legacy_horus_binary(hstates, ascii_out, uw_loc);
             //#define DUMP_BINARY_PACKET
             #ifdef DUMP_BINARY_PACKET
             FILE *f = fopen("packetbits.txt", "wt"); assert(f != NULL);

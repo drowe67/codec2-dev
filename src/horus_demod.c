@@ -55,7 +55,8 @@ int main(int argc, char *argv[]) {
     int      quadrature = 0;
     int fsk_lower = -1;
     int fsk_upper = -1;
-    int Rs = 100;
+    int Rs = -1;
+    int tone_spacing = -1;
 
     stats_loop = 0;
     stats_rate = 8;
@@ -69,6 +70,7 @@ int main(int argc, char *argv[]) {
             {"help",      no_argument,        0, 'h'},
             {"mode",      required_argument,  0, 'm'},
             {"rate",      optional_argument,  0, 'r'},
+            {"tonespacing", optional_argument,  0, 's'},
             {"stats",     optional_argument,  0, 't'},
             {"fsk_lower", optional_argument,  0, 'b'},
             {"fsk_upper", optional_argument,  0, 'u'},
@@ -85,6 +87,13 @@ int main(int argc, char *argv[]) {
                 if ((strcmp(optarg, "BINARY") == 0) || (strcmp(optarg, "binary") == 0)) {
                     mode = HORUS_MODE_BINARY;
                 }
+                // Commented out until these are implemented.
+                // if ((strcmp(optarg, "256BIT") == 0) || (strcmp(optarg, "256bit") == 0)) {
+                //     mode = HORUS_MODE_BINARY_256BIT;
+                // }
+                // if ((strcmp(optarg, "128BIT") == 0) || (strcmp(optarg, "128bit") == 0)) {
+                //     mode = HORUS_MODE_BINARY_128BIT;
+                // }
                 if (mode == -1) {
                     fprintf(stderr, "use --mode RTTY or --mode binary\n");
                     exit(1);
@@ -127,6 +136,11 @@ int main(int argc, char *argv[]) {
                     Rs = atoi(optarg);
                 }
                 break;
+            case 's':
+                if (optarg != NULL){
+                    tone_spacing = atoi(optarg);
+                }
+                break;
             break;
         }
     }
@@ -138,7 +152,7 @@ int main(int argc, char *argv[]) {
         goto helpmsg;
     }
     
-    if( (argc - dx) > 5) {
+    if( (argc - dx) > 6) {
         fprintf(stderr, "Too many arguments\n");
     helpmsg:
         fprintf(stderr,"usage: %s -m RTTY|binary [-q] [-v] [-c] [-t [r]] InputModemRawFile OutputAsciiFile\n",argv[0]);
@@ -146,7 +160,8 @@ int main(int argc, char *argv[]) {
         fprintf(stderr,"InputModemRawFile      48 kHz 16 bit shorts real modem signal from radio\n");
         fprintf(stderr," -m RTTY|binary\n"); 
         fprintf(stderr,"--mode=RTTY|binary     RTTY or binary Horus protcols\n");
-        fprintf(stderr,"--rate=[Rs]            Modem baud rate. Default: 100\n");
+        fprintf(stderr,"--rate=[Rs]            Customise modem baud rate. Default: (depends on mode) \n");
+        fprintf(stderr,"--tonespacing=[tone_spacing] Transmitter Tone Spacing (Hz) Default: Not used.\n");
         fprintf(stderr," -t[r] --stats=[r]     Print out modem statistics to stderr in JSON.\n");
         fprintf(stderr,"                       r, if provided, sets the number of modem frames\n"
                        "                       between statistic printouts\n");
@@ -180,7 +195,7 @@ int main(int argc, char *argv[]) {
 
     /* end command line processing */
 
-    hstates = horus_open(mode, Rs);
+    hstates = horus_open_advanced(mode, Rs, tone_spacing);
     horus_set_verbose(hstates, verbose);
     
     if (hstates == NULL) {

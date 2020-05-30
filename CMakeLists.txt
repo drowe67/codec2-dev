@@ -651,7 +651,7 @@ endif(NOT APPLE)
      # Horus telemetry waveforms             
      add_test(NAME test_horus_binary
              COMMAND sh -c "sox ${CMAKE_CURRENT_SOURCE_DIR}/wav/horus_binary_ebno_4.5db.wav -r 48000 -t raw - |
-                             $<TARGET_FILE:horus_demod> -m binary - -"
+                             $<TARGET_FILE:horus_demod> -m binary --tonespacing=200 - -"
               )
              set_tests_properties(test_horus_binary PROPERTIES PASS_REGULAR_EXPRESSION "1C9A9545")
      add_test(NAME test_horus_binary_iq
