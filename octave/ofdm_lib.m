@@ -15,45 +15,67 @@
 %-------------------------------------------------------------
 
 #{
-  Frame has Ns-1 data symbols between pilots, e.g. for Ns=3, Nc=3: 
-  
-   PPPPP
-    DDD
-    DDD
-   PPPPP
 
-  Time flows down, freq across
+  Modem frame has Ns-1 data symbols between pilots, so every Ns symbol is
+  pilot.  There are a total of Nf symbols (data+pilot) in a modem
+  frame.
+  
+  e.g. for Nf=8, Ns=4, Nc=6:
+  
+    |-Nc-|                Time
+   PPPPPPPP  ---------     |
+    DDDDDD    |     |      |
+    DDDDDD    Ns    |      |
+    DDDDDD    |     |      |
+   PPPPPPPP  ---    Nf    \|/ 
+    DDDDDD    |     |      |
+    DDDDDD    Ns    |      |
+    DDDDDD    |     |      |
+   PPPPPPPP  ---------     |
+
+   Freq------------------>
+
+   Time flows down, freq across
 #}
 
-function states = ofdm_init(bps, Rs, Tcp, Ns, Nc)
+function states = ofdm_init(bps, Rs, Tcp, Nf, Ns, Nc)
   states.Fs = 8000;
+  
+  % some basic sanity checks
+  if floor(states.Fs/Rs) != states.Fs/Rs
+    printf("Need an integer oversample factor M=Fs/R Fs: %f Rs: %d\n", states.Fs, Rs);
+    assert 0;
+  end;
+  
+  if floor(Nf/Ns) != Nf/Ns
+    printf("Need an integer number of pilots/frame Nf: %d Ns: %d\n", Nf, Ns);
+    assert 0;
+  end;
+  
   states.bps = bps;
   states.Rs = Rs;
   states.Tcp = Tcp;
+  states.Nf = Nf;       % total (pilots+data) number of symbols/frame
   states.Ns = Ns;       % step size for pilots
-  states.Nc = Nc;       % Number of cols, aka number of carriers
+  states.Nc = Nc;       % Number of carriers
   states.M  = states.Fs/Rs; 
   states.Ncp = Tcp*states.Fs;
-  states.Nbitsperframe = (Ns-1)*Nc*bps;
-  states.Nrowsperframe = states.Nbitsperframe/(Nc*bps);
-  states.Nsamperframe =  (states.Nrowsperframe+1)*(states.M+states.Ncp);
-  states.Ntxtbits = 4;   % reserved bits/frame for auxillary text information
-  states.Nuwbits  = bps*5;   % Let use 5 symbols for the UW, note longer for QAM
+  states.Nbitsperframe = (Ns-1)*(Nf/Ns)*Nc*bps;     % total bits in all data symbols, whatever they are used for
+  states.Nsamperframe =  Nf*(states.M+states.Ncp);
+  states.Ntxtbits = 4;                              % reserved bits/frame for auxillary text information
+  states.Nuwbits  = bps*5;                          % Let use 5 symbols for the UW, note ths means longer for QAM that QPSK
   states.qam16 = [
     1 + j,  1 + j*3,  3 + j,  3 + j*3;
     1 - j,  1 - j*3,  3 - j,  3 - j*3;
    -1 + j, -1 + j*3, -3 + j, -3 + j*3;
    -1 - j, -1 - j*3, -3 - j, -3 - j*3]/3;
-   
-  % some basic sanity checks
-  assert(floor(states.M) == states.M);
+
   test_qam16(states.qam16);
-  
+     
   % UW symbol placement, designed to get no false syncs at any freq
   % offset.  Use ofdm_dev.m, debug_false_sync() to test.  Note we need
-  % to pair the UW bits so the fit into symbols.  The LDPC decoder
-  % works on symbols so we can't break up any symbols into UW/LDPC
-  % bits.
+  % to fill each UW symbols with bits.  The LDPC decoder works on
+  % symbols so we can't break up any symbols into UW/LDPC bits.
   
   states.uw_ind = states.uw_ind_sym = [];
   for i=1:states.Nuwbits/bps
@@ -65,7 +87,6 @@ function states = ofdm_init(bps, Rs, Tcp, Ns, Nc)
   end
 
   states.tx_uw = zeros(1,states.Nuwbits);       
-  assert(length(states.tx_uw) == states.Nuwbits);
   tx_uw_syms = [];
   for b=1:bps:states.Nuwbits
     tx_uw_syms = [tx_uw_syms qpsk_mod(states.tx_uw(b:b+1))];
@@ -73,7 +94,7 @@ function states = ofdm_init(bps, Rs, Tcp, Ns, Nc)
   states.tx_uw_syms = tx_uw_syms;
   
   % use this to scale tx output to 16 bit short.  Adjusted by experiment
-  % to have same RMS power as FDMDV waveform
+  % to have same RMS power as other modem waveforms
   
   states.amp_scale = 2E5*1.1491/1.06;
 
@@ -182,8 +203,8 @@ endfunction
 %
 % usage: ofdm_init_mode("Ts=0.018 Nc=17 Ncp=0.002")
 
-function [bps Rs Tcp Ns Nc] = ofdm_init_mode(mode="700D")
-  bps = 2; Tcp = 0.002; Ns=8;
+function [bps Rs Tcp Nf Ns Nc] = ofdm_init_mode(mode="700D")
+  bps = 2; Tcp = 0.002; Nf=Ns=8;
 
   % some "canned" modes
   if strcmp(mode,"700D")
@@ -196,9 +217,9 @@ function [bps Rs Tcp Ns Nc] = ofdm_init_mode(mode="700D")
     # Ns=5, Rs=50, so Rs/Ns=10 -> +/- 5Hz doppler tracking bandwidth
     # For (504,296) LDPC code we want 504+5*4+4=528 uncoded bits/frame
     # Rs*Nc=1650, so fits easily in 2000 Hz
-    Ns=5; Tcp = 0.004; Tframe = 0.1; Ts = Tframe/Ns; Nc = 33; bps=4;
+    f=Ns=5; Tcp = 0.004; Tframe = 0.1; Ts = Tframe/Ns; Nc = 33; bps=4;
   elseif strcmp(mode,"1")
-    Ns=100; Tcp = 0; Tframe = 0.1; Ts = Tframe/Ns; Nc = 1; bps=2;
+    Nf=80; Ns=8; Tcp = 0; Tframe = 0.1; Ts = Tframe/Ns; Nc = 1; bps=2;
   else
     % try to parse mode string for user defined mode
     vec = sscanf(mode, "Ts=%f Nc=%d Ncp=%f");
@@ -210,11 +231,12 @@ end
 
 function print_config(states)
   ofdm_load_const;
-  printf("Rs=%5.2f Nc=%d Tcp=%4.3f ", Rs, Nc, Tcp);
-  printf("Nbitsperframe: %d Nrowsperframe: %d Ntxtbits: %d Nuwbits: %d ",
-          Nbitsperframe, Nrowsperframe, Ntxtbits, Nuwbits);
-  printf("bits/s: %4.1f\n",  Nbitsperframe*Rs/Ns);
+  printf("Rs=%5.2f Nf=%d Ns=%s Nc=%d Tcp=%4.3f ", Rs, Nf, Ns, Nc, Tcp);
+  printf("Nbitsperframe: %d Ntxtbits: %d Nuwbits: %d ",
+          Nbitsperframe, Ntxtbits, Nuwbits);
+  printf("bits/s: %4.1f\n",  Nbitsperframe*Rs/Nf);
 end
+
 
 % Gray coded QPSK modulation function
 function symbol = qpsk_mod(two_bits)
@@ -448,18 +470,23 @@ function tx = ofdm_txframe(states, tx_sym_lin)
   ofdm_load_const;
   assert(length(tx_sym_lin) == Nbitsperframe/bps);
 
-  % place symbols in multi-carrier frame with pilots and boundary carriers
+  % place data symbols in multi-carrier frame with pilots and boundary carriers
 
   tx_sym = []; s = 1;
-  aframe = zeros(Ns,Nc+2);
-  aframe(1,:) = pilots;
-  for r=1:Nrowsperframe
-    arowofsymbols = tx_sym_lin(s:s+Nc-1);
-    s += Nc;
-    aframe(r+1,2:Nc+1) = arowofsymbols;
-    if states.dpsk
-      aframe(r+1,2:Nc+1) = aframe(r+1,2:Nc+1) .* aframe(r,2:Nc+1);
-    end   
+  aframe = zeros(Nf,Nc+2);
+  for r=1:Nf
+    if mod(r-1,Ns) == 0
+      % row of pilots
+      aframe(r,:) = pilots;
+    else
+      % row of data symbols
+      arowofsymbols = tx_sym_lin(s:s+Nc-1);
+      aframe(r,2:Nc+1) = arowofsymbols;
+      s += Nc;
+      if states.dpsk
+        aframe(r,2:Nc+1) = aframe(r,2:Nc+1) .* aframe(r-1,2:Nc+1);
+      end
+    end
   end
   tx_sym = [tx_sym; aframe];
 
