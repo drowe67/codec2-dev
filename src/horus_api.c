@@ -338,7 +338,7 @@ int extract_horus_rtty(struct horus *hstates, char ascii_out[], int uw_loc) {
 }
 
 
-int extract_legacy_horus_binary(struct horus *hstates, char hex_out[], int uw_loc) {
+int extract_horus_binary_v1(struct horus *hstates, char hex_out[], int uw_loc) {
     const int nfield = 8;                      /* 8 bit binary                   */
     int st = uw_loc;                           /* first bit of first char        */
     int en = uw_loc + hstates->max_packet_len; /* last bit of max length packet  */
@@ -466,7 +466,7 @@ int horus_rx(struct horus *hstates, char ascii_out[], short demod_in[], int quad
             packet_detected = extract_horus_rtty(hstates, ascii_out, uw_loc);
         }
         if (hstates->mode == HORUS_MODE_BINARY_V1) {
-            packet_detected = extract_legacy_horus_binary(hstates, ascii_out, uw_loc);
+            packet_detected = extract_horus_binary_v1(hstates, ascii_out, uw_loc);
             //#define DUMP_BINARY_PACKET
             #ifdef DUMP_BINARY_PACKET
             FILE *f = fopen("packetbits.txt", "wt"); assert(f != NULL);
