@@ -60,6 +60,7 @@ function states = ofdm_init(bps, Rs, Tcp, Ns, Nf, Nc)
                                                   % modem frame.  In other modes (e.g. 700D/2020) Nf == Ns, ie the modem frame
                                                   % is the same length as the FEC frame.
   assert(floor(Nf/Ns) == Nf/Ns);               
+  states.Nbitsperpacket = (Nf/Ns)*states.Nbitsperframe;
   
   % some basic sanity checks
   assert(floor(states.M) == states.M);
@@ -314,26 +315,26 @@ function out = freq_shift(in, foff, Fs)
 endfunction
 
 
-% --------------------------------------
-% ofdm_mod - modulates one frame of bits
-% --------------------------------------
+% -----------------------------------------------------------------
+% ofdm_mod - modulates a complete packet (one or mode modem frames)
+% ----------------------------------------------------------------
 
 function tx = ofdm_mod(states, tx_bits)
   ofdm_load_const;
-  assert(length(tx_bits) == Nbitsperframe);
-
+  assert(length(tx_bits) == Nbitsperpacket);
+ 
   % map to symbols in linear array
 
   if bps == 1
     tx_sym_lin = 2*tx_bits - 1;
   end
   if bps == 2
-    for s=1:Nbitsperframe/bps
+    for s=1:Nbitsperpacket/bps
       tx_sym_lin(s) = qpsk_mod(tx_bits(2*(s-1)+1:2*s));
     end
   end  
   if bps == 4
-    for s=1:Nbitsperframe/bps
+    for s=1:Nbitsperpacket/bps
       tx_sym_lin(s) = qam16_mod(states.qam16,tx_bits(4*(s-1)+1:4*s));
     end
   end
@@ -342,22 +343,44 @@ function tx = ofdm_mod(states, tx_bits)
 endfunction
 
 
-% -----------------------------------------
-% ofdm_tx - modulates one frame of symbols
-% ----------------------------------------
+% ----------------------------------------------
+% ofdm_txframe - modulates one packet of symbols
+% ----------------------------------------------
 
-#{ 
-   Each carrier amplitude is 1/M.  There are two edge carriers that
-   are just tx-ed for pilots plus plus Nc continuous carriers. So
-   power is:
+function tx = ofdm_txframe(states, tx_sym_lin)
+  ofdm_load_const;
+  assert(length(tx_sym_lin) == Nbitsperpacket/bps);
 
-     p = 2/(Ns*(M*M)) + Nc/(M*M)
+  % place data symbols in multi-carrier frame with pilots and boundary carriers
 
-   e.g. Ns=8, Nc=16, M=144 
-   
-     p = 2/(8*(144*144)) + 16/(144*144) = 7.84-04
+  tx_sym = []; s = 1;
+  aframe = zeros(Nf,Nc+2);
+  for r=1:Nf
+    if mod(r-1,Ns) == 0
+      % row of pilots
+      aframe(r,:) = pilots;
+    else
+      % row of data symbols
+      arowofsymbols = tx_sym_lin(s:s+Nc-1);
+      aframe(r,2:Nc+1) = arowofsymbols;
+      s += Nc;
+      if states.dpsk
+        aframe(r,2:Nc+1) = aframe(r,2:Nc+1) .* aframe(r-1,2:Nc+1);
+      end
+    end
+  end
+  tx_sym = [tx_sym; aframe];
 
-#}
+  % OFDM upconvert symbol by symbol so we can add CP
+
+  tx = [];
+  for r=1:Ns
+    asymbol = tx_sym(r,:) * W/M;
+    asymbol_cp = [asymbol(M-Ncp+1:M) asymbol];
+    tx = [tx asymbol_cp];
+  end
+endfunction
+
 
 function tx = ofdm_txframe(states, tx_sym_lin)
   ofdm_load_const;

@@ -10,6 +10,7 @@ M = states.M;
 Ncp = states.Ncp;
 bps = states.bps;
 Nbitsperframe = states.Nbitsperframe;
+Nbitsperpacket = states.Nbitsperpacket;
 Nsampersymbol = states.Nsampersymbol;
 Nsamperframe = states.Nsamperframe;
 timing_mx_thresh = 0.35;
