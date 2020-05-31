@@ -50,7 +50,7 @@ end
 printf("Nc = %d LDPC testing: %d\n", Nc, cml_support);
 
 Ns = 8;
-states = ofdm_init(bps, Rs, Tcp, Ns, Nc);
+states = ofdm_init(bps, Rs, Tcp, Ns, Ns, Nc);
 states.verbose = 0;
 ofdm_load_const;
 

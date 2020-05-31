@@ -19,8 +19,8 @@ function ofdm_rx(filename, mode="700D", error_pattern_filename)
   
   % init modem
 
-  [bps Rs Tcp Ns Nc] = ofdm_init_mode(mode);
-  states = ofdm_init(bps, Rs, Tcp, Ns, Nc);
+  [bps Rs Tcp Ns Nf Nc] = ofdm_init_mode(mode);
+  states = ofdm_init(bps, Rs, Tcp, Ns, Nf, Nc);
   print_config(states);
   ofdm_load_const;
   states.verbose = 0;
