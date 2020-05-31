@@ -59,10 +59,10 @@ function states = ofdm_init(bps, Rs, Tcp, Ns, Nc)
   assert(floor(states.M) == states.M);
   test_qam16(states.qam16);
   
-  % UW symbol placement, designed to get no false syncs at any freq
-  % offset.  Use ofdm_dev.m, debug_false_sync() to test.  Note we need
-  % to fill each UW symbols with bits.  The LDPC decoder works on
-  % symbols so we can't break up any symbols into UW/FEC encoded bits.
+  % UW symbol placement.  Use ofdm_dev.m, debug_false_sync() to test.
+  % Note we need to fill each UW symbols with bits.  The LDPC decoder
+  % works on symbols so we can't break up any symbols into UW/FEC
+  % encoded bits.
   
   states.uw_ind = states.uw_ind_sym = [];
   for i=1:states.Nuwbits/bps
@@ -224,6 +224,23 @@ function print_config(states)
   printf("Nbitsperframe: %d Ns: %d Ntxtbits: %d Nuwbits: %d ",
           Nbitsperframe, Ns, Ntxtbits, Nuwbits);
   printf("bits/s: %4.1f\n",  Nbitsperframe*Rs/Ns);
+  s=1; u=1; Nuwsyms=length(uw_ind_sym);
+  for r=1:Ns
+    for c=1:Nc+2
+      if r == 1
+        sym="P";
+      elseif c>1 && c <=(Nc+1)
+        sym=".";
+        if (u <= Nuwsyms) && (s == uw_ind_sym(u)) sym="U"; u++; end
+        s++;
+      else
+        sym=" ";
+      end
+      printf("%s",sym);
+    end
+    printf("\n");
+  end
+  states.uw_ind_sym
 end
 
 % Gray coded QPSK modulation function
