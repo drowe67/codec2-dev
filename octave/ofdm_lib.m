@@ -2,7 +2,7 @@
 % David Rowe Mar 2017
 
 #{
-  Library of functions that implement a BPSK/QPSK OFDM modem.  Rate Fs
+  Library of functions that implement a PSK OFDM modem.  Rate Fs
   verison of ofdm_rs.m with OFDM based up and down conversion, and all
   those nasty real-world details like fine freq, timing.  
 #}
@@ -35,7 +35,7 @@
    In this figure, time flows down, freq across.
 #}
 
-function states = ofdm_init(bps, Rs, Tcp, Ns, Nc)
+function states = ofdm_init(bps, Rs, Tcp, Ns, Nf, Nc)
   states.Fs = 8000;
   states.bps = bps;
   states.Rs = Rs;
@@ -54,7 +54,13 @@ function states = ofdm_init(bps, Rs, Tcp, Ns, Nc)
     1 - j,  1 - j*3,  3 - j,  3 - j*3;
    -1 + j, -1 + j*3, -3 + j, -3 + j*3;
    -1 - j, -1 - j*3, -3 - j, -3 - j*3]/3;
-   
+  states.Nf = Nf;                                 % number of symbols per FEC frame (or superframe). In some modes we want
+                                                  % the total packet of data to span multiple modem frames, e.g. HF data
+                                                  % and/or when the FEC codeword is larger than the number of symbols in one
+                                                  % modem frame.  In other modes (e.g. 700D/2020) Nf == Ns, ie the modem frame
+                                                  % is the same length as the FEC frame.
+  assert(floor(Nf/Ns) == Nf/Ns);               
+  
   % some basic sanity checks
   assert(floor(states.M) == states.M);
   test_qam16(states.qam16);
@@ -187,13 +193,13 @@ function states = ofdm_init(bps, Rs, Tcp, Ns, Nc)
 endfunction
 
 
-%
-%  Helper function to set up modems for various FreeDV modes, and parse mode string
-%
-% usage: ofdm_init_mode("Ts=0.018 Nc=17 Ncp=0.002")
+%------------------------------------------------------------------------------
+% ofdm_init_mode - Helper function to set up modems for various FreeDV modes,
+%                  and parse mode string.
+%------------------------------------------------------------------------------
 
-function [bps Rs Tcp Ns Nc] = ofdm_init_mode(mode="700D")
-  bps = 2; Tcp = 0.002; Ns=8;
+function [bps Rs Tcp Ns Nf Nc] = ofdm_init_mode(mode="700D")
+  bps = 2; Tcp = 0.002; Ns=Nf=8;
 
   % some "canned" modes
   if strcmp(mode,"700D")
@@ -207,8 +213,10 @@ function [bps Rs Tcp Ns Nc] = ofdm_init_mode(mode="700D")
     # For (504,296) LDPC code we want 504+5*4+4=528 uncoded bits/frame
     # Rs*Nc=1650, so fits easily in 2000 Hz
     Ns=5; Tcp = 0.004; Tframe = 0.1; Ts = Tframe/Ns; Nc = 33; bps=4;
+  elseif strcmp(mode,"data")
+    Ns=5; Nf=10; Tcp = 0.004; Tframe = 0.1; Ts = Tframe/Ns; Nc = 17; bps=2;
   elseif strcmp(mode,"1")
-    Ns=100; Tcp = 0; Tframe = 0.1; Ts = Tframe/Ns; Nc = 1; bps=2;
+    Ns=5; Nf=10; Tcp=0; Tframe = 0.1; Ts = Tframe/Ns; Nc = 1; bps=2;
   else
     % try to parse mode string for user defined mode
     vec = sscanf(mode, "Ts=%f Nc=%d Ncp=%f");
@@ -218,6 +226,10 @@ function [bps Rs Tcp Ns Nc] = ofdm_init_mode(mode="700D")
 end
 
 
+%------------------------------------------------------------------------------
+% print_config - utility function to use ascsii-art to describe the modem frame
+%------------------------------------------------------------------------------
+
 function print_config(states)
   ofdm_load_const;
   printf("Rs=%5.2f Nc=%d Tcp=%4.3f ", Rs, Nc, Tcp);
@@ -225,22 +237,23 @@ function print_config(states)
           Nbitsperframe, Ns, Ntxtbits, Nuwbits);
   printf("bits/s: %4.1f\n",  Nbitsperframe*Rs/Ns);
   s=1; u=1; Nuwsyms=length(uw_ind_sym);
-  for r=1:Ns
-    for c=1:Nc+2
-      if r == 1
-        sym="P";
-      elseif c>1 && c <=(Nc+1)
-        sym=".";
-        if (u <= Nuwsyms) && (s == uw_ind_sym(u)) sym="U"; u++; end
-        s++;
-      else
-        sym=" ";
+  for f=1:Nf/Ns
+    for r=1:Ns
+      for c=1:Nc+2
+        if r == 1
+          sym="P";
+        elseif c>1 && c <=(Nc+1)
+          sym=".";
+          if (u <= Nuwsyms) && (s == uw_ind_sym(u)) sym="U"; u++; end
+          s++;
+        else
+          sym=" ";
+        end
+        printf("%s",sym);
       end
-      printf("%s",sym);
+      printf("\n");
     end
-    printf("\n");
-  end
-  states.uw_ind_sym
+  end  
 end
 
 % Gray coded QPSK modulation function
@@ -301,6 +314,85 @@ function out = freq_shift(in, foff, Fs)
 endfunction
 
 
+% --------------------------------------
+% ofdm_mod - modulates one frame of bits
+% --------------------------------------
+
+function tx = ofdm_mod(states, tx_bits)
+  ofdm_load_const;
+  assert(length(tx_bits) == Nbitsperframe);
+
+  % map to symbols in linear array
+
+  if bps == 1
+    tx_sym_lin = 2*tx_bits - 1;
+  end
+  if bps == 2
+    for s=1:Nbitsperframe/bps
+      tx_sym_lin(s) = qpsk_mod(tx_bits(2*(s-1)+1:2*s));
+    end
+  end  
+  if bps == 4
+    for s=1:Nbitsperframe/bps
+      tx_sym_lin(s) = qam16_mod(states.qam16,tx_bits(4*(s-1)+1:4*s));
+    end
+  end
+
+  tx = ofdm_txframe(states, tx_sym_lin);
+endfunction
+
+
+% -----------------------------------------
+% ofdm_tx - modulates one frame of symbols
+% ----------------------------------------
+
+#{ 
+   Each carrier amplitude is 1/M.  There are two edge carriers that
+   are just tx-ed for pilots plus plus Nc continuous carriers. So
+   power is:
+
+     p = 2/(Ns*(M*M)) + Nc/(M*M)
+
+   e.g. Ns=8, Nc=16, M=144 
+   
+     p = 2/(8*(144*144)) + 16/(144*144) = 7.84-04
+
+#}
+
+function tx = ofdm_txframe(states, tx_sym_lin)
+  ofdm_load_const;
+  assert(length(tx_sym_lin) == Nbitsperframe/bps);
+
+  % place symbols in multi-carrier frame with pilots and boundary carriers
+
+  tx_sym = []; s = 1;
+  aframe = zeros(Ns,Nc+2);
+  aframe(1,:) = pilots;
+  for r=1:Ns-1
+    arowofsymbols = tx_sym_lin(s:s+Nc-1);
+    s += Nc;
+    aframe(r+1,2:Nc+1) = arowofsymbols;
+    if states.dpsk
+      aframe(r+1,2:Nc+1) = aframe(r+1,2:Nc+1) .* aframe(r,2:Nc+1);
+    end   
+  end
+  tx_sym = [tx_sym; aframe];
+
+  % OFDM upconvert symbol by symbol so we can add CP
+
+  tx = [];
+  for r=1:Ns
+    asymbol = tx_sym(r,:) * W/M;
+    asymbol_cp = [asymbol(M-Ncp+1:M) asymbol];
+    tx = [tx asymbol_cp];
+  end
+endfunction
+
+
+% -----------------------------------------------------------
+% est_timing
+% -----------------------------------------------------------
+
 #{
   Correlates the OFDM pilot symbol samples with a window of received
   samples to determine the most likely timing offset.  Combines two
@@ -348,6 +440,10 @@ function [t_est timing_valid timing_mx av_level] = est_timing(states, rx, rate_f
 endfunction
 
 
+% -----------------------------------------------------------
+% est_freq_offset
+% -----------------------------------------------------------
+
 #{
   Determines frequency offset at current timing estimate, used for
   coarse freq offset estimation during acquisition.
@@ -383,6 +479,10 @@ function [foff_est states] = est_freq_offset(states, rx, rate_fs_pilot_samples, 
  
 endfunction
 
+
+% -----------------------------------------------------------
+% est_freq_offset_pilot_corr
+% -----------------------------------------------------------
 
 #{
   Determines frequency offset at current timing estimate, used for
@@ -424,80 +524,6 @@ function foff_est = est_freq_offset_pilot_corr(states, rx, rate_fs_pilot_samples
       figure(10); clf;
       plot(st:en,C(Fs/2+st:Fs/2+en)); grid;
     end 
-endfunction
-
-
-% --------------------------------------
-% ofdm_mod - modulates one frame of bits
-% --------------------------------------
-
-function tx = ofdm_mod(states, tx_bits)
-  ofdm_load_const;
-  assert(length(tx_bits) == Nbitsperframe);
-
-  % map to symbols in linear array
-
-  if bps == 1
-    tx_sym_lin = 2*tx_bits - 1;
-  end
-  if bps == 2
-    for s=1:Nbitsperframe/bps
-      tx_sym_lin(s) = qpsk_mod(tx_bits(2*(s-1)+1:2*s));
-    end
-  end  
-  if bps == 4
-    for s=1:Nbitsperframe/bps
-      tx_sym_lin(s) = qam16_mod(states.qam16,tx_bits(4*(s-1)+1:4*s));
-    end
-  end
-
-  tx = ofdm_txframe(states, tx_sym_lin);
-endfunction
-
-% -----------------------------------------
-% ofdm_tx - modulates one frame of symbols
-% ----------------------------------------
-
-#{ 
-   Each carrier amplitude is 1/M.  There are two edge carriers that
-   are just tx-ed for pilots plus plus Nc continuous carriers. So
-   power is:
-
-     p = 2/(Ns*(M*M)) + Nc/(M*M)
-
-   e.g. Ns=8, Nc=16, M=144 
-   
-     p = 2/(8*(144*144)) + 16/(144*144) = 7.84-04
-
-#}
-
-function tx = ofdm_txframe(states, tx_sym_lin)
-  ofdm_load_const;
-  assert(length(tx_sym_lin) == Nbitsperframe/bps);
-
-  % place symbols in multi-carrier frame with pilots and boundary carriers
-
-  tx_sym = []; s = 1;
-  aframe = zeros(Ns,Nc+2);
-  aframe(1,:) = pilots;
-  for r=1:Ns-1
-    arowofsymbols = tx_sym_lin(s:s+Nc-1);
-    s += Nc;
-    aframe(r+1,2:Nc+1) = arowofsymbols;
-    if states.dpsk
-      aframe(r+1,2:Nc+1) = aframe(r+1,2:Nc+1) .* aframe(r,2:Nc+1);
-    end   
-  end
-  tx_sym = [tx_sym; aframe];
-
-  % OFDM upconvert symbol by symbol so we can add CP
-
-  tx = [];
-  for r=1:Ns
-    asymbol = tx_sym(r,:) * W/M;
-    asymbol_cp = [asymbol(M-Ncp+1:M) asymbol];
-    tx = [tx asymbol_cp];
-  end
 endfunction
 
 
@@ -577,6 +603,7 @@ function [timing_valid states] = ofdm_sync_search(states, rxbuf_in)
   states.timing_mx = timing_mx;
   states.coarse_foff_est_hz = foff_est;
 endfunction
+
 
 % ------------------------------------------
 % ofdm_demod - Demodulates one frame of bits
@@ -842,7 +869,9 @@ function [rx_bits states aphase_est_pilot_log rx_np rx_amp] = ofdm_demod(states,
 endfunction
 
 
-% assemble modem frame from UW, payload, and txt bits
+% ----------------------------------------------------------------------------------
+% assemble_modem_frame - assemble modem frame from UW, payload, and txt bits
+% ----------------------------------------------------------------------------------
 
 function modem_frame = assemble_modem_frame(states, payload_bits, txt_bits)
   ofdm_load_const;
@@ -866,7 +895,9 @@ function modem_frame = assemble_modem_frame(states, payload_bits, txt_bits)
 endfunction
 
 
-% assemble modem frame from UW, payload, and txt symbols
+% ----------------------------------------------------------------------------------
+% assemble_modem_frame_symbols - assemble modem frame from UW, payload, and txt bits
+% ----------------------------------------------------------------------------------
 
 function modem_frame = assemble_modem_frame_symbols(states, payload_syms, txt_syms)
   ofdm_load_const;
@@ -893,7 +924,9 @@ function modem_frame = assemble_modem_frame_symbols(states, payload_syms, txt_sy
 endfunction
 
 
-% extract UW and txt bits, and payload symbols from a frame of modem symbols
+% ------------------------------------------------------------------------------------------------
+% disassemble_modem_frame - extract UW, txt bits, and payload symbols from a frame of modem symbols
+% -------------------------------------------------------------------------------------------------
 
 function [rx_uw payload_syms payload_amps txt_bits] = disassemble_modem_frame(states, modem_frame_syms, modem_frame_amps)
   ofdm_load_const;
@@ -937,9 +970,11 @@ function [rx_uw payload_syms payload_amps txt_bits] = disassemble_modem_frame(st
 endfunction
 
 
-% a psuedo-random number generator that we can implement in C with
-% identical results to Octave.  Returns an unsigned int between 0
-% and 32767
+%-----------------------------------------------------------------------
+% ofdm_rand - a psuedo-random number generator that we can implement
+%             in C with identical results to Octave.  Returns an unsigned
+%             int between 0 and 32767
+%-----------------------------------------------------------------------
 
 function r = ofdm_rand(n)
   r = zeros(1,n); seed = 1;
@@ -950,8 +985,9 @@ function r = ofdm_rand(n)
 endfunction
 
 
-% generate a test frame of bits.  Works differently for coded and
-% uncoded mods.
+%-----------------------------------------------------------------------
+% create_ldpc_test_frame - generate a test frame of bits
+%-----------------------------------------------------------------------
 
 function [tx_bits payload_data_bits codeword] = create_ldpc_test_frame(states, coded_frame=1)
   ofdm_load_const;
@@ -999,44 +1035,9 @@ function [tx_bits payload_data_bits codeword] = create_ldpc_test_frame(states, c
 endfunction
 
 
-% Save test bits frame to a text file in the form of a C array
-% 
-% usage:
-%   ofdm_lib; test_bits_ofdm_file
-%
-
-function test_bits_ofdm_file
-  Ts = 0.018; Tcp = 0.002; Rs = 1/Ts; bps = 2; Nc = 17; Ns = 8;
-  states = ofdm_init(bps, Rs, Tcp, Ns, Nc);
-  [test_bits_ofdm payload_data_bits codeword] = create_ldpc_test_frame(states);
-  printf("%d test bits\n", length(test_bits_ofdm));
-  
-  f=fopen("../src/test_bits_ofdm.h","wt");
-  fprintf(f,"/* Generated by test_bits_ofdm_file() Octave function */\n\n");
-  fprintf(f,"const int test_bits_ofdm[]={\n");
-  for m=1:length(test_bits_ofdm)-1
-    fprintf(f,"  %d,\n",test_bits_ofdm(m));
-  endfor
-  fprintf(f,"  %d\n};\n",test_bits_ofdm(end));
-
-  fprintf(f,"\nconst int payload_data_bits[]={\n");
-  for m=1:length(payload_data_bits)-1
-    fprintf(f,"  %d,\n",payload_data_bits(m));
-  endfor
-  fprintf(f,"  %d\n};\n",payload_data_bits(end));
-
-  fprintf(f,"\nconst int test_codeword[]={\n");
-  for m=1:length(codeword)-1
-    fprintf(f,"  %d,\n",codeword(m));
-  endfor
-  fprintf(f,"  %d\n};\n",codeword(end));
-
-  fclose(f);
-
-endfunction
-
-
-% iterate state machine ------------------------------------
+%-------------------------------------------------------
+% sync_state_machine - determines sync state based on UW
+%-------------------------------------------------------
 
 function states = sync_state_machine(states, rx_uw)
   ofdm_load_const;
@@ -1098,6 +1099,72 @@ function states = sync_state_machine(states, rx_uw)
 endfunction
 
 
+% ------------------------------------------------------------------------------
+% codec_to_frame_packing - Set up a bunch of constants to support modem frame
+%                          construction from LDPC codewords and codec source bits
+% ------------------------------------------------------------------------------
+
+function [code_param Nbitspercodecframe Ncodecframespermodemframe] = codec_to_frame_packing(states, mode)
+  ofdm_load_const;
+  mod_order = 4; bps = 2; modulation = 'QPSK'; mapping = 'gray';
+
+  init_cml('~/cml/');
+  if strcmp(mode, "700D")
+    load HRA_112_112.txt
+    code_param = ldpc_init_user(HRA_112_112, modulation, mod_order, mapping);
+    assert(Nbitsperframe == (code_param.coded_bits_per_frame + Nuwbits + Ntxtbits));
+    % unused for this mode
+    Nbitspercodecframe = Ncodecframespermodemframe = 0;
+  end
+  if strcmp(mode, "2020")
+    load HRA_504_396.txt
+    code_param = ldpc_init_user(HRA_504_396, modulation, mod_order, mapping);
+    code_param.data_bits_per_frame = 312;
+    code_param.coded_bits_per_frame = code_param.data_bits_per_frame + code_param.ldpc_parity_bits_per_frame;
+    code_param.coded_syms_per_frame = code_param.coded_bits_per_frame/code_param.bits_per_symbol;
+    printf("2020 mode\n");
+    printf("ldpc_data_bits_per_frame = %d\n", code_param.ldpc_data_bits_per_frame);
+    printf("ldpc_coded_bits_per_frame  = %d\n", code_param.ldpc_coded_bits_per_frame);
+    printf("ldpc_parity_bits_per_frame  = %d\n", code_param.ldpc_parity_bits_per_frame);
+    printf("data_bits_per_frame = %d\n", code_param.data_bits_per_frame);
+    printf("coded_bits_per_frame  = %d\n", code_param.coded_bits_per_frame);
+    printf("coded_syms_per_frame  = %d\n", code_param.coded_syms_per_frame);
+    printf("ofdm_bits_per_frame  = %d\n", Nbitsperframe);
+    Nbitspercodecframe = 52; Ncodecframespermodemframe = 6;
+    printf("  Nuwbits: %d  Ntxtbits: %d\n", Nuwbits, Ntxtbits);
+    Nparity = code_param.ldpc_parity_bits_per_frame;
+    totalbitsperframe = code_param.data_bits_per_frame + Nparity + Nuwbits + Ntxtbits;
+    printf("Total bits per frame: %d\n", totalbitsperframe);
+    assert(totalbitsperframe == Nbitsperframe);
+  end
+endfunction
+
+
+% ------------------------------------------------------------------------------
+% assemble_frame - Assemble a modem frame from input codec bits based on the
+%                  current FreeDV "mode".  Note we don't insert UW and txt bits
+%                  at this stage, that is handled as a second stage of modem frame
+%                  construction a little later.
+% ------------------------------------------------------------------------------
+
+function [frame_bits bits_per_frame] = assemble_frame(states, code_param, mode, codec_bits, ...
+                                                      Ncodecframespermodemframe, Nbitspercodecframe)
+  ofdm_load_const;
+
+  if strcmp(mode, "700D")
+    frame_bits = LdpcEncode(codec_bits, code_param.H_rows, code_param.P_matrix);
+  end
+  if strcmp(mode, "2020")
+    Nunused = code_param.ldpc_data_bits_per_frame - code_param.data_bits_per_frame;
+    frame_bits = LdpcEncode([codec_bits zeros(1,Nunused)], code_param.H_rows, code_param.P_matrix);
+    % remove unused datat bits
+    frame_bits = [ frame_bits(1:code_param.data_bits_per_frame) frame_bits(code_param.ldpc_data_bits_per_frame+1:end) ];
+  end
+  bits_per_frame = length(frame_bits);
+    
+endfunction
+
+
 % test function, kind of like a CRC for QPSK symbols, to compare two vectors
 
 function acc = test_acc(v)
@@ -1111,6 +1178,42 @@ function acc = test_acc(v)
   acc = sre + j*sim;
 end
 
+
+% Save test bits frame to a text file in the form of a C array
+% 
+% usage:
+%   ofdm_lib; test_bits_ofdm_file
+%
+
+function test_bits_ofdm_file
+  Ts = 0.018; Tcp = 0.002; Rs = 1/Ts; bps = 2; Nc = 17; Ns = 8;
+  states = ofdm_init(bps, Rs, Tcp, Ns, Nc);
+  [test_bits_ofdm payload_data_bits codeword] = create_ldpc_test_frame(states);
+  printf("%d test bits\n", length(test_bits_ofdm));
+  
+  f=fopen("../src/test_bits_ofdm.h","wt");
+  fprintf(f,"/* Generated by test_bits_ofdm_file() Octave function */\n\n");
+  fprintf(f,"const int test_bits_ofdm[]={\n");
+  for m=1:length(test_bits_ofdm)-1
+    fprintf(f,"  %d,\n",test_bits_ofdm(m));
+  endfor
+  fprintf(f,"  %d\n};\n",test_bits_ofdm(end));
+
+  fprintf(f,"\nconst int payload_data_bits[]={\n");
+  for m=1:length(payload_data_bits)-1
+    fprintf(f,"  %d,\n",payload_data_bits(m));
+  endfor
+  fprintf(f,"  %d\n};\n",payload_data_bits(end));
+
+  fprintf(f,"\nconst int test_codeword[]={\n");
+  for m=1:length(codeword)-1
+    fprintf(f,"  %d,\n",codeword(m));
+  endfor
+  fprintf(f,"  %d\n};\n",codeword(end));
+
+  fclose(f);
+
+endfunction
 
 % Get rid of nasty unfiltered stuff either side of OFDM signal
 % This may need to be tweaked, or better yet made a function of Nc, if Nc changes
@@ -1153,61 +1256,3 @@ function bpf_coeff = make_ofdm_bpf(write_c_header_file)
 endfunction
 
 
-% Set up a bunch of constants to support modem frame construction from LDPC codewords and codec source bits
-
-function [code_param Nbitspercodecframe Ncodecframespermodemframe] = codec_to_frame_packing(states, mode)
-  ofdm_load_const;
-  mod_order = 4; bps = 2; modulation = 'QPSK'; mapping = 'gray';
-
-  init_cml('~/cml/');
-  if strcmp(mode, "700D")
-    load HRA_112_112.txt
-    code_param = ldpc_init_user(HRA_112_112, modulation, mod_order, mapping);
-    assert(Nbitsperframe == (code_param.coded_bits_per_frame + Nuwbits + Ntxtbits));
-    % unused for this mode
-    Nbitspercodecframe = Ncodecframespermodemframe = 0;
-  end
-  if strcmp(mode, "2020")
-    load HRA_504_396.txt
-    code_param = ldpc_init_user(HRA_504_396, modulation, mod_order, mapping);
-    code_param.data_bits_per_frame = 312;
-    code_param.coded_bits_per_frame = code_param.data_bits_per_frame + code_param.ldpc_parity_bits_per_frame;
-    code_param.coded_syms_per_frame = code_param.coded_bits_per_frame/code_param.bits_per_symbol;
-    printf("2020 mode\n");
-    printf("ldpc_data_bits_per_frame = %d\n", code_param.ldpc_data_bits_per_frame);
-    printf("ldpc_coded_bits_per_frame  = %d\n", code_param.ldpc_coded_bits_per_frame);
-    printf("ldpc_parity_bits_per_frame  = %d\n", code_param.ldpc_parity_bits_per_frame);
-    printf("data_bits_per_frame = %d\n", code_param.data_bits_per_frame);
-    printf("coded_bits_per_frame  = %d\n", code_param.coded_bits_per_frame);
-    printf("coded_syms_per_frame  = %d\n", code_param.coded_syms_per_frame);
-    printf("ofdm_bits_per_frame  = %d\n", Nbitsperframe);
-    Nbitspercodecframe = 52; Ncodecframespermodemframe = 6;
-    printf("  Nuwbits: %d  Ntxtbits: %d\n", Nuwbits, Ntxtbits);
-    Nparity = code_param.ldpc_parity_bits_per_frame;
-    totalbitsperframe = code_param.data_bits_per_frame + Nparity + Nuwbits + Ntxtbits;
-    printf("Total bits per frame: %d\n", totalbitsperframe);
-    assert(totalbitsperframe == Nbitsperframe);
-  end
-endfunction
-
-
-% Assemble a modem frame from input codec bits based on the current FreeDV "mode".  Note
-% we don't insert UW and txt bits at this stage, that is handled as a second stage of modem frame
-% construction a little later.
-
-function [frame_bits bits_per_frame] = assemble_frame(states, code_param, mode, codec_bits, ...
-                                                      Ncodecframespermodemframe, Nbitspercodecframe)
-  ofdm_load_const;
-
-  if strcmp(mode, "700D")
-    frame_bits = LdpcEncode(codec_bits, code_param.H_rows, code_param.P_matrix);
-  end
-  if strcmp(mode, "2020")
-    Nunused = code_param.ldpc_data_bits_per_frame - code_param.data_bits_per_frame;
-    frame_bits = LdpcEncode([codec_bits zeros(1,Nunused)], code_param.H_rows, code_param.P_matrix);
-    % remove unused datat bits
-    frame_bits = [ frame_bits(1:code_param.data_bits_per_frame) frame_bits(code_param.ldpc_data_bits_per_frame+1:end) ];
-  end
-  bits_per_frame = length(frame_bits);
-    
-endfunction
