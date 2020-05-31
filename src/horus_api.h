@@ -36,33 +36,36 @@
 #include "modem_stats.h"
       
 /* Horus API Modes */
-#define HORUS_MODE_BINARY            0  // Legacy binary mode
-#define HORUS_MODE_BINARY_256BIT     1  // New 256-bit LDPC-encoded mode
-#define HORUS_MODE_BINARY_128BIT     2  // New 128-bit LDPC-encoded mode
-#define HORUS_MODE_RTTY              99 // RTTY Decoding
+#define HORUS_MODE_BINARY_V1            0  // Legacy binary mode
+#define HORUS_MODE_BINARY_V2_256BIT     1  // New 256-bit LDPC-encoded mode
+#define HORUS_MODE_BINARY_V2_128BIT     2  // New 128-bit LDPC-encoded mode
+#define HORUS_MODE_RTTY                 99 // RTTY Decoding
 
 
 // Settings for Legacy Horus Binary Mode (Golay Encoding)
-#define HORUS_BINARY_NUM_BITS                   360   /* fixed number of coded bits */
-#define HORUS_BINARY_NUM_PAYLOAD_BYTES          22    /* fixed number of bytes in binary payload     */
-#define HORUS_BINARY_DEFAULT_BAUD               100   /* Default baud rate of 100 baud */
-#define HORUS_BINARY_DEFAULT_TONE_SPACING       270   /* Default tone spacing of 270 Hz */
+#define HORUS_BINARY_V1_NUM_CODED_BITS             360
+#define HORUS_BINARY_V1_NUM_UNCODED_PAYLOAD_BYTES  22
+#define HORUS_BINARY_V1_DEFAULT_BAUD               100
+#define HORUS_BINARY_V1_DEFAULT_TONE_SPACING       270  // This is the minimum tone spacing possible on the RS41 
+                                                        // reference implementation of this modem.
+                                                        // Note that mask estimation is turned off by default for 
+                                                        // this mode, and hence this spacing is not used.
 
 // Settings for Horus Binary 256-bit mode (LDPC Encoding, r=1/3)
-#define HORUS_BINARY_256BIT_NUM_BITS            768
-#define HORUS_BINARY_256BIT_NUM_PAYLOAD_BYTES   32
-#define HORUS_BINARY_256BIT_DEFAULT_BAUD        100   /* Default baud rate of 100 baud */
-#define HORUS_BINARY_256BIT_DEFAULT_TONE_SPACING 270   /* Default tone spacing of 270 Hz */
+#define HORUS_BINARY_V2_256BIT_NUM_CODED_BITS               768
+#define HORUS_BINARY_V2_256BIT_NUM_UNCODED_PAYLOAD_BYTES    32
+#define HORUS_BINARY_V2_256BIT_DEFAULT_BAUD                 100
+#define HORUS_BINARY_V2_256BIT_DEFAULT_TONE_SPACING         270
 
 // Settings for Horus Binary 128-bit mode (LDPC Encoding, r=1/3)
-#define HORUS_BINARY_128BIT_NUM_BITS            384
-#define HORUS_BINARY_128BIT_NUM_PAYLOAD_BYTES   16
-#define HORUS_BINARY_128BIT_DEFAULT_BAUD        50   /* Default baud rate of 100 baud */
-#define HORUS_BINARY_128BIT_DEFAULT_TONE_SPACING 270   /* Default tone spacing of 270 Hz */
+#define HORUS_BINARY_V2_128BIT_NUM_CODED_BITS                  384
+#define HORUS_BINARY_V2_128BIT_NUM_UNCODED_PAYLOAD_BYTES       16
+#define HORUS_BINARY_V2_128BIT_DEFAULT_BAUD                    25
+#define HORUS_BINARY_V2_128BIT_DEFAULT_TONE_SPACING            270 
 
-// Settings for RTTY Decoders
-#define HORUS_RTTY_NUM_BITS                     1000 /* Maximum 1000 bits in a RTTY frame (100 characters) */
-#define HORUS_RTTY_DEFAULT_BAUD                 100 /* Default baud rate of 100 baud */
+// Settings for RTTY Decoder
+#define HORUS_RTTY_NUM_BITS                     1000   // Limit the RTTY decoder to 100 characters per line (frame).
+#define HORUS_RTTY_DEFAULT_BAUD                 100
 
 struct horus;
 struct MODEM_STATS;
@@ -78,7 +81,7 @@ struct horus *horus_open  (int mode);
  * Create an Horus Demod config/state struct with more customizations.
  * 
  * int mode - Horus Mode Type (refer list above)
- * int Rs - Symbol Rate (Hz)
+ * int Rs - Symbol Rate (Hz). Set to -1 to use the default value for the mode (refer above)
  * int tx_tone_spacing - FSK Tone Spacing, to configure mask estimator. Set to -1 to disable mask estimator.
  */
 
