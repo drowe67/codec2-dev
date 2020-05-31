@@ -15,14 +15,24 @@
 %-------------------------------------------------------------
 
 #{
-  Frame has Ns-1 data symbols between pilots, e.g. for Ns=3, Nc=3: 
-  
-   PPPPP
-    DDD
-    DDD
-   PPPPP
 
-  Time flows down, freq across
+  Modem frame has a pilot every Ns symbols. There are Ns-1 data
+  symbols between every pilot.
+
+   e.g. for Ns=4, Nc=6:
+  
+    |-Nc-|          Time
+    DDDDDD           |
+   PPPPPPPP  ---     |
+    DDDDDD    |      |
+    DDDDDD    Ns     |
+    DDDDDD    |      |
+   PPPPPPPP  ---    \|/ 
+    DDDDDD    |      |
+
+   Freq------------------>
+
+   In this figure, time flows down, freq across.
 #}
 
 function states = ofdm_init(bps, Rs, Tcp, Ns, Nc)
@@ -30,15 +40,15 @@ function states = ofdm_init(bps, Rs, Tcp, Ns, Nc)
   states.bps = bps;
   states.Rs = Rs;
   states.Tcp = Tcp;
-  states.Ns = Ns;       % step size for pilots
-  states.Nc = Nc;       % Number of cols, aka number of carriers
-  states.M  = states.Fs/Rs; 
+  states.Ns = Ns;                                 % one pilot every Ns symbols, e.g. Ns=3, ...PDDDPDDDP...
+  states.Nc = Nc;                                 % Number of carriers
+  states.M  = states.Fs/Rs;                       % oversampling rate
   states.Ncp = Tcp*states.Fs;
-  states.Nbitsperframe = (Ns-1)*Nc*bps;
-  states.Nrowsperframe = states.Nbitsperframe/(Nc*bps);
-  states.Nsamperframe =  (states.Nrowsperframe+1)*(states.M+states.Ncp);
-  states.Ntxtbits = 4;   % reserved bits/frame for auxillary text information
-  states.Nuwbits  = bps*5;   % Let use 5 symbols for the UW, note longer for QAM
+  states.Nbitsperframe = (Ns-1)*Nc*bps;           % total bits in all data symbols in modem frame
+  states.Nsampersymbol = states.M+states.Ncp;     % number of samples in a single symbol
+  states.Nsamperframe  = Ns*states.Nsampersymbol; % number of samples in a modem frame
+  states.Ntxtbits = 4;                            % reserved bits/frame for auxillary text information
+  states.Nuwbits  = bps*5;                        % Let use 5 symbols for the UW, note ths means longer UWs for QAM than QPSK
   states.qam16 = [
     1 + j,  1 + j*3,  3 + j,  3 + j*3;
     1 - j,  1 - j*3,  3 - j,  3 - j*3;
@@ -51,9 +61,8 @@ function states = ofdm_init(bps, Rs, Tcp, Ns, Nc)
   
   % UW symbol placement, designed to get no false syncs at any freq
   % offset.  Use ofdm_dev.m, debug_false_sync() to test.  Note we need
-  % to pair the UW bits so the fit into symbols.  The LDPC decoder
-  % works on symbols so we can't break up any symbols into UW/LDPC
-  % bits.
+  % to fill each UW symbols with bits.  The LDPC decoder works on
+  % symbols so we can't break up any symbols into UW/FEC encoded bits.
   
   states.uw_ind = states.uw_ind_sym = [];
   for i=1:states.Nuwbits/bps
@@ -109,7 +118,8 @@ function states = ofdm_init(bps, Rs, Tcp, Ns, Nc)
   %                         ^
   % also see ofdm_demod() ...
 
-  states.Nrxbuf = 3*states.Nsamperframe+states.M+states.Ncp + 2*(states.M + states.Ncp);
+  %                       D                 P DDD P DDD P DDD             P                    D
+  states.Nrxbuf = states.Nsampersymbol + 3*states.Nsamperframe + states.Nsampersymbol + states.Nsampersymbol;
   states.rxbuf = zeros(1, states.Nrxbuf);
  
   % default settings on a bunch of options and states
@@ -211,8 +221,8 @@ end
 function print_config(states)
   ofdm_load_const;
   printf("Rs=%5.2f Nc=%d Tcp=%4.3f ", Rs, Nc, Tcp);
-  printf("Nbitsperframe: %d Nrowsperframe: %d Ntxtbits: %d Nuwbits: %d ",
-          Nbitsperframe, Nrowsperframe, Ntxtbits, Nuwbits);
+  printf("Nbitsperframe: %d Ns: %d Ntxtbits: %d Nuwbits: %d ",
+          Nbitsperframe, Ns, Ntxtbits, Nuwbits);
   printf("bits/s: %4.1f\n",  Nbitsperframe*Rs/Ns);
 end
 
@@ -453,7 +463,7 @@ function tx = ofdm_txframe(states, tx_sym_lin)
   tx_sym = []; s = 1;
   aframe = zeros(Ns,Nc+2);
   aframe(1,:) = pilots;
-  for r=1:Nrowsperframe
+  for r=1:Ns-1
     arowofsymbols = tx_sym_lin(s:s+Nc-1);
     s += Nc;
     aframe(r+1,2:Nc+1) = arowofsymbols;
