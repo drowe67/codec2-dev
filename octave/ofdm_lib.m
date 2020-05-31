@@ -644,7 +644,8 @@ function [timing_valid states] = ofdm_sync_search(states, rxbuf_in)
     states.sample_point = states.timing_est = 1;
     states.foff_est_hz = foff_est;
   else
-    states.nin = Nsampersymbol;
+    % note different to when we have frame sync
+    states.nin = Nsamperpilot;
   end
   
   states.timing_valid = timing_valid;
@@ -674,8 +675,8 @@ function [rx_bits states aphase_est_pilot_log rx_np rx_amp] = ofdm_demod(states,
   if timing_en
     % update timing at start of every frame
 
-    st = M+Ncp + Nsamperframe + 1 - floor(ftwindow_width/2) + (timing_est-1);
-    en = st + Nsamperframe-1 + M+Ncp + ftwindow_width-1;
+    st = Nsampersymbol + Nsamperframe + 1 - floor(ftwindow_width/2) + (timing_est-1);
+    en = st + Nsamperpilot-1 + Nsampersymbol + ftwindow_width-1;
           
     [ft_est timing_valid timing_mx] = est_timing(states, rxbuf(st:en) .* exp(-j*woff_est*(st:en)), rate_fs_pilot_samples, 1);
     % printf("  timing_est: %d ft_est: %d timing_valid: %d timing_mx: %d\n", timing_est, ft_est, timing_valid, timing_mx);
