@@ -15,69 +15,45 @@
 %-------------------------------------------------------------
 
 #{
-
-  Modem frame has Ns-1 data symbols between pilots, so every Ns symbol is
-  pilot.  There are a total of Nf symbols (data+pilot) in a modem
-  frame.
+  Frame has Ns-1 data symbols between pilots, e.g. for Ns=3, Nc=3: 
   
-  e.g. for Nf=8, Ns=4, Nc=6:
-  
-    |-Nc-|                Time
-   PPPPPPPP  ---------     |
-    DDDDDD    |     |      |
-    DDDDDD    Ns    |      |
-    DDDDDD    |     |      |
-   PPPPPPPP  ---    Nf    \|/ 
-    DDDDDD    |     |      |
-    DDDDDD    Ns    |      |
-    DDDDDD    |     |      |
-   PPPPPPPP  ---------     |
+   PPPPP
+    DDD
+    DDD
+   PPPPP
 
-   Freq------------------>
-
-   Time flows down, freq across
+  Time flows down, freq across
 #}
 
-function states = ofdm_init(bps, Rs, Tcp, Nf, Ns, Nc)
+function states = ofdm_init(bps, Rs, Tcp, Ns, Nc)
   states.Fs = 8000;
-  
-  % some basic sanity checks
-  if floor(states.Fs/Rs) != states.Fs/Rs
-    printf("Need an integer oversample factor M=Fs/R Fs: %f Rs: %d\n", states.Fs, Rs);
-    assert 0;
-  end;
-  
-  if floor(Nf/Ns) != Nf/Ns
-    printf("Need an integer number of pilots/frame Nf: %d Ns: %d\n", Nf, Ns);
-    assert 0;
-  end;
-  
   states.bps = bps;
   states.Rs = Rs;
   states.Tcp = Tcp;
-  states.Nf = Nf;                                   % total (pilots+data) number of symbols/frame
-  states.Ns = Ns;                                   % one pilot every Ns symbols, e.g. Ns=3, ...PDDDPDDDP...
-  states.Nc = Nc;                                   % Number of carriers
+  states.Ns = Ns;       % step size for pilots
+  states.Nc = Nc;       % Number of cols, aka number of carriers
   states.M  = states.Fs/Rs; 
   states.Ncp = Tcp*states.Fs;
-  states.Nbitsperframe = (Ns-1)*(Nf/Ns)*Nc*bps;     % total bits in all data symbols in modem frame
-  states.Nsamperpilot  =  Ns*(states.M+states.Ncp); % number of samples in Ns symbols e.g. Ns=4 "PDDD"
-  states.Nsampersymbol =  states.M+states.Ncp;      % number of samples in a single symbol
-  states.Nsamperframe  =  Nf*(states.M+states.Ncp); % number of samples in Nf symbols e.g. Nf=8,Ns=4 "PDDDPDDD", a complete modem frame
-  states.Ntxtbits = 4;                              % reserved bits/frame for auxillary text information
-  states.Nuwbits  = bps*5;                          % Let use 5 symbols for the UW, note ths means longer for QAM that QPSK
+  states.Nbitsperframe = (Ns-1)*Nc*bps;
+  states.Nrowsperframe = states.Nbitsperframe/(Nc*bps);
+  states.Nsamperframe =  (states.Nrowsperframe+1)*(states.M+states.Ncp);
+  states.Ntxtbits = 4;   % reserved bits/frame for auxillary text information
+  states.Nuwbits  = bps*5;   % Let use 5 symbols for the UW, note longer for QAM
   states.qam16 = [
     1 + j,  1 + j*3,  3 + j,  3 + j*3;
     1 - j,  1 - j*3,  3 - j,  3 - j*3;
    -1 + j, -1 + j*3, -3 + j, -3 + j*3;
    -1 - j, -1 - j*3, -3 - j, -3 - j*3]/3;
-
+   
+  % some basic sanity checks
+  assert(floor(states.M) == states.M);
   test_qam16(states.qam16);
-     
+  
   % UW symbol placement, designed to get no false syncs at any freq
   % offset.  Use ofdm_dev.m, debug_false_sync() to test.  Note we need
-  % to fill each UW symbols with bits.  The LDPC decoder works on
-  % symbols so we can't break up any symbols into UW/LDPC bits.
+  % to pair the UW bits so the fit into symbols.  The LDPC decoder
+  % works on symbols so we can't break up any symbols into UW/LDPC
+  % bits.
   
   states.uw_ind = states.uw_ind_sym = [];
   for i=1:states.Nuwbits/bps
@@ -89,6 +65,7 @@ function states = ofdm_init(bps, Rs, Tcp, Nf, Ns, Nc)
   end
 
   states.tx_uw = zeros(1,states.Nuwbits);       
+  assert(length(states.tx_uw) == states.Nuwbits);
   tx_uw_syms = [];
   for b=1:bps:states.Nuwbits
     tx_uw_syms = [tx_uw_syms qpsk_mod(states.tx_uw(b:b+1))];
@@ -96,7 +73,7 @@ function states = ofdm_init(bps, Rs, Tcp, Nf, Ns, Nc)
   states.tx_uw_syms = tx_uw_syms;
   
   % use this to scale tx output to 16 bit short.  Adjusted by experiment
-  % to have same RMS power as other modem waveforms
+  % to have same RMS power as FDMDV waveform
   
   states.amp_scale = 2E5*1.1491/1.06;
 
@@ -127,52 +104,12 @@ function states = ofdm_init(bps, Rs, Tcp, Nf, Ns, Nc)
   % fine timing search +/- window_width/2 from current timing instant
 
   states.ftwindow_width = 11; 
+ 
+  % Receive buffer: D P DDD P DDD P DDD P D
+  %                         ^
+  % also see ofdm_demod() ...
 
-
-  #{
-     Ns=4,Nf=8 (two pilots per modem frame)
-
-                             |----Nf---|
-                        
-     Receive buffer: D P DDD P DDD P DDD P DDD P D
-
-                             |-Ns--|
-
-     Figure 1: Relationship of Nf and Ns
-     -----------------------------------
-
-                             |----Nf---|
-                             
-     Receive buffer: D P DDD P DDD P DDD P DDD P D
-                       |     | ^^^ |     |
-                       Average Phase over 4 pilots
-                       
-     Receive buffer: D P DDD P DDD P DDD P DDD P D
-                             |     | ^^^ |     |
-                             Average Phase over 4 pilots
-
-     Note: Pilots used for phase est of D symbols ^
-           shifts in second half of modem frame
-     
-     Figure 2: Phase estimation
-     ---------------------------
-     
-     To allow timing adjustment/slip-------------\
-                     |                           |
-                    \|/                         \|/
-                     |                           |
-     Receive buffer: D P DDD P DDD P DDD P DDD P D
-                             ^
-                             |
-                    ideal timing instant
-
-     Fig 3: Timing adjustment
-    -------------------------
-  #}
-
-  % Based on receive buffer figure above, e.g. for Ns=4,Nf=8
-  %                      D                 PDDD                 PDDDPDDD                    PDDD                  D
-  states.Nrxbuf = states.Nsampersymbol + states.Nsamperpilot + states.Nsamperframe +  states.Nsampersymbol + states.Nsamperpilot;
+  states.Nrxbuf = 3*states.Nsamperframe+states.M+states.Ncp + 2*(states.M + states.Ncp);
   states.rxbuf = zeros(1, states.Nrxbuf);
  
   % default settings on a bunch of options and states
@@ -187,12 +124,7 @@ function states = ofdm_init(bps, Rs, Tcp, Nf, Ns, Nc)
   states.foff_est_gain = 0.1;
   states.foff_est_hz = 0;
   states.sample_point = states.timing_est = 1;
-
-  % Initial acquisition gets "pilot sync" rather than frame sync,
-  % higher layers find UW and get frame sync.  So when we are in
-  % acquisition mode we slurp up one pilots worth of samples
-  states.nin = states.Nsamperpilot;
-
+  states.nin = states.Nsamperframe;
   states.timing_valid = 0;
   states.timing_mx = 0;
   states.coarse_foff_est_hz = 0;
@@ -200,11 +132,14 @@ function states = ofdm_init(bps, Rs, Tcp, Nf, Ns, Nc)
   states.foff_metric = 0;
   
   % generate OFDM pilot symbol, used for timing and freq offset est
+
   rate_fs_pilot_samples = states.pilots * W/states.M;
-  
+
   % During tuning it was found that not including the cyc prefix in
   % rate_fs_pilot_samples produced better fest results
-    states.rate_fs_pilot_samples = [zeros(1,states.Ncp) rate_fs_pilot_samples];
+  
+  %states.rate_fs_pilot_samples = [rate_fs_pilot_samples(states.M-states.Ncp+1:states.M) rate_fs_pilot_samples];
+  states.rate_fs_pilot_samples = [zeros(1,states.Ncp) rate_fs_pilot_samples];
 
   % pre-compute a constant used to detect valid modem frames
 
@@ -247,8 +182,8 @@ endfunction
 %
 % usage: ofdm_init_mode("Ts=0.018 Nc=17 Ncp=0.002")
 
-function [bps Rs Tcp Nf Ns Nc] = ofdm_init_mode(mode="700D")
-  bps = 2; Tcp = 0.002; Nf=Ns=8;
+function [bps Rs Tcp Ns Nc] = ofdm_init_mode(mode="700D")
+  bps = 2; Tcp = 0.002; Ns=8;
 
   % some "canned" modes
   if strcmp(mode,"700D")
@@ -261,9 +196,9 @@ function [bps Rs Tcp Nf Ns Nc] = ofdm_init_mode(mode="700D")
     # Ns=5, Rs=50, so Rs/Ns=10 -> +/- 5Hz doppler tracking bandwidth
     # For (504,296) LDPC code we want 504+5*4+4=528 uncoded bits/frame
     # Rs*Nc=1650, so fits easily in 2000 Hz
-    f=Ns=5; Tcp = 0.004; Tframe = 0.1; Ts = Tframe/Ns; Nc = 33; bps=4;
+    Ns=5; Tcp = 0.004; Tframe = 0.1; Ts = Tframe/Ns; Nc = 33; bps=4;
   elseif strcmp(mode,"1")
-    Nf=80; Ns=8; Tcp = 0; Tframe = 0.1; Ts = Tframe/Ns; Nc = 1; bps=2;
+    Ns=100; Tcp = 0; Tframe = 0.1; Ts = Tframe/Ns; Nc = 1; bps=2;
   else
     % try to parse mode string for user defined mode
     vec = sscanf(mode, "Ts=%f Nc=%d Ncp=%f");
@@ -275,12 +210,11 @@ end
 
 function print_config(states)
   ofdm_load_const;
-  printf("Rs=%5.2f Nf=%d Ns=%s Nc=%d Tcp=%4.3f ", Rs, Nf, Ns, Nc, Tcp);
-  printf("Nbitsperframe: %d Ntxtbits: %d Nuwbits: %d ",
-          Nbitsperframe, Ntxtbits, Nuwbits);
-  printf("bits/s: %4.1f\n",  Nbitsperframe*Rs/Nf);
+  printf("Rs=%5.2f Nc=%d Tcp=%4.3f ", Rs, Nc, Tcp);
+  printf("Nbitsperframe: %d Nrowsperframe: %d Ntxtbits: %d Nuwbits: %d ",
+          Nbitsperframe, Nrowsperframe, Ntxtbits, Nuwbits);
+  printf("bits/s: %4.1f\n",  Nbitsperframe*Rs/Ns);
 end
-
 
 % Gray coded QPSK modulation function
 function symbol = qpsk_mod(two_bits)
@@ -343,7 +277,7 @@ endfunction
 #{
   Correlates the OFDM pilot symbol samples with a window of received
   samples to determine the most likely timing offset.  Combines two
-  frames pilots so we need at least Nsamperpilot+Nsampersymbol samples in rx.
+  frames pilots so we need at least Nsamperframe+M+Ncp samples in rx.
 
   Can be used for acquisition (coarse timing), and fine timing.  Tends
   to break down when freq offset approaches +/- symbol rate (e.g +/-
@@ -354,9 +288,9 @@ function [t_est timing_valid timing_mx av_level] = est_timing(states, rx, rate_f
     ofdm_load_const;
     Npsam = length(rate_fs_pilot_samples);
     
-    Ncorr = length(rx) - (Nsampersymbol+Npsam);
+    Ncorr = length(rx) - (Nsamperframe+Npsam);
     corr = zeros(1,Ncorr);
-    %printf("Npsam: %d M+Ncp: %d Ncorr: %d Nsampersymbol: %d step: %d\n", Npsam,  M+Ncp, Ncorr, Nsampersymbol, step);
+    %printf("Npsam: %d M+Ncp: %d Ncorr: %d Nsamperframe: %d step: %d\n", Npsam,  M+Ncp, Ncorr, Nsamperframe, step);
     
     % normalise correlation so we can compare to a threshold across varying input levels
 
@@ -365,7 +299,7 @@ function [t_est timing_valid timing_mx av_level] = est_timing(states, rx, rate_f
     % correlate with pilots at start and end of frame to determine timing offset
     
     for i=1:step:Ncorr
-      rx1     = rx(i:i+Npsam-1); rx2 = rx(i+Nsampersymbol:i+Nsampersymbol+Npsam-1);
+      rx1     = rx(i:i+Npsam-1); rx2 = rx(i+Nsamperframe:i+Nsamperframe+Npsam-1);
       corr_st = rx1 * rate_fs_pilot_samples'; corr_en = rx2 * rate_fs_pilot_samples';
       corr(i) = (abs(corr_st) + abs(corr_en))/av_level;
     end
@@ -393,7 +327,7 @@ endfunction
 
   This estimator works well for AWGN channels but has problems with
   fading channels.  With stationary/slow fading channels (say a notch
-  in the spectrum), it exhibits bias which can delay sync for 10's of
+  in the spectrum), ot exhibits bias which can delay sync for 10's of
   seconds.
 #}
 
@@ -436,8 +370,7 @@ function foff_est = est_freq_offset_pilot_corr(states, rx, rate_fs_pilot_samples
     Npsam = length(rate_fs_pilot_samples);
 
     % extract pilot samples from either end of frame
-    rx1  = rx(t_est:t_est+Npsam-1);
-    rx2 = rx(t_est+Nsampersymbol:t_est+Nsampersymbol+Npsam-1);
+    rx1  = rx(t_est:t_est+Npsam-1); rx2 = rx(t_est+Nsamperframe:t_est+Nsamperframe+Npsam-1);
 
     % "mix" these down (correlate) with 0 Hz offset pilot samples
     corr_st = rx1 .* conj(rate_fs_pilot_samples);
@@ -515,23 +448,18 @@ function tx = ofdm_txframe(states, tx_sym_lin)
   ofdm_load_const;
   assert(length(tx_sym_lin) == Nbitsperframe/bps);
 
-  % place data symbols in multi-carrier frame with pilots and boundary carriers
+  % place symbols in multi-carrier frame with pilots and boundary carriers
 
   tx_sym = []; s = 1;
-  aframe = zeros(Nf,Nc+2);
-  for r=1:Nf
-    if mod(r-1,Ns) == 0
-      % row of pilots
-      aframe(r,:) = pilots;
-    else
-      % row of data symbols
-      arowofsymbols = tx_sym_lin(s:s+Nc-1);
-      aframe(r,2:Nc+1) = arowofsymbols;
-      s += Nc;
-      if states.dpsk
-        aframe(r,2:Nc+1) = aframe(r,2:Nc+1) .* aframe(r-1,2:Nc+1);
-      end
-    end
+  aframe = zeros(Ns,Nc+2);
+  aframe(1,:) = pilots;
+  for r=1:Nrowsperframe
+    arowofsymbols = tx_sym_lin(s:s+Nc-1);
+    s += Nc;
+    aframe(r+1,2:Nc+1) = arowofsymbols;
+    if states.dpsk
+      aframe(r+1,2:Nc+1) = aframe(r+1,2:Nc+1) .* aframe(r,2:Nc+1);
+    end   
   end
   tx_sym = [tx_sym; aframe];
 
@@ -558,46 +486,17 @@ function [timing_valid states] = ofdm_sync_search(states, rxbuf_in)
   states.rxbuf(1:Nrxbuf-states.nin) = states.rxbuf(states.nin+1:Nrxbuf);
   states.rxbuf(Nrxbuf-states.nin+1:Nrxbuf) = rxbuf_in;
 
+  % Attempt coarse timing estimate (i.e. detect start of frame) at a range of frequency offsets
 
-  #{
-     Attempt coarse timing estimate (i.e. detect start of frame) at a
-     range of frequency offsets.
-
-     Nf=Ns=4:
-
-                            st            en
-                             |             |
-                            \|/           \|/
-                             |             |
-     Receive buffer: D P DDD P DDD P DDD P D
-                             ^
-                             |
-                    ideal timing instant
-
-    Nf=8 Ns=4:
-
-                            st            en
-                             |             |
-                            \|/           \|/
-                             |             |
-     Receive buffer: D P DDD P DDD P DDD P DDD P D
-                             ^
-                             |
-                    ideal timing instant
-  #}
-  
-  st = Nsampersymbol + Nsamperpilot + 1; en = st + 2*Nsamperpilot + Nsampersymbol - 1;
-  timing_mx = 0; fcoarse = 0; timing_valid = 0;
-
-  % TODO: the -40:40:40 in this for loop is waveform dependent, and should be computed at init time
-
+  st = M+Ncp + Nsamperframe + 1; en = st + 2*Nsamperframe +  M+Ncp - 1;
+  timing_mx = 0; fcoarse = 0; timing_valid = 0; 
   for afcoarse=-40:40:40
     % vector of local oscillator samples to shift input vector
-    % these could be computed on the fly to save memory, or pre-computed and stored in flash based tables as they are static
+    % these could be computed on the fly to save memory, or pre-computed in flash at tables as they are static
 
     if afcoarse != 0
       w = 2*pi*afcoarse/Fs;
-      wvec = exp(-j*w*(0:2*Nsamperpilot+Nsampersymbol-1));
+      wvec = exp(-j*w*(0:2*Nsamperframe+M+Ncp-1));
 
       % choose best timing offset metric at this freq offset
       [act_est atiming_valid atiming_mx] = est_timing(states, wvec .* states.rxbuf(st:en), states.rate_fs_pilot_samples, 2);
@@ -620,7 +519,7 @@ function [timing_valid states] = ofdm_sync_search(states, rxbuf_in)
 
   if fcoarse != 0
     w = 2*pi*fcoarse/Fs;
-    wvec = exp(-j*w*(0:2*Nsamperpilot+Nsampersymbol-1));
+    wvec = exp(-j*w*(0:2*Nsamperframe+M+Ncp-1));
     foff_est = est_freq_offset_pilot_corr(states, wvec .* states.rxbuf(st:en), states.rate_fs_pilot_samples, ct_est);
     foff_est += fcoarse;
   else
@@ -644,8 +543,7 @@ function [timing_valid states] = ofdm_sync_search(states, rxbuf_in)
     states.sample_point = states.timing_est = 1;
     states.foff_est_hz = foff_est;
   else
-    % note different to when we have frame sync
-    states.nin = Nsamperpilot;
+    states.nin = Nsamperframe;
   end
   
   states.timing_valid = timing_valid;
@@ -656,6 +554,22 @@ endfunction
 % ------------------------------------------
 % ofdm_demod - Demodulates one frame of bits
 % ------------------------------------------
+
+#{ 
+
+  For phase estimation we need to maintain buffer of 3 frames plus
+  one pilot, so we have 4 pilots total. '^' is the start of current
+  frame that we are demodulating.
+           
+  P DDD P DDD P DDD P
+        ^
+    
+  Then add one symbol either side to account for movement in
+  sampling instant due to sample clock differences:
+
+  D P DDD P DDD P DDD P D
+          ^
+#}
 
 function [rx_bits states aphase_est_pilot_log rx_np rx_amp] = ofdm_demod(states, rxbuf_in)
   ofdm_load_const;
@@ -675,8 +589,8 @@ function [rx_bits states aphase_est_pilot_log rx_np rx_amp] = ofdm_demod(states,
   if timing_en
     % update timing at start of every frame
 
-    st = Nsampersymbol + Nsamperframe + 1 - floor(ftwindow_width/2) + (timing_est-1);
-    en = st + Nsamperpilot-1 + Nsampersymbol + ftwindow_width-1;
+    st = M+Ncp + Nsamperframe + 1 - floor(ftwindow_width/2) + (timing_est-1);
+    en = st + Nsamperframe-1 + M+Ncp + ftwindow_width-1;
           
     [ft_est timing_valid timing_mx] = est_timing(states, rxbuf(st:en) .* exp(-j*woff_est*(st:en)), rate_fs_pilot_samples, 1);
     % printf("  timing_est: %d ft_est: %d timing_valid: %d timing_mx: %d\n", timing_est, ft_est, timing_valid, timing_mx);
