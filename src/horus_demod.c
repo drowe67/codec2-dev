@@ -87,13 +87,6 @@ int main(int argc, char *argv[]) {
                 if ((strcmp(optarg, "BINARY") == 0) || (strcmp(optarg, "binary") == 0)) {
                     mode = HORUS_MODE_BINARY_V1;
                 }
-                // Commented out until these are implemented.
-                // if ((strcmp(optarg, "256BIT") == 0) || (strcmp(optarg, "256bit") == 0)) {
-                //     mode = HORUS_MODE_BINARY_256BIT;
-                // }
-                // if ((strcmp(optarg, "128BIT") == 0) || (strcmp(optarg, "128bit") == 0)) {
-                //     mode = HORUS_MODE_BINARY_128BIT;
-                // }
                 if (mode == -1) {
                     fprintf(stderr, "use --mode RTTY or --mode binary\n");
                     exit(1);

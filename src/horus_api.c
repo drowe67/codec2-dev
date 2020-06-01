@@ -76,24 +76,13 @@ int8_t uw_horus_binary_v1[] = {
 };
 
 
-/* Unique word for Horus Binary V2 128/256 bit modes (Last row in the 32x32 Hadamard matrix) */
-
-int8_t uw_horus_binary_v2[] = {
-    1, 0, 0, 1, 0, 1, 1, 0,  // 0x96
-    0, 1, 1, 0, 1, 0, 0, 1,  // 0x69
-    0, 1, 1, 0, 1, 0, 0, 1,  // 0x69
-    1, 0, 0, 1, 0, 1, 1, 0   // 0x96
-};
-
-
 struct horus *horus_open (int mode) {
-    assert((mode == HORUS_MODE_RTTY) || (mode == HORUS_MODE_BINARY_V1) || (mode == HORUS_MODE_BINARY_V2_256BIT) || (mode == HORUS_MODE_BINARY_V2_128BIT));
+    assert((mode == HORUS_MODE_RTTY) || (mode == HORUS_MODE_BINARY_V1));
 
     if (mode == HORUS_MODE_RTTY){
         // RTTY Mode defaults - 100 baud, no assumptions about tone spacing.
         return horus_open_advanced(HORUS_MODE_RTTY, HORUS_RTTY_DEFAULT_BAUD, -1);
     } else {
-        // Placeholder until we have more definition of the new modes.
         // Legacy Horus Binary Mode defaults - 100 baud, Disable mask estimation.
         return horus_open_advanced(HORUS_MODE_BINARY_V1, HORUS_BINARY_V1_DEFAULT_BAUD, -1);
     }
@@ -102,7 +91,7 @@ struct horus *horus_open (int mode) {
 
 struct horus *horus_open_advanced (int mode, int Rs, int tx_tone_spacing) {
     int i, mask;
-    assert((mode == HORUS_MODE_RTTY) || (mode == HORUS_MODE_BINARY_V1) || (mode == HORUS_MODE_BINARY_V2_256BIT) || (mode == HORUS_MODE_BINARY_V2_128BIT));
+    assert((mode == HORUS_MODE_RTTY) || (mode == HORUS_MODE_BINARY_V1));
 
     struct horus *hstates = (struct horus *)malloc(sizeof(struct horus));
     assert(hstates != NULL);
@@ -150,11 +139,11 @@ struct horus *horus_open_advanced (int mode, int Rs, int tx_tone_spacing) {
         }
 
         if (tx_tone_spacing == -1){
-            // No tone spacing provided. Disable mask estimation, and use the default tone spacing value as a dummy value.
-            tx_tone_spacing = HORUS_BINARY_V1_DEFAULT_TONE_SPACING;
+            // No tone spacing provided. Disable mask estimation, and use a dummy tone spacing value.
+            tx_tone_spacing = 2*hstates->Rs;
             mask = 0;
         } else {
-            // Tone spacing provided, enable mask estimation.
+            // Tone spacing provided, enable mask estimation
             mask = 1;
         }
 
@@ -166,9 +155,8 @@ struct horus *horus_open_advanced (int mode, int Rs, int tx_tone_spacing) {
         horus_l2_init();
         hstates->rx_bits_len = hstates->max_packet_len;
     }
-    // TODO: Horus 256/128-bit modes here.
 
-    // Create the FSK modedm struct. Note that the low-tone-frequency parameter is unused.
+    // Create the FSK modem struct. Note that the low-tone-frequency parameter is unused.
     #define UNUSED 1000
     hstates->fsk = fsk_create(hstates->Fs, hstates->Rs, hstates->mFSK, UNUSED, tx_tone_spacing);
 
@@ -513,12 +501,6 @@ int horus_get_max_ascii_out_len(struct horus *hstates) {
     }
     if (hstates->mode == HORUS_MODE_BINARY_V1) {
         return (HORUS_BINARY_V1_NUM_UNCODED_PAYLOAD_BYTES*2+1);     /* Hexadecimal encoded */
-    }
-    if (hstates->mode == HORUS_MODE_BINARY_V2_256BIT) {
-        return (HORUS_BINARY_V2_256BIT_NUM_UNCODED_PAYLOAD_BYTES*2+1);     /* Hexadecimal encoded */
-    }
-    if (hstates->mode == HORUS_MODE_BINARY_V2_128BIT) {
-        return (HORUS_BINARY_V2_128BIT_NUM_UNCODED_PAYLOAD_BYTES*2+1);     /* Hexadecimal encoded */
     }
     assert(0); /* should never get here */
     return 0;
