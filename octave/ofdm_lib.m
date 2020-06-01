@@ -955,16 +955,16 @@ endfunction
 function [rx_uw payload_syms payload_amps txt_bits] = disassemble_modem_frame(states, modem_frame_syms, modem_frame_amps)
   ofdm_load_const;
 
-  Nsymsperframe = Nbitsperframe/bps;
+  Nsymsperpacket = Nbitsperpacket/bps;
   Nuwsyms = Nuwbits/bps;
   Ntxtsyms = Ntxtbits/bps;
-  payload_syms = zeros(1,Nsymsperframe-Nuwsyms-Ntxtsyms);
-  payload_amps = zeros(1,Nsymsperframe-Nuwsyms-Ntxtsyms);
+  payload_syms = zeros(1,Nsymsperpacket-Nuwsyms-Ntxtsyms);
+  payload_amps = zeros(1,Nsymsperpacket-Nuwsyms-Ntxtsyms);
   rx_uw_syms = zeros(1,Nuwsyms);
   txt_syms = zeros(1,Ntxtsyms);
   p = 1; u = 1;
  
-  for s=1:Nsymsperframe-Ntxtsyms;
+  for s=1:Nsymsperpacket-Ntxtsyms;
     if (u <= Nuwsyms) && (s == uw_ind_sym(u))
       rx_uw_syms(u++) = modem_frame_syms(s);
     else
@@ -973,11 +973,11 @@ function [rx_uw payload_syms payload_amps txt_bits] = disassemble_modem_frame(st
     end
   end
   t = 1;
-  for s=Nsymsperframe-Ntxtsyms+1:Nsymsperframe
+  for s=Nsymsperpacket-Ntxtsyms+1:Nsymsperpacket
     txt_syms(t++) = modem_frame_syms(s);
   end
   assert(u == (Nuwsyms+1));
-  assert(p = (Nsymsperframe+1));
+  assert(p = (Nsymsperpacket+1));
 
   % now demodulate UW and txt bits
   
