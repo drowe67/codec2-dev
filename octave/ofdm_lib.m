@@ -35,7 +35,7 @@
    In this figure, time flows down, freq across.
 #}
 
-function states = ofdm_init(bps, Rs, Tcp, Ns, Nf, Nc)
+function states = ofdm_init(bps, Rs, Tcp, Ns, Np, Nc)
   states.Fs = 8000;
   states.bps = bps;
   states.Rs = Rs;
@@ -55,13 +55,13 @@ function states = ofdm_init(bps, Rs, Tcp, Ns, Nf, Nc)
     1 - j,  1 - j*3,  3 - j,  3 - j*3;
    -1 + j, -1 + j*3, -3 + j, -3 + j*3;
    -1 - j, -1 - j*3, -3 - j, -3 - j*3]/3;
-  states.Nf = Nf;                                 % number of symbols per FEC frame (or superframe). In some modes we want
+  states.Np = Np;                                 % number of symbols per packet. In some modes we want
                                                   % the total packet of data to span multiple modem frames, e.g. HF data
                                                   % and/or when the FEC codeword is larger than the number of symbols in one
-                                                  % modem frame.  In other modes (e.g. 700D/2020) Nf == Ns, ie the modem frame
-                                                  % is the same length as the FEC frame.
-  assert(floor(Nf/Ns) == Nf/Ns);               
-  states.Nbitsperpacket = (Nf/Ns)*states.Nbitsperframe;
+                                                  % modem frame.  In other modes (e.g. 700D/2020) Np == Ns, ie the modem frame
+                                                  % is the same length as the packet/FEC frame.
+  assert(floor(Np/Ns) == Np/Ns);               
+  states.Nbitsperpacket = (Np/Ns)*states.Nbitsperframe;
   
   % some basic sanity checks
   assert(floor(states.M) == states.M);
@@ -200,8 +200,8 @@ endfunction
 %                  and parse mode string.
 %------------------------------------------------------------------------------
 
-function [bps Rs Tcp Ns Nf Nc] = ofdm_init_mode(mode="700D")
-  bps = 2; Tcp = 0.002; Ns=Nf=8;
+function [bps Rs Tcp Ns Np Nc] = ofdm_init_mode(mode="700D")
+  bps = 2; Tcp = 0.002; Ns=Np=8;
 
   % some "canned" modes
   if strcmp(mode,"700D")
@@ -216,9 +216,9 @@ function [bps Rs Tcp Ns Nf Nc] = ofdm_init_mode(mode="700D")
     # Rs*Nc=1650, so fits easily in 2000 Hz
     Ns=5; Tcp = 0.004; Tframe = 0.1; Ts = Tframe/Ns; Nc = 33; bps=4;
   elseif strcmp(mode,"data")
-    Ns=5; Nf=10; Tcp = 0.004; Tframe = 0.1; Ts = Tframe/Ns; Nc = 17; bps=2;
+    Ns=5; Np=10; Tcp = 0.004; Tframe = 0.1; Ts = Tframe/Ns; Nc = 17; bps=2;
   elseif strcmp(mode,"1")
-    Ns=5; Nf=10; Tcp=0; Tframe = 0.1; Ts = Tframe/Ns; Nc = 1; bps=2;
+    Ns=5; Np=10; Tcp=0; Tframe = 0.1; Ts = Tframe/Ns; Nc = 1; bps=2;
   else
     % try to parse mode string for user defined mode
     vec = sscanf(mode, "Ts=%f Nc=%d Ncp=%f");
@@ -235,11 +235,11 @@ end
 function print_config(states)
   ofdm_load_const;
   printf("Rs=%5.2f Nc=%d Tcp=%4.3f ", Rs, Nc, Tcp);
-  printf("Nbitsperframe: %d Ns: %d Ntxtbits: %d Nuwbits: %d ",
-          Nbitsperframe, Ns, Ntxtbits, Nuwbits);
+  printf("Nbitsperpacket: %d Ns: %d Np: %d Ntxtbits: %d Nuwbits: %d ",
+          Nbitsperpacket, Ns, Np, Ntxtbits, Nuwbits);
   printf("bits/s: %4.1f\n",  Nbitsperframe*Rs/Ns);
   s=1; u=1; Nuwsyms=length(uw_ind_sym);
-  for f=1:Nf/Ns
+  for f=1:Np/Ns
     for r=1:Ns
       for c=1:Nc+2
         if r == 1
@@ -355,8 +355,8 @@ function tx = ofdm_txframe(states, tx_sym_lin)
   % place data symbols in multi-carrier frame with pilots and boundary carriers
 
   tx_sym = []; s = 1;
-  aframe = zeros(Nf,Nc+2);
-  for r=1:Nf
+  aframe = zeros(Np,Nc+2);
+  for r=1:Np
     if mod(r-1,Ns) == 0
       % row of pilots
       aframe(r,:) = pilots;
@@ -385,7 +385,7 @@ endfunction
 
 function tx = ofdm_txframe(states, tx_sym_lin)
   ofdm_load_const;
-  assert(length(tx_sym_lin) == Nbitsperframe/bps);
+  assert(length(tx_sym_lin) == Nbitsperpacket/bps);
 
   % place symbols in multi-carrier frame with pilots and boundary carriers
 
@@ -900,10 +900,10 @@ endfunction
 function modem_frame = assemble_modem_frame(states, payload_bits, txt_bits)
   ofdm_load_const;
 
-  modem_frame = zeros(1,Nbitsperframe);
+  modem_frame = zeros(1,Nbitsperpacket);
   p = 1; u = 1;
  
-  for b=1:Nbitsperframe-Ntxtbits;
+  for b=1:Nbitsperpacket-Ntxtbits;
     if (u <= Nuwbits) && (b == uw_ind(u))
       modem_frame(b) = tx_uw(u++);
     else
@@ -911,7 +911,7 @@ function modem_frame = assemble_modem_frame(states, payload_bits, txt_bits)
     end  
   end
   t = 1;
-  for b=Nbitsperframe-Ntxtbits+1:Nbitsperframe
+  for b=Nbitsperpacket-Ntxtbits+1:Nbitsperpacket
     modem_frame(b) = txt_bits(t++);
   end
   assert(u == (Nuwbits+1));

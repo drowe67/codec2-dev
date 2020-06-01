@@ -5,6 +5,7 @@ bps = states.bps;
 Rs = states.Rs;
 Tcp = states.Tcp;
 Ns = states.Ns;
+Np = states.Np;
 Nc = states.Nc;
 M = states.M;
 Ncp = states.Ncp;
@@ -19,7 +20,6 @@ Ntxtbits = states.Ntxtbits;
 tx_uw =  states.tx_uw;
 uw_ind = states.uw_ind;
 uw_ind_sym = states.uw_ind_sym;
-Nf = states.Nf;
 
 W = states.W;
 w = states.w;
