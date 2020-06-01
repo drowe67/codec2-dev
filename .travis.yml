@@ -4,12 +4,14 @@ env:
   - GCC_SHORT=8-2018q4
 sudo: required
 language: generic
-dist: focal
+dist: xenial
 addons:
   apt:
     packages: libc6-i386 octave octave-common octave-signal liboctave-dev gnuplot
               sox p7zip-full python3-numpy valgrind fonts-freefont-otf
-              
+              libspeexdsp-dev libsamplerate0-dev libwxgtk3.0-dev portaudio19-dev libhamlib-dev
+              libasound2-dev libao-dev libgsm1-dev libsndfile-dev
+             
 cache:
   directories:
   - "$HOME/$GCC_BASE"
@@ -19,34 +21,60 @@ install:
 - export GCC_URL=https://armkeil.blob.core.windows.net/developer/Files/downloads/gnu-rm/$GCC_SHORT/$GCC_BASE-linux.tar.bz2
 - if [ ! -e $GCC_DIR/bin/arm-none-eabi-g++ ]; then wget -q $GCC_URL -O $GCC_ARCHIVE;
   tar xfj $GCC_ARCHIVE -C $HOME; fi
-- export CODEC2DEV=${PWD}
+- export CODEC2DIR=${PWD}
+- export LPCNETDIR=${HOME}/LPCNet
+- export FREEDVGUIDIR=${HOME}/freedv-gui
 - export MAKEFLAGS=-j2
-- export BUILDSTD=${CODEC2DEV}/build_linux
-- export BUILDSTM=${CODEC2DEV}/stm32/build_stm32
 - export STDLIBDIR=$HOME/STM32F4xx_DSP_StdPeriph_Lib_V1.8.0
 - if [ ! "$STDLIBURL" == "" ]; then pwd; wget -q $STDLIBURL; 7z  x -p$STDLIBKEY -o$HOME
   stdperiph_lib.zip; fi
 - unset STDLIBURL STDLIBKEY # DO NOT TOUCH  
-# CML library for LDPC support ----------------------
+
+script:
+
+# CML library for Octave LDPC support ----------------------------
 - cd ${HOME}
 - wget http://www.iterativesolutions.com/user/image/cml.1.10.zip
 - unzip cml.1.10.zip
-- ls ${CODEC2DEV}/octave/cml.patch
-- patch -p0 < ${CODEC2DEV}/octave/cml.patch
+- ls ${CODEC2DIR}/octave/cml.patch
+- patch -p0 < ${CODEC2DIR}/octave/cml.patch
 - cd cml/source
 - octave --no-gui -qf --eval "make"
-script:
-# codec2 build and test -----------------------------
-- cd ${CODEC2DEV}
-- mkdir -p $BUILDSTD
-- cd $BUILDSTD
-- cmake $CODEC2DEV
-- make -j4
-- CTEST_OUTPUT_ON_FAILURE=1 make -j4 all test
-- mkdir -p $BUILDSTM
-- cd $BUILDSTM
-- if [ -e $STDLIBDIR ]; then  (ln -s $STDLIBDIR . && cmake $CODEC2DEV/stm32 -DPERIPHLIBDIR="$STDLIBDIR" 
-  -DCMAKE_TOOLCHAIN_FILE="$CODEC2DEV/stm32/cmake/STM32_Toolchain.cmake" -DARM_GCC_BIN:STRING="$GCC_DIR/bin/" 
+
+# build codec2 (initially without LPCNet) -------------------------
+- cd ${CODEC2DIR} && mkdir -p build_linux && cd build_linux
+- cmake $CODEC2DIR && make -j4
+
+# build and test LPCNet -------------------------------------------
+- cd $HOME
+- git clone https://github.com/drowe67/LPCNet.git
+- cd $LPCNETDIR && git checkout master && git pull
+- mkdir -p build_linux && cd build_linux && rm -Rf *
+- cmake -DCODEC2_BUILD_DIR=$CODEC2DIR/build_linux .. && make
+# sanity check test
+- cd src && sox ../../wav/wia.wav -t raw -r 16000 - | ./lpcnet_enc -s | ./lpcnet_dec -s > /dev/null
+
+# Re-build codec2 with LPCNet for FreeDV 2020 support  -------------
+- cd $CODEC2DIR/build_linux && rm -Rf *
+- cmake -DLPCNET_BUILD_DIR=$LPCNETDIR/build_linux .. && make -j4
+
+# Now run all the ctests
+- ctest --output-on-failure
+
+# test build of freedv-gui to trap any API changes -----------------
+- cd $HOME
+- git clone https://github.com/drowe67/freedv-gui.git
+- cd $FREEDVGUIDIR
+- mkdir -p build_linux && cd build_linux
+- cmake -DCMAKE_BUILD_TYPE=Debug -DCODEC2_BUILD_DIR=$CODEC2DIR/build_linux -DLPCNET_BUILD_DIR=$LPCNETDIR/build_linux ..
+- make
+
+# stm32 support --------------------------------------
+
+- mkdir -p build_stm32
+- cd build_stm32
+- if [ -e $STDLIBDIR ]; then  (ln -s $STDLIBDIR . && cmake $CODEC2DIR/stm32 -DPERIPHLIBDIR="$STDLIBDIR" 
+  -DCMAKE_TOOLCHAIN_FILE="$CODEC2DIR/stm32/cmake/STM32_Toolchain.cmake" -DARM_GCC_BIN:STRING="$GCC_DIR/bin/" 
   -DUT_PARAMS="--openocd" && make -j4 && ctest -V -E check_ram_limit) ; fi
 - if [ -n "$UT_SSH_PARAMS" ]; then  PATH="$GCC_DIR/bin/":${PATH} ctest -V -E ofdm_demod_ldpc_fade; fi
 before_install:

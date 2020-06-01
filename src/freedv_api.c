@@ -71,12 +71,26 @@
  *              buffers.
  */
 
-char *ofdm_statemode[] = {
-    "search",
-    "trial",
-    "synced"
-};
+char *ofdm_statemode[] = {"search","trial","synced"};
 
+char *rx_sync_flags_to_text[] = {
+    "----",
+    "---T",
+    "--S-",
+    "--ST",
+    "-B--",
+    "-B-T",
+    "-BS-",
+    "-BST",
+    "E---",
+    "E--T",
+    "E-S-",
+    "E-ST",
+    "EB--",
+    "EB-T",
+    "EBS-",
+    "EBST"};
+    
 /*---------------------------------------------------------------------------* \
 
   FUNCTION....: freedv_open
@@ -638,6 +652,7 @@ static void codec2_decode_upacked(struct freedv *f, short speech_out[], uint8_t 
   Deal with 700D first frame burble, and different sync states from OFDM modes like 700D
   Output no samples if squelched, we assume it's OK for the audio sink to run dry
   A FIFO required on output to smooth sample flow to audio sink
+  Don't decode when we are sendingtest frames
 
 \*---------------------------------------------------------------------------*/
 
@@ -675,7 +690,7 @@ int freedv_bits_to_speech(struct freedv *f, short speech_out[], short demod_in[]
         }
     }
 
-    if ((rx_status & RX_SYNC) && (rx_status & RX_BITS)) {
+    if ((rx_status & RX_SYNC) && (rx_status & RX_BITS) && !f->test_frames) {
        /* following logic is tricky so spell it out clearly, see table
           in: https://github.com/drowe67/codec2/pull/111 */
         
@@ -704,6 +719,7 @@ int freedv_bits_to_speech(struct freedv *f, short speech_out[], short demod_in[]
         if(FDV_MODE_ACTIVE( FREEDV_MODE_2020, f->mode)) {
 #ifdef __LPCNET__
             /* LPCNet decoder */
+            
             int bits_per_codec_frame = lpcnet_bits_per_frame(f->lpcnet);
             int data_bits_per_frame = f->ldpc->data_bits_per_frame;
             int frames = data_bits_per_frame/bits_per_codec_frame;            
@@ -716,6 +732,7 @@ int freedv_bits_to_speech(struct freedv *f, short speech_out[], short demod_in[]
                 }
                 f->modem_frame_count_rx++;
             }
+          
  #endif          
         }
         else {

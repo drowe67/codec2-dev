@@ -617,7 +617,6 @@ else
   subplot(212)
   plot(imag(tx_fdm_frame_log))
   title('tx fdm imag');
-  close(f, "force")
 
   f = figure(2)
   clf
@@ -629,7 +628,6 @@ else
   ylabel('Amplitude (dB)')
   xlabel('Frequency (Hz)')
   grid;
-  close(f, "force")
 
   f = figure(3)
   clf;
@@ -642,7 +640,6 @@ else
   title('Scatter');
   ymax = abs(max(max(combined)));
   axis([-ymax ymax -ymax ymax])
-  close(f, "force")
 
   f = figure(4)
   clf;
@@ -650,7 +647,6 @@ else
   plot(rx_phi_log)
   subplot(212)
   plot(rx_amp_log)
-  close(f, "force")
 
   f = figure(5)
   clf;
@@ -660,7 +656,6 @@ else
   subplot(212)
   stem(ratio_log)
   title('Sync ratio');
-  close(f, "force")
 
   f = figure(6)
   clf;
@@ -670,7 +665,6 @@ else
   subplot(212)
   plot(noise_rms_filt_log,'r', sig_rms_log,'g');
   title('Est rms signal and noise')
-  close(f, "force")
 
   f = figure(7);
   clf;
@@ -684,7 +678,6 @@ else
   subplot(212)
   plot(foff_log(1:length(f_est_log)) - f_est_log + Fcentre)
   title('freq offset estimation error');
-  close(f, "force")
 
   f = figure(8)
   clf
@@ -693,13 +686,11 @@ else
   axis([1 Fs/2 -20 0])
   grid
   title('SSB tx filter')
-  close(f, "force")
 
   f = figure(9)
   clf
   plot(error_positions_hist)    
   title('histogram of bit errors')                               
-  close(f, "force")
 
   
 end

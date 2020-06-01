@@ -100,12 +100,12 @@ int main(int argc, char *argv[]) {
     fprintf(stderr, "bits_per_modem_frame: %d bytes_per_modem_frame: %d\n", freedv_get_bits_per_modem_frame(freedv), bytes_per_modem_frame);
     assert((freedv_get_bits_per_modem_frame(freedv) % 8) == 0);
     int n_mod_out = freedv_get_n_nom_modem_samples(freedv);
-    uint8_t bytes_in[bytes_per_modem_frame];
+    u_char bytes_in[bytes_per_modem_frame];
     short   mod_out[n_mod_out];
 
     /* OK main loop  --------------------------------------- */
 
-    while(fread(bytes_in, sizeof(uint8_t), bytes_per_modem_frame, fin) == bytes_per_modem_frame) {
+    while(fread(bytes_in, 1, bytes_per_modem_frame, fin) == bytes_per_modem_frame) {
         freedv_rawdatatx(freedv, mod_out, bytes_in);
         fwrite(mod_out, sizeof(short), n_mod_out, fout);
     
