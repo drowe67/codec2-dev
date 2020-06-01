@@ -47,7 +47,8 @@ function states = ofdm_init(bps, Rs, Tcp, Ns, Nf, Nc)
   states.Nbitsperframe = (Ns-1)*Nc*bps;           % total bits in all data symbols in modem frame
   states.Nsampersymbol = states.M+states.Ncp;     % number of samples in a single symbol
   states.Nsamperframe  = Ns*states.Nsampersymbol; % number of samples in a modem frame
-  states.Ntxtbits = 4;                            % reserved bits/frame for auxillary text information
+  states.Ntxtbits = 4;                            % reserved bits/frame for auxillary text information.  Uncoded/unprotected so may
+                                                  % be of limited use going forward, consider setting to 0
   states.Nuwbits  = bps*5;                        % Let use 5 symbols for the UW, note ths means longer UWs for QAM than QPSK
   states.qam16 = [
     1 + j,  1 + j*3,  3 + j,  3 + j*3;
@@ -1047,13 +1048,13 @@ function [tx_bits payload_data_bits codeword] = create_ldpc_test_frame(states, c
       codeword_raw = [codeword_raw qpsk_demod(tx_symbols(s))];
     end
   else
-    codeword_raw = round(ofdm_rand(Nbitsperframe-(Nuwbits+Ntxtbits))/32767);
+    codeword_raw = round(ofdm_rand(Nbitsperpacket-(Nuwbits+Ntxtbits))/32767);
   end
   
   % insert UW and txt bits
   
   tx_bits = assemble_modem_frame(states, codeword_raw, zeros(1,Ntxtbits));
-  assert(Nbitsperframe == length(tx_bits));
+  assert(Nbitsperpacket == length(tx_bits));
 
 endfunction
 
