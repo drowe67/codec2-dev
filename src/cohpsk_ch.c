@@ -94,7 +94,7 @@ int main(int argc, char *argv[])
     float          hf_gain;
     COMP          *ch_fdm_delay = NULL, aspread, aspread_2ms, delayed, direct;
     float          tx_pwr, tx_pwr_fade, noise_pwr;
-    int            frames, i, j, k, arg, Fs, ret, clipped, ssbfilt_en, complex_out;
+    int            frames, i, j, k, Fs, ret, clipped, ssbfilt_en, complex_out;
     float          sam, peak, inclip, papr, CNo, snr3k;
   
     if (argc > 3) {
@@ -113,42 +113,24 @@ int main(int argc, char *argv[])
         }
 
         NodB = atof(argv[3]);
-
-        Fs = COHPSK_FS;
-        if ((arg = opt_exists(argv, argc, "--Fs"))) {
-            Fs = atoi(argv[arg+1]);
-        }
-        
-        foff_hz = 0.0;
-        if ((arg = opt_exists(argv, argc, "-f"))) {
-            foff_hz = atoi(argv[arg+1]);
-        }
-        fading_en = 0;
-        if (opt_exists(argv, argc, "--slow")) {
-            fading_en = 1;
-        }
-        if (opt_exists(argv, argc, "--fast")) {
-            fading_en = 2;
-        }
-        if (opt_exists(argv, argc, "--faster")) {
-            fading_en = 3;
-        }
-        inclip = 1.0;
-        if ((arg = opt_exists(argv, argc, "--clip"))) {
-            inclip = atof(argv[arg+1]);
-        }
-        ssbfilt_en = 1;
-        if ((arg = opt_exists(argv, argc, "--ssbfilt"))) {
-            ssbfilt_en = atof(argv[arg+1]);
-        }
-        complex_out = 0;
-        if ((arg = opt_exists(argv, argc, "--complexout"))) {
-            complex_out = 1;
-        }
+        Fs = COHPSK_FS; foff_hz = 0.0; fading_en = 0; inclip = 1.0; ssbfilt_en = 1; complex_out = 0;
         raw_dir = strdup(DEFAULT_RAW_DIR);
-        if ((arg = opt_exists(argv, argc, "--raw_dir"))) {
-	    FREE(raw_dir);
-            raw_dir = strdup(argv[arg+1]);
+
+        for(int i=4; i<argc; i++) {
+            if (!strcmp(argv[i],"--Fs")) { Fs = atoi(argv[i+1]); i++; }
+            else if (!strcmp(argv[i], "-f")) { foff_hz = atoi(argv[i+1]); i++; }
+            else if (!strcmp(argv[i], "--slow")) fading_en = 1;
+            else if (!strcmp(argv[i], "--fast")) fading_en = 2;
+            else if (!strcmp(argv[i], "--faster")) fading_en = 3;
+            else if (!strcmp(argv[i], "--clip")) { inclip = atof(argv[i+1]); i++; }
+            else if (!strcmp(argv[i], "--ssbfilt")) { ssbfilt_en = atof(argv[i+1]); i++; }
+            else if (!strcmp(argv[i], "--complexout")) complex_out = 1;
+            else if (!strcmp(argv[i], "--raw_dir")) {
+                FREE(raw_dir); raw_dir = strdup(argv[i+1]); i++;
+            } else {
+                fprintf(stderr, "Unknown argument: %s\n", argv[i]);
+                exit(1);
+            }
         }
     }
     else {

@@ -8,7 +8,7 @@
 % Wenet.......: 100 kbit/s HAB High Def image telemetry
 %
 % Handles frequency offsets, performance right on ideal, C implementation
-% in codec2-dev/src
+% in codec2/src
 
 1;
 
@@ -36,6 +36,7 @@ function states = fsk_init(Fs, Rs, M=2, P=8, nsym=50)
   states.P = P;                                   % oversample rate out of filter
   assert(Ts/states.P == floor(Ts/states.P), "Ts/P must be an integer");
 
+  states.tx_tone_separation = 2*Rs;
   states.nin = N;                                 % can be N +/- Ts/P samples to adjust for sample clock offsets
   states.verbose = 0;
   states.phi = zeros(1, M);                       % keep down converter osc phase continuous

@@ -616,9 +616,6 @@ endif(NOT APPLE)
      add_test(NAME test_fsk_lib
              COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/octave; DISPLAY=\"\" octave --no-gui -qf fsk_lib_demo.m")
              set_tests_properties(test_fsk_lib PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
-     add_test(NAME test_fsk_horus
-             COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/octave; DISPLAY=\"\" octave --no-gui -qf fsk_horus.m")
-             set_tests_properties(test_fsk_horus PROPERTIES PASS_REGULAR_EXPRESSION "Received 3 packets")
      add_test(NAME test_fsk_modem_octave_port
              COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/octave; 
                             PATH_TO_TFSK=${CMAKE_CURRENT_BINARY_DIR}/unittest/tfsk octave --no-gui -qf tfsk.m")
@@ -652,9 +649,9 @@ endif(NOT APPLE)
                             ./cohpsk_ch - - -23 --Fs 8000 --ssbfilt 0 --complexout -f -4000 | 
                             ./fsk_demod -c -p 8 4 8000 100 - - | 
                             ./fsk_put_test_bits -b 0.025 -q - ")
-     # Horus "lock down" uncoded PER/BER test:
+     # Low SNR 4FSK uncoded PER/BER test:
      # 4FSK modem at Eb/No = 2dB, SNR = Eb/No+10log10(Rb/B) = 6 + 10*log10(2*100/3000) = -15.7dB
-     # Theoretical BER is 0.14.  As it's singlesided noise cohpsk_ch reports 3dB less (-18.7dB)
+     # Theoretical BER is 0.14.  As it's single sided noise cohpsk_ch reports 3dB less (-18.7dB)
      # Pass condition is 10% PER
      add_test(NAME test_fsk_4fsk_lockdown
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src; 
@@ -674,39 +671,6 @@ endif(NOT APPLE)
                             ./fsk_demod -p 10 4 8000 400 - - | 
                             ./vhf_deframe_c2 B - /dev/null")
              set_tests_properties(test_fsk_vhf_framer PROPERTIES PASS_REGULAR_EXPRESSION "total_uw_err: 0")
-
-     # Horus telemetry waveforms             
-     add_test(NAME test_horus_binary
-             COMMAND sh -c "sox ${CMAKE_CURRENT_SOURCE_DIR}/wav/horus_binary_ebno_4.5db.wav -r 48000 -t raw - |
-                             $<TARGET_FILE:horus_demod> -m binary - -"
-              )
-             set_tests_properties(test_horus_binary PROPERTIES PASS_REGULAR_EXPRESSION "1C9A9545")
-     add_test(NAME test_horus_binary_iq
-             COMMAND sh -c "cat ${CMAKE_CURRENT_SOURCE_DIR}/raw/horusb_iq_s16.raw | 
-                            $<TARGET_FILE:horus_demod> -q -m binary --fsk_lower=1000 --fsk_upper=20000 - -"
-             )
-             set_tests_properties(test_horus_binary_iq PROPERTIES
-             PASS_REGULAR_EXPRESSION "000900071E2A000000000000000000000000259A6B14")
-    
-     # Wenet
-     # Using Mask estimator (Assuming ~120 kHz tone spacing)
-     add_test(NAME test_wenet_mask
-        COMMAND sh -c "cat ${CMAKE_CURRENT_SOURCE_DIR}/raw/wenet_sample.c8 | 
-                        $<TARGET_FILE:fsk_demod> --cu8 -s --mask=120000 2 921416 115177 - - |
-                        $<TARGET_FILE:drs232_ldpc> - - 2>&1 | strings"
-        )
-        set_tests_properties(test_wenet_mask PROPERTIES
-        PASS_REGULAR_EXPRESSION "packet_errors: 0 PER: 0.000")
-
-     # Using regular frequency estimator, tell freq est to avoid first 100 kHz due to a DC line 
-     add_test(NAME test_wenet_nomask
-        COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src; 
-                       cat ${CMAKE_CURRENT_SOURCE_DIR}/raw/wenet_sample.c8 | 
-                       ./fsk_demod --cu8 -s --fsk_lower 100000 2 921416 115177 - - |
-                       ./drs232_ldpc - - 2>&1 | strings"
-        )
-        set_tests_properties(test_wenet_nomask PROPERTIES
-        PASS_REGULAR_EXPRESSION "packet_errors: 0 PER: 0.000")
 
       # VHF Ethernet-style packet system
       add_test(NAME test_freedv_data_channel

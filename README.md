@@ -8,7 +8,6 @@ Also included:
   + APIs for raw and Ethernet packet data over radio [README_data](README_data.md)
   + High performance Coherent OFDM modem for HF channels [README_ofdm](README_ofdm.txt)
   + High performance Non-coherent FSK modem [README_fsk](README_fsk.md)
-  + High Altitude Balloon image and telemetry reception protocol and modem software (Horus and Wenet).
   + Coherent PSK [README_cohpsk](README_cohpsk.md) for HF channels
   + FDMDV DPSK modem [README_fdmdv](README_fdmdv.txt) for HF channels
 
