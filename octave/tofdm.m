@@ -50,7 +50,7 @@ end
 printf("Nc = %d LDPC testing: %d\n", Nc, cml_support);
 
 Ns = 8;
-states = ofdm_init(bps, Rs, Tcp, Ns, Ns, Nc);
+states = ofdm_init(bps, Rs, Tcp, Ns, 1, Nc);
 states.verbose = 0;
 ofdm_load_const;
 
@@ -141,7 +141,7 @@ for f=1:Nframes
   end
   prx += lnew;
 
-  [rx_bits states aphase_est_pilot_log arx_np arx_amp] = ofdm_demod(states, rxbuf_in);
+  [states rx_bits aphase_est_pilot_log arx_np arx_amp] = ofdm_demod(states, rxbuf_in);
   
   % log some states for comparison to C
 
