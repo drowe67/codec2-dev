@@ -19,8 +19,8 @@ function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", interleave_frames = 
   
   % init modem
 
-  [bps Rs Tcp Ns Nc] = ofdm_init_mode(mode);
-  states = ofdm_init(bps, Rs, Tcp, Ns, Nc);
+  [bps Rs Tcp Ns Np Nc] = ofdm_init_mode(mode);
+  states = ofdm_init(bps, Rs, Tcp, Ns, Np, Nc);
   ofdm_load_const;
   states.verbose = 1;
   states.dpsk = dpsk;
@@ -135,7 +135,7 @@ function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", interleave_frames = 
     end
 
     if strcmp(states.sync_state,'synced') || strcmp(states.sync_state,'trial')
-      [rx_bits states aphase_est_pilot_log arx_np arx_amp] = ofdm_demod(states, rxbuf_in);
+      [states rx_bits aphase_est_pilot_log arx_np arx_amp] = ofdm_demod(states, rxbuf_in);
       [rx_uw payload_syms payload_amps txt_bits] = disassemble_modem_frame(states, arx_np, arx_amp);
            
       % we are in sync so log modem states

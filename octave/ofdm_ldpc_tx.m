@@ -17,24 +17,6 @@
 #}
 
 
-#{
-  TODO: 
-    [ ] measure and report raw and coded BER
-    [ ] maybe 10s worth of frames, sync up to any one automatically
-        + or start with maybe 10 frames
-        + measure BER match on each one
-    [ ] model clipping/PA compression
-    [ ] sample clock offsets
-    [ ] compare with same SNR from pathsim
-    [ ] How to pack arbitrary frames into ofdm frame and codec 2 frames
-        + integer number of ofdm frames?
-        + how to sync at other end
- 
-#}
-
-% Set up LDPC code and voice codec to "codeword" packing
-
-
 function ofdm_ldpc_tx(filename, mode="700D", interleave_frames = 1, Nsec, EbNodB=100, channel='awgn', freq_offset_Hz=0)
   ofdm_lib;
   ldpc;
@@ -43,8 +25,8 @@ function ofdm_ldpc_tx(filename, mode="700D", interleave_frames = 1, Nsec, EbNodB
   % init modem
 
   bps = 2; Ns = 8; Tcp = 0.002;
-  [bps Rs Tcp Ns Nc] = ofdm_init_mode(mode, Ns);
-  states = ofdm_init(bps, Rs, Tcp, Ns, Nc);
+  [bps Rs Tcp Ns Np Nc] = ofdm_init_mode(mode, Ns);
+  states = ofdm_init(bps, Rs, Tcp, Ns, Np, Nc);
   ofdm_load_const;
 
   % some constants used for assembling modem frames
