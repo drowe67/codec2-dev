@@ -211,7 +211,6 @@ set(CODEC2_PUBLIC_HEADERS
     comp.h
     modem_stats.h
     freedv_api.h
-    horus_api.h
     ${CODEC2_VERSION_PATH}/version.h
 )
 
