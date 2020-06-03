@@ -45,12 +45,11 @@ function ofdm_tx(filename, mode="700D", Nsec, EbNodB=100, channel='awgn', freq_o
   
   % Generate fixed test frame of tx bits and run OFDM modulator
 
-  Nrows = Nsec*Rs;
-  Nframes = floor((Nrows-1)/Ns);
+  Npackets = round(Nsec/states.Tpacket);
   tx_bits = create_ldpc_test_frame(states, coded_frame=0);
 
   tx = [];
-  for f=1:Nframes
+  for f=1:Npackets
     tx = [tx ofdm_mod(states, tx_bits)];
   end
   
