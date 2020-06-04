@@ -25,6 +25,7 @@ end
 % and exclude it from the BER estimation.
 
 function [states ber per] = modem_run_test(EbNodB = 10, num_frames=10, Fs=8000, Rs=100, df=0, plots=0)
+  randn('state',1); rand('state',1);
   [states M bits_per_frame] = modem_init(Rs, Fs, df);
   N = states.N;
   if plots; states.verbose = 0x4; end
