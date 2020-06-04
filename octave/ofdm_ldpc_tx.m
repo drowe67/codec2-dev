@@ -24,9 +24,8 @@ function ofdm_ldpc_tx(filename, mode="700D", interleave_frames = 1, Nsec, EbNodB
 
   % init modem
 
-  bps = 2; Ns = 8; Tcp = 0.002;
-  [bps Rs Tcp Ns Np Nc] = ofdm_init_mode(mode, Ns);
-  states = ofdm_init(bps, Rs, Tcp, Ns, Np, Nc);
+  config = ofdm_init_mode(mode);
+  states = ofdm_init(config);
   ofdm_load_const;
 
   % some constants used for assembling modem frames
@@ -47,7 +46,7 @@ function ofdm_ldpc_tx(filename, mode="700D", interleave_frames = 1, Nsec, EbNodB
 
   if strcmp(mode, "700D")
     codec_bits = round(ofdm_rand(code_param.data_bits_per_frame)/32767);
-  else
+  elseif strcmp(mode, "2020")
     codec_bits = round(ofdm_rand(Ncodecframespermodemframe*Nbitspercodecframe)/32767);
   end
   [frame_bits bits_per_frame] = assemble_frame(states, code_param, mode, codec_bits, Ncodecframespermodemframe, Nbitspercodecframe);

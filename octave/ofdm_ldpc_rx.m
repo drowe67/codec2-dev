@@ -19,8 +19,8 @@ function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", interleave_frames = 
   
   % init modem
 
-  [bps Rs Tcp Ns Np Nc] = ofdm_init_mode(mode);
-  states = ofdm_init(bps, Rs, Tcp, Ns, Np, Nc);
+  config = ofdm_init_mode(mode);
+  states = ofdm_init(config);
   ofdm_load_const;
   states.verbose = 1;
   states.dpsk = dpsk;
