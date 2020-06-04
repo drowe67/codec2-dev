@@ -35,7 +35,13 @@
    In this figure, time flows down, freq across.
 #}
 
-function states = ofdm_init(bps, Rs, Tcp, Ns, Np, Nc)
+function states = ofdm_init(config)
+  if isfield(config,"bps") bps = config.bps; else bps=2; end
+  Rs = config.Rs; Tcp = config.Tcp; Ns = config.Ns; Nc = config.Nc;
+  if isfield(config,"Np") Np = config.Np; else Np = 1; end
+  if isfield(config,"Ntxtbits") Ntxtbits = config.Ntxtbits ; else Ntxtbits = 4; end
+  if isfield(config,"Nuwbits") Nuwbits = config.Nuwbits ; else Nuwbits = 5*bps; end
+  
   states.Fs = 8000;
   states.bps = bps;
   states.Rs = Rs;
@@ -47,9 +53,6 @@ function states = ofdm_init(bps, Rs, Tcp, Ns, Np, Nc)
   states.Nbitsperframe = (Ns-1)*Nc*bps;           % total bits in all data symbols in modem frame
   states.Nsampersymbol = states.M+states.Ncp;     % number of samples in a single symbol
   states.Nsamperframe  = Ns*states.Nsampersymbol; % number of samples in a modem frame
-  states.Ntxtbits = 4;                            % reserved bits/frame for auxillary text information.  Uncoded/unprotected so may
-                                                  % be of limited use going forward, consider setting to 0
-  states.Nuwbits  = bps*5;                        % Let use 5 symbols for the UW, note ths means longer UWs for QAM than QPSK
   states.qam16 = [
     1 + j,  1 + j*3,  3 + j,  3 + j*3;
     1 - j,  1 - j*3,  3 - j,  3 - j*3;
@@ -62,6 +65,10 @@ function states = ofdm_init(bps, Rs, Tcp, Ns, Np, Nc)
                                                   % is the same length as the packet/FEC frame.
   states.Nbitsperpacket = Np*states.Nbitsperframe;
   states.Tpacket = Np*Ns*(Tcp+1/Rs);              % time for one packet in ms
+
+  states.Ntxtbits = Ntxtbits;                     % reserved bits/frame for auxillary text information.  Uncoded/unprotected so may
+                                                  % be of limited use going forward, consider setting to 0
+  states.Nuwbits  = Nuwbits;                      
   
   % some basic sanity checks
   assert(floor(states.M) == states.M);
@@ -203,8 +210,8 @@ endfunction
 %                  and parse mode string.
 %------------------------------------------------------------------------------
 
-function [bps Rs Tcp Ns Np Nc] = ofdm_init_mode(mode="700D")
-  bps = 2; Tcp = 0.002; Ns=8; Np=1;
+function config = ofdm_init_mode(mode="700D")
+  Tcp = 0.002; Ns=8;
 
   % some "canned" modes
   if strcmp(mode,"700D")
@@ -219,15 +226,17 @@ function [bps Rs Tcp Ns Np Nc] = ofdm_init_mode(mode="700D")
     # Rs*Nc=1650, so fits easily in 2000 Hz
     Ns=5; Tcp = 0.004; Tframe = 0.1; Ts = Tframe/Ns; Nc = 33; bps=4;
   elseif strcmp(mode,"data")
-    Ns=5; Np=2; Tcp = 0.004; Tframe = 0.1; Ts = Tframe/Ns; Nc = 17; bps=2;
+    Ns=5; config.Np=18; Tcp = 0.004; Ts = 0.016; Nc = 18; bps=2;
+    config.Ntxtbits = 0; config.Nuwbits = 12;
   elseif strcmp(mode,"1")
-    Ns=5; Np=10; Tcp=0; Tframe = 0.1; Ts = Tframe/Ns; Nc = 1; bps=2;
+    Ns=5; config.Np=10; Tcp=0; Tframe = 0.1; Ts = Tframe/Ns; Nc = 1; bps=2;
   else
     % try to parse mode string for user defined mode
     vec = sscanf(mode, "Ts=%f Nc=%d Ncp=%f");
     Ts=vec(1); Nc=vec(2); Ncp=vec(3);
   end
   Rs=1/Ts;
+  config.Rs = Rs; config.Tcp = Tcp; config.Ns = Ns; config.Nc = Nc;
 end
 
 
@@ -1165,6 +1174,19 @@ function [code_param Nbitspercodecframe Ncodecframespermodemframe] = codec_to_fr
     totalbitsperframe = code_param.data_bits_per_frame + Nparity + Nuwbits + Ntxtbits;
     printf("Total bits per frame: %d\n", totalbitsperframe);
     assert(totalbitsperframe == Nbitsperframe);
+  end
+  if strcmp(mode, "data")
+    load H2064_516_sparse.mat
+    code_param = ldpc_init_user(HRA, modulation, mod_order, mapping);
+    printf("data mode\n");
+    printf("ldpc_data_bits_per_frame = %d\n", code_param.ldpc_data_bits_per_frame);
+    printf("ldpc_coded_bits_per_frame  = %d\n", code_param.ldpc_coded_bits_per_frame);
+    printf("ldpc_parity_bits_per_frame  = %d\n", code_param.ldpc_parity_bits_per_frame);
+    printf("Nbitsperpacket  = %d\n", Nbitsperpacket);
+    Nparity = code_param.ldpc_parity_bits_per_frame;
+    totalbitsperframe = code_param.data_bits_per_frame + Nparity + Nuwbits + Ntxtbits;
+    printf("totalbitsperframe: %d\n", totalbitsperframe);
+    assert(totalbitsperframe == Nbitsperpacket);
   end
 endfunction
 
