@@ -52,18 +52,20 @@ function ofdm_tx(filename, mode="700D", Nsec, EbNodB=100, channel='awgn', freq_o
   for f=1:Npackets
     tx = [tx ofdm_mod(states, tx_bits)];
   end
-  
+  % a few empty frames of samples os Rx can finish it's processing
+  tx = [tx zeros(1,2*Nsamperframe)]; 
+ 
   Nsam = length(tx);
 
   % channel simulation
-
+  
   EsNo = rate * bps * (10 .^ (EbNodB/10));
   variance = 1/(M*EsNo/2);
   woffset = 2*pi*freq_offset_Hz/Fs;
   dwoffset = 2*pi*dfoff_hz_per_sec/(Fs*Fs);
   
   SNRdB = EbNodB + 10*log10(Nc*bps*Rs/3000);
-  printf("EbNo: %3.1f dB  SNR(3k) est: %3.1f dB  foff: %3.1fHz ", EbNodB, SNRdB, freq_offset_Hz);
+  printf("Packets: %3d EbNo: %3.1f dB  SNR(3k) est: %3.1f dB  foff: %3.1fHz ", Npackets, EbNodB, SNRdB, freq_offset_Hz);
 
   % set up HF model ---------------------------------------------------------------
 

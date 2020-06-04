@@ -41,7 +41,8 @@ function ofdm_rx(filename, mode="700D", error_pattern_filename)
 
   rx_np_log = []; timing_est_log = []; delta_t_log = []; foff_est_hz_log = [];
   phase_est_pilot_log = []; sig_var_log = []; noise_var_log = []; channel_est_log = [];
-  Terrs = Tbits = Terrs_coded = Tbits_coded = Tpackets = Tpacketerrs = frame_count = 0;
+  Terrs = Tbits = Terrs_coded = Tbits_coded = Tpackets = Tpacketerrs = 0;
+  packet_count = frame_count = 0;
   Nerrs_coded_log = Nerrs_log = [];
   error_positions = [];
 
@@ -98,10 +99,10 @@ function ofdm_rx(filename, mode="700D", error_pattern_filename)
 
         errors = xor(tx_bits, rx_bits);
         Nerrs = sum(errors);
-        aber = Nerrs/Nbitsperframe;
         Nerrs_log = [Nerrs_log Nerrs];
         Terrs += Nerrs;
         Tbits += Nbitsperpacket;
+        packet_count++;
       end
       
       % we are in sync so log states
@@ -121,7 +122,7 @@ function ofdm_rx(filename, mode="700D", error_pattern_filename)
     states = sync_state_machine(states, rx_uw);
 
     if states.verbose
-      printf("f: %2d mf: %d nin: %4d state: %-6s uw_errors: %2d %1d pbw: %-4s Nerrs: %3d foff: %5.1f clkOff: %5.0f\n",
+      printf("f: %3d mf: %2d nin: %4d state: %-6s uw_errors: %2d %1d pbw: %-4s Nerrs: %3d foff: %5.1f clkOff: %5.0f\n",
              f, states.modem_frame, states.nin, states.last_sync_state, states.uw_errors, states.sync_counter,
              states.phase_est_bandwidth, Nerrs, states.foff_est_hz, states.clock_offset_est*1E6);
     end
@@ -142,7 +143,7 @@ function ofdm_rx(filename, mode="700D", error_pattern_filename)
   % offset is adjusting
 
   Ndiscard = 20;
-  if frame_count > Ndiscard
+  if packet_count > Ndiscard
     Terrs -= sum(Nerrs_log(1:Ndiscard)); Tbits -= Ndiscard*Nbitsperframe;
     printf("BER2.: %5.4f Tbits: %5d Terrs: %5d\n", Terrs/Tbits, Tbits, Terrs);
   end
@@ -150,8 +151,9 @@ function ofdm_rx(filename, mode="700D", error_pattern_filename)
   %EsNo_est = mean(sig_var_log(floor(end/2):end))/mean(noise_var_log(floor(end/2):end));
   EsNo_est = mean(sig_var_log)/mean(noise_var_log);
   EsNo_estdB = 10*log10(EsNo_est);
-  SNR_estdB = EsNo_estdB + 10*log10(Nc*Rs/3000);
-  printf("Es/No est dB: % -4.1f SNR3k: %3.2f %f %f\n", EsNo_estdB, SNR_estdB, mean(sig_var_log), mean(noise_var_log));
+  SNR_estdB = EsNo_estdB + 10*log10(Nc*Rs*bps/3000);
+  printf("Packets: %3d Es/No est dB: % -4.1f SNR3k: %3.2f %f %f\n",
+         packet_count, EsNo_estdB, SNR_estdB, mean(sig_var_log), mean(noise_var_log));
   
   figure(1); clf; 
   %plot(rx_np_log,'+');
