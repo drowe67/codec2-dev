@@ -37,11 +37,16 @@ end
 
 function code_param = ldpc_init_wimax(rate, framesize, modulation, mod_order, mapping)
     [code_param.H_rows, code_param.H_cols, code_param.P_matrix] = InitializeWiMaxLDPC( rate, framesize,  0 );
-    code_param.ldpc_data_bits_per_frame = length(code_param.H_cols) - length( code_param.P_matrix );
     code_param.S_matrix = CreateConstellation( modulation, mod_order, mapping );
     code_param.bits_per_symbol = log2(mod_order);
+
+    code_param.ldpc_data_bits_per_frame = length(code_param.H_cols) - length(code_param.P_matrix);
+    code_param.ldpc_parity_bits_per_frame = framesize - code_param.ldpc_data_bits_per_frame;
     code_param.ldpc_coded_bits_per_frame = framesize;
-    code_param.ldpc_coded_syms_per_frame = framesize/code_param.bits_per_symbol;
+
+    code_param.data_bits_per_frame  = code_param.ldpc_data_bits_per_frame;
+    code_param.coded_bits_per_frame = code_param.ldpc_coded_bits_per_frame;
+    code_param.coded_syms_per_frame = code_param.coded_bits_per_frame/code_param.bits_per_symbol;
 endfunction
 
 
@@ -70,6 +75,7 @@ function [code_param framesize rate] = ldpc_init_user(HRA, modulation, mod_order
     code_param.ldpc_parity_bits_per_frame = framesize - code_param.ldpc_data_bits_per_frame;
     code_param.ldpc_coded_bits_per_frame = framesize;
 
+    % these variables support underfilling frame
     code_param.data_bits_per_frame  = code_param.ldpc_data_bits_per_frame;
     code_param.coded_bits_per_frame = code_param.ldpc_coded_bits_per_frame;
     code_param.coded_syms_per_frame = code_param.coded_bits_per_frame/code_param.bits_per_symbol;
