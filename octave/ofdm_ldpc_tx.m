@@ -4,20 +4,7 @@
 % File based ofdm tx with LDPC encoding and interleaver.  Generates a
 % file of ofdm samples, including optional channel simulation.
 
-#{
-  Examples:
- 
-  i) 10 seconds, AWGN channel at (coded) Eb/No=3dB
-
-    octave:4> ofdm_ldpc_tx('awgn_ebno_3dB_700d.raw', "700D", 10, 3);
-
-  ii) 10 seconds, HF channel at (coded) Eb/No=6dB
-
-    ofdm_ldpc_tx('hf_ebno_6dB_700d.raw', "700D", 10, 6, 'hf');
-#}
-
-
-function ofdm_ldpc_tx(filename, mode="700D", Nsec, EbNodB=100, channel='awgn', freq_offset_Hz=0)
+function ofdm_ldpc_tx(filename, mode="700D", Nsec, SNR3kdB=100, channel='awgn', freq_offset_Hz=0)
   ofdm_lib;
   ldpc;
   gp_interleaver;
@@ -76,69 +63,56 @@ function ofdm_ldpc_tx(filename, mode="700D", Nsec, EbNodB=100, channel='awgn', f
   tx = [tx zeros(1,2*Nsamperframe)]; 
   Nsam = length(tx);
 
-  % channel simulation
+  printf("Packets: %3d SNR(3k): %3.1f dB foff: %3.1f Hz ", Npackets, SNR3kdB, freq_offset_Hz);
 
-  EsNo = rate * bps * (10 .^ (EbNodB/10));
-  variance = 1/(M*EsNo/2);
-  woffset = 2*pi*freq_offset_Hz/Fs;
+% set up HF model ---------------------------------------------------------------
 
-  SNRdB = EbNodB + 10*log10(Nc*bps*Rs*rate/3000);
-  printf("Packets: %3d EbNo: %3.1f dB  SNR(3k) est: %3.1f dB  foff: %3.1fHz",
-         Npackets, EbNodB, SNRdB, freq_offset_Hz);
-
-  % set up HF model ---------------------------------------------------------------
-
-  if strcmp(channel, 'hf') || strcmp(channel, 'hfgood')
+  if strcmp(channel, 'awgn') == 0
     randn('seed',1);
 
-    % ITUT "poor" or "moderate" channels
-
-    if strcmp(channel, 'hf')
-      dopplerSpreadHz = 1; path_delay_ms = 1;
-    else
-      % "hfgood"
-      dopplerSpreadHz = 0.1; path_delay_ms = 0.5;
-    end
+    % Winmor multipath definitions
+    if strcmp(channel, 'mpg')     dopplerSpreadHz = 0.1; path_delay_ms = 0.5;
+    elseif strcmp(channel, 'mpm') dopplerSpreadHz = 0.5; path_delay_ms = 1.0;
+    elseif strcmp(channel, 'mpp') dopplerSpreadHz = 1.0; path_delay_ms = 2.0;
+    elseif strcmp(channel, 'mpd') dopplerSpreadHz = 2.5; path_delay_ms = 5.0;
+    elseif printf("Unknown multipath channel\n"); assert(0); end
     
     path_delay_samples = path_delay_ms*Fs/1000;
     printf(" Doppler Spread: %3.2f Hz Path Delay: %3.2f ms %d samples\n", dopplerSpreadHz, path_delay_ms, path_delay_samples);
 
     % generate same fading pattern for every run
-
     randn('seed',1);
 
-    spread1 = doppler_spread(dopplerSpreadHz, Fs, (Nsec*(M+Ncp)/M)*Fs*1.1);
-    spread2 = doppler_spread(dopplerSpreadHz, Fs, (Nsec*(M+Ncp)/M)*Fs*1.1);
+    spread1 = doppler_spread(dopplerSpreadHz, Fs, Fs*(Nsec+1));
+    spread2 = doppler_spread(dopplerSpreadHz, Fs, Fs*(Nsec+1));
    
-    % sometimes doppler_spread() doesn't return exactly the number of samples we need
- 
+    % sometimes doppler_spread() doesn't return exactly the number of samples we need 
     assert(length(spread1) >= Nsam, "not enough doppler spreading samples");
     assert(length(spread2) >= Nsam, "not enough doppler spreading samples");
   end
 
   rx = tx;
 
-  if strcmp(channel, 'hf') || strcmp(channel, 'hfgood')
+  if strcmp(channel, 'awgn') == 0
+    % multipath model, this will affect signal power but we take care of that in the SNR calculations below
     rx  = tx(1:Nsam) .* spread1(1:Nsam);
     rx += [zeros(1,path_delay_samples) tx(1:Nsam-path_delay_samples)] .* spread2(1:Nsam);
-
-    % normalise rx power to same as tx
-
-    nom_rx_pwr = 2/(Ns*(M*M)) + Nc/(M*M);
-    rx_pwr = var(rx);
-    rx *= sqrt(nom_rx_pwr/rx_pwr);
   end
 
+  woffset = 2*pi*freq_offset_Hz/Fs;
   rx = rx .* exp(j*woffset*(1:Nsam));
 
-  % note variance/2 as we are using real() operator, mumble,
-  % reflection of -ve freq to +ve, mumble, hand wave
+  rx = real(rx); S = rx*rx';
 
-  noise = sqrt(variance/2)*0.5*randn(1,Nsam);
-  rx = real(rx) + noise;
-  printf("measured SNR: %3.2f dB\n", 10*log10(var(real(tx))/var(noise)) + 10*log10(4000) - 10*log10(3000));
-
-  % adjusted by experiment to match rms power of early test signals
+  % SNR in a 4k bandwidth will be lower than 3k as total noise power N is higher
+  SNR4kdB = SNR3kdB - 10*log10(Fs/2) + 10*log10(3000); SNR = 10^(SNR4kdB/10);
+  N = S/SNR; sigma = sqrt(N/Nsam);
+  n = sigma*randn(1,Nsam);
+  % printf("SNR3kdB: %f SNR4kdB: %f N: %f %f\n", SNR3kdB, SNR4kdB, N, n*n');
+  rx += n;
+  % check our sums are OK to within 0.25 dB
+  SNR4kdB_measured = 10*log10(S/(n*n')); assert (abs(SNR4kdB - SNR4kdB_measured) < 0.25);
+  printf("meas SNR3k: %3.2f dB\n", 10*log10(S/(n*n')) + 10*log10(4000) - 10*log10(3000));
 
   frx=fopen(filename,"wb"); fwrite(frx, states.amp_scale*rx, "short"); fclose(frx);
 endfunction
