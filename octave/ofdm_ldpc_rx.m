@@ -49,7 +49,7 @@ function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", error_pattern_filena
   % Generate tx frame for BER calcs
   
   payload_bits = round(ofdm_rand(code_param.data_bits_per_frame)/32767);
-  [frame_bits bits_per_frame] = assemble_frame(states, code_param, mode, payload_bits, Ncodecframespermodemframe, Nbitspercodecframe);
+  tx_bits = assemble_frame(states, code_param, mode, payload_bits, Ncodecframespermodemframe, Nbitspercodecframe);
 
   % Some handy constants
   
@@ -63,7 +63,7 @@ function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", error_pattern_filena
   rx_bits = []; rx_np_log = []; timing_est_log = []; delta_t_log = []; foff_est_hz_log = [];
   phase_est_pilot_log = [];
   sig_var_log = []; noise_var_log = [];
-  Terrs = Tbits = Terrs_coded = Tbits_coded = 0;
+  Terrs = Tbits = Terrs_coded = Tbits_coded = Perrs_coded = 0;
   Nerrs_coded_log = Nerrs_log = [];
   error_positions = [];
   Nerrs_coded = Nerrs_raw = 0;
@@ -104,9 +104,50 @@ function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", error_pattern_filena
     end
 
     if strcmp(states.sync_state,'synced') || strcmp(states.sync_state,'trial')
+      % accumulate a buffer of data symbols for this packet
+      rx_syms(1:end-Nsymsperframe) = rx_syms(Nsymsperframe+1:end);
+      rx_amps(1:end-Nsymsperframe) = rx_amps(Nsymsperframe+1:end);
       [states rx_bits aphase_est_pilot_log arx_np arx_amp] = ofdm_demod(states, rxbuf_in);
-      [rx_uw payload_syms payload_amps txt_bits] = disassemble_modem_frame(states, arx_np, arx_amp);
+      rx_syms(end-Nsymsperframe+1:end) = arx_np;
+      rx_amps(end-Nsymsperframe+1:end) = arx_amp;
 
+      % We need the full packet of symbols before disassmbling and checking for bit errors
+      if (states.modem_frame == (states.Np-1))
+        packet_count++;
+
+        % unpack, de-interleave PSK symbols and symbol amplitudes       
+        [rx_uw payload_syms payload_amps txt_bits] = disassemble_modem_frame(states, rx_syms, rx_amps);
+        payload_syms_de = gp_deinterleave(payload_syms);
+        payload_amps_de = gp_deinterleave(payload_amps);
+
+        % Count uncoded (raw) errors 
+        rx_bits = zeros(1,Ncodedbitsperpacket);
+        for s=1:Ncodedsymsperpacket
+          rx_bits(2*s-1:2*s) = qpsk_demod(payload_syms_de(s));
+        end
+        errors = xor(tx_bits, rx_bits);
+        Nerrs = sum(errors);
+        Nerrs_log = [Nerrs_log Nerrs]; Nerrs_raw = Nerrs;
+        Terrs += Nerrs;
+        Tbits += Nbitsperpacket;
+
+        % LDPC decode
+
+        rx_bits = []; mean_amp = states.mean_amp;      
+        if strcmp(mode, "700D")
+          [rx_codeword paritychecks] = ldpc_dec(code_param, max_iterations, demod_type, decoder_type, payload_syms_de/mean_amp, min(EsNo,30), payload_amps_de/mean_amp);
+          arx_bits = rx_codeword(1:code_param.data_bits_per_frame);
+          errors = xor(payload_bits, arx_bits);
+          Nerrs_coded  = sum(errors);
+          rx_bits = [rx_bits arx_bits];
+        end
+
+        if Nerrs_coded Perrs_coded++; end
+        Terrs_coded += Nerrs_coded;
+        Tbits_coded += code_param.data_bits_per_frame;
+        Nerrs_coded_log = [Nerrs_coded_log Nerrs_coded];
+      end
+      
       % we are in sync so log modem states
 
       rx_np_log = [rx_np_log arx_np];
@@ -116,39 +157,7 @@ function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", error_pattern_filena
       phase_est_pilot_log = [phase_est_pilot_log; aphase_est_pilot_log];
       sig_var_log = [sig_var_log states.sig_var];
       noise_var_log = [noise_var_log states.noise_var];
-
-      % de-interleave QPSK symbols and symbol amplitudes
-
-      rx_np_de = gp_deinterleave(payload_syms);
-      rx_amp_de = gp_deinterleave(payload_amps);
-      
-      % measure uncoded bit errors over interleaver frame
-
-      rx_bits_raw = [];
-      for s=1:Ncodedsymsperpacket
-        rx_bits_raw = [rx_bits_raw qpsk_demod(rx_np_de(s))];
-      end
-      errors = xor(frame_bits, rx_bits_raw); Nerrs = sum(errors);
-      Nerrs_log = [Nerrs_log Nerrs]; Nerrs_raw = Nerrs;
-      Tbits += Ncodedbitsperpacket;
-      Terrs += Nerrs;
-        
-      % LDPC decode
-
-      rx_bits = [];
-      mean_amp = states.mean_amp;      
-      if strcmp(mode, "700D")
-        [rx_codeword paritychecks] = ldpc_dec(code_param, max_iterations, demod_type, decoder_type, rx_np_de/mean_amp, min(EsNo,30), rx_amp_de/mean_amp);
-        arx_bits = rx_codeword(1:code_param.data_bits_per_frame);
-        errors = xor(payload_bits, arx_bits);
-        Nerrs  = sum(errors);
-        Tbits_coded += code_param.data_bits_per_frame;
-        rx_bits = [rx_bits arx_bits];
-      end
-          
-      Nerrs_coded = Nerrs;
-      Terrs_coded += Nerrs;
-      Nerrs_coded_log = [Nerrs_coded_log Nerrs];
+      frame_count++;
     end
     
     states = sync_state_machine(states, rx_uw);
@@ -159,9 +168,9 @@ function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", error_pattern_filena
       for i=1:length(paritychecks)
         if paritychecks(i) iter=i; end
       end
-      printf("f: %3d st: %-6s euw: %2d %1d eraw: %3d ecdd: %3d iter: %3d pcc: %3d foff: %4.1f nin: %d\n",
-             f, states.last_sync_state, states.uw_errors, states.sync_counter, 
-             Nerrs_raw, Nerrs_coded, iter, pcc, states.foff_est_hz, states.nin);
+      printf("f: %3d mf: %2d nin: %4d st: %-6s euw: %2d %1d eraw: %3d ecdd: %3d iter: %3d pcc: %3d foff: %4.1f\n",
+             f, states.modem_frame, states.nin, states.last_sync_state, states.uw_errors, states.sync_counter, 
+             Nerrs_raw, Nerrs_coded, iter, pcc, states.foff_est_hz);
       % detect a sucessful sync
       if (time_to_sync < 0) && (strcmp(states.sync_state,'synced') || strcmp(states.sync_state,'trial'))
         if (pcc > 80) && (iter != 100)
@@ -184,6 +193,7 @@ function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", error_pattern_filena
   
   printf("Raw BER..: %5.4f Tbits: %5d Terrs: %5d\n", Terrs/(Tbits+1E-12), Tbits, Terrs);
   printf("Coded BER: %5.4f Tbits: %5d Terrs: %5d\n", Terrs_coded/(Tbits_coded+1E-12), Tbits_coded, Terrs_coded);
+  printf("Coded PER: %5.4f Pckts: %5d Perrs: %5d\n", Perrs_coded/(packet_count+1E-12), packet_count, Perrs_coded);
 
   if length(rx_np_log)
       figure(1); clf; 
