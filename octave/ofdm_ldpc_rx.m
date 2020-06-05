@@ -51,37 +51,19 @@ function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", error_pattern_filena
   payload_bits = round(ofdm_rand(code_param.data_bits_per_frame)/32767);
   [frame_bits bits_per_frame] = assemble_frame(states, code_param, mode, payload_bits, Ncodecframespermodemframe, Nbitspercodecframe);
 
-  % Some handy constants, "frame" refers to modem frame less UW and
-  % txt bits.
+  % Some handy constants
   
-  Ncodedbitsperframe = code_param.coded_bits_per_frame;
-  Nsymbolsperframe = code_param.coded_syms_per_frame;
-  Nuwtxtsymbolsperframe = (Nuwbits+Ntxtbits)/bps;
-  Nsymbolsperinterleavedframe = Nsymbolsperframe;
-
+   Ncodedbitsperframe = code_param.coded_bits_per_frame;
+   Nsymbolsperframe = code_param.coded_syms_per_frame;
+   Nuwtxtsymbolsperframe = (Nuwbits+Ntxtbits)/bps;
+   Nsymbolsperinterleavedframe = Nsymbolsperframe;
+#{
   % buffers for interleaved frames
 
   rx_np = zeros(1, Nsymbolsperinterleavedframe);
   rx_amp = zeros(1, Nsymbolsperinterleavedframe);
-  rx_uw = [];
-  
-  tx_bits = []; tx_frames = [];
-  tx_bits = [tx_bits payload_bits];
-  tx_frames = [tx_frames frame_bits];
-
-  % used for rx frame sync on interleaved symbols - we demod the
-  % entire interleaved frame to raw bits
-
-  tx_symbols = [];
-  for s=1:Nsymbolsperinterleavedframe
-    tx_symbols = [tx_symbols qpsk_mod( tx_frames(2*(s-1)+1:2*s) )];
-  end
-  tx_symbols = gp_interleave(tx_symbols);
-  
-  tx_bits_raw = [];
-  for s=1:Nsymbolsperinterleavedframe
-    tx_bits_raw = [tx_bits_raw qpsk_demod(tx_symbols(s))];
-  end
+#}
+rx_uw = [];
 
   % init logs and BER stats
 
@@ -91,7 +73,7 @@ function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", error_pattern_filena
   Terrs = Tbits = Terrs_coded = Tbits_coded = 0;
   Nerrs_coded_log = Nerrs_log = [];
   error_positions = [];
-  Nerrs_coded = Nerrs_raw = 0; % zeros(1, interleave_frames);
+  Nerrs_coded = Nerrs_raw = 0;
   paritychecks = [0];
   time_to_sync = -1;
 
@@ -142,21 +124,11 @@ function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", error_pattern_filena
       phase_est_pilot_log = [phase_est_pilot_log; aphase_est_pilot_log];
       sig_var_log = [sig_var_log states.sig_var];
       noise_var_log = [noise_var_log states.noise_var];
-      
-      % update sliding windows of rx-ed symbols and symbol amplitudes,
-      % discarding UW and txt symbols at start of each modem frame
 
-      rx_np(1:Nsymbolsperinterleavedframe-Nsymbolsperframe) = rx_np(Nsymbolsperframe+1:Nsymbolsperinterleavedframe);
-      rx_np(Nsymbolsperinterleavedframe-Nsymbolsperframe+1:Nsymbolsperinterleavedframe) = payload_syms;
-      rx_amp(1:Nsymbolsperinterleavedframe-Nsymbolsperframe) = rx_amp(Nsymbolsperframe+1:Nsymbolsperinterleavedframe);
-      rx_amp(Nsymbolsperinterleavedframe-Nsymbolsperframe+1:Nsymbolsperinterleavedframe) = payload_amps;
-           
-      mean_amp = states.mean_amp;
-      
       % de-interleave QPSK symbols and symbol amplitudes
 
-      rx_np_de = gp_deinterleave(rx_np);
-      rx_amp_de = gp_deinterleave(rx_amp);
+      rx_np_de = gp_deinterleave(payload_syms);
+      rx_amp_de = gp_deinterleave(payload_amps);
       
       % measure uncoded bit errors over interleaver frame
 
@@ -172,10 +144,9 @@ function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", error_pattern_filena
       % LDPC decode
 
       rx_bits = [];
+      mean_amp = states.mean_amp;      
       if strcmp(mode, "700D")
-        ff=1;
-        st = (ff-1)*Nsymbolsperframe+1; en = st + Nsymbolsperframe-1;
-        [rx_codeword paritychecks] = ldpc_dec(code_param, max_iterations, demod_type, decoder_type, rx_np_de(st:en)/mean_amp, min(EsNo,30), rx_amp_de(st:en)/mean_amp);
+        [rx_codeword paritychecks] = ldpc_dec(code_param, max_iterations, demod_type, decoder_type, rx_np_de/mean_amp, min(EsNo,30), rx_amp_de/mean_amp);
         arx_bits = rx_codeword(1:code_param.data_bits_per_frame);
         errors = xor(payload_bits, arx_bits);
         Nerrs  = sum(errors);
@@ -183,7 +154,7 @@ function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", error_pattern_filena
         rx_bits = [rx_bits arx_bits];
       end
           
-      Nerrs_coded(ff) = Nerrs;
+      Nerrs_coded = Nerrs;
       Terrs_coded += Nerrs;
       Nerrs_coded_log = [Nerrs_coded_log Nerrs];
     end
@@ -191,14 +162,13 @@ function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", error_pattern_filena
     states = sync_state_machine(states, rx_uw);
 
     if states.verbose
-      %r = mod(states.frame_count_interleaver,  interleave_frames)+1;
       pcc = max(paritychecks);
       iter = 0;
       for i=1:length(paritychecks)
         if paritychecks(i) iter=i; end
       end
-      printf("f: %3d st: %-6s euw: %2d %1d ist: %-6s eraw: %3d ecdd: %3d iter: %3d pcc: %3d foff: %4.1f nin: %d\n",
-             f, states.last_sync_state, states.uw_errors, states.sync_counter, states.last_sync_state_interleaver,
+      printf("f: %3d st: %-6s euw: %2d %1d eraw: %3d ecdd: %3d iter: %3d pcc: %3d foff: %4.1f nin: %d\n",
+             f, states.last_sync_state, states.uw_errors, states.sync_counter, 
              Nerrs_raw, Nerrs_coded, iter, pcc, states.foff_est_hz, states.nin);
       % detect a sucessful sync
       if (time_to_sync < 0) && (strcmp(states.sync_state,'synced') || strcmp(states.sync_state,'trial'))
@@ -211,7 +181,7 @@ function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", error_pattern_filena
     % act on any events returned by modem sync state machine
     
     if states.sync_start
-      Nerrs_raw = Nerrs_coded = 0; % zeros(1, interleave_frames);
+      Nerrs_raw = Nerrs_coded = 0;
       Nerrs_log = [];
       Terrs = Tbits = 0;
       Tpacketerrs = Tpackets = 0;
