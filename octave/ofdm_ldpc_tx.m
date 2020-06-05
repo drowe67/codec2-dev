@@ -34,8 +34,7 @@ function ofdm_ldpc_tx(filename, mode="700D", Nsec, EbNodB=100, channel='awgn', f
 
   % Generate fixed test frame of tx bits and run OFDM modulator
 
-  Nrows = Nsec*Rs;
-  Nframes = floor((Nrows-1)/Ns);
+  Npackets = round(Nsec/states.Tpacket);
 
   % OK generate a modem frame using random payload bits
 
@@ -55,6 +54,7 @@ function ofdm_ldpc_tx(filename, mode="700D", Nsec, EbNodB=100, channel='awgn', f
   for b=1:2:bits_per_frame
     tx_symbols = [tx_symbols qpsk_mod(frame_bits(b:b+1))];
   end
+  assert(gp_deinterleave(gp_interleave(tx_symbols)) == tx_symbols);
   tx_symbols = gp_interleave(tx_symbols);
   
   % generate txt symbols
@@ -69,9 +69,11 @@ function ofdm_ldpc_tx(filename, mode="700D", Nsec, EbNodB=100, channel='awgn', f
   
   modem_frame = assemble_modem_frame_symbols(states, tx_symbols, txt_symbols);
   atx = ofdm_txframe(states, modem_frame); tx = [];
-  for f=1:Nframes
+  for f=1:Npackets
     tx = [tx atx];
   end
+  % a few empty frames of samples os Rx can finish it's processing
+  tx = [tx zeros(1,2*Nsamperframe)]; 
   Nsam = length(tx);
 
   % channel simulation
@@ -81,8 +83,8 @@ function ofdm_ldpc_tx(filename, mode="700D", Nsec, EbNodB=100, channel='awgn', f
   woffset = 2*pi*freq_offset_Hz/Fs;
 
   SNRdB = EbNodB + 10*log10(Nc*bps*Rs*rate/3000);
-  printf("EbNo: %3.1f dB  SNR(3k) est: %3.1f dB  foff: %3.1fHz",
-         EbNodB, SNRdB, freq_offset_Hz);
+  printf("Packets: %3d EbNo: %3.1f dB  SNR(3k) est: %3.1f dB  foff: %3.1fHz",
+         Npackets, EbNodB, SNRdB, freq_offset_Hz);
 
   % set up HF model ---------------------------------------------------------------
 
@@ -99,7 +101,7 @@ function ofdm_ldpc_tx(filename, mode="700D", Nsec, EbNodB=100, channel='awgn', f
     end
     
     path_delay_samples = path_delay_ms*Fs/1000;
-    printf("Doppler Spread: %3.2f Hz Path Delay: %3.2f ms %d samples\n", dopplerSpreadHz, path_delay_ms, path_delay_samples);
+    printf(" Doppler Spread: %3.2f Hz Path Delay: %3.2f ms %d samples\n", dopplerSpreadHz, path_delay_ms, path_delay_samples);
 
     % generate same fading pattern for every run
 

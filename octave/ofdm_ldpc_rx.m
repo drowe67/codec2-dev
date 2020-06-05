@@ -28,7 +28,7 @@ function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", error_pattern_filena
   %states.phase_est_bandwidth = "high";
   
   mod_order = 4; bps = 2; modulation = 'QPSK'; mapping = 'gray';
-  demod_type = 0; decoder_type = 0; max_iterations = 100;
+  demod = 0; dec = 0; mx_iter = 100;
 
   EsNo = 3; % TODO: fixme
   printf("EsNo fixed at %f - need to est from channel\n", EsNo);
@@ -134,8 +134,9 @@ function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", error_pattern_filena
         % LDPC decode
 
         rx_bits = []; mean_amp = states.mean_amp;      
-        if strcmp(mode, "700D")
-          [rx_codeword paritychecks] = ldpc_dec(code_param, max_iterations, demod_type, decoder_type, payload_syms_de/mean_amp, min(EsNo,30), payload_amps_de/mean_amp);
+        if strcmp(mode, "700D") || strcmp(mode, "data") 
+          [rx_codeword paritychecks] = ldpc_dec(code_param, mx_iter, demod, dec, ...
+                                                payload_syms_de/mean_amp, min(EsNo,30), payload_amps_de/mean_amp);
           arx_bits = rx_codeword(1:code_param.data_bits_per_frame);
           errors = xor(payload_bits, arx_bits);
           Nerrs_coded  = sum(errors);
