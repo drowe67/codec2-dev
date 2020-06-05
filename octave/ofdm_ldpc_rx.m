@@ -125,11 +125,6 @@ function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", error_pattern_filena
     end
     prx += states.nin;
 
-    % If looking for sync: check raw BER on frame just received
-    % against all possible positions in the interleaver frame.
-
-    % state machine(s) for modem and interleaver sync ------------------------------------
-
     if strcmp(states.sync_state,'search') 
       [timing_valid states] = ofdm_sync_search(states, rxbuf_in);
     end
@@ -163,52 +158,34 @@ function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", error_pattern_filena
       rx_np_de = gp_deinterleave(rx_np);
       rx_amp_de = gp_deinterleave(rx_amp);
       
-      #if strcmp(states.sync_state_interleaver,'synced') && (states.frame_count_interleaver == interleave_frames)
-      if 1
-        %states.frame_count_interleaver = 0;
-        Nerrs_raw = Nerrs_coded = 0;
+      % measure uncoded bit errors over interleaver frame
 
-        %printf("decode!\n");
-        
-        % measure uncoded bit errors over interleaver frame
-
-        rx_bits_raw = [];
-        for s=1:Nsymbolsperinterleavedframe
-          rx_bits_raw = [rx_bits_raw qpsk_demod(rx_np_de(s))];
-        end
-        %for ff=1:interleave_frames
-        ff=1;
-          st = (ff-1)*Ncodedbitsperframe+1; en = st+Ncodedbitsperframe-1;
-          errors = xor(frame_bits, rx_bits_raw(st:en));
-          Nerrs = sum(errors);
-          Nerrs_log = [Nerrs_log Nerrs];
-          Nerrs_raw(ff) += Nerrs;
-          Tbits += Ncodedbitsperframe;
-          Terrs += Nerrs;
-        %end
-        
-        % LDPC decode
-        %  note: ldpc_errors can be used to measure raw BER
-        %        std CML library doesn't have an indication of convergence
-
-        rx_bits = [];
-        %for ff=1:interleave_frames
-          ff=1
-          if strcmp(mode, "700D")
-            st = (ff-1)*Nsymbolsperframe+1; en = st + Nsymbolsperframe-1;
-            [rx_codeword paritychecks] = ldpc_dec(code_param, max_iterations, demod_type, decoder_type, rx_np_de(st:en)/mean_amp, min(EsNo,30), rx_amp_de(st:en)/mean_amp);
-            arx_bits = rx_codeword(1:code_param.data_bits_per_frame);
-            errors = xor(payload_bits, arx_bits);
-            Nerrs  = sum(errors);
-            Tbits_coded += code_param.data_bits_per_frame;
-            rx_bits = [rx_bits arx_bits];
-          end
-          
-          Nerrs_coded(ff) = Nerrs;
-          Terrs_coded += Nerrs;
-          Nerrs_coded_log = [Nerrs_coded_log Nerrs];
-        %end
+      rx_bits_raw = [];
+      for s=1:Nsymbolsperinterleavedframe
+        rx_bits_raw = [rx_bits_raw qpsk_demod(rx_np_de(s))];
       end
+      errors = xor(frame_bits, rx_bits_raw); Nerrs = sum(errors);
+      Nerrs_log = [Nerrs_log Nerrs]; Nerrs_raw = Nerrs;
+      Tbits += Ncodedbitsperframe;
+      Terrs += Nerrs;
+        
+      % LDPC decode
+
+      rx_bits = [];
+      if strcmp(mode, "700D")
+        ff=1;
+        st = (ff-1)*Nsymbolsperframe+1; en = st + Nsymbolsperframe-1;
+        [rx_codeword paritychecks] = ldpc_dec(code_param, max_iterations, demod_type, decoder_type, rx_np_de(st:en)/mean_amp, min(EsNo,30), rx_amp_de(st:en)/mean_amp);
+        arx_bits = rx_codeword(1:code_param.data_bits_per_frame);
+        errors = xor(payload_bits, arx_bits);
+        Nerrs  = sum(errors);
+        Tbits_coded += code_param.data_bits_per_frame;
+        rx_bits = [rx_bits arx_bits];
+      end
+          
+      Nerrs_coded(ff) = Nerrs;
+      Terrs_coded += Nerrs;
+      Nerrs_coded_log = [Nerrs_coded_log Nerrs];
     end
     
     states = sync_state_machine(states, rx_uw);
