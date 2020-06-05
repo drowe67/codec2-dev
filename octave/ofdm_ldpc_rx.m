@@ -53,17 +53,10 @@ function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", error_pattern_filena
 
   % Some handy constants
   
-   Ncodedbitsperframe = code_param.coded_bits_per_frame;
-   Nsymbolsperframe = code_param.coded_syms_per_frame;
-   Nuwtxtsymbolsperframe = (Nuwbits+Ntxtbits)/bps;
-   Nsymbolsperinterleavedframe = Nsymbolsperframe;
-#{
-  % buffers for interleaved frames
-
-  rx_np = zeros(1, Nsymbolsperinterleavedframe);
-  rx_amp = zeros(1, Nsymbolsperinterleavedframe);
-#}
-rx_uw = [];
+  Nsymsperframe = Nbitsperframe/bps;
+  Nsymsperpacket = Nbitsperpacket/bps;
+  Ncodedbitsperpacket = code_param.coded_bits_per_frame;
+  Ncodedsymsperpacket = code_param.coded_syms_per_frame;
 
   % init logs and BER stats
 
@@ -76,12 +69,11 @@ rx_uw = [];
   Nerrs_coded = Nerrs_raw = 0;
   paritychecks = [0];
   time_to_sync = -1;
+  rx_uw = rx_uw = zeros(1,states.Nuwbits);
 
-  %
-  %rx_syms = zeros(1,Nsymsperpacket); rx_amps = zeros(1,Nsymsperpacket);
-  %packet_count = frame_count = 0;
-  %
-  
+  rx_syms = zeros(1,Nsymsperpacket); rx_amps = zeros(1,Nsymsperpacket);
+  packet_count = frame_count = 0;
+    
   #{
   % 'prime' rx buf to get correct coarse timing (for now)
   
@@ -133,12 +125,12 @@ rx_uw = [];
       % measure uncoded bit errors over interleaver frame
 
       rx_bits_raw = [];
-      for s=1:Nsymbolsperinterleavedframe
+      for s=1:Ncodedsymsperpacket
         rx_bits_raw = [rx_bits_raw qpsk_demod(rx_np_de(s))];
       end
       errors = xor(frame_bits, rx_bits_raw); Nerrs = sum(errors);
       Nerrs_log = [Nerrs_log Nerrs]; Nerrs_raw = Nerrs;
-      Tbits += Ncodedbitsperframe;
+      Tbits += Ncodedbitsperpacket;
       Terrs += Nerrs;
         
       % LDPC decode
