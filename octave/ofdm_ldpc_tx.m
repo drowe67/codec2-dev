@@ -7,17 +7,17 @@
 #{
   Examples:
  
-  i) 4 frame interleaver, 10 seconds, AWGN channel at (coded) Eb/No=3dB
+  i) 10 seconds, AWGN channel at (coded) Eb/No=3dB
 
-    octave:4> ofdm_ldpc_tx('awgn_ebno_3dB_700d.raw', "700D", 4, 10, 3);
+    octave:4> ofdm_ldpc_tx('awgn_ebno_3dB_700d.raw', "700D", 10, 3);
 
-  ii) 4 frame interleaver, 10 seconds, HF channel at (coded) Eb/No=6dB
+  ii) 10 seconds, HF channel at (coded) Eb/No=6dB
 
-    ofdm_ldpc_tx('hf_ebno_6dB_700d.raw', "700D", 4, 10, 6, 'hf');
+    ofdm_ldpc_tx('hf_ebno_6dB_700d.raw', "700D", 10, 6, 'hf');
 #}
 
 
-function ofdm_ldpc_tx(filename, mode="700D", interleave_frames = 1, Nsec, EbNodB=100, channel='awgn', freq_offset_Hz=0)
+function ofdm_ldpc_tx(filename, mode="700D", Nsec, EbNodB=100, channel='awgn', freq_offset_Hz=0)
   ofdm_lib;
   ldpc;
   gp_interleaver;
@@ -37,11 +37,6 @@ function ofdm_ldpc_tx(filename, mode="700D", interleave_frames = 1, Nsec, EbNodB
   Nrows = Nsec*Rs;
   Nframes = floor((Nrows-1)/Ns);
 
-  % Adjust Nframes so we have an integer number of interleaver frames
-  % in simulation
-
-  Nframes = interleave_frames*round(Nframes/interleave_frames);
-
   % OK generate a modem frame using random payload bits
 
   if strcmp(mode, "700D")
@@ -56,11 +51,9 @@ function ofdm_ldpc_tx(filename, mode="700D", interleave_frames = 1, Nsec, EbNodB
   % modulate to create symbols and interleave
   
   tx_bits = tx_symbols = [];
-  for f=1:interleave_frames
-    tx_bits = [tx_bits payload_bits];
-    for b=1:2:bits_per_frame
-      tx_symbols = [tx_symbols qpsk_mod(frame_bits(b:b+1))];
-    end
+  tx_bits = [tx_bits payload_bits];
+  for b=1:2:bits_per_frame
+    tx_symbols = [tx_symbols qpsk_mod(frame_bits(b:b+1))];
   end
   tx_symbols = gp_interleave(tx_symbols);
   
@@ -74,18 +67,11 @@ function ofdm_ldpc_tx(filename, mode="700D", interleave_frames = 1, Nsec, EbNodB
 
   % assemble interleaved modem frames that include UW and txt symbols
   
-  atx = [];
-  for f=1:interleave_frames
-    st = (f-1)*bits_per_frame/bps+1; en = st + bits_per_frame/bps-1;
-    modem_frame = assemble_modem_frame_symbols(states, tx_symbols(st:en), txt_symbols);
-    atx = [atx ofdm_txframe(states, modem_frame) ];
-  end
-  
-  tx = [];
-  for f=1:Nframes/interleave_frames
+  modem_frame = assemble_modem_frame_symbols(states, tx_symbols, txt_symbols);
+  atx = ofdm_txframe(states, modem_frame); tx = [];
+  for f=1:Nframes
     tx = [tx atx];
   end
-
   Nsam = length(tx);
 
   % channel simulation
@@ -95,8 +81,8 @@ function ofdm_ldpc_tx(filename, mode="700D", interleave_frames = 1, Nsec, EbNodB
   woffset = 2*pi*freq_offset_Hz/Fs;
 
   SNRdB = EbNodB + 10*log10(Nc*bps*Rs*rate/3000);
-  printf("EbNo: %3.1f dB  SNR(3k) est: %3.1f dB  foff: %3.1fHz inter_frms: %d ",
-         EbNodB, SNRdB, freq_offset_Hz, interleave_frames);
+  printf("EbNo: %3.1f dB  SNR(3k) est: %3.1f dB  foff: %3.1fHz",
+         EbNodB, SNRdB, freq_offset_Hz);
 
   % set up HF model ---------------------------------------------------------------
 
