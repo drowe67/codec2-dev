@@ -45,17 +45,19 @@ function ofdm_ldpc_tx(filename, mode="700D", interleave_frames = 1, Nsec, EbNodB
   % OK generate a modem frame using random payload bits
 
   if strcmp(mode, "700D")
-    codec_bits = round(ofdm_rand(code_param.data_bits_per_frame)/32767);
+    payload_bits = round(ofdm_rand(code_param.data_bits_per_frame)/32767);
   elseif strcmp(mode, "2020")
-    codec_bits = round(ofdm_rand(Ncodecframespermodemframe*Nbitspercodecframe)/32767);
+    payload_bits = round(ofdm_rand(Ncodecframespermodemframe*Nbitspercodecframe)/32767);
+  elseif strcmp(mode, "data")
+    payload_bits = round(ofdm_rand(code_param.data_bits_per_frame)/32767);
   end
-  [frame_bits bits_per_frame] = assemble_frame(states, code_param, mode, codec_bits, Ncodecframespermodemframe, Nbitspercodecframe);
+  [frame_bits bits_per_frame] = assemble_frame(states, code_param, mode, payload_bits, Ncodecframespermodemframe, Nbitspercodecframe);
    
   % modulate to create symbols and interleave
   
   tx_bits = tx_symbols = [];
   for f=1:interleave_frames
-    tx_bits = [tx_bits codec_bits];
+    tx_bits = [tx_bits payload_bits];
     for b=1:2:bits_per_frame
       tx_symbols = [tx_symbols qpsk_mod(frame_bits(b:b+1))];
     end

@@ -50,8 +50,8 @@ function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", interleave_frames = 
   %   easier than using a test frame of bits that spans the entire interleaver
   %   frame.  Doesn't affect operation with the speech codec.
   
-  codec_bits = round(ofdm_rand(code_param.data_bits_per_frame)/32767);
-  [frame_bits bits_per_frame] = assemble_frame(states, code_param, mode, codec_bits, Ncodecframespermodemframe, Nbitspercodecframe);
+  payload_bits = round(ofdm_rand(code_param.data_bits_per_frame)/32767);
+  [frame_bits bits_per_frame] = assemble_frame(states, code_param, mode, payload_bits, Ncodecframespermodemframe, Nbitspercodecframe);
 
   % Some handy constants, "frame" refers to modem frame less UW and
   % txt bits.
@@ -69,7 +69,7 @@ function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", interleave_frames = 
   
   tx_bits = []; tx_frames = [];
   for f=1:interleave_frames
-    tx_bits = [tx_bits codec_bits];
+    tx_bits = [tx_bits payload_bits];
     tx_frames = [tx_frames frame_bits];
   end
 
@@ -99,6 +99,11 @@ function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", interleave_frames = 
   Nerrs_coded = Nerrs_raw = zeros(1, interleave_frames);
   paritychecks = [0];
   time_to_sync = -1;
+
+  %
+  %rx_syms = zeros(1,Nsymsperpacket); rx_amps = zeros(1,Nsymsperpacket);
+  %packet_count = frame_count = 0;
+  %
   
   #{
   % 'prime' rx buf to get correct coarse timing (for now)
@@ -137,7 +142,7 @@ function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", interleave_frames = 
     if strcmp(states.sync_state,'synced') || strcmp(states.sync_state,'trial')
       [states rx_bits aphase_est_pilot_log arx_np arx_amp] = ofdm_demod(states, rxbuf_in);
       [rx_uw payload_syms payload_amps txt_bits] = disassemble_modem_frame(states, arx_np, arx_amp);
-           
+
       % we are in sync so log modem states
 
       rx_np_log = [rx_np_log arx_np];
@@ -224,7 +229,7 @@ function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", interleave_frames = 
             st = (ff-1)*Nsymbolsperframe+1; en = st + Nsymbolsperframe-1;
             [rx_codeword paritychecks] = ldpc_dec(code_param, max_iterations, demod_type, decoder_type, rx_np_de(st:en)/mean_amp, min(EsNo,30), rx_amp_de(st:en)/mean_amp);
             arx_bits = rx_codeword(1:code_param.data_bits_per_frame);
-            errors = xor(codec_bits, arx_bits);
+            errors = xor(payload_bits, arx_bits);
             Nerrs  = sum(errors);
             Tbits_coded += code_param.data_bits_per_frame;
             rx_bits = [rx_bits arx_bits];

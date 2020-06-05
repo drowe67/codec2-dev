@@ -1185,31 +1185,33 @@ function [code_param Nbitspercodecframe Ncodecframespermodemframe] = codec_to_fr
     printf("Nbitsperpacket  = %d\n", Nbitsperpacket);
     Nparity = code_param.ldpc_parity_bits_per_frame;
     totalbitsperframe = code_param.data_bits_per_frame + Nparity + Nuwbits + Ntxtbits;
-    printf("totalbitsperframe: %d\n", totalbitsperframe);
+    printf("totalbitsperframe = %d\n", totalbitsperframe);
     assert(totalbitsperframe == Nbitsperpacket);
+    Nbitspercodecframe = Ncodecframespermodemframe = -1;
   end
 endfunction
 
 
 % ------------------------------------------------------------------------------
-% assemble_frame - Assemble a modem frame from input codec bits based on the
+% assemble_frame - Assemble a modem frame from input payload bits based on the
 %                  current FreeDV "mode".  Note we don't insert UW and txt bits
 %                  at this stage, that is handled as a second stage of modem frame
 %                  construction a little later.
 % ------------------------------------------------------------------------------
 
-function [frame_bits bits_per_frame] = assemble_frame(states, code_param, mode, codec_bits, ...
+function [frame_bits bits_per_frame] = assemble_frame(states, code_param, mode, payload_bits, ...
                                                       Ncodecframespermodemframe, Nbitspercodecframe)
   ofdm_load_const;
 
-  if strcmp(mode, "700D")
-    frame_bits = LdpcEncode(codec_bits, code_param.H_rows, code_param.P_matrix);
-  end
-  if strcmp(mode, "2020")
+  if strcmp(mode, "700D") || strcmp(mode, "data") 
+    frame_bits = LdpcEncode(payload_bits, code_param.H_rows, code_param.P_matrix);
+  elseif strcmp(mode, "2020")
     Nunused = code_param.ldpc_data_bits_per_frame - code_param.data_bits_per_frame;
-    frame_bits = LdpcEncode([codec_bits zeros(1,Nunused)], code_param.H_rows, code_param.P_matrix);
-    % remove unused datat bits
+    frame_bits = LdpcEncode([payload_bits zeros(1,Nunused)], code_param.H_rows, code_param.P_matrix);
+    % remove unused data bits
     frame_bits = [ frame_bits(1:code_param.data_bits_per_frame) frame_bits(code_param.ldpc_data_bits_per_frame+1:end) ];
+  else
+    assert(0);
   end
   bits_per_frame = length(frame_bits);
     
