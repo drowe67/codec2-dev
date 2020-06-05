@@ -179,9 +179,6 @@ function states = ofdm_init(config)
   states.frame_count = 0;                                 % number of frames we have been in sync
   states.sync_start = 0;
   states.sync_end = 0;
-  states.sync_state_interleaver = 'search';
-  states.last_sync_state_interleaver = 'search';
-  states.frame_count_interleaver = 0;
   states.modem_frame = 0;                                 % keep track of how many frames received in packet
   
   % LDPC code is optionally enabled
@@ -1023,9 +1020,7 @@ function [tx_bits payload_data_bits codeword] = create_ldpc_test_frame(states, c
     codeword = LdpcEncode(payload_data_bits, code_param.H_rows, code_param.P_matrix);
     Nsymbolsperframe = length(codeword)/bps;
   
-    % need all these steps to get actual raw codeword bits at demod
-    % note this will only work for single interleaver frame case,
-    % but that's enough for initial quick tests
+    % need all these steps to get actual raw codeword bits at demod ..
   
     tx_symbols = [];
     for s=1:Nsymbolsperframe
@@ -1088,7 +1083,6 @@ function states = sync_state_machine(states, rx_uw)
   if strcmp(states.sync_state,'synced') || strcmp(states.sync_state,'trial')
 
     states.frame_count++;
-    states.frame_count_interleaver++;
 
     % UW occurs at the start of a packet
     if states.modem_frame == 0
@@ -1101,7 +1095,6 @@ function states = sync_state_machine(states, rx_uw)
           end
           if states.sync_counter == 2
             next_state = "search";
-            states.sync_state_interleaver = "search";
             states.phase_est_bandwidth = "high";
           end
           if states.frame_count == 4
@@ -1120,7 +1113,6 @@ function states = sync_state_machine(states, rx_uw)
 
           if states.sync_counter == 6
             next_state = "search";
-            states.sync_state_interleaver = "search";
             states.phase_est_bandwidth = "high";
           end
         end
@@ -1132,7 +1124,6 @@ function states = sync_state_machine(states, rx_uw)
   end
   
   states.last_sync_state = states.sync_state;
-  states.last_sync_state_interleaver = states.sync_state_interleaver;
   states.sync_state = next_state;
 endfunction
 

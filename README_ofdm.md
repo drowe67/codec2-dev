@@ -59,14 +59,14 @@ Built as part of codec2-dev, see [README](README.md) for build instructions.
      build_linux/src$ ./ofdm_demod --in ../../octave/ofdm_test.raw --out /dev/null --testframes --verbose 1
    ```
 
-1. Run mod/demod with LDPC FEC; 4 frame interleaver, 60 seconds, 3dB Eb/No, Eb/No measured on 700 bit/s payload data bits.  For rate 1/2 code this is equivalent to 0dB on 1400 bit/s uncoded bits (0dB Eb/No argument for ofdm_tx())
+1. Run mod/demod with LDPC FEC; 60 seconds, 3dB Eb/No, Eb/No measured on 700 bit/s payload data bits.  For rate 1/2 code this is equivalent to 0dB on 1400 bit/s uncoded bits (0dB Eb/No argument for ofdm_tx())
    ```
-     octave:6> ofdm_ldpc_tx('ofdm_test.raw',"700D",4,60,3)
-     octave:7> ofdm_ldpc_rx('ofdm_test.raw',"700D",4)
+     octave:6> ofdm_ldpc_tx('ofdm_test.raw',"700D",60,3)
+     octave:7> ofdm_ldpc_rx('ofdm_test.raw',"700D")
    ```
    C demodulator/LDPC decoder:
    ```   
-   build_linux/src$ ./ofdm_demod --in ../../octave/ofdm_test.raw --out /dev/null --verbose 1 --testframes --ldpc 1 --interleave 4
+   build_linux/src$ ./ofdm_demod --in ../../octave/ofdm_test.raw --out /dev/null --verbose 1 --testframes --ldpc 1
    ```
    
 1. Run C mod/demod with LDPC and 2 frames interleaving:
@@ -133,7 +133,7 @@ Built as part of codec2-dev, see [README](README.md) for build instructions.
 
 1. Acquisition (getting sync) can be problematic in fading channels. Some special tests have been developed, that measure acquisition time on off air 700D samples at different time offsets:
    ```
-   octave:61> ofdm_ldpc_rx("../wav/vk2tpm_004.wav", "700D", 1, "", 5, 4)
+   octave:61> ofdm_ldpc_rx("../wav/vk2tpm_004.wav", "700D", "", 5, 4)
    build_linux/src$ ./ofdm_demod --in ../../wav/vk2tpm_004.wav --out /dev/null --verbose 2 --ldpc 1 --start_secs 5 --len_secs 4
    ```
 
@@ -210,8 +210,8 @@ Here are some useful tests for the LDPC coded C version of the modem, useful to 
 | ofdm_tx | Modulate test frames to a file of sample, cam add channel impairments |
 | ofdm_rx | Demod from a sample file and count errors |
 | tofdm | Compares Octave and C ports of modem | 
-| ofdm_ldpc_tx | OFDM modulator with interleaver and (224,112) LDPC code |
-| ofdm_ldpc_rx | OFDM demodulator with interleaver and (224,112) LDPC code, interleaver sync |
+| ofdm_ldpc_tx | OFDM modulator with LDPC FEC |
+| ofdm_ldpc_rx | OFDM demodulator with LDPC FEC |
 
 ## Specifications
 
