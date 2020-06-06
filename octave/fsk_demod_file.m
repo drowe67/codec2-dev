@@ -14,7 +14,7 @@
 
    Same thing but complex (single sided):
    
-   $ ./fsk_get_test_bits - 1000 | ./fsk_mod 2 8000 100 1000 1000 - - | ./cohpsk_ch - fsk.cs16 -100 --FS 8000 --complexout
+   $ ./fsk_get_test_bits - 1000 | ./fsk_mod 2 8000 100 1000 1000 - - | ./cohpsk_ch - fsk.cs16 -100 --Fs 8000 --complexout
    octave:2> fsk_demod_file("fsk.cs16",format="cs16",8000,100,2)
 #}
 
@@ -22,9 +22,8 @@ function fsk_demod_file(filename, format="s16", Fs=8000, Rs=50, M=2, max_secs=1E
   more off;
   fsk_lib;
   plot_en = 1;
-  
+
   states = fsk_init(Fs, Rs, M);
-  states.fest_min_spacing = 50000;
   
   if strcmp(format,"s16")
     read_complex = 0; sample_size = 'int16'; shift_fs_on_4=0;
@@ -37,7 +36,7 @@ function fsk_demod_file(filename, format="s16", Fs=8000, Rs=50, M=2, max_secs=1E
   end
 
   fin = fopen(filename,"rb");
-  if fin == -1 printf("Error opneing file: %s\n",filename); return; end
+  if fin == -1 printf("Error opening file: %s\n",filename); return; end
   
   nbit = states.nbit;
 
@@ -120,8 +119,8 @@ function fsk_demod_file(filename, format="s16", Fs=8000, Rs=50, M=2, max_secs=1E
     plot(f, RxdB);
     axis([-Fs/2 Fs/2 mx-80 mx])
     xlabel('Frequency (Hz)');
-
-    figure(2); specgram(rx,Fs);
+    length(rx)
+    figure(2); Ndft=2^ceil(log2(Fs/10)); specgram(rx,Ndft,Fs);
     figure(3); clf; plot(f_log,'+-'); axis([1 length(f_log) -Fs/2 Fs/2]); title('Tone Freq Estimates');    
     figure(4); clf; mesh(Sf_log(1:end,:)); title('Freq Est Sf over time');
     figure(5); clf; plot(f_int_resample_log','+'); title('Integrator outputs for each tone');
