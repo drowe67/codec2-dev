@@ -18,17 +18,20 @@
    octave:2> fsk_demod_file("fsk.cs16",format="cs16",8000,100,2)
 #}
 
-function fsk_demod_file(filename, format="s16", Fs=8000, Rs=50, M=2, max_secs=1E32)
+function fsk_demod_file(filename, format="s16", Fs=8000, Rs=50, M=2, P=8, max_secs=1E32)
   more off;
   fsk_lib;
   plot_en = 1;
 
-  states = fsk_init(Fs, Rs, M);
+  states = fsk_init(Fs, Rs, M, P);
   
   if strcmp(format,"s16")
     read_complex = 0; sample_size = 'int16'; shift_fs_on_4=0;
-  elseif strcmp(format,"cs16")
+  elseif strcmp(format,"cs16") || strcmp(format,"iq16")
     read_complex = 1; sample_size = 'int16'; shift_fs_on_4=0;
+    states.fest_fmin = -Fs/2; states.fest_fmax = Fs/2; 
+  elseif strcmp(format,"iqfloat")
+    read_complex = 1; sample_size = 'float32'; shift_fs_on_4=0;
     states.fest_fmin = -Fs/2; states.fest_fmax = Fs/2; 
   else
     printf("Error in format: %s\n", format);
@@ -57,7 +60,7 @@ function fsk_demod_file(filename, format="s16", Fs=8000, Rs=50, M=2, max_secs=1E
     nin = states.nin;
     if read_complex
       [sf count] = fread(fin, 2*nin, sample_size);
-      if sample_size == "uint8" sf = (sf - 127)/128; end
+      if strcmp(sample_size, "uint8") sf = (sf - 127)/128; end
       sf = sf(1:2:end) + j*sf(2:2:end);
       count /= 2;
       if shift_fs_on_4
@@ -68,7 +71,7 @@ function fsk_demod_file(filename, format="s16", Fs=8000, Rs=50, M=2, max_secs=1E
         end
       end
     else
-      [sf count] = fread(fin, nin, "short");
+      [sf count] = fread(fin, nin, sample_size);
     end
     rx = [rx; sf];
     
@@ -120,7 +123,9 @@ function fsk_demod_file(filename, format="s16", Fs=8000, Rs=50, M=2, max_secs=1E
     axis([-Fs/2 Fs/2 mx-80 mx])
     xlabel('Frequency (Hz)');
     length(rx)
-    figure(2); Ndft=2^ceil(log2(Fs/10)); specgram(rx,Ndft,Fs);
+    if length(rx) > Fs
+      figure(2); Ndft=2^ceil(log2(Fs/10)); specgram(rx,Ndft,Fs);
+    end
     figure(3); clf; plot(f_log,'+-'); axis([1 length(f_log) -Fs/2 Fs/2]); title('Tone Freq Estimates');    
     figure(4); clf; mesh(Sf_log(1:end,:)); title('Freq Est Sf over time');
     figure(5); clf; plot(f_int_resample_log','+'); title('Integrator outputs for each tone');
