@@ -41,7 +41,9 @@ function states = ofdm_init(config)
   if isfield(config,"Np") Np = config.Np; else Np = 1; end
   if isfield(config,"Ntxtbits") Ntxtbits = config.Ntxtbits ; else Ntxtbits = 4; end
   if isfield(config,"Nuwbits") Nuwbits = config.Nuwbits ; else Nuwbits = 5*bps; end
-  
+  if isfield(config,"Nuwbits") Nuwbits = config.Nuwbits ; else Nuwbits = 5*bps; end
+  if isfield(config,"ftwindow_width") ftwindow_width = config.ftwindow_width; else ftwindow_width = 11; end
+ 
   states.Fs = 8000;
   states.bps = bps;
   states.Rs = Rs;
@@ -124,10 +126,11 @@ function states = ofdm_init(config)
   states.w = w;
   states.W = W;
 
-  % fine timing search +/- window_width/2 from current timing instant
+  % fine timing search +/- window_width/2 from current timing instant,
+  % adjust this to be roughly the maximum delay spread
 
-  states.ftwindow_width = 11; 
- 
+  states.ftwindow_width = ftwindow_width;
+  
   % Receive buffer: D P DDD P DDD P DDD P D
   %                         ^
   % also see ofdm_demod() ...
@@ -223,8 +226,9 @@ function config = ofdm_init_mode(mode="700D")
     # Rs*Nc=1650, so fits easily in 2000 Hz
     Ns=5; Tcp = 0.004; Tframe = 0.1; Ts = Tframe/Ns; Nc = 33; bps=4;
   elseif strcmp(mode,"data")
-    Ns=5; config.Np=18; Tcp = 0.004; Ts = 0.016; Nc = 18; bps=2;
+    Ns=5; config.Np=18; Tcp = 0.006; Ts = 0.016; Nc = 18; bps=2;
     config.Ntxtbits = 0; config.Nuwbits = 12;
+    config.ftwindow_width = 32;
   elseif strcmp(mode,"1")
     Ns=5; config.Np=10; Tcp=0; Tframe = 0.1; Ts = Tframe/Ns; Nc = 1; bps=2;
   else
@@ -243,10 +247,10 @@ end
 
 function print_config(states)
   ofdm_load_const;
-  printf("Rs=%5.2f Nc=%d Tcp=%4.3f %d Ns: %d Np: %d\n", Rs, Nc, Tcp, Ns, Np);
-  printf("Nsymperframe: %d Nbitsperpacket: %d Nsamperframe: %d Ntxtbits: %d Nuwbits: %d ",
+  printf("Nc=%d Ts=%4.3f Tcp=%4.3f Ns: %d Np: %d\n", Nc, 1/Rs, Tcp, Ns, Np);
+  printf("Nsymperframe: %d Nbitsperpacket: %d Nsamperframe: %d Ntxtbits: %d Nuwbits: %d\n",
           Ns*Nc, Nbitsperpacket, Nsamperframe, Ntxtbits, Nuwbits);
-  printf("bits/s: %4.1f\n",  Nbitsperframe*Rs/Ns);
+  printf("uncoded bits/s: %4.1f\n",  Nbitsperpacket*Fs/(Np*Nsamperframe));
   s=1; u=1; Nuwsyms=length(uw_ind_sym);
   for f=1:Np
     for r=1:Ns
@@ -1062,7 +1066,14 @@ endfunction
 
 %-------------------------------------------------------
 % sync_state_machine - determines sync state based on UW
+%                      700D/2020 version
 %-------------------------------------------------------
+
+#{
+  Due to the low pilot symbol insertion rate and acquisition issues
+  the earlier OFDM modem waveforms (700D and 2020) need a complex
+  state machine to help them avoid false sync.
+#}
 
 function states = sync_state_machine(states, rx_uw)
   ofdm_load_const;
@@ -1102,6 +1113,13 @@ function states = sync_state_machine(states, rx_uw)
             % change to low bandwidth, but more accurate phase estimation
             states.phase_est_bandwidth = "low";
           end
+          if states.uw_errors < 2
+            next_state = "synced";
+            % change to low bandwidth, but more accurate phase estimation
+            states.phase_est_bandwidth = "low";
+          else
+            next_state = "search"
+          end  
         end
 
         if strcmp(states.sync_state,'synced')
@@ -1119,6 +1137,66 @@ function states = sync_state_machine(states, rx_uw)
       end % if modem_frame == 0 ....
 
       % keep track of where we are up to in packet
+      states.modem_frame++;
+      if (states.modem_frame >= states.Np) states.modem_frame = 0; end
+  end
+  
+  states.last_sync_state = states.sync_state;
+  states.sync_state = next_state;
+endfunction
+
+
+%-------------------------------------------------------
+% sync_state_machine_data - data waveform version
+%-------------------------------------------------------
+
+function states = sync_state_machine2(states, rx_uw)
+  ofdm_load_const;
+  next_state = states.sync_state;
+  states.sync_start = states.sync_end = 0;
+  
+  if strcmp(states.sync_state,'search') 
+
+    if states.timing_valid
+      states.frame_count = 0;
+      states.sync_counter = 0;
+      states.modem_frame = 0;
+      states.sync_start = 1;
+      states.phase_est_bandwidth = "high";
+      next_state = 'trial';
+    end
+  end
+        
+  if strcmp(states.sync_state,'synced') || strcmp(states.sync_state,'trial')
+
+    states.frame_count++;
+
+    % UW occurs at the start of a packet
+    if states.modem_frame == 0
+        states.uw_errors = sum(xor(tx_uw,rx_uw));
+
+        if strcmp(states.sync_state,'trial')
+          if states.uw_errors <= 2
+            next_state = "synced";
+          else
+            next_state = "search"
+          end  
+        end
+
+        if strcmp(states.sync_state,'synced')
+          if states.uw_errors > 4
+            states.sync_counter++;
+          else
+            states.sync_counter = 0;
+          end
+
+          if states.sync_counter == 2
+            next_state = "search";
+          end
+        end
+      end % if modem_frame == 0 ....
+
+      % keep track of where we are up to in packet, so we know when to look for a UW
       states.modem_frame++;
       if (states.modem_frame >= states.Np) states.modem_frame = 0; end
   end

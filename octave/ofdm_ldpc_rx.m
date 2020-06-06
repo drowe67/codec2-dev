@@ -30,9 +30,6 @@ function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", error_pattern_filena
   mod_order = 4; bps = 2; modulation = 'QPSK'; mapping = 'gray';
   demod = 0; dec = 0; mx_iter = 100;
 
-  EsNo = 3; % TODO: fixme
-  printf("EsNo fixed at %f - need to est from channel\n", EsNo);
-  
   % some constants used for assembling modem frames
   
   [code_param Nbitspercodecframe Ncodecframespermodemframe] = codec_to_frame_packing(states, mode);
@@ -134,7 +131,8 @@ function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", error_pattern_filena
         % LDPC decode
 
         rx_bits = []; mean_amp = states.mean_amp;      
-        if strcmp(mode, "700D") || strcmp(mode, "data") 
+        if strcmp(mode, "700D") || strcmp(mode, "data")
+          EsNo = states.sig_var/states.noise_var;
           [rx_codeword paritychecks] = ldpc_dec(code_param, mx_iter, demod, dec, ...
                                                 payload_syms_de/mean_amp, min(EsNo,30), payload_amps_de/mean_amp);
           arx_bits = rx_codeword(1:code_param.data_bits_per_frame);
@@ -161,17 +159,21 @@ function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", error_pattern_filena
       frame_count++;
     end
     
-    states = sync_state_machine(states, rx_uw);
-
+    if strcmp(mode,"data")
+      states = sync_state_machine2(states, rx_uw);
+    else
+      states = sync_state_machine(states, rx_uw);
+    end
+    
     if states.verbose
       pcc = max(paritychecks);
       iter = 0;
       for i=1:length(paritychecks)
         if paritychecks(i) iter=i; end
       end
-      printf("f: %3d mf: %2d nin: %4d st: %-6s euw: %2d %1d eraw: %3d ecdd: %3d iter: %3d pcc: %3d foff: %4.1f\n",
+      printf("f: %3d mf: %2d nin: %4d st: %-6s euw: %2d %1d pbw: %s eraw: %3d ecdd: %3d iter: %3d pcc: %3d foff: %4.1f\n",
              f, states.modem_frame, states.nin, states.last_sync_state, states.uw_errors, states.sync_counter, 
-             Nerrs_raw, Nerrs_coded, iter, pcc, states.foff_est_hz);
+             states.phase_est_bandwidth(1), Nerrs_raw, Nerrs_coded, iter, pcc, states.foff_est_hz);
       % detect a sucessful sync
       if (time_to_sync < 0) && (strcmp(states.sync_state,'synced') || strcmp(states.sync_state,'trial'))
         if (pcc > 80) && (iter != 100)
@@ -229,12 +231,12 @@ function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", error_pattern_filena
     subplot(211)
     stem(Nerrs_log);
     title('Uncoded errrors/modem frame')
-    axis([1 length(Nerrs_log) 0 Nbitsperframe*rate/2]);
+    axis([1 length(Nerrs_log) 0 Nbitsperpacket*0.2]);
     if length(Nerrs_coded_log)
       subplot(212)
       stem(Nerrs_coded_log);
       title('Coded errors/mode frame')
-      axis([1 length(Nerrs_coded_log) 0 Nbitsperframe/2]);
+      axis([1 length(Nerrs_coded_log) 0 Nbitsperpacket*0.2]);
     end
   end
   

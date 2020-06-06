@@ -13,6 +13,7 @@ function ofdm_ldpc_tx(filename, mode="700D", Nsec, SNR3kdB=100, channel='awgn', 
 
   config = ofdm_init_mode(mode);
   states = ofdm_init(config);
+  print_config(states);
   ofdm_load_const;
 
   % some constants used for assembling modem frames
@@ -70,11 +71,11 @@ function ofdm_ldpc_tx(filename, mode="700D", Nsec, SNR3kdB=100, channel='awgn', 
   if strcmp(channel, 'awgn') == 0
     randn('seed',1);
 
-    % Winmor multipath definitions
+    % Winlink multipath definitions
     if strcmp(channel, 'mpg')     dopplerSpreadHz = 0.1; path_delay_ms = 0.5;
     elseif strcmp(channel, 'mpm') dopplerSpreadHz = 0.5; path_delay_ms = 1.0;
     elseif strcmp(channel, 'mpp') dopplerSpreadHz = 1.0; path_delay_ms = 2.0;
-    elseif strcmp(channel, 'mpd') dopplerSpreadHz = 2.5; path_delay_ms = 5.0;
+    elseif strcmp(channel, 'mpd') dopplerSpreadHz = 2.5; path_delay_ms = 4.0;
     elseif printf("Unknown multipath channel\n"); assert(0); end
     
     path_delay_samples = path_delay_ms*Fs/1000;
