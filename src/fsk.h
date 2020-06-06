@@ -42,8 +42,10 @@
 #define FSK_SCALE 16383
 
 /* default internal parameters */
-#define FSK_DEFAULT_P 8
-#define FSK_DEFAULT_NSYM 50
+#define FSK_DEFAULT_P     8      /* Number of timing offsets we have to choose from, try to keep P >= 8 */
+#define FSK_DEFAULT_NSYM 50      /* how many symbols we average timing over, more gives a smoother estimate, 
+                                    but slower response */
+#define FSK_NONE         -1      /* unused parameter */
 
 struct FSK {
     /*  Static parameters set up by fsk_init */
@@ -57,7 +59,7 @@ struct FSK {
     int Nsym;               /* Number of symbols spat out in a processing frame */
     int Nbits;              /* Number of bits spat out in a processing frame */
     int f1_tx;              /* f1 for modulator */
-    int fs_tx;              /* Space between TX freqs for modulatosr */
+    int tone_spacing;       /* Space between TX freqs for modulator (and option mask freq estimator) */
     int mode;               /* 2FSK or 4FSK */
     float tc;               /* time constant for smoothing FFTs */
     int est_min;            /* Minimum frequency for freq. estimator */
@@ -95,24 +97,28 @@ struct FSK {
 };
 
 /*
- * Create an FSK config/state struct from a set of config parameters
+ * Create a FSK modem
  * 
  * int Fs - Sample frequency
  * int Rs - Symbol rate
- * int tx_f1 - '0' frequency
- * int tx_fs - frequency spacing
+ * int M  - 2 for 2FSK, 4 for 4FSK
+ * int f1_tx - first tone frequency
+ * int tone_spacing - frequency spacing (for modulator and optional "mask" freq estimator)
  */
-struct FSK * fsk_create(int Fs, int Rs, int M, int tx_f1, int tx_fs);
+struct FSK * fsk_create(int Fs, int Rs, int M, int f1_tx, int tone_spacing);
 
 /*
- * Create an FSK config/state struct from a set of config parameters
+ * Create a FSK modem - advanced version
  * 
  * int Fs - Sample frequency
  * int Rs - Symbol rate
- * int tx_f1 - '0' frequency
- * int tx_fs - frequency spacing
+ * int M  - 2 for 2FSK, 4 for 4FSK
+ * int P  - number of timing offsets to choose from (suggest >= 8)
+ * int Nsym  - windows size for timing estimator
+ * int f1_tx - first tone frequency
+ * int tone_spacing - frequency spacing (for modulator and optional "mask" freq estimator)
  */
-struct FSK * fsk_create_hbr(int Fs, int Rs, int M, int P, int Nsym, int tx_f1, int tx_fs);
+struct FSK * fsk_create_hbr(int Fs, int Rs, int M, int P, int Nsym, int f1_tx, int tone_spacing);
 
 /*
  * Set the minimum and maximum frequencies at which the freq. estimator can find tones
