@@ -225,9 +225,13 @@ function config = ofdm_init_mode(mode="700D")
     # For (504,296) LDPC code we want 504+5*4+4=528 uncoded bits/frame
     # Rs*Nc=1650, so fits easily in 2000 Hz
     Ns=5; Tcp = 0.004; Tframe = 0.1; Ts = Tframe/Ns; Nc = 33; bps=4;
-  elseif strcmp(mode,"data")
+  elseif strcmp(mode,"datac1")
     Ns=5; config.Np=18; Tcp = 0.006; Ts = 0.016; Nc = 18; bps=2;
     config.Ntxtbits = 0; config.Nuwbits = 12;
+    config.ftwindow_width = 32;
+  elseif strcmp(mode,"datac2")
+    Ns=5; config.Np=11; Tcp = 0.006; Ts = 0.016; Nc = 9; bps=2;
+    config.Ntxtbits = 0; config.Nuwbits = 24;
     config.ftwindow_width = 32;
   elseif strcmp(mode,"1")
     Ns=5; config.Np=10; Tcp=0; Tframe = 0.1; Ts = Tframe/Ns; Nc = 1; bps=2;
@@ -1244,10 +1248,17 @@ function [code_param Nbitspercodecframe Ncodecframespermodemframe] = codec_to_fr
     printf("Total bits per frame: %d\n", totalbitsperframe);
     assert(totalbitsperframe == Nbitsperframe);
   end
-  if strcmp(mode, "data")
+  if strcmp(mode, "datac1")
     load H2064_516_sparse.mat
     code_param = ldpc_init_user(HRA, modulation, mod_order, mapping);
-    printf("data mode\n");
+    printf("data mode c1\n");
+  end
+  if strcmp(mode, "datac2")
+    load H_256_768_22.txt
+    code_param = ldpc_init_user(H_256_768_22, modulation, mod_order, mapping);
+    printf("data mode c2\n");
+  end
+  if strcmp(mode, "datac1") || strcmp(mode, "datac2")
     printf("ldpc_data_bits_per_frame = %d\n", code_param.ldpc_data_bits_per_frame);
     printf("ldpc_coded_bits_per_frame  = %d\n", code_param.ldpc_coded_bits_per_frame);
     printf("ldpc_parity_bits_per_frame  = %d\n", code_param.ldpc_parity_bits_per_frame);
@@ -1272,7 +1283,7 @@ function [frame_bits bits_per_frame] = assemble_frame(states, code_param, mode, 
                                                       Ncodecframespermodemframe, Nbitspercodecframe)
   ofdm_load_const;
 
-  if strcmp(mode, "700D") || strcmp(mode, "data") 
+  if strcmp(mode, "700D") || strcmp(mode, "datac1") || strcmp(mode, "datac2") 
     frame_bits = LdpcEncode(payload_bits, code_param.H_rows, code_param.P_matrix);
   elseif strcmp(mode, "2020")
     Nunused = code_param.ldpc_data_bits_per_frame - code_param.data_bits_per_frame;

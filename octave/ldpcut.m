@@ -116,7 +116,6 @@ function sim_out = run_simulation(sim_in)
         % print "." if frame decoded without errors, 'x' if we can't decode
 
         if Nerrs > 0, printf('x'),  else printf('.'),  end
-        if (rem(nn, 50)==0),  printf('\n'),  end    
       end
 
       if Nerrs > 0,  Ferrs = Ferrs + 1;  end
@@ -307,6 +306,7 @@ end
 test1_single
 test2_multiple("wimax")
 test2_multiple("H2064_516_sparse.mat")
-test3_curves("wimax",1)
+%test3_curves("wimax",1)
 %test3_curves("H2064_516_sparse.mat",2)
+test3_curves("H_256_768_22.txt",2)
 %test4_qam16(3)
