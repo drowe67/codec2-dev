@@ -230,6 +230,10 @@ function config = ofdm_init_mode(mode="700D")
     config.Ntxtbits = 0; config.Nuwbits = 12;
     config.ftwindow_width = 32;
   elseif strcmp(mode,"datac2")
+    Ns=5; config.Np=36; Tcp = 0.006; Ts = 0.016; Nc = 9; bps=2;
+    config.Ntxtbits = 0; config.Nuwbits = 12;
+    config.ftwindow_width = 32;
+  elseif strcmp(mode,"datac3")
     Ns=5; config.Np=11; Tcp = 0.006; Ts = 0.016; Nc = 9; bps=2;
     config.Ntxtbits = 0; config.Nuwbits = 24;
     config.ftwindow_width = 32;
@@ -1248,12 +1252,12 @@ function [code_param Nbitspercodecframe Ncodecframespermodemframe] = codec_to_fr
     printf("Total bits per frame: %d\n", totalbitsperframe);
     assert(totalbitsperframe == Nbitsperframe);
   end
-  if strcmp(mode, "datac1")
+  if strcmp(mode, "datac1") || strcmp(mode, "datac2")
     load H2064_516_sparse.mat
     code_param = ldpc_init_user(HRA, modulation, mod_order, mapping);
     printf("data mode c1\n");
   end
-  if strcmp(mode, "datac2")
+  if strcmp(mode, "datac3")
     load H_256_768_22.txt
     code_param = ldpc_init_user(H_256_768_22, modulation, mod_order, mapping);
     printf("data mode c2\n");

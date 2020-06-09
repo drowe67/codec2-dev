@@ -268,5 +268,5 @@ endfunction
 
 more off;
 rand('seed',1); randn('seed', 1);
-%run_curves
-run_single
+run_curves
+#run_single

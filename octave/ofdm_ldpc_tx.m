@@ -84,12 +84,18 @@ function ofdm_ldpc_tx(filename, mode="700D", Nsec, SNR3kdB=100, channel='awgn', 
     % generate same fading pattern for every run
     randn('seed',1);
 
-    spread1 = doppler_spread(dopplerSpreadHz, Fs, Fs*(Nsec+1));
-    spread2 = doppler_spread(dopplerSpreadHz, Fs, Fs*(Nsec+1));
+    spread1 = doppler_spread(dopplerSpreadHz, Fs, Fs*Nsec + 2*Np*Nsamperframe);
+    spread2 = doppler_spread(dopplerSpreadHz, Fs, Fs*Nsec + 2*Np*Nsamperframe);
    
     % sometimes doppler_spread() doesn't return exactly the number of samples we need 
-    assert(length(spread1) >= Nsam, "not enough doppler spreading samples");
-    assert(length(spread2) >= Nsam, "not enough doppler spreading samples");
+    if length(spread1) < Nsam
+      printf("not enough doppler spreading samples %d %d\n", length(spread1), Nsam);
+      assert(0);
+    end
+    if length(spread2) < Nsam
+      printf("not enough doppler spreading samples %d %d\n", length(spread2), Nsam);
+      assert(0);
+    end
   end
 
   rx = tx;
