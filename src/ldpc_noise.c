@@ -3,10 +3,8 @@
   AUTHOR.: Don Reid
   CREATED: Aug 2018
 
-  Add noise to ldpc sd samples for testing.
-  
-  First pass only adds AGWN with variance = 1
-
+  Add noise to LDPC soft decision samples for testing.  Simulates use
+  of LDPC code with PSK modem.
 */
 
 #include <stdio.h>
@@ -15,18 +13,6 @@
 #include <string.h>
 #include <math.h>
 #include <errno.h>
-
-/*
-int opt_exists(char *argv[], int argc, char opt[]) {
-    int i;
-    for (i=0; i<argc; i++) {
-        if (strcmp(argv[i], opt) == 0) {
-            return i;
-        }
-    }
-    return 0;
-}
-*/
 
 int main(int argc, char *argv[]) {
     FILE        *fin, *fout;
@@ -57,7 +43,10 @@ int main(int argc, char *argv[]) {
     double No = pow(10.0, NodB/10.0);
     double sum_xx = 0; double sum_x = 0.0; long n = 0;
     
-    fprintf(stderr, "single sided NodB = %f, No = %f\n", NodB, No);
+    fprintf(stderr, "Uncoded PSK Eb/No simulation:\n");
+    fprintf(stderr, "No    = % 4.2f dB (%4.2f linear)\n", NodB, No);
+    fprintf(stderr, "Eb    = % 4.2f dB (%4.2f linear)\n", 0.0, 1.0);
+    fprintf(stderr, "Eb/No = %4.2f dB (%4.2f linear)\n", -NodB, pow(10,-NodB/10.0));
     
     while (fread(&datain, sizeof(double), 1, fin) == 1) {
 

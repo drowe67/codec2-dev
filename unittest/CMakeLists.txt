@@ -10,6 +10,8 @@ target_link_libraries(tcohpsk codec2)
 add_executable(tfsk tfsk.c ../src/kiss_fft.c ../src/kiss_fftr.c ../src/octave.c ../src/modem_probe.c)
 target_link_libraries(tfsk m)
 
+add_executable(tfreedv_data_channel tfreedv_data_channel.c ../src/freedv_data_channel.c)
+
 add_executable(tfmfsk tfmfsk.c ../src/octave.c ../src/modem_probe.c)
 target_link_libraries(tfmfsk m)
 
@@ -57,3 +59,12 @@ add_executable(tst_codec2_fft_init tst_codec2_fft_init.c)
 target_link_libraries(tst_codec2_fft_init m codec2)
 
 add_executable(tvq_mbest tvq_mbest.c)
+
+add_executable(tfreedv_800XA_rawdata tfreedv_800XA_rawdata.c)
+target_link_libraries(tfreedv_800XA_rawdata codec2)
+
+add_executable(tfreedv_2400A_rawdata tfreedv_2400A_rawdata.c)
+target_link_libraries(tfreedv_2400A_rawdata codec2)
+
+add_executable(tfreedv_2400B_rawdata tfreedv_2400B_rawdata.c)
+target_link_libraries(tfreedv_2400B_rawdata codec2)

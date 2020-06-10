@@ -9,6 +9,7 @@
   * 2 control bits per frame
   * 4 byte counter bits per frame
   * 64 bits of data per frame
+
 \*---------------------------------------------------------------------------*/
 
 /*
@@ -172,6 +173,7 @@ void freedv_data_channel_rx_frame(struct freedv_data_channel *fdc, unsigned char
             unsigned char calc_crc = fdc_crc4(data, size);
             if (calc_crc == end_bits) {
 	        /* It is a single header field, remember it for later */
+                memcpy(fdc->rx_header, data, 6);
                 memcpy(fdc->packet_rx + 6, data, 6);
 		memcpy(fdc->packet_rx, fdc_header_bcast, 6);
                 if (fdc->cb_rx) {
@@ -212,8 +214,10 @@ void freedv_data_channel_rx_frame(struct freedv_data_channel *fdc, unsigned char
 		memcpy(fdc->packet_rx + 6, tmp, 6);
 		
 		size_t size = fdc->packet_rx_cnt - 2;
-                if (size < 12)
+                if (size < 12) {
                     size = 12;
+		    memcpy(fdc->packet_rx, fdc_header_bcast, 6);
+		}
                 fdc->cb_rx(fdc->cb_rx_state, fdc->packet_rx, size);
             }
         }    

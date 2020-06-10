@@ -1,28 +1,8 @@
 % fsk.m
 % David Rowe Nov 2014
 
-% Simulation to test FSK demod
-%
-% TODO
-%   [X] Code up mod/non-coh demod/AWGN channel simulation
-%   [X] Eb/No verses BER curves
-%   [X] test analog FM with pre/de-emphahsis 
-%       + this will introduce delay, use fir filter, group delay
-%   [X] channel simulation of HT/FM radio
-%       + filtering, varying modulation index
-%   [ ] GMSK
-%   [X] refactor to plot analog FM demod curves
-%   [X] SSB curves
-%   [-] different modn index beta curves, 
-%       + not really important for now
-%   [ ] plot to illustrate harmonic dist, 
-%   [X] integration with AFSK, AFSK-FM, v AFSK-SSB (ie FSK)
-%   [-] fine timing offset for pre/de filters?
-%       + do we need interpolation as well?
-%       + might leave this as pre/de not significant now
-%   [X] C/No curves?
-%   [X] spectrum plots or analog FM and FSK
-%   [ ] figures
+% Ideal non-coherent FSK and AFSK-over-analog-FM simulation. Can draw
+% Eb/No curves or run single point simulations
 
 rand('state',1); 
 randn('state',1);
@@ -245,7 +225,8 @@ function run_fsk_single
   fsk_sim = fsk_ber_test(sim_in);
 endfunction
 
+# choose one of these functions below
 
-%run_fsk_curves
-run_fsk_single
+run_fsk_curves
+#run_fsk_single
 

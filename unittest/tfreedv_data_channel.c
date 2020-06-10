@@ -32,6 +32,7 @@
 #include <string.h>
 
 unsigned char test_header[] = { 0x11, 0x22, 0x33, 0x44, 0x55, 0x66 };
+unsigned char bcast_header[] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
 
 
 struct testvec {
@@ -120,6 +121,24 @@ struct testvec {
         (unsigned char[]){ 0x2f },
     },
     {
+        "Broadcast packet (6 byte frames)",
+        (unsigned char[]){ 
+            0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x11, 0x22,
+            0x33, 0x44, 0x55, 0x66, 0x05, 0x06, 0x07, 0x08, 
+            0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10,
+            0x11
+        },
+        0x19,
+        6,
+        (unsigned char[]){ 
+            0x05, 0x06, 0x07, 0x08, 
+            0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10,
+            0x11, 0x3c, 0xbe
+        },
+        0x0f,
+        (unsigned char[]){ 0xc0, 0x00, 0x03 },
+    },
+    {
         "Broadcast packet, header does not match (6 byte frames)",
         (unsigned char[]){ 
             0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xaa, 0x22,
@@ -195,6 +214,10 @@ void tfreedv_data_callback_rx(void *arg, unsigned char *packet, size_t size)
             printf("FAIL: Received header is not 12 bytes: %zd\n", size);
             ret++;
         } else {
+            if (memcmp(packet, bcast_header, 6)) {
+                printf("FAIL: Header is not a broadcast!\n");
+                ret++;
+	    }
             if (memcmp(packet+6, test_header, 6)) {
                 printf("FAIL: Header does not match!\n");
                 ret++;

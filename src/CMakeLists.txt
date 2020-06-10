@@ -158,7 +158,6 @@ set(CODEC2_SRCS
     fm.c
     fsk.c
     fmfsk.c
-    tdma.c
     kiss_fft.c
     kiss_fftr.c
     linreg.c
@@ -181,6 +180,10 @@ set(CODEC2_SRCS
     codebooknewamp2_energy.c
     golay23.c
     freedv_api.c
+    freedv_1600.c
+    freedv_700.c
+    freedv_2020.c
+    freedv_fsk.c
     freedv_vhf_framing.c
     freedv_data_channel.c
     varicode.c
@@ -191,15 +194,13 @@ set(CODEC2_SRCS
     gp_interleaver.c
     interldpc.c
     filter.c
-    horus_api.c
-    horus_l2.c
     HRA_112_112.c
     HRAb_396_504.c
+    H_256_768_22.c
     lpcnet_freq.c
 )
 
 set(CODEC2_PUBLIC_HEADERS
-    golay23.h
     codec2.h
     codec2_fdmdv.h
     codec2_cohpsk.h
@@ -208,14 +209,8 @@ set(CODEC2_PUBLIC_HEADERS
     fsk.h
     codec2_fifo.h
     comp.h
-    comp_prim.h
     modem_stats.h
-    kiss_fft.h
     freedv_api.h
-    varicode.h
-    freedv_api_internal.h
-    filter.h
-    horus_api.h
     ${CODEC2_VERSION_PATH}/version.h
 )
 
@@ -293,6 +288,24 @@ target_link_libraries(freedv_tx ${CMAKE_REQUIRED_LIBRARIES} codec2)
 add_executable(freedv_rx freedv_rx.c)
 target_link_libraries(freedv_rx ${CMAKE_REQUIRED_LIBRARIES} codec2)
 
+add_executable(freedv_data_raw_tx freedv_data_raw_tx.c)
+target_link_libraries(freedv_data_raw_tx ${CMAKE_REQUIRED_LIBRARIES} codec2)
+
+add_executable(freedv_data_raw_rx freedv_data_raw_rx.c)
+target_link_libraries(freedv_data_raw_rx ${CMAKE_REQUIRED_LIBRARIES} codec2)
+
+add_executable(freedv_data_tx freedv_data_tx.c)
+target_link_libraries(freedv_data_tx ${CMAKE_REQUIRED_LIBRARIES} codec2)
+
+add_executable(freedv_data_rx freedv_data_rx.c)
+target_link_libraries(freedv_data_rx ${CMAKE_REQUIRED_LIBRARIES} codec2)
+
+add_executable(freedv_mixed_tx freedv_mixed_tx.c)
+target_link_libraries(freedv_mixed_tx ${CMAKE_REQUIRED_LIBRARIES} codec2)
+
+add_executable(freedv_mixed_rx freedv_mixed_rx.c)
+target_link_libraries(freedv_mixed_rx ${CMAKE_REQUIRED_LIBRARIES} codec2)
+
 add_executable(fsk_mod fsk_mod.c)
 target_link_libraries(fsk_mod ${CMAKE_REQUIRED_LIBRARIES} codec2)
 
@@ -362,37 +375,9 @@ target_link_libraries(ldpc_enc ${CMAKE_REQUIRED_LIBRARIES} codec2)
 add_executable(ldpc_dec ldpc_dec.c)
 target_link_libraries(ldpc_dec ${CMAKE_REQUIRED_LIBRARIES} codec2)
 
-add_executable(drs232 drs232.c)
-target_link_libraries(drs232 ${CMAKE_REQUIRED_LIBRARIES})
-
-add_executable(drs232_ldpc drs232_ldpc.c)
-target_link_libraries(drs232_ldpc ${CMAKE_REQUIRED_LIBRARIES} codec2)
-
-add_definitions(-DHORUS_L2_RX -DINTERLEAVER -DSCRAMBLER -DRUN_TIME_TABLES)
-add_executable(horus_demod horus_demod.c horus_api.c horus_l2.c golay23.c fsk.c kiss_fft.c)
-target_link_libraries(horus_demod m ${CMAKE_REQUIRED_LIBRARIES})
-
 install(TARGETS codec2 EXPORT codec2-config
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
     PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/codec2
-)
-
-#install(EXPORT codec2-config
-#    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/codec2
-#)
-
-install(TARGETS
-    c2enc
-    c2dec
-    fdmdv_get_test_bits
-    fdmdv_mod fdmdv_demod
-    fm_demod
-    fsk_mod
-    fdmdv_put_test_bits
-    insert_errors
-    drs232
-    drs232_ldpc
-    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
