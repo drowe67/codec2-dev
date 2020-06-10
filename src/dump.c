@@ -142,7 +142,7 @@ void dump_off(){
 
 void dump_Sn(int m_pitch, float Sn[]) {
     int i;
-    char s[MAX_STR];
+    char s[MAX_STR + 7];
 
     if (!dumpon) return;
 
@@ -165,7 +165,7 @@ void dump_Sn(int m_pitch, float Sn[]) {
 
 void dump_Sw(COMP Sw[]) {
     int i;
-    char s[MAX_STR];
+    char s[MAX_STR + 7];
 
     if (!dumpon) return;
 
@@ -183,7 +183,7 @@ void dump_Sw(COMP Sw[]) {
 
 void dump_Sw_(COMP Sw_[]) {
     int i;
-    char s[MAX_STR];
+    char s[MAX_STR + 8];
 
     if (!dumpon) return;
 
@@ -201,7 +201,7 @@ void dump_Sw_(COMP Sw_[]) {
 
 void dump_Ew(COMP Ew[]) {
     int i;
-    char s[MAX_STR];
+    char s[MAX_STR + 7];
 
     if (!dumpon) return;
 
@@ -220,7 +220,7 @@ void dump_Ew(COMP Ew[]) {
 void dump_softdec(float *softdec, int n)
 {
     int i;
-    char s[MAX_STR];
+    char s[MAX_STR + 12];
 
     if (!dumpon) return;
 
@@ -237,7 +237,7 @@ void dump_softdec(float *softdec, int n)
 
 void dump_model(MODEL *model) {
     int l;
-    char s[MAX_STR];
+    char s[MAX_STR + 10];
     char line[MAX_STR*10];
 
     if (!dumpon) return;
@@ -267,7 +267,7 @@ void dump_model(MODEL *model) {
 
 void dump_quantised_model(MODEL *model) {
     int l;
-    char s[MAX_STR];
+    char s[MAX_STR + 11];
     char line[4096];
 
     if (!dumpon) return;
@@ -297,7 +297,7 @@ void dump_quantised_model(MODEL *model) {
 
 void dump_phase(float phase[], int L) {
     int l;
-    char s[MAX_STR];
+    char s[MAX_STR + 10];
 
     if (!dumpon) return;
 
@@ -316,7 +316,7 @@ void dump_phase(float phase[], int L) {
 
 void dump_phase_(float phase_[], int L) {
     int l;
-    char s[MAX_STR];
+    char s[MAX_STR + 11];
 
     if (!dumpon) return;
 
@@ -336,7 +336,7 @@ void dump_phase_(float phase_[], int L) {
 
 void dump_hephase(int ind[], int dim) {
     int m;
-    char s[MAX_STR];
+    char s[MAX_STR + 12];
 
     if (!dumpon) return;
 
@@ -353,7 +353,7 @@ void dump_hephase(int ind[], int dim) {
 
 
 void dump_snr(float snr) {
-    char s[MAX_STR];
+    char s[MAX_STR + 8];
 
     if (!dumpon) return;
 
@@ -367,7 +367,7 @@ void dump_snr(float snr) {
 }
 
 void dump_lpc_snr(float snr) {
-    char s[MAX_STR];
+    char s[MAX_STR + 12];
 
     if (!dumpon) return;
 
@@ -384,7 +384,7 @@ void dump_lpc_snr(float snr) {
 
 void dump_Pwb(float Pwb[]) {
     int i;
-    char s[MAX_STR];
+    char s[MAX_STR + 8];
 
     if (!dumpon) return;
 
@@ -401,7 +401,7 @@ void dump_Pwb(float Pwb[]) {
 
 void dump_Pw(float Pw[]) {
     int i;
-    char s[MAX_STR];
+    char s[MAX_STR +7];
 
     if (!dumpon) return;
 
@@ -418,7 +418,7 @@ void dump_Pw(float Pw[]) {
 
 void dump_Rw(float Rw[]) {
     int i;
-    char s[MAX_STR];
+    char s[MAX_STR + 7];
 
     if (!dumpon) return;
 
@@ -435,7 +435,7 @@ void dump_Rw(float Rw[]) {
 
 void dump_weights(float w[], int order) {
     int i;
-    char s[MAX_STR];
+    char s[MAX_STR + 12];
 
     if (!dumpon) return;
 
@@ -452,7 +452,7 @@ void dump_weights(float w[], int order) {
 
 void dump_lsp(float lsp[]) {
     int i;
-    char s[MAX_STR];
+    char s[MAX_STR + 8];
 
     if (!dumpon) return;
 
@@ -469,7 +469,7 @@ void dump_lsp(float lsp[]) {
 
 void dump_lsp_(float lsp_[]) {
     int i;
-    char s[MAX_STR];
+    char s[MAX_STR + 9];
 
     if (!dumpon) return;
 
@@ -486,7 +486,7 @@ void dump_lsp_(float lsp_[]) {
 
 void dump_mel(float mel[], int order) {
     int i;
-    char s[MAX_STR];
+    char s[MAX_STR + 8];
 
     if (!dumpon) return;
 
@@ -503,7 +503,7 @@ void dump_mel(float mel[], int order) {
 
 void dump_mel_indexes(int mel_indexes[], int order) {
     int i;
-    char s[MAX_STR];
+    char s[MAX_STR + 16];
 
     if (!dumpon) return;
 
@@ -520,7 +520,7 @@ void dump_mel_indexes(int mel_indexes[], int order) {
 
 void dump_ak(float ak[], int order) {
     int i;
-    char s[MAX_STR];
+    char s[MAX_STR + 7];
 
     if (!dumpon) return;
 
@@ -537,7 +537,7 @@ void dump_ak(float ak[], int order) {
 
 void dump_ak_(float ak_[], int order) {
     int i;
-    char s[MAX_STR];
+    char s[MAX_STR + 8];
 
     if (!dumpon) return;
 
@@ -554,7 +554,7 @@ void dump_ak_(float ak_[], int order) {
 
 void dump_Fw(COMP Fw[]) {
     int i;
-    char s[MAX_STR];
+    char s[MAX_STR + 7];
 
     if (!dumpon) return;
 
@@ -571,7 +571,7 @@ void dump_Fw(COMP Fw[]) {
 
 void dump_e(float e_hz[]) {
     int i;
-    char s[MAX_STR];
+    char s[MAX_STR + 6];
 
     if (!dumpon) return;
 
@@ -591,7 +591,7 @@ void dump_e(float e_hz[]) {
 
 void dump_sq(int m_pitch, float sq[]) {
     int i;
-    char s[MAX_STR];
+    char s[MAX_STR + 7];
 
     if (!dumpon) return;
 
@@ -611,7 +611,7 @@ void dump_sq(int m_pitch, float sq[]) {
 
 void dump_dec(COMP Fw[]) {
     int i;
-    char s[MAX_STR];
+    char s[MAX_STR + 8];
 
     if (!dumpon) return;
 
@@ -627,7 +627,7 @@ void dump_dec(COMP Fw[]) {
 }
 
 void dump_bg(float e, float bg_est, float percent_uv) {
-    char s[MAX_STR];
+    char s[MAX_STR + 7];
 
     if (!dumpon) return;
 
@@ -641,7 +641,7 @@ void dump_bg(float e, float bg_est, float percent_uv) {
 }
 
 void dump_E(float E) {
-    char s[MAX_STR];
+    char s[MAX_STR + 6];
 
     if (!dumpon) return;
 
