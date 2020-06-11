@@ -438,6 +438,17 @@ void freedv_datatx (struct freedv *f, short mod_out[]) {
     }
 }
 
+void freedv_datacomptx(struct freedv *f, COMP mod_out[])
+{
+    assert(f != NULL);
+    if (FDV_MODE_ACTIVE( FREEDV_MODE_2400A, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_2400B, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_800XA, f->mode)) {
+        short out[f->n_nom_modem_samples];
+        freedv_tx_fsk_data(f, out);
+	for (int i = 0; i < f->n_nom_modem_samples; i++)
+	    mod_out[i].real = out[i];
+    }
+}
+
 
 /* VHF packet data: returns how many tx frames are queued up but not sent yet */
 int  freedv_data_ntxframes (struct freedv *f) {

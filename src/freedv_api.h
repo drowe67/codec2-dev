@@ -137,6 +137,7 @@ void freedv_tx        (struct freedv *freedv, short mod_out[], short speech_in[]
 void freedv_comptx    (struct freedv *freedv, COMP  mod_out[], short speech_in[]);
 void freedv_rawdatatx (struct freedv *f, short mod_out[], unsigned char *packed_payload_bits);
 void freedv_datatx    (struct freedv *f, short mod_out[]);
+void freedv_datacomptx(struct freedv *f, COMP mod_out[]);
 int  freedv_data_ntxframes (struct freedv *freedv);
 
 // Receive -------------------------------------------------------------------
