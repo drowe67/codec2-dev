@@ -301,7 +301,8 @@ void freedv_comptx(struct freedv *f, COMP mod_out[], short speech_in[]) {
 
     assert((FDV_MODE_ACTIVE( FREEDV_MODE_1600, f->mode)) || (FDV_MODE_ACTIVE( FREEDV_MODE_700C, f->mode)) || 
            (FDV_MODE_ACTIVE( FREEDV_MODE_2400A, f->mode)) || (FDV_MODE_ACTIVE( FREEDV_MODE_2400B, f->mode)) ||
-           (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode))  || (FDV_MODE_ACTIVE( FREEDV_MODE_2020, f->mode)));
+           (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode))  || (FDV_MODE_ACTIVE( FREEDV_MODE_2020, f->mode)) ||
+	   (FDV_MODE_ACTIVE( FREEDV_MODE_800XA, f->mode)) );
 
     if (FDV_MODE_ACTIVE( FREEDV_MODE_1600, f->mode)) {
         codec2_encode_upacked(f, f->tx_payload_bits, speech_in);
@@ -381,8 +382,14 @@ void freedv_comptx(struct freedv *f, COMP mod_out[], short speech_in[]) {
 #endif
     
     /* 2400 A and B are handled by the real-mode TX */
-    if(FDV_MODE_ACTIVE( FREEDV_MODE_2400A, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_2400B, f->mode)){
-        codec2_encode(f->codec2, f->tx_payload_bits, speech_in);
+    if ((FDV_MODE_ACTIVE( FREEDV_MODE_2400A, f->mode)) || (FDV_MODE_ACTIVE( FREEDV_MODE_2400B, f->mode)) || (FDV_MODE_ACTIVE( FREEDV_MODE_800XA, f->mode))){
+        /* 800XA has two codec frames per modem frame */
+        if(FDV_MODE_ACTIVE( FREEDV_MODE_800XA, f->mode)){
+            codec2_encode(f->codec2, &f->tx_payload_bits[0], &speech_in[  0]);
+            codec2_encode(f->codec2, &f->tx_payload_bits[4], &speech_in[320]);
+        }else{
+            codec2_encode(f->codec2, f->tx_payload_bits, speech_in);
+        }
         freedv_comptx_fsk_voice(f, mod_out);
     }
 }

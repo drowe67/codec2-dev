@@ -468,14 +468,28 @@ endif()
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
                             ./freedv_tx 2400A ../../raw/ve9qrp_10s.raw - | ./freedv_rx 2400A - /dev/null")
              set_tests_properties(test_freedv_api_2400A PROPERTIES PASS_REGULAR_EXPRESSION "frames decoded: 250")
+     add_test(NAME test_freedv_api_2400A_complex
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            ./freedv_comptx 2400A ../../raw/ve9qrp_10s.raw - | ./freedv_rx 2400A - /dev/null --usecomplex")
+             set_tests_properties(test_freedv_api_2400A_complex PROPERTIES PASS_REGULAR_EXPRESSION "frames decoded: 250")
+
      add_test(NAME test_freedv_api_2400B
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
                             ./freedv_tx 2400B ../../raw/ve9qrp_10s.raw - | ./freedv_rx 2400B - /dev/null")
              set_tests_properties(test_freedv_api_2400B PROPERTIES PASS_REGULAR_EXPRESSION "frames decoded: 250")
+     add_test(NAME test_freedv_api_2400B_complex
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            ./freedv_comptx 2400B ../../raw/ve9qrp_10s.raw - | ./freedv_rx 2400B - /dev/null --usecomplex")
+             set_tests_properties(test_freedv_api_2400B_complex PROPERTIES PASS_REGULAR_EXPRESSION "frames decoded: 250")
+
      add_test(NAME test_freedv_api_800XA
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
                             ./freedv_tx 800XA ../../raw/ve9qrp_10s.raw - | ./freedv_rx 800XA - /dev/null")
              set_tests_properties(test_freedv_api_800XA PROPERTIES PASS_REGULAR_EXPRESSION "frames decoded: 125")
+     add_test(NAME test_freedv_api_800XA_complex
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            ./freedv_comptx 800XA ../../raw/ve9qrp_10s.raw - | ./freedv_rx 800XA - /dev/null --usecomplex")
+             set_tests_properties(test_freedv_api_800XA_complex PROPERTIES PASS_REGULAR_EXPRESSION "frames decoded: 125")
 
      add_test(NAME test_freedv_api_rawdata_800XA
              COMMAND sh -c "./tfreedv_800XA_rawdata"

@@ -285,6 +285,9 @@ target_link_libraries(insert_errors ${CMAKE_REQUIRED_LIBRARIES})
 add_executable(freedv_tx freedv_tx.c)
 target_link_libraries(freedv_tx ${CMAKE_REQUIRED_LIBRARIES} codec2)
 
+add_executable(freedv_comptx freedv_comptx.c)
+target_link_libraries(freedv_comptx ${CMAKE_REQUIRED_LIBRARIES} codec2)
+
 add_executable(freedv_rx freedv_rx.c)
 target_link_libraries(freedv_rx ${CMAKE_REQUIRED_LIBRARIES} codec2)
 
