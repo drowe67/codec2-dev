@@ -23,8 +23,10 @@ add_definitions(-DMODEMPROBE_ENABLE -DXXXXX)
 add_executable(tofdm tofdm.c ../src/ofdm.c ../src/octave.c ../src/kiss_fft.c ../src/modem_probe.c ../src/mpdecode_core.c ../src/phi0.c ../src/filter.c ../src/HRA_112_112.c)
 target_link_libraries(tofdm m)
 
+if(UNIX) # Uses pthreads
 add_executable(tfifo tfifo.c ../src/codec2_fifo.c)
 target_link_libraries(tfifo codec2 ${CMAKE_THREAD_LIBS_INIT})
+endif()
 
 add_executable(fdmdv_mem fdmdv_mem.c)
 
