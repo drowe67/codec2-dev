@@ -1192,7 +1192,7 @@ function states = sync_state_machine2(states, rx_uw)
         end
 
         if strcmp(states.sync_state,'synced')
-          if states.uw_errors > 4
+          if states.uw_errors > 8
             states.sync_counter++;
           else
             states.sync_counter = 0;
