@@ -112,6 +112,10 @@ function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", error_pattern_filena
       rx_syms(end-Nsymsperframe+1:end) = arx_np;
       rx_amps(end-Nsymsperframe+1:end) = arx_amp;
 
+      if (states.modem_frame == 0)
+        rx_uw = disassemble_modem_frame(states, arx_np);
+      end
+      
       % We need the full packet of symbols before disassembling and checking for bit errors
       if (states.modem_frame == (states.Np-1))
         packet_count++;

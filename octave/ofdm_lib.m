@@ -952,6 +952,37 @@ endfunction
 
 
 % ------------------------------------------------------------------------------------------------
+% disassemble_modem_frame - extract just the UW from a frame of symbols, to check UW on first
+%                           received frame of a packet
+% -------------------------------------------------------------------------------------------------
+
+function rx_uw = disassemble_modem_frame(states, modem_frame_syms)
+  ofdm_load_const;
+
+  Nsymsperframe = Nbitsperframe/bps;
+  Nuwsyms = Nuwbits/bps;
+  Ntxtsyms = Ntxtbits/bps;
+  rx_uw_syms = zeros(1,Nuwsyms);
+  u = 1;
+ 
+  for s=1:Nsymsperframe
+    if (u <= Nuwsyms) && (s == uw_ind_sym(u))
+      rx_uw_syms(u++) = modem_frame_syms(s);
+    end
+  end
+  assert(u == (Nuwsyms+1));
+
+  % now demodulate UW bits  
+  rx_uw = zeros(1,Nuwbits);
+  txt_bits = zeros(1,Ntxtbits);
+  
+  for s=1:Nuwsyms
+    rx_uw(2*s-1:2*s) = qpsk_demod(rx_uw_syms(s));
+  end
+endfunction
+
+
+% ------------------------------------------------------------------------------------------------
 % disassemble_modem_packet - extract UW, txt bits, and payload symbols from a packet of symbols
 % -------------------------------------------------------------------------------------------------
 
@@ -1167,49 +1198,37 @@ function states = sync_state_machine2(states, rx_uw)
   states.sync_start = states.sync_end = 0;
   
   if strcmp(states.sync_state,'search') 
-
     if states.timing_valid
       states.sync_start = 1;
-      states.phase_est_bandwidth = "high";
       next_state = 'trial';
     end
   end
-        
-  if strcmp(states.sync_state,'synced') || strcmp(states.sync_state,'trial')
 
-    states.frame_count++;
+  if strcmp(states.sync_state,'trial') || strcmp(states.sync_state,'synced')
 
-    % UW occurs at the start of a packet
+    % UW in the first frame
     if states.modem_frame == 0
-        states.uw_errors = sum(xor(tx_uw,rx_uw));
+      states.uw_errors = sum(xor(tx_uw,rx_uw));
 
-        if strcmp(states.sync_state,'trial')
-          if states.uw_errors <= 2
-            next_state = "synced";
-          else
-            next_state = "search";
-          end  
+      if strcmp(states.sync_state,'trial')
+        if states.uw_errors <= 8
+          next_state = "synced";
         end
+      end
 
-        if strcmp(states.sync_state,'synced')
-          if states.uw_errors > 8
-            states.sync_counter++;
-          else
-            states.sync_counter = 0;
-          end
-
-          if states.sync_counter == 2
-            next_state = "search";
-            states.frame_count = 0;
-            states.sync_counter = 0;
-            states.modem_frame = 0;
-          end
+      if strcmp(states.sync_state,'synced')
+        if states.uw_errors > 8
+          next_state = "search";
+          states.frame_count = 0;
+          states.modem_frame = 0;
         end
-      end % if modem_frame == 0 ....
-
-      % keep track of where we are up to in packet, so we know when to look for a UW
-      states.modem_frame++;
-      if (states.modem_frame >= states.Np) states.modem_frame = 0; end
+      end
+    end
+    
+    states.frame_count++;
+    % keep track of where we are up to in packet, so we know when to look for a UW
+    states.modem_frame++;
+    if (states.modem_frame >= states.Np) states.modem_frame = 0; end
   end
   
   states.last_sync_state = states.sync_state;

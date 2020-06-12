@@ -88,10 +88,12 @@ function ofdm_rx(filename, mode="700D", error_pattern_filename)
       rx_syms(end-Nsymsperframe+1:end) = arx_np;
       rx_amps(end-Nsymsperframe+1:end) = arx_amp;
 
+      if (states.modem_frame == 0)
+        rx_uw = disassemble_modem_frame(states, arx_np);
+      end
+      
       % We need the full packet of symbols before disassmbling and checking for bit errors
-      if (states.modem_frame == (states.Np-1))
-        % As this is an uncoded simulation we are just using this function to extract the UW
-        [rx_uw payload_syms payload_amps txt_bits] = disassemble_modem_packet(states, rx_syms, rx_amps);
+      if states.modem_frame == (states.Np-1)
         rx_bits = zeros(1,Nbitsperpacket);
         for s=1:Nsymsperpacket
           rx_bits(2*s-1:2*s) = qpsk_demod(rx_syms(s));
@@ -119,7 +121,11 @@ function ofdm_rx(filename, mode="700D", error_pattern_filename)
       frame_count++;
     end
     
-    states = sync_state_machine(states, rx_uw);
+    if strcmp(mode,"datac1") || strcmp(mode,"datac2") || strcmp(mode,"datac3")
+      states = sync_state_machine2(states, rx_uw);
+    else
+      states = sync_state_machine(states, rx_uw);
+    end
 
     if states.verbose
       printf("f: %3d mf: %2d nin: %4d state: %-6s uw_errors: %2d %1d pbw: %-4s Nerrs: %3d foff: %5.1f clkOff: %5.0f\n",

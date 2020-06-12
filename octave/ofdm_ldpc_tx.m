@@ -53,7 +53,7 @@ function ofdm_ldpc_tx(filename, mode="700D", Nsec, SNR3kdB=100, channel='awgn', 
 
   % assemble interleaved modem packet that include UW and txt symbols  
   modem_packet = assemble_modem_packet_symbols(states, tx_symbols, txt_symbols);
-  atx = ofdm_txframes(states, modem_packet); tx = [];
+  atx = ofdm_txframe(states, modem_packet); tx = [];
   for f=1:Npackets
     tx = [tx atx];
   end
