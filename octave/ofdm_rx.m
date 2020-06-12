@@ -88,9 +88,7 @@ function ofdm_rx(filename, mode="700D", error_pattern_filename)
       rx_syms(end-Nsymsperframe+1:end) = arx_np;
       rx_amps(end-Nsymsperframe+1:end) = arx_amp;
 
-      if (states.modem_frame == 0)
-        rx_uw = disassemble_modem_frame(states, arx_np);
-      end
+      rx_uw = extract_uw(states, rx_syms(end-Nuwframes*Nsymsperframe+1:end));
       
       % We need the full packet of symbols before disassmbling and checking for bit errors
       if states.modem_frame == (states.Np-1)

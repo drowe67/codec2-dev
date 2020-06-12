@@ -44,6 +44,7 @@ function states = ofdm_init(config)
   if isfield(config,"Nuwbits") Nuwbits = config.Nuwbits ; else Nuwbits = 5*bps; end
   if isfield(config,"ftwindow_width") ftwindow_width = config.ftwindow_width; else ftwindow_width = 11; end
   if isfield(config,"timing_mx_thresh") timing_mx_thresh = config.timing_mx_thresh; else timing_mx_thresh = 0.35; end
+  if isfield(config,"tx_uw") tx_uw = config.tx_uw; else tx_uw = zeros(1,Nuwbits); end
   
   states.Fs = 8000;
   states.bps = bps;
@@ -89,8 +90,11 @@ function states = ofdm_init(config)
       states.uw_ind = [states.uw_ind bps*ind_sym-b];   % bit index
     end  
   end
-
-  states.tx_uw = zeros(1,states.Nuwbits);       
+  % how many of the first few frames have UW symbols in them
+  Nsymsperframe = states.Nbitsperframe/states.bps;
+  states.Nuwframes = ceil(states.uw_ind_sym(end)/Nsymsperframe);
+  
+  states.tx_uw = tx_uw;
   assert(length(states.tx_uw) == states.Nuwbits);
   tx_uw_syms = [];
   for b=1:bps:states.Nuwbits
@@ -99,22 +103,18 @@ function states = ofdm_init(config)
   states.tx_uw_syms = tx_uw_syms;
   
   % use this to scale tx output to 16 bit short.  Adjusted by experiment
-  % to have same RMS power as FDMDV waveform
-  
+  % to have same RMS power as other FreeDV waveforms  
   states.amp_scale = 2E5*1.1491/1.06;
 
   % this is used to scale inputs to LDPC decoder to make it amplitude indep
-  
   states.mean_amp = 0;
 
   % generate same pilots each time
-
   rand('seed',1);
   states.pilots = 1 - 2*(rand(1,Nc+2) > 0.5);
   %printf("number of pilots total: %d\n", length(states.pilots));
   
   % carrier tables for up and down conversion
-
   fcentre = 1500;
   alower = fcentre - Rs * (Nc/2);  % approx frequency of lowest carrier
   Nlower = round(alower / Rs) - 1; % round this to nearest integer multiple from 0Hz to keep DFT happy
@@ -240,6 +240,7 @@ function config = ofdm_init_mode(mode="700D")
     Ns=5; config.Np=11; Tcp = 0.006; Ts = 0.016; Nc = 9; bps=2;
     config.Ntxtbits = 0; config.Nuwbits = 24;
     config.ftwindow_width = 32; config.timing_mx_thresh = 0.30;
+    config.tx_uw = [1 1 0 0  1 0 1 0  1 1 1 1  0 0 0 0  1 1 1 1  0 0 0 0];
   elseif strcmp(mode,"1")
     Ns=5; config.Np=10; Tcp=0; Tframe = 0.1; Ts = Tframe/Ns; Nc = 1; bps=2;
   else
@@ -259,8 +260,8 @@ end
 function print_config(states)
   ofdm_load_const;
   printf("Nc=%d Ts=%4.3f Tcp=%4.3f Ns: %d Np: %d\n", Nc, 1/Rs, Tcp, Ns, Np);
-  printf("Nsymperframe: %d Nbitsperpacket: %d Nsamperframe: %d Ntxtbits: %d Nuwbits: %d\n",
-          Ns*Nc, Nbitsperpacket, Nsamperframe, Ntxtbits, Nuwbits);
+  printf("Nsymperframe: %d Nbitsperpacket: %d Nsamperframe: %d Ntxtbits: %d Nuwbits: %d Nuwframes: %d\n",
+          Ns*Nc, Nbitsperpacket, Nsamperframe, Ntxtbits, Nuwbits, Nuwframes);
   printf("uncoded bits/s: %4.1f\n",  Nbitsperpacket*Fs/(Np*Nsamperframe));
   s=1; u=1; Nuwsyms=length(uw_ind_sym);
   for f=1:Np
@@ -905,7 +906,8 @@ function modem_frame = assemble_modem_packet(states, payload_bits, txt_bits)
   # entire packet (multiple modem frames if Np>1)
 
   p = 1; u = 1;
- 
+  modem_frame = zeros(1,Nbitsperpacket);
+  
   for b=1:Nbitsperpacket-Ntxtbits;
     if (u <= Nuwbits) && (b == uw_ind(u))
       modem_frame(b) = tx_uw(u++);
@@ -952,22 +954,22 @@ endfunction
 
 
 % ------------------------------------------------------------------------------------------------
-% disassemble_modem_frame - extract just the UW from a frame of symbols, to check UW on first
-%                           received frame of a packet
+% disassemble_modem_frame - extract just the UW from the first few frames of a packet, to check UW
+%                           during acquisition
 % -------------------------------------------------------------------------------------------------
 
-function rx_uw = disassemble_modem_frame(states, modem_frame_syms)
+function rx_uw = extract_uw(states, rx_syms)
   ofdm_load_const;
 
   Nsymsperframe = Nbitsperframe/bps;
+  assert(length(rx_syms) == Nuwframes*Nsymsperframe);
   Nuwsyms = Nuwbits/bps;
-  Ntxtsyms = Ntxtbits/bps;
   rx_uw_syms = zeros(1,Nuwsyms);
   u = 1;
  
-  for s=1:Nsymsperframe
+  for s=1:Nuwframes*Nsymsperframe
     if (u <= Nuwsyms) && (s == uw_ind_sym(u))
-      rx_uw_syms(u++) = modem_frame_syms(s);
+      rx_uw_syms(u++) = rx_syms(s);
     end
   end
   assert(u == (Nuwsyms+1));
@@ -1091,19 +1093,30 @@ function [tx_bits payload_data_bits codeword] = create_ldpc_test_frame(states, c
 endfunction
 
 % automated test
+
 function test_assemble_disassemble(states)
   ofdm_load_const;
+
   Nsymsperpacket = Nbitsperpacket/bps;
-  tx_bits = create_ldpc_test_frame(states, coded_frame=0);
+  Ndatabitsperpacket = Nbitsperpacket-(Nuwbits+Ntxtbits);
+  Ndatasymsperpacket = Ndatabitsperpacket/bps;
+  codeword_bits = round(ofdm_rand(Ndatabitsperpacket)/32767);
+  tx_bits = assemble_modem_packet(states, codeword_bits, zeros(1,Ntxtbits));
+
   tx_syms = zeros(1,Nsymsperpacket);
   for s=1:Nsymsperpacket
-    tx_sym(s) = qpsk_mod(tx_bits(2*(s-1)+1:2*s));
+    tx_syms(s) = qpsk_mod(tx_bits(2*(s-1)+1:2*s));
   end
+  codeword_syms = zeros(1,Ndatasymsperpacket);
+  for s=1:Ndatasymsperpacket
+    codeword_syms(s) = qpsk_mod(codeword_bits(2*(s-1)+1:2*s));
+  end
+
+  [rx_uw rx_codeword_syms payload_amps txt_bits] = disassemble_modem_packet(states, tx_syms, ones(1,Nsymsperpacket));
   
-  [rx_uw rx_syms payload_amps txt_bits] = disassemble_modem_packet(states, tx_syms, ones(1,Nsymsperpacket));
   assert(rx_uw == states.tx_uw);
   Ndatasymsperframe = (Nbitsperpacket-(Nuwbits+Ntxtbits))/bps;
-  assert(tx_syms(1:Ndatasymsperframe) == rx_syms);
+  assert(codeword_syms == rx_codeword_syms);
 endfunction
 
 %-------------------------------------------------------
@@ -1204,29 +1217,42 @@ function states = sync_state_machine2(states, rx_uw)
     end
   end
 
-  if strcmp(states.sync_state,'trial') || strcmp(states.sync_state,'synced')
+  states.uw_errors = sum(xor(tx_uw,rx_uw));
+ 
+  if strcmp(states.sync_state,'trial')
+
+    if strcmp(states.sync_state,'trial')
+      if states.uw_errors <= 5
+        next_state = "synced";
+        states.frame_count = Nuwframes;
+        states.modem_frame = Nuwframes;
+      else
+        next_state = "search";
+      end
+    end
+  end
+   
+  if strcmp(states.sync_state,'synced')
 
     % UW in the first frame
-    if states.modem_frame == 0
-      states.uw_errors = sum(xor(tx_uw,rx_uw));
-
-      if strcmp(states.sync_state,'trial')
-        if states.uw_errors <= 8
-          next_state = "synced";
-        end
+    if states.modem_frame == (Nuwframes-1)
+      
+      if states.uw_errors >= 8
+        states.sync_counter++;
+      else
+        states.sync_counter = 0;
       end
 
-      if strcmp(states.sync_state,'synced')
-        if states.uw_errors > 8
-          next_state = "search";
-          states.frame_count = 0;
-          states.modem_frame = 0;
-        end
+      if states.sync_counter > 4
+        next_state = "search";
+        states.frame_count = 0;
+        states.modem_frame = 0;
+        states.sync_counter = 0;
       end
+      
     end
     
     states.frame_count++;
-    % keep track of where we are up to in packet, so we know when to look for a UW
     states.modem_frame++;
     if (states.modem_frame >= states.Np) states.modem_frame = 0; end
   end

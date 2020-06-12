@@ -97,7 +97,7 @@ function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", error_pattern_filena
     prx += states.nin;
 
     if states.verbose
-      printf("f: %3d nin: %4d st: %-6s euw: %2d %d ", f, states.nin, states.sync_state,states.uw_errors, states.sync_counter);
+      printf("f: %3d nin: %4d st: %-6s ", f, states.nin, states.sync_state);
     end
     
     if strcmp(states.sync_state,'search') 
@@ -112,9 +112,7 @@ function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", error_pattern_filena
       rx_syms(end-Nsymsperframe+1:end) = arx_np;
       rx_amps(end-Nsymsperframe+1:end) = arx_amp;
 
-      if (states.modem_frame == 0)
-        rx_uw = disassemble_modem_frame(states, arx_np);
-      end
+      rx_uw = extract_uw(states, rx_syms(end-Nuwframes*Nsymsperframe+1:end));
       
       % We need the full packet of symbols before disassembling and checking for bit errors
       if (states.modem_frame == (states.Np-1))
@@ -167,16 +165,22 @@ function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", error_pattern_filena
       frame_count++;
     end
     
+    if strcmp(mode,"datac1") || strcmp(mode,"datac2") || strcmp(mode,"datac3")
+      states = sync_state_machine2(states, rx_uw);
+    else
+      states = sync_state_machine(states, rx_uw);
+    end
+
     if states.verbose
-      if  strcmp(states.sync_state,'synced') || strcmp(states.sync_state,'trial')
+      if strcmp(states.last_sync_state,'synced') || strcmp(states.last_sync_state,'trial')
         pcc = max(paritychecks);
         iter = 0;
         for i=1:length(paritychecks)
           if paritychecks(i) iter=i; end
         end
         % complete logging line
-        printf("mf: %2d pbw: %s eraw: %3d ecod: %3d iter: %3d pcc: %3d foff: %4.1f",
-               states.modem_frame, states.phase_est_bandwidth(1),
+        printf("euw: %2d %d mf: %2d pbw: %s eraw: %3d ecod: %3d iter: %3d pcc: %3d foff: %4.1f",
+               states.uw_errors, states.sync_counter, states.modem_frame, states.phase_est_bandwidth(1),
                Nerrs_raw, Nerrs_coded, iter, pcc, states.foff_est_hz);
         % detect a sucessful sync (for tests calling this function)
         if (time_to_sync < 0) && (strcmp(states.sync_state,'synced') || strcmp(states.sync_state,'trial'))
@@ -186,12 +190,6 @@ function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", error_pattern_filena
         end
       end
       printf("\n");
-    end
-
-    if strcmp(mode,"datac1") || strcmp(mode,"datac2") || strcmp(mode,"datac3")
-      states = sync_state_machine2(states, rx_uw);
-    else
-      states = sync_state_machine(states, rx_uw);
     end
     
     % act on any events returned by modem sync state machine
