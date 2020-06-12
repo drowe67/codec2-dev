@@ -91,7 +91,7 @@ function ofdm_rx(filename, mode="700D", error_pattern_filename)
       % We need the full packet of symbols before disassmbling and checking for bit errors
       if (states.modem_frame == (states.Np-1))
         % As this is an uncoded simulation we are just using this function to extract the UW
-        [rx_uw payload_syms payload_amps txt_bits] = disassemble_modem_frame(states, rx_syms, rx_amps);
+        [rx_uw payload_syms payload_amps txt_bits] = disassemble_modem_packet(states, rx_syms, rx_amps);
         rx_bits = zeros(1,Nbitsperpacket);
         for s=1:Nsymsperpacket
           rx_bits(2*s-1:2*s) = qpsk_demod(rx_syms(s));

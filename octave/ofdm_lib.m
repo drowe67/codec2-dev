@@ -894,10 +894,10 @@ endfunction
 
 
 % ----------------------------------------------------------------------------------
-% assemble_modem_frame - assemble modem frame from UW, payload, and txt bits
+% assemble_modem_packet - assemble modem packet from UW, payload, and txt bits
 % ----------------------------------------------------------------------------------
 
-function modem_frame = assemble_modem_frame(states, payload_bits, txt_bits)
+function modem_frame = assemble_modem_packet(states, payload_bits, txt_bits)
   ofdm_load_const;
 
   # Due to the operation of the FEC encoder or interleaver, Tx data
@@ -923,10 +923,10 @@ endfunction
 
 
 % ----------------------------------------------------------------------------------
-% assemble_modem_frame_symbols - assemble modem frame from UW, payload, and txt bits
+% assemble_modem_packet_symbols - assemble modem packet from UW, payload, and txt bits
 % ----------------------------------------------------------------------------------
 
-function modem_frame = assemble_modem_frame_symbols(states, payload_syms, txt_syms)
+function modem_frame = assemble_modem_packet_symbols(states, payload_syms, txt_syms)
   ofdm_load_const;
 
   Nsymsperpacket = Nbitsperpacket/bps;
@@ -952,10 +952,10 @@ endfunction
 
 
 % ------------------------------------------------------------------------------------------------
-% disassemble_modem_frame - extract UW, txt bits, and payload symbols from a frame of modem symbols
+% disassemble_modem_packet - extract UW, txt bits, and payload symbols from a packet of symbols
 % -------------------------------------------------------------------------------------------------
 
-function [rx_uw payload_syms payload_amps txt_bits] = disassemble_modem_frame(states, modem_frame_syms, modem_frame_amps)
+function [rx_uw payload_syms payload_amps txt_bits] = disassemble_modem_packet(states, modem_frame_syms, modem_frame_amps)
   ofdm_load_const;
 
   Nsymsperpacket = Nbitsperpacket/bps;
@@ -1054,7 +1054,7 @@ function [tx_bits payload_data_bits codeword] = create_ldpc_test_frame(states, c
   
   % insert UW and txt bits
   
-  tx_bits = assemble_modem_frame(states, codeword_raw, zeros(1,Ntxtbits));
+  tx_bits = assemble_modem_packet(states, codeword_raw, zeros(1,Ntxtbits));
   assert(Nbitsperpacket == length(tx_bits));
 
 endfunction
@@ -1069,7 +1069,7 @@ function test_assemble_disassemble(states)
     tx_sym(s) = qpsk_mod(tx_bits(2*(s-1)+1:2*s));
   end
   
-  [rx_uw rx_syms payload_amps txt_bits] = disassemble_modem_frame(states, tx_syms, ones(1,Nsymsperpacket));
+  [rx_uw rx_syms payload_amps txt_bits] = disassemble_modem_packet(states, tx_syms, ones(1,Nsymsperpacket));
   assert(rx_uw == states.tx_uw);
   Ndatasymsperframe = (Nbitsperpacket-(Nuwbits+Ntxtbits))/bps;
   assert(tx_syms(1:Ndatasymsperframe) == rx_syms);
