@@ -45,6 +45,7 @@ function states = ofdm_init(config)
   if isfield(config,"ftwindow_width") ftwindow_width = config.ftwindow_width; else ftwindow_width = 11; end
   if isfield(config,"timing_mx_thresh") timing_mx_thresh = config.timing_mx_thresh; else timing_mx_thresh = 0.35; end
   if isfield(config,"tx_uw") tx_uw = config.tx_uw; else tx_uw = zeros(1,Nuwbits); end
+  if isfield(config,"bad_uw_errors") bad_uw_errors = config.bad_uw_errors; else bad_uw_errors = 3; end
   
   states.Fs = 8000;
   states.bps = bps;
@@ -101,6 +102,9 @@ function states = ofdm_init(config)
     tx_uw_syms = [tx_uw_syms qpsk_mod(states.tx_uw(b:b+1))];
   end
   states.tx_uw_syms = tx_uw_syms;
+  % if the UW has this many errors it is "bad", the binomal cdf can be used to set this:
+  %   Nuw=12; plot(0:Nuw, binocdf(0:Nuw,Nuw,0.05)); hold on; plot(binocdf(0:Nuw,Nuw,0.5)); hold off;
+  states.bad_uw_errors = bad_uw_errors;
   
   % use this to scale tx output to 16 bit short.  Adjusted by experiment
   % to have same RMS power as other FreeDV waveforms  
@@ -230,15 +234,15 @@ function config = ofdm_init_mode(mode="700D")
     Ns=5; Tcp = 0.004; Tframe = 0.1; Ts = Tframe/Ns; Nc = 33; bps=4;
   elseif strcmp(mode,"datac1")
     Ns=5; config.Np=18; Tcp = 0.006; Ts = 0.016; Nc = 18; bps=2;
-    config.Ntxtbits = 0; config.Nuwbits = 12;
+    config.Ntxtbits = 0; config.Nuwbits = 12; config.bad_uw_errors = 2;
     config.ftwindow_width = 32;
   elseif strcmp(mode,"datac2")
     Ns=5; config.Np=36; Tcp = 0.006; Ts = 0.016; Nc = 9; bps=2;
-    config.Ntxtbits = 0; config.Nuwbits = 12;
+    config.Ntxtbits = 0; config.Nuwbits = 12; config.bad_uw_errors = 1;
     config.ftwindow_width = 32;
   elseif strcmp(mode,"datac3")
     Ns=5; config.Np=11; Tcp = 0.006; Ts = 0.016; Nc = 9; bps=2;
-    config.Ntxtbits = 0; config.Nuwbits = 24;
+    config.Ntxtbits = 0; config.Nuwbits = 24; config.bad_uw_errors = 5;
     config.ftwindow_width = 32; config.timing_mx_thresh = 0.30;
     config.tx_uw = [1 1 0 0  1 0 1 0  1 1 1 1  0 0 0 0  1 1 1 1  0 0 0 0];
   elseif strcmp(mode,"1")
@@ -1155,7 +1159,7 @@ function states = sync_state_machine(states, rx_uw)
         states.uw_errors = sum(xor(tx_uw,rx_uw));
 
         if strcmp(states.sync_state,'trial')
-          if states.uw_errors > 2
+          if states.uw_errors >= states.bad_uw_errors
             states.sync_counter++;
             states.frame_count = 0;
           end
@@ -1212,7 +1216,7 @@ function states = sync_state_machine2(states, rx_uw)
   
   if strcmp(states.sync_state,'search') 
     if states.timing_valid
-      states.sync_start = 1;
+      states.sync_start = 1; states.sync_counter = 0;
       next_state = 'trial';
     end
   end
@@ -1220,38 +1224,23 @@ function states = sync_state_machine2(states, rx_uw)
   states.uw_errors = sum(xor(tx_uw,rx_uw));
  
   if strcmp(states.sync_state,'trial')
-
     if strcmp(states.sync_state,'trial')
-      if states.uw_errors <= 5
+      if states.uw_errors < states.bad_uw_errors;
         next_state = "synced";
         states.frame_count = Nuwframes;
         states.modem_frame = Nuwframes;
       else
-        next_state = "search";
+        states.sync_counter++;
+        if states.sync_counter > Np
+          next_state = "search";
+        end
       end
     end
   end
-   
-  if strcmp(states.sync_state,'synced')
 
-    % UW in the first frame
-    if states.modem_frame == (Nuwframes-1)
-      
-      if states.uw_errors >= 8
-        states.sync_counter++;
-      else
-        states.sync_counter = 0;
-      end
-
-      if states.sync_counter > 4
-        next_state = "search";
-        states.frame_count = 0;
-        states.modem_frame = 0;
-        states.sync_counter = 0;
-      end
-      
-    end
-    
+  % Note we don't every lose sync, we assume there are a known number of frames being sent,
+  % or the packets contain an "end of stream" information.
+  if strcmp(states.sync_state,'synced')    
     states.frame_count++;
     states.modem_frame++;
     if (states.modem_frame >= states.Np) states.modem_frame = 0; end
