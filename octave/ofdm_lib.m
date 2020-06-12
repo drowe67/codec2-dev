@@ -341,7 +341,7 @@ endfunction
 
 
 % -----------------------------------------------------------------
-% ofdm_mod - modulates a complete packet (one or mode modem frames)
+% ofdm_mod - modulates a complete packet (one or more modem frames)
 % ----------------------------------------------------------------
 
 function tx = ofdm_mod(states, tx_bits)
@@ -1281,13 +1281,10 @@ endfunction
 
 
 % ------------------------------------------------------------------------------
-% assemble_frame - Assemble a modem frame from input payload bits based on the
-%                  current FreeDV "mode".  Note we don't insert UW and txt bits
-%                  at this stage, that is handled as a second stage of modem frame
-%                  construction a little later.
+% fec_encode - Handle FEC encoding
 % ------------------------------------------------------------------------------
 
-function [frame_bits bits_per_frame] = assemble_frame(states, code_param, mode, payload_bits, ...
+function [frame_bits bits_per_frame] = fec_encode(states, code_param, mode, payload_bits, ...
                                                       Ncodecframespermodemframe, Nbitspercodecframe)
   ofdm_load_const;
 

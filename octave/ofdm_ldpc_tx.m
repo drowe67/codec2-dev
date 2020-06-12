@@ -33,30 +33,27 @@ function ofdm_ldpc_tx(filename, mode="700D", Nsec, SNR3kdB=100, channel='awgn', 
   elseif strcmp(mode, "datac1") || strcmp(mode, "datac2") || strcmp(mode, "datac3")
     payload_bits = round(ofdm_rand(code_param.data_bits_per_frame)/32767);
   end
-  [frame_bits bits_per_frame] = assemble_frame(states, code_param, mode, payload_bits, Ncodecframespermodemframe, Nbitspercodecframe);
+  [packet_bits bits_per_packet] = fec_encode(states, code_param, mode, payload_bits, Ncodecframespermodemframe, Nbitspercodecframe);
    
-  % modulate to create symbols and interleave
-  
+  % modulate to create symbols and interleave  
   tx_bits = tx_symbols = [];
   tx_bits = [tx_bits payload_bits];
-  for b=1:2:bits_per_frame
-    tx_symbols = [tx_symbols qpsk_mod(frame_bits(b:b+1))];
+  for b=1:2:bits_per_packet
+    tx_symbols = [tx_symbols qpsk_mod(packet_bits(b:b+1))];
   end
   assert(gp_deinterleave(gp_interleave(tx_symbols)) == tx_symbols);
   tx_symbols = gp_interleave(tx_symbols);
   
-  % generate txt symbols
- 
+  % generate txt (non FEC protected) symbols
   txt_bits = zeros(1,Ntxtbits);
   txt_symbols = [];
   for b=1:2:length(txt_bits)
     txt_symbols = [txt_symbols qpsk_mod(txt_bits(b:b+1))];
   end
 
-  % assemble interleaved modem packet that include UW and txt symbols
-  
-  modem_frame = assemble_modem_packet_symbols(states, tx_symbols, txt_symbols);
-  atx = ofdm_txframe(states, modem_frame); tx = [];
+  % assemble interleaved modem packet that include UW and txt symbols  
+  modem_packet = assemble_modem_packet_symbols(states, tx_symbols, txt_symbols);
+  atx = ofdm_txframes(states, modem_packet); tx = [];
   for f=1:Npackets
     tx = [tx atx];
   end
