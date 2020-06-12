@@ -43,7 +43,8 @@ function states = ofdm_init(config)
   if isfield(config,"Nuwbits") Nuwbits = config.Nuwbits ; else Nuwbits = 5*bps; end
   if isfield(config,"Nuwbits") Nuwbits = config.Nuwbits ; else Nuwbits = 5*bps; end
   if isfield(config,"ftwindow_width") ftwindow_width = config.ftwindow_width; else ftwindow_width = 11; end
- 
+  if isfield(config,"timing_mx_thresh") timing_mx_thresh = config.timing_mx_thresh; else timing_mx_thresh = 0.35; end
+  
   states.Fs = 8000;
   states.bps = bps;
   states.Rs = Rs;
@@ -128,9 +129,11 @@ function states = ofdm_init(config)
 
   % fine timing search +/- window_width/2 from current timing instant,
   % adjust this to be roughly the maximum delay spread
-
   states.ftwindow_width = ftwindow_width;
-  
+
+  % magic number we adjust by experiment (see ofdm_dev.m acquisition tests, blog post on 700D sync)
+  states.timing_mx_thresh = timing_mx_thresh;
+
   % Receive buffer: D P DDD P DDD P DDD P D
   %                         ^
   % also see ofdm_demod() ...
@@ -236,7 +239,7 @@ function config = ofdm_init_mode(mode="700D")
   elseif strcmp(mode,"datac3")
     Ns=5; config.Np=11; Tcp = 0.006; Ts = 0.016; Nc = 9; bps=2;
     config.Ntxtbits = 0; config.Nuwbits = 24;
-    config.ftwindow_width = 32;
+    config.ftwindow_width = 32; config.timing_mx_thresh = 0.30;
   elseif strcmp(mode,"1")
     Ns=5; config.Np=10; Tcp=0; Tframe = 0.1; Ts = Tframe/Ns; Nc = 1; bps=2;
   else
@@ -596,7 +599,7 @@ function [timing_valid states] = ofdm_sync_search(states, rxbuf_in)
   end
  
   if verbose
-    printf("    ct_est: %d mx: %3.2f coarse_foff: %4.1f\n", ct_est, timing_mx, foff_est);
+    printf(" ct_est: %4d mx: %3.2f coarse_foff: %5.1f timing_valid: %d", ct_est, timing_mx, foff_est, timing_valid);
   end
 
   if timing_valid
@@ -1166,9 +1169,6 @@ function states = sync_state_machine2(states, rx_uw)
   if strcmp(states.sync_state,'search') 
 
     if states.timing_valid
-      states.frame_count = 0;
-      states.sync_counter = 0;
-      states.modem_frame = 0;
       states.sync_start = 1;
       states.phase_est_bandwidth = "high";
       next_state = 'trial';
@@ -1187,7 +1187,7 @@ function states = sync_state_machine2(states, rx_uw)
           if states.uw_errors <= 2
             next_state = "synced";
           else
-            next_state = "search"
+            next_state = "search";
           end  
         end
 
@@ -1200,6 +1200,9 @@ function states = sync_state_machine2(states, rx_uw)
 
           if states.sync_counter == 2
             next_state = "search";
+            states.frame_count = 0;
+            states.sync_counter = 0;
+            states.modem_frame = 0;
           end
         end
       end % if modem_frame == 0 ....
@@ -1261,8 +1264,9 @@ function [code_param Nbitspercodecframe Ncodecframespermodemframe] = codec_to_fr
     load H_256_768_22.txt
     code_param = ldpc_init_user(H_256_768_22, modulation, mod_order, mapping);
     printf("data mode c2\n");
+    Nbitspercodecframe = Ncodecframespermodemframe = -1;
   end
-  if strcmp(mode, "datac1") || strcmp(mode, "datac2")
+  if strcmp(mode, "datac1") || strcmp(mode, "datac2") || strcmp(mode, "datac3")
     printf("ldpc_data_bits_per_frame = %d\n", code_param.ldpc_data_bits_per_frame);
     printf("ldpc_coded_bits_per_frame  = %d\n", code_param.ldpc_coded_bits_per_frame);
     printf("ldpc_parity_bits_per_frame  = %d\n", code_param.ldpc_parity_bits_per_frame);
@@ -1287,7 +1291,7 @@ function [frame_bits bits_per_frame] = assemble_frame(states, code_param, mode, 
                                                       Ncodecframespermodemframe, Nbitspercodecframe)
   ofdm_load_const;
 
-  if strcmp(mode, "700D") || strcmp(mode, "datac1") || strcmp(mode, "datac2") 
+  if strcmp(mode, "700D") || strcmp(mode, "datac1") || strcmp(mode, "datac2") || strcmp(mode, "datac3") 
     frame_bits = LdpcEncode(payload_bits, code_param.H_rows, code_param.P_matrix);
   elseif strcmp(mode, "2020")
     Nunused = code_param.ldpc_data_bits_per_frame - code_param.data_bits_per_frame;

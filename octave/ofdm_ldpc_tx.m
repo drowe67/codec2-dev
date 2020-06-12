@@ -30,7 +30,7 @@ function ofdm_ldpc_tx(filename, mode="700D", Nsec, SNR3kdB=100, channel='awgn', 
     payload_bits = round(ofdm_rand(code_param.data_bits_per_frame)/32767);
   elseif strcmp(mode, "2020")
     payload_bits = round(ofdm_rand(Ncodecframespermodemframe*Nbitspercodecframe)/32767);
-  elseif strcmp(mode, "datac1") || strcmp(mode, "datac2")
+  elseif strcmp(mode, "datac1") || strcmp(mode, "datac2") || strcmp(mode, "datac3")
     payload_bits = round(ofdm_rand(code_param.data_bits_per_frame)/32767);
   end
   [frame_bits bits_per_frame] = assemble_frame(states, code_param, mode, payload_bits, Ncodecframespermodemframe, Nbitspercodecframe);
@@ -66,7 +66,7 @@ function ofdm_ldpc_tx(filename, mode="700D", Nsec, SNR3kdB=100, channel='awgn', 
 
   printf("Packets: %3d SNR(3k): %3.1f dB foff: %3.1f Hz ", Npackets, SNR3kdB, freq_offset_Hz);
 
-% set up HF model ---------------------------------------------------------------
+  % set up HF model ---------------------------------------------------------------
 
   if strcmp(channel, 'awgn') == 0
     randn('seed',1);

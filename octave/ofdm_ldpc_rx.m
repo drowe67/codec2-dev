@@ -96,6 +96,10 @@ function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", error_pattern_filena
     end
     prx += states.nin;
 
+    if states.verbose
+      printf("f: %3d nin: %4d st: %-6s euw: %2d %d ", f, states.nin, states.sync_state,states.uw_errors, states.sync_counter);
+    end
+    
     if strcmp(states.sync_state,'search') 
       [timing_valid states] = ofdm_sync_search(states, rxbuf_in);
     end
@@ -108,7 +112,7 @@ function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", error_pattern_filena
       rx_syms(end-Nsymsperframe+1:end) = arx_np;
       rx_amps(end-Nsymsperframe+1:end) = arx_amp;
 
-      % We need the full packet of symbols before disassmbling and checking for bit errors
+      % We need the full packet of symbols before disassembling and checking for bit errors
       if (states.modem_frame == (states.Np-1))
         packet_count++;
 
@@ -159,29 +163,33 @@ function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", error_pattern_filena
       frame_count++;
     end
     
-    if strcmp(mode,"datac1") || strcmp(mode,"datac2")
+    if states.verbose
+      if  strcmp(states.sync_state,'synced') || strcmp(states.sync_state,'trial')
+        pcc = max(paritychecks);
+        iter = 0;
+        for i=1:length(paritychecks)
+          if paritychecks(i) iter=i; end
+        end
+        % complete logging line
+        printf("mf: %2d pbw: %s eraw: %3d ecod: %3d iter: %3d pcc: %3d foff: %4.1f",
+               states.modem_frame, states.phase_est_bandwidth(1),
+               Nerrs_raw, Nerrs_coded, iter, pcc, states.foff_est_hz);
+        % detect a sucessful sync (for tests calling this function)
+        if (time_to_sync < 0) && (strcmp(states.sync_state,'synced') || strcmp(states.sync_state,'trial'))
+          if (pcc > 80) && (iter != 100)
+            time_to_sync = f*Nsamperframe/Fs;
+          end
+        end
+      end
+      printf("\n");
+    end
+
+    if strcmp(mode,"datac1") || strcmp(mode,"datac2") || strcmp(mode,"datac3")
       states = sync_state_machine2(states, rx_uw);
     else
       states = sync_state_machine(states, rx_uw);
     end
     
-    if states.verbose
-      pcc = max(paritychecks);
-      iter = 0;
-      for i=1:length(paritychecks)
-        if paritychecks(i) iter=i; end
-      end
-      printf("f: %3d mf: %2d nin: %4d st: %-6s euw: %2d %1d pbw: %s eraw: %3d ecdd: %3d iter: %3d pcc: %3d foff: %4.1f\n",
-             f, states.modem_frame, states.nin, states.last_sync_state, states.uw_errors, states.sync_counter, 
-             states.phase_est_bandwidth(1), Nerrs_raw, Nerrs_coded, iter, pcc, states.foff_est_hz);
-      % detect a sucessful sync
-      if (time_to_sync < 0) && (strcmp(states.sync_state,'synced') || strcmp(states.sync_state,'trial'))
-        if (pcc > 80) && (iter != 100)
-          time_to_sync = f*Nsamperframe/Fs;
-        end
-      end
-    end
-
     % act on any events returned by modem sync state machine
     
     if states.sync_start
