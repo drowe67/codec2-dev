@@ -1,6 +1,6 @@
 % fsk_llr.m
 %
-% 4FSK simulation to develop LLR estimation
+% 4FSK simulation to develop LLR estimation algorithms for 4FSK/LDPC modems
 
 #{
   TODO
@@ -72,7 +72,7 @@ function [rx_filt rx_bits] = run_single(tx_bits, M=4, EbNodB=100)
 
   Nerrors = sum(xor(tx_bits, rx_bits));
   ber = Nerrors/Nbits;
-  printf("EbNodB: %4.1f  Uncoded Nerrors: %d BER: %1.3f\n", EbNodB, Nerrors, ber);
+  printf("EbNodB: %4.1f  Uncoded Nbits: %5d Nerrors: %4d BER: %1.3f\n", EbNodB, Nbits, Nerrors, ber);
 endfunction
 
 
@@ -105,10 +105,10 @@ function llr = sd_to_llr(sd)
 endfunction
 
 
-% single point LDPC encoded frame simulation
-% Note: ~/cml/matCreateConstellation.m has some support for FSK
+% single point LDPC encoded frame simulation, usin 2FSK as a tractable starting point
+% Note: ~/cml/matCreateConstellation.m has some support for FSK - can it do 4FSK?
 
-function run_single_ldpc(Nbits=256,EbNodB=10)
+function run_single_ldpc(Nbits=10000,EbNodB=4)
   M=2;
   bps = 1; modulation = 'FSK'; mod_order=2; mapping = 'gray'; decoder_type = 0; max_iterations = 100;
   load H_256_768_22.txt
@@ -117,26 +117,32 @@ function run_single_ldpc(Nbits=256,EbNodB=10)
   Nbits = Nframes*code_param.data_bits_per_frame;
 
   % Encoder
-  data_bits = round(rand(1,Nbits));
+  data_bits = round(rand(1,code_param.data_bits_per_frame));
   tx_bits = [];
   for f=1:Nframes;
     codeword_bits = LdpcEncode(data_bits, code_param.H_rows, code_param.P_matrix);
     tx_bits = [tx_bits codeword_bits];
   end  
+
+  % modem/channel simulation
   rx_filt = run_single(tx_bits,M,EbNodB);
 
-  Nerrors = 0;
   % Decoder
-  sd = rx_filt(:,1) - rx_filt(:,2);
-  llr = sd_to_llr(sd)';
+  Nerrors = 0;
+  for f=1:Nframes
+    st = (f-1)*code_param.coded_bits_per_frame + 1;
+    en = st + code_param.coded_bits_per_frame - 1;
+    sd = rx_filt(st:en,1) - rx_filt(st:en,2);
+    llr = sd_to_llr(sd)';
   
-  [x_hat, PCcnt] = MpDecode(llr, code_param.H_rows, code_param.H_cols, ...
+    [x_hat, PCcnt] = MpDecode(llr, code_param.H_rows, code_param.H_cols, ...
                             max_iterations, decoder_type, 1, 1);         
-  Niters = sum(PCcnt!=0);
-  detected_data = x_hat(Niters,:);
-  Nerrors += sum(xor(data_bits, detected_data(1:length(data_bits))));
+    Niters = sum(PCcnt!=0);
+    detected_data = x_hat(Niters,:);
+    Nerrors += sum(xor(data_bits, detected_data(1:code_param.data_bits_per_frame)));
+  end  
   ber = Nerrors/Nbits;
-  printf("EbNodB: %4.1f  Coded   Nerrors: %d BER: %1.3f\n", EbNodB, Nerrors, ber);
+  printf("EbNodB: %4.1f  Coded   Nbits: %5d Nerrors: %4d BER: %1.3f\n", EbNodB, Nbits, Nerrors, ber);
 endfunction
 
 % Choose what you would like to run here --------------------------------------------------
