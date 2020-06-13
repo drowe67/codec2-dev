@@ -138,7 +138,11 @@ function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", error_pattern_filena
 
         rx_bits = []; mean_amp = states.mean_amp;      
         if strcmp(mode, "700D") || strcmp(mode, "datac1") || strcmp(mode, "datac2") || strcmp(mode, "datac3")
-          EsNo = states.sig_var/states.noise_var;
+          if states.noise_var
+            EsNo = states.sig_var/states.noise_var;
+          else
+            EsNo = 3;
+          end
           [rx_codeword paritychecks] = ldpc_dec(code_param, mx_iter, demod, dec, ...
                                                 payload_syms_de/mean_amp, min(EsNo,30), payload_amps_de/mean_amp);
           arx_bits = rx_codeword(1:code_param.data_bits_per_frame);

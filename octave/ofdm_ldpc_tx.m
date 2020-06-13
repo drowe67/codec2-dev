@@ -57,8 +57,6 @@ function ofdm_ldpc_tx(filename, mode="700D", Nsec, SNR3kdB=100, channel='awgn', 
   for f=1:Npackets
     tx = [tx atx];
   end
-  % a few empty frames of samples os Rx can finish it's processing
-  tx = [tx zeros(1,2*Nsamperframe)]; 
   Nsam = length(tx);
 
   printf("Packets: %3d SNR(3k): %3.1f dB foff: %3.1f Hz ", Npackets, SNR3kdB, freq_offset_Hz);
@@ -118,5 +116,7 @@ function ofdm_ldpc_tx(filename, mode="700D", Nsec, SNR3kdB=100, channel='awgn', 
   SNR4kdB_measured = 10*log10(S/(n*n')); assert (abs(SNR4kdB - SNR4kdB_measured) < 0.25);
   printf("meas SNR3k: %3.2f dB\n", 10*log10(S/(n*n')) + 10*log10(4000) - 10*log10(3000));
 
+  % add a few seconds of no signal either side and write to disk
+  rx = [sigma*randn(1,Fs) rx sigma*randn(1,Fs)];
   frx=fopen(filename,"wb"); fwrite(frx, states.amp_scale*rx, "short"); fclose(frx);
 endfunction
