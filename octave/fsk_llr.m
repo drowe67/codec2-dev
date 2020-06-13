@@ -14,27 +14,23 @@
 
 1;
 
-function run_single(EbNodB)
-  rand('seed',1);
-  randn('seed',1);
-  format short
-  more off
-
+function [tx_bits rx_bits rx_filt] = run_single(Nbits=100, EbNodB=100)
   M = 4;          % M-FSK
   bps = log2(M);  % bits per symbol
   Ts = 16;        % length of each symbol in samples
-  Nbits = 10;
 
   tx_bits = round(rand(1,Nbits));
   Nsymbols = Nbits/log2(M);
 
-  symbol_lut=zeros(M,bps);
+  mapper = bps:-1:1;
+  % look up table demapper from symbols to bits (hard decision) 
+  demapper=zeros(M,bps);
   for m=1:M
     for b=1:bps
-      if  bitand(m-1,b) symbol_lut(m,bps-b+1) = 1; end
+      if  bitand(m-1,b) demapper(m,bps-b+1) = 1; end
     end
   end
-
+  
   % continuous phase mFSK modulator
 
   w(1:M) = 2*pi*(1:M)/Ts;
@@ -43,8 +39,8 @@ function run_single(EbNodB)
 
   for s=1:Nsymbols
     bits_for_this_symbol = tx_bits(bps*(s-1)+1:bps*s);
-    symbol_index = bits_for_this_symbol * [2 1]' + 1;
-    assert(symbol_lut(symbol_index,:) == bits_for_this_symbol);
+    symbol_index = bits_for_this_symbol * mapper' + 1;
+    assert(demapper(symbol_index,:) == bits_for_this_symbol);
     for k=1:Ts
       tx_phase += w(symbol_index);
       tx((s-1)*Ts+k) = exp(j*tx_phase);
@@ -53,22 +49,23 @@ function run_single(EbNodB)
 
   % AWGN channel noise
 
-  EbNo = 10^(EbNodB/10);
-  variance = Ts/(EbNo*bps);
+  EsNodB = EbNodB + 10*log10(bps);
+  EsNo = 10^(EsNodB/10);
+  variance = Ts/EsNo;
   noise = sqrt(variance/2)*(randn(1,Nsymbols*Ts) + j*randn(1,Nsymbols*Ts));
   rx = tx + noise;
 
   % integrate and dump demodulator
 
   rx_bits = zeros(1,Nbits);
-  filt = zeros(1,M);
+  rx_filt = zeros(Nsymbols,M);
   for s=1:Nsymbols
     arx_symb = rx((s-1)*Ts + (1:Ts));
     for m=1:M
-      filt(m) = sum(exp(-j*w(m)*(1:Ts)) .* arx_symb);
+      rx_filt(s,m) = sum(exp(-j*w(m)*(1:Ts)) .* arx_symb);
     end
-    [tmp symbol_index] = max(filt);
-    rx_bits(bps*(s-1)+1:bps*s) = symbol_lut(symbol_index,:);
+    [tmp symbol_index] = max(rx_filt(s,:));
+    rx_bits(bps*(s-1)+1:bps*s) = demapper(symbol_index,:);
   end
 
   Nerrors = sum(xor(tx_bits, rx_bits));
@@ -76,4 +73,8 @@ function run_single(EbNodB)
   printf("EbNodB: %4.1f  Nerrors: %d BER: %1.3f\n", EbNodB, Nerrors, ber);
 endfunction
 
-run_single(100)
+rand('seed',1);
+randn('seed',1);
+format short
+more off
+run_single(10000,6);
