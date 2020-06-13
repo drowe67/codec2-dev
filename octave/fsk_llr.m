@@ -4,8 +4,8 @@
 
 #{
   TODO
-  [ ] Hard decision 4FSK modme simulation
-  [ ] single point AWGn simulation
+  [X] Hard decision 4FSK modem simulation
+  [X] single point AWGn simulation
   [ ] SD outputs
   [ ] histogram
   [ ] modify for frames of LDPC codec size
@@ -14,12 +14,11 @@
 
 1;
 
-function [tx_bits rx_bits rx_filt] = run_single(Nbits=100, EbNodB=100)
-  M = 4;          % M-FSK
+function [rx_filt rx_bits] = run_single(tx_bits, M=4, EbNodB=100)
   bps = log2(M);  % bits per symbol
   Ts = 16;        % length of each symbol in samples
 
-  tx_bits = round(rand(1,Nbits));
+  Nbits = length(tx_bits);
   Nsymbols = Nbits/log2(M);
 
   mapper = bps:-1:1;
@@ -62,7 +61,7 @@ function [tx_bits rx_bits rx_filt] = run_single(Nbits=100, EbNodB=100)
   for s=1:Nsymbols
     arx_symb = rx((s-1)*Ts + (1:Ts));
     for m=1:M
-      rx_filt(s,m) = sum(exp(-j*w(m)*(1:Ts)) .* arx_symb);
+      rx_filt(s,m) = abs(sum(exp(-j*w(m)*(1:Ts)) .* arx_symb));
     end
     [tmp symbol_index] = max(rx_filt(s,:));
     rx_bits(bps*(s-1)+1:bps*s) = demapper(symbol_index,:);
@@ -73,8 +72,23 @@ function [tx_bits rx_bits rx_filt] = run_single(Nbits=100, EbNodB=100)
   printf("EbNodB: %4.1f  Nerrors: %d BER: %1.3f\n", EbNodB, Nerrors, ber);
 endfunction
 
+function plot_hist(Nbits,EbNodB)
+  Nbits = 10000; M=4;
+  tx_bits = ones(1,Nbits);
+  rx_filt = run_single(tx_bits,M,EbNodB=6);
+  figure(1); clf;
+  for m=1:4
+    subplot(2,2,m);
+    hist(rx_filt(:,m),25);
+  end
+endfunction
+
 rand('seed',1);
 randn('seed',1);
 format short
 more off
-run_single(10000,6);
+
+% Eb/No = 6dB test pount should be about BER = 0.0157
+Nbits = 10000; tx_bits = round(rand(1,Nbits)); run_single(tx_bits,4,6);
+
+plot_hist;
