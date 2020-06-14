@@ -565,7 +565,7 @@ function [timing_valid states] = ofdm_sync_search(states, rxbuf_in)
   % Attempt coarse timing estimate (i.e. detect start of frame) at a range of frequency offsets
 
   st = M+Ncp + Nsamperframe + 1; en = st + 2*Nsamperframe +  M+Ncp - 1;
-  timing_mx = 0; fcoarse = 0; timing_valid = 0; 
+  timing_mx = 0; fcoarse = 0; timing_valid = 0; ct_est = 1;
   for afcoarse=-40:40:40
     % vector of local oscillator samples to shift input vector
     % these could be computed on the fly to save memory, or pre-computed in flash at tables as they are static
@@ -1321,7 +1321,6 @@ endfunction
 function [frame_bits bits_per_frame] = fec_encode(states, code_param, mode, payload_bits, ...
                                                       Ncodecframespermodemframe, Nbitspercodecframe)
   ofdm_load_const;
-
   if strcmp(mode, "700D") || strcmp(mode, "datac1") || strcmp(mode, "datac2") || strcmp(mode, "datac3") 
     frame_bits = LdpcEncode(payload_bits, code_param.H_rows, code_param.P_matrix);
   elseif strcmp(mode, "2020")

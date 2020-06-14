@@ -46,7 +46,7 @@ function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", error_pattern_filena
   % Generate tx frame for BER calcs
   
   payload_bits = round(ofdm_rand(code_param.data_bits_per_frame)/32767);
-  tx_bits = assemble_frame(states, code_param, mode, payload_bits, Ncodecframespermodemframe, Nbitspercodecframe);
+  tx_bits = fec_encode(states, code_param, mode, payload_bits, Ncodecframespermodemframe, Nbitspercodecframe);
 
   % Some handy constants
   
