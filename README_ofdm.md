@@ -20,6 +20,10 @@ Steve, David, Don, Richard
 
 1. [Steve Ports an OFDM modem from Octave to C](https://www.rowetel.com/?p=5824)
 
+1. [Modems for HF Digital Voice Part 1](http://www.rowetel.com/wordpress/?p=5420)
+
+1. [Modems for HF Digital Voice Part 2](http://www.rowetel.com/wordpress/?p=5448)
+
 # Examples
 
 Built as part of codec2-dev, see [README](README.md) for build instructions.
