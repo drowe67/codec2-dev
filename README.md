@@ -55,14 +55,6 @@ $ play -t raw -r 8000 -e signed-integer -b 16 ./hts1a_c2_700.raw
 ```
 $ ./src/c2enc 1300 ../raw/hts1a.raw - | ./src/c2dec 1300 - - | play -t raw -r 8000 -b 16 -e signed-integer -
 ```
-   Same at 450 bit/s:
-```
-$ ./src/c2enc 450 ../raw/ve9qrp.raw - | ./src/c2dec 450 - - | play -t raw -r 8000 -e signed-integer -b 16 -
-```
-   Please note that 450PWB (pseudo-wideband) can be chosen for decoding, providing a bandwidth extension to 8kHz/16ksps from a 4kHz/8ksps encoded 450bit/s file:
-```
-$ ./src/c2enc 450 ../raw/ve9qrp.raw - | ./src/c2dec 450PWB - - | play -t raw -r 16000 -e signed-integer -b 16 -
-```
 ## Programs
 
 + c2demo encodes a file of speech samples, then decodes them and saves the result.
@@ -74,8 +66,6 @@ $ ./src/c2enc 450 ../raw/ve9qrp.raw - | ./src/c2dec 450PWB - - | play -t raw -r 
 + freedv_tx/freedv_rx are command line implementations of the FreeDV protocol, which combines Codec 2, modems, and Forward Error Correction (FEC).
   
 + cohpsk_* are coherent PSK (COHPSK) HF modem command line programs.
-
-+ drs232, drs232_ldpc, and horus_demod are used for receiving images and telemetry from high altitude balloons (Project Horus Wenet, Horus Binary protocol)
 
 + fdmdv_* are differential PSK HF modem command line programs (README_fdmdv).
 
