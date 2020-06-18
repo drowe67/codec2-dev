@@ -506,9 +506,11 @@ endif()
              WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/unittest
              )
 
+if(UNIX) # Uses pthreads
      add_test(NAME test_fifo
              COMMAND $<TARGET_FILE:tfifo>
              )
+endif()
 
 if (NOT APPLE)
      add_test(NAME test_memory_leak_FreeDV_1600_tx
