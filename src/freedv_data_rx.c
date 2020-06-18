@@ -162,10 +162,11 @@ int main(int argc, char *argv[]) {
     int                        mode;
     int                        verbose;
     int                        i;
+    int                        use_complex = 0;
 
     
     if (argc < 3) {
-	printf("usage: %s 2400A|2400B|800XA InputModemSpeechFile\n"
+	printf("usage: %s 2400A|2400B|800XA InputModemSpeechFile [--usecomplex]\n"
                " \n", argv[0]);
 	printf("e.g    %s 2400A data_fdmdv.raw\n", argv[0]);
 	exit(1);
@@ -195,11 +196,14 @@ int main(int argc, char *argv[]) {
         for (i = 3; i < argc; i++) {
             if (strcmp(argv[i], "-v") == 0) {
                 verbose = 1;
-            }
-            if (strcmp(argv[i], "-vv") == 0) {
+            } else if (strcmp(argv[i], "-vv") == 0) {
                 verbose = 2;
-            }
-        }
+            } else if (strcmp(argv[i], "--usecomplex") == 0) use_complex = 1;
+	    else {
+                fprintf(stderr, "unkown option: %s\n", argv[i]);
+                exit(1);
+	    }
+	}
     }
 
     freedv = freedv_open(mode);
@@ -221,10 +225,19 @@ int main(int argc, char *argv[]) {
     while(fread(demod_in, sizeof(short), nin, fin) == nin) {
         frame++;
         
-        /* usual case: use the freedv_api to do everything: speech decoding, demodulating */
-        // most common interface - real shorts in, real shorts out
-        freedv_rx(freedv, speech_out, demod_in);
-
+        if (use_complex) {
+            COMP demod_in_complex[nin];
+            for(int i=0; i<nin; i++) {
+                demod_in_complex[i].real = (float)demod_in[i];
+                demod_in_complex[i].imag = 0.0;
+            }
+            freedv_comprx(freedv, speech_out, demod_in_complex);
+        } else {
+           /* usual case: use the freedv_api to do everything: speech decoding, demodulating */
+           // most common interface - real shorts in, real shorts out
+           freedv_rx(freedv, speech_out, demod_in);
+        }
+	
         nin = freedv_nin(freedv);
 
 	/* if this is in a pipeline, we probably don't want the usual
@@ -235,6 +248,7 @@ int main(int argc, char *argv[]) {
 
     fclose(fin);
     fprintf(stderr, "frames decoded: %d\n", frame);
+    fprintf(stderr, "packets decoded: %d\n", my_cb_state.calls);
 
     freedv_close(freedv);
     return 0;

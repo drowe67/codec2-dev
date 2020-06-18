@@ -196,10 +196,11 @@ int main(int argc, char *argv[]) {
     char                     *callsign = "NOCALL";
     int                       ssid = 0;
     bool                      multicast = false;
+    int                       use_complex = 0;
 
     if (argc < 3) {
         printf("usage: %s 2400A|2400B|800XA OutputModemRawFile\n"
-	       " [--frames nr] [--callsign callsign] [--ssid ssid] [--mac-multicast 0|1]\n", argv[0]);
+	       " [--packets nr] [--callsign callsign] [--ssid ssid] [--mac-multicast 0|1] [--usecomplex]\n", argv[0]);
         printf("e.g    %s 2400A data_fdmdv.raw\n", argv[0]);
         exit(1);
     }
@@ -225,17 +226,18 @@ int main(int argc, char *argv[]) {
     if (argc > 3) {
         for (i = 3; i < argc; i++) {
             if (strcmp(argv[i], "--packets") == 0) {
-                n_packets = atoi(argv[i+1]);
-            }
-            if (strcmp(argv[i], "--callsign") == 0) {
-                callsign = argv[i+1];
-            }
-            if (strcmp(argv[i], "--ssid") == 0) {
-                ssid = atoi(argv[i+1]);
-            }
-            if (strcmp(argv[i], "--mac-multicast") == 0) {
-                multicast = atoi(argv[i+1]);
-            }
+                n_packets = atoi(argv[i+1]); i++;
+            } else if (strcmp(argv[i], "--callsign") == 0) {
+                callsign = argv[i+1]; i++;
+            } else if (strcmp(argv[i], "--ssid") == 0) {
+                ssid = atoi(argv[i+1]); i++;
+            } else if (strcmp(argv[i], "--mac-multicast") == 0) {
+                multicast = atoi(argv[i+1]); i++;
+            } else if (strcmp(argv[i], "--usecomplex") == 0) use_complex = 1;
+	    else {
+                fprintf(stderr, "unkown option: %s\n", argv[i]);
+                exit(1);
+	    }
 	}
     }
 
@@ -263,7 +265,15 @@ int main(int argc, char *argv[]) {
        packet might be transmitted in multiple freedv frames.
      */
     while (my_cb_state.calls <= n_packets || freedv_data_ntxframes(freedv)) {
-        freedv_datatx(freedv, mod_out);
+        if (use_complex) {
+            COMP mod_out_comp[n_nom_modem_samples];
+            freedv_datacomptx(freedv, mod_out_comp);
+	    for (i = 0; i < n_nom_modem_samples; i++) {
+               mod_out[i] = mod_out_comp[i].real;
+	    }
+	} else {
+            freedv_datatx(freedv, mod_out);
+        }
 
         fwrite(mod_out, sizeof(short), n_nom_modem_samples, fout);
 

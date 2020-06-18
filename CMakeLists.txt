@@ -506,6 +506,33 @@ endif()
              WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/unittest
              )
 
+     add_test(NAME test_freedv_api_data_2400A
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            ./freedv_data_tx 2400A - --packets 100 | ./freedv_data_rx 2400A -")
+             set_tests_properties(test_freedv_api_data_2400A PROPERTIES PASS_REGULAR_EXPRESSION "packets decoded: 100")
+     add_test(NAME test_freedv_api_data_2400A_complex
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            ./freedv_data_tx 2400A - --packets 100 --usecomplex| ./freedv_data_rx 2400A - --usecomplex")
+             set_tests_properties(test_freedv_api_data_2400A_complex PROPERTIES PASS_REGULAR_EXPRESSION "packets decoded: 100")
+
+     add_test(NAME test_freedv_api_data_2400B
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            ./freedv_data_tx 2400B - --packets 100 | ./freedv_data_rx 2400B -")
+             set_tests_properties(test_freedv_api_data_2400B PROPERTIES PASS_REGULAR_EXPRESSION "packets decoded: 100")
+     add_test(NAME test_freedv_api_data_2400B_complex
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            ./freedv_data_tx 2400B - --packets 100 --usecomplex| ./freedv_data_rx 2400B - --usecomplex")
+             set_tests_properties(test_freedv_api_data_2400B_complex PROPERTIES PASS_REGULAR_EXPRESSION "packets decoded: 100")
+
+     add_test(NAME test_freedv_api_data_800XA
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            ./freedv_data_tx 800XA - --packets 100 | ./freedv_data_rx 800XA -")
+             set_tests_properties(test_freedv_api_data_800XA PROPERTIES PASS_REGULAR_EXPRESSION "packets decoded: 100")
+     add_test(NAME test_freedv_api_data_800XA_complex
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            ./freedv_data_tx 800XA - --packets 100 --usecomplex| ./freedv_data_rx 800XA - --usecomplex")
+             set_tests_properties(test_freedv_api_data_800XA_complex PROPERTIES PASS_REGULAR_EXPRESSION "packets decoded: 100")
+
 if(UNIX) # Uses pthreads
      add_test(NAME test_fifo
              COMMAND $<TARGET_FILE:tfifo>
