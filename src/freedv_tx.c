@@ -37,7 +37,7 @@ int main(int argc, char *argv[]) {
     FILE                     *fin, *fout;
     struct freedv            *freedv;
     int                       mode;
-    int                       use_testframes, interleave_frames, use_clip, use_txbpf, use_dpsk;
+    int                       use_testframes, interleave_frames, use_clip, use_txbpf, use_dpsk, use_complex;
     int                       i;
 
     if (argc < 4) {
@@ -46,7 +46,7 @@ int main(int argc, char *argv[]) {
         sprintf(f2020,"|2020");
         #endif     
         printf("usage: %s 1600|700C|700D|2400A|2400B|800XA%s InputRawSpeechFile OutputModemRawFile\n"
-               " [--testframes] [--interleave depth] [--clip 0|1] [--txbpf 0|1] [--dpsk]\n", argv[0], f2020);
+               " [--testframes] [--interleave depth] [--clip 0|1] [--txbpf 0|1] [--dpsk] [--usecomplex]\n", argv[0], f2020);
         printf("e.g    %s 1600 hts1a.raw hts1a_fdmdv.raw\n", argv[0]);
         exit(1);
     }
@@ -78,7 +78,7 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
-    use_testframes = 0; interleave_frames = 1; use_clip = 0; use_txbpf = 1; use_dpsk = 0;
+    use_testframes = 0; interleave_frames = 1; use_clip = 0; use_txbpf = 1; use_dpsk = 0; use_complex = 0;
     
     if (argc > 4) {
         for (i = 4; i < argc; i++) {
@@ -87,6 +87,7 @@ int main(int argc, char *argv[]) {
             else if (strcmp(argv[i], "--clip") == 0) { use_clip = atoi(argv[i+1]); i++; }
             else if (strcmp(argv[i], "--txbpf") == 0) { use_txbpf = atoi(argv[i+1]); i++; }
             else if (strcmp(argv[i], "--dpsk") == 0) use_dpsk = 1;
+            else if (strcmp(argv[i], "--usecomplex") == 0) use_complex = 1;
             else {
                 fprintf(stderr, "unkown option: %s\n", argv[i]);
                 exit(1);
@@ -123,7 +124,15 @@ int main(int argc, char *argv[]) {
     /* OK main loop  --------------------------------------- */
 
     while(fread(speech_in, sizeof(short), n_speech_samples, fin) == n_speech_samples) {
-        freedv_tx(freedv, mod_out, speech_in);
+        if (use_complex) {
+            COMP mod_out_comp[n_nom_modem_samples];
+            freedv_comptx(freedv, mod_out_comp, speech_in);
+	    for (i = 0; i < n_nom_modem_samples; i++) {
+               mod_out[i] = mod_out_comp[i].real;
+	    }
+	} else {
+            freedv_tx(freedv, mod_out, speech_in);
+        }
         fwrite(mod_out, sizeof(short), n_nom_modem_samples, fout);
     
         /* if using pipes we don't want the usual buffering to occur */
