@@ -217,70 +217,6 @@ function test3_curves(code,fg=1)
 end
 
 
-% ---------------------------------------------------------------------------------
-% 4/ QAM16 experiments 
-% ---------------------------------------------------------------------------------
-
-function test4_qam16(fg=2)
-  printf("\nTest 4: QAM16 ----------------------------------------\n");
-
-  mod_order = 16; bps = log2(mod_order);
-  modulation = 'QAM'; mapping = ""; demod_type = 0; decoder_type = 0;
-  max_iterations = 100; EsNo_dec = 10;
-  qam16 = [
-    1 + j,  1 + j*3,  3 + j,  3 + j*3;
-    1 - j,  1 - j*3,  3 - j,  3 - j*3;
-   -1 + j, -1 + j*3, -3 + j, -3 + j*3;
-   -1 - j, -1 - j*3, -3 - j, -3 - j*3];
-  qam16 = qam16/std(qam16(:));
-  constellation_source = 'custom';
-   
-  load HRA_504_396.txt
-  if strcmp(constellation_source,'cml')
-    code_param = ldpc_init_user(HRA_504_396, modulation, mod_order, mapping);
-  else
-    code_param = ldpc_init_user(HRA_504_396, modulation, mod_order, mapping, reshape(qam16,1,16));
-  end
-  rate = code_param.ldpc_data_bits_per_frame/code_param.ldpc_coded_bits_per_frame;
-   
-  EbNodBvec = 3:10; Ntrials = 1000;
-  for i=1:length(EbNodBvec)
-    EbNodB =EbNodBvec(i);
-    EsNodB = EbNodB + 10*log10(rate) + 10*log10(bps); EsNodBvec(i) = EsNodB;
-    EsNo = 10^(EsNodB/10);
-    variance = 1/EsNo;
-    Terrs = 0; Tbits = 0; Perrs = 0; rx_symbols_log = [];
-    for nn = 1:Ntrials        
-      tx_bits = round(rand(1, code_param.ldpc_data_bits_per_frame));
-      [tx_codeword, tx_symbols] = ldpc_enc(tx_bits, code_param);
-      noise = sqrt(variance*0.5)*(randn(1,length(tx_symbols)) + j*randn(1,length(tx_symbols)));
-      rx_symbols = tx_symbols + noise;
-      rx_symbols_log = [rx_symbols_log rx_symbols];
-    
-      rx_codeword = ldpc_dec(code_param, max_iterations, demod_type, decoder_type, rx_symbols, EsNo_dec, ones(1,length(rx_symbols)));
-      errors_positions = xor(tx_bits, rx_codeword(1:code_param.ldpc_data_bits_per_frame));
-      Nerr = sum(errors_positions);
-      Tbits += code_param.ldpc_data_bits_per_frame; Terrs += Nerr;
-      if Nerr Perrs++; end
-    end
-    figure(fg); clf; plot(rx_symbols_log,"."); axis([-1.5 1.5 -1.5 1.5]); drawnow;
-    printf("EbNodB: %4.1f Tbits: %6d Terrs: %6d Perrs: %6d CBER: %5.2f CPER: %5.2f\n",
-    EbNodB, Tbits, Terrs, Perrs, Terrs/Tbits, Perrs/Ntrials);
-    cber(i) = Terrs/Tbits; cper(i) = Perrs/Ntrials;
-  end
-  print("qam64_scatter.png","-dpng");
-  figure(fg+1); clf; title('QAM16 with LDPC (504,396)'); 
-  semilogy(EbNodBvec,cber+1E-10,'b+-;QAM16 coded BER;','markersize', 10, 'linewidth', 2); hold on;
-  semilogy(EbNodBvec,cper+1E-10,'g+-;QAM16 coded PER;','markersize', 10, 'linewidth', 2); hold off;
-  grid; axis([min(EbNodBvec) max(EbNodBvec) 1E-5 1]); xlabel('Eb/No (dB)');
-  figure(fg+2); clf; title('QAM16 with LDPC (504,396)'); 
-  semilogy(EsNodBvec,cber+1E-10,'b+-;QAM16 coded BER;','markersize', 10, 'linewidth', 2); hold on;
-  semilogy(EsNodBvec,cper+1E-10,'g+-;QAM16 coded PER;','markersize', 10, 'linewidth', 2); hold off;
-  grid; axis([min(EsNodBvec) max(EsNodBvec) 1E-5 1]); xlabel('Es/No (dB)');
-  print("qam64_504_396.png","-dpng");
-
-endfunction
-
 % --------------------------------------------------------------------------------
 % START SIMULATIONS
 % --------------------------------------------------------------------------------
@@ -309,4 +245,3 @@ test2_multiple("H2064_516_sparse.mat")
 %test3_curves("wimax",1)
 %test3_curves("H2064_516_sparse.mat",2)
 test3_curves("H_256_768_22.txt",2)
-%test4_qam16(3)

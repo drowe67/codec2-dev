@@ -7,8 +7,8 @@
   those nasty real-world details like fine freq, timing.  
 #}
 
-
 1;
+qam16;
 
 %-------------------------------------------------------------
 % ofdm_init
@@ -207,7 +207,7 @@ function states = ofdm_init(config)
   states.clock_offset_est = 0;
 
   % automated tests
-  test_qam16(states.qam16);
+  test_qam16_mod_demod(states.qam16);
   test_assemble_disassemble(states);
 endfunction
 
@@ -305,34 +305,6 @@ function two_bits = qpsk_demod(symbol)
     two_bits = [bit1 bit0];
 endfunction
 
-function symbol = qam16_mod(constellation, four_bits)
-    bits_decimal = sum(four_bits .* [8 4 2 1]);
-    symbol = constellation(bits_decimal+1);
-    % same convention as QPSK mapping above
-    symbol *= exp(-j*pi/4);
-endfunction
-
-function four_bits = qam16_demod(constellation, symbol)
-    symbol *= exp(j*pi/4);
-    dist = abs(symbol - constellation(1:16));
-    [tmp decimal] = min(dist);
-    four_bits = zeros(1,4);
-    for i=1:4
-      four_bits(1,5-i) = bitand(bitshift(decimal-1,1-i),1);
-    end
-endfunction
-
-function test_qam16(constellation)
-    for decimal=0:15
-      tx_bits = zeros(1,4);
-      for i=1:4
-        tx_bits(1,5-i) = bitand(bitshift(decimal-1,1-i),1);
-      end
-      symbol = qam16_mod(constellation, tx_bits);
-      rx_bits = qam16_demod(constellation,symbol);
-      assert(tx_bits == rx_bits);
-    end
-endfunction
 
 function out = freq_shift(in, foff, Fs)
   foff_rect = exp(j*2*pi*foff/Fs);
@@ -365,7 +337,7 @@ function tx = ofdm_mod(states, tx_bits)
   end  
   if bps == 4
     for s=1:Nbitsperpacket/bps
-      tx_sym_lin(s) = qam16_mod(states.qam16,tx_bits(4*(s-1)+1:4*s));
+      tx_sym_lin(s) = qam16_mod(states.qam16,tx_bits(4*(s-1)+1:4*s))*exp(-j*pi/4);
     end
   end
   
@@ -822,7 +794,7 @@ function [states rx_bits aphase_est_pilot_log rx_np rx_amp] = ofdm_demod(states,
         abit = qpsk_demod(rx_corr);
       end
       if bps == 4
-        abit = qam16_demod(states.qam16, rx_corr);
+        abit = qam16_demod(states.qam16, rx_corr*exp(j*pi/4));
       end
       rx_bits = [rx_bits abit];
     end % c=2:Nc+1
