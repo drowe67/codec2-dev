@@ -227,11 +227,12 @@ function config = ofdm_init_mode(mode="700D")
     Ts = 0.0205; Nc = 31;
   elseif strcmp(mode,"2200")
     Tframe = 0.175; Ts = Tframe/Ns; Nc = 37;
-  elseif strcmp(mode,"QAM16")
+  elseif strcmp(mode,"qam16")
     # Ns=5, Rs=50, so Rs/Ns=10 -> +/- 5Hz doppler tracking bandwidth
     # For (504,296) LDPC code we want 504+5*4+4=528 uncoded bits/frame
     # Rs*Nc=1650, so fits easily in 2000 Hz
-    Ns=5; Tcp = 0.004; Tframe = 0.1; Ts = Tframe/Ns; Nc = 33; bps=4;
+    Ns=5; Tcp = 0.004; Tframe = 0.1; Ts = Tframe/Ns; Nc = 33;
+    config.bps=4;
   elseif strcmp(mode,"datac1")
     Ns=5; config.Np=18; Tcp = 0.006; Ts = 0.016; Nc = 18; bps=2;
     config.Ntxtbits = 0; config.Nuwbits = 12; config.bad_uw_errors = 2;
