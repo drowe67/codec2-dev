@@ -228,26 +228,24 @@ function config = ofdm_init_mode(mode="700D")
   elseif strcmp(mode,"2200")
     Tframe = 0.175; Ts = Tframe/Ns; Nc = 37;
   elseif strcmp(mode,"qam16")
-    # Ns=5, Rs=50, so Rs/Ns=10 -> +/- 5Hz doppler tracking bandwidth
-    # For (504,296) LDPC code we want 504+5*4+4=528 uncoded bits/frame
-    # Rs*Nc=1650, so fits easily in 2000 Hz
-    Ns=5; Tcp = 0.004; Tframe = 0.1; Ts = Tframe/Ns; Nc = 33;
-    config.bps=4;
+    Ns=5; config.Np=5; Tcp = 0.004; Ts = 0.016; Nc = 33;
+    config.bps=4; config.Ntxtbits = 0; config.Nuwbits = 15*4; config.bad_uw_errors = 5;
+    config.ftwindow_width = 32;
   elseif strcmp(mode,"datac1")
-    Ns=5; config.Np=18; Tcp = 0.006; Ts = 0.016; Nc = 18; bps=2;
+    Ns=5; config.Np=18; Tcp = 0.006; Ts = 0.016; Nc = 18;
     config.Ntxtbits = 0; config.Nuwbits = 12; config.bad_uw_errors = 2;
     config.ftwindow_width = 32;
   elseif strcmp(mode,"datac2")
-    Ns=5; config.Np=36; Tcp = 0.006; Ts = 0.016; Nc = 9; bps=2;
+    Ns=5; config.Np=36; Tcp = 0.006; Ts = 0.016; Nc = 9;
     config.Ntxtbits = 0; config.Nuwbits = 12; config.bad_uw_errors = 1;
     config.ftwindow_width = 32;
   elseif strcmp(mode,"datac3")
-    Ns=5; config.Np=11; Tcp = 0.006; Ts = 0.016; Nc = 9; bps=2;
+    Ns=5; config.Np=11; Tcp = 0.006; Ts = 0.016; Nc = 9;
     config.Ntxtbits = 0; config.Nuwbits = 24; config.bad_uw_errors = 5;
     config.ftwindow_width = 32; config.timing_mx_thresh = 0.30;
     config.tx_uw = [1 1 0 0  1 0 1 0  1 1 1 1  0 0 0 0  1 1 1 1  0 0 0 0];
   elseif strcmp(mode,"1")
-    Ns=5; config.Np=10; Tcp=0; Tframe = 0.1; Ts = Tframe/Ns; Nc = 1; bps=2;
+    Ns=5; config.Np=10; Tcp=0; Tframe = 0.1; Ts = Tframe/Ns; Nc = 1;
   else
     % try to parse mode string for user defined mode
     vec = sscanf(mode, "Ts=%f Nc=%d Ncp=%f");
@@ -931,8 +929,8 @@ endfunction
 
 
 % ------------------------------------------------------------------------------------------------
-% disassemble_modem_frame - extract just the UW from the first few frames of a packet, to check UW
-%                           during acquisition
+% extract_uw - extract just the UW from the first few frames of a packet, to check UW
+%              during acquisition
 % -------------------------------------------------------------------------------------------------
 
 function rx_uw = extract_uw(states, rx_syms)
@@ -956,7 +954,11 @@ function rx_uw = extract_uw(states, rx_syms)
   txt_bits = zeros(1,Ntxtbits);
   
   for s=1:Nuwsyms
-    rx_uw(2*s-1:2*s) = qpsk_demod(rx_uw_syms(s));
+    if bps == 2
+      rx_uw(bps*(s-1)+1:bps*s) = qpsk_demod(rx_uw_syms(s));
+    elseif bps == 4
+      rx_uw(bps*(s-1)+1:bps*s) = qam16_demod(states.qam16,rx_uw_syms(s)*exp(j*pi/4));
+    end
   end
 endfunction
 
@@ -998,7 +1000,11 @@ function [rx_uw payload_syms payload_amps txt_bits] = disassemble_modem_packet(s
   txt_bits = zeros(1,Ntxtbits);
   
   for s=1:Nuwsyms
-    rx_uw(2*s-1:2*s) = qpsk_demod(rx_uw_syms(s));
+    if bps == 2
+      rx_uw(bps*(s-1)+1:bps*s) = qpsk_demod(rx_uw_syms(s));
+    elseif bps == 4
+      rx_uw(bps*(s-1)+1:bps*s) = qam16_demod(states.qam16,rx_uw_syms(s)*exp(j*pi/4));
+    end
   end
   for s=1:Ntxtsyms
     txt_bits(2*s-1:2*s) = qpsk_demod(txt_syms(s));
@@ -1082,15 +1088,24 @@ function test_assemble_disassemble(states)
 
   tx_syms = zeros(1,Nsymsperpacket);
   for s=1:Nsymsperpacket
-    tx_syms(s) = qpsk_mod(tx_bits(2*(s-1)+1:2*s));
+    if bps == 2
+      tx_syms(s) = qpsk_mod(tx_bits(bps*(s-1)+1:bps*s));
+    elseif bps == 4
+      tx_syms(s) = qam16_mod(states.qam16,tx_bits(bps*(s-1)+1:bps*s));
+    end
   end
   codeword_syms = zeros(1,Ndatasymsperpacket);
   for s=1:Ndatasymsperpacket
-    codeword_syms(s) = qpsk_mod(codeword_bits(2*(s-1)+1:2*s));
+    if bps == 2
+      codeword_syms(s) = qpsk_mod(codeword_bits(bps*(s-1)+1:bps*s));
+    elseif bps == 4
+      codeword_syms(s) = qam16_mod(states.qam16,codeword_bits(bps*(s-1)+1:bps*s));
+    end
   end
 
   [rx_uw rx_codeword_syms payload_amps txt_bits] = disassemble_modem_packet(states, tx_syms, ones(1,Nsymsperpacket));
-  
+  tx_uw
+  rx_uw
   assert(rx_uw == states.tx_uw);
   Ndatasymsperframe = (Nbitsperpacket-(Nuwbits+Ntxtbits))/bps;
   assert(codeword_syms == rx_codeword_syms);
