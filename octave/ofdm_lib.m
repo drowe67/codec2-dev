@@ -1275,18 +1275,16 @@ function [code_param Nbitspercodecframe Ncodecframespermodemframe] = codec_to_fr
     printf("Total bits per frame: %d\n", totalbitsperframe);
     assert(totalbitsperframe == Nbitsperframe);
   end
-  if strcmp(mode, "datac1") || strcmp(mode, "datac2")
+  if strcmp(mode, "datac1") || strcmp(mode, "datac2") || strcmp(mode, "qam16")
     load H2064_516_sparse.mat
     code_param = ldpc_init_user(HRA, modulation, mod_order, mapping);
-    printf("data mode c1\n");
   end
   if strcmp(mode, "datac3")
     load H_256_768_22.txt
     code_param = ldpc_init_user(H_256_768_22, modulation, mod_order, mapping);
-    printf("data mode c2\n");
     Nbitspercodecframe = Ncodecframespermodemframe = -1;
   end
-  if strcmp(mode, "datac1") || strcmp(mode, "datac2") || strcmp(mode, "datac3")
+  if strcmp(mode, "datac1") || strcmp(mode, "datac2") || strcmp(mode, "datac3") || strcmp(mode, "qam16")
     printf("ldpc_data_bits_per_frame = %d\n", code_param.ldpc_data_bits_per_frame);
     printf("ldpc_coded_bits_per_frame  = %d\n", code_param.ldpc_coded_bits_per_frame);
     printf("ldpc_parity_bits_per_frame  = %d\n", code_param.ldpc_parity_bits_per_frame);
@@ -1307,7 +1305,7 @@ endfunction
 function [frame_bits bits_per_frame] = fec_encode(states, code_param, mode, payload_bits, ...
                                                       Ncodecframespermodemframe, Nbitspercodecframe)
   ofdm_load_const;
-  if strcmp(mode, "700D") || strcmp(mode, "datac1") || strcmp(mode, "datac2") || strcmp(mode, "datac3") 
+  if strcmp(mode, "700D") || strcmp(mode, "datac1") || strcmp(mode, "datac2") || strcmp(mode, "datac3") || strcmp(mode, "qam16") 
     frame_bits = LdpcEncode(payload_bits, code_param.H_rows, code_param.P_matrix);
   elseif strcmp(mode, "2020")
     Nunused = code_param.ldpc_data_bits_per_frame - code_param.data_bits_per_frame;

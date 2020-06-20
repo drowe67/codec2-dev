@@ -25,10 +25,6 @@ function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", error_pattern_filena
   ofdm_load_const;
   states.verbose = 1;
   states.dpsk = dpsk;
-  %states.phase_est_bandwidth = "high";
-  
-  mod_order = 4; bps = 2; modulation = 'QPSK'; mapping = 'gray';
-  demod = 0; dec = 0; mx_iter = 100;
 
   % some constants used for assembling modem frames
   
@@ -49,7 +45,7 @@ function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", error_pattern_filena
   tx_bits = fec_encode(states, code_param, mode, payload_bits, Ncodecframespermodemframe, Nbitspercodecframe);
 
   % Some handy constants
-  
+
   Nsymsperframe = Nbitsperframe/bps;
   Nsymsperpacket = Nbitsperpacket/bps;
   Ncodedbitsperpacket = code_param.coded_bits_per_frame;
@@ -66,7 +62,7 @@ function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", error_pattern_filena
   Nerrs_coded = Nerrs_raw = 0;
   paritychecks = [0];
   time_to_sync = -1;
-  rx_uw = rx_uw = zeros(1,states.Nuwbits);
+  rx_uw = zeros(1,states.Nuwbits);
 
   rx_syms = zeros(1,Nsymsperpacket); rx_amps = zeros(1,Nsymsperpacket);
   packet_count = frame_count = 0;
@@ -137,13 +133,13 @@ function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", error_pattern_filena
         % LDPC decode
 
         rx_bits = []; mean_amp = states.mean_amp;      
-        if strcmp(mode, "700D") || strcmp(mode, "datac1") || strcmp(mode, "datac2") || strcmp(mode, "datac3")
+        if strcmp(mode, "700D") || strcmp(mode, "datac1") || strcmp(mode, "datac2") || strcmp(mode, "datac3") || strcmp(mode, "qam16")
           if states.noise_var
             EsNo = states.sig_var/states.noise_var;
           else
             EsNo = 3;
           end
-          [rx_codeword paritychecks] = ldpc_dec(code_param, mx_iter, demod, dec, ...
+          [rx_codeword paritychecks] = ldpc_dec(code_param, mx_iter=100, demod=0, dec=0, ...
                                                 payload_syms_de/mean_amp, min(EsNo,30), payload_amps_de/mean_amp);
           arx_bits = rx_codeword(1:code_param.data_bits_per_frame);
           errors = xor(payload_bits, arx_bits);
@@ -169,7 +165,7 @@ function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", error_pattern_filena
       frame_count++;
     end
     
-    if strcmp(mode,"datac1") || strcmp(mode,"datac2") || strcmp(mode,"datac3")
+    if strcmp(mode,"datac1") || strcmp(mode,"datac2") || strcmp(mode,"datac3") || strcmp(mode,"qam16")
       states = sync_state_machine2(states, rx_uw);
     else
       states = sync_state_machine(states, rx_uw);
