@@ -1104,8 +1104,6 @@ function test_assemble_disassemble(states)
   end
 
   [rx_uw rx_codeword_syms payload_amps txt_bits] = disassemble_modem_packet(states, tx_syms, ones(1,Nsymsperpacket));
-  tx_uw
-  rx_uw
   assert(rx_uw == states.tx_uw);
   Ndatasymsperframe = (Nbitsperpacket-(Nuwbits+Ntxtbits))/bps;
   assert(codeword_syms == rx_codeword_syms);
