@@ -63,9 +63,6 @@ function ofdm_ldpc_tx(filename, mode="700D", Nsec, SNR3kdB=100, channel='awgn', 
   Nsam = length(tx);
 
   printf("Packets: %3d SNR(3k): %3.1f dB foff: %3.1f Hz ", Npackets, SNR3kdB, freq_offset_Hz);
-
-  % Channel simulation  ---------------------------------------------------------------
-
   rx = channel_simulate(Fs, SNR3kdB, freq_offset_Hz, channel, tx);
   frx=fopen(filename,"wb"); fwrite(frx, states.amp_scale*rx, "short"); fclose(frx);
 endfunction

@@ -56,5 +56,5 @@ function rx = channel_simulate(Fs, SNR3kdB, freq_offset_Hz, channel, tx)
   printf("meas SNR3k: %3.2f dB\n", 10*log10(S/(n*n')) + 10*log10(4000) - 10*log10(3000));
 
   % add a few seconds of no signal either side
-  rx = [sigma*randn(1,Fs) rx sigma*randn(1,Fs)];
+  rx = [sigma*randn(1,Fs) rx sigma*randn(1,Fs/2)];
 endfunction
