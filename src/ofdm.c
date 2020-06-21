@@ -144,11 +144,13 @@ void qam16_demod(complex float symbol, int *bits) {
     complex float rotate = symbol * cmplx(ROT45);
     float dist[16];
     float mdist = 10000.0f;
-    int i, row;
+    int i;
 
     for (i = 0; i < 16; i++) {
         dist[i] = cnormf(rotate - (QAM16_constellation[i] / 3.0f));
     }
+    
+    int row = 0;
     
     for (i = 0; i < 16; i++) {
         if (dist[i] < mdist) {
@@ -249,6 +251,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     ofdm->config.tx_centre = ofdm->tx_centre;
     ofdm->config.rx_centre = ofdm->rx_centre;
     ofdm->config.fs = ofdm->fs;
+    ofdm->config.rs = ofdm->rs;
     ofdm->config.ts = ofdm->ts;
     ofdm->config.tcp = ofdm->tcp;
     ofdm->config.nc = ofdm->nc;
