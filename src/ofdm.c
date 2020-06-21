@@ -194,8 +194,7 @@ void qam16_demod(complex float symbol, int *bits) {
  * Return NULL on fail
  *
  * If you want the defaults, call this with config structure
- * and the config structure pointer NULL. This will fill the
- * structure with default values.
+ * pointer NULL. This will fill the structure with default values.
  */
 struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     struct OFDM *ofdm;
@@ -274,10 +273,9 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     ofdm->samplespersymbol = (ofdm->m + ofdm->ncp);
     ofdm->samplesperframe = ofdm->ns * ofdm->samplespersymbol;
     ofdm->max_samplesperframe = ofdm->samplesperframe + (ofdm->samplespersymbol / 4);
-
     ofdm->nrxbuf = (3 * ofdm->samplesperframe) + (3 * ofdm->samplespersymbol);
     
-    ofdm->pilot_samples = (complex float *) MALLOC(sizeof (complex float) * (ofdm->m + ofdm->ncp));
+    ofdm->pilot_samples = (complex float *) MALLOC(sizeof (complex float) * ofdm->samplespersymbol);
     assert(ofdm->pilot_samples != NULL);
 
     ofdm->rxbuf = (complex float *) MALLOC(sizeof (complex float) * ofdm->nrxbuf);
@@ -459,11 +457,11 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
 
     float acc = 0.0f;
 
-    for (i = 0; i < (ofdm->m + ofdm->ncp); i++) {
+    for (i = 0; i < ofdm->samplespersymbol; i++) {
         acc += cnormf(ofdm->pilot_samples[i]);
     }
 
-    ofdm->timing_norm = (ofdm->m + ofdm->ncp) * acc;
+    ofdm->timing_norm = ofdm->samplespersymbol * acc;
     ofdm->clock_offset_counter = 0;
     ofdm->sig_var = ofdm->noise_var = 1.0f;
 
@@ -612,7 +610,7 @@ static int est_timing(struct OFDM *ofdm, complex float *rx, int length,
     PROFILE_VAR(wvecpilot);
     PROFILE_SAMPLE(wvecpilot);
 
-    complex float wvec_pilot[ofdm->m + ofdm->ncp];
+    complex float wvec_pilot[ofdm->samplespersymbol];
 
     switch(fcoarse) {
     case -40:
@@ -997,8 +995,8 @@ static int ofdm_sync_search_core(struct OFDM *ofdm) {
 
     /* Attempt coarse timing estimate (i.e. detect start of frame) at a range of frequency offsets */
 
-    int st = ofdm->m + ofdm->ncp + ofdm->samplesperframe;
-    int en = st + 2 * ofdm->samplesperframe + ofdm->samplespersymbol;
+    int st = ofdm->samplespersymbol + ofdm->samplesperframe;
+    int en = st + (2 * ofdm->samplesperframe) + ofdm->samplespersymbol;
 
     int fcoarse = 0;
     float atiming_mx, timing_mx = 0.0f;
@@ -1126,8 +1124,8 @@ static void ofdm_demod_core(struct OFDM *ofdm, int *rx_bits) {
     if (ofdm->timing_en == true) {
         /* update timing at start of every frame */
 
-        st = ((ofdm->m + ofdm->ncp) + ofdm->samplesperframe) - floorf(ofdm->ftwindowwidth / 2) + ofdm->timing_est;
-        en = st + ofdm->samplesperframe - 1 + (ofdm->m + ofdm->ncp) + ofdm->ftwindowwidth;
+        st = (ofdm->samplespersymbol + ofdm->samplesperframe) - floorf(ofdm->ftwindowwidth / 2) + ofdm->timing_est;
+        en = st + ofdm->samplesperframe - 1 + ofdm->samplespersymbol + ofdm->ftwindowwidth;
 
         complex float work[(en - st)];
 
@@ -1213,7 +1211,7 @@ static void ofdm_demod_core(struct OFDM *ofdm, int *rx_bits) {
     }
 
     /*
-     * Each symbol is of course (ofdm->m + ofdm->ncp) samples long and
+     * Each symbol is of course ofdm->samplespersymbol samples long and
      * becomes Nc+2 carriers after DFT.
      *
      * We put this carrier pilot symbol at the top of our matrix:
@@ -1477,8 +1475,8 @@ static void ofdm_demod_core(struct OFDM *ofdm, int *rx_bits) {
     if (ofdm->timing_en == true) {
         ofdm->clock_offset_counter += (prev_timing_est - ofdm->timing_est);
 
-        int thresh = (ofdm->m + ofdm->ncp) / 8;
-        int tshift = (ofdm->m + ofdm->ncp) / 4;
+        int thresh = ofdm->samplespersymbol / 8;
+        int tshift = ofdm->samplespersymbol / 4;
 
         if (ofdm->timing_est > thresh) {
             ofdm->nin = ofdm->samplesperframe + tshift;
@@ -1922,6 +1920,6 @@ void ofdm_print_info(struct OFDM *ofdm) {
     fprintf(stderr, "ofdm->foff_est_en = %s\n", ofdm->foff_est_en ? "true" : "false");
     fprintf(stderr, "ofdm->phase_est_en = %s\n", ofdm->phase_est_en ? "true" : "false");
     fprintf(stderr, "ofdm->tx_bpf_en = %s\n", ofdm->tx_bpf_en ? "true" : "false");
-    fprintf(stderr, "ofdm->dpsk = %s\n", ofdm->dpsk_en ? "true" : "false");
+    fprintf(stderr, "ofdm->dpsk_en = %s\n", ofdm->dpsk_en ? "true" : "false");
     fprintf(stderr, "ofdm->phase_est_bandwidth_mode = %s\n", phase_est_bandwidth_mode[ofdm->phase_est_bandwidth_mode]);
 }
