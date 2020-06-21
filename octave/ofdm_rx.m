@@ -19,8 +19,8 @@ function ofdm_rx(filename, mode="700D", error_pattern_filename)
   
   % init modem
 
-  [bps Rs Tcp Ns Nc] = ofdm_init_mode(mode);
-  states = ofdm_init(bps, Rs, Tcp, Ns, Nc);
+  config = ofdm_init_mode(mode);
+  states = ofdm_init(config);
   print_config(states);
   ofdm_load_const;
   states.verbose = 0;
@@ -36,13 +36,13 @@ function ofdm_rx(filename, mode="700D", error_pattern_filename)
   % OK re-generate tx frame for BER calcs
 
   tx_bits = create_ldpc_test_frame(states, coded_frame=0);
-
+  
   % init logs and BER stats
 
-  rx_bits = []; rx_np_log = []; timing_est_log = []; delta_t_log = []; foff_est_hz_log = [];
+  rx_np_log = []; timing_est_log = []; delta_t_log = []; foff_est_hz_log = [];
   phase_est_pilot_log = []; sig_var_log = []; noise_var_log = []; channel_est_log = [];
-  Terrs = Tbits = Terrs_coded = Tbits_coded = Tpackets = Tpacketerrs = frame_count = 0;
-  Nbitspervocframe = 28;
+  Terrs = Tbits = Terrs_coded = Tbits_coded = Tpackets = Tpacketerrs = 0;
+  packet_count = frame_count = 0;
   Nerrs_coded_log = Nerrs_log = [];
   error_positions = [];
 
@@ -55,6 +55,8 @@ function ofdm_rx(filename, mode="700D", error_pattern_filename)
   
   states.verbose = 1;
 
+  Nsymsperpacket = Nbitsperpacket/bps; Nsymsperframe = Nbitsperframe/bps;
+  rx_syms = zeros(1,Nsymsperpacket); rx_amps = zeros(1,Nsymsperpacket);
   Nerrs = 0; rx_uw = zeros(1,states.Nuwbits);
   
   % main loop ----------------------------------------------------------------
@@ -73,18 +75,44 @@ function ofdm_rx(filename, mode="700D", error_pattern_filename)
     end
     prx += states.nin;
  
+    if states.verbose
+      printf("f: %3d nin: %4d st: %-6s ", f, states.nin, states.sync_state);
+    end
+    
     if strcmp(states.sync_state,'search') 
       [timing_valid states] = ofdm_sync_search(states, rxbuf_in);
     end
     
     if strcmp(states.sync_state,'synced') || strcmp(states.sync_state,'trial')
-      [rx_bits states aphase_est_pilot_log arx_np arx_amp] = ofdm_demod(states, rxbuf_in);
-      [rx_uw payload_syms payload_amps txt_bits] = disassemble_modem_frame(states, arx_np, arx_amp);
+
+      % accumulate a buffer of data symbols for this packet
+      rx_syms(1:end-Nsymsperframe) = rx_syms(Nsymsperframe+1:end);
+      rx_amps(1:end-Nsymsperframe) = rx_amps(Nsymsperframe+1:end);
+      [states rx_bits aphase_est_pilot_log arx_np arx_amp] = ofdm_demod(states, rxbuf_in);
+      rx_syms(end-Nsymsperframe+1:end) = arx_np;
+      rx_amps(end-Nsymsperframe+1:end) = arx_amp;
+
+      rx_uw = extract_uw(states, rx_syms(end-Nuwframes*Nsymsperframe+1:end));
       
-      errors = xor(tx_bits, rx_bits);
-      Nerrs = sum(errors);
-      aber = Nerrs/Nbitsperframe;
-    
+      % We need the full packet of symbols before disassmbling and checking for bit errors
+      if states.modem_frame == (states.Np-1)
+        rx_bits = zeros(1,Nbitsperpacket);
+        for s=1:Nsymsperpacket
+          if bps == 2
+             rx_bits(bps*(s-1)+1:bps*s) = qpsk_demod(rx_syms(s));
+          elseif bps == 4
+             rx_bits(bps*(s-1)+1:bps*s) = qam16_demod(states.qam16,rx_syms(s)*exp(j*pi/4));
+          end
+        end
+
+        errors = xor(tx_bits, rx_bits);
+        Nerrs = sum(errors);
+        Nerrs_log = [Nerrs_log Nerrs];
+        Terrs += Nerrs;
+        Tbits += Nbitsperpacket;
+        packet_count++;
+      end
+      
       % we are in sync so log states
 
       rx_np_log = [rx_np_log arx_np];
@@ -96,21 +124,22 @@ function ofdm_rx(filename, mode="700D", error_pattern_filename)
       noise_var_log = [noise_var_log states.noise_var];
       channel_est_log = [channel_est_log; states.achannel_est_rect];
       
-      % measure uncoded bit errors on modem frame
-
-      Nerrs_log = [Nerrs_log Nerrs];
-      Terrs += Nerrs;
-      Tbits += Nbitsperframe;
-
       frame_count++;
     end
     
-    states = sync_state_machine(states, rx_uw);
+    if strcmp(mode,"datac1") || strcmp(mode,"datac2") || strcmp(mode,"datac3") || strcmp(mode,"qam16")
+      states = sync_state_machine2(states, rx_uw);
+    else
+      states = sync_state_machine(states, rx_uw);
+    end
 
     if states.verbose
-      printf("f: %2d nin: %4d state: %-10s uw_errors: %2d %1d pbw: %-4s Nerrs: %3d foff: %5.1f clkOff: %5.0f\n",
-             f, states.nin, states.last_sync_state, states.uw_errors, states.sync_counter, states.phase_est_bandwidth, Nerrs,
-             states.foff_est_hz, states.clock_offset_est*1E6);
+      if strcmp(states.last_sync_state,'synced') || strcmp(states.last_sync_state,'trial')
+        printf("euw: %2d %d mf: %2d pbw: %s eraw: %3d foff: %4.1f",
+                states.uw_errors, states.sync_counter, states.modem_frame, states.phase_est_bandwidth(1),
+                Nerrs, states.foff_est_hz);
+      end
+      printf("\n");
     end
 
     % act on any events returned by state machine
@@ -129,7 +158,7 @@ function ofdm_rx(filename, mode="700D", error_pattern_filename)
   % offset is adjusting
 
   Ndiscard = 20;
-  if frame_count > Ndiscard
+  if packet_count > Ndiscard
     Terrs -= sum(Nerrs_log(1:Ndiscard)); Tbits -= Ndiscard*Nbitsperframe;
     printf("BER2.: %5.4f Tbits: %5d Terrs: %5d\n", Terrs/Tbits, Tbits, Terrs);
   end
@@ -137,12 +166,13 @@ function ofdm_rx(filename, mode="700D", error_pattern_filename)
   %EsNo_est = mean(sig_var_log(floor(end/2):end))/mean(noise_var_log(floor(end/2):end));
   EsNo_est = mean(sig_var_log)/mean(noise_var_log);
   EsNo_estdB = 10*log10(EsNo_est);
-  SNR_estdB = EsNo_estdB + 10*log10(Nc*Rs/3000);
-  printf("Es/No est dB: % -4.1f SNR3k: %3.2f %f %f\n", EsNo_estdB, SNR_estdB, mean(sig_var_log), mean(noise_var_log));
+  SNR_estdB = EsNo_estdB + 10*log10(Nc*Rs*bps/3000);
+  printf("Packets: %3d Es/No est dB: % -4.1f SNR3k: %3.2f %f %f\n",
+         packet_count, EsNo_estdB, SNR_estdB, mean(sig_var_log), mean(noise_var_log));
   
   figure(1); clf; 
-  plot(rx_np_log,'+');
-  plot(rx_np_log(floor(end/2):end),'+');
+  %plot(rx_np_log,'+');
+  plot(exp(j*pi/4)*rx_np_log(floor(end/2):end),'+');
   mx = 2*max(abs(rx_np_log));
   axis([-mx mx -mx mx]);
   title('Scatter');

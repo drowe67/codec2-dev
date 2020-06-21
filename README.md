@@ -6,8 +6,9 @@ Also included:
 
   + The FreeDV API for digital voice over radio. FreeDV is an open source digital voice protocol that integrates modems, codecs, and FEC
   + APIs for raw and Ethernet packet data over radio [README_data](README_data.md)
-  + High performance Coherent OFDM modem for HF channels [README_ofdm](README_ofdm.txt)
+  + High performance Coherent OFDM modem for HF channels [README_ofdm](README_ofdm.md)
   + High performance Non-coherent FSK modem [README_fsk](README_fsk.md)
+  + A stm32 embedded version of FreeDV 1600/700D for the [SM1000](stm32/README.md)
   + Coherent PSK [README_cohpsk](README_cohpsk.md) for HF channels
   + FDMDV DPSK modem [README_fdmdv](README_fdmdv.txt) for HF channels
 
