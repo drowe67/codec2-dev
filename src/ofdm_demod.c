@@ -78,6 +78,7 @@ void opt_help() {
     fprintf(stderr, "  --out         filename   Name of OutputOneCharPerBitFile\n");
     fprintf(stderr, "  --log         filename   Octave log file for testing\n");
     fprintf(stderr, "  --nc          [17..62]   Number of Carriers (17 default, 62 max)\n");
+    fprintf(stderr, "  --np                     Number of packets\n");
     fprintf(stderr, "  --ns           Nframes   Number of Symbol Frames (8 default)\n");
     fprintf(stderr, "  --tcp            Nsecs   Cyclic Prefix Duration (.002 default)\n");
     fprintf(stderr, "  --ts             Nsecs   Symbol Duration (.018 default)\n");
@@ -128,6 +129,7 @@ int main(int argc, char *argv[]) {
     int interleave_frames = 1;
     int nc = 17;
     int ns = 8;
+    int np = 1;
     int verbose = 0;
     int phase_est_bandwidth_mode = AUTO_PHASE_EST;
     int ldpc_en = 0;
@@ -169,6 +171,7 @@ int main(int argc, char *argv[]) {
         {"tcp", 'k', OPTPARSE_REQUIRED},
         {"ts", 'l', OPTPARSE_REQUIRED},
         {"ns", 'm', OPTPARSE_REQUIRED},
+        {"np", 'n', OPTPARSE_REQUIRED},
         {"databits", 'p', OPTPARSE_REQUIRED},        
         {"start_secs", 'x', OPTPARSE_REQUIRED},        
         {"len_secs", 'y', OPTPARSE_REQUIRED},        
@@ -237,6 +240,9 @@ int main(int argc, char *argv[]) {
                 break;
             case 'm':
                 ns = atoi(options.optarg);
+                break;
+            case 'n':
+                np = atoi(options.optarg);
                 break;
             case 'o':
                 phase_est_bandwidth_mode = atoi(options.optarg);
@@ -308,6 +314,7 @@ int main(int argc, char *argv[]) {
     }
 
     ofdm_config->nc = nc;
+    ofdm_config->np = np;
     ofdm_config->ns = ns; /* Number of Symbol frames */
     ofdm_config->bps = 2; /* Bits per Symbol */
     ofdm_config->ts = ts;
@@ -315,7 +322,10 @@ int main(int argc, char *argv[]) {
     ofdm_config->tx_centre = tx_centre;
     ofdm_config->rx_centre = rx_centre;
     ofdm_config->fs = FS; /* Sample Frequency */
-    ofdm_config->txtbits = 4; /* number of auxiliary data bits */
+    ofdm_config->rs = (1.0f / ts);
+    ofdm_config->ntxtbits = 4; /* number of auxiliary data bits */
+    ofdm_config->nuwbits = 5 * bps;
+    ofdm_config->bad_uw_errors = 3;
 
     ofdm_config->ftwindowwidth = 11;
     ofdm_config->timing_mx_thresh = 0.30f;
