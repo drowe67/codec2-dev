@@ -402,8 +402,8 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
         
         ofdm->uw_ind_sym[i] = val;             // symbol index
     
-        for (int b = 0; b < ofdm->bps; b++) {
-            ofdm->uw_ind[j + b] = (val * ofdm->bps) + b; // bit index
+        for (int b = ofdm->bps - 1; b >= 0 ; b--) {
+            ofdm->uw_ind[j + b] = (val * ofdm->bps) - b; // bit index (MSB -> LSB)
         }
     }
 
