@@ -122,7 +122,6 @@ function fsk_demod_file(filename, format="s16", Fs=8000, Rs=50, M=2, P=8, max_se
     plot(f, RxdB);
     axis([-Fs/2 Fs/2 mx-80 mx])
     xlabel('Frequency (Hz)');
-    length(rx)
     if length(rx) > Fs
       figure(2); Ndft=2^ceil(log2(Fs/10)); specgram(rx,Ndft,Fs);
     end
