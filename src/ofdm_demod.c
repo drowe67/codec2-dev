@@ -130,6 +130,7 @@ int main(int argc, char *argv[]) {
     int nc = 17;
     int ns = 8;
     int np = 1;
+    int bps = 2;
     int verbose = 0;
     int phase_est_bandwidth_mode = AUTO_PHASE_EST;
     int ldpc_en = 0;
@@ -316,14 +317,14 @@ int main(int argc, char *argv[]) {
     ofdm_config->nc = nc;
     ofdm_config->np = np;
     ofdm_config->ns = ns; /* Number of Symbol frames */
-    ofdm_config->bps = 2; /* Bits per Symbol */
+    ofdm_config->bps = bps; /* Bits per Symbol */
     ofdm_config->ts = ts;
     ofdm_config->tcp = tcp;
     ofdm_config->tx_centre = tx_centre;
     ofdm_config->rx_centre = rx_centre;
     ofdm_config->fs = FS; /* Sample Frequency */
     ofdm_config->rs = (1.0f / ts);
-    ofdm_config->ntxtbits = 4; /* number of auxiliary data bits */
+    ofdm_config->txtbits = 4; /* number of auxiliary data bits */
     ofdm_config->nuwbits = 5 * bps;
     ofdm_config->bad_uw_errors = 3;
 

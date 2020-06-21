@@ -118,6 +118,7 @@ int main(int argc, char *argv[]) {
 
     int nc = 17;
     int ns = 8;
+    int bps = 2;
     float tcp = 0.0020f;
     float ts = 0.0180f;
     float rx_centre = 1500.0f;
@@ -258,8 +259,8 @@ int main(int argc, char *argv[]) {
     ofdm_config->rx_centre = rx_centre;
     ofdm_config->nc = nc;
     ofdm_config->tcp = tcp;
-    pofdm_config->ts = ts;
-    pofdm_config->np = 1;
+    ofdm_config->ts = ts;
+    ofdm_config->np = 1;
 
     ofdm_config->rs = (1.0f / ts); /* Modulating Symbol Rate */
     ofdm_config->nuwbits = 5 * bps;
