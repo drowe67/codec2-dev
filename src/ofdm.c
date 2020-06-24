@@ -1298,11 +1298,9 @@ static void ofdm_demod_core(struct OFDM *ofdm, int *rx_bits) {
             }
 
             aphase_est_pilot_rect += vector_sum(symbol, 3);
-            aphase_est_pilot[i] = cargf(aphase_est_pilot_rect);
-
+ 
             /* amplitude is estimated over 12 pilots */
-
-            aamp_est_pilot[i] = cabsf(aphase_est_pilot_rect / 12.0f);
+            aphase_est_pilot_rect /= 12.0f;
         } else {
             assert(ofdm->phase_est_bandwidth == high_bw);
 
@@ -1314,12 +1312,13 @@ static void ofdm_demod_core(struct OFDM *ofdm, int *rx_bits) {
              */
             aphase_est_pilot_rect = ofdm->rx_sym[1][i] * conjf(ofdm->pilots[i]);            /* "this" pilot conjugate */
             aphase_est_pilot_rect += ofdm->rx_sym[ofdm->ns + 1][i] * conjf(ofdm->pilots[i]); /* "next" pilot conjugate */
-            aphase_est_pilot[i] = cargf(aphase_est_pilot_rect);
 
             /* amplitude is estimated over 2 pilots */
-
-            aamp_est_pilot[i] = cabsf(aphase_est_pilot_rect / 2.0f);
+            aphase_est_pilot_rect /= 2.0f;
         }
+
+        aphase_est_pilot[i] = cargf(aphase_est_pilot_rect);
+        aamp_est_pilot[i] = cabsf(aphase_est_pilot_rect);
     }
 
     /*
