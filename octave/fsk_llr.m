@@ -153,10 +153,12 @@ format short
 more off
 init_cml('~/cml/');
 
-#{
-% Eb/No = 6dB test pount should be about BER = 0.0157
+% 1) Eb/No = 6dB test pount should be about BER = 0.0157
 Nbits = 10000; tx_bits = round(rand(1,Nbits)); run_single(tx_bits,4,6);
 
+% 2) Histograms
 plot_hist;
-#}
-run_single_ldpc
+
+% 3) 2FSK/LDPC simulation as a starting point
+run_single_ldpc;
+
