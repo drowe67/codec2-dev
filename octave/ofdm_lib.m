@@ -46,6 +46,7 @@ function states = ofdm_init(config)
   if isfield(config,"timing_mx_thresh") timing_mx_thresh = config.timing_mx_thresh; else timing_mx_thresh = 0.35; end
   if isfield(config,"tx_uw") tx_uw = config.tx_uw; else tx_uw = zeros(1,Nuwbits); end
   if isfield(config,"bad_uw_errors") bad_uw_errors = config.bad_uw_errors; else bad_uw_errors = 3; end
+  if isfield(config,"amp_scale") amp_scale = config.amp_scale; else amp_scale = 217E3; end
   
   states.Fs = 8000;
   states.bps = bps;
@@ -107,8 +108,8 @@ function states = ofdm_init(config)
   states.bad_uw_errors = bad_uw_errors;
   
   % use this to scale tx output to 16 bit short.  Adjusted by experiment
-  % to have same RMS power as other FreeDV waveforms  
-  states.amp_scale = 2E5*1.1491/1.06;
+  % to have same RMS value as other FreeDV waveforms (around 4400)
+  states.amp_scale = amp_scale;
 
   % this is used to scale inputs to LDPC decoder to make it amplitude indep
   states.mean_amp = 0;
@@ -230,7 +231,7 @@ function config = ofdm_init_mode(mode="700D")
   elseif strcmp(mode,"qam16")
     Ns=5; config.Np=5; Tcp = 0.004; Ts = 0.016; Nc = 33;
     config.bps=4; config.Ntxtbits = 0; config.Nuwbits = 15*4; config.bad_uw_errors = 5;
-    config.ftwindow_width = 32;
+    config.ftwindow_width = 32; config.amp_scale = 135E3;
   elseif strcmp(mode,"datac1")
     Ns=5; config.Np=18; Tcp = 0.006; Ts = 0.016; Nc = 18;
     config.Ntxtbits = 0; config.Nuwbits = 12; config.bad_uw_errors = 2;
@@ -625,7 +626,7 @@ endfunction
     rx_amp     - amplitude estimates for each symbol
 #}
 
-function [states rx_bits aphase_est_pilot_log rx_np rx_amp] = ofdm_demod(states, rxbuf_in)
+function [states rx_bits achannel_est_rect_log rx_np rx_amp] = ofdm_demod(states, rxbuf_in)
   ofdm_load_const;
 
   % insert latest input samples into rxbuf
@@ -771,8 +772,7 @@ function [states rx_bits aphase_est_pilot_log rx_np rx_amp] = ofdm_demod(states,
   % bits, separate loop as it runs across cols (carriers) to get
   % frame bit ordering correct
 
-  aphase_est_pilot_log = [];
-  rx_bits = []; rx_np = []; rx_amp = [];
+  rx_bits = []; rx_np = []; rx_amp = []; achannel_est_rect_log = [];
   for rr=1:Ns-1
     for c=2:Nc+1
       if phase_est_en
@@ -797,7 +797,7 @@ function [states rx_bits aphase_est_pilot_log rx_np rx_amp] = ofdm_demod(states,
       end
       rx_bits = [rx_bits abit];
     end % c=2:Nc+1
-    aphase_est_pilot_log = [aphase_est_pilot_log; aphase_est_pilot(2:Nc+1)];
+    achannel_est_rect_log = [achannel_est_rect_log; achannel_est_rect(2:Nc+1)];
   end 
 
   % Adjust nin to take care of sample clock offset
@@ -855,7 +855,6 @@ function [states rx_bits aphase_est_pilot_log rx_np rx_amp] = ofdm_demod(states,
 
   states.mean_amp = 0.9*states.mean_amp + 0.1*mean(rx_amp);
 
-  states.achannel_est_rect = achannel_est_rect;
   states.rx_sym = rx_sym;
   states.rxbuf = rxbuf;
   states.nin = nin;
