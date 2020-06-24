@@ -1,9 +1,19 @@
 % fsk_llr_test.m
 %
 % 2/4FSK simulation to develop LLR estimation algorithms for 4FSK/LDPC modems
+% Modified version of David's fsk_llr.m;   Bill 
 
 #{
   TODO
+  The 'v' param of the Ricean pdf is the signal-only amplitude: genie value=16 
+  In practice, given varying input levels, this value needs to be estimated.
+
+  A small scaling factor seems to improve 2FSK performance -- probably the 'sig'
+  estimate can be improved.    
+
+  Only tested with short code -- try a longer one!  
+
+  Simulation should be updated to exit Eb after given Nerr reached
 
 #}
 
@@ -244,9 +254,11 @@ format short
 more off
 init_cml('~/cml/');
 
-% store results in array "res" and plot afterwards 
-%% nrun = 0; clear res;  plt=0;  
-Nbits = 50000;   
+% store results in array "res" and plot afterwards
+% comment the following line if you want to retain prev sims 
+nrun = 0; clear res;   
+
+Nbits = 20000;  plt=0;    
 
 #{
 disp(' uncoded runs')
@@ -260,9 +272,9 @@ endfor
 
 disp(' coded runs '); 
 
-M=2,   %v=16; 
+M=2,  
 for Ltype = [1 2 3] 		    
-for Eb = [8.3 8.6 9.5]
+for Eb = [7: 0.5: 9]
   [Nerr raw_ber Ec] = run_single_ldpc(M, Ltype, Nbits, Eb, plt)   
    nrun = nrun+1; res(nrun,:) =  [Eb Ec M Ltype Nbits Nerr raw_ber]
 endfor
@@ -270,13 +282,11 @@ endfor
 
 M=4,   %v=16; 
 for Ltype = [2 3] 		    
-for Eb = [8.3 8.6 9.5] 
+for Eb = [8.0 8.3 8.6 ] 
   [Nerr raw_ber Ec] = run_single_ldpc(M, Ltype, Nbits, Eb, plt)   
    nrun = nrun+1; res(nrun,:) =  [Eb Ec M Ltype Nbits Nerr raw_ber]
 endfor
 endfor
-
-
 
 		    
 date = datestr(now)
