@@ -47,6 +47,7 @@ function states = ofdm_init(config)
   if isfield(config,"tx_uw") tx_uw = config.tx_uw; else tx_uw = zeros(1,Nuwbits); end
   if isfield(config,"bad_uw_errors") bad_uw_errors = config.bad_uw_errors; else bad_uw_errors = 3; end
   if isfield(config,"amp_scale") amp_scale = config.amp_scale; else amp_scale = 217E3; end
+  if isfield(config,"amp_est_en") amp_est_en = config.amp_est_en; else amp_est_en = 0; end
   
   states.Fs = 8000;
   states.bps = bps;
@@ -155,6 +156,7 @@ function states = ofdm_init(config)
   states.timing_en = 1;
   states.foff_est_en = 1;
   states.phase_est_en = 1;
+  states.amp_est_en = amp_est_en;
   states.phase_est_bandwidth = "high";
   states.dpsk = 0;
   
@@ -233,7 +235,7 @@ function config = ofdm_init_mode(mode="700D")
   elseif strcmp(mode,"qam16")
     Ns=5; config.Np=5; Tcp = 0.004; Ts = 0.016; Nc = 33;
     config.bps=4; config.Ntxtbits = 0; config.Nuwbits = 15*4; config.bad_uw_errors = 5;
-    config.ftwindow_width = 32; config.amp_scale = 135E3;
+    config.ftwindow_width = 32; config.amp_scale = 135E3; config.amp_est_en = 1;
   elseif strcmp(mode,"datac1")
     Ns=5; config.Np=18; Tcp = 0.006; Ts = 0.016; Nc = 18;
     config.Ntxtbits = 0; config.Nuwbits = 12; config.bad_uw_errors = 2;
@@ -737,7 +739,7 @@ function [states rx_bits achannel_est_rect_log rx_np rx_amp] = ofdm_demod(states
     else
       phase_est_bandwidth = "low";
     end
-    phase_est_bandwidth = "high";
+    
     if strcmp(phase_est_bandwidth, "high")
       % Only use pilots at start and end of this frame to track quickly changes in phase
       % present.  Useful for initial sync where freq offset est may be a bit off, and
@@ -781,8 +783,8 @@ function [states rx_bits achannel_est_rect_log rx_np rx_amp] = ofdm_demod(states
         if states.dpsk
           rx_corr = rx_sym(rr+2,c) *  rx_sym(rr+1,c)';
         else
-          %rx_corr = rx_sym(rr+2,c) * exp(-j*aphase_est_pilot(c));
-          rx_corr = rx_sym(rr+2,c) * exp(-j*aphase_est_pilot(c))/(aamp_est_pilot(c)+1E-12) ;
+          rx_corr = rx_sym(rr+2,c) * exp(-j*aphase_est_pilot(c));
+          if states.amp_est_en rx_corr /= aamp_est_pilot(c)+1E-12; end            
         end
       else
         rx_corr = rx_sym(rr+2,c);

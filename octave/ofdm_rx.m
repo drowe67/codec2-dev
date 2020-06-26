@@ -5,7 +5,7 @@
 % ofdm_ldpc_rx which includes LDPC and interleaving, and ofdm_demod.c
 
 
-function ofdm_rx(filename, mode="700D", error_pattern_filename)
+function ofdm_rx(filename, mode="700D", pass_ber)
   ofdm_lib;
   more off;
 
@@ -151,7 +151,8 @@ function ofdm_rx(filename, mode="700D", error_pattern_filename)
     end
   end
 
-  printf("\nBER..: %5.4f Tbits: %5d Terrs: %5d\n", Terrs/(Tbits+1E-12), Tbits, Terrs);
+  ber = Terrs/(Tbits+1E-12);
+  printf("\nBER..: %5.4f Tbits: %5d Terrs: %5d\n", ber, Tbits, Terrs);
 
   % If we have enough frames, calc BER discarding first few frames where freq
   % offset is adjusting
@@ -215,9 +216,8 @@ function ofdm_rx(filename, mode="700D", error_pattern_filename)
   hold off;
   title('Signal and Noise Power estimates');
 
-  if nargin == 3
-    fep = fopen(error_pattern_filename, "wb");
-    fwrite(fep, error_positions, "short");
-    fclose(fep);
+  % optional pass criteria for ctests
+  if pass_ber > 0
+    if ber < pass_ber printf("Pass!\n"); else printf("Fail!\n"); end;
   end
 endfunction
