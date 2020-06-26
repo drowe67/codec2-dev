@@ -53,9 +53,8 @@ function ofdm_tx(filename, mode="700D", Nsec, SNR3kdB=100, channel='awgn', freq_
   for f=1:Npackets
     tx = [tx ofdm_mod(states, tx_bits)];
   end
-  Nsam = length(tx);
 
-  % channel simulation and svae to disk
+  % channel simulation and save to disk
   
   printf("Packets: %3d SNR(3k): %3.1f dB foff: %3.1f Hz ", Npackets, SNR3kdB, freq_offset_Hz);
   rx = channel_simulate(Fs, SNR3kdB, freq_offset_Hz, channel, tx);

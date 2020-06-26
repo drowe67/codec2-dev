@@ -64,6 +64,7 @@ function states = ofdm_init(config)
     1 - j,  1 - j*3,  3 - j,  3 - j*3;
    -1 + j, -1 + j*3, -3 + j, -3 + j*3;
    -1 - j, -1 - j*3, -3 - j, -3 - j*3]/3;
+  states.qam16 *= exp(-j*pi/4);                   % sample convention as QPSK constellation
   states.Np = Np;                                 % number of modem frames per packet. In some modes we want
                                                   % the total packet of data to span multiple modem frames, e.g. HF data
                                                   % and/or when the FEC codeword is larger than the one
@@ -100,7 +101,8 @@ function states = ofdm_init(config)
   assert(length(states.tx_uw) == states.Nuwbits);
   tx_uw_syms = [];
   for b=1:bps:states.Nuwbits
-    tx_uw_syms = [tx_uw_syms qpsk_mod(states.tx_uw(b:b+1))];
+    if bps == 2 tx_uw_syms = [tx_uw_syms qpsk_mod(states.tx_uw(b:b+1))]; end
+    if bps == 4 tx_uw_syms = [tx_uw_syms qam16_mod(states.qam16, states.tx_uw(b:b+bps-1))]; end
   end
   states.tx_uw_syms = tx_uw_syms;
   % if the UW has this many errors it is "bad", the binomal cdf can be used to set this:
@@ -337,7 +339,7 @@ function tx = ofdm_mod(states, tx_bits)
   end  
   if bps == 4
     for s=1:Nbitsperpacket/bps
-      tx_sym_lin(s) = qam16_mod(states.qam16,tx_bits(4*(s-1)+1:4*s))*exp(-j*pi/4);
+      tx_sym_lin(s) = qam16_mod(states.qam16,tx_bits(4*(s-1)+1:4*s));
     end
   end
   
@@ -735,7 +737,7 @@ function [states rx_bits achannel_est_rect_log rx_np rx_amp] = ofdm_demod(states
     else
       phase_est_bandwidth = "low";
     end
-    
+    phase_est_bandwidth = "high";
     if strcmp(phase_est_bandwidth, "high")
       % Only use pilots at start and end of this frame to track quickly changes in phase
       % present.  Useful for initial sync where freq offset est may be a bit off, and
@@ -767,7 +769,7 @@ function [states rx_bits achannel_est_rect_log rx_np rx_amp] = ofdm_demod(states
 
   aphase_est_pilot = angle(achannel_est_rect);
   aamp_est_pilot = abs(achannel_est_rect);
-
+ 
   % correct phase offset using phase estimate, and demodulate
   % bits, separate loop as it runs across cols (carriers) to get
   % frame bit ordering correct
@@ -779,7 +781,8 @@ function [states rx_bits achannel_est_rect_log rx_np rx_amp] = ofdm_demod(states
         if states.dpsk
           rx_corr = rx_sym(rr+2,c) *  rx_sym(rr+1,c)';
         else
-          rx_corr = rx_sym(rr+2,c) * exp(-j*aphase_est_pilot(c));
+          %rx_corr = rx_sym(rr+2,c) * exp(-j*aphase_est_pilot(c));
+          rx_corr = rx_sym(rr+2,c) * exp(-j*aphase_est_pilot(c))/(aamp_est_pilot(c)+1E-12) ;
         end
       else
         rx_corr = rx_sym(rr+2,c);
@@ -793,7 +796,7 @@ function [states rx_bits achannel_est_rect_log rx_np rx_amp] = ofdm_demod(states
         abit = qpsk_demod(rx_corr);
       end
       if bps == 4
-        abit = qam16_demod(states.qam16, rx_corr*exp(j*pi/4));
+        abit = qam16_demod(states.qam16, rx_corr);
       end
       rx_bits = [rx_bits abit];
     end % c=2:Nc+1
@@ -956,7 +959,7 @@ function rx_uw = extract_uw(states, rx_syms)
     if bps == 2
       rx_uw(bps*(s-1)+1:bps*s) = qpsk_demod(rx_uw_syms(s));
     elseif bps == 4
-      rx_uw(bps*(s-1)+1:bps*s) = qam16_demod(states.qam16,rx_uw_syms(s)*exp(j*pi/4));
+      rx_uw(bps*(s-1)+1:bps*s) = qam16_demod(states.qam16,rx_uw_syms(s));
     end
   end
 endfunction
@@ -1002,7 +1005,7 @@ function [rx_uw payload_syms payload_amps txt_bits] = disassemble_modem_packet(s
     if bps == 2
       rx_uw(bps*(s-1)+1:bps*s) = qpsk_demod(rx_uw_syms(s));
     elseif bps == 4
-      rx_uw(bps*(s-1)+1:bps*s) = qam16_demod(states.qam16,rx_uw_syms(s)*exp(j*pi/4));
+      rx_uw(bps*(s-1)+1:bps*s) = qam16_demod(states.qam16,rx_uw_syms(s));
     end
   end
   for s=1:Ntxtsyms
