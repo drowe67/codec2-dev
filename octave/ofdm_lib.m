@@ -1279,7 +1279,11 @@ function [code_param Nbitspercodecframe Ncodecframespermodemframe] = codec_to_fr
     printf("Total bits per frame: %d\n", totalbitsperframe);
     assert(totalbitsperframe == Nbitsperframe);
   end
-  if strcmp(mode, "datac1") || strcmp(mode, "datac2") || strcmp(mode, "qam16")
+  if strcmp(mode, "qam16")
+      load H2064_516_sparse.mat
+      code_param = ldpc_init_user(HRA, modulation='QAM', mod_order=16, mapping="", reshape(states.qam16,1,16));
+  end
+  if strcmp(mode, "datac1") || strcmp(mode, "datac2")
     load H2064_516_sparse.mat
     code_param = ldpc_init_user(HRA, modulation, mod_order, mapping);
   end

@@ -122,7 +122,8 @@ function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", error_pattern_filena
         % Count uncoded (raw) errors 
         rx_bits = zeros(1,Ncodedbitsperpacket);
         for s=1:Ncodedsymsperpacket
-          rx_bits(2*s-1:2*s) = qpsk_demod(payload_syms_de(s));
+          if bps == 2 rx_bits(2*s-1:2*s) = qpsk_demod(payload_syms_de(s)); end
+          if bps == 4 rx_bits(bps*(s-1)+1:bps*s) = qam16_demod(states.qam16,payload_syms_de(s)); end
         end
         errors = xor(tx_bits, rx_bits);
         Nerrs = sum(errors);
@@ -211,7 +212,7 @@ function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", error_pattern_filena
   if length(rx_np_log)
       figure(1); clf; 
       plot(exp(j*pi/4)*rx_np_log(floor(end/4):floor(end-end/8)),'+');
-      mx = 2*max(abs(rx_np_log));
+      mx = 2*std(channel_est_pilot_log(:))
       axis([-mx mx -mx mx]);
       title('Scatter');
 
