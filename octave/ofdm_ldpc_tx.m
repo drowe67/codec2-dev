@@ -69,5 +69,12 @@ function ofdm_ldpc_tx(filename, mode="700D", Nsec, SNR3kdB=100, channel='awgn', 
 
   printf("Packets: %3d SNR(3k): %3.1f dB foff: %3.1f Hz ", Npackets, SNR3kdB, freq_offset_Hz);
   rx = channel_simulate(Fs, SNR3kdB, freq_offset_Hz, channel, tx);
-  frx=fopen(filename,"wb"); fwrite(frx, states.amp_scale*rx, "short"); fclose(frx);
+  rx *= states.amp_scale;
+  % multipath models can lead to clipping of int16 samples
+  num_clipped = length(find(abs(rx> 32767)));
+  while num_clipped/length(rx) > 0.001
+    rx /= 2;
+    num_clipped = length(find(abs(rx> 32767)));
+  end
+  frx=fopen(filename,"wb"); fwrite(frx, rx, "short"); fclose(frx);
 endfunction
