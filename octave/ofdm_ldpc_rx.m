@@ -55,7 +55,7 @@ function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", error_pattern_filena
 
   rx_bits = []; rx_np_log = []; timing_est_log = []; delta_t_log = []; foff_est_hz_log = [];
   channel_est_pilot_log = [];
-  sig_var_log = []; noise_var_log = [];
+  sig_var_log = []; noise_var_log = []; EsNo_log = []; mean_amp_log = [];
   Terrs = Tbits = Terrs_coded = Tbits_coded = Perrs_coded = 0;
   Nerrs_coded_log = Nerrs_log = [];
   error_positions = [];
@@ -133,27 +133,24 @@ function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", error_pattern_filena
 
         % LDPC decode
 
-        rx_bits = []; mean_amp = states.mean_amp;      
+        % keep earlier mean amplitude estimator for compatability with 700D
+        if strcmp(mode, "700D")
+          mean_amp = states.mean_amp;
+        else
+          mean_amp = mean( payload_amps_de);
+        end
+        mean_amp_log = [mean_amp_log mean_amp];
+
         if strcmp(mode, "700D") || strcmp(mode, "datac1") || strcmp(mode, "datac2") || strcmp(mode, "datac3") || strcmp(mode, "qam16")
-          if states.noise_var
-            EsNo = states.sum_sig_var/states.sum_noise_var;
-          else
-            EsNo = 3;
-          end
-          if states.amp_corr_en
-            % with QAM we est amplitudes of pilots which are further out that the average symbol, so we use EsNo/2
-            #[rx_codeword paritychecks] = ldpc_dec(code_param, mx_iter=100, demod=0, dec=0, ...
-            #                                   payload_syms_de, min(EsNo/2,30), ones(1,Ncodedsymsperpacket) );
-            [rx_codeword paritychecks] = ldpc_dec(code_param, mx_iter=100, demod=0, dec=0, ...
-                                                payload_syms_de, min(EsNo/2,30),  payload_amps_de );
-          else
-            [rx_codeword paritychecks] = ldpc_dec(code_param, mx_iter=100, demod=0, dec=0, ...
+          if states.noise_var EsNo = states.sum_sig_var/states.sum_noise_var; else EsNo = 3; end
+          [rx_codeword paritychecks] = ldpc_dec(code_param, mx_iter=100, demod=0, dec=0, ...
                                                 payload_syms_de/mean_amp, min(EsNo,30), payload_amps_de/mean_amp);
-          end                                      
-          arx_bits = rx_codeword(1:code_param.data_bits_per_frame);
-          errors = xor(payload_bits, arx_bits);
+          rx_bits = rx_codeword(1:code_param.data_bits_per_frame);
+          errors = xor(payload_bits, rx_bits);
           Nerrs_coded  = sum(errors);
-          rx_bits = [rx_bits arx_bits];
+          EsNo_log = [EsNo_log EsNo];
+          
+          % reset EsNo estimator for next packet
           states.sum_sig_var = states.sum_noise_var = 0;
         end
 
@@ -231,11 +228,16 @@ function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", error_pattern_filena
       axis([1 length(channel_est_pilot_log) -pi pi]);
 
       figure(3); clf;
-      plot(abs(channel_est_pilot_log(:,2:Nc)),'g+', 'markersize', 5); 
+      amp_est = abs(channel_est_pilot_log);
+      plot(amp_est,'g+', 'markersize', 5); 
       title('Amp est');
-      axis([1 length(channel_est_pilot_log) -3 3]);  
+      axis([1 length(channel_est_pilot_log) min(amp_est(:)) max(amp_est(:))]);  
 
       figure(4); clf;
+      subplot(211); plot(EsNo_log); ylabel('EsNo');
+      subplot(212); plot(mean_amp_log); ylabel('mean amp');
+      
+      figure(5); clf;
       subplot(211)
       stem(delta_t_log)
       title('delta t');
@@ -243,7 +245,7 @@ function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", error_pattern_filena
       plot(timing_est_log);
       title('timing est');
 
-      figure(5); clf;
+      figure(6); clf;
       plot(foff_est_hz_log)
       mx = max(abs(foff_est_hz_log));
       axis([1 max(Nframes,2) -mx mx]);
@@ -252,7 +254,7 @@ function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", error_pattern_filena
   end
    
   if length(Nerrs_log) > 1
-    figure(6); clf;
+    figure(7); clf;
     subplot(211)
     stem(Nerrs_log);
     title('Uncoded errrors/modem frame')
@@ -265,14 +267,14 @@ function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", error_pattern_filena
     end
   end
   
-  figure(7); clf;
+  figure(8); clf;
   snr_estdB = 10*log10(sig_var_log) - 10*log10(noise_var_log+1E-12) + 10*log10(Nc*Rs/3000);
   snr_smoothed_estdB = filter(0.1,[1 -0.9],snr_estdB);
   plot(snr_smoothed_estdB);
   title('Signal and Noise Power estimates');
   ylabel('SNR (dB)')
 
-  figure(8); clf; plot_specgram(rx);
+  figure(9); clf; plot_specgram(rx);
   if len_secs
     axis([0 len_secs 500 2500])
   end
