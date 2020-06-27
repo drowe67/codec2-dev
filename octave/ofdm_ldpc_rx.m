@@ -38,7 +38,7 @@ function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", error_pattern_filena
   if (nargin >= 6) printf("len_secs: %d\n", len_secs); rx = rx(1:len_secs*Fs); end
   Nsam = length(rx); Nframes = floor(Nsam/Nsamperframe);
   prx = 1;
-
+  
   % Generate tx frame for BER calcs
   
   payload_bits = round(ofdm_rand(code_param.data_bits_per_frame)/32767);
@@ -108,7 +108,7 @@ function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", error_pattern_filena
       rx_syms(end-Nsymsperframe+1:end) = arx_np;
       rx_amps(end-Nsymsperframe+1:end) = arx_amp;
 
-      rx_uw = extract_uw(states, rx_syms(end-Nuwframes*Nsymsperframe+1:end));
+      rx_uw = extract_uw(states, rx_syms(end-Nuwframes*Nsymsperframe+1:end), rx_amps(end-Nuwframes*Nsymsperframe+1:end));
       
       % We need the full packet of symbols before disassembling and checking for bit errors
       if (states.modem_frame == (states.Np-1))
@@ -123,7 +123,7 @@ function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", error_pattern_filena
         rx_bits = zeros(1,Ncodedbitsperpacket);
         for s=1:Ncodedsymsperpacket
           if bps == 2 rx_bits(2*s-1:2*s) = qpsk_demod(payload_syms_de(s)); end
-          if bps == 4 rx_bits(bps*(s-1)+1:bps*s) = qam16_demod(states.qam16,payload_syms_de(s)); end
+          if bps == 4 rx_bits(bps*(s-1)+1:bps*s) = qam16_demod(states.qam16,payload_syms_de(s), payload_amps_de(s)); end
         end
         errors = xor(tx_bits, rx_bits);
         Nerrs = sum(errors);
@@ -136,16 +136,25 @@ function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", error_pattern_filena
         rx_bits = []; mean_amp = states.mean_amp;      
         if strcmp(mode, "700D") || strcmp(mode, "datac1") || strcmp(mode, "datac2") || strcmp(mode, "datac3") || strcmp(mode, "qam16")
           if states.noise_var
-            EsNo = states.sig_var/states.noise_var;
+            EsNo = states.sum_sig_var/states.sum_noise_var;
           else
             EsNo = 3;
           end
-          [rx_codeword paritychecks] = ldpc_dec(code_param, mx_iter=100, demod=0, dec=0, ...
+          if states.amp_corr_en
+            % with QAM we est amplitudes of pilots which are further out that the average symbol, so we use EsNo/2
+            #[rx_codeword paritychecks] = ldpc_dec(code_param, mx_iter=100, demod=0, dec=0, ...
+            #                                   payload_syms_de, min(EsNo/2,30), ones(1,Ncodedsymsperpacket) );
+            [rx_codeword paritychecks] = ldpc_dec(code_param, mx_iter=100, demod=0, dec=0, ...
+                                                payload_syms_de, min(EsNo/2,30),  payload_amps_de );
+          else
+            [rx_codeword paritychecks] = ldpc_dec(code_param, mx_iter=100, demod=0, dec=0, ...
                                                 payload_syms_de/mean_amp, min(EsNo,30), payload_amps_de/mean_amp);
+          end                                      
           arx_bits = rx_codeword(1:code_param.data_bits_per_frame);
           errors = xor(payload_bits, arx_bits);
           Nerrs_coded  = sum(errors);
           rx_bits = [rx_bits arx_bits];
+          states.sum_sig_var = states.sum_noise_var = 0;
         end
 
         if Nerrs_coded Perrs_coded++; end
@@ -212,7 +221,7 @@ function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", error_pattern_filena
   if length(rx_np_log)
       figure(1); clf; 
       plot(exp(j*pi/4)*rx_np_log(floor(end/4):floor(end-end/8)),'+');
-      mx = 2*std(channel_est_pilot_log(:))
+      mx = 2*mean(abs(channel_est_pilot_log(:)));
       axis([-mx mx -mx mx]);
       title('Scatter');
 
@@ -257,7 +266,7 @@ function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", error_pattern_filena
   end
   
   figure(7); clf;
-  snr_estdB = 10*log10(sig_var_log) - 10*log10(noise_var_log) + 10*log10(Nc*Rs/3000);
+  snr_estdB = 10*log10(sig_var_log) - 10*log10(noise_var_log+1E-12) + 10*log10(Nc*Rs/3000);
   snr_smoothed_estdB = filter(0.1,[1 -0.9],snr_estdB);
   plot(snr_smoothed_estdB);
   title('Signal and Noise Power estimates');

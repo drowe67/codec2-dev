@@ -47,7 +47,8 @@ function states = ofdm_init(config)
   if isfield(config,"tx_uw") tx_uw = config.tx_uw; else tx_uw = zeros(1,Nuwbits); end
   if isfield(config,"bad_uw_errors") bad_uw_errors = config.bad_uw_errors; else bad_uw_errors = 3; end
   if isfield(config,"amp_scale") amp_scale = config.amp_scale; else amp_scale = 217E3; end
-  if isfield(config,"amp_est_en") amp_est_en = config.amp_est_en; else amp_est_en = 0; end
+  if isfield(config,"amp_corr_en") amp_corr_en = config.amp_corr_en; else amp_corr_en = 0; end
+  if isfield(config,"EsNo_est_all_symbols")  EsNo_est_all_symbols= config.EsNo_est_all_symbols; else EsNo_est_all_symbols = 1; end
   
   states.Fs = 8000;
   states.bps = bps;
@@ -156,7 +157,7 @@ function states = ofdm_init(config)
   states.timing_en = 1;
   states.foff_est_en = 1;
   states.phase_est_en = 1;
-  states.amp_est_en = amp_est_en;
+  states.amp_corr_en = amp_corr_en;
   states.phase_est_bandwidth = "high";
   states.dpsk = 0;
   
@@ -207,7 +208,7 @@ function states = ofdm_init(config)
 
   % Es/No (SNR) est states
   
-  states.EsNo_est_all_symbols = 1;
+  states.EsNo_est_all_symbols = EsNo_est_all_symbols;
   states.noise_var = 0;
   states.sig_var = 0;
   states.sum_sig_var = 0;
@@ -238,7 +239,8 @@ function config = ofdm_init_mode(mode="700D")
   elseif strcmp(mode,"qam16")
     Ns=5; config.Np=5; Tcp = 0.004; Ts = 0.016; Nc = 33;
     config.bps=4; config.Ntxtbits = 0; config.Nuwbits = 15*4; config.bad_uw_errors = 5;
-    config.ftwindow_width = 32; config.amp_scale = 135E3; config.amp_est_en = 1;
+    config.ftwindow_width = 32; config.amp_scale = 135E3; config.amp_corr_en = 0;
+    config.EsNo_est_all_symbols = 0;
   elseif strcmp(mode,"datac1")
     Ns=5; config.Np=18; Tcp = 0.006; Ts = 0.016; Nc = 18;
     config.Ntxtbits = 0; config.Nuwbits = 12; config.bad_uw_errors = 2;
@@ -723,6 +725,7 @@ function [states rx_bits achannel_est_rect_log rx_np rx_amp] = ofdm_demod(states
   % OK - now channel for each carrier and correct phase  ----------------------------------
 
   achannel_est_rect = zeros(1,Nc+2);
+  aamp_est_pilot = zeros(1,Nc+2);
   for c=2:Nc+1
 
     % estimate channel for this carrier using an average of 12 pilots
@@ -748,33 +751,47 @@ function [states rx_bits achannel_est_rect_log rx_np rx_amp] = ofdm_demod(states
       % present.  Useful for initial sync where freq offset est may be a bit off, and
       % for high Doppler channels.  As less pilots are averaged, low SNR performance
       % will be poorer.
-      achannel_est_rect(c) =  sum(rx_sym(2,c)*pilots(c)');      % frame    
-      achannel_est_rect(c) += sum(rx_sym(2+Ns,c)*pilots(c)');   % frame+1
+      achannel_est_rect(c) =  rx_sym(2,c)*pilots(c)';        % frame    
+      achannel_est_rect(c) += rx_sym(2+Ns,c)*pilots(c)';     % frame+1
+      aamp_est_pilot(c) = abs(rx_sym(2,c)) + abs(rx_sym(2+Ns,c));
+      #{
+      cr = c-1:c+1;
+      aamp_est_pilot(c) = sum(abs(rx_sym(2,cr)) + abs(rx_sym(2+Ns,cr)));
+      aamp_est_pilot(c) += sum(abs(rx_sym(1,cr)));
+      aamp_est_pilot(c) += sum(abs(rx_sym(2+Ns+1,cr)));
+      #}
     else
       % Average over a bunch of pilots in adjacent carriers, and past and future frames, good
       % low SNR performance, but will fall over with high Doppler of freq offset.
       cr = c-1:c+1;
-      achannel_est_rect(c) =  sum(rx_sym(2,cr)*pilots(cr)');      % frame    
-      achannel_est_rect(c) += sum(rx_sym(2+Ns,cr)*pilots(cr)');   % frame+1
+      achannel_est_rect(c) =  rx_sym(2,cr)*pilots(cr)';      % frame    
+      achannel_est_rect(c) += rx_sym(2+Ns,cr)*pilots(cr)';   % frame+1
+      aamp_est_pilot(c)  = sum(abs(rx_sym(2,cr)));
+      aamp_est_pilot(c) += sum(abs(rx_sym(2+Ns,cr)));
 
       % use next step of pilots in past and future
 
-      achannel_est_rect(c) += sum(rx_sym(1,cr)*pilots(cr)');      % frame-1
-      achannel_est_rect(c) += sum(rx_sym(2+Ns+1,cr)*pilots(cr)'); % frame+2
+      achannel_est_rect(c) += rx_sym(1,cr)*pilots(cr)';      % frame-1
+      achannel_est_rect(c) += rx_sym(2+Ns+1,cr)*pilots(cr)'; % frame+2
+      aamp_est_pilot(c) += sum(abs(rx_sym(1,cr)));
+      aamp_est_pilot(c) += sum(abs(rx_sym(2+Ns+1,cr)));
     end
   end
-  
+ 
   if strcmp(phase_est_bandwidth, "high")
     achannel_est_rect /= 2;
+    aamp_est_pilot /= 2;
   else
     achannel_est_rect /= 12;
+    aamp_est_pilot /= 12;
   end
   
   % pilots are estimated over 12 pilot symbols, so find average
 
   aphase_est_pilot = angle(achannel_est_rect);
-  aamp_est_pilot = abs(achannel_est_rect);
- 
+  %aamp_est_pilot = abs(achannel_est_rect);
+  achannel_est_rect = aamp_est_pilot.*exp(j*aphase_est_pilot);
+  
   % correct phase offset using phase estimate, and demodulate
   % bits, separate loop as it runs across cols (carriers) to get
   % frame bit ordering correct
@@ -787,7 +804,7 @@ function [states rx_bits achannel_est_rect_log rx_np rx_amp] = ofdm_demod(states
           rx_corr = rx_sym(rr+2,c) *  rx_sym(rr+1,c)';
         else
           rx_corr = rx_sym(rr+2,c) * exp(-j*aphase_est_pilot(c));
-          if states.amp_est_en rx_corr /= aamp_est_pilot(c)+1E-12; end            
+          if states.amp_corr_en rx_corr /= aamp_est_pilot(c)+1E-12; end            
         end
       else
         rx_corr = rx_sym(rr+2,c);
@@ -799,7 +816,7 @@ function [states rx_bits achannel_est_rect_log rx_np rx_amp] = ofdm_demod(states
       % hard decision demod
       if bps == 1 abit = real(rx_corr) > 0; end
       if bps == 2 abit = qpsk_demod(rx_corr); end
-      if bps == 4 abit = qam16_demod(states.qam16, rx_corr); end
+      if bps == 4 abit = qam16_demod(states.qam16, rx_corr, aamp_est_pilot(c)); end
       rx_bits = [rx_bits abit];
     end % c=2:Nc+1
     achannel_est_rect_log = [achannel_est_rect_log; achannel_est_rect(2:Nc+1)];
@@ -957,18 +974,21 @@ endfunction
 %              during acquisition
 % -------------------------------------------------------------------------------------------------
 
-function rx_uw = extract_uw(states, rx_syms)
+function rx_uw = extract_uw(states, rx_syms, rx_amps)
   ofdm_load_const;
 
   Nsymsperframe = Nbitsperframe/bps;
   assert(length(rx_syms) == Nuwframes*Nsymsperframe);
   Nuwsyms = Nuwbits/bps;
   rx_uw_syms = zeros(1,Nuwsyms);
+  rx_uw_amps = zeros(1,Nuwsyms);
   u = 1;
  
   for s=1:Nuwframes*Nsymsperframe
     if (u <= Nuwsyms) && (s == uw_ind_sym(u))
-      rx_uw_syms(u++) = rx_syms(s);
+      rx_uw_syms(u) = rx_syms(s);
+      rx_uw_amps(u) = rx_amps(s);
+      u++;
     end
   end
   assert(u == (Nuwsyms+1));
@@ -981,7 +1001,7 @@ function rx_uw = extract_uw(states, rx_syms)
     if bps == 2
       rx_uw(bps*(s-1)+1:bps*s) = qpsk_demod(rx_uw_syms(s));
     elseif bps == 4
-      rx_uw(bps*(s-1)+1:bps*s) = qam16_demod(states.qam16,rx_uw_syms(s));
+      rx_uw(bps*(s-1)+1:bps*s) = qam16_demod(states.qam16,rx_uw_syms(s), rx_amps(s));
     end
   end
 endfunction
@@ -1000,12 +1020,15 @@ function [rx_uw payload_syms payload_amps txt_bits] = disassemble_modem_packet(s
   payload_syms = zeros(1,Nsymsperpacket-Nuwsyms-Ntxtsyms);
   payload_amps = zeros(1,Nsymsperpacket-Nuwsyms-Ntxtsyms);
   rx_uw_syms = zeros(1,Nuwsyms);
+  rx_uw_amps = zeros(1,Nuwsyms);
   txt_syms = zeros(1,Ntxtsyms);
   p = 1; u = 1;
  
   for s=1:Nsymsperpacket-Ntxtsyms;
     if (u <= Nuwsyms) && (s == uw_ind_sym(u))
-      rx_uw_syms(u++) = modem_frame_syms(s);
+      rx_uw_syms(u) = modem_frame_syms(s);
+      rx_uw_amps(u) = modem_frame_amps(s);
+      u++;
     else
       payload_syms(p) = modem_frame_syms(s);
       payload_amps(p++) = modem_frame_amps(s);
@@ -1027,7 +1050,7 @@ function [rx_uw payload_syms payload_amps txt_bits] = disassemble_modem_packet(s
     if bps == 2
       rx_uw(bps*(s-1)+1:bps*s) = qpsk_demod(rx_uw_syms(s));
     elseif bps == 4
-      rx_uw(bps*(s-1)+1:bps*s) = qam16_demod(states.qam16,rx_uw_syms(s));
+      rx_uw(bps*(s-1)+1:bps*s) = qam16_demod(states.qam16,rx_uw_syms(s),rx_uw_amps(s));
     end
   end
   for s=1:Ntxtsyms
