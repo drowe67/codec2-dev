@@ -117,7 +117,7 @@ function states = ofdm_init(config)
   % this is used to scale inputs to LDPC decoder to make it amplitude indep
   states.mean_amp = 0;
 
-  % generate same pilots each time
+  % generate same BPSK pilots each time
   rand('seed',1);
   states.pilots = 1 - 2*(rand(1,Nc+2) > 0.5);
   %printf("number of pilots total: %d\n", length(states.pilots));
@@ -207,8 +207,11 @@ function states = ofdm_init(config)
 
   % Es/No (SNR) est states
   
+  states.EsNo_est_all_symbols = 1;
   states.noise_var = 0;
   states.sig_var = 0;
+  states.sum_sig_var = 0;
+  states.sum_noise_var = 0;
   states.clock_offset_est = 0;
 
   % automated tests
@@ -789,17 +792,14 @@ function [states rx_bits achannel_est_rect_log rx_np rx_amp] = ofdm_demod(states
       else
         rx_corr = rx_sym(rr+2,c);
       end
+
       rx_np = [rx_np rx_corr];
       rx_amp = [rx_amp aamp_est_pilot(c)];
-      if bps == 1
-        abit = real(rx_corr) > 0;
-      end
-      if bps == 2
-        abit = qpsk_demod(rx_corr);
-      end
-      if bps == 4
-        abit = qam16_demod(states.qam16, rx_corr);
-      end
+
+      % hard decision demod
+      if bps == 1 abit = real(rx_corr) > 0; end
+      if bps == 2 abit = qpsk_demod(rx_corr); end
+      if bps == 4 abit = qam16_demod(states.qam16, rx_corr); end
       rx_bits = [rx_bits abit];
     end % c=2:Nc+1
     achannel_est_rect_log = [achannel_est_rect_log; achannel_est_rect(2:Nc+1)];
@@ -823,38 +823,19 @@ function [states rx_bits achannel_est_rect_log rx_np rx_amp] = ofdm_demod(states
       sample_point += tshift;
     end
   end
-
-  % estimates of signal and noise power (see cohpsk.m for further explanation)
-  % signal power is distance from axis on complex plane
-  % we just measure noise power on imag axis, as it isn't affected by fading
-  % using all symbols in frame worked better than just pilots
   
-  sig_var = sum(abs(rx_np) .^ 2)/length(rx_np);
-  sig_rms = sqrt(sig_var);
-  
-  sum_x = 0;
-  sum_xx = 0;
-  n = 0;
-  for i=1:length(rx_np)
-    s = rx_np(i);
-    if abs(real(s)) > sig_rms 
-      % select two constellation points on real axis
-      sum_x  += imag(s);
-      sum_xx += imag(s)*imag(s);
-      n++;
-    end
+  % Estimate signal and noise power to estimate EsNo.  This is used for SNR estimation and LDPC decoding
+  if states.EsNo_est_all_symbols
+    [sig_var noise_var] = est_signal_and_noise_var(rx_np);
+  else
+    % For QAM we just use this frame's pilots, as these have no amplitude modulation on them
+    [sig_var noise_var] = est_signal_and_noise_var(rx_sym(2,:).*exp(-j*aphase_est_pilot));
   end
-   
-  noise_var = 0;
-  if n > 1
-    noise_var = (n*sum_xx - sum_x*sum_x)/(n*(n-1));
-  end
-
-  % Total noise power is twice estimate of imaginary-axis noise.  This
-  % effectively gives us the an estimate of Es/No
   
-  states.noise_var = 2*noise_var; 
+  states.noise_var = noise_var; 
   states.sig_var = sig_var;
+  states.sum_noise_var += noise_var; 
+  states.sum_sig_var += sig_var;
 
   % maintain mean amp estimate for LDPC decoder
 
@@ -870,6 +851,45 @@ function [states rx_bits achannel_est_rect_log rx_np rx_amp] = ofdm_demod(states
   states.delta_t = delta_t;
   states.foff_est_hz = foff_est_hz;
   states.coarse_foff_est_hz = coarse_foff_est_hz; % just used for tofdm
+endfunction
+
+
+#{
+  ----------------------------------------------------------------------------
+  Estimates of signal and noise power (see cohpsk.m for further
+  explanation).  Signal power is distance from axis on complex
+  plane. We just measure noise power on imag axis, as it isn't
+  affected by fading.  For 700D using all symbols in frame worked
+  better than just pilots, but for QAM we need to use pilots as they
+  don't have modulation that affects estimate. 
+  ----------------------------------------------------------------------------
+#}
+  
+function [sig_var noise_var] = est_signal_and_noise_var(rx_syms)
+  sig_var = sum(abs(rx_syms) .^ 2)/length(rx_syms);
+  sig_rms = sqrt(sig_var);
+  
+  sum_x = 0;
+  sum_xx = 0;
+  n = 0;
+  for i=1:length(rx_syms)
+    s = rx_syms(i);
+    if abs(real(s)) > sig_rms 
+      % select two constellation points on real axis
+      sum_x  += imag(s);
+      sum_xx += imag(s)*imag(s);
+      n++;
+    end
+  end
+   
+  noise_var = 0;
+  if n > 1
+    noise_var = (n*sum_xx - sum_x*sum_x)/(n*(n-1));
+  end
+
+  % Total noise power is twice estimate of imaginary-axis noise.  This
+  % effectively gives us the an estimate of Es/No
+  noise_var = 2*noise_var;
 endfunction
 
 
