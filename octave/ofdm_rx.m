@@ -5,7 +5,7 @@
 % ofdm_ldpc_rx which includes LDPC and interleaving, and ofdm_demod.c
 
 
-function ofdm_rx(filename, mode="700D", pass_ber)
+function ofdm_rx(filename, mode="700D", pass_ber=0)
   ofdm_lib;
   more off;
 
@@ -92,7 +92,7 @@ function ofdm_rx(filename, mode="700D", pass_ber)
       rx_syms(end-Nsymsperframe+1:end) = arx_np;
       rx_amps(end-Nsymsperframe+1:end) = arx_amp;
 
-      rx_uw = extract_uw(states, rx_syms(end-Nuwframes*Nsymsperframe+1:end));
+      rx_uw = extract_uw(states, rx_syms(end-Nuwframes*Nsymsperframe+1:end), rx_amps(end-Nuwframes*Nsymsperframe+1:end));
       
       % We need the full packet of symbols before disassmbling and checking for bit errors
       if states.modem_frame == (states.Np-1)
@@ -101,7 +101,7 @@ function ofdm_rx(filename, mode="700D", pass_ber)
           if bps == 2
              rx_bits(bps*(s-1)+1:bps*s) = qpsk_demod(rx_syms(s));
           elseif bps == 4
-             rx_bits(bps*(s-1)+1:bps*s) = qam16_demod(states.qam16,rx_syms(s));
+             rx_bits(bps*(s-1)+1:bps*s) = qam16_demod(states.qam16,rx_syms(s), rx_amps(s));
           end
         end
 
