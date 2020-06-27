@@ -47,8 +47,8 @@ function states = ofdm_init(config)
   if isfield(config,"tx_uw") tx_uw = config.tx_uw; else tx_uw = zeros(1,Nuwbits); end
   if isfield(config,"bad_uw_errors") bad_uw_errors = config.bad_uw_errors; else bad_uw_errors = 3; end
   if isfield(config,"amp_scale") amp_scale = config.amp_scale; else amp_scale = 217E3; end
-  if isfield(config,"amp_corr_en") amp_corr_en = config.amp_corr_en; else amp_corr_en = 0; end
-  if isfield(config,"EsNo_est_all_symbols")  EsNo_est_all_symbols= config.EsNo_est_all_symbols; else EsNo_est_all_symbols = 1; end
+  if isfield(config,"amp_est_mode") amp_est_mode = config.amp_est_mode; else amp_est_mode = 0; end
+  if isfield(config,"EsNo_est_all_symbols")  EsNo_est_all_symbols = config.EsNo_est_all_symbols; else EsNo_est_all_symbols = 1; end
   
   states.Fs = 8000;
   states.bps = bps;
@@ -157,9 +157,9 @@ function states = ofdm_init(config)
   states.timing_en = 1;
   states.foff_est_en = 1;
   states.phase_est_en = 1;
-  states.amp_corr_en = amp_corr_en;
   states.phase_est_bandwidth = "high";
   states.dpsk = 0;
+  states.amp_est_mode = amp_est_mode;
   
   states.foff_est_gain = 0.1;
   states.foff_est_hz = 0;
@@ -239,21 +239,22 @@ function config = ofdm_init_mode(mode="700D")
   elseif strcmp(mode,"qam16")
     Ns=5; config.Np=5; Tcp = 0.004; Ts = 0.016; Nc = 33;
     config.bps=4; config.Ntxtbits = 0; config.Nuwbits = 15*4; config.bad_uw_errors = 5;
-    config.ftwindow_width = 32; config.amp_scale = 135E3; config.amp_corr_en = 0;
-    config.EsNo_est_all_symbols = 0;
+    config.ftwindow_width = 32; config.amp_scale = 135E3;
+    config.EsNo_est_all_symbols = 0; config.amp_est_mode = 1;
   elseif strcmp(mode,"datac1")
     Ns=5; config.Np=18; Tcp = 0.006; Ts = 0.016; Nc = 18;
     config.Ntxtbits = 0; config.Nuwbits = 12; config.bad_uw_errors = 2;
-    config.ftwindow_width = 32;
+    config.ftwindow_width = 32; config.amp_est_mode = 1;
   elseif strcmp(mode,"datac2")
     Ns=5; config.Np=36; Tcp = 0.006; Ts = 0.016; Nc = 9;
     config.Ntxtbits = 0; config.Nuwbits = 12; config.bad_uw_errors = 1;
-    config.ftwindow_width = 32;
+    config.ftwindow_width = 32; config.amp_est_mode = 1;
   elseif strcmp(mode,"datac3")
     Ns=5; config.Np=11; Tcp = 0.006; Ts = 0.016; Nc = 9;
     config.Ntxtbits = 0; config.Nuwbits = 24; config.bad_uw_errors = 5;
     config.ftwindow_width = 32; config.timing_mx_thresh = 0.30;
     config.tx_uw = [1 1 0 0  1 0 1 0  1 1 1 1  0 0 0 0  1 1 1 1  0 0 0 0];
+    config.amp_est_mode = 1;
   elseif strcmp(mode,"1")
     Ns=5; config.Np=10; Tcp=0; Tframe = 0.1; Ts = Tframe/Ns; Nc = 1;
   else
@@ -272,10 +273,8 @@ end
 
 function print_config(states)
   ofdm_load_const;
-  printf("Nc=%d Ts=%4.3f Tcp=%4.3f Ns: %d Np: %d\n", Nc, 1/Rs, Tcp, Ns, Np);
-  printf("Nsymperframe: %d Nbitsperpacket: %d Nsamperframe: %d Ntxtbits: %d Nuwbits: %d Nuwframes: %d\n",
-          Ns*Nc, Nbitsperpacket, Nsamperframe, Ntxtbits, Nuwbits, Nuwframes);
-  printf("uncoded bits/s: %4.1f\n",  Nbitsperpacket*Fs/(Np*Nsamperframe));
+
+  % ASCII-art packet visualisation
   s=1; u=1; Nuwsyms=length(uw_ind_sym);
   for f=1:Np
     for r=1:Ns
@@ -294,6 +293,12 @@ function print_config(states)
       printf("\n");
     end
   end  
+
+  printf("Nc=%d Ts=%4.3f Tcp=%4.3f Ns: %d Np: %d\n", Nc, 1/Rs, Tcp, Ns, Np);
+  printf("Nsymperframe: %d Nbitsperpacket: %d Nsamperframe: %d Ntxtbits: %d Nuwbits: %d Nuwframes: %d\n",
+          Ns*Nc, Nbitsperpacket, Nsamperframe, Ntxtbits, Nuwbits, Nuwframes);
+  printf("amp_est_mode: %d\n", states.amp_est_mode);
+  printf("uncoded bits/s: %4.1f\n",  Nbitsperpacket*Fs/(Np*Nsamperframe));
 end
 
 % Gray coded QPSK modulation function
@@ -754,12 +759,6 @@ function [states rx_bits achannel_est_rect_log rx_np rx_amp] = ofdm_demod(states
       achannel_est_rect(c) =  rx_sym(2,c)*pilots(c)';        % frame    
       achannel_est_rect(c) += rx_sym(2+Ns,c)*pilots(c)';     % frame+1
       aamp_est_pilot(c) = abs(rx_sym(2,c)) + abs(rx_sym(2+Ns,c));
-      #{
-      cr = c-1:c+1;
-      aamp_est_pilot(c) = sum(abs(rx_sym(2,cr)) + abs(rx_sym(2+Ns,cr)));
-      aamp_est_pilot(c) += sum(abs(rx_sym(1,cr)));
-      aamp_est_pilot(c) += sum(abs(rx_sym(2+Ns+1,cr)));
-      #}
     else
       % Average over a bunch of pilots in adjacent carriers, and past and future frames, good
       % low SNR performance, but will fall over with high Doppler of freq offset.
@@ -778,6 +777,8 @@ function [states rx_bits achannel_est_rect_log rx_np rx_amp] = ofdm_demod(states
     end
   end
  
+  % pilots are estimated over 12 pilot symbols, so find average
+
   if strcmp(phase_est_bandwidth, "high")
     achannel_est_rect /= 2;
     aamp_est_pilot /= 2;
@@ -786,10 +787,11 @@ function [states rx_bits achannel_est_rect_log rx_np rx_amp] = ofdm_demod(states
     aamp_est_pilot /= 12;
   end
   
-  % pilots are estimated over 12 pilot symbols, so find average
-
   aphase_est_pilot = angle(achannel_est_rect);
-  %aamp_est_pilot = abs(achannel_est_rect);
+  if states.amp_est_mode == 0
+    % legacy 700D/2020 ampl estimator for compatability with current C code
+    aamp_est_pilot = abs(achannel_est_rect);
+  end
   achannel_est_rect = aamp_est_pilot.*exp(j*aphase_est_pilot);
   
   % correct phase offset using phase estimate, and demodulate
@@ -804,7 +806,6 @@ function [states rx_bits achannel_est_rect_log rx_np rx_amp] = ofdm_demod(states
           rx_corr = rx_sym(rr+2,c) *  rx_sym(rr+1,c)';
         else
           rx_corr = rx_sym(rr+2,c) * exp(-j*aphase_est_pilot(c));
-          if states.amp_corr_en rx_corr /= aamp_est_pilot(c)+1E-12; end            
         end
       else
         rx_corr = rx_sym(rr+2,c);
@@ -855,7 +856,6 @@ function [states rx_bits achannel_est_rect_log rx_np rx_amp] = ofdm_demod(states
   states.sum_sig_var += sig_var;
 
   % maintain mean amp estimate for LDPC decoder
-
   states.mean_amp = 0.9*states.mean_amp + 0.1*mean(rx_amp);
 
   states.rx_sym = rx_sym;
