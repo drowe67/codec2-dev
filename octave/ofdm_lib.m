@@ -236,11 +236,19 @@ function config = ofdm_init_mode(mode="700D")
     Ts = 0.0205; Nc = 31;
   elseif strcmp(mode,"2200")
     Tframe = 0.175; Ts = Tframe/Ns; Nc = 37;
-  elseif strcmp(mode,"qam16")
+  elseif strcmp(mode,"qam16c1")
     Ns=5; config.Np=5; Tcp = 0.004; Ts = 0.016; Nc = 33;
     config.bps=4; config.Ntxtbits = 0; config.Nuwbits = 15*4; config.bad_uw_errors = 5;
     config.ftwindow_width = 32; config.amp_scale = 135E3;
     config.EsNo_est_all_symbols = 0; config.amp_est_mode = 1;
+  elseif strcmp(mode,"qam16c2")
+    Ns=5; config.Np=31; Tcp = 0.004; Ts = 0.016; Nc = 33;
+    config.bps=4; config.Ntxtbits = 0; config.Nuwbits = 42*4; config.bad_uw_errors = 15;
+    config.ftwindow_width = 32; config.amp_scale = 135E3;
+    config.EsNo_est_all_symbols = 0; config.amp_est_mode = 1;
+    config.tx_uw = zeros(1,config.Nuwbits = 42*4);
+    config.tx_uw(1:24) = [1 1 0 0  1 0 1 0  1 1 1 1  0 0 0 0  1 1 1 1  0 0 0 0];
+    config.tx_uw(end-24+1:end) = [1 1 0 0  1 0 1 0  1 1 1 1  0 0 0 0  1 1 1 1  0 0 0 0];
   elseif strcmp(mode,"datac1")
     Ns=5; config.Np=18; Tcp = 0.006; Ts = 0.016; Nc = 18;
     config.Ntxtbits = 0; config.Nuwbits = 12; config.bad_uw_errors = 2;
@@ -817,7 +825,7 @@ function [states rx_bits achannel_est_rect_log rx_np rx_amp] = ofdm_demod(states
       % hard decision demod
       if bps == 1 abit = real(rx_corr) > 0; end
       if bps == 2 abit = qpsk_demod(rx_corr); end
-      if bps == 4 abit = qam16_demod(states.qam16, rx_corr, aamp_est_pilot(c)); end
+      if bps == 4 abit = qam16_demod(states.qam16, rx_corr, max(1E-12,aamp_est_pilot(c))); end
       rx_bits = [rx_bits abit];
     end % c=2:Nc+1
     achannel_est_rect_log = [achannel_est_rect_log; achannel_est_rect(2:Nc+1)];
@@ -1001,7 +1009,7 @@ function rx_uw = extract_uw(states, rx_syms, rx_amps)
     if bps == 2
       rx_uw(bps*(s-1)+1:bps*s) = qpsk_demod(rx_uw_syms(s));
     elseif bps == 4
-      rx_uw(bps*(s-1)+1:bps*s) = qam16_demod(states.qam16,rx_uw_syms(s), rx_amps(s));
+      rx_uw(bps*(s-1)+1:bps*s) = qam16_demod(states.qam16,rx_uw_syms(s), max(1E-12,rx_amps(s)));
     end
   end
 endfunction
@@ -1255,7 +1263,9 @@ function states = sync_state_machine2(states, rx_uw)
   end
 
   states.uw_errors = sum(xor(tx_uw,rx_uw));
- 
+  %tx_uw(1:10)
+  %rx_uw(1:10)
+  
   if strcmp(states.sync_state,'trial')
     if strcmp(states.sync_state,'trial')
       if states.uw_errors < states.bad_uw_errors;
@@ -1322,9 +1332,13 @@ function [code_param Nbitspercodecframe Ncodecframespermodemframe] = codec_to_fr
     printf("Total bits per frame: %d\n", totalbitsperframe);
     assert(totalbitsperframe == Nbitsperframe);
   end
-  if strcmp(mode, "qam16")
+  if strcmp(mode, "qam16c1")
       load H2064_516_sparse.mat
       code_param = ldpc_init_user(HRA, modulation='QAM', mod_order=16, mapping="", reshape(states.qam16,1,16));
+  end
+  if strcmp(mode, "qam16c2")
+      framesize = 16200; rate = 0.8;
+      code_param = ldpc_init_builtin("dvbs2", rate, framesize, modulation='QAM', mod_order=16, mapping="", reshape(states.qam16,1,16));
   end
   if strcmp(mode, "datac1") || strcmp(mode, "datac2")
     load H2064_516_sparse.mat
@@ -1335,7 +1349,7 @@ function [code_param Nbitspercodecframe Ncodecframespermodemframe] = codec_to_fr
     code_param = ldpc_init_user(H_256_768_22, modulation, mod_order, mapping);
     Nbitspercodecframe = Ncodecframespermodemframe = -1;
   end
-  if strcmp(mode, "datac1") || strcmp(mode, "datac2") || strcmp(mode, "datac3") || strcmp(mode, "qam16")
+  if strcmp(mode, "datac1") || strcmp(mode, "datac2") || strcmp(mode, "datac3") || strcmp(mode, "qam16c1") || strcmp(mode, "qam16c2")
     printf("ldpc_data_bits_per_frame = %d\n", code_param.ldpc_data_bits_per_frame);
     printf("ldpc_coded_bits_per_frame  = %d\n", code_param.ldpc_coded_bits_per_frame);
     printf("ldpc_parity_bits_per_frame  = %d\n", code_param.ldpc_parity_bits_per_frame);
@@ -1356,15 +1370,13 @@ endfunction
 function [frame_bits bits_per_frame] = fec_encode(states, code_param, mode, payload_bits, ...
                                                       Ncodecframespermodemframe, Nbitspercodecframe)
   ofdm_load_const;
-  if strcmp(mode, "700D") || strcmp(mode, "datac1") || strcmp(mode, "datac2") || strcmp(mode, "datac3") || strcmp(mode, "qam16") 
-    frame_bits = LdpcEncode(payload_bits, code_param.H_rows, code_param.P_matrix);
-  elseif strcmp(mode, "2020")
+  if strcmp(mode, "2020")
     Nunused = code_param.ldpc_data_bits_per_frame - code_param.data_bits_per_frame;
     frame_bits = LdpcEncode([payload_bits zeros(1,Nunused)], code_param.H_rows, code_param.P_matrix);
     % remove unused data bits
     frame_bits = [ frame_bits(1:code_param.data_bits_per_frame) frame_bits(code_param.ldpc_data_bits_per_frame+1:end) ];
   else
-    assert(0);
+    frame_bits = LdpcEncode(payload_bits, code_param.H_rows, code_param.P_matrix);
   end
   bits_per_frame = length(frame_bits);
     

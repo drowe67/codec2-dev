@@ -11,6 +11,7 @@ function symbol = qam16_mod(constellation, four_bits)
 endfunction
 
 function four_bits = qam16_demod(constellation, symbol, amp_est=1)
+    assert (amp_est != 0);
     symbol /= amp_est;
     dist = abs(symbol - constellation(1:16));
     [tmp decimal] = min(dist);

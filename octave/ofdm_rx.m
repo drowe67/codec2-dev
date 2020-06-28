@@ -126,15 +126,15 @@ function ofdm_rx(filename, mode="700D", pass_ber=0)
       frame_count++;
     end
     
-    if strcmp(mode,"datac1") || strcmp(mode,"datac2") || strcmp(mode,"datac3") || strcmp(mode,"qam16")
-      states = sync_state_machine2(states, rx_uw);
-    else
+    if strcmp(mode,"700D") || strcmp(mode,"2020")
       states = sync_state_machine(states, rx_uw);
+    else
+      states = sync_state_machine2(states, rx_uw);
     end
 
     if states.verbose
       if strcmp(states.last_sync_state,'synced') || strcmp(states.last_sync_state,'trial')
-        printf("euw: %2d %d mf: %2d pbw: %s eraw: %3d foff: %4.1f",
+        printf("euw: %3d %d mf: %2d pbw: %s eraw: %3d foff: %4.1f",
                 states.uw_errors, states.sync_counter, states.modem_frame, states.phase_est_bandwidth(1),
                 Nerrs, states.foff_est_hz);
       end

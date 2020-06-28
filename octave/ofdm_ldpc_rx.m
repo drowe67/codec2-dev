@@ -50,7 +50,7 @@ function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", error_pattern_filena
   Nsymsperpacket = Nbitsperpacket/bps;
   Ncodedbitsperpacket = code_param.coded_bits_per_frame;
   Ncodedsymsperpacket = code_param.coded_syms_per_frame;
-
+  
   % init logs and BER stats
 
   rx_bits = []; rx_np_log = []; timing_est_log = []; delta_t_log = []; foff_est_hz_log = [];
@@ -141,18 +141,16 @@ function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", error_pattern_filena
         end
         mean_amp_log = [mean_amp_log mean_amp];
 
-        if strcmp(mode, "700D") || strcmp(mode, "datac1") || strcmp(mode, "datac2") || strcmp(mode, "datac3") || strcmp(mode, "qam16")
-          if states.noise_var EsNo = states.sum_sig_var/states.sum_noise_var; else EsNo = 3; end
-          [rx_codeword paritychecks] = ldpc_dec(code_param, mx_iter=100, demod=0, dec=0, ...
-                                                payload_syms_de/mean_amp, min(EsNo,30), payload_amps_de/mean_amp);
-          rx_bits = rx_codeword(1:code_param.data_bits_per_frame);
-          errors = xor(payload_bits, rx_bits);
-          Nerrs_coded  = sum(errors);
-          EsNo_log = [EsNo_log EsNo];
+        if states.noise_var EsNo = states.sum_sig_var/states.sum_noise_var; else EsNo = 3; end
+        [rx_codeword paritychecks] = ldpc_dec(code_param, mx_iter=100, demod=0, dec=0, ...
+                                              payload_syms_de/mean_amp, min(EsNo,30), payload_amps_de/mean_amp);
+        rx_bits = rx_codeword(1:code_param.data_bits_per_frame);
+        errors = xor(payload_bits, rx_bits);
+        Nerrs_coded  = sum(errors);
+        EsNo_log = [EsNo_log EsNo];
           
-          % reset EsNo estimator for next packet
-          states.sum_sig_var = states.sum_noise_var = 0;
-        end
+        % reset EsNo estimator for next packet
+        states.sum_sig_var = states.sum_noise_var = 0;
 
         if Nerrs_coded Perrs_coded++; end
         Terrs_coded += Nerrs_coded;
@@ -172,10 +170,10 @@ function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", error_pattern_filena
       frame_count++;
     end
     
-    if strcmp(mode,"datac1") || strcmp(mode,"datac2") || strcmp(mode,"datac3") || strcmp(mode,"qam16")
-      states = sync_state_machine2(states, rx_uw);
-    else
+    if strcmp(mode,"700D") || strcmp(mode,"2020")
       states = sync_state_machine(states, rx_uw);
+    else
+      states = sync_state_machine2(states, rx_uw);
     end
 
     if states.verbose
@@ -186,7 +184,7 @@ function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", error_pattern_filena
           if paritychecks(i) iter=i; end
         end
         % complete logging line
-        printf("euw: %2d %d mf: %2d pbw: %s eraw: %3d ecod: %3d iter: %3d pcc: %3d foff: %4.1f",
+        printf("euw: %3d %d mf: %2d pbw: %s eraw: %3d ecod: %3d iter: %3d pcc: %3d foff: %4.1f",
                states.uw_errors, states.sync_counter, states.modem_frame, states.phase_est_bandwidth(1),
                Nerrs_raw, Nerrs_coded, iter, pcc, states.foff_est_hz);
         % detect a sucessful sync (for tests calling this function)

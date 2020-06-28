@@ -29,11 +29,9 @@ function ofdm_ldpc_tx(filename, mode="700D", Nsec, SNR3kdB=100, channel='awgn', 
 
   % OK generate a modem frame using random payload bits
 
-  if strcmp(mode, "700D")
-    payload_bits = round(ofdm_rand(code_param.data_bits_per_frame)/32767);
-  elseif strcmp(mode, "2020")
+  if strcmp(mode, "2020")
     payload_bits = round(ofdm_rand(Ncodecframespermodemframe*Nbitspercodecframe)/32767);
-  elseif strcmp(mode, "datac1") || strcmp(mode, "datac2") || strcmp(mode, "datac3") || strcmp(mode, "qam16")
+  else
     payload_bits = round(ofdm_rand(code_param.data_bits_per_frame)/32767);
   end
   [packet_bits bits_per_packet] = fec_encode(states, code_param, mode, payload_bits, Ncodecframespermodemframe, Nbitspercodecframe);
