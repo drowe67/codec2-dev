@@ -1337,7 +1337,7 @@ function [code_param Nbitspercodecframe Ncodecframespermodemframe] = codec_to_fr
       code_param = ldpc_init_user(HRA, modulation='QAM', mod_order=16, mapping="", reshape(states.qam16,1,16));
   end
   if strcmp(mode, "qam16c2")
-      framesize = 16200; rate = 0.8;
+      framesize = 16200; rate = 0.6;
       code_param = ldpc_init_builtin("dvbs2", rate, framesize, modulation='QAM', mod_order=16, mapping="", reshape(states.qam16,1,16));
   end
   if strcmp(mode, "datac1") || strcmp(mode, "datac2")

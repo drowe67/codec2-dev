@@ -161,7 +161,7 @@ function test1_single(code="wimax")
 
   % CML library has a bunch of different framesizes available
   if strcmp(code,'wimax') framesize = 576*2; rate = 0.5; end
-  if strcmp(code,'dvbs2') framesize = 16200; rate = 0.8; end
+  if strcmp(code,'dvbs2') framesize = 16200; rate = 0.6; end
   code_param = ldpc_init_builtin(code, rate, framesize, modulation, mod_order, mapping);
 
   % find out what rate we actually obtained ...
