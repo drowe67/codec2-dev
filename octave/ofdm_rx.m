@@ -75,6 +75,10 @@ function ofdm_rx(filename, mode="700D", error_pattern_filename)
     end
     prx += states.nin;
  
+    if states.verbose
+      printf("f: %3d nin: %4d st: %-6s ", f, states.nin, states.sync_state);
+    end
+    
     if strcmp(states.sync_state,'search') 
       [timing_valid states] = ofdm_sync_search(states, rxbuf_in);
     end
@@ -94,7 +98,11 @@ function ofdm_rx(filename, mode="700D", error_pattern_filename)
       if states.modem_frame == (states.Np-1)
         rx_bits = zeros(1,Nbitsperpacket);
         for s=1:Nsymsperpacket
-          rx_bits(2*s-1:2*s) = qpsk_demod(rx_syms(s));
+          if bps == 2
+             rx_bits(bps*(s-1)+1:bps*s) = qpsk_demod(rx_syms(s));
+          elseif bps == 4
+             rx_bits(bps*(s-1)+1:bps*s) = qam16_demod(states.qam16,rx_syms(s)*exp(j*pi/4));
+          end
         end
 
         errors = xor(tx_bits, rx_bits);
@@ -119,16 +127,19 @@ function ofdm_rx(filename, mode="700D", error_pattern_filename)
       frame_count++;
     end
     
-    if strcmp(mode,"datac1") || strcmp(mode,"datac2") || strcmp(mode,"datac3")
+    if strcmp(mode,"datac1") || strcmp(mode,"datac2") || strcmp(mode,"datac3") || strcmp(mode,"qam16")
       states = sync_state_machine2(states, rx_uw);
     else
       states = sync_state_machine(states, rx_uw);
     end
 
     if states.verbose
-      printf("f: %3d mf: %2d nin: %4d state: %-6s uw_errors: %2d %1d pbw: %-4s Nerrs: %3d foff: %5.1f clkOff: %5.0f\n",
-             f, states.modem_frame, states.nin, states.last_sync_state, states.uw_errors, states.sync_counter,
-             states.phase_est_bandwidth, Nerrs, states.foff_est_hz, states.clock_offset_est*1E6);
+      if strcmp(states.last_sync_state,'synced') || strcmp(states.last_sync_state,'trial')
+        printf("euw: %2d %d mf: %2d pbw: %s eraw: %3d foff: %4.1f",
+                states.uw_errors, states.sync_counter, states.modem_frame, states.phase_est_bandwidth(1),
+                Nerrs, states.foff_est_hz);
+      end
+      printf("\n");
     end
 
     % act on any events returned by state machine

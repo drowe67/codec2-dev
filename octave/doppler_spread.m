@@ -11,8 +11,8 @@ function [spread_FsHz states] = doppler_spread(dopplerSpreadHz, FsHz, Nsam)
   sigma = dopplerSpreadHz/2;
   lowFs = ceil(10*dopplerSpreadHz);
   Ntaps = 100;
-  Nsam_low = Nsam*lowFs/FsHz + Ntaps; % fill filter memory
-
+  Nsam_low = ceil(Nsam*lowFs/FsHz + Ntaps); % fill filter memory
+  
   % generate gaussian freq response and design filter
 
   x = 0:lowFs/100:lowFs/2;
@@ -26,7 +26,8 @@ function [spread_FsHz states] = doppler_spread(dopplerSpreadHz, FsHz, Nsam)
   % resample to FsHz, scaling for desired spreadFreqHz
 
   spread_FsHz = resample(spread_lowFs(Ntaps+1:Nsam_low), FsHz, lowFs);
-
+  assert(length(spread_FsHz) >= Nsam);
+  
   % return some states for optional unit testing
   states.x = x;
   states.y = y;
