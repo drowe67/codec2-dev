@@ -61,7 +61,7 @@ function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", error_pattern_filena
   error_positions = [];
   Nerrs_coded = Nerrs_raw = 0;
   paritychecks = [0];
-  time_to_sync = -1;
+  time_to_sync = -1; EsNo = 1;
   rx_uw = zeros(1,states.Nuwbits);
 
   rx_syms = zeros(1,Nsymsperpacket); rx_amps = zeros(1,Nsymsperpacket);
@@ -141,9 +141,11 @@ function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", error_pattern_filena
         end
         mean_amp_log = [mean_amp_log mean_amp];
 
-        if states.noise_var EsNo = states.sum_sig_var/states.sum_noise_var; else EsNo = 3; end
+        % used fixed EsNo est, as EsNo estimator for QAM not working very well at this stage
+        EsNo = 10^(states.EsNodB/10);
+        
         [rx_codeword paritychecks] = ldpc_dec(code_param, mx_iter=100, demod=0, dec=0, ...
-                                              payload_syms_de/mean_amp, min(EsNo,30), payload_amps_de/mean_amp);
+                                              payload_syms_de/mean_amp, EsNo, payload_amps_de/mean_amp);
         rx_bits = rx_codeword(1:code_param.data_bits_per_frame);
         errors = xor(payload_bits, rx_bits);
         Nerrs_coded  = sum(errors);
@@ -184,9 +186,9 @@ function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", error_pattern_filena
           if paritychecks(i) iter=i; end
         end
         % complete logging line
-        printf("euw: %3d %d mf: %2d pbw: %s eraw: %3d ecod: %3d iter: %3d pcc: %3d foff: %4.1f",
+        printf("euw: %3d %d mf: %2d pbw: %s eraw: %3d ecod: %3d iter: %3d pcc: %3d EsNo: %4.2f foff: %4.1f",
                states.uw_errors, states.sync_counter, states.modem_frame, states.phase_est_bandwidth(1),
-               Nerrs_raw, Nerrs_coded, iter, pcc, states.foff_est_hz);
+               Nerrs_raw, Nerrs_coded, iter, pcc, 10*log10(EsNo), states.foff_est_hz);
         % detect a sucessful sync (for tests calling this function)
         if (time_to_sync < 0) && (strcmp(states.sync_state,'synced') || strcmp(states.sync_state,'trial'))
           if (pcc > 80) && (iter != 100)
@@ -232,7 +234,7 @@ function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", error_pattern_filena
       axis([1 length(channel_est_pilot_log) min(amp_est(:)) max(amp_est(:))]);  
 
       figure(4); clf;
-      subplot(211); plot(EsNo_log); ylabel('EsNo');
+      subplot(211); plot(10*log10(EsNo_log+1E-12)); ylabel('EsNodB');
       subplot(212); plot(mean_amp_log); ylabel('mean amp');
       
       figure(5); clf;

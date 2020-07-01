@@ -49,6 +49,7 @@ function states = ofdm_init(config)
   if isfield(config,"amp_scale") amp_scale = config.amp_scale; else amp_scale = 217E3; end
   if isfield(config,"amp_est_mode") amp_est_mode = config.amp_est_mode; else amp_est_mode = 0; end
   if isfield(config,"EsNo_est_all_symbols")  EsNo_est_all_symbols = config.EsNo_est_all_symbols; else EsNo_est_all_symbols = 1; end
+  if isfield(config,"EsNodB") EsNodB = config.EsNodB; else EsNodB = 3; end
   
   states.Fs = 8000;
   states.bps = bps;
@@ -66,7 +67,9 @@ function states = ofdm_init(config)
     1 - j,  1 - j*3,  3 - j,  3 - j*3;
    -1 + j, -1 + j*3, -3 + j, -3 + j*3;
    -1 - j, -1 - j*3, -3 - j, -3 - j*3]/3;
-  states.qam16 *= exp(-j*pi/4);                   % sample convention as QPSK constellation
+  rms = sqrt(states.qam16(:)'*states.qam16(:)/16);% set average Es to 1
+  states.qam16 /= rms;
+  states.qam16 *= exp(-j*pi/4);                   % same rotation as QPSK constellation
   states.Np = Np;                                 % number of modem frames per packet. In some modes we want
                                                   % the total packet of data to span multiple modem frames, e.g. HF data
                                                   % and/or when the FEC codeword is larger than the one
@@ -117,6 +120,9 @@ function states = ofdm_init(config)
 
   % this is used to scale inputs to LDPC decoder to make it amplitude indep
   states.mean_amp = 0;
+
+  % use a fxed EsNo for LDPC decoder, this seems to work OK and avoid another estimator
+  states.EsNodB = EsNodB;
 
   % generate same BPSK pilots each time
   rand('seed',1);
@@ -240,29 +246,29 @@ function config = ofdm_init_mode(mode="700D")
     Ns=5; config.Np=5; Tcp = 0.004; Ts = 0.016; Nc = 33;
     config.bps=4; config.Ntxtbits = 0; config.Nuwbits = 15*4; config.bad_uw_errors = 5;
     config.ftwindow_width = 32; config.amp_scale = 135E3;
-    config.EsNo_est_all_symbols = 0; config.amp_est_mode = 1;
+    config.EsNo_est_all_symbols = 0; config.amp_est_mode = 1; config.EsNodB = 10;
   elseif strcmp(mode,"qam16c2")
     Ns=5; config.Np=31; Tcp = 0.004; Ts = 0.016; Nc = 33;
     config.bps=4; config.Ntxtbits = 0; config.Nuwbits = 42*4; config.bad_uw_errors = 15;
     config.ftwindow_width = 32; config.amp_scale = 135E3;
-    config.EsNo_est_all_symbols = 0; config.amp_est_mode = 1;
+    config.EsNo_est_all_symbols = 0; config.amp_est_mode = 1; config.EsNodB = 10;
     config.tx_uw = zeros(1,config.Nuwbits = 42*4);
     config.tx_uw(1:24) = [1 1 0 0  1 0 1 0  1 1 1 1  0 0 0 0  1 1 1 1  0 0 0 0];
     config.tx_uw(end-24+1:end) = [1 1 0 0  1 0 1 0  1 1 1 1  0 0 0 0  1 1 1 1  0 0 0 0];
   elseif strcmp(mode,"datac1")
     Ns=5; config.Np=18; Tcp = 0.006; Ts = 0.016; Nc = 18;
     config.Ntxtbits = 0; config.Nuwbits = 12; config.bad_uw_errors = 2;
-    config.ftwindow_width = 32; config.amp_est_mode = 1;
+    config.ftwindow_width = 32; config.amp_est_mode = 1; config.EsNodB = 10;
   elseif strcmp(mode,"datac2")
     Ns=5; config.Np=36; Tcp = 0.006; Ts = 0.016; Nc = 9;
     config.Ntxtbits = 0; config.Nuwbits = 12; config.bad_uw_errors = 1;
-    config.ftwindow_width = 32; config.amp_est_mode = 1;
+    config.ftwindow_width = 32; config.amp_est_mode = 1; config.EsNodB = 10;
   elseif strcmp(mode,"datac3")
     Ns=5; config.Np=11; Tcp = 0.006; Ts = 0.016; Nc = 9;
     config.Ntxtbits = 0; config.Nuwbits = 24; config.bad_uw_errors = 5;
     config.ftwindow_width = 32; config.timing_mx_thresh = 0.30;
     config.tx_uw = [1 1 0 0  1 0 1 0  1 1 1 1  0 0 0 0  1 1 1 1  0 0 0 0];
-    config.amp_est_mode = 1;
+    config.amp_est_mode = 1; config.EsNodB = 0;
   elseif strcmp(mode,"1")
     Ns=5; config.Np=10; Tcp=0; Tframe = 0.1; Ts = Tframe/Ns; Nc = 1;
   else
@@ -374,7 +380,7 @@ endfunction
 function tx = ofdm_txframe(states, tx_sym_lin)
   ofdm_load_const;
   assert(length(tx_sym_lin) == Nbitsperpacket/bps);
-
+  
   % place data symbols in multi-carrier frame with pilots and boundary carriers
 
   s = 1; tx_frame = zeros(Np*Ns,Nc+2);
@@ -396,7 +402,7 @@ function tx = ofdm_txframe(states, tx_sym_lin)
   assert((s-1) == length(tx_sym_lin));
 
   % OFDM upconvert symbol by symbol so we can add CP
-
+ 
   tx = [];
   for r=1:Ns*Np
     asymbol = tx_frame(r,:) * W/M;
@@ -850,7 +856,7 @@ function [states rx_bits achannel_est_rect_log rx_np rx_amp] = ofdm_demod(states
     end
   end
   
-  % Estimate signal and noise power to estimate EsNo.  This is used for SNR estimation and LDPC decoding
+  % Estimate signal and noise power to estimate EsNo.  This is used for SNR estimation and (possible) LDPC decoding
   if states.EsNo_est_all_symbols
     [sig_var noise_var] = est_signal_and_noise_var(rx_np);
   else
@@ -911,7 +917,7 @@ function [sig_var noise_var] = est_signal_and_noise_var(rx_syms)
   if n > 1
     noise_var = (n*sum_xx - sum_x*sum_x)/(n*(n-1));
   end
-
+  
   % Total noise power is twice estimate of imaginary-axis noise.  This
   % effectively gives us the an estimate of Es/No
   noise_var = 2*noise_var;
@@ -1272,6 +1278,7 @@ function states = sync_state_machine2(states, rx_uw)
         next_state = "synced";
         states.frame_count = Nuwframes;
         states.modem_frame = Nuwframes;
+        states.sum_sig_var = states.sum_noise_var = 0;
       else
         states.sync_counter++;
         if states.sync_counter > Np
