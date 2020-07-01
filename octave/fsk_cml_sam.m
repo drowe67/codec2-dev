@@ -133,7 +133,7 @@ if plt==1, plot_hist(rx_filt,tx_symbols, M); end
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%
-function [Nerrors raw_ber EcNodB] = run_single_ldpc(M, Ltype, Nbits,EbNodB, plt)
+function [Nerrors raw_ber EcNodB] = run_single_ldpc(M, Ltype, Nbits,EbNodB, plt, HRA)
 
 disp([num2str(M) 'FSK coded test ...  '])
 if M==2
@@ -145,14 +145,14 @@ else
 end
 decoder_type = 0; max_iterations = 100;
 
-load HRAa_1536_512.mat
+%load HRAa_1536_512.mat
 %[H_rows, H_cols] = Mat2Hrows(HRA);
 %code_param.H_rows = H_rows;
 %code_param.H_cols = H_cols;
 %code_param.P_matrix = [];
 
-
-Krate = 3/4;
+Hsize=size(HRA); 
+Krate = (Hsize(2)-Hsize(1))/Hsize(2) % Krate = 3/4;
 EcNodB = EbNodB + 10*log10(Krate);
 code_param = ldpc_init_user(HRA, modulation, mod_order, mapping);
 Nframes = floor(Nbits/code_param.data_bits_per_frame)
@@ -244,6 +244,19 @@ format short
 more off
 init_cml('~/cml/');
 
+if exist('Ctype')==0, Ctype=1, end
+
+if Ctype==1
+   load H_256_768_22.txt;   HRA = H_256_768_22; % rate 1/3
+elseif Ctype==2
+   load H_256_512_4.mat;   HRA=H;  % rate 1/2 code 
+elseif Ctype==3
+   load HRAa_1536_512.mat; % rate 3/4 2k code 
+else
+   error('bad Ctype');
+end
+
+
 % store results in array "res" and plot afterwards
 % comment the following line if you want to retain prev sims
 nrun = 0; clear res;
@@ -252,10 +265,11 @@ if exist('Nbits')==0, Nbits = 20000,   end
 if exist('Evec')==0,  Evec = [5: 0.5: 9],  end
 if exist('plt')==0.   plt=0;               end
 
-M=2,
-for Ltype = [2 4]
+if exist('M')==0,  M=2,  end
+
+for Ltype = [4]
     for Eb = Evec
-        [Nerr raw_ber Ec] = run_single_ldpc(M, Ltype, Nbits, Eb, plt);
+        [Nerr raw_ber Ec] = run_single_ldpc(M, Ltype, Nbits, Eb, plt, HRA);
         nrun = nrun+1; res(nrun,:) =  [Eb Ec M Ltype Nbits Nerr raw_ber]
     end
 end
