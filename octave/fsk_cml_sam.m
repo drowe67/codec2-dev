@@ -13,6 +13,15 @@
 %
 % Adjust Evec and Nbits as required before running. 
 
+#{
+  Example 1 2FSK:
+    octave:4> fsk_cml_sam
+    octave:5> fsk_llr_plot
+
+  Example 2 4FSK:
+    octave:4> M=4; fsk_cml_sam
+    octave:4> fsk_llr_plot
+#}
 
 ldpc;
 
