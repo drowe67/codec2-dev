@@ -33,17 +33,14 @@ function [states ber per] = modem_run_test(HRA, EbNodB = 10, num_frames=10, Fs=8
   % set up LDPC code
   Hsize=size(HRA); 
   Krate = (Hsize(2)-Hsize(1))/Hsize(2) % Krate = 3/4;
-  code_param = ldpc_init_user(HRA, modulation='FSK', mod_order=states.M, mapping='gray')
-  xx
-  bits_per_frame = code_param.data_bits_per_frame
-  nbits = bits_per_frame*num_frames;
+  code_param = ldpc_init_user(HRA, modulation='FSK', mod_order=states.M, mapping='gray');
   
   % set up AWGN noise
   EcNodB = EbNodB + 10*log10(Krate);
   EcNo = 10^(EcNodB/10);
   variance = states.Fs/(states.Rs*EcNo*states.bitspersymbol);
 
-  data_bits = round(rand(1,bits_per_frame)); tx_bits = [];
+  data_bits = round(rand(1,code_param.data_bits_per_frame)); tx_bits = [];
   for f=1:num_frames
     codeword_bits = LdpcEncode(data_bits, code_param.H_rows, code_param.P_matrix);
     tx_bits = [tx_bits codeword_bits];
@@ -72,10 +69,10 @@ function [states ber per] = modem_run_test(HRA, EbNodB = 10, num_frames=10, Fs=8
     end
   end
 
-  num_frames=floor(length(rx_bits)/bits_per_frame);
+  num_frames=floor(length(rx_bits)/code_param.coded_bits_per_frame);
   log_nerrs = []; num_frames_rx = 0;
   for f=1:num_frames-1
-    st = (f-1)*bits_per_frame + 1; en = (f+1)*bits_per_frame;
+    st = (f-1)*code_param.coded_bits_per_frame + 1; en = (f+1)*code_param.coded_bits_per_frame;
     states = ber_counter(states, codeword_bits, rx_bits(st:en));
     log_nerrs = [log_nerrs states.nerr];
     if states.ber_state; num_frames_rx++; end
@@ -107,6 +104,6 @@ end
 % Start simulation here ---------------------------------------------------
 
 init_cml('~/cml/');
-load H_256_512_5.mat
+load H_256_512_4.mat; HRA=H;
 
-[states ber per] = modem_run_test(HRA, EbNodB=6);
+[states ber per] = modem_run_test(HRA, EbNodB=8);
