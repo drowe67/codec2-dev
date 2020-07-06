@@ -35,6 +35,8 @@ function [states uber cber cper] = modem_run_test(HRA, EbNodB = 10, num_frames=1
   Hsize=size(HRA); 
   Krate = (Hsize(2)-Hsize(1))/Hsize(2); states.rate = Krate;
   code_param = ldpc_init_user(HRA, modulation='FSK', mod_order=states.M, mapping='gray');
+  states.coden = code_param.coded_bits_per_frame;
+  states.codek = code_param.data_bits_per_frame;
   
   % set up AWGN noise
   EcNodB = EbNodB + 10*log10(Krate);
@@ -147,8 +149,9 @@ function freq_run_curve_peak_mask(HRA, num_frames=100)
   semilogy(EbNodB_raw, uber_log+1E-12, 'linewidth', 2, '+-;uber;');
   semilogy(EbNodB, cber_log+1E-12, 'linewidth', 2, 'r+-;cber;');
   semilogy(EbNodB, cper_log+1E-12, 'linewidth', 2, 'c+-;cper;'); hold off;
-  xlabel('Eb/No (dB)'); ylabel('BER/PER'); axis([min(EbNodB_raw) max(EbNodB) 1E-4 1]);
-  title(sprintf("Fs = %d Rs = %d", states.Fs, states.Rs));
+  xlabel('Eb/No (info bits, dB)'); ylabel('BER/PER'); axis([min(EbNodB_raw) max(EbNodB) 1E-4 1]);
+  title(sprintf("%dFSK rate %3.1f (%d,%d) Ncodewords=%d NCodewordBits=%d Fs=%d Rs=%d",
+                states.M, states.rate, states.coden, states.codek, num_frames, states.Tbits, states.Fs, states.Rs));
   print("fsk_lib_ldpc.png", "-dpng")
 end
 
