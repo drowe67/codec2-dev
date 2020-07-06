@@ -1,5 +1,6 @@
 % fsk_lib_ldpc_demo.m
-% LDPC coded FSK modem demo
+%
+% LDPC coded 4FSK modem demo, demonstrating soft dec using CML library functions
 
 fsk_lib;
 ldpc;
@@ -46,12 +47,14 @@ function [states ber per] = modem_run_test(HRA, EbNodB = 10, num_frames=10, Fs=8
     tx_bits = [tx_bits codeword_bits];
   end
 
+  % modulator and AWGN channel
   tx = fsk_mod(states, tx_bits);
   noise = sqrt(variance/2)*randn(length(tx),1) + j*sqrt(variance/2)*randn(length(tx),1);
   rx = tx + noise;
 
+  % freq estimator and demod
   run_frames = floor(length(rx)/N)-1;
-  st = 1; f_log = []; f_log2 = []; rx_bits = []; rx_bits2 = [];
+  st = 1; f_log = []; rx_bits = []; rx_filt = [];
   for f=1:run_frames
 
     % extract nin samples from input stream
@@ -64,19 +67,42 @@ function [states ber per] = modem_run_test(HRA, EbNodB = 10, num_frames=10, Fs=8
       states = est_freq(states, sf, states.M);  states.f = states.f2;
       [arx_bits states] = fsk_demod(states, sf);
       rx_bits = [rx_bits arx_bits];
+      rx_filt = [rx_filt abs(states.f_int_resample)];
       f_log = [f_log; states.f];
       st += nin;
     end
   end
 
+  % count bit errors in test frames
+  states.verbose = 0x4;
   num_frames=floor(length(rx_bits)/code_param.coded_bits_per_frame);
-  log_nerrs = []; num_frames_rx = 0;
+  log_nerrs = []; num_frames_rx = 0; Nerrors = 0;
   for f=1:num_frames-1
     st = (f-1)*code_param.coded_bits_per_frame + 1; en = (f+1)*code_param.coded_bits_per_frame;
     states = ber_counter(states, codeword_bits, rx_bits(st:en));
     log_nerrs = [log_nerrs states.nerr];
-    if states.ber_state; num_frames_rx++; end
+    if states.ber_state num_frames_rx++; end
+
+    % Using sync provided by ber_counter() state machine for LDPC frame alignment
+    if states.ber_state
+      st_bit = (f-1)*code_param.coded_bits_per_frame + states.coarse_offset;
+      st_symbol = (st_bit-1)/states.bitspersymbol + 1;
+      en_symbol = st_symbol +  code_param.coded_bits_per_frame/states.bitspersymbol - 1;
+      printf("coded_bits: %d bps: %d st_bit: %d st_symbol: %d en_symbol: %d\n", code_param.coded_bits_per_frame, states.bitspersymbol, st_bit,  st_symbol, en_symbol);
+      size(rx_filt(:,st_symbol:en_symbol))
+      symL = DemodFSK(1/states.v_est*rx_filt(:,st_symbol:en_symbol), states.SNRest, 1);     
+      
+      llr = -Somap(symL);
+      
+      [x_hat, PCcnt] = MpDecode(llr, code_param.H_rows, code_param.H_cols, max_iterations=100, decoder_type=0, 1, 1);
+      Niters = sum(PCcnt~=0);
+      detected_data = x_hat(Niters,:);
+      Nerrors = sum(xor(data_bits, detected_data(1:code_param.data_bits_per_frame)));
+      printf("Niters : %d Coded Nerrors: %d\n", Niters, Nerrors);
+      
+    end
   end
+
   if states.Terrs
     printf("Fs: %d Rs: %d df % 3.2f EbNo: %4.2f ftx: %3d frx: %3d nbits: %4d nerrs: %3d ber: %4.3f\n",
             Fs, Rs, df, EbNodB, num_frames, num_frames_rx, states.Tbits, states.Terrs, states.Terrs/states.Tbits);
