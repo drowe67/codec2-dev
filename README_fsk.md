@@ -14,7 +14,7 @@ This modem can demodulate FSK signals that sound like [this sample](doc/lockdown
 
 ## Credits
 
-The Octave version of the modem was developed by David Rowe.  Brady O'Brien ported the modem to C, and wrote the C/Octave tests.  The modem is being maintained by David Rowe.  Mark Jessop has helped improve the modem operation by testing against various balloon telemtry waveforms.
+The Octave version of the modem was developed by David Rowe.  Brady O'Brien ported the modem to C, and wrote the C/Octave tests.  The modem is being maintained by David Rowe.  Mark Jessop has helped improve the modem operation by testing against various balloon telemtry waveforms.  Bill Cowley has developed the Log Likelihood Ratio (LLR) algorithms for 4FSK.
 
 ## Quickstart
 
@@ -90,8 +90,12 @@ The Octave version of the modem was developed by David Rowe.  Brady O'Brien port
    | fsk_lib.m | Core FSK modem library |
    | fsk_lib_demo.m | A demonstration of fsk_lib, runs a single point BER test |
    | fsk_demod_file.m | Demodulates FSK signals from a file, useful for debugging FSK waveforms |
-   | fsk_lock_down.m | simulations to support the "lock down" waveform |
+   | fsk_lock_down.m | simulations to support the "lock down" low SNR waveform |
    | tfsk.m | automated test that compares the C and Octave versions of the modem |
+   | fsk_cml.m | Symbol rate experiments with FSK modem LLR estimation and LDPC |
+   | fsk_cml_sam.m | Sample rate experiments with FSK modem LLR estimation and LDPC |
+   | fsk_llr_plot.m | Plots curves from fsk_cml.m & fsk_cml_sam.m |
+   | fsk_lib_ldpc_demo.m | CML library LLR routines and LDPC codes with fsk_lib.m |
    
    You can run many of them from the Octave command line:
    ```
@@ -114,23 +118,13 @@ The Octave version of the modem was developed by David Rowe.  Brady O'Brien port
    ```
    These are written in ```codec2/CmakeLists.txt```, inspect them to find out how we test the modem.
 
-1. The Octave version is useful for peering inside the modem, for example when debugging.  Here is an example of debugging a Wenet sample:
-   ```
-   $ octave --no-gui
-   octave:1> fsk_horus_as_a_lib=1; fsk_horus; demod_file("../raw/wenet_sample.c8",test_frame_mode=9, 0, 100, max_frames=50);
-   ```
-   Running this pops up a bunch of plots. Here is the 3D plot the modem spectrum evolving over time, using a 128 point FFT:
-   ![Wenet spectrum 3D](doc/wenet_spectrum_3d.png)
-
-   This is a 2FSK signal so we should see two tones.  However there are three tones. The lowest one is a "DC line" common in signals from RTL-SDRs or those with coarse quantisation.  This DC tone was confusing the "peak" frequency estimator.
-
-   To work around this problem we can tell the C version of the modem to ignore low frequency tones with the ```fsk_lower``` option:
+1. ```fsk_demod_file.m``` is useful for peering inside the modem, for example when debugging.
    ```
    $ cd ~/codec2/build_linux/src
-   $ cat /home/david/codec2/raw/wenet_sample.c8 | ./fsk_demod --cu8 --fsk_lower 500 -s 2 8000 1000 - - | ./drs232_ldpc - /dev/null
-   packets: 17 packet_errors: 0 PER: 0.000
+   $ ./fsk_get_test_bits - 1000 | ./fsk_mod 2 8000 100 1000 1000 - ../../octave/fsk.s16
+   $ octave --no-gui
+   octave:1> fsk_demod_file("fsk.s16",format="s16",8000,100,2)
    ```
-   This successfully decodes all 17 packets in the sample with no errors, yayyy!
    
 ## Further Reading
 
@@ -145,3 +139,4 @@ The Octave version of the modem was developed by David Rowe.  Brady O'Brien port
    1. [FreeDV 2400A and 2400B](http://www.rowetel.com/?p=5219), digital speech for VHF/UHF radios.
    1. [HF FSK with Rpitx](http://www.rowetel.com/?p=6317), a zero hardware FSK transmitter using a Pi
    1. [Eb/No and SNR worked Example](http://www.rowetel.com/wordpress/?p=4621)
+   1. [FSK LLR LDPC Code Experiments](https://github.com/drowe67/codec2/pull/129)
