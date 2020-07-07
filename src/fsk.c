@@ -111,7 +111,7 @@ static void fsk_generate_hann_table(struct FSK* fsk){
 
 \*---------------------------------------------------------------------------*/
 
-struct FSK * fsk_create_core(int Fs, int Rs, int M, int P, int Nsym, int tx_f1, int tx_fs)
+struct FSK * fsk_create_core(int Fs, int Rs, int M, int P, int Nsym, int f1_tx, int tone_spacing)
 {
     struct FSK *fsk;
     int i;
@@ -119,14 +119,14 @@ struct FSK * fsk_create_core(int Fs, int Rs, int M, int P, int Nsym, int tx_f1, 
     /* Check configuration validity */
     assert(Fs > 0 );
     assert(Rs > 0 );
-    assert(tx_f1 > 0);
-    assert(tx_fs > 0);
     assert(P > 0);
     assert(Nsym > 0);
     /* Ts (Fs/Rs) must be an integer */
     assert( (Fs%Rs) == 0 );
     /* Ts/P (Fs/Rs/P) must be an integer */
     assert( ((Fs/Rs)%P) == 0 );
+    /* If P is too low we don't have a good chocie of timing offsets to choose from */
+    assert( P >= 4 );
     assert( M==2 || M==4);
     
     fsk = (struct FSK*) malloc(sizeof(struct FSK)); assert(fsk != NULL);
@@ -147,8 +147,8 @@ struct FSK * fsk_create_core(int Fs, int Rs, int M, int P, int Nsym, int tx_f1, 
     fsk->Ndft = Ndft;
     fsk->tc = 0.1;
     fsk->Nmem = fsk->N+(2*fsk->Ts);
-    fsk->f1_tx = tx_f1;
-    fsk->fs_tx = tx_fs;
+    fsk->f1_tx = f1_tx;
+    fsk->tone_spacing = tone_spacing;
     fsk->nin = fsk->N;
     fsk->lock_nin = 0;
     fsk->mode = M==2 ? MODE_2FSK : MODE_4FSK;
@@ -210,6 +210,9 @@ struct FSK * fsk_create_core(int Fs, int Rs, int M, int P, int Nsym, int tx_f1, 
   to the modem state/config struct. One modem config struct may be used
   for both mod and demod.
 
+  If you are not intending to use the modulation functions, you can
+  set f1_tx to FSK_NONE.
+
 \*---------------------------------------------------------------------------*/
 
 struct FSK * fsk_create(int Fs, int Rs, int M, int tx_f1, int tx_fs) {
@@ -222,18 +225,23 @@ struct FSK * fsk_create(int Fs, int Rs, int M, int tx_f1, int tx_fs) {
   AUTHOR......: Brady O'Brien
   DATE CREATED: 11 February 2016
   
-  Alternate version of create allows user defined decimation P and
-  Nsym.  In the current version of the demod it's simply an alias for
-  the default core function.
+  Alternate version of create allows user defined oversampling P and
+  averaging window Nsym.  In the current version of the demod it's
+  simply an alias for the default core function.
 
-  P is the decimation rate, so the intermal demod processing happens
-  at Fs/P Hz.  Nsym is the number of symbols we average demod
-  parameters like symbol timing over.
+  P is the oversampling rate of the internal demod processing, which
+  happens at Rs*P Hz.  We filter the tones at P different timing
+  offsets, and choose the best one.  P should be >=8, so we have a
+  choice of at least 8 timing offsets.  This may require some
+  adjustment of Fs and Rs, as Fs/Rs/P must be an integer.
+
+  Nsym is the number of symbols we average demod parameters like
+  symbol timing over.
 
 \*---------------------------------------------------------------------------*/
 
-struct FSK * fsk_create_hbr(int Fs, int Rs, int M, int P, int Nsym, int tx_f1, int tx_fs) {
-    return fsk_create_core(Fs, Rs, M, P, Nsym, tx_f1, tx_fs);
+struct FSK * fsk_create_hbr(int Fs, int Rs, int M, int P, int Nsym, int f1_tx, int tone_spacing) {
+    return fsk_create_core(Fs, Rs, M, P, Nsym, f1_tx, tone_spacing);
 }
 
 /*---------------------------------------------------------------------------*\
@@ -265,19 +273,23 @@ void fsk_destroy(struct FSK *fsk){
 \*---------------------------------------------------------------------------*/
 
 void fsk_mod(struct FSK *fsk,float fsk_out[],uint8_t tx_bits[]){
-    COMP tx_phase_c = fsk->tx_phase_c; /* Current complex TX phase */
-    int f1_tx = fsk->f1_tx;         /* '0' frequency */
-    int fs_tx = fsk->fs_tx;         /* space between frequencies */
-    int Ts = fsk->Ts;               /* samples-per-symbol */
-    int Fs = fsk->Fs;               /* sample freq */
+    COMP tx_phase_c = fsk->tx_phase_c;    /* Current complex TX phase */
+    int f1_tx = fsk->f1_tx;               /* '0' frequency */
+    int tone_spacing = fsk->tone_spacing; /* space between frequencies */
+    int Ts = fsk->Ts;                     /* samples-per-symbol */
+    int Fs = fsk->Fs;                     /* sample freq */
     int M = fsk->mode;
-    COMP dosc_f[M];                 /* phase shift per sample */
-    COMP dph;                       /* phase shift of current bit */
+    COMP dosc_f[M];                       /* phase shift per sample */
+    COMP dph;                             /* phase shift of current bit */
     size_t i,j,m,bit_i,sym;
+
+    /* trap these parametrs being set to FSK_UNUSED, then calling mod */
+    assert(f1_tx > 0);
+    assert(tone_spacing > 0);
     
     /* Init the per sample phase shift complex numbers */
     for( m=0; m<M; m++){
-        dosc_f[m] = comp_exp_j(2*M_PI*((float)(f1_tx+(fs_tx*m))/(float)(Fs)));
+        dosc_f[m] = comp_exp_j(2*M_PI*((float)(f1_tx+(tone_spacing*m))/(float)(Fs)));
     }
     
     bit_i = 0;
@@ -319,20 +331,24 @@ void fsk_mod(struct FSK *fsk,float fsk_out[],uint8_t tx_bits[]){
 \*---------------------------------------------------------------------------*/
 
 void fsk_mod_c(struct FSK *fsk,COMP fsk_out[],uint8_t tx_bits[]){
-    COMP tx_phase_c = fsk->tx_phase_c; /* Current complex TX phase */
-    int f1_tx = fsk->f1_tx;         /* '0' frequency */
-    int fs_tx = fsk->fs_tx;         /* space between frequencies */
-    int Ts = fsk->Ts;               /* samples-per-symbol */
-    int Fs = fsk->Fs;               /* sample freq */
+    COMP tx_phase_c = fsk->tx_phase_c;    /* Current complex TX phase */
+    int f1_tx = fsk->f1_tx;               /* '0' frequency */
+    int tone_spacing = fsk->tone_spacing; /* space between frequencies */
+    int Ts = fsk->Ts;                     /* samples-per-symbol */
+    int Fs = fsk->Fs;                     /* sample freq */
     int M = fsk->mode;
-    COMP dosc_f[M];                 /* phase shift per sample */
-    COMP dph;                       /* phase shift of current bit */
+    COMP dosc_f[M];                       /* phase shift per sample */
+    COMP dph;                             /* phase shift of current bit */
     size_t i,j,bit_i,sym;
     int m;
     
+    /* trap these parametrs being set to FSK_UNUSED, then calling mod */
+    assert(f1_tx > 0);
+    assert(tone_spacing > 0);
+
     /* Init the per sample phase shift complex numbers */
     for( m=0; m<M; m++){
-        dosc_f[m] = comp_exp_j(2*M_PI*((float)(f1_tx+(fs_tx*m))/(float)(Fs)));
+        dosc_f[m] = comp_exp_j(2*M_PI*((float)(f1_tx+(tone_spacing*m))/(float)(Fs)));
     }
     
     bit_i = 0;
@@ -375,12 +391,16 @@ void fsk_mod_c(struct FSK *fsk,COMP fsk_out[],uint8_t tx_bits[]){
 \*---------------------------------------------------------------------------*/
 
 void fsk_mod_ext_vco(struct FSK *fsk, float vco_out[], uint8_t tx_bits[]) {
-    int f1_tx = fsk->f1_tx;         /* '0' frequency */
-    int fs_tx = fsk->fs_tx;         /* space between frequencies */
-    int Ts = fsk->Ts;               /* samples-per-symbol */
+    int f1_tx = fsk->f1_tx;                   /* '0' frequency */
+    int tone_spacing = fsk->tone_spacing;     /* space between frequencies */
+    int Ts = fsk->Ts;                         /* samples-per-symbol */
     int M = fsk->mode;
     int i, j, m, sym, bit_i;
     
+    /* trap these parametrs being set to FSK_UNUSED, then calling mod */
+    assert(f1_tx > 0);
+    assert(tone_spacing > 0);
+
     bit_i = 0;
     for(i=0; i<fsk->Nsym; i++) {
         /* generate the symbol number from the bit stream, 
@@ -402,9 +422,9 @@ void fsk_mod_ext_vco(struct FSK *fsk, float vco_out[], uint8_t tx_bits[]) {
            Note: drive is inverted, a higher tone drives VCO voltage lower
          */
 
-        //fprintf(stderr, "i: %d sym: %d freq: %f\n", i, sym, f1_tx + fs_tx*(float)sym);
+        //fprintf(stderr, "i: %d sym: %d freq: %f\n", i, sym, f1_tx + tone_spacing*(float)sym);
         for(j=0; j<Ts; j++) {
-            vco_out[i*Ts+j] = f1_tx + fs_tx*(float)sym;
+            vco_out[i*Ts+j] = f1_tx + tone_spacing*(float)sym;
         }
     }
 }
@@ -554,7 +574,7 @@ void fsk_demod_freq_est(struct FSK *fsk, COMP fsk_in[], float *freqs, int M) {
     for(i=0;i<3; i++) mask[i] = 1.0;
     int bin=0;
     for(int m=1; m<=M-1; m++) {
-        bin = round((float)m*fsk->fs_tx*Ndft/Fs)-1;
+        bin = round((float)m*fsk->tone_spacing*Ndft/Fs)-1;
         for(i=bin; i<=bin+2; i++) mask[i] = 1.0;
     }
     int len_mask = bin+2+1;
@@ -576,9 +596,9 @@ void fsk_demod_freq_est(struct FSK *fsk, COMP fsk_in[], float *freqs, int M) {
         }
     }
     float foff = (b_max-Ndft/2)*Fs/Ndft;
-    //fprintf(stderr, "fsk->fs_tx: %d\n",fsk->fs_tx);
+    //fprintf(stderr, "fsk->tone_spacing: %d\n",fsk->tone_spacing);
     for (int m=0; m<M; m++)
-        fsk->f2_est[m] = foff + m*fsk->fs_tx;
+        fsk->f2_est[m] = foff + m*fsk->tone_spacing;
     #ifdef MODEMPROBE_ENABLE
     modem_probe_samp_f("t_f2_est",fsk->f2_est,M);
     #endif
@@ -646,7 +666,6 @@ void fsk_demod_core(struct FSK *fsk, uint8_t rx_bits[], float rx_sd[], COMP fsk_
         for(i=nold,j=0; i<Nmem; i++,j++) {
             phi_c[m] = cmult(phi_c[m],dphi_m);
             f_dc[m*Nmem+i] = cmult(fsk_in[j],cconj(phi_c[m]));
-            //f_dc[m*Nmem+i] = cconj(phi_c[m]);
         }
         phi_c[m] = comp_normalize(phi_c[m]);
         #ifdef MODEMPROBE_ENABLE
@@ -851,7 +870,7 @@ void fsk_demod_core(struct FSK *fsk, uint8_t rx_bits[], float rx_sd[], COMP fsk_
     fc_avg = fc_tx = 0.0;
     for(int m=0; m<M; m++) {
         fc_avg += f_est[m]/M;
-        fc_tx  += (fsk->f1_tx + m*fsk->fs_tx)/M;
+        fc_tx  += (fsk->f1_tx + m*fsk->tone_spacing)/M;
     }
     fsk->stats->foff = fc_tx-fc_avg;
     
