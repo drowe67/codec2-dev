@@ -492,11 +492,6 @@ endif()
              WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/unittest
              )
 
-     add_test(NAME test_freedv_api_rawdata_700D
-             COMMAND sh -c "./tfreedv_700D_rawdata"
-             WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/unittest
-             )
-
 if(UNIX) # Uses pthreads
      add_test(NAME test_fifo
              COMMAND $<TARGET_FILE:tfifo>
