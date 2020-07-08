@@ -322,11 +322,11 @@ int main(int argc, char *argv[]) {
 	       - Get activity from codec2 api
 	       - Based on activity either send encoded voice or data
 	     */
-            int bits_per_codec_frame = codec2_bits_per_frame(c2);
-            int bytes_per_codec_frame = (bits_per_codec_frame + 7) / 8;
-            int codec_frames = freedv_get_bits_per_codec_frame(freedv) / bits_per_codec_frame;
+            int bytes_per_codec_frame = freedv_get_bytes_per_codec_frame(freedv);
+            int codec_frames = freedv_get_n_codec_frames(freedv);
             int samples_per_frame = codec2_samples_per_frame(c2);
             unsigned char encoded[bytes_per_codec_frame * codec_frames];
+	    unsigned char rawdata[freedv_get_bytes_per_modem_frame(freedv)];
             unsigned char *enc_frame = encoded;
             short *speech_frame = speech_in;
             float energy = 0;
@@ -346,7 +346,8 @@ int main(int argc, char *argv[]) {
                 freedv_datatx(freedv, mod_out);
             } else {
                 /* Use the freedv_api to modulate already encoded frames */
-                freedv_rawdatatx(freedv, mod_out, encoded);
+		freedv_rawdata_from_codec_frames(freedv, rawdata, encoded);
+                freedv_rawdatatx(freedv, mod_out, rawdata);
             }
         }
 

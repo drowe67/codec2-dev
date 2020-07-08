@@ -68,3 +68,6 @@ target_link_libraries(tfreedv_2400A_rawdata codec2)
 
 add_executable(tfreedv_2400B_rawdata tfreedv_2400B_rawdata.c)
 target_link_libraries(tfreedv_2400B_rawdata codec2)
+
+add_executable(tfreedv_700D_rawdata tfreedv_700D_rawdata.c)
+target_link_libraries(tfreedv_700D_rawdata codec2)
