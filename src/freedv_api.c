@@ -485,7 +485,7 @@ int freedv_codec_frames_from_rawdata(struct freedv *f, unsigned char *codec_fram
 	    nr_cbits = 0;
 	}
     }
-    return freedv_get_n_codec_frames(f);
+    return f->n_codec_frames;
 }
 
 int freedv_rawdata_from_codec_frames(struct freedv *f, unsigned char *rawdata, unsigned char *codec_frames)
@@ -522,7 +522,7 @@ int freedv_rawdata_from_codec_frames(struct freedv *f, unsigned char *rawdata, u
 	    nr_cbits = 0;
 	}
     }
-    return freedv_get_n_codec_frames(f);
+    return f->n_codec_frames;
 }
 
 
@@ -875,7 +875,7 @@ int freedv_rawdatarx(struct freedv *f, unsigned char *packed_payload_bits, short
         rx_status = freedv_comprx_fsk(f, rx_fdm);
         f->rx_status = rx_status;
         if (rx_status & RX_BITS) {
-	    ret = freedv_get_bytes_per_modem_frame(f);
+	    ret = (freedv_get_bits_per_modem_frame(f) + 7) / 8;
 	    freedv_rawdata_from_codec_frames(f, packed_payload_bits, f->rx_payload_bits);
         }
         return ret;
@@ -1197,11 +1197,8 @@ int freedv_get_total_bit_errors_coded     (struct freedv *f) {return f->total_bi
 int freedv_get_sync                       (struct freedv *f) {return f->stats.sync;}
 struct CODEC2 *freedv_get_codec2	  (struct freedv *f){return  f->codec2;}
 int freedv_get_bits_per_codec_frame       (struct freedv *f){return f->bits_per_codec_frame;}
-int freedv_get_bytes_per_codec_frame      (struct freedv *f){return (f->bits_per_codec_frame+7)/8;}
 int freedv_get_bits_per_modem_frame       (struct freedv *f){return f->bits_per_modem_frame;}
-int freedv_get_bytes_per_modem_frame      (struct freedv *f){return (f->bits_per_modem_frame+7)/8;}
 int freedv_get_uncorrected_errors         (struct freedv *f) {return f->rx_status & RX_BIT_ERRORS;}
-int freedv_get_n_codec_frames             (struct freedv *f) {return f->n_codec_frames; }
 
 int freedv_get_n_max_speech_samples(struct freedv *f) {
     /* When "passing through" demod samples to the speech output

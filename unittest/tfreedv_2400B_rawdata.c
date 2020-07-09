@@ -67,25 +67,10 @@ int main(int argc, char **argv)
     assert(codec_bits == 52);
     printf("%d Passed\n", codec_bits);
 
-    printf("freedv_get_n_bytes_per_codec_frame() ");
-    int codec_bytes = freedv_get_bytes_per_codec_frame(f);
-    assert(codec_bytes == 7);
-    printf("%d Passed\n", codec_bytes);
-
     printf("freedv_get_n_bits_per_modem_frame() ");
     int frame_bits = freedv_get_bits_per_modem_frame(f);
     assert(frame_bits == 52);
     printf("%d Passed\n", frame_bits);
-
-    printf("freedv_get_n_bytes_per_modem_frame() ");
-    int frame_bytes = freedv_get_bytes_per_modem_frame(f);
-    assert(frame_bytes == 7);
-    printf("%d Passed\n", frame_bytes);
-
-    printf("freedv_get_n_codec_frames() ");
-    int n_codec_frames = freedv_get_n_codec_frames(f);
-    assert(n_codec_frames == 1);
-    printf("%d Passed\n", n_codec_frames);
 
     printf("freedv_rawdatatx()/freedv_rawdatarx() ");
     int frames = 0;
