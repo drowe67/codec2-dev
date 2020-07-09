@@ -343,36 +343,49 @@ function [rx_bits states] = fsk_demod(states, sf)
 
   f_int_resample = zeros(M,nsym);
   rx_bits = zeros(1,nsym*states.bitspersymbol);
-  tone_max = rx_bits_sd = zeros(1,nsym);
-
+  tone_max = zeros(1,nsym);
+  rx_nse_pow = 1E-12; rx_sig_pow = 0.0;
+  
   for i=1:nsym
     st = i*P+1;
     f_int_resample(:,i) = f_int(:,st+low_sample)*(1-fract) + f_int(:,st+high_sample)*fract;
 
-    % Largest amplitude tone is the winner.  Map this FSK "symbol" back to a bunch-o-bits,
-    % depending on M.
+    % Hard decision decoding, Largest amplitude tone is the winner.
+    % Map this FSK "symbol" back to bits, depending on M
 
     [tone_max(i) tone_index] = max(f_int_resample(:,i));
     st = (i-1)*states.bitspersymbol + 1;
     en = st + states.bitspersymbol-1;
     arx_bits = dec2bin(tone_index - 1, states.bitspersymbol) - '0';
     rx_bits(st:en) = arx_bits;
+
+    % each filter is the DFT of a chunk of spectrum.  If there is no tone in the
+    % filter it can be considered an estimate of noise in that bandwidth
+    rx_pows = f_int_resample(:,i) .* conj(f_int_resample(:,i));
+    rx_sig_pow += rx_pows(tone_index);
+    rx_nse_pow += (sum(rx_pows) - rx_pows(tone_index))/(M-1);
   end
 
   states.f_int_resample = f_int_resample;
-  states.rx_bits_sd = rx_bits_sd;
 
-  % Eb/No estimation (todo: this needs some work, like calibration, low Eb/No perf)
-
+  % Eb/No estimation (todo: this needs some work, like calibration, low Eb/No perf, work for all M)
   tone_max = abs(tone_max);
   states.EbNodB = -6 + 20*log10(1E-6+mean(tone_max)/(1E-6+std(tone_max)));
+
+  % Estimators for LDPC decoder, might be a bit rough if nsym is small
+  rx_sig_pow = rx_sig_pow/nsym;
+  rx_nse_pow = rx_nse_pow/nsym;
+  states.v_est = sqrt(rx_sig_pow-rx_nse_pow); 
+  states.SNRest = rx_sig_pow/rx_nse_pow;
 endfunction
 
 
 % BER counter and test frame sync logic -------------------------------------------
+% We look for test_frame in rx_bits_buf,  rx_bits_buf must be twice as long as test_frame
 
 function states = ber_counter(states, test_frame, rx_bits_buf)
   nbit = length(test_frame);
+  assert (length(rx_bits_buf) == 2*nbit);
   state = states.ber_state;
   next_state = state;
 

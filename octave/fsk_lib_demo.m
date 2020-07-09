@@ -1,4 +1,5 @@
 % fsk_lib_demo.m
+% Uncoded FSK modem demo
 
 fsk_lib;
 
