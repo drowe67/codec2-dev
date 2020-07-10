@@ -241,7 +241,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
         ofdm->ftwindowwidth = config->ftwindowwidth;
         ofdm->timing_mx_thresh = config->timing_mx_thresh;
     }
-
+    
     ofdm->m = (int) (ofdm->fs / ofdm->rs); /* 144 */
     ofdm->ncp = (int) (ofdm->tcp * ofdm->fs); /* 16 */
     ofdm->inv_m = (1.0f / (float) ofdm->m);
@@ -261,7 +261,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     ofdm->config.nuwbits = ofdm->nuwbits;
     ofdm->config.txtbits = ofdm->ntxtbits; /* reserved bits/frame for auxiliary text information.  Uncoded/unprotected so may */
                                            /* be of limited use going forward, consider setting to 0 */
-    ofdm->config.bad_uw_errors = config->bad_uw_errors;
+    ofdm->config.bad_uw_errors = ofdm->bad_uw_errors;
     ofdm->config.timing_mx_thresh = ofdm->timing_mx_thresh;
     ofdm->config.ftwindowwidth = ofdm->ftwindowwidth;
     
