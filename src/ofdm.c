@@ -218,7 +218,6 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
         ofdm->fs = 8000.0f; /* Sample Frequency */
         ofdm->ntxtbits = 4;
         ofdm->bps = 2; /* Bits per Symbol */
-        ofdm->nuwbits = 5 * ofdm->bps; /* Unique Words */
         ofdm->bad_uw_errors = 3;
         ofdm->ftwindowwidth = 11;
         ofdm->timing_mx_thresh = 0.35f;
@@ -245,6 +244,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     ofdm->m = (int) (ofdm->fs / ofdm->rs); /* 144 */
     ofdm->ncp = (int) (ofdm->tcp * ofdm->fs); /* 16 */
     ofdm->inv_m = (1.0f / (float) ofdm->m);
+    ofdm->nuwbits = 5 * ofdm->bps; /* Unique Words */
     
     /* Copy constants into states */
 
