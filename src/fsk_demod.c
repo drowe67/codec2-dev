@@ -1,12 +1,11 @@
 /*---------------------------------------------------------------------------*\
 
   FILE........: fsk_demod.c
-  AUTHOR......: Brady O'Brien
+  AUTHOR......: Brady O'Brien and David Rowe
   DATE CREATED: 8 January 2016
 
-  C test driver for fsk_demod in fsk.c. Reads in a stream of 32 bit cpu endian
-  floats and writes out the detected bits
-   
+  Command line FSK demodulator.  Reads in FSK samples, writes demodulated 
+  output bits.   
 
 \*---------------------------------------------------------------------------*/
 
