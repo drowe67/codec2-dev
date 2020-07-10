@@ -1,12 +1,14 @@
-function [Hrows Hcols] = Mat2Hrows(HRA); 
+function [Hrows Hcols] = Mat2Hrows(HRA, RAmode); 
 
 H = full(HRA); 
-[Nr Nc] = size(H); 
+[Nr Nc] = size(H);
 
-H= H(:,1:Nc-Nr); 
-[Nr Nc] = size(H); 
+if nargin==1, RAmode = 1; end; 
 
-
+if RAmode==1
+   H= H(:,1:Nc-Nr); 
+   [Nr Nc] = size(H); 
+end 
 
 Max_colwt = max(sum(H));
 Max_rowwt = max(sum(H')); 
