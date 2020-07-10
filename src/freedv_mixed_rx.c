@@ -164,16 +164,20 @@ int main(int argc, char *argv[]) {
             nout = freedv_rx(freedv, speech_out, demod_in);
         } else {
             /* demo of codecrx mode - separate demodulation and speech decoding */
-            int bits_per_codec_frame = codec2_bits_per_frame(c2);
+            int bits_per_codec_frame = freedv_get_bits_per_codec_frame(freedv);
+            int bits_per_modem_frame = freedv_get_bits_per_modem_frame(freedv);
             int bytes_per_codec_frame = (bits_per_codec_frame + 7) / 8;
-            int codec_frames = freedv_get_bits_per_modem_frame(freedv) / bits_per_codec_frame;
+            int bytes_per_modem_frame = (bits_per_modem_frame + 7) / 8;
+            int codec_frames = bits_per_modem_frame / bits_per_codec_frame;
             int samples_per_frame = codec2_samples_per_frame(c2);
             unsigned char encoded[bytes_per_codec_frame * codec_frames];
+	    unsigned char rawdata[bytes_per_modem_frame];
 
             nout = 0;
 	    
             /* Use the freedv_api to demodulate only */
-            int ncodec = freedv_rawdatarx(freedv, encoded, demod_in);
+            int ncodec = freedv_rawdatarx(freedv, rawdata, demod_in);
+	    freedv_codec_frames_from_rawdata(freedv, encoded, rawdata);
 	  
             /* decode the speech ourself (or send it to elsewhere, e.g. network) */
             if (ncodec) {
