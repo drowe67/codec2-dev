@@ -137,33 +137,34 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     if (config == NULL) {
         /* Fill in default values */
 
-        ofdm->nc = 17; /* Number of carriers */
+        ofdm->nc = 17;                            /* Number of carriers */
         ofdm->np = 1;
-        ofdm->ns = 8; /* Number of Symbol frames */
+        ofdm->ns = 8;                             /* Number of Symbols per modem frame */
         ofdm->ts = 0.018f;
-        ofdm->rs = (1.0f / ofdm->ts); /* Modulation Symbol Rate */
-        ofdm->tcp = .002f; /* Cyclic Prefix duration */
-        ofdm->tx_centre = 1500.0f; /* TX Centre Audio Frequency */
-        ofdm->rx_centre = 1500.0f; /* RX Centre Audio Frequency */
-        ofdm->fs = 8000.0f; /* Sample Frequency */
+        ofdm->rs = (1.0f / ofdm->ts);             /* Modulation Symbol Rate */
+        ofdm->tcp = .002f;                        /* Cyclic Prefix duration */
+        ofdm->tx_centre = 1500.0f;                /* TX Carrier Frequency */
+        ofdm->rx_centre = 1500.0f;                /* RX Carrier Frequency */
+        ofdm->fs = 8000.0f;                       /* Sample rate */
         ofdm->ntxtbits = 4;
-        ofdm->bps = 2; /* Bits per Symbol */
+        ofdm->bps = 2;                            /* Bits per Symbol */
+        ofdm->nuwbits = 5 * ofdm->bps;            /* default is 5 symbols of Unique Word bits */
         ofdm->bad_uw_errors = 3;
         ofdm->ftwindowwidth = 11;
         ofdm->timing_mx_thresh = 0.30f;
     } else {
         /* Use the users values */
 
-        ofdm->nc = config->nc; /* Number of carriers */
-        ofdm->np = config->np; /* Number of Frames per Packet */
-        ofdm->ns = config->ns; /* Number of Symbol frames */
-        ofdm->bps = config->bps; /* Bits per Symbol */
+        ofdm->nc = config->nc;                    /* Number of carriers */
+        ofdm->np = config->np;                    /* Number of modem Frames per Packet */
+        ofdm->ns = config->ns;                    /* Number of Symbol frames */
+        ofdm->bps = config->bps;                  /* Bits per Symbol */
         ofdm->ts = config->ts;
-        ofdm->tcp = config->tcp; /* Cyclic Prefix duration */
-        ofdm->tx_centre = config->tx_centre; /* TX Centre Audio Frequency */
-        ofdm->rx_centre = config->rx_centre; /* RX Centre Audio Frequency */
-        ofdm->fs = config->fs; /* Sample Frequency */
-        ofdm->rs = config->rs; /* Symbol Rate */
+        ofdm->tcp = config->tcp;                  /* Cyclic Prefix duration */
+        ofdm->tx_centre = config->tx_centre;      /* TX Centre Audio Frequency */
+        ofdm->rx_centre = config->rx_centre;      /* RX Centre Audio Frequency */
+        ofdm->fs = config->fs;                    /* Sample Frequency */
+        ofdm->rs = config->rs;                    /* Symbol Rate */
         ofdm->ntxtbits = config->txtbits;
         ofdm->nuwbits = config->nuwbits;
         ofdm->bad_uw_errors = config->bad_uw_errors;
@@ -171,10 +172,9 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
         ofdm->timing_mx_thresh = config->timing_mx_thresh;
     }
 
-    ofdm->nuwbits = 5 * ofdm->bps; /* Unique Words */
-    ofdm->rs = (1.0f / ofdm->ts); /* Modulation Symbol Rate */
-    ofdm->m = (int) (ofdm->fs / ofdm->rs); /* 144 */
-    ofdm->ncp = (int) (ofdm->tcp * ofdm->fs); /* 16 */
+    ofdm->rs = (1.0f / ofdm->ts);                 /* Modulation Symbol Rate */
+    ofdm->m = (int) (ofdm->fs / ofdm->rs);        /* 700D: 144 */
+    ofdm->ncp = (int) (ofdm->tcp * ofdm->fs);     /* 700D: 16 */
     ofdm->inv_m = (1.0f / (float) ofdm->m);
     
     /* basic sanity check */
@@ -193,6 +193,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     ofdm->config.ns = ofdm->ns;
     ofdm->config.np = ofdm->np;
     ofdm->config.bps = ofdm->bps;
+    ofdm->config.nuwbits = ofdm->nuwbits;
     ofdm->config.txtbits = ofdm->ntxtbits;
     ofdm->config.bad_uw_errors = ofdm->bad_uw_errors;
     ofdm->config.ftwindowwidth = ofdm->ftwindowwidth;
