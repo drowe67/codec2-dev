@@ -348,7 +348,7 @@ int main(int argc, char *argv[])
 
     int Nsam = ofdm_samplesperframe*NFRAMES;
     int prx = 0;
-    int nin = ofdm_samplesperframe + (2*samplespersymbol);
+    int nin = ofdm_samplesperframe + (2*ofdm_samplespersymbol);
 
     int  lnew;
     COMP rxbuf_in[ofdm_max_samplesperframe];
@@ -356,7 +356,7 @@ int main(int argc, char *argv[])
 #define FRONT_LOAD
 #ifdef FRONT_LOAD
     for (i=0; i<nin; i++,prx++) {
-         ofdm->rxbuf[ofdm_rxbuf-nin+i] = rx_log[prx].real + rx_log[prx].imag * I;
+         ofdm->rxbuf[ofdm_nrxbuf-nin+i] = rx_log[prx].real + rx_log[prx].imag * I;
     }
 #endif
     
