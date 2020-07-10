@@ -218,7 +218,7 @@ int main(int argc, char *argv[])
     ofdm_samplesperframe = ofdm_get_samples_per_frame(ofdm);
     ofdm_samplespersymbol = (ofdm->m + ofdm->ncp);
     ofdm_max_samplesperframe = ofdm_get_max_samples_per_frame(ofdm);
-    ofdm->nrxbuf = (3 * ofdm->samplesperframe) + (3 * ofdm->samplespersymbol);
+    ofdm_nrxbuf = (3 * ofdm_samplesperframe) + (3 * ofdm_samplespersymbol);
     ofdm_ntxtbits = ofdm_config->txtbits;
     ofdm_nuwbits = ofdm_config->nuwbits;
 
