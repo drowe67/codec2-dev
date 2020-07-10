@@ -82,8 +82,9 @@ static int ofdm_ftwindowwidth;
 static int ofdm_bitsperframe;
 static int ofdm_rowsperframe;
 static int ofdm_samplesperframe;
+static int ofdm_samplespersymbol;
 static int ofdm_max_samplesperframe;
-static int ofdm_rxbuf;
+static int ofdm_nrxbuf;
 static int ofdm_ntxtbits;           /* reserve bits/frame for auxillary text information */
 static int ofdm_nuwbits;            /* Unique word, used for positive indication of lock */
 
@@ -215,6 +216,7 @@ int main(int argc, char *argv[])
     ofdm_bitsperframe = ofdm_get_bits_per_frame(ofdm);
     ofdm_rowsperframe = ofdm_bitsperframe / (ofdm_config->nc * ofdm_config->bps);
     ofdm_samplesperframe = ofdm_get_samples_per_frame(ofdm);
+    ofdm_samplespersymbol = (ofdm->m + ofdm->ncp);
     ofdm_max_samplesperframe = ofdm_get_max_samples_per_frame(ofdm);
     ofdm->nrxbuf = (3 * ofdm->samplesperframe) + (3 * ofdm->samplespersymbol);
     ofdm_ntxtbits = ofdm_config->txtbits;
