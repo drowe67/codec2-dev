@@ -488,8 +488,8 @@ int main(int argc, char *argv[])
         nin_tot += nin;
 
         for(i=0; i<ofdm_nrxbuf; i++) {
-            rxbuf_log[ofdm_rxbuf*f+i].real = crealf(ofdm->rxbuf[i]);
-            rxbuf_log[ofdm_rxbuf*f+i].imag = cimagf(ofdm->rxbuf[i]);
+            rxbuf_log[ofdm_nrxbuf*f+i].real = crealf(ofdm->rxbuf[i]);
+            rxbuf_log[ofdm_nrxbuf*f+i].imag = cimagf(ofdm->rxbuf[i]);
         }
 
         for (i = 0; i < (ofdm_ns + 3); i++) {
@@ -546,7 +546,7 @@ int main(int argc, char *argv[])
     fout = fopen("tofdm_out.txt","wt");
     assert(fout != NULL);
     fprintf(fout, "# Created by tofdm.c\n");
-    octave_save_complex(fout, "pilot_samples_c", (COMP*)ofdm->pilot_samples, 1, samplespersymbol, samplespersymbol);
+    octave_save_complex(fout, "pilot_samples_c", (COMP*)ofdm->pilot_samples, 1, ofdm_samplespersymbol, ofdm_samplespersymbol);
     octave_save_int(fout, "tx_bits_log_c", tx_bits_log, 1, ofdm_bitsperframe*NFRAMES);
     octave_save_complex(fout, "tx_log_c", (COMP*)tx_log, 1, ofdm_samplesperframe*NFRAMES,  ofdm_samplesperframe*NFRAMES);
     octave_save_complex(fout, "rx_log_c", (COMP*)rx_log, 1, ofdm_samplesperframe*NFRAMES,  ofdm_samplesperframe*NFRAMES);
