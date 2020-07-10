@@ -218,9 +218,9 @@ int main(int argc, char *argv[])
     ofdm_samplesperframe = ofdm_get_samples_per_frame(ofdm);
     ofdm_samplespersymbol = (ofdm->m + ofdm->ncp);
     ofdm_max_samplesperframe = ofdm_get_max_samples_per_frame(ofdm);
-    ofdm->nrxbuf = (3 * ofdm->samplesperframe) + (3 * ofdm->samplespersymbol);
+    ofdm_nrxbuf = 3 * ofdm_samplesperframe + 3 * (ofdm_m + ofdm_ncp);
     ofdm_ntxtbits = ofdm_config->txtbits;
-    ofdm_nuwbits = ofdm_config->nuwbits;
+    ofdm_nuwbits = (ofdm_config->ns - 1) * ofdm_config->bps - ofdm_config->txtbits;
 
     int tx_bits[ofdm_samplesperframe];
     COMP tx[ofdm_samplesperframe];         /* one frame of tx samples */
@@ -348,7 +348,7 @@ int main(int argc, char *argv[])
 
     int Nsam = ofdm_samplesperframe*NFRAMES;
     int prx = 0;
-    int nin = ofdm_samplesperframe + (2*ofdm_samplespersymbol);
+    int nin = ofdm_samplesperframe + 2*ofdm_samplespersymbol;
 
     int  lnew;
     COMP rxbuf_in[ofdm_max_samplesperframe];
