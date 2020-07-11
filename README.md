@@ -42,7 +42,7 @@ $ ./src/c2dec 2400 hts1a_c2.bit hts1a_c2_2400.raw
 ```
 $ play -t raw -r 8000 -e signed-integer -b 16 ./hts1a_c2_2400.raw
 ```
-   using 700 bps bit rate encoding
+   using 700 bits/s encoding
 ```
 $ ./src/c2enc 700C ../raw/hts1a.raw hts1a_c2.bit
 $ ./src/c2dec 700C hts1a_c2.bit hts1a_c2_700.raw
