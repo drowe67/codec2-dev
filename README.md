@@ -4,7 +4,7 @@ Codec 2 is an open source (LGPL 2.1) low bit rate speech codec: http://rowetel.c
 
 Also included:
 
-  + The FreeDV API for digital voice over radio. FreeDV is an open source digital voice protocol that integrates modems, codecs, and FEC
+  + The [FreeDV](README_freedv.md) API for digital voice over radio. FreeDV is an open source digital voice protocol that integrates modems, codecs, and FEC
   + APIs for raw and Ethernet packet data over radio [README_data](README_data.md)
   + High performance Coherent OFDM modem for HF channels [README_ofdm](README_ofdm.md)
   + High performance Non-coherent FSK modem [README_fsk](README_fsk.md)
