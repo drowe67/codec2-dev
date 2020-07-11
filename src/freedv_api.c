@@ -463,6 +463,7 @@ int freedv_codec_frames_from_rawdata(struct freedv *f, unsigned char *codec_fram
     int nr_cbits = 0;
     int i;
     
+    codec_frames[0] = 0;
     for (i = 0; i < modem_bits; i++) {
         codec_frames[cbyte] |= ((rawdata[rbyte] >> rbit) & 1) << cbit;
 
@@ -476,11 +477,14 @@ int freedv_codec_frames_from_rawdata(struct freedv *f, unsigned char *codec_fram
         if (cbit < 0) {
             cbit = 7;
 	    cbyte++;
+	    codec_frames[cbyte] = 0;
 	}
 	nr_cbits++;
 	if (nr_cbits == codec_bits) {
-            if (cbit)
+            if (cbit) {
                 cbyte++;
+                codec_frames[cbyte] = 0;
+            }
             cbit = 7;
 	    nr_cbits = 0;
 	}
@@ -499,6 +503,7 @@ int freedv_rawdata_from_codec_frames(struct freedv *f, unsigned char *rawdata, u
     int nr_cbits = 0;
     int i;
     
+    rawdata[rbyte] = 0;
     for (i = 0; i < modem_bits; i++) {
         rawdata[rbyte] |= ((codec_frames[cbyte] >> cbit) & 1) << rbit;
 
@@ -506,6 +511,7 @@ int freedv_rawdata_from_codec_frames(struct freedv *f, unsigned char *rawdata, u
         if (rbit < 0) {
             rbit = 7;
             rbyte++;
+	    rawdata[rbyte] = 0;
         }
 	
         cbit--;
