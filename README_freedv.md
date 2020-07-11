@@ -6,7 +6,7 @@ On transmit, FreeDV converts speech to a modem signal you can send over a radio 
 
 FreeDV is available as a GUI application, an open source library (FreeDV API), and in hardware (the SM1000 FreeDV adaptor).  FreeDV is part of the Codec 2 project.
 
-This document gives an overview of the technology inside FreeDV.
+This document gives an overview of the technology inside FreeDV, and some additional notes on building/using the FreeDV 2020 and 2400A/2400B modes.
 
 ![FreeDV mode knob](http://www.rowetel.com/images/codec2/mode_dv.jpg)
 
@@ -25,6 +25,7 @@ This document gives an overview of the technology inside FreeDV.
 1. Technical information on various modem waveforms in the [modem codec frame design spreadsheet](https://github.com/drowe67/codec2/blob/master/doc/modem_codec_frame_design.ods)
 1. [Modems for HF Digital Voice Part 1](http://www.rowetel.com/wordpress/?p=5420)
 1. [Modems for HF Digital Voice Part 2](http://www.rowetel.com/wordpress/?p=5448)
+1. [FDMDV modem README](README_fdmdv.md)
 1. [OFDM modem README](README_ofdm.md)
 1. Many blog posts in the [rowetel.org blog archives](http://www.rowetel.com/?page_id=6172)
 
