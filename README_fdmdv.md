@@ -2,9 +2,9 @@
 
 ## Introduction
 
-A 1400 bit/s (nominal) Frequency Division Multiplexed Digital Voice (FDMDV) modem based on [1].  Used for FreeDV 1600.
+A 1400 bit/s (nominal) Frequency Division Multiplexed Digital Voice (FDMDV) modem based on [FreeDV 1600 Specification](https://freedv.org/freedv-specification).  Used for FreeDV 1600.
 
-The FDMDV modem was first implemented in GNU Octave, then ported to C. Algorithm development is generally easier in Octave, but for real time work we need the C version.  Automated units tests ensure the operation of the Octave and C versions are identical.
+The FDMDV modem was first implemented in GNU Octave, then ported to C. Algorithm development is generally easier in Octave, but for real-time work we need the C version.  Automated units tests ensure the operation of the Octave and C versions are identical.
 
 ## Quickstart
 
@@ -44,7 +44,7 @@ Built as part of codec2, see [README](README.md) for build instructions.
     ```
     $ sox -r 8000 -s -2 modem_sample_8kHz.raw -r 48000 modem_sample_48kHz.wav
     ```
-    For real time applications, the fdmdv.[ch] library includes functions to convert between 48 and 8 kHz sample rates.
+    For real-time applications, the fdmdv.[ch] library includes functions to convert between 48 and 8 kHz sample rates.
 
 1. Send 20 seconds at 2000 bit/s (20 carriers) to demod and count errors:
     ```
@@ -86,7 +86,7 @@ Note these require some Octave packages to be installed, see [README](README.md)
 | fdmdv_mod.m | Octave version of modulator that outputs a raw file. The modulator is driven by a test frame of bits.  This can then be played over a real channel or through a channel simulator like PathSim.  The sample rate can be changed using "sox" to simulate differences in tx/rx sample clocks |
 | fdmdv_demod.m | Demodulator program that takes a raw file as input, and works out the bit error rate using the known test frame.  Can be used to test the demod performs with off-air signals, or signals that have been passed through a channel simulator |
 | fdmdv_demod_c.m | Takes an output text file from the C demod fdmdv_demod.c and produces plots and measures BER. Useful for evaluating fdmdv_demod.c performance. The plots produced are identical to the Octave version fdmdv_demod.m, allowing direct comparison of the C and Octave versions |
-| tfdmdv.m | Automatic tests that compare the Octave and C versions of the FDMDV modem functions.  First run unittest/tfdmdv, this will generate a text file with test vectors from the C version.  Then run the Octave script tfdmdv and it will generate Octave versions of the test vectors and compare each vector with the C equivalent.  Its plots the vectors and and errors (green).  Its also produces an automatic check list based on test results.  If the Octave or C modem code is changed, this script should be used to ensure the C and Octave versions remain identical |
+| tfdmdv.m | Automatic tests that compare the Octave and C versions of the FDMDV modem functions.  First run unittest/tfdmdv, this will generate a text file with test vectors from the C version.  Then run the Octave script tfdmdv and it will generate Octave versions of the test vectors and compare each vector with the C equivalent.  It plots the vectors and errors (green).  It also produces an automatic checklist based on test results.  If the Octave or C modem code is changed, this script should be used to ensure the C and Octave versions remain identical |
 
 1. Typical fdmdv_ut run:
     ```
