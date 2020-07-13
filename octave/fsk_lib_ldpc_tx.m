@@ -1,6 +1,6 @@
 % fsk_lib_ldpc_tx.m
 %
-% LDPC coded 4FSK modem tx, generates a 8 kHz 16 bit short raw file
+% LDPC coded 4FSK modem tx, generates a 8 kHz 16 bit short real valued sample file
 
 function fsk_lib_ldpc_tx(filename, EbNodB=100, num_frames=10, Fs=8000, Rs=100)
   fsk_lib_ldpc;
@@ -24,10 +24,12 @@ function fsk_lib_ldpc_tx(filename, EbNodB=100, num_frames=10, Fs=8000, Rs=100)
   EcNo = 10^(EcNodB/10);
   variance = states.Fs/(states.Rs*EcNo*states.bitspersymbol);
 
-  noise = sqrt(variance/2)*randn(length(tx),1) + j*sqrt(variance/2)*randn(length(tx),1);
+  % note real noise
+  noise = sqrt(variance/2)*randn(length(tx),1);
   rx = tx + noise;
 
   frx=fopen(filename,"wb"); fwrite(frx, states.amp_scale*rx, "short"); fclose(frx);
+  printf("Fs: %d Rs: %d EbNodB: %3.1f  EcNodB: %3.1f frames transmitted: %3d\n", Fs, Rs, EbNodB, EcNodB, num_frames);
 end
 
 

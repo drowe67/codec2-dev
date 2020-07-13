@@ -5,15 +5,15 @@
 fsk_lib;
 ldpc;
 
-% set up modem waveform
+% set up modem waveform, real signal that an pass through a SSB radio
 function [states M] = modem_init(Rs,Fs,df)
   M  = 4;
   states = fsk_init(Fs,Rs,M,P=8,nsym=100);
-  states.tx_real = 0;
-  states.tx_tone_separation = 250;
-  states.ftx = -2.5*states.tx_tone_separation + states.tx_tone_separation*(1:M);
-  states.fest_fmin = -Fs/2;
-  states.fest_fmax = +Fs/2;
+  states.tx_real = 1;
+  states.tx_tone_separation = 100;
+  states.ftx = 1500 -2.5*states.tx_tone_separation + states.tx_tone_separation*(1:M);
+  states.fest_fmin = 1000;
+  states.fest_fmax = 2000;
   states.fest_min_spacing = Rs/2;
   states.df = df;
 

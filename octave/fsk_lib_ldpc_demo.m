@@ -159,9 +159,10 @@ end
 
 init_cml('~/cml/');
 load H_256_512_4.mat; HRA=H;
+more off;
 
 % single point
-%[states uber cber cper] = modem_run_test(HRA, EbNodB=8);
+[states uber cber cper] = modem_run_test(HRA, EbNodB=8);
 
 % curve
-freq_run_curve_peak_mask(HRA, 200)
+%freq_run_curve_peak_mask(HRA, 200)
