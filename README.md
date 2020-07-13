@@ -150,7 +150,7 @@ CTest is used as a test frame work, with support from GNU Octave scripts.
 
 1/ Install GNU Octave and libraries on Ubuntu with:
 ```
-$ sudo apt install octave octave-common octave-signal octave-parallel liboctave-dev gnuplot
+$ sudo apt install octave octave-common octave-signal liboctave-dev gnuplot python3-numpy sox valgrind
 ```
 (for more information see Octave section below)
 
