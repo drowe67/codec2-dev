@@ -54,7 +54,7 @@ Notes:
 
 1. All of the modems use multiple parallel carriers running at a low symbol rate of around 50 Hz.  This helps combat the effects of multipath channels.
 
-1. Codec 2 has various modes (2400/1300/700C etc), than sometimes accidentally match the name of the FreeDV mode.  For example FreeDV 700C uses Codec 2 700C for voice compression. However FreeDV 700D also uses Codec 2 700C for voice compression, but has a very different modem waveform to FreeDV 700C.  Sorry for the confusing nomenclature.
+1. Codec 2 has various modes (2400/1300/700C etc), that sometimes accidentally match the name of the FreeDV mode.  For example FreeDV 700C uses Codec 2 700C for voice compression. However FreeDV 700D also uses Codec 2 700C for voice compression, but has a very different modem waveform to FreeDV 700C.  Sorry for the confusing nomenclature.
 
 1. Coherent demodulation gives much better performance than differential, at the cost of some additional complexity.  Pilot symbols are transmitted regularly to allow the demod to estimate the reference phase of each carrier.
 
