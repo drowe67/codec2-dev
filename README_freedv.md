@@ -1,6 +1,6 @@
 # FreeDV README
 
-FreeDV is an open source digital voice protocol that integrates modems, codecs, and FEC. 
+FreeDV is an open source digital voice protocol that integrates modems, codecs, and FEC.
 
 On transmit, FreeDV converts speech to a modem signal you can send over a radio channel.  On receive, FreeDV takes off air modem signals and converts them to speech samples.
 
@@ -60,9 +60,9 @@ Notes:
 
 1. The 1600 and 700C waveforms use parallel tone modems, later modes use OFDM.  OFDM gives tighter carrier packing which allows higher bit rates, but tends to suffer more from frequency offsets and delay spread.
 
-1. At medium to high SNRs, FreeDV 700C performs well (better than 700D) on fast fading multipath channels with large delay spread due it's parallel tone design and high pilot symbol rate.  It employs transmit diversity which delivers BER performance similar to modes using FEC.  FreeDV 700C also has a short frame (40ms), so syncs fast with low latency.  Fast sync is useful on marginal channels that move between unusable and barely usable.
+1. At medium to high SNRs, FreeDV 700C performs well (better than 700D) on fast fading multipath channels with large delay spread due its parallel tone design and high pilot symbol rate.  It employs transmit diversity which delivers BER performance similar to modes using FEC.  FreeDV 700C also has a short frame (40ms), so syncs fast with low latency.  Fast sync is useful on marginal channels that move between unusable and barely usable.
 
-1. FreeDV 700D uses an OFDM modem and was optimised for low SNR channels, with strong FEC but a low pilot symbol rate and modest (2ms) cyclic prefix which means it's performance degrades on multipath channels with fast (> 1Hz) fading.  The use of strong FEC makes this mode quite robust to other channel impairments, such as static crashes, urban HF noise, and in-band interference.
+1. FreeDV 700D uses an OFDM modem and was optimised for low SNR channels, with strong FEC but a low pilot symbol rate and modest (2ms) cyclic prefix which means its performance degrades on multipath channels with fast (> 1Hz) fading.  The use of strong FEC makes this mode quite robust to other channel impairments, such as static crashes, urban HF noise, and in-band interference.
 
 1. FEC was added fairly recently to FreeDV modes.  The voice codecs we use work OK at bit error rates of a few %, and packet error rates of 10%. Raw bit error rates on multipath channels often exceed 10%.  For reasonable latency (say 40ms) we need small codewords. Thus to be useful we require a FEC code that works at over 10% raw BER, has 1% output (coded) bit error rate, and a codeword of around 100 bits.  Digital voice has unusual requirements, most FEC codes are designed for data which is intolerant of any bit errors, and few operate over 10% raw BER.  Powerful FEC codes have long block lengths (1000's of bits) which leads to long latency.  However LDPC codes come close, and can also "clean up" other channel errors caused by static and interference.  The use of OFDM means we now have "room" for the extra bits required for FEC, so there is little cost in adding it, apart from latency.
 
