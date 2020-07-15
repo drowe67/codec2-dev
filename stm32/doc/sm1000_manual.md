@@ -105,7 +105,7 @@ You can program the flash memory on your SM1000 via USB using a Windows or Linux
    1   | May 2015 | [sm1000.bin](http://www.rowetel.com/downloads/codec2/smartmic/sm1000.bin) | | Original release with FreeDV 1600
    2   | July 2019 | [sm1000v2.bin](http://www.rowetel.com/downloads/codec2/smartmic/sm1000v2.bin) |  [sm1000v2.dfu](http://www.rowetel.com/downloads/codec2/smartmic/sm1000v2.dfu) | FreeDV 700D and morse menus
    3   | March 2020 | [sm1000v3.bin](http://www.rowetel.com/downloads/codec2/smartmic/sm1000v3.bin) |  [sm1000v3.dfu](http://www.rowetel.com/downloads/codec2/smartmic/sm1000v3.dfu) | Menu bug fixes, 700D modem improvements & automatic Mic EQ
-   4   | May 2020 | [sm1000v4.bin](http://www.rowetel.com/downloads/codec2/smartmic/sm1000v4.bin) |  [sm1000v4.dfu](http://www.rowetel.com/downloads/codec2/smartmic/sm1000v3.dfu) | 700D sync logic to reduce stop burbling with no signal
+   4   | May 2020 | [sm1000v4.bin](http://www.rowetel.com/downloads/codec2/smartmic/sm1000v4.bin) |  [sm1000v4.dfu](http://www.rowetel.com/downloads/codec2/smartmic/sm1000v4.dfu) | 700D sync logic to reduce stop burbling with no signal
    
 ## Windows
 
