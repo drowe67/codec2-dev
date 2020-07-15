@@ -85,7 +85,7 @@ function fsk_lib_ldpc_rx(filename, Fs=8000, Rs=100)
   subplot(211); plot(f_log); axis([1 length(f_log) states.fest_fmin states.fest_fmax]); ylabel('Tone Freq (Hz)');
   subplot(212); plot(rx_timing_log); axis([1 length(rx_timing_log) -0.5 0.5]); ylabel('Timing');
   figure(3); clf;
-  mx_SNRest = 5*ceil(max(SNRest_log)/5);
+  mx_SNRest = 5*ceil(max(SNRest_log)/5)
   subplot(211); plot(10*log10(SNRest_log)); axis([1 length(SNRest_log) 0 mx_SNRest]); ylabel('SNRest (dB)');
   subplot(212); stem(log_nerrs); ylabel('Uncoded errors');
 end
