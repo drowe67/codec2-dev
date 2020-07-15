@@ -1,4 +1,4 @@
-# FreeDV README
+# FreeDV Technology
 
 FreeDV is an open source digital voice protocol that integrates modems, codecs, and FEC.
 
@@ -171,7 +171,7 @@ $ ./freedv_tx 2020 ~/LPCNet/wav/all.wav - | ./cohpsk_ch - - -22 --Fs 8000 | ./fr
 
 1. ~~Spell check/proofread~~
 1. Screen shots of each modes (waterfall and spectrum), discussing aspects of waveforms
-1. Link to this doc from freedv-gui user manual, rowetel/codec2 page, freedv/org
+1. ~~Link to this doc from freedv-gui user manual, rowetel/codec2 page, freedv.org~~
 1. ~~README_fdmdv.txt -> .md~~
 1. nice image or two
 1. table of source files
