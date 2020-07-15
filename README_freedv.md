@@ -27,7 +27,7 @@ This document gives an overview of the technology inside FreeDV, and some additi
 1. [Modems for HF Digital Voice Part 2](http://www.rowetel.com/wordpress/?p=5448)
 1. [FDMDV modem README](README_fdmdv.md)
 1. [OFDM modem README](README_ofdm.md)
-1. Many blog posts in the [rowetel.org blog archives](http://www.rowetel.com/?page_id=6172)
+1. Many blog posts in the [rowetel.com blog archives](http://www.rowetel.com/?page_id=6172)
 
 ## FreeDV HF Modes
 
