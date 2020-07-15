@@ -22,7 +22,7 @@ Also included:
    ```
    $ sudo dnf groupinstall "Development Tools" "C Development Tools and Libraries"
    $ sudo dnf install cmake
-   ```i
+   ```
    
 1. Build Codec 2:
    ```
@@ -38,7 +38,7 @@ Also included:
    ```
    $ ./src/c2demo ../raw/hts1a.raw hts1a_c2.raw
    $ aplay -f S16_LE ../raw/hts1a.raw
-   $ aplay hts1a_c2.raw
+   $ aplay -f S16_LE hts1a_c2.raw
    ```
 1. Compress, decompress and then play a file using Codec 2 at 2400 bit/s:
    ```
@@ -47,13 +47,13 @@ Also included:
    ```
    which can be played with:
    ```
-   $ aplay -f S16_LE ./hts1a_c2_2400.raw
+   $ aplay -f S16_LE hts1a_c2_2400.raw
    ```
-   or using Codec 2 using 700C (700 bits/2):
+   Or using Codec 2 using 700C (700 bits/s):
    ```
    $ ./src/c2enc 700C ../raw/hts1a.raw hts1a_c2.bit
    $ ./src/c2dec 700C hts1a_c2.bit hts1a_c2_700.raw
-   $ aplay -f S16_LE ./hts1a_c2_700.raw
+   $ aplay -f S16_LE hts1a_c2_700.raw
    ```
 1. If you prefer a one-liner without saving to files:
    ```
@@ -88,8 +88,6 @@ CTest is used as a test frame work, with support from GNU Octave scripts.
    ```
    $ sudo apt install octave octave-common octave-signal liboctave-dev gnuplot python3-numpy sox valgrind
    ```
-   (for more information see Octave section below)
-
 1. Install CML library with instructions at the top of ```octave/ldpc.m```
 
 1. To build and run the tests:
@@ -103,7 +101,7 @@ CTest is used as a test frame work, with support from GNU Octave scripts.
 
 1. To just run tests without rebuilding:
    ```
-   $ make test
+   $ ctest
    ```
 
 1. To get a verbose run (e.g. for test debugging):
@@ -116,7 +114,7 @@ CTest is used as a test frame work, with support from GNU Octave scripts.
    $ ctest -R test_OFDM_modem_octave_port
    ```
 
-1/ To list the available tests:
+1. To list the available tests:
    ```
    $ ctest -N
    ```
@@ -166,9 +164,11 @@ On Ubuntu 17 and above:
    
 ## Building for Windows on a Windows machine
 
+ ```
  mkdir build_windows (Or what ever you want to call your build dir)
  cmake -G "MinGW Makefiles" -D CMAKE_MAKE_PROGRAM=mingw32-make.exe
  Or if you use ninja for building cmake -G "Ninja" ..
  mingw32-make or ninja  depends on what you used in the last command
  wait for it to build.
+ ```
 
