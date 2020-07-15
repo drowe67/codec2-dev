@@ -54,7 +54,7 @@ Notes:
 
 1. All of the modems use multiple parallel carriers running at a low symbol rate of around 50 Hz.  This helps combat the effects of multipath channels.
 
-1. Codec 2 has various modes (2400/1300/700C etc), that sometimes accidentally match the name of the FreeDV mode.  For example FreeDV 700C uses Codec 2 700C for voice compression. However FreeDV 700D also uses Codec 2 700C for voice compression, but has a very different modem waveform to FreeDV 700C.  Sorry for the confusing nomenclature.
+1. Some of the Codec 2 modes (2400/1300/700C etc) happen to match the name of a FreeDV mode.  For example FreeDV 700C uses Codec 2 700C for voice compression. However FreeDV 700D *also* uses Codec 2 700C for voice compression, but has a very different modem waveform to FreeDV 700C.  Sorry for the confusing nomenclature.
 
 1. Coherent demodulation gives much better performance than differential, at the cost of some additional complexity.  Pilot symbols are transmitted regularly to allow the demod to estimate the reference phase of each carrier.
 
@@ -169,10 +169,9 @@ $ ./freedv_tx 2020 ~/LPCNet/wav/all.wav - | ./cohpsk_ch - - -22 --Fs 8000 | ./fr
 
 ## Further work
 
-1. Spell check/proof read
-1. Screen shots of each modes (waterfall and spectrum), discussing aspects of wavefoms
+1. ~~Spell check/proofread~~
+1. Screen shots of each modes (waterfall and spectrum), discussing aspects of waveforms
 1. Link to this doc from freedv-gui user manual, rowetel/codec2 page, freedv/org
-1. README_fdmdv.txt -> .md
+1. ~~README_fdmdv.txt -> .md~~
 1. nice image or two
 1. table of source files
-
