@@ -6,11 +6,11 @@ Also included:
 
   + The FreeDV API for digital voice over radio. FreeDV is an open source digital voice protocol that integrates modems, codecs, and FEC [README_freedv](README_freedv.md)
   + APIs for raw and Ethernet packet data over radio [README_data](README_data.md)
-  + High performance Coherent OFDM modem for HF channels [README_ofdm](README_ofdm.md)
-  + High performance Non-coherent FSK modem [README_fsk](README_fsk.md)
-  + A stm32 embedded version of FreeDV 1600/700D for the [SM1000](stm32/README.md)
+  + High performance coherent OFDM modem for HF channels [README_ofdm](README_ofdm.md)
+  + High performance non-coherent FSK modem [README_fsk](README_fsk.md)
+  + An STM32 embedded version of FreeDV 1600/700D for the [SM1000](stm32/README.md)
   + Coherent PSK [README_cohpsk](README_cohpsk.md) for HF channels
-  + FDMDV DPSK modem [README_fdmdv](README_fdmdv.txt) for HF channels
+  + FDMDV DPSK modem [README_fdmdv](README_fdmdv.md) for HF channels
 
 ## Quickstart
 
@@ -82,13 +82,13 @@ Also included:
 
 ## Building and Running Unit Tests
 
-CTest is used as a test frame work, with support from GNU Octave scripts.
+CTest is used as a test framework, with support from [GNU Octave](https://www.gnu.org/software/octave/) scripts.
 
 1. Install GNU Octave and libraries on Ubuntu with:
    ```
    $ sudo apt install octave octave-common octave-signal liboctave-dev gnuplot python3-numpy sox valgrind
    ```
-1. Install CML library with instructions at the top of ```octave/ldpc.m```
+1. Install CML library with instructions at the top of [```octave/ldpc.m```](octave/ldpc.m)
 
 1. To build and run the tests:
    ```
