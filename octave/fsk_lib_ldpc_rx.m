@@ -33,7 +33,8 @@ function fsk_lib_ldpc_rx(filename, Fs=8000, Rs=100)
       [arx_bits states] = fsk_demod(states, sf);
       rx_bits = [rx_bits arx_bits];
       rx_filt = [rx_filt abs(states.f_int_resample)];
-      f_log = [f_log; states.f]; SNRest_log = [SNRest_log states.SNRest];
+      f_log = [f_log; states.f];
+      SNRest_log = [SNRest_log states.SNRest];
       rx_timing_log = [rx_timing_log states.norm_rx_timing];
       st += nin;
     end
@@ -85,8 +86,9 @@ function fsk_lib_ldpc_rx(filename, Fs=8000, Rs=100)
   subplot(211); plot(f_log); axis([1 length(f_log) states.fest_fmin states.fest_fmax]); ylabel('Tone Freq (Hz)');
   subplot(212); plot(rx_timing_log); axis([1 length(rx_timing_log) -0.5 0.5]); ylabel('Timing');
   figure(3); clf;
-  mx_SNRest = 5*ceil(max(SNRest_log)/5)
-  subplot(211); plot(10*log10(SNRest_log)); axis([1 length(SNRest_log) 0 mx_SNRest]); ylabel('SNRest (dB)');
+  SNRestdB_log = 10*log10(SNRest_log);
+  mx_SNRestdB = 5*ceil(max(SNRestdB_log)/5);
+  subplot(211); plot(SNRestdB_log); axis([1 length(SNRestdB_log) 0 mx_SNRestdB]); ylabel('SNRest (dB)');
   subplot(212); stem(log_nerrs); ylabel('Uncoded errors');
 end
 
