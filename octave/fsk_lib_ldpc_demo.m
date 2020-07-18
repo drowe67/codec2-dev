@@ -163,6 +163,9 @@ more off;
 
 % single point
 [states uber cber cper] = modem_run_test(HRA, EbNodB=8);
+if cber == 0
+  printf("PASS\n");
+end
 
 % curve
 %freq_run_curve_peak_mask(HRA, 200)

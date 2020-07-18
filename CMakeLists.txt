@@ -614,10 +614,11 @@ endif(NOT APPLE)
      #                                FSK Modem      
      # -------------------------------------------------------------------------
            
-     # Octave FSK Modem tests, to make sure we don't break reference simulations
+     # Octave FSK Modem, to make sure we don't break reference simulation
      add_test(NAME test_fsk_lib
              COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/octave; DISPLAY=\"\" octave --no-gui -qf fsk_lib_demo.m")
              set_tests_properties(test_fsk_lib PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
+
      add_test(NAME test_fsk_modem_octave_port
              COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/octave; 
                             PATH_TO_TFSK=${CMAKE_CURRENT_BINARY_DIR}/unittest/tfsk octave --no-gui -qf tfsk.m")
@@ -663,9 +664,14 @@ endif(NOT APPLE)
                             ./cohpsk_ch - - -13 --Fs 8000 --ssbfilt 0 -f -3000 --complexout | 
                             ./fsk_demod -c -p 8 --mask $tx_tone_sep -t1 --nsym 100 4 8000 $Rs - - 2>stats.txt | 
                             ./fsk_put_test_bits -t 0.25 -b 0.20 -p $rx_packets -f $bits -q -")
-           
-      # 800XA framer test
-      add_test(NAME test_fsk_vhf_framer
+
+     # Octave 4FSK LLR reference simulation - make sure this keeps working
+     add_test(NAME test_fsk_lib_4fsk_ldpc
+             COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/octave; DISPLAY=\"\" octave --no-gui -qf fsk_lib_ldpc_demo.m")
+             set_tests_properties(test_fsk_lib_4fsk_ldpc PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
+
+     # 800XA framer test
+     add_test(NAME test_fsk_vhf_framer
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src; 
                             ./c2enc 700C ../../raw/ve9qrp_10s.raw - | 
                             ./vhf_frame_c2 B - - | 
@@ -674,14 +680,14 @@ endif(NOT APPLE)
                             ./vhf_deframe_c2 B - /dev/null")
              set_tests_properties(test_fsk_vhf_framer PROPERTIES PASS_REGULAR_EXPRESSION "total_uw_err: 0")
 
-      # VHF Ethernet-style packet system
-      add_test(NAME test_freedv_data_channel
+     # VHF Ethernet-style packet system
+     add_test(NAME test_freedv_data_channel
              COMMAND sh -c "./tfreedv_data_channel"
              WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/unittest
              )
            
-      # using FreeDV API/codec 2 modems to send raw data frames
-      add_test(NAME test_freedv_data_raw
+     # using FreeDV API/codec 2 modems to send raw data frames
+     add_test(NAME test_freedv_data_raw
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
                             head -c 140 </dev/urandom > binaryIn.bin;
                             ./freedv_data_raw_tx 700D binaryIn.bin - | 
