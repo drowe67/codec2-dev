@@ -2,13 +2,20 @@
 %
 % LDPC coded 4FSK modem tx, generates a 8 kHz 16 bit short real valued sample file
 
-function fsk_lib_ldpc_tx(filename, EbNodB=100, num_frames=10, Fs=8000, Rs=100)
+function fsk_lib_ldpc_tx(filename, num_frames=10, Rs=100, coderate=0.5, EbNodB=100)
   fsk_lib_ldpc;
   
   % set up LDPC code
   init_cml('~/cml/');
-  load H_256_512_4.mat;
-  [states code_param] = fsk_lib_ldpc_init (H, Rs, Fs);
+  if coderate == 0.5
+    load H_256_512_4.mat;
+  elseif coderate == 0.75
+    load HRAa_1536_512.mat; H=HRA;
+  else
+    disp("unknown code rate");
+  end  
+  [states code_param] = fsk_lib_ldpc_init (H, Rs, Fs=8000);
+  n = code_param.coded_bits_per_frame; k = code_param.data_bits_per_frame;
   
   rand('seed',1);
   data_bits = round(rand(1,code_param.data_bits_per_frame)); tx_bits = [];
@@ -29,7 +36,8 @@ function fsk_lib_ldpc_tx(filename, EbNodB=100, num_frames=10, Fs=8000, Rs=100)
   rx = tx + noise;
 
   frx=fopen(filename,"wb"); fwrite(frx, states.amp_scale*rx, "short"); fclose(frx);
-  printf("Fs: %d Rs: %d EbNodB: %3.1f  EcNodB: %3.1f frames transmitted: %3d\n", Fs, Rs, EbNodB, EcNodB, num_frames);
+  printf("Fs: %d Rs: %d rate %4.2f (%d,%d) EbNodB: %3.1f  EcNodB: %3.1f frames transmitted: %3d\n",
+  Fs, Rs, coderate, n, k, EbNodB, EcNodB, num_frames);
 end
 
 

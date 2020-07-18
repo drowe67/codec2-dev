@@ -8,12 +8,20 @@ ldpc;
 % set up modem waveform, real signal that an pass through a SSB radio
 function [states M] = modem_init(Rs,Fs,df)
   M  = 4;
-  states = fsk_init(Fs,Rs,M,P=8,nsym=100);
+  if Rs == 100 P=8; end
+  if Rs == 400 P=10; end;
+  states = fsk_init(Fs,Rs,M,P=10,nsym=100);
   states.tx_real = 1;
-  states.tx_tone_separation = 100;
-  states.ftx = 1500 -2.5*states.tx_tone_separation + states.tx_tone_separation*(1:M);
-  states.fest_fmin = 1000;
-  states.fest_fmax = 2000;
+  states.tx_tone_separation = Rs;
+  if Rs == 100
+    states.ftx = 1500 -2.5*states.tx_tone_separation + states.tx_tone_separation*(1:M);
+  elseif Rs == 400
+    states.ftx = 600 + states.tx_tone_separation*(0:M-1);
+  else
+    disp("unknown symbol rate");
+  end  
+  states.fest_fmin = 500;
+  states.fest_fmax = 2500;
   states.fest_min_spacing = Rs/2;
   states.df = df;
 

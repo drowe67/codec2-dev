@@ -2,13 +2,20 @@
 %
 % LDPC coded 4FSK modem rx, reads 8 kHz 16 bit short raw file of real samples and demodulates
 
-function fsk_lib_ldpc_rx(filename, Fs=8000, Rs=100)
+function fsk_lib_ldpc_rx(filename, Rs=100, coderate=0.5)
   fsk_lib_ldpc;
   
   % set up LDPC code
   init_cml('~/cml/');
-  load H_256_512_4.mat;
-  [states code_param] = fsk_lib_ldpc_init (H, Rs, Fs);
+  if coderate == 0.5
+    load H_256_512_4.mat;
+  elseif coderate == 0.75
+    load HRAa_1536_512.mat; H=HRA;
+  else
+    disp("unknown code rate");
+  end
+  [states code_param] = fsk_lib_ldpc_init (H, Rs, Fs=8000);
+  n = code_param.coded_bits_per_frame; k = code_param.data_bits_per_frame;
 
   % known transmitted bits for BER estimation
   rand('seed',1);
@@ -71,8 +78,10 @@ function fsk_lib_ldpc_rx(filename, Fs=8000, Rs=100)
     end
   end
 
+  SNRestdB_log = 10*log10(SNRest_log);
   if states.Tbits
-    printf("Fs: %d Rs: %d frames received: %3d\n",Fs, Rs, num_frames_rx);
+    printf("Fs: %d Rs: %d rate %4.2f (%d,%d) frames received: %3d SNRav: %4.2f\n",
+    Fs, Rs, coderate, n, k, num_frames_rx, mean(SNRestdB_log));
     uber = states.Terrs/states.Tbits; cber = Terrs/Tbits; cper = Tperr/Tpackets;
     printf("  Uncoded: nbits: %6d nerrs: %6d ber: %4.3f\n", states.Tbits, states.Terrs, uber);
     printf("  Coded..: nbits: %6d nerrs: %6d ber: %4.3f\n", Tbits, Terrs, cber);
@@ -86,7 +95,6 @@ function fsk_lib_ldpc_rx(filename, Fs=8000, Rs=100)
   subplot(211); plot(f_log); axis([1 length(f_log) states.fest_fmin states.fest_fmax]); ylabel('Tone Freq (Hz)');
   subplot(212); plot(rx_timing_log); axis([1 length(rx_timing_log) -0.5 0.5]); ylabel('Timing');
   figure(3); clf;
-  SNRestdB_log = 10*log10(SNRest_log);
   mx_SNRestdB = 5*ceil(max(SNRestdB_log)/5);
   subplot(211); plot(SNRestdB_log); axis([1 length(SNRestdB_log) 0 mx_SNRestdB]); ylabel('SNRest (dB)');
   subplot(212); stem(log_nerrs); ylabel('Uncoded errors');
