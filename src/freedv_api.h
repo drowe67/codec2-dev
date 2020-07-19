@@ -148,6 +148,11 @@ int freedv_floatrx   (struct freedv *freedv, short speech_out[], float demod_in[
 int freedv_comprx    (struct freedv *freedv, short speech_out[], COMP  demod_in[]);
 int freedv_rawdatarx (struct freedv *freedv, unsigned char *packed_payload_bits, short demod_in[]);
 
+// Rawdata -------------------------------------------------------------------
+
+int freedv_codec_frames_from_rawdata(struct freedv *freedv, unsigned char *codec_frames, unsigned char *rawdata);
+int freedv_rawdata_from_codec_frames(struct freedv *freedv, unsigned char *rawdata, unsigned char *codec_frames);
+
 // Set parameters ------------------------------------------------------------
 
 void freedv_set_callback_txt            (struct freedv *freedv, freedv_callback_rx rx, freedv_callback_tx tx, void *callback_state);

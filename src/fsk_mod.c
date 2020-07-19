@@ -1,14 +1,11 @@
 /*---------------------------------------------------------------------------*\
 
   FILE........: fsk_mod.c
-  AUTHOR......: Brady O'Brien
+  AUTHOR......: Brady O'Brien and David Rowe
   DATE CREATED: 8 January 2016
 
-  C test driver for fsk_mod in fsk.c. Reads in a set of bits to modulate
-   from a file, passed as a parameter, and writes modulated output to
-   another file
+  Command line FSK modulator.  Reads in bits, writes FSK modulated output.
    
-
 \*---------------------------------------------------------------------------*/
 
 /*

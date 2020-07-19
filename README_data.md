@@ -175,8 +175,8 @@ The following FreeDV modes are recommended for *preliminary development* using t
 
 | FreeDV Mode | RF bandwidth (Hz) | Payload data rate bits/s | bytes/frame | FEC | Min SNR (dB, AWGN) |
 | :-: | :-: | :-: | :-: | :-: | :-: |
-| 700C | 1100 | 700C | 7 | none | 2 |
-| 700D | 1100 | 700D | 14 | rate 0.8 | -2 |
+| 700C | 1100 | 700 | 7 | none | 2 |
+| 700D | 1100 | 700 | 14 | rate 0.8 | -2 |
 | 2020 | 1500 | 1733 | 39 | rate 0.6 | 2 |
 
 The API can signal if there were uncorrected bit errors in the frame returned using ```freedv_get_uncorrected_errors(freedv)```, these frames are usually discarded in data applications.

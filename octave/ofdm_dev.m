@@ -53,7 +53,6 @@ function [sim_out rx states] = run_sim(sim_in)
     printf("Ncp:.........: %d\n", Ncp);
     printf("bps:.........: %d\n", bps);
     printf("Nbitsperframe: %d\n", Nbitsperframe);
-    printf("Nrowsperframe: %d\n", Nrowsperframe);
     printf("Nsamperframe.: %d\n", Nsamperframe);
   end
   

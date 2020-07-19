@@ -87,13 +87,13 @@ int main(int argc, char **argv)
         int nin = 0;
         for (i = 0; i < nom_samples * 9; i += nin) {
             nin = freedv_nin(f);
-	    unsigned char rx_payload[7] = {0};
-            int r = freedv_rawdatarx(f, rx_payload, mod + i);
+	    unsigned char payload_rx[7] = {0};
+            int r = freedv_rawdatarx(f, payload_rx, mod + i);
             if (r) {
 	        int b;
                 for (b = 0; b < 7; b++) {
-	    	    if (payload[b] != rx_payload[b]) {
-		        printf("Received codec bits 0x%02x do not match expected 0x%02x\n", rx_payload[b], payload[b]);
+	    	    if (payload[b] != payload_rx[b]) {
+		        printf("Received codec bits 0x%02x do not match expected 0x%02x\n", payload_rx[b], payload[b]);
 		        fails++;
                     }
                 }

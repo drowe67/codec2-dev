@@ -105,7 +105,7 @@ You can program the flash memory on your SM1000 via USB using a Windows or Linux
    1   | May 2015 | [sm1000.bin](http://www.rowetel.com/downloads/codec2/smartmic/sm1000.bin) | | Original release with FreeDV 1600
    2   | July 2019 | [sm1000v2.bin](http://www.rowetel.com/downloads/codec2/smartmic/sm1000v2.bin) |  [sm1000v2.dfu](http://www.rowetel.com/downloads/codec2/smartmic/sm1000v2.dfu) | FreeDV 700D and morse menus
    3   | March 2020 | [sm1000v3.bin](http://www.rowetel.com/downloads/codec2/smartmic/sm1000v3.bin) |  [sm1000v3.dfu](http://www.rowetel.com/downloads/codec2/smartmic/sm1000v3.dfu) | Menu bug fixes, 700D modem improvements & automatic Mic EQ
-   4   | May 2020 | [sm1000v4.bin](http://www.rowetel.com/downloads/codec2/smartmic/sm1000v4.bin) |  [sm1000v4.dfu](http://www.rowetel.com/downloads/codec2/smartmic/sm1000v3.dfu) | 700D sync logic to reduce stop burbling with no signal
+   4   | May 2020 | [sm1000v4.bin](http://www.rowetel.com/downloads/codec2/smartmic/sm1000v4.bin) |  [sm1000v4.dfu](http://www.rowetel.com/downloads/codec2/smartmic/sm1000v4.dfu) | 700D sync logic to reduce stop burbling with no signal
    
 ## Windows
 
@@ -168,7 +168,7 @@ To perform a factory reset, hold down BACK whilst powering the device on. A loud
 1. [SM1000 Ref F Schematic](https://svn.code.sf.net/p/freetel/code/smartmic/SM1000-F/MFG-SM1000-F/SCH-SM1000-F.pdf)
 1. [SM1000 Hardware Design](https://svn.code.sf.net/p/freetel/code/smartmic)
 1. [Series of blog posts on the SM1000 development](http://www.rowetel.com/?page_id=6172) (2014 section of archive)
-1. Nice write up of a mobile [SM1000 installation](http://rfhead.net/?p=582) by Mark VK5QI including tips on testing and debugging a microphone level problem.
+1. Nice write up of a mobile [Codan NGT SM1000 installation](http://rfhead.net/?p=582) by Mark VK5QI including tips on testing and debugging a microphone level problem.
 
 # Credits
 

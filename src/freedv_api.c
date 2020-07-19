@@ -395,9 +395,7 @@ void freedv_rawdatatx(struct freedv *f, short mod_out[], unsigned char *packed_p
     /* FSK modes used packed bits */
     if(FDV_MODE_ACTIVE( FREEDV_MODE_2400A, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_2400B, f->mode) ||
        FDV_MODE_ACTIVE( FREEDV_MODE_800XA, f->mode) ) {
-        int bytes_per_codec_frame = (f->bits_per_codec_frame + 7) / 8;
-	int codec_frames = f->bits_per_modem_frame / f->bits_per_codec_frame;
-        memcpy(f->tx_payload_bits, packed_payload_bits, bytes_per_codec_frame * codec_frames);
+	freedv_codec_frames_from_rawdata(f, f->tx_payload_bits,  packed_payload_bits);
         freedv_tx_fsk_voice(f, mod_out);
         return; /* output is already real */
     }
@@ -453,6 +451,86 @@ int freedv_nin(struct freedv *f) {
     else
         return f->nin;
 }
+
+int freedv_codec_frames_from_rawdata(struct freedv *f, unsigned char *codec_frames, unsigned char *rawdata)
+{
+    int cbit = 7;
+    int cbyte = 0;
+    int rbit = 7;
+    int rbyte = 0;
+    int modem_bits = freedv_get_bits_per_modem_frame(f);
+    int codec_bits = freedv_get_bits_per_codec_frame(f);
+    int nr_cbits = 0;
+    int i;
+    
+    codec_frames[0] = 0;
+    for (i = 0; i < modem_bits; i++) {
+        codec_frames[cbyte] |= ((rawdata[rbyte] >> rbit) & 1) << cbit;
+
+        rbit--;
+        if (rbit < 0) {
+            rbit = 7;
+            rbyte++;
+        }
+	
+        cbit--;
+        if (cbit < 0) {
+            cbit = 7;
+	    cbyte++;
+	    codec_frames[cbyte] = 0;
+	}
+	nr_cbits++;
+	if (nr_cbits == codec_bits) {
+            if (cbit) {
+                cbyte++;
+                codec_frames[cbyte] = 0;
+            }
+            cbit = 7;
+	    nr_cbits = 0;
+	}
+    }
+    return f->n_codec_frames;
+}
+
+int freedv_rawdata_from_codec_frames(struct freedv *f, unsigned char *rawdata, unsigned char *codec_frames)
+{
+    int cbit = 7;
+    int cbyte = 0;
+    int rbit = 7;
+    int rbyte = 0;
+    int modem_bits = freedv_get_bits_per_modem_frame(f);
+    int codec_bits = freedv_get_bits_per_codec_frame(f);
+    int nr_cbits = 0;
+    int i;
+    
+    rawdata[rbyte] = 0;
+    for (i = 0; i < modem_bits; i++) {
+        rawdata[rbyte] |= ((codec_frames[cbyte] >> cbit) & 1) << rbit;
+
+        rbit--;
+        if (rbit < 0) {
+            rbit = 7;
+            rbyte++;
+	    rawdata[rbyte] = 0;
+        }
+	
+        cbit--;
+        if (cbit < 0) {
+            cbit = 7;
+	    cbyte++;
+	}
+	
+	nr_cbits++;
+	if (nr_cbits == codec_bits) {
+            if (cbit)
+                cbyte++;
+            cbit = 7;
+	    nr_cbits = 0;
+	}
+    }
+    return f->n_codec_frames;
+}
+
 
 /*---------------------------------------------------------------------------*\
 
@@ -803,10 +881,8 @@ int freedv_rawdatarx(struct freedv *f, unsigned char *packed_payload_bits, short
         rx_status = freedv_comprx_fsk(f, rx_fdm);
         f->rx_status = rx_status;
         if (rx_status & RX_BITS) {
-            int bytes_per_codec_frame = (f->bits_per_codec_frame + 7) / 8;
-	    int codec_frames = f->bits_per_modem_frame / f->bits_per_codec_frame;
-            ret = bytes_per_codec_frame * codec_frames;
-            memcpy(packed_payload_bits, f->rx_payload_bits, ret);
+	    ret = (freedv_get_bits_per_modem_frame(f) + 7) / 8;
+	    freedv_rawdata_from_codec_frames(f, packed_payload_bits, f->rx_payload_bits);
         }
         return ret;
     }
@@ -1128,7 +1204,7 @@ int freedv_get_sync                       (struct freedv *f) {return f->stats.sy
 struct CODEC2 *freedv_get_codec2	  (struct freedv *f){return  f->codec2;}
 int freedv_get_bits_per_codec_frame       (struct freedv *f){return f->bits_per_codec_frame;}
 int freedv_get_bits_per_modem_frame       (struct freedv *f){return f->bits_per_modem_frame;}
-int freedv_get_uncorrected_errors          (struct freedv *f) {return f->rx_status & RX_BIT_ERRORS;}
+int freedv_get_uncorrected_errors         (struct freedv *f) {return f->rx_status & RX_BIT_ERRORS;}
 
 int freedv_get_n_max_speech_samples(struct freedv *f) {
     /* When "passing through" demod samples to the speech output
