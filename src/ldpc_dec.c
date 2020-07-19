@@ -8,19 +8,6 @@
   code is defined by the parameters and array stored in the include
   file below, which can be machine generated from the Octave function
   ldpc_fsk_lib.m:ldpc_decode()
-
-  The include file also contains test input/output vectors for the LDPC
-  decoder for testing this program.
-
-  Build:
-
-    $ gcc -O2 -o ldpc_dec ldpc_dec.c mpdecode_core.c -Wall -lm -g
-
-  Note: -O2 option was required to get identical results to MpDecode,
-  which is also compiled with -O2.  Without it the number of bit errors
-  between C and Octave was different, especially when the code did
-  not converge and hit max_iters.
-
 */
 
 #include <assert.h>

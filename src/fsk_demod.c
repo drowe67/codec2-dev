@@ -59,7 +59,7 @@ int main(int argc,char *argv[]){
     uint8_t *bitbuf = NULL;
     int16_t *rawbuf;
     COMP *modbuf;
-    float *sdbuf = NULL;
+    float *rx_filt = NULL;
     int i,j,Ndft;
     int soft_dec_mode = 0;
     stats_loop = 0;
@@ -255,9 +255,9 @@ int main(int argc,char *argv[]){
     }
     
     /* allocate buffers for processing */
-    if(soft_dec_mode){
-        sdbuf = (float*)malloc(sizeof(float)*fsk->Nbits); assert(sdbuf != NULL);
-    }else{
+    if (soft_dec_mode) {
+        rx_filt = (float*)malloc(sizeof(float)*fsk->mode*fsk->Nsym); assert(rx_filt != NULL);
+    } else {
         bitbuf = (uint8_t*)malloc(sizeof(uint8_t)*fsk->Nbits); assert(bitbuf != NULL);
     }
     rawbuf = (int16_t*)malloc(bytes_per_sample*(fsk->N+fsk->Ts*2)*complex_input);
@@ -300,13 +300,15 @@ int main(int argc,char *argv[]){
         }
 
         if(soft_dec_mode){
-            fsk_demod_sd(fsk,sdbuf,modbuf);
+            fsk_demod_sd(fsk,rx_filt,modbuf);            
         }else{
             fsk_demod(fsk,bitbuf,modbuf);
         }
         
         testframe_detected = 0;
         if (testframe_mode) {
+            assert(soft_dec_mode == 0);
+            
             /* attempt to find a testframe and update stats */
             /* update silding window of input bits */
 
@@ -315,12 +317,7 @@ int main(int argc,char *argv[]){
                 for(i=0; i<TEST_FRAME_SIZE-1; i++) {
                     bitbuf_rx[i] = bitbuf_rx[i+1];
                 }
-                if (soft_dec_mode == 1) {
-                    bitbuf_rx[TEST_FRAME_SIZE-1] = sdbuf[j] < 0.0;
-                }
-                else {
-                    bitbuf_rx[TEST_FRAME_SIZE-1] = bitbuf[j];
-                }
+                bitbuf_rx[TEST_FRAME_SIZE-1] = bitbuf[j];
 
                 /* compare to know tx frame.  If they are time aligned, there
                    will be a fairly low bit error rate */
@@ -410,7 +407,7 @@ int main(int argc,char *argv[]){
         }
 
         if(soft_dec_mode){
-            fwrite(sdbuf,sizeof(float),fsk->Nbits,fout);
+            fwrite(rx_filt,sizeof(float),fsk->mode*fsk->Nsym,fout);
         }else{
             fwrite(bitbuf,sizeof(uint8_t),fsk->Nbits,fout);
         }
@@ -426,9 +423,9 @@ int main(int argc,char *argv[]){
         free(bitbuf_rx);
     }
     
-    if(soft_dec_mode){
-        free(sdbuf);
-    }else{
+    if (soft_dec_mode) {
+        free(rx_filt);
+    } else{
         free(bitbuf);
     }
     
