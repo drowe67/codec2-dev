@@ -691,19 +691,100 @@ void symbols_to_llrs(float llr[], COMP rx_qpsk_symbols[], float rx_amps[], float
     }
 }
 
-void ldpc_print_info(struct LDPC *ldpc) {
-fprintf(stderr, "ldpc->max_iter = %d\n", ldpc->max_iter);
-fprintf(stderr, "ldpc->dec_type = %d\n", ldpc->dec_type);
-fprintf(stderr, "ldpc->q_scale_factor = %d\n", ldpc->q_scale_factor);
-fprintf(stderr, "ldpc->r_scale_factor = %d\n", ldpc->r_scale_factor);
-fprintf(stderr, "ldpc->CodeLength = %d\n", ldpc->CodeLength);
-fprintf(stderr, "ldpc->NumberParityBits = %d\n", ldpc->NumberParityBits);
-fprintf(stderr, "ldpc->NumberRowsHcols = %d\n", ldpc->NumberRowsHcols);
-fprintf(stderr, "ldpc->max_row_weight = %d\n", ldpc->max_row_weight);
-fprintf(stderr, "ldpc->max_col_weight = %d\n", ldpc->max_col_weight);
-fprintf(stderr, "ldpc->data_bits_per_frame = %d\n", ldpc->data_bits_per_frame);
-fprintf(stderr, "ldpc->coded_bits_per_frame = %d\n", ldpc->coded_bits_per_frame);
-fprintf(stderr, "ldpc->coded_syms_per_frame = %d\n", ldpc->coded_syms_per_frame);
+/*
+   Description: Transforms M-dimensional FSK symbols into ML symbol log-likelihoods 
+
+   The calling syntax is:
+      [output] = FskDemod( input, EsNo, [csi_flag], [fade_coef] )
+
+   Where:
+      output    = M by N matrix of symbol log-likelihoods
+
+      input     = M by N matrix of (complex) matched filter outputs
+	  EsNo      = the symbol SNR (in linear, not dB, units)
+	  csi_flag  = 0 for coherent reception (default)
+	              1 for noncoherent reception w/ perfect amplitude estimates
+		      2 for noncoherent reception without amplitude estimates
+	  fade_coef = 1 by N matrix of (complex) fading coefficients (defaults to all-ones, i.e. AWGN)
+
+   Copyright (C) 2006, Matthew C. Valenti
+
+   Last updated on May 6, 2006
+
+   Function DemodFSK is part of the Iterative Solutions 
+   Coded Modulation Library. The Iterative Solutions Coded Modulation 
+   Library is free software; you can redistribute it and/or modify it 
+   under the terms of the GNU Lesser General Public License as published 
+   by the Free Software Foundation; either version 2.1 of the License, 
+   or (at your option) any later version.
+
+   This library is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+   Lesser General Public License for more details.
+  
+   You should have received a copy of the GNU Lesser General Public
+   License along with this library; if not, write to the Free Software
+   Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+
+*/
+
+/* the logI_0 function */
+static float logbesseli0(float x)
+{	
+    if (x < 1) 
+        return( 0.226*x*x+0.0125*x-0.0012 );
+    else if (x < 2)
+        return( 0.1245*x*x+0.2177*x-0.108 );
+    else if (x < 5)
+        return( 0.0288*x*x+0.6314*x-0.5645 );
+    else if (x < 20)
+        return( 0.002*x*x+0.9048*x-1.2997 );
+    else
+        return(0.9867*x-2.2053);
 }
 
-/* vi:set ts=4 et sts=4: */
+/* Function that does the demodulation (can be used in stand-alone C) */
+
+static void FskDemod(float out[], float yr[], float SNR, int M, int number_symbols)
+{
+    int i, j;	
+    float y_envelope, scale_factor;
+	
+    scale_factor = 2*SNR;
+    for (i=0;i<number_symbols;i++) { 
+        for (j=0;j<M;j++) { 
+            y_envelope = sqrt( yr[i*M+j]*yr[i*M+j]);
+            out[i*M+j] = logbesseli0( scale_factor*y_envelope );
+        }
+    }
+}
+
+void fsk_rx_filt_to_llrs(float llr[], float rx_filt[], float v_est, float SNRest, int M, int nsyms) {
+    int i;
+
+    float symbol_likelihood[M*nsyms];
+    float bit_likelihood[M*nsyms];
+
+    FskDemod(symbol_likelihood, rx_filt, SNRest, M, nsyms);
+    Somap(bit_likelihood, symbol_likelihood, nsyms);
+    for(i=0; i<M*nsyms; i++) {
+        llr[i] = -bit_likelihood[i];
+    }
+}
+
+void ldpc_print_info(struct LDPC *ldpc) {
+    fprintf(stderr, "ldpc->max_iter = %d\n", ldpc->max_iter);
+    fprintf(stderr, "ldpc->dec_type = %d\n", ldpc->dec_type);
+    fprintf(stderr, "ldpc->q_scale_factor = %d\n", ldpc->q_scale_factor);
+    fprintf(stderr, "ldpc->r_scale_factor = %d\n", ldpc->r_scale_factor);
+    fprintf(stderr, "ldpc->CodeLength = %d\n", ldpc->CodeLength);
+    fprintf(stderr, "ldpc->NumberParityBits = %d\n", ldpc->NumberParityBits);
+    fprintf(stderr, "ldpc->NumberRowsHcols = %d\n", ldpc->NumberRowsHcols);
+    fprintf(stderr, "ldpc->max_row_weight = %d\n", ldpc->max_row_weight);
+    fprintf(stderr, "ldpc->max_col_weight = %d\n", ldpc->max_col_weight);
+    fprintf(stderr, "ldpc->data_bits_per_frame = %d\n", ldpc->data_bits_per_frame);
+    fprintf(stderr, "ldpc->coded_bits_per_frame = %d\n", ldpc->coded_bits_per_frame);
+    fprintf(stderr, "ldpc->coded_syms_per_frame = %d\n", ldpc->coded_syms_per_frame);
+}
+
