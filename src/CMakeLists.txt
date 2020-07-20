@@ -324,6 +324,9 @@ target_link_libraries(fsk_put_test_bits ${CMAKE_REQUIRED_LIBRARIES} codec2)
 add_executable(framer framer.c)
 target_link_libraries(framer)
 
+add_executable(deframer deframer.c)
+target_link_libraries(deframer)
+
 add_executable(fm_demod fm_demod.c fm.c)
 target_link_libraries(fm_demod m ${CMAKE_REQUIRED_LIBRARIES})
 
