@@ -334,6 +334,12 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
 
         ofdm->uw_ind[j    ] = (val * 2);       // bit index 1
         ofdm->uw_ind[j + 1] = (val * 2) + 1;   // bit index 2
+
+        /* TODO fix me
+        for (int b = ofdm->bps - 1; b >= 0 ; b--) {
+            ofdm->uw_ind[j + b] = (val * ofdm->bps) - b; // bit index (MSB -> LSB)
+        }
+        */
     }
 
     ofdm->tx_uw_syms = MALLOC(sizeof (complex float) * (ofdm->nuwbits / 2));
@@ -347,10 +353,13 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
 
     ofdm->sync_state = search;
     ofdm->last_sync_state = search;
+    ofdm->sync_state_interleaver = search;
+    ofdm->last_sync_state_interleaver = search;
 
     ofdm->uw_errors = 0;
     ofdm->sync_counter = 0;
     ofdm->frame_count = 0;
+    ofdm->frame_count_interleaver = 0;
     ofdm->sync_start = false;
     ofdm->sync_end = false;
     ofdm->sync_mode = autosync;
@@ -1490,6 +1499,7 @@ void ofdm_sync_state_machine(struct OFDM *ofdm, uint8_t *rx_uw) {
 
     if ((ofdm->sync_state == synced) || (ofdm->sync_state == trial)) {
         ofdm->frame_count++;
+        ofdm->frame_count_interleaver++;
 
         /*
          * freq offset est may be too far out, and has aliases every 1/Ts, so
@@ -1517,6 +1527,7 @@ void ofdm_sync_state_machine(struct OFDM *ofdm, uint8_t *rx_uw) {
                 /* if we get two bad frames drop sync and start again */
 
                 next_state = search;
+                ofdm->sync_state_interleaver = search;
                 ofdm->phase_est_bandwidth = high_bw;
             }
 
@@ -1546,12 +1557,14 @@ void ofdm_sync_state_machine(struct OFDM *ofdm, uint8_t *rx_uw) {
                 /* run of consecutive bad frames ... drop sync */
 
                 next_state = search;
+                ofdm->sync_state_interleaver = search;
                 ofdm->phase_est_bandwidth = high_bw;
             }
         }
     }
 
     ofdm->last_sync_state = ofdm->sync_state;
+    ofdm->last_sync_state_interleaver = ofdm->sync_state_interleaver;
     ofdm->sync_state = next_state;
 }
 
@@ -1582,6 +1595,7 @@ void ofdm_set_sync(struct OFDM *ofdm, int sync_cmd) {
              * which will cause sync state machine to have another go at sync
              */
             ofdm->sync_state = search;
+            ofdm->sync_state_interleaver = search;
             break;
         case AUTO_SYNC:
             /* normal operating mode - sync state machine decides when to unsync */
@@ -1838,6 +1852,7 @@ void ofdm_print_info(struct OFDM *ofdm) {
     fprintf(stderr, "ofdm->sync_start = %s\n", ofdm->sync_start ? "true" : "false");
     fprintf(stderr, "ofdm->sync_end = %s\n", ofdm->sync_end ? "true" : "false");
     fprintf(stderr, "ofdm->sync_mode = %s\n", syncmode[ofdm->sync_mode]);
+    fprintf(stderr, "ofdm->frame_count_interleaver = %d\n", ofdm->frame_count_interleaver);
     fprintf(stderr, "ofdm->timing_en = %s\n", ofdm->timing_en ? "true" : "false");
     fprintf(stderr, "ofdm->foff_est_en = %s\n", ofdm->foff_est_en ? "true" : "false");
     fprintf(stderr, "ofdm->phase_est_en = %s\n", ofdm->phase_est_en ? "true" : "false");
@@ -1845,3 +1860,4 @@ void ofdm_print_info(struct OFDM *ofdm) {
     fprintf(stderr, "ofdm->dpsk_en = %s\n", ofdm->dpsk_en ? "true" : "false");
     fprintf(stderr, "ofdm->phase_est_bandwidth_mode = %s\n", phase_est_bandwidth_mode[ofdm->phase_est_bandwidth_mode]);
 }
+

@@ -86,3 +86,4 @@ void modem_stats_get_rx_spectrum(struct MODEM_STATS *f, float mag_spec_dB[], COM
 #endif
 
 #endif
+
