@@ -191,7 +191,6 @@ set(CODEC2_SRCS
     ofdm.c
     mpdecode_core.c
     phi0.c
-    gp_interleaver.c
     interldpc.c
     filter.c
     HRA_112_112.c

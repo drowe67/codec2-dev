@@ -401,4 +401,3 @@ optparse_long(struct optparse *options,
 
 #endif /* OPTPARSE_IMPLEMENTATION */
 #endif /* OPTPARSE_H */
-

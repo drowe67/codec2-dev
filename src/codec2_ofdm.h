@@ -72,7 +72,7 @@ int  ofdm_sync_search(struct OFDM *, COMP *);
 int  ofdm_sync_search_shorts(struct OFDM *, short *, float);
 void ofdm_sync_state_machine(struct OFDM *, uint8_t *);
 
-/* getters */
+/* option getters */
     
 struct OFDM_CONFIG *ofdm_get_config_param(struct OFDM *ofdm);
 int ofdm_get_nin(struct OFDM *);
@@ -101,4 +101,3 @@ void ofdm_print_info(struct OFDM *);
 #endif
 
 #endif
-
