@@ -40,7 +40,6 @@
 #include "codec2_ofdm.h"
 #include "ofdm_internal.h"
 #include "interldpc.h"
-#include "gp_interleaver.h"
 #include "varicode.h"
 
 #define IS_DIR_SEPARATOR(c)     ((c) == '/')
@@ -60,7 +59,6 @@ void opt_help() {
     fprintf(stderr, "  --tcp        Nsecs    Cyclic Prefix Duration (.002 default)\n");
     fprintf(stderr, "  --ts         Nsecs    Symbol Duration (.018 default)\n");
     fprintf(stderr, "  --testframes Nsecs    Transmit test frames (adjusts test frames for raw and LDPC modes)\n");
-    fprintf(stderr, "  --interleave depth    Interleave depth for LDPC frames, e.g. 1,2,4,8,16 (default is 1)\n");
     fprintf(stderr, "  --tx_freq     freq    Set an optional modulation TX centre frequency (1500.0 default)\n");
     fprintf(stderr, "  --rx_freq     freq    Set an optional modulation RX centre frequency (1500.0 default)\n\n");
     fprintf(stderr, "  --verbose  [1|2|3]    Verbose output level to stderr (default off)\n");
@@ -76,7 +74,7 @@ void opt_help() {
 
 int main(int argc, char *argv[]) {
     char *fin_name, *fout_name;
-    int i, j, opt, val;
+    int i, opt, val;
 
     char *pn = argv[0] + strlen(argv[0]);
 
@@ -102,7 +100,6 @@ int main(int argc, char *argv[]) {
     /* set for LDPC coded or uncoded frames */
 
     int ldpc_en = 0;
-    int interleave_frames = 1;
 
     int input_specified = 0;
     int output_specified = 0;
@@ -135,7 +132,6 @@ int main(int argc, char *argv[]) {
         {"tcp", 'd', OPTPARSE_REQUIRED},
         {"ts", 'e', OPTPARSE_REQUIRED},
         {"testframes", 'f', OPTPARSE_REQUIRED},
-        {"interleave", 'g', OPTPARSE_REQUIRED},
         {"tx_freq", 'h', OPTPARSE_REQUIRED},
         {"rx_freq", 'i', OPTPARSE_REQUIRED},
         {"ldpc", 'j', OPTPARSE_REQUIRED},
@@ -182,9 +178,6 @@ int main(int argc, char *argv[]) {
             case 'f':
                 testframes = 1;
                 Nsec = atoi(options.optarg);
-                break;
-            case 'g':
-                interleave_frames = atoi(options.optarg);
                 break;
             case 'h':
                 tx_centre = atof(options.optarg);
@@ -308,12 +301,11 @@ int main(int argc, char *argv[]) {
             fprintf(stderr, "data_bits_per_frame = %d\n", data_bits_per_frame);
             fprintf(stderr, "coded_bits_per_frame  = %d\n", coded_bits_per_frame);
             fprintf(stderr, "ofdm_bits_per_frame  = %d\n", ofdm_bitsperframe);
-            fprintf(stderr, "interleave_frames: %d\n", interleave_frames);
         }
 
         assert((ofdm_nuwbits + ofdm_ntxtbits + coded_bits_per_frame) <= ofdm_bitsperframe); /* sanity check */
         
-        Nbitsperframe = interleave_frames*data_bits_per_frame;
+        Nbitsperframe = data_bits_per_frame;
     } else {
         /* vanilla uncoded input bits mode */
         Nbitsperframe = ofdm_bitsperframe;
@@ -323,15 +315,14 @@ int main(int argc, char *argv[]) {
 
     if (verbose) {
         ofdm_set_verbose(ofdm, verbose);
-        fprintf(stderr, "Nsamperframe: %d, interleave_frames: %d, Nbitsperframe: %d \n",
-                Nsamperframe, interleave_frames, Nbitsperframe);
+        fprintf(stderr, "Nsamperframe: %d, Nbitsperframe: %d \n", Nsamperframe, Nbitsperframe);
     }
 
     uint8_t tx_bits_char[Nbitsperframe];
     short tx_scaled[Nsamperframe];
-    uint8_t txt_bits_char[ofdm_ntxtbits * interleave_frames];
+    uint8_t txt_bits_char[ofdm_ntxtbits];
 
-    for (i = 0; i < ofdm_ntxtbits * interleave_frames; i++) {
+    for (i = 0; i < ofdm_ntxtbits; i++) {
         txt_bits_char[i] = 0;
     }
 
@@ -368,7 +359,7 @@ int main(int argc, char *argv[]) {
     while (fread(tx_bits_char, sizeof (uint8_t), Nbitsperframe, fin) == Nbitsperframe) {
 
         if (ldpc_en) {
-            /* fancy interleaved LDPC encoded frames ----------------------------*/
+            /* fancy LDPC encoded frames ----------------------------*/
 
             /* optionally overwrite input data with test frame of
                payload data bits known to demodulator */
@@ -377,7 +368,7 @@ int main(int argc, char *argv[]) {
 
                 if (use_text) {
                     // Get text bits
-                    int nspare = ofdm_ntxtbits*interleave_frames;
+                    int nspare = ofdm_ntxtbits;
                     int k;
 
                     for (k = 0; k < nspare; k++) {
@@ -404,23 +395,19 @@ int main(int argc, char *argv[]) {
 
                 ofdm_rand(r, data_bits_per_frame);
 
-                for (j = 0; j < interleave_frames; j++) {
-                    for (i = 0; i < data_bits_per_frame; i++) {
-                        tx_bits_char[j * data_bits_per_frame + i] = r[i] > 16384;
-                    }
+                for (i = 0; i < data_bits_per_frame; i++) {
+                    tx_bits_char[i] = r[i] > 16384;
                 }
             }
 
-            complex float tx_sams[interleave_frames * Nsamperframe];
-            ofdm_ldpc_interleave_tx(ofdm, &ldpc, tx_sams, tx_bits_char, txt_bits_char, interleave_frames, ofdm_config);
+            complex float tx_sams[Nsamperframe];
+            ofdm_ldpc_tx(ofdm, &ldpc, tx_sams, tx_bits_char, txt_bits_char, ofdm_config);
 
-            for (j = 0; j < interleave_frames; j++) {
-                for (i = 0; i < Nsamperframe; i++) {
-                    tx_scaled[i] = OFDM_AMP_SCALE * crealf(tx_sams[j * Nsamperframe + i]);
-                }
-
-                fwrite(tx_scaled, sizeof (short), Nsamperframe, fout);
+            for (i = 0; i < Nsamperframe; i++) {
+                tx_scaled[i] = OFDM_AMP_SCALE * crealf(tx_sams[i]);
             }
+
+            fwrite(tx_scaled, sizeof (short), Nsamperframe, fout);
         } else {
             /* just modulate uncoded raw bits ------------------------------------*/
 
