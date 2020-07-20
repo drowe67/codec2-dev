@@ -637,9 +637,10 @@ void Demod2D(float   symbol_likelihood[],       /* output, M*number_symbols     
 
 void Somap(float  bit_likelihood[],      /* number_bits, bps*number_symbols */
            float  symbol_likelihood[],   /* M*number_symbols                */
-           int     number_symbols)
+           int    M,                     /* constellation size              */
+           int    bps,                   /* bits per symbol                 */
+           int    number_symbols)
 {
-    int    M=QPSK_CONSTELLATION_SIZE, bps = QPSK_BITS_PER_SYMBOL;
     int    n,i,j,k,mask;
     float num[bps], den[bps];
     float metric;
@@ -685,7 +686,7 @@ void symbols_to_llrs(float llr[], COMP rx_qpsk_symbols[], float rx_amps[], float
     float bit_likelihood[nsyms*QPSK_BITS_PER_SYMBOL];
 
     Demod2D(symbol_likelihood, rx_qpsk_symbols, S_matrix, EsNo, rx_amps, mean_amp, nsyms);
-    Somap(bit_likelihood, symbol_likelihood, nsyms);
+    Somap(bit_likelihood, symbol_likelihood, QPSK_CONSTELLATION_SIZE, QPSK_BITS_PER_SYMBOL, nsyms);
     for(i=0; i<nsyms*QPSK_BITS_PER_SYMBOL; i++) {
         llr[i] = -bit_likelihood[i];
     }
@@ -762,13 +763,13 @@ static void FskDemod(float out[], float yr[], float SNR, int M, int number_symbo
 
 void fsk_rx_filt_to_llrs(float llr[], float rx_filt[], float v_est, float SNRest, int M, int nsyms) {
     int i;
-
+    int bps = log2(M);
     float symbol_likelihood[M*nsyms];
-    float bit_likelihood[M*nsyms];
+    float bit_likelihood[bps*nsyms];
 
     FskDemod(symbol_likelihood, rx_filt, SNRest, M, nsyms);
-    Somap(bit_likelihood, symbol_likelihood, nsyms);
-    for(i=0; i<M*nsyms; i++) {
+    Somap(bit_likelihood, symbol_likelihood, M, bps, nsyms);
+    for(i=0; i<bps*nsyms; i++) {
         llr[i] = -bit_likelihood[i];
     }
 }
