@@ -349,7 +349,6 @@ int freedv_comp_short_rx_700d(struct freedv *f, void *demod_in_8kHz, int demod_i
     int    data_bits_per_frame = ldpc->data_bits_per_frame;
     int    coded_bits_per_frame = ldpc->coded_bits_per_frame;
     int    coded_syms_per_frame = ldpc->coded_syms_per_frame;
-    int    interleave_frames = f->interleave_frames;
     COMP  *codeword_symbols = f->codeword_symbols;
     float *codeword_amps = f->codeword_amps;
     int    rx_bits[f->ofdm_bitsperframe];
