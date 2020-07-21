@@ -180,7 +180,7 @@ void freedv_comptx_2020(struct freedv *f, COMP mod_out[]) {
 }
 
 int freedv_comprx_2020(struct freedv *f, COMP demod_in[]) {
-    int   i, j, k;
+    int   i, k;
     int   n_ascii;
     char  ascii_out;
     struct OFDM *ofdm = f->ofdm;
