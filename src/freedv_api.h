@@ -208,6 +208,7 @@ int freedv_get_total_bit_errors_coded(struct freedv *freedv);
 int freedv_get_uncorrected_errors   (struct freedv *freedv);
 
 int freedv_get_sync		    (struct freedv *freedv);
+int freedv_get_sync_interleaver	    (struct freedv *freedv);
 
 // access to speech codec states
 struct FSK * freedv_get_fsk         (struct freedv *f);

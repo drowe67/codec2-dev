@@ -1169,6 +1169,11 @@ int freedv_get_n_max_speech_samples(struct freedv *f) {
         return f->n_speech_samples;
 }
 
+// Now dummy obsolete call
+int freedv_get_sync_interleaver(struct freedv *f) {
+    return 1;
+}
+
 int freedv_get_sz_error_pattern(struct freedv *f) 
 {
     if (FDV_MODE_ACTIVE( FREEDV_MODE_700C, f->mode)) {
