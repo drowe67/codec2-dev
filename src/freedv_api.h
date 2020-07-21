@@ -94,11 +94,6 @@
 // struct that hold state information for one freedv instance
 struct freedv;
 
-// advanced freedv open options rqd by some modes
-struct freedv_advanced {
-    int interleave_frames;
-};
-      
 // Called when text message char is decoded
 typedef void (*freedv_callback_rx)(void *, char);
 // Called when new text message char is needed
@@ -128,7 +123,6 @@ typedef void (*freedv_callback_datatx)(void *, unsigned char *packet, size_t *si
 // open, close ----------------------------------------------------------------
 
 struct freedv *freedv_open(int mode);
-struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv);
 void freedv_close   (struct freedv *freedv);
 
 // Transmit -------------------------------------------------------------------
@@ -208,7 +202,6 @@ int freedv_get_total_bit_errors_coded(struct freedv *freedv);
 int freedv_get_uncorrected_errors   (struct freedv *freedv);
 
 int freedv_get_sync		    (struct freedv *freedv);
-int freedv_get_sync_interleaver	    (struct freedv *freedv);
 
 // access to speech codec states
 struct FSK * freedv_get_fsk         (struct freedv *f);

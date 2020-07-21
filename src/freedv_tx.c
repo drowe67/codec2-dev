@@ -37,7 +37,7 @@ int main(int argc, char *argv[]) {
     FILE                     *fin, *fout;
     struct freedv            *freedv;
     int                       mode;
-    int                       use_testframes, interleave_frames, use_clip, use_txbpf, use_dpsk;
+    int                       use_testframes, use_clip, use_txbpf, use_dpsk;
     int                       i;
 
     if (argc < 4) {
@@ -46,7 +46,7 @@ int main(int argc, char *argv[]) {
         sprintf(f2020,"|2020");
         #endif     
         printf("usage: %s 1600|700C|700D|2400A|2400B|800XA%s InputRawSpeechFile OutputModemRawFile\n"
-               " [--testframes] [--interleave depth] [--clip 0|1] [--txbpf 0|1] [--dpsk]\n", argv[0], f2020);
+               " [--testframes] [--clip 0|1] [--txbpf 0|1] [--dpsk]\n", argv[0], f2020);
         printf("e.g    %s 1600 hts1a.raw hts1a_fdmdv.raw\n", argv[0]);
         exit(1);
     }
@@ -78,32 +78,22 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
-    use_testframes = 0; interleave_frames = 1; use_clip = 0; use_txbpf = 1; use_dpsk = 0;
+    use_testframes = 0; use_clip = 0; use_txbpf = 1; use_dpsk = 0;
     
     if (argc > 4) {
         for (i = 4; i < argc; i++) {
             if (strcmp(argv[i], "--testframes") == 0) use_testframes = 1;
-            else if (strcmp(argv[i], "--interleave") == 0) { interleave_frames = atoi(argv[i+1]); i++; }
             else if (strcmp(argv[i], "--clip") == 0) { use_clip = atoi(argv[i+1]); i++; }
             else if (strcmp(argv[i], "--txbpf") == 0) { use_txbpf = atoi(argv[i+1]); i++; }
             else if (strcmp(argv[i], "--dpsk") == 0) use_dpsk = 1;
             else {
-                fprintf(stderr, "unkown option: %s\n", argv[i]);
+                fprintf(stderr, "unknown option: %s\n", argv[i]);
                 exit(1);
             }
         }
     }
 
-    /* freedv_open_advanced() for non-standard start up */ 
-    if ((mode == FREEDV_MODE_700D) || (mode == FREEDV_MODE_2020)) {
-        struct freedv_advanced adv;
-        adv.interleave_frames = interleave_frames;
-        freedv = freedv_open_advanced(mode, &adv);
-    }
-    else {
-        /* Just use this normally */
-        freedv = freedv_open(mode);
-    }
+    freedv = freedv_open(mode);
     assert(freedv != NULL);
 
     /* these are all optional ------------------ */
