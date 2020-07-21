@@ -238,12 +238,10 @@ int count_errors(uint8_t tx_bits[], uint8_t rx_bits[], int n) {
 void ofdm_ldpc_interleave_tx(struct OFDM *ofdm, struct LDPC *ldpc, complex float tx_sams[], uint8_t tx_bits[], uint8_t txt_bits[], struct OFDM_CONFIG *config) {
     int coded_syms_per_frame = ldpc->coded_syms_per_frame;
     int coded_bits_per_frame = ldpc->coded_bits_per_frame;
-    int data_bits_per_frame = ldpc->data_bits_per_frame;
     int ofdm_bitsperframe = ofdm_get_bits_per_frame(ofdm);
     int codeword[coded_bits_per_frame];
     COMP coded_symbols[coded_syms_per_frame];
     COMP coded_symbols_inter[coded_syms_per_frame];
-    int Nsamperframe = ofdm_get_samples_per_frame(ofdm);
     complex float tx_symbols[ofdm_bitsperframe / config->bps];
 
     ldpc_encode_frame(ldpc, codeword, tx_bits);

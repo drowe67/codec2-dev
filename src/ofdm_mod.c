@@ -75,7 +75,7 @@ void opt_help() {
 
 int main(int argc, char *argv[]) {
     char *fin_name, *fout_name;
-    int i, j, opt, val;
+    int i, opt, val;
 
     char *pn = argv[0] + strlen(argv[0]);
 

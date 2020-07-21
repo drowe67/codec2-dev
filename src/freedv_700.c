@@ -176,7 +176,7 @@ void freedv_700d_open(struct freedv *f) {
 */
 
 void freedv_comptx_700d(struct freedv *f, COMP mod_out[]) {
-    int    i, j, k;
+    int    i, k;
     int    nspare;
  
     // Generate Varicode txt bits. Txt bits in OFDM frame come just
@@ -340,7 +340,7 @@ int freedv_comprx_700c(struct freedv *f, COMP demod_in_8kHz[]) {
 */
 
 int freedv_comp_short_rx_700d(struct freedv *f, void *demod_in_8kHz, int demod_in_is_short, float gain) {
-    int   i, j, k;
+    int   i, k;
     int   n_ascii;
     char  ascii_out;
     struct OFDM *ofdm = f->ofdm;
