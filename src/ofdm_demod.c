@@ -125,7 +125,6 @@ int main(int argc, char *argv[]) {
     char *log_name = NULL;
 
     int logframes = NFRAMES;
-    int interleave_frames = 1;
     int nc = 17;
     int ns = 8;
     int np = 1;
