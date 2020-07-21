@@ -78,11 +78,11 @@ void opt_help() {
     fprintf(stderr, "  --out         filename   Name of OutputOneCharPerBitFile\n");
     fprintf(stderr, "  --log         filename   Octave log file for testing\n");
     fprintf(stderr, "  --nc          [17..62]   Number of Carriers (17 default, 62 max)\n");
+    fprintf(stderr, "  --np                     Number of packets\n");
     fprintf(stderr, "  --ns           Nframes   Number of Symbol Frames (8 default)\n");
     fprintf(stderr, "  --tcp            Nsecs   Cyclic Prefix Duration (.002 default)\n");
     fprintf(stderr, "  --ts             Nsecs   Symbol Duration (.018 default)\n");
     fprintf(stderr, "  --bandwidth      [0|1]   Select phase est bw mode AUTO low or high (0) or LOCKED high (1) (default 0)\n");
-    fprintf(stderr, "  --interleave     depth   Interleaver for LDPC frames, e.g. 1,2,4,8,16 (default is 1)\n");
     fprintf(stderr, "                           Must also specify --ldpc option\n");
     fprintf(stderr, "  --tx_freq         freq   Set modulation TX centre Frequency (1500.0 default)\n");
     fprintf(stderr, "  --rx_freq         freq   Set modulation RX centre Frequency (1500.0 default)\n");
@@ -128,6 +128,8 @@ int main(int argc, char *argv[]) {
     int interleave_frames = 1;
     int nc = 17;
     int ns = 8;
+    int np = 1;
+    int bps = 2;
     int verbose = 0;
     int phase_est_bandwidth_mode = AUTO_PHASE_EST;
     int ldpc_en = 0;
@@ -138,7 +140,6 @@ int main(int argc, char *argv[]) {
     bool output_specified = false;
     bool log_specified = false;
     bool log_active = false;
-    bool ldpc_check = false;
     bool llr_en = false;
     bool dpsk = false;
     
@@ -151,6 +152,7 @@ int main(int argc, char *argv[]) {
     float start_secs = 0.0;
     float len_secs = 0.0;
     float skip_secs = 0.0;
+    
     struct optparse options;
 
     struct optparse_long longopts[] = {
@@ -158,7 +160,6 @@ int main(int argc, char *argv[]) {
         {"out", 'b', OPTPARSE_REQUIRED},
         {"log", 'c', OPTPARSE_REQUIRED},
         {"testframes", 'd', OPTPARSE_NONE},
-        {"interleave", 'e', OPTPARSE_REQUIRED},
         {"bandwidth", 'o', OPTPARSE_REQUIRED},
         {"tx_freq", 'f', OPTPARSE_REQUIRED},
         {"rx_freq", 'g', OPTPARSE_REQUIRED},
@@ -169,6 +170,7 @@ int main(int argc, char *argv[]) {
         {"tcp", 'k', OPTPARSE_REQUIRED},
         {"ts", 'l', OPTPARSE_REQUIRED},
         {"ns", 'm', OPTPARSE_REQUIRED},
+        {"np", 'n', OPTPARSE_REQUIRED},
         {"databits", 'p', OPTPARSE_REQUIRED},        
         {"start_secs", 'x', OPTPARSE_REQUIRED},        
         {"len_secs", 'y', OPTPARSE_REQUIRED},        
@@ -198,11 +200,6 @@ int main(int argc, char *argv[]) {
                 break;
             case 'd':
                 testframes = true;
-                break;
-            case 'e':
-                interleave_frames = atoi(options.optarg);
-                ldpc_check = true;
-                llr_en = true;
                 break;
             case 'i':
                 ldpc_en = atoi(options.optarg);
@@ -238,6 +235,9 @@ int main(int argc, char *argv[]) {
             case 'm':
                 ns = atoi(options.optarg);
                 break;
+            case 'n':
+                np = atoi(options.optarg);
+                break;
             case 'o':
                 phase_est_bandwidth_mode = atoi(options.optarg);
                 break;
@@ -271,13 +271,6 @@ int main(int argc, char *argv[]) {
     while ((arg = optparse_arg(&options)))
         fprintf(stderr, "%s\n", arg);
 
-    if (ldpc_check == true) {
-        if ((interleave_frames != 1) && (ldpc_en == 0)) {
-            fprintf(stderr, "You must also specify an ldpc option with interleave\n");
-            exit(-1);
-        }
-    }
-
     if (input_specified == true) {
         if ((fin = fopen(fin_name, "rb")) == NULL) {
             fprintf(stderr, "Error opening input modem sample file: %s\n", fin_name);
@@ -308,14 +301,18 @@ int main(int argc, char *argv[]) {
     }
 
     ofdm_config->nc = nc;
+    ofdm_config->np = np;
     ofdm_config->ns = ns; /* Number of Symbol frames */
-    ofdm_config->bps = 2; /* Bits per Symbol */
+    ofdm_config->bps = bps; /* Bits per Symbol */
     ofdm_config->ts = ts;
     ofdm_config->tcp = tcp;
     ofdm_config->tx_centre = tx_centre;
     ofdm_config->rx_centre = rx_centre;
     ofdm_config->fs = FS; /* Sample Frequency */
+    ofdm_config->rs = (1.0f / ts);
     ofdm_config->txtbits = 4; /* number of auxiliary data bits */
+    ofdm_config->nuwbits = 5 * bps;
+    ofdm_config->bad_uw_errors = 3;
 
     ofdm_config->ftwindowwidth = 11;
     ofdm_config->timing_mx_thresh = 0.30f;
@@ -398,7 +395,6 @@ int main(int argc, char *argv[]) {
     }
     
     if (verbose != 0) {
-        fprintf(stderr, "interleave_frames: %d\n", interleave_frames);
         ofdm_set_verbose(ofdm, verbose);
         
         fprintf(stderr, "Phase Estimate Switching: ");
@@ -410,17 +406,10 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    int Nerrs_raw[interleave_frames];
-    int Nerrs_coded[interleave_frames];
-    int iter[interleave_frames];
-    int parityCheckCount[interleave_frames];
-
-    for (i = 0; i < interleave_frames; i++) {
-        Nerrs_raw[i] = 0;
-        Nerrs_coded[i] = 0;
-        iter[i] = 0;
-        parityCheckCount[i] = 0;
-    }
+    int Nerrs_raw = 0;
+    int Nerrs_coded = 0;
+    int iter = 0;
+    int parityCheckCount = 0;
 
     int Nbitsperframe = ofdm_bitsperframe;
     int Nmaxsamperframe = ofdm_get_max_samples_per_frame(ofdm);
@@ -446,12 +435,12 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "Warning EsNo: %f hard coded\n", EsNo);
 
     COMP payload_syms[Npayloadsymsperframe];
-    COMP codeword_symbols[interleave_frames * Npayloadsymsperframe];
+    COMP codeword_symbols[Npayloadsymsperframe];
 
     float payload_amps[Npayloadsymsperframe];
-    float codeword_amps[interleave_frames * Npayloadsymsperframe];
+    float codeword_amps[Npayloadsymsperframe];
 
-    for (i = 0; i < (interleave_frames * Npayloadsymsperframe); i++) {
+    for (i = 0; i < Npayloadsymsperframe; i++) {
         codeword_symbols[i].real = 0.0f;
         codeword_symbols[i].imag = 0.0f;
         codeword_amps[i] = 0.0f;
@@ -491,7 +480,7 @@ int main(int argc, char *argv[]) {
 
         if ((ofdm->sync_state == synced) || (ofdm->sync_state == trial)) {
             ofdm_demod_shorts(ofdm, rx_bits, rx_scaled, (OFDM_AMP_SCALE / 2.0f));
-            ofdm_disassemble_modem_frame(ofdm, rx_uw, payload_syms, payload_amps, txt_bits);
+            ofdm_disassemble_qpsk_modem_frame(ofdm, rx_uw, payload_syms, payload_amps, txt_bits);
             log_payload_syms = true;
 
             /* SNR estimation and smoothing */
@@ -509,84 +498,67 @@ int main(int argc, char *argv[]) {
 
                 assert((ofdm_nuwbits + ofdm_ntxtbits + coded_bits_per_frame) <= ofdm_bitsperframe);
 
-                /* now we need to buffer for de-interleaving -------------------------------------*/
-
-                /* shift interleaved symbol buffers to make room for new symbols */
-
-                for (i = 0, j = coded_syms_per_frame; j < interleave_frames * coded_syms_per_frame; i++, j++) {
-                    codeword_symbols[i] = codeword_symbols[j];
-                    codeword_amps[i] = codeword_amps[j];
-                }
-
                 /* newest symbols at end of buffer (uses final i from last loop) */
 
-                for (i = (interleave_frames - 1) * coded_syms_per_frame, j = 0; i < interleave_frames * coded_syms_per_frame; i++, j++) {
-                    codeword_symbols[i] = payload_syms[j];
-                    codeword_amps[i] = payload_amps[j];
+                for (i = 0; i < coded_syms_per_frame; i++) {
+                    codeword_symbols[i] = payload_syms[i];
+                    codeword_amps[i] = payload_amps[i];
                 }
 
                 /* run de-interleaver */
 
-                COMP codeword_symbols_de[interleave_frames * coded_syms_per_frame];
-                float codeword_amps_de[interleave_frames * coded_syms_per_frame];
+                COMP codeword_symbols_de[coded_syms_per_frame];
+                float codeword_amps_de[coded_syms_per_frame];
 
-                gp_deinterleave_comp(codeword_symbols_de, codeword_symbols, interleave_frames * coded_syms_per_frame);
-                gp_deinterleave_float(codeword_amps_de, codeword_amps, interleave_frames * coded_syms_per_frame);
+                gp_deinterleave_comp(codeword_symbols_de, codeword_symbols, coded_syms_per_frame);
+                gp_deinterleave_float(codeword_amps_de, codeword_amps, coded_syms_per_frame);
 
                 float llr[coded_bits_per_frame];
 
                 if (ldpc_en) {
                     uint8_t out_char[coded_bits_per_frame];
 
-                    interleaver_sync_state_machine(ofdm, &ldpc, ofdm_config, codeword_symbols_de, codeword_amps_de, EsNo,
-                            interleave_frames, iter, parityCheckCount, Nerrs_coded);
+                    if (testframes == true) {
+                        Terrs += count_uncoded_errors(&ldpc, ofdm_config, &Nerrs_raw, codeword_symbols_de);
+                        Tbits += coded_bits_per_frame; /* not counting errors in txt bits */
+                    }
 
-                    if ((ofdm->sync_state_interleaver == synced) && (ofdm->frame_count_interleaver == interleave_frames)) {
-                        ofdm->frame_count_interleaver = 0;
+                    symbols_to_llrs(llr, codeword_symbols_de, codeword_amps_de,
+                            EsNo, ofdm->mean_amp, coded_syms_per_frame);
+                    
+                    if (ldpc.data_bits_per_frame == ldpc.ldpc_data_bits_per_frame) {
+                        /* all data bits in code word used */
+                        iter = run_ldpc_decoder(&ldpc, out_char, llr, &parityCheckCount);
+                    } else {
+                        /* some unused data bits, set these to known values to strengthen code */
+                        float llr_full_codeword[ldpc.ldpc_coded_bits_per_frame];
+                        int unused_data_bits = ldpc.ldpc_data_bits_per_frame - ldpc.data_bits_per_frame;
 
-                        if (testframes == true) {
-                            Terrs += count_uncoded_errors(&ldpc, ofdm_config, Nerrs_raw, interleave_frames, codeword_symbols_de);
-                            Tbits += coded_bits_per_frame*interleave_frames; /* not counting errors in txt bits */
-                        }
+                        // received data bits
+                        for (i = 0; i < ldpc.data_bits_per_frame; i++)
+                            llr_full_codeword[i] = llr[i];
+                        // known bits ... so really likely
+                        for (i = ldpc.data_bits_per_frame; i < ldpc.ldpc_data_bits_per_frame; i++)
+                            llr_full_codeword[i] = -100.0;
+                        // parity bits at end
+                        for (i = ldpc.ldpc_data_bits_per_frame; i < ldpc.ldpc_coded_bits_per_frame; i++)
+                            llr_full_codeword[i] = llr[i - unused_data_bits];
+                        
+                        iter = run_ldpc_decoder(&ldpc, out_char, llr_full_codeword, &parityCheckCount);
+                    }
 
-                        for (j = 0; j < interleave_frames; j++) {
-                            symbols_to_llrs(llr, &codeword_symbols_de[j * coded_syms_per_frame],
-                                    &codeword_amps_de[j * coded_syms_per_frame],
-                                    EsNo, ofdm->mean_amp, coded_syms_per_frame);                           
-                            if (ldpc.data_bits_per_frame == ldpc.ldpc_data_bits_per_frame) {
-                                /* all data bits in code word used */
-                               iter[j] = run_ldpc_decoder(&ldpc, out_char, llr, &parityCheckCount[j]);
-                            } else {
-                                /* some unused data bits, set these to known values to strengthen code */
-                                float llr_full_codeword[ldpc.ldpc_coded_bits_per_frame];
-                                int unused_data_bits = ldpc.ldpc_data_bits_per_frame - ldpc.data_bits_per_frame;
-                                
-                                // received data bits
-                                for (i = 0; i < ldpc.data_bits_per_frame; i++)
-                                    llr_full_codeword[i] = llr[i]; 
-                                // known bits ... so really likely
-                                for (i = ldpc.data_bits_per_frame; i < ldpc.ldpc_data_bits_per_frame; i++)
-                                    llr_full_codeword[i] = -100.0;
-                                // parity bits at end
-                                for (i = ldpc.ldpc_data_bits_per_frame; i < ldpc.ldpc_coded_bits_per_frame; i++)
-                                    llr_full_codeword[i] = llr[i-unused_data_bits]; 
-                                iter[j] = run_ldpc_decoder(&ldpc, out_char, llr_full_codeword, &parityCheckCount[j]);
-                            }
+                    if (testframes == true) {
+                        /* construct payload data bits */
 
-                            if (testframes == true) {
-                                /* construct payload data bits */
+                        uint8_t payload_data_bits[data_bits_per_frame];
+                        ofdm_generate_payload_data_bits(payload_data_bits, data_bits_per_frame);
 
-                                uint8_t payload_data_bits[data_bits_per_frame];
-                                ofdm_generate_payload_data_bits(payload_data_bits, data_bits_per_frame);
+                        Nerrs_coded = count_errors(payload_data_bits, out_char, data_bits_per_frame);
+                        Terrs_coded += Nerrs_coded;
+                        Tbits_coded += data_bits_per_frame;
+                    }
 
-                                Nerrs_coded[j] = count_errors(payload_data_bits, out_char, data_bits_per_frame);
-                                Terrs_coded += Nerrs_coded[j];
-                                Tbits_coded += data_bits_per_frame;
-                            }
-
-                            fwrite(out_char, sizeof (char), data_bits_per_frame, fout);
-                        }
-                    } /* if interleaver synced ..... */
+                    fwrite(out_char, sizeof (char), data_bits_per_frame, fout);
                 } else {
                     /* lpdc_en == false,  external LDPC decoder, so output LLRs */
                     symbols_to_llrs(llr, codeword_symbols_de, codeword_amps_de, EsNo, ofdm->mean_amp, coded_syms_per_frame);
@@ -626,7 +598,7 @@ int main(int argc, char *argv[]) {
                     txt_bits[i] = 0;
                 }
 
-                ofdm_assemble_modem_frame(ofdm, tx_bits, payload_bits, txt_bits);
+                ofdm_assemble_qpsk_modem_frame(ofdm, tx_bits, payload_bits, txt_bits);
 
                 Nerrs = 0;
 
@@ -655,17 +627,14 @@ int main(int argc, char *argv[]) {
 
         if (ofdm->sync_start == true) {
             Terrs = Tbits = Terrs2 = Tbits2 = Terrs_coded = Tbits_coded = frame_count = 0;
-
-            for (i = 0; i < interleave_frames; i++) {
-                Nerrs_raw[i] = 0;
-                Nerrs_coded[i] = 0;
-            }
+            Nerrs_raw = 0;
+            Nerrs_coded = 0;
         }
 
         #ifdef TT
         if (ldpc_en) {
             /* experimental timing gear switching based on LDPC TODO: move into shared function */
-            bool ldpc_decode_ok = parityCheckCount[0] > 0.8*ldpc.NumberParityBits;
+            bool ldpc_decode_ok = parityCheckCount > 0.8*ldpc.NumberParityBits;
             if (ofdm->sync_state == synced) {
                 if ((ofdm->sync_counter>2) && (ldpc_decode_ok == false)) {
                     ofdm_set_timing_range(ofdm, WIDE_TIMING);
@@ -678,26 +647,18 @@ int main(int argc, char *argv[]) {
         #endif
         
         if (verbose >= 2) {
-            int r = 0;
-
-            if (testframes == true) {
-                r = (ofdm->frame_count_interleaver - 1) % interleave_frames;
-            }
-
-           fprintf(stderr, "%3d nin: %4d st: %-6s euw: %2d %1d f: %5.1f pbw: %d ist: %-6s %2d eraw: %3d ecdd: %3d iter: %3d pcc: %3d\n",
+           fprintf(stderr, "%3d nin: %4d st: %-6s euw: %2d %1d f: %5.1f pbw: %d eraw: %3d ecdd: %3d iter: %3d pcc: %3d\n",
                     f, nin_frame, 
                     statemode[ofdm->last_sync_state],
                     ofdm->uw_errors,
                     ofdm->sync_counter,
                     ofdm->foff_est_hz,
                     ofdm->phase_est_bandwidth,
-                    statemode[ofdm->last_sync_state_interleaver],
-                    ofdm->frame_count_interleaver,
-                    Nerrs_raw[r], Nerrs_coded[r], iter[r], parityCheckCount[r]);
+                    Nerrs_raw, Nerrs_coded, iter, parityCheckCount);
 
-            /* detect a sucessful sync for time to sync tests */
+            /* detect a successful sync for time to sync tests */
             if ((time_to_sync < 0) && ((ofdm->sync_state == synced) || (ofdm->sync_state == trial)))          
-                if ((parityCheckCount[r] > 80) && (iter[r] != 100))
+                if ((parityCheckCount > 80) && (iter != 100))
                     time_to_sync = (float)(f+1)*ofdm_get_samples_per_frame(ofdm)/FS;
 
         }
