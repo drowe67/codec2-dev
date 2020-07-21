@@ -290,7 +290,7 @@ int freedv_comprx_2020(struct freedv *f, COMP demod_in[]) {
             f->total_bit_errors_coded += Nerrs_coded;
             f->total_bits_coded += data_bits_per_frame;
         } else {
-            memcpy(f->rx_payload_bits + j*data_bits_per_frame, out_char, data_bits_per_frame);
+            memcpy(f->rx_payload_bits*data_bits_per_frame, out_char, data_bits_per_frame);
         }
 
         rx_status |= RX_BITS;
