@@ -103,6 +103,12 @@ char *rx_sync_flags_to_text[] = {
 
 \*---------------------------------------------------------------------------*/
 
+// Obsolete call
+
+struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
+    freedv_open(mode);
+}
+
 struct freedv *freedv_open(int mode) {
     struct freedv *f;
     
