@@ -103,13 +103,12 @@ char *rx_sync_flags_to_text[] = {
 
 \*---------------------------------------------------------------------------*/
 
-// Obsolete call
-
-struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
-    return freedv_open(mode);
+struct freedv *freedv_open(int mode) {
+    return freedv_open_advanced(mode, NULL);
 }
 
-struct freedv *freedv_open(int mode) {
+// Ignoring adv parameter
+struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
     struct freedv *f;
     
     if (false == (FDV_MODE_ACTIVE( FREEDV_MODE_1600,mode) || FDV_MODE_ACTIVE( FREEDV_MODE_2400A,mode) || 
