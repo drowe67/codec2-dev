@@ -138,18 +138,7 @@ int main(int argc, char *argv[]) {
     printf("config_mode: %d config_verbose: %d\n", config_mode, config_verbose);
     
     ////////
-    // Static config
-    int interleave_frames = 1; 
-
-    ////////
-    if (config_mode == FREEDV_MODE_700D) {
-        struct freedv_advanced adv;
-        adv.interleave_frames = interleave_frames;
-        freedv = freedv_open_advanced(config_mode, &adv);
-    }
-    else {
-        freedv = freedv_open(config_mode);
-    }
+    freedv = freedv_open(config_mode);
     assert(freedv != NULL);
 
     memtools_find_unused(printf);
