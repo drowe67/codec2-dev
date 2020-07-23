@@ -175,7 +175,7 @@ int main(int argc, char *argv[]) {
     }
 
     ofdm_config->fs = 8000.0;			/* Sample Frequency */
-    ofdm_config->ofdm_timing_mx_thresh = 0.30;
+    ofdm_config->timing_mx_thresh = 0.30;
     ofdm_config->ftwindowwidth = 11;
     ofdm_config->bps = 2;   			/* Bits per Symbol */
     ofdm_config->txtbits = 4; 			/* number of auxiliary data bits */
@@ -191,11 +191,11 @@ int main(int argc, char *argv[]) {
     FREE(ofdm_config);
 
     /* Get a copy of the actual modem config */
-    ofdm_config = ofdm_get_config_param();
+    ofdm_config = ofdm_get_config_param(ofdm);
 
     set_up_hra_112_112(&ldpc, ofdm_config);
 
-    ofdm_bitsperframe = ofdm_get_bits_per_frame();
+    ofdm_bitsperframe = ofdm_get_bits_per_frame(ofdm);
     ofdm_rowsperframe = ofdm_bitsperframe / (ofdm_config->nc * ofdm_config->bps);
     ofdm_nuwbits = (ofdm_config->ns - 1) * ofdm_config->bps - ofdm_config->txtbits;
     ofdm_ntxtbits = ofdm_config->txtbits;
@@ -203,7 +203,7 @@ int main(int argc, char *argv[]) {
 
     ofdm_set_verbose(ofdm, config_verbose);
 
-    int Nmaxsamperframe = ofdm_get_max_samples_per_frame();
+    int Nmaxsamperframe = ofdm_get_max_samples_per_frame(ofdm);
 
     int data_bits_per_frame = ldpc.data_bits_per_frame;
     int coded_bits_per_frame = ldpc.coded_bits_per_frame;
@@ -272,7 +272,7 @@ int main(int argc, char *argv[]) {
             ofdm_demod_shorts(ofdm, rx_bits, rx_scaled, (OFDM_AMP_SCALE/2));
             if (config_profile) PROFILE_SAMPLE_AND_LOG2(ofdm_demod_demod, "  ofdm_demod_demod");
             if (config_profile) PROFILE_SAMPLE(ofdm_demod_diss);
-            ofdm_disassemble_modem_frame(ofdm, rx_uw, payload_syms, payload_amps, txt_bits);
+            ofdm_disassemble_qpsk_modem_frame(ofdm, rx_uw, payload_syms, payload_amps, txt_bits);
             if (config_profile) PROFILE_SAMPLE_AND_LOG2(ofdm_demod_diss, "  ofdm_demod_diss");
             log_payload_syms_flag = 1;
 
@@ -326,17 +326,21 @@ int main(int argc, char *argv[]) {
                 if (config_ldpc_en) {
                     uint8_t out_char[coded_bits_per_frame];
 
+                    /*
                     interleaver_sync_state_machine(ofdm, &ldpc, ofdm_config, 
                                 codeword_symbols_de, codeword_amps_de, EsNo,
                                 interleave_frames, iter, parityCheckCount, Nerrs_coded);
-
+                    */
+                    /*
                     if ((ofdm->sync_state_interleaver == synced) && 
                             (ofdm->frame_count_interleaver == interleave_frames)) {
-                        ofdm->frame_count_interleaver = 0;
+                    */
+                    if (1) {
+                        //ofdm->frame_count_interleaver = 0;
 
                         if (config_testframes) {
                             Terrs += count_uncoded_errors(&ldpc, ofdm_config, Nerrs_raw, 
-                                        interleave_frames, codeword_symbols_de);
+                                        codeword_symbols_de);
                             Tbits += coded_bits_per_frame*interleave_frames; 
                         }
 
@@ -400,7 +404,7 @@ int main(int argc, char *argv[]) {
                     txt_bits[i] = 0;
                 }
 
-                ofdm_assemble_modem_frame(ofdm, tx_bits, payload_bits, txt_bits);
+                ofdm_assemble_qpsk_modem_frame(ofdm, tx_bits, payload_bits, txt_bits);
 
                 Nerrs = 0;
                 for(i=0; i<ofdm_bitsperframe; i++) {
@@ -436,13 +440,11 @@ int main(int argc, char *argv[]) {
 
         int r = 0;
         if (config_testframes && config_verbose) {
-            r = (ofdm->frame_count_interleaver - 1 ) % interleave_frames;
+            //r = (ofdm->frame_count_interleaver - 1 ) % interleave_frames;
             fprintf(stderr, "%3d st: %-6s", f, statemode[ofdm->last_sync_state]);
-            fprintf(stderr, " euw: %2d %1d f: %5.1f ist: %-6s %2d eraw: %3d ecdd: %3d iter: %3d pcc: %3d",
+            fprintf(stderr, " euw: %2d %1d f: %5.1f eraw: %3d ecdd: %3d iter: %3d pcc: %3d",
                 ofdm->uw_errors, ofdm->sync_counter,
                 (double)ofdm->foff_est_hz,
-                statemode[ofdm->last_sync_state_interleaver], 
-                ofdm->frame_count_interleaver,
                 Nerrs_raw[r], Nerrs_coded[r], iter[r], parityCheckCount[r]);
             fprintf(stderr, "\n");
         }
