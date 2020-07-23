@@ -38,6 +38,7 @@
 
 #include "fsk.h"
 #include "codec2_fdmdv.h"
+#include "mpdecode_core.h"
 #include "modem_stats.h"
 
 /* cleanly exit when we get a SIGTERM */
@@ -60,6 +61,7 @@ int main(int argc,char *argv[]){
     int16_t *rawbuf;
     COMP *modbuf;
     float *rx_filt = NULL;
+    float *llrs = NULL;
     int i,j,Ndft;
     int soft_dec_mode = 0;
     stats_loop = 0;
@@ -257,6 +259,7 @@ int main(int argc,char *argv[]){
     /* allocate buffers for processing */
     if (soft_dec_mode) {
         rx_filt = (float*)malloc(sizeof(float)*fsk->mode*fsk->Nsym); assert(rx_filt != NULL);
+        llrs = (float*)malloc(sizeof(float)*fsk->Nbits); assert(llrs != NULL);
     } else {
         bitbuf = (uint8_t*)malloc(sizeof(uint8_t)*fsk->Nbits); assert(bitbuf != NULL);
     }
@@ -299,9 +302,11 @@ int main(int argc,char *argv[]){
             }            
         }
 
-        if(soft_dec_mode){
-            fsk_demod_sd(fsk,rx_filt,modbuf);            
-        }else{
+        if (soft_dec_mode) {
+            /* output bit LLRs */
+            fsk_demod_sd(fsk,rx_filt,modbuf);
+            fsk_rx_filt_to_llrs(llrs, rx_filt, fsk->v_est, fsk->SNRest, fsk->mode, fsk->Nsym);
+        } else {
             fsk_demod(fsk,bitbuf,modbuf);
         }
         
@@ -407,8 +412,8 @@ int main(int argc,char *argv[]){
         }
 
         if(soft_dec_mode){
-            fwrite(rx_filt,sizeof(float),fsk->mode*fsk->Nsym,fout);
-        }else{
+            fwrite(llrs,sizeof(float),fsk->Nbits,fout);
+        } else{
             fwrite(bitbuf,sizeof(uint8_t),fsk->Nbits,fout);
         }
 
@@ -425,6 +430,7 @@ int main(int argc,char *argv[]){
     
     if (soft_dec_mode) {
         free(rx_filt);
+        free(llrs);
     } else{
         free(bitbuf);
     }

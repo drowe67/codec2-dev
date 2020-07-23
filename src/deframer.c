@@ -41,9 +41,10 @@ unsigned int toInt(char c)
 int main(int argc,char *argv[]){
     FILE *fin, *fout;
     
-    if (argc != 5) {
-        fprintf(stderr,"usage: %s InputBitsOnePerByte OutputBitsOnePerByte frameSizeBits HexUW\n",argv[0]);
-        exit(1);
+    if (argc < 5) {
+        fprintf(stderr,"usage: %s InOneFloatPerLLR OutOneFloatPerLLR frameSizeBits HexUW [--hard]\n",argv[0]);
+        fprintf(stderr,"    --hard  Treat input and output files as OneBitPerByte hard decisions\n");
+                exit(1);
     }
 
     if (strcmp(argv[1],"-") == 0) {
@@ -64,7 +65,7 @@ int main(int argc,char *argv[]){
         }
     }
 
-    /* extract UW array */
+    /* extract UW array from hex on command line */
     
     size_t framesize = atoi(argv[3]);
     char *uw_hex = argv[4];
@@ -80,15 +81,41 @@ int main(int argc,char *argv[]){
         fprintf(stderr,"%d ", uw[i]);
     fprintf(stderr,"\n");
 
+    /* set up for LLRs or hard decision inputs */
+    
+    size_t framedsize = framesize+uwsize;
+    int oneBitPerByte = 0;
+    int nelement = sizeof(float);
+    if (argc == 6) {
+        oneBitPerByte = 1;
+        nelement = sizeof(uint8_t);
+    }
+    uint8_t *inbuf = malloc(2*nelement*framedsize);  assert(inbuf != NULL);
+    memset(inbuf, 0, 2*nelement*framedsize);
+    
     /* main loop */
 
-    size_t framedsize = framesize+uwsize;
     uint8_t twoframes[2*framedsize]; memset(twoframes, 0, 2*framedsize);
     int state = 0; int thresh1 = 0.1*uwsize; int thresh2 = 0.2*uwsize;
     fprintf(stderr, "thresh1: %d thresh2: %d\n", thresh1, thresh2);
     int best_location, errors;
-    while(fread(&twoframes[framedsize], sizeof(uint8_t), framedsize, fin) == framedsize) {
+    while(fread(&inbuf[nelement*framedsize], nelement, framedsize, fin) == framedsize) {
 
+        /* We need to maintain a two frame buffer of hard decision data for UW sync */
+        
+        if (oneBitPerByte) {
+            memcpy(&twoframes[framedsize], inbuf, framedsize);
+        } else {
+            /* convert bit LLRs to hard decisions */
+            float *pllr = (float*)&inbuf[nelement*framedsize];
+            for(int i=0; i<framedsize; i++) {
+                if (*pllr < 0)
+                    twoframes[framedsize+i] = 1;
+                else
+                    twoframes[framedsize+i] = 0;
+            }
+        }
+        
         int next_state = state;
         switch(state) {
         case 0:
@@ -114,11 +141,14 @@ int main(int argc,char *argv[]){
         }
         state = next_state;
         
-        if (state == 1)
-            fwrite(&twoframes[best_location+uwsize],sizeof(uint8_t),framesize,fout);
+        if (state == 1) {
+            fwrite(&inbuf[(best_location+uwsize)*nelement], nelement, framesize, fout);
+        }
         memmove(twoframes, &twoframes[framedsize], framedsize);
+        memmove(inbuf, &inbuf[nelement*framedsize], nelement*framedsize);
     }
-    
+
+    free(inbuf);
     fclose(fin);
     fclose(fout);
 
