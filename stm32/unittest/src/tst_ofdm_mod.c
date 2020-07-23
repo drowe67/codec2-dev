@@ -94,8 +94,6 @@ int main(int argc, char *argv[]) {
     int          frame = 0;
     int          i, j;
 
-    static const int interleave_frames = 1; // No interleaving yet!
-
     semihosting_init();
 
     printf("OFDM_mod test and profile\n");
@@ -151,29 +149,26 @@ int main(int argc, char *argv[]) {
     set_up_hra_112_112(&ldpc, ofdm_config);
 
     if (config_ldpc_en) {
-        Nbitsperframe =  interleave_frames * ldpc.data_bits_per_frame;
+        Nbitsperframe = ldpc.data_bits_per_frame;
     } else {
         Nbitsperframe = ofdm_get_bits_per_frame(ofdm);
     }
 
     Nsamperframe = ofdm_get_samples_per_frame(ofdm);
-//    int ofdm_nuwbits = (ofdm_config->ns - 1) * ofdm_config->bps -
-//                                                    ofdm_config->txtbits;
+//    int ofdm_nuwbits = (ofdm_config->ns - 1) * ofdm_config->bps - ofdm_config->txtbits;
 
     if (config_verbose) {
         ofdm_set_verbose(ofdm, config_verbose);
-        fprintf(stderr, "Nsamperframe: %d, interleave_frames: %d, Nbitsperframe: %d \n",
-            Nsamperframe, interleave_frames, Nbitsperframe);
+        fprintf(stderr, "Nsamperframe: %d, Nbitsperframe: %d \n", Nsamperframe, Nbitsperframe);
     }
-
 
     int ofdm_ntxtbits =  ofdm_config->txtbits;
 
     uint8_t tx_bits_char[Nbitsperframe];
     int16_t tx_scaled[Nsamperframe];
-    uint8_t txt_bits_char[ofdm_ntxtbits*interleave_frames];
+    uint8_t txt_bits_char[ofdm_ntxtbits];
 
-    for(i=0; i< ofdm_ntxtbits*interleave_frames; i++) {
+    for(i=0; i< ofdm_ntxtbits; i++) {
         txt_bits_char[i] = 0;
     }    
     
@@ -200,16 +195,12 @@ int main(int argc, char *argv[]) {
 
             if (config_ldpc_en) {
 
-                complex float tx_sams[interleave_frames * Nsamperframe];
-                ofdm_ldpc_interleave_tx(ofdm, &ldpc, tx_sams, tx_bits_char,
-                                txt_bits_char, ofdm_config);
+                complex float tx_sams[Nsamperframe];
+                ofdm_ldpc_interleave_tx(ofdm, &ldpc, tx_sams, tx_bits_char, txt_bits_char, ofdm_config);
 
-                for (j=0; j<interleave_frames; j++) {
                     for(i=0; i<Nsamperframe; i++) {
-                        tx_scaled[i] = OFDM_AMP_SCALE * crealf(tx_sams[j * Nsamperframe + i]);
+                        tx_scaled[i] = OFDM_AMP_SCALE * crealf(tx_sams[i]);
                     }
-
-                }
 
              } else { // !config_ldpc_en
                 int tx_bits[Nbitsperframe];
@@ -218,7 +209,7 @@ int main(int argc, char *argv[]) {
                     tx_bits[i] = tx_bits_char[i];
                 }
 
-	            if (config_verbose >=3) {
+	        if (config_verbose >=3) {
                     fprintf(stderr, "\ntx_bits:\n");
                     for (i = 0; i < Nbitsperframe; i++) {
                         fprintf(stderr, "  %3d %8d\n", i, tx_bits[i]);
@@ -228,7 +219,7 @@ int main(int argc, char *argv[]) {
                 COMP tx_sams[Nsamperframe];
                 ofdm_mod(ofdm, tx_sams, tx_bits);
 
-	            if (config_verbose >=3) {
+	        if (config_verbose >=3) {
                     fprintf(stderr, "\ntx_sams:\n");
                     for (i = 0; i < Nsamperframe; i++) {
                         fprintf(stderr, "  %3d % f\n", i, (double)tx_sams[i].real);
