@@ -14,11 +14,15 @@ Required:
 * You must have STM32F4xx_DSP_StdPeriph_Lib_V1.8.0 (see codec2/stm32/README.md)
 * You must build openocd from source and have it in your path (see below)
 
-Build codec2 for Linux, then the stm32, and run tests on stm32 Discovery:
+Build codec2 for x86 Linux and run the ctests.  This generates several artifacts required for the stm32 tests:
 
 ```
 $ cd ~/codec2
-$ mkdir build_linux && cd build_linux && cmake .. && make
+$ mkdir build_linux && cd build_linux && cmake .. && make && ctest
+```
+
+Now build for the stm32, and run the stm32 ctests:
+```
 $ cd ~/codec2/stm32 && mkdir build_stm32 && cd build_stm32
 $ cmake -DCMAKE_TOOLCHAIN_FILE=../cmake/STM32_Toolchain.cmake -DPERIPHLIBDIR=~/Downloads/STM32F4xx_DSP_StdPeriph_Lib_V1.8.0 ..
 $ make
