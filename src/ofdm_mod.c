@@ -118,6 +118,7 @@ int main(int argc, char *argv[]) {
 
     int nc = 17;
     int ns = 8;
+    int bps = 2;
     float tcp = 0.0020f;
     float ts = 0.0180f;
     float rx_centre = 1500.0f;
@@ -259,8 +260,11 @@ int main(int argc, char *argv[]) {
     ofdm_config->nc = nc;
     ofdm_config->tcp = tcp;
     ofdm_config->ts = ts;
+    ofdm_config->np = 1;
 
     ofdm_config->rs = (1.0f / ts); /* Modulating Symbol Rate */
+    ofdm_config->nuwbits = 5 * bps;
+    ofdm_config->bad_uw_errors = 3;
 
     struct OFDM *ofdm = ofdm_create(ofdm_config);
     assert(ofdm != NULL);
@@ -441,7 +445,7 @@ int main(int argc, char *argv[]) {
                     txt_bits[i] = 0;
                 }
 
-                ofdm_assemble_modem_frame(ofdm, tx_bits_char, payload_bits, txt_bits);
+                ofdm_assemble_qpsk_modem_frame(ofdm, tx_bits_char, payload_bits, txt_bits);
             }
 
             int tx_bits[Nbitsperframe];
