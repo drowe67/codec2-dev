@@ -126,7 +126,7 @@ int main(int argc,char *argv[]){
                 errors = 0;
                 for(int u=0; u<uwsize; u++)
                     errors += twoframes[i+u] ^ uw[u];
-                fprintf(stderr, "%d %d %d\n", i, errors, best_errors);
+                // fprintf(stderr, "%d %d %d\n", i, errors, best_errors);
                 if (errors < best_errors) { best_errors = errors; best_location = i; }
             }
             if (best_errors <= thresh1) { fprintf(stderr, "found UW!\n"); next_state = 1; }

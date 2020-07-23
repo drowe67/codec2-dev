@@ -135,7 +135,7 @@ int main(int argc,char *argv[]){
  
     fclose(fin);
 
-    fprintf(stderr,"[%04d] BER %5.3f, bits tested %6d, bit errors %4d\n", packetcnt, ber, bitcnt, biterr);
+    fprintf(stderr,"[%04d] BER %5.3f, bits tested %6d, bit errors %6d\n", packetcnt, ber, bitcnt, biterr);
     if ((packetcnt >= packet_pass_thresh) && (ber <= ber_pass_thresh)) {
         fprintf(stderr,"PASS\n");
         return 0;

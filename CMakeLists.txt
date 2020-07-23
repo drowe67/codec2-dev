@@ -670,6 +670,15 @@ endif(NOT APPLE)
              COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/octave; DISPLAY=\"\" octave --no-gui -qf fsk_lib_ldpc_demo.m")
              set_tests_properties(test_fsk_lib_4fsk_ldpc PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
 
+     # Command line Unique Word (UW) framer in hard decision mode
+     add_test(NAME test_fsk_framer
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src; 
+                            ./fsk_get_test_bits - 300 | 
+                            ./framer - - 100 51 | 
+                            ./deframer - - 100 51 --hard | 
+                            ./fsk_put_test_bits -")
+             set_tests_properties(test_fsk_framer PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
+            
      # 800XA framer test
      add_test(NAME test_fsk_vhf_framer
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src; 
