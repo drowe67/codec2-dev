@@ -256,7 +256,6 @@ int main(int argc, char *argv[]) {
     ofdm_config->tcp = tcp;
     ofdm_config->ts = ts;
     ofdm_config->np = 1;
-    
     ofdm_config->rs = (1.0f / ts); /* Modulating Symbol Rate */
     ofdm_config->nuwbits = 5 * bps;
     ofdm_config->bad_uw_errors = 3;

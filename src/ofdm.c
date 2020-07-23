@@ -334,6 +334,12 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
 
         ofdm->uw_ind[j    ] = (val * 2);       // bit index 1
         ofdm->uw_ind[j + 1] = (val * 2) + 1;   // bit index 2
+
+        /* TODO fix me
+        for (int b = ofdm->bps - 1; b >= 0 ; b--) {
+            ofdm->uw_ind[j + b] = (val * ofdm->bps) - b; // bit index (MSB -> LSB)
+        }
+        */
     }
 
     ofdm->tx_uw_syms = MALLOC(sizeof (complex float) * (ofdm->nuwbits / 2));
