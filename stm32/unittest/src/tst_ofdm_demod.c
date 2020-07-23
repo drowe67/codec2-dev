@@ -122,7 +122,7 @@ int main(int argc, char *argv[]) {
     int          config_log_payload_syms;
     int          config_profile;
 
-    int          i, j;
+    int          i;
     int          Nerrs, Terrs, Tbits, Terrs2, Tbits2, frame_count;
     int          Tbits_coded, Terrs_coded;
 
@@ -162,26 +162,8 @@ int main(int argc, char *argv[]) {
     ofdm_demod_snr = 0;
     if (config_profile) machdep_profile_init();
 
-    if ((ofdm_config = (struct OFDM_CONFIG *) CALLOC(1, sizeof (struct OFDM_CONFIG))) == NULL) {
-        fprintf(stderr, "Out of Memory\n");
-        exit(1);
-    }
-
-    ofdm_config->fs = 8000.0;			/* Sample Frequency */
-    ofdm_config->timing_mx_thresh = 0.30;
-    ofdm_config->ftwindowwidth = 11;
-    ofdm_config->bps = 2;   			/* Bits per Symbol */
-    ofdm_config->txtbits = 4; 			/* number of auxiliary data bits */
-    ofdm_config->ns = 8;  			/* Number of Symbol frames */
-
-    ofdm_config->rs = (1.0f / ofdm_config->ts); /* Symbol Rate */
-
-    /* config options can change here, non yet */
-
-    ofdm = ofdm_create(ofdm_config);
+    ofdm = ofdm_create(NULL);
     assert(ofdm != NULL);
-
-    FREE(ofdm_config);
 
     /* Get a copy of the actual modem config */
     ofdm_config = ofdm_get_config_param(ofdm);
@@ -396,7 +378,6 @@ int main(int argc, char *argv[]) {
             Terrs = Tbits = Terrs2 = Tbits2 = Terrs_coded = Tbits_coded = frame_count = Nerrs_raw = Nerrs_coded = 0;
         }
 
-        int r = 0;
         if (config_testframes && config_verbose) {
             fprintf(stderr, "%3d st: %-6s", f, statemode[ofdm->last_sync_state]);
             fprintf(stderr, " euw: %2d %1d f: %5.1f eraw: %3d ecdd: %3d iter: %3d pcc: %3d\n",

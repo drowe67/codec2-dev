@@ -92,7 +92,7 @@ int main(int argc, char *argv[]) {
 
     int          Nbitsperframe, Nsamperframe;
     int          frame = 0;
-    int          i, j;
+    int          i;
 
     semihosting_init();
 
@@ -120,28 +120,9 @@ int main(int argc, char *argv[]) {
     if (config_profile) machdep_profile_init();
 
     struct OFDM_CONFIG *ofdm_config;
-    if ((ofdm_config = (struct OFDM_CONFIG *) CALLOC(1, sizeof (struct OFDM_CONFIG))) == NULL) {
-        fprintf(stderr, "Out of Memory\n");
-        exit(1);
-    }
 
-    ofdm_config->fs = 8000.0;			/* Sample Frequency */
-    ofdm_config->timing_mx_thresh = 0.30;
-    ofdm_config->ftwindowwidth = 11;
-    ofdm_config->bps = 2;   			/* Bits per Symbol */
-    ofdm_config->txtbits = 4; 			/* number of auxiliary data bits */
-    ofdm_config->ns = 8;  			/* Number of Symbol frames */
-    ofdm_config->tx_centre = 1500.0f;
-    ofdm_config->rx_centre = 1500.0f;
-    ofdm_config->nc = 17;
-    ofdm_config->tcp = 0.0020f;
-    ofdm_config->ts = 0.0180f;
-    ofdm_config->rs = (1.0f / ofdm_config->ts); /* Modulating Symbol Rate */
-
-    ofdm = ofdm_create(ofdm_config);
+    ofdm = ofdm_create(NULL);
     assert(ofdm != NULL);
-
-    FREE(ofdm_config);
 
     /* Get a copy of the actual modem config */
     ofdm_config = ofdm_get_config_param(ofdm);
