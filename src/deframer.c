@@ -96,7 +96,7 @@ int main(int argc,char *argv[]){
     /* main loop */
 
     uint8_t twoframes[2*framedsize]; memset(twoframes, 0, 2*framedsize);
-    int state = 0; int thresh1 = 0.1*uwsize; int thresh2 = 0.2*uwsize;
+    int state = 0; int thresh1 = 0.1*uwsize; int thresh2 = 0.4*uwsize; int baduw = 0;
     fprintf(stderr, "thresh1: %d thresh2: %d\n", thresh1, thresh2);
     int best_location, errors;
     while(fread(&inbuf[nelement*framedsize], nelement, framedsize, fin) == framedsize) {
@@ -130,14 +130,22 @@ int main(int argc,char *argv[]){
                 //fprintf(stderr, "%d %d %d\n", i, errors, best_errors);
                 if (errors < best_errors) { best_errors = errors; best_location = i; }
             }
-            if (best_errors <= thresh1) { fprintf(stderr, "found UW!\n"); next_state = 1; }
+            if (best_errors <= thresh1) {
+                fprintf(stderr, "found UW!\n"); next_state = 1; baduw = 0;
+            }
             break;
         case 1:
             /* in sync - check UW still OK */
             errors = 0;
             for(int u=0; u<uwsize; u++)
                 errors += twoframes[best_location+u] ^ uw[u];
-            if (errors >= thresh2) { fprintf(stderr, "lost UW!\n"); next_state = 0; }
+            if (errors >= thresh2) {
+                baduw++;
+                if (baduw == 1) {
+                    fprintf(stderr, "lost UW!\n"); next_state = 0;
+                }
+            }
+            else baduw = 0;
             break;
         }
         state = next_state;

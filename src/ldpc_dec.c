@@ -48,7 +48,7 @@ int main(int argc, char *argv[])
     struct LDPC ldpc;
     float      *ainput;
     int         iter, total_iters;
-    int         Tbits, Terrs, Tbits_raw, Terrs_raw;
+    int         Tbits, Terrs, Tbits_raw, Terrs_raw, Tpackets, Tpacketerrs;
 
     int unused_data_bits = 84;
 
@@ -172,7 +172,7 @@ int main(int argc, char *argv[])
 
     testframes = 0;
     total_iters = 0;
-    Tbits = Terrs = Tbits_raw = Terrs_raw = 0;
+    Tbits = Terrs = Tbits_raw = Terrs_raw = Tpackets = Tpacketerrs = 0;
     
     if (!strcmp(argv[1],"--test")) {
 
@@ -316,15 +316,17 @@ int main(int argc, char *argv[])
             fwrite(out_char, sizeof(char), data_bits_per_frame, fout);
 
             if (testframes) {
+                int perr = 0;
                 for (i=0; i<data_bits_per_frame; i++) {
-                    //fprintf(stderr, "%d %d\n", out_char[i], ibits[i]);
                     if (out_char[i] != ibits[i]) {
                         Terrs++;
+                        perr = 1;
                     }
                     Tbits++;
                 }
+                Tpackets++; if (perr) { Tpacketerrs++; fprintf(stderr,"x"); } else fprintf(stderr,".");
             }
-            fprintf(stderr, "Terrs_raw: %d  Tbits_raw: %d Terr: %d Tbits: %d\n", Terrs_raw, Tbits_raw, Terrs, Tbits);
+            //fprintf(stderr, "Terrs_raw: %d  Tbits_raw: %d Terr: %d Tbits: %d\n", Terrs_raw, Tbits_raw, Terrs, Tbits);
         }
 
         free(input_float);
@@ -335,10 +337,11 @@ int main(int argc, char *argv[])
     fprintf(stderr, "total iters %d\n", total_iters);
 
     if (testframes) {
-        fprintf(stderr, "Raw Tbits..: %d Terr: %d BER: %4.3f\n", Tbits_raw, Terrs_raw,
+        fprintf(stderr, "Raw   Tbits: %6d Terr: %6d BER: %4.3f\n", Tbits_raw, Terrs_raw,
                 (float)Terrs_raw/(Tbits_raw+1E-12));
         float coded_ber = (float)Terrs/(Tbits+1E-12);
-        fprintf(stderr, "Coded Tbits: %d Terr: %d BER: %4.3f\n", Tbits, Terrs, coded_ber);
+        fprintf(stderr, "Coded Tbits: %6d Terr: %6d BER: %4.3f\n", Tbits, Terrs, coded_ber);
+        fprintf(stderr, "      Tpkts: %6d Tper: %6d PER: %4.3f\n", Tpackets, Tpacketerrs, Tpacketerrs/(Tpackets+1E-12));
 
         /* set return code for Ctest */
         if (coded_ber < 0.01)
