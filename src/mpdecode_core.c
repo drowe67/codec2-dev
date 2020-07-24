@@ -566,7 +566,7 @@ int run_ldpc_decoder(struct LDPC *ldpc, uint8_t out_char[], float input[], int *
 }
 
 
-void sd_to_llr(float llr[], double sd[], int n) {
+void sd_to_llr(float llr[], float sd[], int n) {
     double sum, mean, sign, sumsq, estvar, estEsN0, x;
     int i;
 

@@ -4,10 +4,7 @@
   CREATED: Sep 2016
 
   Command line C LDPC decoder derived from MpDecode.c in the CML
-  library.  Allows us to run the same decoder in Octave and C.  The
-  code is defined by the parameters and array stored in the include
-  file below, which can be machine generated from the Octave function
-  ldpc_fsk_lib.m:ldpc_decode()
+  library.  Allows us to run the same decoder in Octave and C.
 */
 
 #include <assert.h>
@@ -45,7 +42,7 @@ int opt_exists(char *argv[], int argc, char opt[]) {
 int main(int argc, char *argv[])
 {    
     int         CodeLength, NumberParityBits;
-    int         i, r, num_ok, num_runs, codename, parityCheckCount, mute, state, next_state, frame, testframes;
+    int         i, r, num_ok, num_runs, codename, parityCheckCount, mute, testframes;
     int         data_bits_per_frame;
     char        *adetected_data;
     struct LDPC ldpc;
@@ -63,17 +60,14 @@ int main(int argc, char *argv[])
         fprintf(stderr, "usage: %s --listcodes\n\n", argv[0]);
         fprintf(stderr, "  List supported codes (more can be added via using Octave ldpc scripts)\n");
         fprintf(stderr, "\n");
-        fprintf(stderr, "usage: %s InOneSymbolPerDouble OutOneBitPerByte [--sd] [--half] [--code CodeName] [--testframes]", argv[0]);
+        fprintf(stderr, "usage: %s InOneSymbolPerFloat OutOneBitPerByte [--sd] [--half] [--code CodeName] [--testframes]", argv[0]);
         fprintf(stderr, " [--unused numUnusedDataBits]\n\n");
-        fprintf(stderr, "   InOneSymbolPerDouble    Input file of double LLRs, use - for the \n");        
+        fprintf(stderr, "   InOneSymbolPerFloat     Input file of float LLRs, use - for the \n");        
         fprintf(stderr, "                           file names to use stdin/stdout\n");
         fprintf(stderr, "   --code                  Use LDPC code CodeName\n");
         fprintf(stderr, "   --listcodes             List available LDPC codes\n");
         fprintf(stderr, "   --sd                    Treat input file samples as Soft Decision\n");
         fprintf(stderr, "                           demod outputs rather than LLRs\n");
-        fprintf(stderr, "   --half                  Load framesize/2 input samples for each decode\n");
-        fprintf(stderr, "                           attempt, only output decoded bits\n");
-        fprintf(stderr, "                           converges.  Form of frame sync.\n");
         fprintf(stderr, "   --mute                  Only output frames with < 10%% parity check fails\n");
         fprintf(stderr, "   --testframes            built in test frame modem, requires --testframes at encoder\n");
         fprintf(stderr, "    --unused               number of unused data bits, which are set to 1's at enc and dec\n");
@@ -215,7 +209,7 @@ int main(int argc, char *argv[])
     }
     else {
         FILE *fin, *fout;
-        int   sdinput, readhalfframe, nread, offset;
+        int   sdinput, nread, offset;
 
         /* File I/O mode ------------------------------------------------*/
 
@@ -233,14 +227,9 @@ int main(int argc, char *argv[])
             exit(1);
         }
 
-        sdinput = 0;
-        readhalfframe = 0;
-        mute = 0; state = 0; frame = 0; testframes = 0;
+        sdinput = 0; mute = 0; testframes = 0;
         if (opt_exists(argv, argc, "--sd")) {
             sdinput = 1;
-        }
-        if (opt_exists(argv, argc, "--half")) {
-            readhalfframe = 1;
         }
         if (opt_exists(argv, argc, "--mute")) {
             mute = 1;
@@ -261,35 +250,26 @@ int main(int argc, char *argv[])
                 ibits[i] = 1;
             }
             encode(&ldpc, ibits, pbits);  
-       }
+        }
 
-        double *input_double = calloc(CodeLength, sizeof(double));
         float  *input_float  = calloc(CodeLength, sizeof(float));
 
         nread = CodeLength - unused_data_bits;
-        offset = 0;
-        if (readhalfframe) {
-            nread = CodeLength/2;
-            offset = CodeLength/2;
-            for(i=0; i<offset; i++) {
-                input_double[i] = 0.0;
-            }
-        }
         fprintf(stderr, "CodeLength: %d offset: %d\n", CodeLength, offset);
 
-        while(fread(&input_double[offset], sizeof(double), nread, fin) == nread) {
+        while(fread(input_float, sizeof(float), nread, fin) == nread) {
             if (sdinput) {
                 if (testframes) {
                     char in_char;
                     for (i=0; i<data_bits_per_frame-unused_data_bits; i++) {
-                        in_char = input_double[i] < 0;
+                        in_char = input_float[i] < 0;
                         if (in_char != ibits[i]) {
                             Terrs_raw++;
                         }
                         Tbits_raw++;
                     }
                     for (i=0; i<NumberParityBits; i++) {
-                        in_char = input_double[i+data_bits_per_frame-unused_data_bits] < 0;
+                        in_char = input_float[i+data_bits_per_frame-unused_data_bits] < 0;
                         if (in_char != pbits[i]) {
                             Terrs_raw++;
                         }
@@ -297,17 +277,18 @@ int main(int argc, char *argv[])
                     }
                 }
 
-                sd_to_llr(input_float, input_double, CodeLength-unused_data_bits);
+                float llr[CodeLength-unused_data_bits];
+                sd_to_llr(llr, input_float, CodeLength-unused_data_bits);
 
                 /* insert unused data LLRs */
 
                 float llr_tmp[CodeLength];
                 for(i=0; i<data_bits_per_frame-unused_data_bits; i++)
-                    llr_tmp[i] = input_float[i];  // rx data bits
+                    llr_tmp[i] = llr[i];  // rx data bits
                 for(i=data_bits_per_frame-unused_data_bits; i<data_bits_per_frame; i++)
                     llr_tmp[i] = -10.0;           // known data bits high likelhood
                 for(i=data_bits_per_frame; i<CodeLength; i++)
-                    llr_tmp[i] = input_float[i-unused_data_bits];  // rx parity bits
+                    llr_tmp[i] = llr[i-unused_data_bits];  // rx parity bits
                 memcpy(input_float, llr_tmp, sizeof(float)*CodeLength);                
             }
 
@@ -317,9 +298,9 @@ int main(int argc, char *argv[])
             
             if (mute) {
 
-                // Output data bits if decoder converged, or was
+                // Output data bits only if decoder converged, or was
                 // within 10% of all parity checks converging (10% est
-                // BER).  useful for real world operation as it can
+                // BER).  Useful for real world operation as it can
                 // resync and won't send crappy packets to the decoder
                 
                 float ber_est = (float)(ldpc.NumberParityBits - parityCheckCount)/ldpc.NumberParityBits;
@@ -328,37 +309,6 @@ int main(int argc, char *argv[])
                     fwrite(out_char, sizeof(char), ldpc.NumberRowsHcols, fout);
                 }
 
-            } else {
-                
-                if (readhalfframe) {
-                    // Establish which half frame we want to sync on,
-                    // used for testing with cohpsk_put_bits, as it
-                    // maintains sync with test bits state machine.
-                
-                    next_state = state;
-                    switch(state) {
-                    case 0:
-                        if (iter < ldpc.max_iter) {
-                            /* OK we've found which frame to sync on */
-                            next_state = 1;
-                            frame = 0;
-                        }
-                        break;
-                    case 1:
-                        frame++;
-                        if ((frame % 2) == 0) {
-                            /* write decoded packets every second input frame */
-                            fwrite(out_char, sizeof(char), ldpc.NumberRowsHcols, fout);
-                        }
-                        break;
-                    }
-                    state = next_state;
-                    fprintf(stderr, "state: %d iter: %d\n", state, iter);
-                }
-
-                for(i=0; i<offset; i++) {
-                    input_double[i] = input_double[i+offset];
-                }
             }
 
             fwrite(out_char, sizeof(char), data_bits_per_frame, fout);
@@ -375,7 +325,7 @@ int main(int argc, char *argv[])
             fprintf(stderr, "Terrs_raw: %d  Tbits_raw: %d Terr: %d Tbits: %d\n", Terrs_raw, Tbits_raw, Terrs, Tbits);
         }
 
-        free(input_double);
+        free(input_float);
         if (fin  != NULL) fclose(fin);
         if (fout != NULL) fclose(fout);
     }

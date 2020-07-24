@@ -5,8 +5,6 @@
 
   RA LDPC encoder program. Using the elegant back substitution of RA
   LDPC codes.
-
-  building: gcc ldpc_enc.c -o ldpc_enc -Wall -g
 */
 
 #include <stdio.h>
@@ -120,7 +118,7 @@ int main(int argc, char *argv[])
     
     unsigned char ibits[data_bits_per_frame];
     unsigned char pbits[parity_bits_per_frame];
-    double        sdout[data_bits_per_frame+parity_bits_per_frame];
+    float         sdout[data_bits_per_frame+parity_bits_per_frame];
 
     if (strcmp(argv[1], "-")  == 0) fin = stdin;
     else if ( (fin = fopen(argv[1],"rb")) == NULL ) {
@@ -179,7 +177,7 @@ int main(int argc, char *argv[])
                 sdout[i] = 1.0 - 2.0 * ibits[i];
             for (i=0; i<parity_bits_per_frame; i++)
                 sdout[i+data_bits_per_frame-unused_data_bits] = 1.0 - 2.0 * pbits[i];
-            written += fwrite(sdout, sizeof(double), data_bits_per_frame-unused_data_bits+parity_bits_per_frame, fout); 
+            written += fwrite(sdout, sizeof(float), data_bits_per_frame-unused_data_bits+parity_bits_per_frame, fout); 
         }
         else {
             fwrite(ibits, sizeof(char), data_bits_per_frame, fout); 

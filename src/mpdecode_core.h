@@ -43,7 +43,7 @@ void encode(struct LDPC *ldpc, unsigned char ibits[], unsigned char pbits[]);
 
 int run_ldpc_decoder(struct LDPC *ldpc, uint8_t out_char[], float input[], int *parityCheckCount);
 
-void sd_to_llr(float llr[], double sd[], int n);
+void sd_to_llr(float llr[], float sd[], int n);
 void Demod2D(float symbol_likelihood[], COMP r[], COMP S_matrix[], float EsNo, float fading[], float mean_amp, int number_symbols);
 void Somap(float bit_likelihood[], float symbol_likelihood[], int M, int bps, int number_symbols);
 void symbols_to_llrs(float llr[], COMP rx_qpsk_symbols[], float rx_amps[], float EsNo, float mean_amp, int nsyms);
