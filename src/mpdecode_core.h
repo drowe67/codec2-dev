@@ -16,6 +16,7 @@
 #include "comp.h"
 
 struct LDPC {
+    char name[32];
     int max_iter;
     int dec_type;
     int q_scale_factor;
@@ -26,6 +27,9 @@ struct LDPC {
     int max_row_weight;
     int max_col_weight;
 
+    uint16_t *H_rows;
+    uint16_t *H_cols;
+    
     /* these two are fixed to code params */
     int ldpc_data_bits_per_frame;
     int ldpc_coded_bits_per_frame;
@@ -34,9 +38,6 @@ struct LDPC {
     int data_bits_per_frame;
     int coded_bits_per_frame;
     int coded_syms_per_frame;
-
-    uint16_t *H_rows;
-    uint16_t *H_cols;
 };
 
 void encode(struct LDPC *ldpc, unsigned char ibits[], unsigned char pbits[]);

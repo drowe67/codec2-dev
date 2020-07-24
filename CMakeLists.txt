@@ -682,8 +682,10 @@ endif(NOT APPLE)
      add_test(NAME test_fsk_llr
              COMMAND sh -c "${CMAKE_CURRENT_BINARY_DIR}/unittest/tfsk_llr")
 
-     # 4FSK LDPC modem with framer at Rs=100, rate 0.8 code, at Eb/No = 8dB, 10% PER
-     # SNR = Eb/No+10log10(Rb/B) = 8 + 10*log10(100/3000) = -6.7dB
+     # 4FSK LDPC modem with framer at Rs=100 (uncoded Rb=200), rate 0.8 code
+     # SNR = Eb/No + 10*log10(Rb/B) = 5 + 10*log10(200/3000) = -6.7dB
+     # Coded Ebc/No = Eb/No - 10*log1010(0.8) = 5 - 10*log10(0.8) = 6.0dB
+     # This ignores the UW overhead
      add_test(NAME test_fsk_4fsk_ldpc
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
                             ./ldpc_enc /dev/zero - --code HRAb_396_504 --testframes 200 | 
