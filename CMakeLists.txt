@@ -678,9 +678,21 @@ endif(NOT APPLE)
                             ./ldpc_enc /dev/zero - --code HRA_112_112 --testframes 10 | ./framer - - 224 51 | 
                             ./tollr | ./deframer - - 224 51 | ./ldpc_dec - /dev/null --code HRA_112_112 --testframes")
 
-     # mFSK soft decision rx_filter outputs to LLR mapping
+     # mFSK soft decision rx_filter to LLR mapping
      add_test(NAME test_fsk_llr
              COMMAND sh -c "${CMAKE_CURRENT_BINARY_DIR}/unittest/tfsk_llr")
+
+     # 4FSK LDPC modem with framer at Rs=100, rate 0.8 code, at Eb/No = 8dB, 10% PER
+     # SNR = Eb/No+10log10(Rb/B) = 8 + 10*log10(100/3000) = -6.7dB
+     add_test(NAME test_fsk_4fsk_ldpc
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            ./ldpc_enc /dev/zero - --code HRAb_396_504 --testframes 200 | 
+                            ./framer - - 504 5186 |
+                            ./fsk_mod 4 8000 100 1000 100 - - | 
+                            ./cohpsk_ch - - -25 --Fs 8000  | 
+                            ./fsk_demod -s 4 8000 100 - - | 
+                            ./deframer - - 504 5186  | 
+                            ./ldpc_dec - /dev/null --code HRAb_396_504 --testframes")
 
      # 800XA framer test
      add_test(NAME test_fsk_vhf_framer
