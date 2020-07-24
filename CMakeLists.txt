@@ -385,15 +385,24 @@ endif()
            
     # tests ldpc_enc/ldpc_noise/ldpc_dec
     add_test(NAME test_ldpc_enc_dec
-             COMMAND sh -c "$<TARGET_FILE:ldpc_enc> /dev/zero - --sd --code HRA_112_112 --testframes 200 | $<TARGET_FILE:ldpc_noise> - - 0.5 | $<TARGET_FILE:ldpc_dec> - /dev/null --code HRA_112_112 --sd --testframes"
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            ./ldpc_enc /dev/zero - --sd --code HRA_112_112 --testframes 200 | 
+                            ./ldpc_noise - - 0.5 | 
+                            ./ldpc_dec - /dev/null --code HRA_112_112 --sd --testframes"
              )
 
     add_test(NAME test_ldpc_enc_dec_HRAb_396_504
-             COMMAND sh -c "$<TARGET_FILE:ldpc_enc> /dev/zero - --sd --code HRAb_396_504 --testframes 200 | $<TARGET_FILE:ldpc_noise> - - -2.0 | $<TARGET_FILE:ldpc_dec> - /dev/null --code HRAb_396_504 --sd --testframes"
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            ./ldpc_enc /dev/zero - --sd --code HRAb_396_504 --testframes 200 | 
+                            ./ldpc_noise - - -2.0 | 
+                            ./ldpc_dec - /dev/null --code HRAb_396_504 --sd --testframes"
              )
 
     add_test(NAME test_ldpc_enc_dec_H_256_768
-             COMMAND sh -c "$<TARGET_FILE:ldpc_enc> /dev/zero - --sd --code H_256_768 --testframes 200 | $<TARGET_FILE:ldpc_noise> - - 3.0 | $<TARGET_FILE:ldpc_dec> - /dev/null --code H_256_768 --sd --testframes"
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            ./ldpc_enc /dev/zero - --sd --code H_256_768 --testframes 200 | 
+                            ./ldpc_noise - - 3.0 | 
+                            ./ldpc_dec - /dev/null --code H_256_768 --sd --testframes"
              )
 
     # basic test of C utils
