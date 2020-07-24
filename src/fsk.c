@@ -742,9 +742,9 @@ void fsk_demod_core(struct FSK *fsk, uint8_t rx_bits[], float rx_filt[], COMP fs
     /* Unless we're in burst mode or nin locked */
     if(!fsk->burst_mode && !fsk->lock_nin) {
         if(norm_rx_timing > 0.25)
-            fsk->nin = N+Ts/2;
+            fsk->nin = N+Ts/4;
         else if(norm_rx_timing < -0.25)
-            fsk->nin = N-Ts/2;
+            fsk->nin = N-Ts/4;
         else
             fsk->nin = N;
     }

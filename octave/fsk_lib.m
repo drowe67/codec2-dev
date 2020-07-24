@@ -322,10 +322,10 @@ function [rx_bits states] = fsk_demod(states, sf)
 
   next_nin = N;
   if norm_rx_timing > 0.25
-     next_nin += Ts/2;
+     next_nin += Ts/4;
   end
   if norm_rx_timing < -0.25;
-     next_nin -= Ts/2;
+     next_nin -= Ts/4;
   end
   states.nin = next_nin;
 
