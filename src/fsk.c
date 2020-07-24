@@ -929,7 +929,7 @@ void fsk_demod_core(struct FSK *fsk, uint8_t rx_bits[], float rx_filt[], COMP fs
 
 /*---------------------------------------------------------------------------*\
 
-  FUNCTION....: fsk_demod/fsk_demod_sd
+  FUNCTION....: fsk_demod
   AUTHOR......: Brady O'Brien
   DATE CREATED: 11 February 2016
   
