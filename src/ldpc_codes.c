@@ -119,8 +119,12 @@ int ldpc_codes_num(void) { return sizeof(ldpc_codes)/sizeof(struct LDPC); }
 
 void ldpc_codes_list() {
     fprintf(stderr, "\n");
-    for(int c=0; c<ldpc_codes_num(); c++)
-        fprintf(stderr, "%s\n", ldpc_codes[c].name);
+    for(int c=0; c<ldpc_codes_num(); c++) {
+        int n =  ldpc_codes[c].NumberRowsHcols + ldpc_codes[c].NumberParityBits;
+        int k = ldpc_codes[c].NumberRowsHcols;
+        float rate = (float)k/n;
+        fprintf(stderr, "%-20s rate %3.2f (%d,%d) \n", ldpc_codes[c].name, rate, n, k);
+    }
     fprintf(stderr, "\n");
 }
 
