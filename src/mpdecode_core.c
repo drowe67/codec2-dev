@@ -755,7 +755,7 @@ static void FskDemod(float out[], float yr[], float v_est, float SNR, int M, int
     scale_factor = 2*SNR;
     for (i=0;i<number_symbols;i++) { 
         for (j=0;j<M;j++) { 
-            y_envelope = sqrt( yr[i*M+j]*yr[i*M+j]/(v_est*v_est));
+            y_envelope = sqrt( yr[j*number_symbols+i]*yr[j*number_symbols+i]/(v_est*v_est));
             out[i*M+j] = logbesseli0( scale_factor*y_envelope );
         }
     }

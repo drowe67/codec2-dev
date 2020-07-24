@@ -14,8 +14,8 @@
 
 #define M       4
 #define BPS     2
-#define NSYM    4
-#define V_EST   2
+#define NSYM     5
+#define V_EST    2
 #define SNR_EST 10
 
 /* Generated test vectors with:
@@ -25,18 +25,21 @@
    octave:102> symL = DemodFSK(rx_filt,10,1); -Somap(symL)
 */
 
-float rx_filt[] = {
-    1.0, 0.0, 0.0, 0.0,
-    0.0, 1.0, 0.0, 0.0,
-    0.0, 0.0, 1.0, 0.0,
-    0.0, 0.0, 0.0, 1.0
+/* one col per symbol:
+       0    1    2    3    4 */
+ float rx_filt[] = {
+     1.0, 0.0, 0.0, 0.0, 1.0,  /* filter 0 */
+     0.0, 1.0, 0.0, 0.0, 0.0,  /* filter 1 */
+     0.0, 0.0, 1.0, 0.0, 0.0,  /* filter 2 */
+     0.0, 0.0, 0.0, 1.0, 0.0   /* filter 3 */
 };
 
 float llrs_target[] = {
-    7.3252,   7.3252,
-    7.3252,  -7.3252,
-   -7.3252,   7.3252,
-   -7.3252,  -7.3252
+     7.3252,   7.3252,  /* bit 0, 1      */
+     7.3252,  -7.3252,  /*     2, 3, ... */
+    -7.3252,   7.3252,
+    -7.3252,  -7.3252,
+     7.3252,   7.3252
 };
 
 int main(void) { 
