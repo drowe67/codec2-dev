@@ -141,7 +141,7 @@ int main(int argc,char *argv[]){
                 errors += twoframes[best_location+u] ^ uw[u];
             if (errors >= thresh2) {
                 baduw++;
-                if (baduw == 1) {
+                if (baduw == 3) {
                     fprintf(stderr, "lost UW!\n"); next_state = 0;
                 }
             }
