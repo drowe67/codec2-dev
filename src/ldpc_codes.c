@@ -14,6 +14,7 @@
 #include "HRAb_396_504.h"
 #include "H_256_768_22.h"
 #include "H_256_512_4.h"
+#include "HRAa_1536_512.h"
 
 struct LDPC ldpc_codes[] = {
 
@@ -81,7 +82,7 @@ struct LDPC ldpc_codes[] = {
         (uint16_t *)H_256_768_22_H_cols
     },
 
-    /* used for 4FSK */
+    /* used for 4FSK/LLR experiments */
     {
         "H_256_512_4",
         H_256_512_4_MAX_ITER,
@@ -95,6 +96,22 @@ struct LDPC ldpc_codes[] = {
         H_256_512_4_MAX_COL_WEIGHT,
         (uint16_t *)H_256_512_4_H_rows,
         (uint16_t *)H_256_512_4_H_cols
+    },
+    
+    /* used for 4FSK/LLR experiments */
+    {
+        "HRAa_1536_512",
+        HRAa_1536_512_MAX_ITER,
+        0,
+        1,
+        1,
+        HRAa_1536_512_CODELENGTH,
+        HRAa_1536_512_NUMBERPARITYBITS,
+        HRAa_1536_512_NUMBERROWSHCOLS,
+        HRAa_1536_512_MAX_ROW_WEIGHT,
+        HRAa_1536_512_MAX_COL_WEIGHT,
+        (uint16_t *)HRAa_1536_512_H_rows,
+        (uint16_t *)HRAa_1536_512_H_cols
     }
 };
 
