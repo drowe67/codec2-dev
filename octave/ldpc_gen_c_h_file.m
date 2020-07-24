@@ -9,7 +9,7 @@
 %
 % Inputs:
 % First parameter  - name of file with LDPC codes
-% Second parameter - , defaults to 100
+% Second parameter - defaults to 100
 % Third parameter  - decoder_type, defaults to 0
 %
 % Output: Two files with the same filename as the LDPC input, but with .c and .h
@@ -41,6 +41,10 @@ function ldpc_gen_c_h_file(varargin)
     % are doing.  If .mat, then just load, knowing the variable is HRA
     if strcmp(ext, '.mat') == 1
         load(loadStr);
+        if exist("H") & !exist("HRA")
+            printf("renaming H to HRA...\n");
+            HRA=H;
+        end
     else
         % When calling 'load' this way, it returns a struct.  The code assumes the
         % struct has one element, and the one/first element is the array
@@ -72,8 +76,8 @@ function ldpc_gen_c_h_file(varargin)
    
     [code_param framesize rate] = ldpc_init_user(HRA, modulation, mod_order, mapping);
   
-    code_length = code_param.symbols_per_frame;
-    code_length % reported as 112.
+    code_length = code_param.coded_syms_per_frame;
+    code_length 
   
     % *********************  test for enc/dec
    [input_decoder_c, detected_data] = genInputOutputData(code_param, max_iterations, decoder_type);
@@ -85,7 +89,7 @@ function ldpc_gen_c_h_file(varargin)
  
     fprintf(f,"#define %s_NUMBERPARITYBITS %d\n", ldpcArrayName, rows(code_param.H_rows));
     fprintf(f,"#define %s_MAX_ROW_WEIGHT %d\n", ldpcArrayName, columns(code_param.H_rows));
-    fprintf(f,"#define %s_CODELENGTH %d\n", ldpcArrayName, code_param.symbols_per_frame);
+    fprintf(f,"#define %s_CODELENGTH %d\n", ldpcArrayName, code_param.coded_syms_per_frame);
     fprintf(f,"#define %s_NUMBERROWSHCOLS %d\n", ldpcArrayName, rows(code_param.H_cols));
     fprintf(f,"#define %s_MAX_COL_WEIGHT %d\n", ldpcArrayName, columns(code_param.H_cols));
     fprintf(f,"#define %s_DEC_TYPE %d\n", ldpcArrayName, decoder_type);
@@ -169,12 +173,10 @@ function [input_decoder_c, detected_data] = genInputOutputData(code_param, max_i
     codeword = ldpc_encode(code_param, data);    %defined in ldps_fsk_lib.
  
     s = 1 - 2 * codeword;  
-    %aa = code_param.symbols_per_frame  % test - this WAS 112, then it gets set to 224???
-    %code_param.symbols_per_frame = length( s )
  
     EsNo = 10^(EsNodB/10);
     variance = 1/(2*EsNo);
-    noise = sqrt(variance)* randn(1,code_param.symbols_per_frame);
+    noise = sqrt(variance)* randn(1,code_param.coded_syms_per_frame);
     r = s + noise;
    
     % borrowed from ldpc_fsk_lib.m, ldpc_decode

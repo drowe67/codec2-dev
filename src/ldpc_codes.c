@@ -13,6 +13,7 @@
 #include "HRA_112_112.h"  
 #include "HRAb_396_504.h"
 #include "H_256_768_22.h"
+#include "H_256_512_4.h"
 
 struct LDPC ldpc_codes[] = {
 
@@ -78,6 +79,22 @@ struct LDPC ldpc_codes[] = {
         H_256_768_22_MAX_COL_WEIGHT,
         (uint16_t *)H_256_768_22_H_rows,
         (uint16_t *)H_256_768_22_H_cols
+    },
+
+    /* used for 4FSK */
+    {
+        "H_256_512_4",
+        H_256_512_4_MAX_ITER,
+        0,
+        1,
+        1,
+        H_256_512_4_CODELENGTH,
+        H_256_512_4_NUMBERPARITYBITS,
+        H_256_512_4_NUMBERROWSHCOLS,
+        H_256_512_4_MAX_ROW_WEIGHT,
+        H_256_512_4_MAX_COL_WEIGHT,
+        (uint16_t *)H_256_512_4_H_rows,
+        (uint16_t *)H_256_512_4_H_cols
     }
 };
 
