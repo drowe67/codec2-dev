@@ -685,7 +685,7 @@ endif(NOT APPLE)
                             ./ldpc_enc /dev/zero - --code HRA_112_112 --testframes 10 | ./framer - - 224 51 | 
                             ./tollr | ./deframer - - 224 51 | ./ldpc_dec - /dev/null --code HRA_112_112 --testframes")
 
-     # mFSK soft decision to LLR mapping
+     # mFSK soft decision rx_filter outputs to LLR mapping
      add_test(NAME test_fsk_llr
              COMMAND sh -c "${CMAKE_CURRENT_BINARY_DIR}/unittest/tfsk_llr")
 
