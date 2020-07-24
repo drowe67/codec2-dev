@@ -747,7 +747,7 @@ static float logbesseli0(float x)
 
 /* Function that does the demodulation (can be used in stand-alone C) */
 
-static void FskDemod(float out[], float yr[], float SNR, int M, int number_symbols)
+static void FskDemod(float out[], float yr[], float v_est, float SNR, int M, int number_symbols)
 {
     int i, j;	
     float y_envelope, scale_factor;
@@ -755,7 +755,7 @@ static void FskDemod(float out[], float yr[], float SNR, int M, int number_symbo
     scale_factor = 2*SNR;
     for (i=0;i<number_symbols;i++) { 
         for (j=0;j<M;j++) { 
-            y_envelope = sqrt( yr[i*M+j]*yr[i*M+j]);
+            y_envelope = sqrt( yr[i*M+j]*yr[i*M+j]/(v_est*v_est));
             out[i*M+j] = logbesseli0( scale_factor*y_envelope );
         }
     }
@@ -767,7 +767,7 @@ void fsk_rx_filt_to_llrs(float llr[], float rx_filt[], float v_est, float SNRest
     float symbol_likelihood[M*nsyms];
     float bit_likelihood[bps*nsyms];
 
-    FskDemod(symbol_likelihood, rx_filt, SNRest, M, nsyms);
+    FskDemod(symbol_likelihood, rx_filt, v_est, SNRest, M, nsyms);
     Somap(bit_likelihood, symbol_likelihood, M, bps, nsyms);
     for(i=0; i<bps*nsyms; i++) {
         llr[i] = -bit_likelihood[i];

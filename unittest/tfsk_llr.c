@@ -15,7 +15,7 @@
 #define M       4
 #define BPS     2
 #define NSYM    4
-#define V_EST   1
+#define V_EST   2
 #define SNR_EST 10
 
 /* Generated test vectors with:
@@ -33,10 +33,10 @@ float rx_filt[] = {
 };
 
 float llrs_target[] = {
-     16.906,  16.906,
-     16.906, -16.906,
-    -16.906,  16.906,
-    -16.906, -16.906
+    7.3252,   7.3252,
+    7.3252,  -7.3252,
+   -7.3252,   7.3252,
+   -7.3252,  -7.3252
 };
 
 int main(void) { 
