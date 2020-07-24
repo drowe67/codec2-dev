@@ -6,6 +6,8 @@
   Array of LDPC codes used for various Codec2 waveforms.
 */
 
+#include <stdio.h>
+#include <string.h>
 #include "ldpc_codes.h"
 #include "H2064_516_sparse.h"  
 #include "HRA_112_112.h"  
@@ -78,4 +80,21 @@ struct LDPC ldpc_codes[] = {
         (uint16_t *)H_256_768_22_H_cols
     }
 };
+
+int ldpc_codes_num(void) { return sizeof(ldpc_codes)/sizeof(struct LDPC); }
+
+void ldpc_codes_list() {
+    fprintf(stderr, "\n");
+    for(int c=0; c<ldpc_codes_num(); c++)
+        fprintf(stderr, "%s\n", ldpc_codes[c].name);
+    fprintf(stderr, "\n");
+}
+
+int ldpc_codes_find(char name[]) {
+    int code_index = 0;
+    for(int c=0; c<ldpc_codes_num(); c++)
+        if (strcmp(ldpc_codes[c].name, name) == 0)
+            code_index = c;
+    return code_index;
+}
 

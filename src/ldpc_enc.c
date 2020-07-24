@@ -47,23 +47,15 @@ int main(int argc, char *argv[])
     /* todo: put this in a function file to share with ldpc_dec.c */
 
     if ((codename = opt_exists(argv, argc, "--listcodes")) != 0) {
-        fprintf(stderr,"\n");
-        fprintf(stderr,"H2064_516_sparse\n");
-        fprintf(stderr,"HRA_112_112\n");
-        fprintf(stderr,"HRAb_396_504\n");
-        fprintf(stderr,"H_256_768\n");
-        fprintf(stderr,"\n");
+        ldpc_codes_list();
         exit(0);
     }
 
     /* set up LDPC code */
 
     int code_index = 0;
-    if ((codename = opt_exists(argv, argc, "--code")) != 0) {
-        for(int c=0; c<LDPC_CODES_NCODES; c++)
-            if (strcmp(ldpc_codes[c].name, argv[codename+1]) == 0)
-                code_index = c;
-    }
+    if ((codename = opt_exists(argv, argc, "--code")) != 0)
+        code_index = ldpc_codes_find(argv[codename+1]);
     memcpy(&ldpc,&ldpc_codes[code_index],sizeof(struct LDPC));
     fprintf(stderr, "Using: %s\n", ldpc.name);
     

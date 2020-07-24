@@ -9,7 +9,9 @@
 #ifndef __LDPC_CODES__
 #include "mpdecode_core.h"
 
-#define LDPC_CODES_NCODES 4
 extern struct LDPC ldpc_codes[];
+int ldpc_codes_num(void);
+void ldpc_codes_list();
+int ldpc_codes_find(char name[]);
 
 #endif
