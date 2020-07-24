@@ -396,13 +396,6 @@ endif()
              COMMAND sh -c "$<TARGET_FILE:ldpc_enc> /dev/zero - --sd --code H_256_768 --testframes 200 | $<TARGET_FILE:ldpc_noise> - - 3.0 | $<TARGET_FILE:ldpc_dec> - /dev/null --code H_256_768 --sd --testframes"
              )
 
-    # some more LDPC tests, placed in a script for convenience
-    add_test(NAME test_ldpc_check
-             COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/unittest/ldpc_check
-             WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/unittest
-             )
-             set_tests_properties(test_ldpc_check PROPERTIES PASS_REGULAR_EXPRESSION "PASSED")
-
     # basic test of C utils
     add_test(NAME test_FSK_modem_mod_demod
              COMMAND sh -c "$<TARGET_FILE:fsk_get_test_bits> - 10000 | $<TARGET_FILE:fsk_mod> 2 8000 100 1200 100 - - | $<TARGET_FILE:fsk_demod> -l 2 8000 100 - - | $<TARGET_FILE:fsk_put_test_bits> -"
