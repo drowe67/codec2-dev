@@ -137,7 +137,7 @@ int main(int argc,char *argv[]){
             errors = 0;
             for(int u=0; u<uwsize; u++)
                 errors += twoframes[best_location+u] ^ uw[u];
-            if (best_errors >= thresh2) { fprintf(stderr, "lost UW!\n"); next_state = 0; }
+            if (errors >= thresh2) { fprintf(stderr, "lost UW!\n"); next_state = 0; }
             break;
         }
         state = next_state;
