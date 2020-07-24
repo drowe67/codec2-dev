@@ -107,12 +107,13 @@ int main(int argc,char *argv[]){
             memcpy(&twoframes[framedsize], inbuf, framedsize);
         } else {
             /* convert bit LLRs to hard decisions */
-            float *pllr = (float*)&inbuf[nelement*framedsize];
             for(int i=0; i<framedsize; i++) {
+                float *pllr = (float*)&inbuf[nelement*(framedsize+i)];
                 if (*pllr < 0)
                     twoframes[framedsize+i] = 1;
                 else
                     twoframes[framedsize+i] = 0;
+                //fprintf(stderr, "%d %f %d\n", i, *pllr, twoframes[framedsize+i]);
             }
         }
         
@@ -126,7 +127,7 @@ int main(int argc,char *argv[]){
                 errors = 0;
                 for(int u=0; u<uwsize; u++)
                     errors += twoframes[i+u] ^ uw[u];
-                // fprintf(stderr, "%d %d %d\n", i, errors, best_errors);
+                //fprintf(stderr, "%d %d %d\n", i, errors, best_errors);
                 if (errors < best_errors) { best_errors = errors; best_location = i; }
             }
             if (best_errors <= thresh1) { fprintf(stderr, "found UW!\n"); next_state = 1; }

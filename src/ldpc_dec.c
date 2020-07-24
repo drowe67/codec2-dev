@@ -66,7 +66,7 @@ int main(int argc, char *argv[])
         fprintf(stderr, "                           file names to use stdin/stdout\n");
         fprintf(stderr, "   --code                  Use LDPC code CodeName\n");
         fprintf(stderr, "   --listcodes             List available LDPC codes\n");
-        fprintf(stderr, "   --sd                    Treat input file samples as Soft Decision\n");
+        fprintf(stderr, "   --sd                    Treat input file samples as BPSK Soft Decision\n");
         fprintf(stderr, "                           demod outputs rather than LLRs\n");
         fprintf(stderr, "   --mute                  Only output frames with < 10%% parity check fails\n");
         fprintf(stderr, "   --testframes            built in test frame modem, requires --testframes at encoder\n");
@@ -258,25 +258,27 @@ int main(int argc, char *argv[])
         fprintf(stderr, "CodeLength: %d offset: %d\n", CodeLength, offset);
 
         while(fread(input_float, sizeof(float), nread, fin) == nread) {
-            if (sdinput) {
-                if (testframes) {
-                    char in_char;
-                    for (i=0; i<data_bits_per_frame-unused_data_bits; i++) {
-                        in_char = input_float[i] < 0;
-                        if (in_char != ibits[i]) {
-                            Terrs_raw++;
-                        }
-                        Tbits_raw++;
+            if (testframes) {
+                /* BPSK SD and bit LLRs get mapped roughly the same way so this just happens to work for both */
+                char in_char;
+                for (i=0; i<data_bits_per_frame-unused_data_bits; i++) {
+                    in_char = input_float[i] < 0;
+                    if (in_char != ibits[i]) {
+                        Terrs_raw++;
                     }
-                    for (i=0; i<NumberParityBits; i++) {
-                        in_char = input_float[i+data_bits_per_frame-unused_data_bits] < 0;
-                        if (in_char != pbits[i]) {
-                            Terrs_raw++;
-                        }
-                        Tbits_raw++;
-                    }
+                    Tbits_raw++;
                 }
+                for (i=0; i<NumberParityBits; i++) {
+                    in_char = input_float[i+data_bits_per_frame-unused_data_bits] < 0;
+                    if (in_char != pbits[i]) {
+                        Terrs_raw++;
+                    }
+                    Tbits_raw++;
+                }
+            }
 
+            if (sdinput) {
+                /* map BPSK SDs to bit LLRs */
                 float llr[CodeLength-unused_data_bits];
                 sd_to_llr(llr, input_float, CodeLength-unused_data_bits);
 

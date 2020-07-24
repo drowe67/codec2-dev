@@ -679,6 +679,12 @@ endif(NOT APPLE)
                             ./fsk_put_test_bits -")
              set_tests_properties(test_fsk_framer PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
             
+     # Command line Unique Word (UW) framer with LLRs and LDPC (no noise)
+     add_test(NAME test_fsk_framer_ldpc
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src; 
+                            ./ldpc_enc /dev/zero - --code HRA_112_112 --testframes 10 | ./framer - - 224 51 | 
+                            ./tollr | ./deframer - - 224 51 | ./ldpc_dec - /dev/null --code HRA_112_112 --testframes")
+
      # 800XA framer test
      add_test(NAME test_fsk_vhf_framer
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src; 
