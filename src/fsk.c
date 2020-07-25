@@ -610,7 +610,7 @@ void fsk_demod_freq_est(struct FSK *fsk, COMP fsk_in[], float *freqs, int M) {
 }
 
 /* core demodulator function */
-void fsk_demod_core(struct FSK *fsk, uint8_t rx_bits[], float rx_sd[], COMP fsk_in[]){
+void fsk_demod_core(struct FSK *fsk, uint8_t rx_bits[], float rx_filt[], COMP fsk_in[]){
     int N = fsk->N;
     int Ts = fsk->Ts;
     int Rs = fsk->Rs;
@@ -742,9 +742,9 @@ void fsk_demod_core(struct FSK *fsk, uint8_t rx_bits[], float rx_sd[], COMP fsk_
     /* Unless we're in burst mode or nin locked */
     if(!fsk->burst_mode && !fsk->lock_nin) {
         if(norm_rx_timing > 0.25)
-            fsk->nin = N+Ts/2;
+            fsk->nin = N+Ts/4;
         else if(norm_rx_timing < -0.25)
-            fsk->nin = N-Ts/2;
+            fsk->nin = N-Ts/4;
         else
             fsk->nin = N;
     }
@@ -764,18 +764,20 @@ void fsk_demod_core(struct FSK *fsk, uint8_t rx_bits[], float rx_sd[], COMP fsk_
     meanebno = 0;
     stdebno = 0;
     #endif
-  
-    /* FINALLY, THE BITS */
-    /* also, resample fx_int */
-    for(i=0; i<nsym; i++){
+
+    float rx_nse_pow = 1E-12; float rx_sig_pow = 0.0;
+    for(i=0; i<nsym; i++) {
+
+        /* resample at ideal sampling instant */
         int st = (i+1)*P;
-        for( m=0; m<M; m++){
+        for( m=0; m<M; m++) {
             t[m] =           fcmult(1-fract,f_int[m][st+ low_sample]);
             t[m] = cadd(t[m],fcmult(  fract,f_int[m][st+high_sample]));
             /* Figure mag^2 of each resampled fx_int */
             tmax[m] = (t[m].real*t[m].real) + (t[m].imag*t[m].imag);
         }
-        
+
+        /* hard decision decoding of bits */
         float max = tmax[0]; /* Maximum for figuring correct symbol */
         float min = tmax[0];
         int sym = 0; /* Index of maximum */
@@ -789,10 +791,8 @@ void fsk_demod_core(struct FSK *fsk, uint8_t rx_bits[], float rx_sd[], COMP fsk_
             }
         }
         
-        /* Get the actual bit */
         if(rx_bits != NULL){
             /* Get bits for 2FSK and 4FSK */
-            /* TODO: Replace this with something more generic maybe */
             if(M==2){
                 rx_bits[i] = sym==1;                /* 2FSK. 1 bit per symbol */
             }else if(M==4){
@@ -801,27 +801,17 @@ void fsk_demod_core(struct FSK *fsk, uint8_t rx_bits[], float rx_sd[], COMP fsk_
             }
         }
         
-        /* Produce soft decision symbols */
-        if(rx_sd != NULL){
-            /* Convert symbols from max^2 into max */
-            for( m=0; m<M; m++)
-                tmax[m] = sqrtf(tmax[m]);
-            
-            if(M==2){
-                rx_sd[i] = tmax[0] - tmax[1];
-            }else if(M==4){
-                /* TODO: Find a soft-decision mode that works for 4FSK */
-                min = sqrtf(min);
-                rx_sd[(i*2)+1] = - tmax[0] ;  /* Bits=00 */
-                rx_sd[(i*2)  ] = - tmax[0] ;
-                rx_sd[(i*2)+1]+=   tmax[1] ;  /* Bits=01 */
-                rx_sd[(i*2)  ]+= - tmax[1] ;
-                rx_sd[(i*2)+1]+= - tmax[2] ;  /* Bits=10 */
-                rx_sd[(i*2)  ]+=   tmax[2] ;
-                rx_sd[(i*2)+1]+=   tmax[3] ;  /* Bits=11 */
-                rx_sd[(i*2)  ]+=   tmax[3] ;
+        /* Output filter magnitudes for soft decision/LLR calculation */
+        if (rx_filt != NULL) {
+            float sum = 0.0;
+            for(m=0; m<M; m++) {
+                rx_filt[m*nsym+i] = sqrtf(tmax[m]);
+                sum += tmax[m];
             }
+            rx_sig_pow += max;
+            rx_nse_pow += (sum-max)/(M-1);
         }
+
         /* Accumulate resampled int magnitude for EbNodB estimation */
         /* Standard deviation is calculated by algorithm devised by crafty soviets */
         #ifdef EST_EBNO
@@ -834,9 +824,13 @@ void fsk_demod_core(struct FSK *fsk, uint8_t rx_bits[], float rx_sd[], COMP fsk_
         #endif
         /* Soft output goes here */
     }
+
+    rx_sig_pow = rx_sig_pow/nsym;
+    rx_nse_pow = rx_nse_pow/nsym;
+    fsk->v_est = sqrt(rx_sig_pow-rx_nse_pow);
+    fsk->SNRest = rx_sig_pow/rx_nse_pow;
     
-    #ifdef EST_EBNO
-    
+    #ifdef EST_EBNO    
     /* Calculate mean for EbNodB estimation */
     meanebno = meanebno/(float)nsym;
     
@@ -935,7 +929,7 @@ void fsk_demod_core(struct FSK *fsk, uint8_t rx_bits[], float rx_sd[], COMP fsk_
 
 /*---------------------------------------------------------------------------*\
 
-  FUNCTION....: fsk_demod/fsk_demod_sd
+  FUNCTION....: fsk_demod
   AUTHOR......: Brady O'Brien
   DATE CREATED: 11 February 2016
   
@@ -946,12 +940,12 @@ void fsk_demod_core(struct FSK *fsk, uint8_t rx_bits[], float rx_sd[], COMP fsk_
 
 \*---------------------------------------------------------------------------*/
 
-void fsk_demod(struct FSK *fsk, uint8_t rx_bits[], COMP fsk_in[]){
+void fsk_demod(struct FSK *fsk, uint8_t rx_bits[], COMP fsk_in[]) {
     fsk_demod_core(fsk,rx_bits,NULL,fsk_in);
 }
 
-void fsk_demod_sd(struct FSK *fsk, float rx_sd[], COMP fsk_in[]){
-    fsk_demod_core(fsk,NULL,rx_sd,fsk_in);
+void fsk_demod_sd(struct FSK *fsk, float rx_filt[], COMP fsk_in[]){
+    fsk_demod_core(fsk,NULL,rx_filt,fsk_in);
 }
 
 /* make sure stats have known values in case monitoring process reads stats before they are set */

@@ -31,7 +31,7 @@
 #include <string.h>
 #include "fsk.h"
 
-#define TEST_FRAME_SIZE 100  /* arbitrary chice, repeats after this
+#define TEST_FRAME_SIZE 100  /* arbitrary choice, repeats after this
                                 many bits, sets frame size for rx
                                 processing */
 

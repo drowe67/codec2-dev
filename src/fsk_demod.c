@@ -38,6 +38,7 @@
 
 #include "fsk.h"
 #include "codec2_fdmdv.h"
+#include "mpdecode_core.h"
 #include "modem_stats.h"
 
 /* cleanly exit when we get a SIGTERM */
@@ -59,7 +60,8 @@ int main(int argc,char *argv[]){
     uint8_t *bitbuf = NULL;
     int16_t *rawbuf;
     COMP *modbuf;
-    float *sdbuf = NULL;
+    float *rx_filt = NULL;
+    float *llrs = NULL;
     int i,j,Ndft;
     int soft_dec_mode = 0;
     stats_loop = 0;
@@ -255,9 +257,10 @@ int main(int argc,char *argv[]){
     }
     
     /* allocate buffers for processing */
-    if(soft_dec_mode){
-        sdbuf = (float*)malloc(sizeof(float)*fsk->Nbits); assert(sdbuf != NULL);
-    }else{
+    if (soft_dec_mode) {
+        rx_filt = (float*)malloc(sizeof(float)*fsk->mode*fsk->Nsym); assert(rx_filt != NULL);
+        llrs = (float*)malloc(sizeof(float)*fsk->Nbits); assert(llrs != NULL);
+    } else {
         bitbuf = (uint8_t*)malloc(sizeof(uint8_t)*fsk->Nbits); assert(bitbuf != NULL);
     }
     rawbuf = (int16_t*)malloc(bytes_per_sample*(fsk->N+fsk->Ts*2)*complex_input);
@@ -299,14 +302,31 @@ int main(int argc,char *argv[]){
             }            
         }
 
-        if(soft_dec_mode){
-            fsk_demod_sd(fsk,sdbuf,modbuf);
-        }else{
+        if (soft_dec_mode) {
+            int bps = log2(fsk->mode);
+            assert(fsk->Nbits == bps*fsk->Nsym);
+            /* output bit LLRs */
+            fsk_demod_sd(fsk, rx_filt, modbuf);
+            fsk_rx_filt_to_llrs(llrs, rx_filt, fsk->v_est, fsk->SNRest, fsk->mode, fsk->Nsym);
+            /*
+            fprintf(stderr, "v_est: %f SNRest: %f\n", fsk->v_est, fsk->SNRest);            
+            for(int i=0; i<fsk->Nsym; i++) {
+                for(int m=0; m<fsk->mode; m++)
+                    fprintf(stderr, "% 5.0f  ", rx_filt[fsk->Nsym*m+i]);
+                for(int b=0; b<bps; b++)
+                    fprintf(stderr, "% 5.0f  ", llrs[i*bps+b]);                    
+                fprintf(stderr, "\n");
+            }
+            fprintf(stderr, "------\n");
+            */
+        } else {
             fsk_demod(fsk,bitbuf,modbuf);
         }
         
         testframe_detected = 0;
         if (testframe_mode) {
+            assert(soft_dec_mode == 0);
+            
             /* attempt to find a testframe and update stats */
             /* update silding window of input bits */
 
@@ -315,12 +335,7 @@ int main(int argc,char *argv[]){
                 for(i=0; i<TEST_FRAME_SIZE-1; i++) {
                     bitbuf_rx[i] = bitbuf_rx[i+1];
                 }
-                if (soft_dec_mode == 1) {
-                    bitbuf_rx[TEST_FRAME_SIZE-1] = sdbuf[j] < 0.0;
-                }
-                else {
-                    bitbuf_rx[TEST_FRAME_SIZE-1] = bitbuf[j];
-                }
+                bitbuf_rx[TEST_FRAME_SIZE-1] = bitbuf[j];
 
                 /* compare to know tx frame.  If they are time aligned, there
                    will be a fairly low bit error rate */
@@ -410,8 +425,8 @@ int main(int argc,char *argv[]){
         }
 
         if(soft_dec_mode){
-            fwrite(sdbuf,sizeof(float),fsk->Nbits,fout);
-        }else{
+            fwrite(llrs,sizeof(float),fsk->Nbits,fout);
+        } else{
             fwrite(bitbuf,sizeof(uint8_t),fsk->Nbits,fout);
         }
 
@@ -426,9 +441,10 @@ int main(int argc,char *argv[]){
         free(bitbuf_rx);
     }
     
-    if(soft_dec_mode){
-        free(sdbuf);
-    }else{
+    if (soft_dec_mode) {
+        free(rx_filt);
+        free(llrs);
+    } else{
         free(bitbuf);
     }
     

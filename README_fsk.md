@@ -61,27 +61,59 @@ The Octave version of the modem was developed by David Rowe.  Brady O'Brien port
 
 1. You can visualise the C modem operation with a companion python script, for example:
    ```
-   ./fsk_get_test_bits - 10000 | ./fsk_mod -p 10 4 8000 400 400 400 - - | ./fsk_demod -p 10 -t1 4 8000 400 - /dev/null 2>stats.txt
-   python ../../octave/plot_fsk_demod_stats.py stats.txt
+   $ ./fsk_get_test_bits - 10000 | ./fsk_mod -p 10 4 8000 400 400 400 - - | ./fsk_demod -p 10 -t1 4 8000 400 - /dev/null 2>stats.txt
+   $ python ../../octave/plot_fsk_demod_stats.py stats.txt
    ```
 
-1. Send some digital voice using FSK at 800 bits/s, the try the two 2400 bits/s FSK modes:
+1. Send some digital voice using FSK at 800 bits/s, and try the two 2400 bits/s FSK modes:
    ```
-   ./freedv_tx 800XA ../../raw/ve9qrp.raw - | ./freedv_rx 800XA - - -vv | aplay -f S16_LE
-   ./freedv_tx 2400A ../../raw/ve9qrp.raw - | ./freedv_rx 2400A - - -vv | aplay -f S16_LE
-   ./freedv_tx 2400B ../../raw/ve9qrp.raw - | ./freedv_rx 2400B - - -vv | aplay -f S16_LE
+   $ ./freedv_tx 800XA ../../raw/ve9qrp.raw - | ./freedv_rx 800XA - - -vv | aplay -f S16_LE
+   $ ./freedv_tx 2400A ../../raw/ve9qrp.raw - | ./freedv_rx 2400A - - -vv | aplay -f S16_LE
+   $ ./freedv_tx 2400B ../../raw/ve9qrp.raw - | ./freedv_rx 2400B - - -vv | aplay -f S16_LE
    ```
+
+1. LDPC encoded 4FSK, with framing:
+   ```
+   $ cd ~/codec2/build_linux/src
+   $ ./ldpc_enc /dev/zero - --code H_256_512_4 --testframes 200 |
+     ./framer - - 512 5186 | ./fsk_mod 4 8000 100 1000 100 - - |
+     ./cohpsk_ch - - -24 --Fs 8000  |
+     ./fsk_demod -s 4 8000 100 - - |
+     ./deframer - - 512 5186  |
+     ./ldpc_dec - /dev/null --code H_256_512_4 --testframes
+   <snip>
+   SNR3k(dB): -7.74 C/No: 27.0 PAPR:  3.0 
+   Raw   Tbits: 100352 Terr:   6701 BER: 0.067
+   Coded Tbits:  50176 Terr:    139 BER: 0.003
+         Tpkts:    196 Tper:      4 PER: 0.020
+   ```
+   In this example the unique word is the 16 bit sequence `5186`.  Se also several ctests using these application. Other codes are also available:
+   ```
+   $ ./ldpc_enc --listcodes
+
+   H2064_516_sparse     rate 0.80 (2580,2064) 
+   HRA_112_112          rate 0.50 (224,112) 
+   HRAb_396_504         rate 0.79 (504,396) 
+   H_256_768            rate 0.33 (768,256) 
+   H_256_512_4          rate 0.50 (512,256) 
+   HRAa_1536_512        rate 0.75 (2048,1536) 
+   H_128_256_5          rate 0.50 (256,128)
+   ```
+   If you change the code you also need to change the `frameSizeBits` argument in `framer/deframer` (`512` in the example above).
    
 1. FSK modem C files in ```codec2/src```:
 
    | File | Description |
    | ---  | --- |
-   | fsk.c/fsk.h | Core FSK modem library |
+   | fsk.c/fsk.h | core FSK modem library |
    | fsk_mod.c | command line modulator |
    | fsk_demod.c | command line demodulator |
    | fsk_get_test_bits.c | source of test bits |
    | fsk_put_test_bits.c | test bit sync, counts bit errors and packet errors |
    | fsk_mod_ext_vco.c | modulator that uses an external FSK oscillator |
+   | framer.c | adds a unique word to a frame of bits to implement frame sync for LDPC codewords |
+   | deframer.c | locates and strips a unique word to implement frame sync for LDPC codewords |
+   | tollr.c | converts bits to LLRs for testing LDPC framing |
 
 1. GNU Octave files in ```codec2/octave```:
 

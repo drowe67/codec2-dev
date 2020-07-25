@@ -16,7 +16,7 @@
 
 int main(int argc, char *argv[]) {
     FILE        *fin, *fout;
-    double	datain, dataout;
+    float	datain, dataout;
 
     if (argc < 3) {
         fprintf(stderr, "\n");
@@ -48,7 +48,7 @@ int main(int argc, char *argv[]) {
     fprintf(stderr, "Eb    = % 4.2f dB (%4.2f linear)\n", 0.0, 1.0);
     fprintf(stderr, "Eb/No = %4.2f dB (%4.2f linear)\n", -NodB, pow(10,-NodB/10.0));
     
-    while (fread(&datain, sizeof(double), 1, fin) == 1) {
+    while (fread(&datain, sizeof(float), 1, fin) == 1) {
 
 	// Gaussian from uniform:
 	double x = (double)rand() / RAND_MAX;
@@ -58,7 +58,7 @@ int main(int argc, char *argv[]) {
 	double noise = sqrt(No/2) * z;
 	dataout = datain + noise;
 
-        fwrite(&dataout, sizeof(double), 1, fout);        
+        fwrite(&dataout, sizeof(float), 1, fout);        
 
         // keep running stats to calculate actual noise variance (power)
         

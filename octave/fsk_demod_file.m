@@ -44,7 +44,7 @@ function fsk_demod_file(filename, format="s16", Fs=8000, Rs=50, M=2, P=8, max_se
   nbit = states.nbit;
 
   frames = 0;
-  rx = []; rx_bits_log = []; rx_bits_sd_log = []; norm_rx_timing_log = [];
+  rx = []; rx_bits_log = []; norm_rx_timing_log = [];
   f_int_resample_log = []; EbNodB_log = []; ppm_log = [];
   f_log = []; Sf_log = [];
   
@@ -85,7 +85,6 @@ function fsk_demod_file(filename, format="s16", Fs=8000, Rs=50, M=2, P=8, max_se
       [rx_bits states] = fsk_demod(states, sf);
 
       rx_bits_log = [rx_bits_log rx_bits];
-      rx_bits_sd_log = [rx_bits_sd_log states.rx_bits_sd];
       norm_rx_timing_log = [norm_rx_timing_log states.norm_rx_timing];
       f_int_resample_log = [f_int_resample_log abs(states.f_int_resample)];
       EbNodB_log = [EbNodB_log states.EbNodB];
