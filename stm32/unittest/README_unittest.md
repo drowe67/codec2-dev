@@ -93,14 +93,15 @@ When each test runs, a directory is created, and several log files generated.
 
 Consider the example:
 ```
-build_stm32$ ctest -R tst_ldpc_dec
+build_stm32$ ctest -R tst_ldpc_dec_noise
 ```
 
 1. The test is kicked off based on `src/CMakeLists.txt`, which calls `scipts/run_stm32_tst`
 1. `run_stm32_tst` calls the test setup script, e.g. `tst_ldpc_dec_setup`.  Typically, this will run a host version to generate a reference.
 1. `run_stm32_tst` runs the stm32 executable on the Discovery, e.g. `tst_ldpc_dec`, the source is in `src/tst_ldpc_dec.c`
+1. The steup and check scripts can handle many sub cases, e.g. `ideal` and `noise`.
 1. `run_stm32_tst` calls the test check script, e.g. `tst_ldpc_dec_check` which typically compares the host generated reference to the output from the stm32.
-1. As the test runs, various files are generated in `test_run/tst_ldpc_dec_awgn`
+1. As the test runs, various files are generated in `test_run/tst_ldpc_dec_noise`
 1. When debugging it's useful to run the ctest with the verbose option:
    ```
    $ ctest -V -R tst_ldpc_dec_noise
