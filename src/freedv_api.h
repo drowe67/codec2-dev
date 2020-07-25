@@ -5,9 +5,11 @@
   DATE CREATED: August 2014
 
   Library of API functions that implement FreeDV "modes", useful for
-  embedding FreeDV in other programs.  Please see the documentation
-  for each function in freedv_api.c, and the sample freedv_tx.c and
-  freedv_rx.c programs.
+  embedding FreeDV in other programs.  Please see:
+
+  1. README_freedv.md
+  2. Notes function use in freedv_api.c
+  3. The sample freedv_tx.c and freedv_rx.c programs
 
 \*---------------------------------------------------------------------------*/
 
@@ -94,7 +96,7 @@
 // struct that hold state information for one freedv instance
 struct freedv;
 
-// Dummy structure for obsolete call
+// Dummy structure for (currently) deprecated call
 struct freedv_advanced {
     int interleave_frames;
 };
@@ -182,10 +184,10 @@ void freedv_set_eq                      (struct freedv *f, int val);
       
 // Get parameters -------------------------------------------------------------------------
 
-
 struct MODEM_STATS;
 
 int freedv_get_version(void);
+void freedv_get_hash(char *git_hash);
 int freedv_get_mode                 (struct freedv *freedv);
 void freedv_get_modem_stats         (struct freedv *freedv, int *sync, float *snr_est);
 void freedv_get_modem_extended_stats(struct freedv *freedv, struct MODEM_STATS *stats);
