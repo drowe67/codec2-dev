@@ -61,6 +61,29 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Debug")
 endif()
 
+#
+# Find the git hash if this is a working copy.
+#
+if(EXISTS ${CMAKE_SOURCE_DIR}/.git)
+    find_package(Git QUIET)
+    if(Git_FOUND)
+        execute_process(
+            COMMAND "${GIT_EXECUTABLE}" describe --always HEAD
+            WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+            RESULT_VARIABLE res
+            OUTPUT_VARIABLE FREEDV_HASH
+            ERROR_QUIET
+            OUTPUT_STRIP_TRAILING_WHITESPACE)
+        message(STATUS "freedv-gui current git hash: ${FREEDV_HASH}")
+        add_definitions(-DGIT_HASH="${FREEDV_HASH}")
+    else()
+        message(WARNING "Git not found. Can not determine current commit hash.")
+        add_definitions(-DGIT_HASH="Unknown")
+    endif()
+else()
+        add_definitions(-DGIT_HASH="None")
+endif()
+
 # Set default C flags.
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wno-strict-overflow")
 
@@ -302,6 +325,9 @@ install(
 if(UNITTEST)
     include(CTest)
     enable_testing()
+
+    add_test(NAME test_freedv_get_hash
+             COMMAND sh -c "${CMAKE_CURRENT_BINARY_DIR}/unittest/thash")
 
     add_test(NAME test_CML_ldpcut
              COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/octave; SHORT_VERSION_FOR_CTEST=1 octave --no-gui -qf ldpcut.m")

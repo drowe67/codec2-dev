@@ -71,3 +71,6 @@ target_link_libraries(tfreedv_2400B_rawdata codec2)
 
 add_executable(tfsk_llr tfsk_llr.c)
 target_link_libraries(tfsk_llr codec2 m)
+
+add_executable(thash thash.c)
+target_link_libraries(thash codec2 m)

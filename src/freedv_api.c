@@ -5,7 +5,11 @@
   DATE CREATED: August 2014
 
   Library of API functions that implement FreeDV "modes", useful for
-  embedding FreeDV in other programs.
+  embedding FreeDV in other programs.  Please see:
+
+  1. README_freedv.md
+  2. Notes function use in freedv_api.c
+  3. The sample freedv_tx.c and freedv_rx.c programs
 
 \*---------------------------------------------------------------------------*/
 
@@ -883,6 +887,22 @@ int freedv_rawdatarx(struct freedv *f, unsigned char *packed_payload_bits, short
 int freedv_get_version(void)
 {
     return VERSION;
+}
+
+/*---------------------------------------------------------------------------* \
+
+  FUNCTION....: freedv_get_hash
+  AUTHOR......: David Rowe
+  DATE CREATED: July 2020
+
+  Return the a string with the Git hash of the repo used to build this code.
+
+\*---------------------------------------------------------------------------*/
+
+static char git_hash[] = GIT_HASH;
+char *freedv_get_hash(void)
+{
+    return git_hash;
 }
 
 /*---------------------------------------------------------------------------*\
