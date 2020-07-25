@@ -326,6 +326,9 @@ if(UNITTEST)
     include(CTest)
     enable_testing()
 
+    add_test(NAME test_freedv_get_hash
+             COMMAND sh -c "${CMAKE_CURRENT_BINARY_DIR}/unittest/thash")
+
     add_test(NAME test_CML_ldpcut
              COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/octave; SHORT_VERSION_FOR_CTEST=1 octave --no-gui -qf ldpcut.m")
              set_tests_properties(test_CML_ldpcut PROPERTIES PASS_REGULAR_EXPRESSION "Nerr: 0")

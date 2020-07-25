@@ -899,9 +899,9 @@ int freedv_get_version(void)
 
 \*---------------------------------------------------------------------------*/
 
-void freedv_get_hash(char *git_hash)
+void freedv_get_hash(char *git_hash, int max_len)
 {
-    strcpy(git_hash, GIT_HASH);
+    strncpy(git_hash, GIT_HASH, max_len);
 }
 
 /*---------------------------------------------------------------------------*\
