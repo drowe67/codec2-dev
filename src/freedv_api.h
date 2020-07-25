@@ -187,7 +187,7 @@ void freedv_set_eq                      (struct freedv *f, int val);
 struct MODEM_STATS;
 
 int freedv_get_version(void);
-void freedv_get_hash(char *git_hash, int max_len);
+char *freedv_get_hash(void);
 int freedv_get_mode                 (struct freedv *freedv);
 void freedv_get_modem_stats         (struct freedv *freedv, int *sync, float *snr_est);
 void freedv_get_modem_extended_stats(struct freedv *freedv, struct MODEM_STATS *stats);

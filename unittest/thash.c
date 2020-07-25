@@ -11,12 +11,8 @@
 #include <stdio.h>
 #include "freedv_api.h"
 
-#define MAX_STR 16
-
 int main(void) { 
-    char hash[MAX_STR];
-    freedv_get_hash(hash, MAX_STR);
-    printf("%s\n", hash);
+    printf("%s\n", freedv_get_hash());
     return 0;
 }
 
