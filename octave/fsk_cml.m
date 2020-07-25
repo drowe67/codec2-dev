@@ -22,7 +22,7 @@ if exist('Ctype')==0,  Ctype=1, end
 if Ctype==1
    load H_256_768_22.txt;   HRA = H_256_768_22; % rate 1/3
 elseif Ctype==2
-   load H_256_512_5.mat;   HRA=H;  % K=256,  rate 1/2 code
+   load H_256_512_4.mat;   HRA=H;  % K=256,  rate 1/2 code
    % above code might be improved -- but still works better than rate 1/3
 elseif Ctype==3
    load HRAa_1536_512.mat; % rate 3/4,  N=2k code 
