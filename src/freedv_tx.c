@@ -33,6 +33,25 @@
 
 #include "freedv_api.h"
 
+struct my_callback_state {
+    char  tx_str[80];
+    char *ptx_str;
+    int calls;
+};
+
+char my_get_next_tx_char(void *callback_state) {
+    struct my_callback_state* pstate = (struct my_callback_state*)callback_state;
+    char  c = *pstate->ptx_str++;
+
+    //fprintf(stderr, "my_get_next_tx_char: %c\n", c);
+
+    if (*pstate->ptx_str == 0) {
+        pstate->ptx_str = pstate->tx_str;
+    }
+
+    return c;
+}
+
 int main(int argc, char *argv[]) {
     FILE                     *fin, *fout;
     struct freedv            *freedv;
@@ -102,6 +121,13 @@ int main(int argc, char *argv[]) {
     freedv_set_tx_bpf(freedv, use_txbpf);
     freedv_set_dpsk(freedv, use_dpsk);
     freedv_set_verbose(freedv, 1);
+
+    /* set up callback for txt msg chars */
+    struct my_callback_state  my_cb_state;
+    sprintf(my_cb_state.tx_str, "cq cq cq hello world\r");
+    my_cb_state.ptx_str = my_cb_state.tx_str;
+    my_cb_state.calls = 0;
+    freedv_set_callback_txt(freedv, NULL, &my_get_next_tx_char, &my_cb_state);
 
     /* handy functions to set buffer sizes, note tx/modulator always
        returns freedv_get_n_nom_modem_samples() (unlike rx side) */
