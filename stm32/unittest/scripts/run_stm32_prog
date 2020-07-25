@@ -71,7 +71,7 @@ if [ ! ${ARGS[--noload]+_} ] ; then
 
 cat <<-EEOOFF >> gdb_cmds
         monitor reset halt
-        monitor adapter_khz 4000
+        monitor adapter speed 4000
 	break EndofMain
 	break abort
 	EEOOFF

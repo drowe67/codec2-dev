@@ -101,7 +101,6 @@ int main(int argc, char *argv[]) {
 
     struct my_callback_state  my_cb_state;
 
-    int interleave_frames = 1; 
     int use_clip = 0; 
     int use_txbpf = 0;
     int use_ext_vco = 0;
@@ -113,9 +112,7 @@ int main(int argc, char *argv[]) {
     semihosting_init();
 
     ////////
-    struct freedv_advanced adv;
-    adv.interleave_frames = interleave_frames;
-    freedv = freedv_open_advanced(FREEDV_MODE_700D, &adv);
+    freedv = freedv_open(FREEDV_MODE_700D);
 
     int n_speech_samples = freedv_get_n_speech_samples(freedv);
     short *speech_in = (short*)malloc(sizeof(short)*n_speech_samples);

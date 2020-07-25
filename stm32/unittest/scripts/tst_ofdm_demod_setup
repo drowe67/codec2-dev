@@ -45,7 +45,7 @@ case "${TEST_OPT}" in
     	# Config is <verbose>, <testframes>, <ldpc_en>, <log_payload_syms> <profile>
     	echo "11000000" > stm_cfg.txt
 	ofdm_mod --in /dev/zero --out mod_bits.raw --testframes 10 > setup.log 2>&1
-        cohpsk_ch mod_bits.raw stm_in.raw -20 -Fs 8000 -f -5 \
+        cohpsk_ch mod_bits.raw stm_in.raw -20 --Fs 8000 -f -5 \
 	    --raw_dir ${CODEC2_BASE}/raw >> setup.log 2>&1
         ofdm_demod --in stm_in.raw --out ref_demod_out.raw --log ofdm_demod_ref_log.txt \
         	--testframes --verbose 1 > ref_gen_log.txt 2>&1
@@ -55,7 +55,7 @@ case "${TEST_OPT}" in
     	# Config is <verbose>, <testframes>, <ldpc_en>, <log_payload_syms> <profile>
     	echo "11000000" > stm_cfg.txt
 	ofdm_mod --in /dev/zero --out mod_bits.raw --testframes 60 > setup.log 2>&1
-        cohpsk_ch mod_bits.raw stm_in.raw -24 -Fs 8000 -f -10 -fast \
+        cohpsk_ch mod_bits.raw stm_in.raw -24.5 --Fs 8000 -f -10 --fast \
 	    --raw_dir ${CODEC2_BASE}/raw >> setup.log 2>&1
         ofdm_demod --in stm_in.raw --out ref_demod_out.raw --log ofdm_demod_ref_log.txt \
         	--testframes --verbose 1 > ref_gen_log.txt 2>&1
@@ -65,7 +65,7 @@ case "${TEST_OPT}" in
     	# Config is <verbose>, <testframes>, <ldpc_en>, <log_payload_syms> <profile>
     	echo "00001000" > stm_cfg.txt
 	ofdm_mod --in /dev/zero --out mod_bits.raw --testframes 100 > setup.log 2>&1
-        cohpsk_ch mod_bits.raw stm_in.raw -20 -Fs 8000 -f -10 -fast \
+        cohpsk_ch mod_bits.raw stm_in.raw -20 --Fs 8000 -f -10 --fast \
 	    --raw_dir ${CODEC2_BASE}/raw >> setup.log 2>&1
         ofdm_demod --in stm_in.raw --out ref_demod_out.raw --log ofdm_demod_ref_log.txt \
         	--testframes --verbose 1 > ref_gen_log.txt 2>&1
@@ -83,7 +83,7 @@ case "${TEST_OPT}" in
     	# Config is <verbose>, <testframes>, <ldpc_en>, <log_payload_syms> <profile>
     	echo "01110000" > stm_cfg.txt
 	ofdm_mod --in /dev/zero --out mod_bits.raw --testframes 30 --ldpc 1 > setup.log 2>&1
-        cohpsk_ch mod_bits.raw stm_in.raw -20 -Fs 8000 -f -10 \
+        cohpsk_ch mod_bits.raw stm_in.raw -20 --Fs 8000 -f -10 \
 	    --raw_dir ${CODEC2_BASE}/raw >> setup.log 2>&1
         ofdm_demod --in stm_in.raw --out ref_demod_out.raw --log ofdm_demod_ref_log.txt \
         	--testframes --ldpc 1 --verbose 1 > ref_gen_log.txt 2>&1
@@ -93,10 +93,10 @@ case "${TEST_OPT}" in
     	# Config is <verbose>, <testframes>, <ldpc_en>, <log_payload_syms> <profile>
     	echo "01110000" > stm_cfg.txt
 	ofdm_mod --in /dev/zero --out mod_bits.raw --testframes 120 --ldpc 1 > setup.log 2>&1
-        cohpsk_ch mod_bits.raw stm_in.raw -24 -Fs 8000 -f -10 -fast \
+        cohpsk_ch mod_bits.raw stm_in.raw -30 --Fs 8000 -f -10 --fast \
 	    --raw_dir ${CODEC2_BASE}/raw >> setup.log 2>&1
         ofdm_demod --in stm_in.raw --out ref_demod_out.raw --log ofdm_demod_ref_log.txt \
-        	--testframes --ldpc 1 --verbose 1 > ref_gen_log.txt 2>&1
+        	   --testframes --ldpc 1 --verbose 1 > ref_gen_log.txt 2>&1;
 	;;
 
     esac

@@ -153,7 +153,6 @@ int main(int argc, char *argv[]) {
     //int use_codectx = 0; 
     //int use_datatx = 0; 
     //int use_testframes = 0; 
-    int interleave_frames = 1; 
     int use_clip = 0; 
     int use_txbpf = 0;
     int use_ext_vco = 0;
@@ -163,14 +162,7 @@ int main(int argc, char *argv[]) {
     //machdep_profile_init();
 
     ////////
-    if (config_mode == FREEDV_MODE_700D) {
-        struct freedv_advanced adv;
-        adv.interleave_frames = interleave_frames;
-        freedv = freedv_open_advanced(config_mode, &adv);
-    }
-    else {
-        freedv = freedv_open(config_mode);
-    }
+    freedv = freedv_open(config_mode);
     assert(freedv != NULL);
     
     fprintf(stderr, "freedv opened %p\n", freedv);
