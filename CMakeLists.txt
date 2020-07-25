@@ -419,6 +419,13 @@ endif()
                             ./ldpc_dec - /dev/null --code HRAa_1536_512 --sd --testframes"
              )
 
+    add_test(NAME test_ldpc_enc_dec_H_128_256_5
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            ./ldpc_enc /dev/zero - --sd --code H_128_256_5 --testframes 200 | 
+                            ./ldpc_noise - - 0.5 | 
+                            ./ldpc_dec - /dev/null --code H_128_256_5 --sd --testframes"
+             )
+
     # basic test of C utils
     add_test(NAME test_FSK_modem_mod_demod
              COMMAND sh -c "$<TARGET_FILE:fsk_get_test_bits> - 10000 | $<TARGET_FILE:fsk_mod> 2 8000 100 1200 100 - - | $<TARGET_FILE:fsk_demod> -l 2 8000 100 - - | $<TARGET_FILE:fsk_put_test_bits> -"
