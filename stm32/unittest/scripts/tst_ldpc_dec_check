@@ -47,9 +47,9 @@ fi
 #
 
 echo -e "\nReference BER values"
-n=$(grep 'Raw.*BER:' ref_gen.log | cut -d ' ' -f 7)
+n=$(grep 'Raw.*BER:' ref_gen.log | awk '{print $7}')
 p1=$(echo $n '<=' ${BER_LIMIT_RAW} | bc)
-n=$(grep 'Coded.*BER:' ref_gen.log | cut -d ' ' -f 7)
+n=$(grep 'Coded.*BER:' ref_gen.log | awk '{print $7}')
 p2=$(echo $n '<=' ${BER_LIMIT_CODED} | bc)
 if [[ $p1 -eq 1 && $p2 -eq 1 ]]; then echo "Pass"; 
 else echo "Fail"; let Fails=($Fails + 1); fi

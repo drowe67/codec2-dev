@@ -88,7 +88,31 @@ When each test runs, a directory is created, and several log files generated.
    $ CFLAGS=-DEBUG_ALLOC cmake -DCMAKE_TOOLCHAIN_FILE=../cmake/STM32_Toolchain.cmake \
      -DPERIPHLIBDIR=~/Downloads/STM32F4xx_DSP_StdPeriph_Lib_V1.8.0 ..
    ```
-   
+
+## Sequence of a Test
+
+Consider the example:
+```
+build_stm32$ ctest -R tst_ldpc_dec
+```
+
+1. The test is kicked off based on `src/CMakeLists.txt`, which calls `scipts/run_stm32_tst`
+1. `run_stm32_tst` calls the test setup script, e.g. `tst_ldpc_dec_setup`.  Typically, this will run a host version to generate a reference.
+1. `run_stm32_tst` runs the stm32 executable on the Discovery, e.g. `tst_ldpc_dec`, the source is in `src/tst_ldpc_dec.c`
+1. `run_stm32_tst` calls the test check script, e.g. `tst_ldpc_dec_check` which typically compares the host generated reference to the output from the stm32.
+1. As the test runs, various files are generated in `test_run/tst_ldpc_dec_awgn`
+1. When debugging it's useful to run the ctest with the verbose option:
+   ```
+   $ ctest -V -R tst_ldpc_dec_noise
+   ```
+   Set the `-x` at the top of the scripts to trace execution:
+   ```
+   #!/bin/bash -x
+   #
+   # tst_ldpc_enc_check
+
+   ```
+      
 ## Directory Structure
 
    | Path | Description |
