@@ -158,8 +158,6 @@ struct OFDM {
     // State enums
     State sync_state;
     State last_sync_state;
-    State sync_state_interleaver;
-    State last_sync_state_interleaver;
 
     // Sync enums
     Sync sync_mode;
@@ -192,7 +190,6 @@ struct OFDM {
     int uw_errors;
     int sync_counter;
     int frame_count;
-    int frame_count_interleaver;
 
     // Boolean
     bool sync_start;
