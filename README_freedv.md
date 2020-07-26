@@ -78,7 +78,7 @@ These modes use constant amplitude modulation like FSK or FM, and are designed f
 
 ## FreeDV API
 
-See ```freedv_api.h``` and ```freedv_api.c```, and the command line demo programs ```freedv_tx.c``` & ```freedv_rx.c```.  Quickstart demo using FreeDV 1600:
+See [freedv_api.h](src/freedv_api.h) and [freedv_api.c](src/freedv_api.c), and the command line demo programs [freedv_tx.c](src/freedv_tx.c) & [freedv_rx.c](src/freedv_rx.c).  Quickstart demo using FreeDV 1600:
 ```
 $ ./freedv_tx 1600 ../../raw/hts1.raw - | ./freedv_rx 1600 - - | play -t raw -r 8000 -s -2 -q -
 $ cat freedv_rx_log.txt
