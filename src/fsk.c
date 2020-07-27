@@ -125,13 +125,13 @@ struct FSK * fsk_create_core(int Fs, int Rs, int M, int P, int Nsym, int f1_tx, 
     assert( (Fs%Rs) == 0 );
     /* Ts/P (Fs/Rs/P) must be an integer */
     assert( ((Fs/Rs)%P) == 0 );
-    /* If P is too low we don't have a good chocie of timing offsets to choose from */
+    /* If P is too low we don't have a good choice of timing offsets to choose from */
     assert( P >= 4 );
     assert( M==2 || M==4);
     
     fsk = (struct FSK*) malloc(sizeof(struct FSK)); assert(fsk != NULL);
      
-    // Need enough bins to with 10% of tone centre
+    // Need enough bins to within 10% of tone centre
     float bin_width_Hz = 0.1*Rs;
     float Ndft = (float)Fs/bin_width_Hz;
     Ndft = pow(2.0, ceil(log2(Ndft)));
@@ -801,16 +801,16 @@ void fsk_demod_core(struct FSK *fsk, uint8_t rx_bits[], float rx_filt[], COMP fs
             }
         }
         
-        /* Output filter magnitudes for soft decision/LLR calculation */
-        if (rx_filt != NULL) {
-            float sum = 0.0;
-            for(m=0; m<M; m++) {
-                rx_filt[m*nsym+i] = sqrtf(tmax[m]);
-                sum += tmax[m];
-            }
-            rx_sig_pow += max;
-            rx_nse_pow += (sum-max)/(M-1);
+        /* Optionally output filter magnitudes for soft decision/LLR
+           calculation.  Update SNRest always as this is a useful
+           alternative to the earlier EbNo estimator below */
+        float sum = 0.0;
+        for(m=0; m<M; m++) {
+            if (rx_filt != NULL) rx_filt[m*nsym+i] = sqrtf(tmax[m]);
+            sum += tmax[m];
         }
+        rx_sig_pow += max;
+        rx_nse_pow += (sum-max)/(M-1);
 
         /* Accumulate resampled int magnitude for EbNodB estimation */
         /* Standard deviation is calculated by algorithm devised by crafty soviets */
@@ -822,7 +822,6 @@ void fsk_demod_core(struct FSK *fsk, uint8_t rx_bits[], float rx_filt[], COMP fs
         /* Figure the abs value of the max tone */
         meanebno += sqrtf(ft1);
         #endif
-        /* Soft output goes here */
     }
 
     rx_sig_pow = rx_sig_pow/nsym;
