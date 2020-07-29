@@ -190,6 +190,7 @@ struct OFDM {
     int uw_errors;
     int sync_counter;
     int frame_count;
+    int modem_frame;
 
     // Boolean
     bool sync_start;

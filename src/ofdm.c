@@ -63,11 +63,30 @@ static void ofdm_demod_core(struct OFDM *, int *);
 /*
  * QPSK Quadrant bit-pair values - Gray Coded
  */
-static const complex float constellation[] = {
+static const complex float qpsk[] = {
     1.0f + 0.0f * I,
     0.0f + 1.0f * I,
     0.0f - 1.0f * I,
     -1.0f + 0.0f * I
+};
+
+static const complex float qam16[] = {
+   1.0f + 1.0f * I,
+   1.0f + 3.0f * I,
+   3.0f + 1.0f * I,
+   3.0f + 3.0f * I,
+   1.0f - 1.0f * I,
+   1.0f - 3.0f * I,
+   3.0f - 1.0f * I,
+   3.0f - 3.0f * I,
+  -1.0f + 1.0f * I,
+  -1.0f + 3.0f * I,
+  -3.0f + 1.0f * I,
+  -3.0f + 3.0f * I,
+  -1.0f - 1.0f * I,
+  -1.0f - 3.0f * I,
+  -3.0f - 1.0f * I,
+  -3.0f - 3.0f * I
 };
 
 /*
@@ -97,7 +116,7 @@ static float cnormf(complex float val) {
  * Gray coded QPSK modulation function
  */
 complex float qpsk_mod(int *bits) {
-    return constellation[(bits[1] << 1) | bits[0]];
+    return qpsk[(bits[1] << 1) | bits[0]];
 }
 
 /*
@@ -112,6 +131,38 @@ void qpsk_demod(complex float symbol, int *bits) {
 
     bits[0] = crealf(rotate) < 0.0f;
     bits[1] = cimagf(rotate) < 0.0f;
+}
+
+complex float qam16_mod(int *bits) {
+    return qam16[
+            (bits[3] << 3) | (bits[2] << 2) |
+            (bits[1] << 1) | bits[0]
+            ];
+}
+
+void qam16_demod(complex float symbol, int *bits) {
+    complex float rotate = symbol * cmplx(ROT45);
+    float dist[16];
+    int i;
+
+    for (i = 0; i < 16; i++) {
+        dist[i] = cnormf(rotate - (qam16[i] / 3.0f));
+    }
+    
+    int row = 0;
+    float mdist = 10000.0f;
+
+    for (i = 0; i < 16; i++) {
+        if (dist[i] < mdist) {
+            mdist = dist[i];
+            row = i;
+        }
+    }
+    
+    bits[0] = row & 1;
+    bits[1] = (row >> 1) & 1;
+    bits[2] = (row >> 2) & 1;
+    bits[3] = (row >> 3) & 1;
 }
 
 /*
@@ -321,31 +372,27 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     ofdm->uw_ind = MALLOC(sizeof (int) * ofdm->nuwbits);
     assert(ofdm->uw_ind != NULL);
 
-    ofdm->uw_ind_sym = MALLOC(sizeof (int) * (ofdm->nuwbits / 2));
+    ofdm->uw_ind_sym = MALLOC(sizeof (int) * (ofdm->nuwbits / ofdm->bps));
     assert(ofdm->uw_ind_sym != NULL);
 
     /*
      * The Unique Word is placed in different indexes based on
      * the number of carriers requested.
      */
-    for (i = 0, j = 0; i < (ofdm->nuwbits / 2); i++, j += 2) {
-        int val = floorf((i + 1) * (ofdm->nc + 1) / 2);
+    for (i = 0, j = 0; i < (ofdm->nuwbits / ofdm->bps); i++, j += ofdm->bps) {
+        int val = floorf((i + 1) * (ofdm->nc + 1) / ofdm->bps);
+        
         ofdm->uw_ind_sym[i] = val;             // symbol index
-
-        ofdm->uw_ind[j    ] = (val * 2);       // bit index 1
-        ofdm->uw_ind[j + 1] = (val * 2) + 1;   // bit index 2
-
-        /* TODO fix me
-        for (int b = ofdm->bps - 1; b >= 0 ; b--) {
-            ofdm->uw_ind[j + b] = (val * ofdm->bps) - b; // bit index (MSB -> LSB)
+    
+        for (int b = 0; b < ofdm->bps ; b++) {
+            ofdm->uw_ind[j + b] = (val * ofdm->bps) + b;
         }
-        */
     }
 
-    ofdm->tx_uw_syms = MALLOC(sizeof (complex float) * (ofdm->nuwbits / 2));
+    ofdm->tx_uw_syms = MALLOC(sizeof (complex float) * (ofdm->nuwbits / ofdm->bps));
     assert(ofdm->tx_uw_syms != NULL);
 
-    for (i = 0; i < (ofdm->nuwbits / 2); i++) {
+    for (i = 0; i < (ofdm->nuwbits / ofdm->bps); i++) {
         ofdm->tx_uw_syms[i] = 1.0f;      // qpsk_mod(0:0)
     }
 
@@ -613,7 +660,7 @@ static int est_timing(struct OFDM *ofdm, complex float *rx, int length,
 	for (j = 0; j < ofdm->samplespersymbol; j++) {
             int ind = i + j;
 
-	    corr_st = corr_st + (rx[ind                       ] * wvec_pilot[j]);
+	    corr_st = corr_st + (rx[ind                        ] * wvec_pilot[j]);
             corr_en = corr_en + (rx[ind + ofdm->samplesperframe] * wvec_pilot[j]);
         }
 #endif	
@@ -689,7 +736,7 @@ static float est_freq_offset_pilot_corr(struct OFDM *ofdm, complex float *rx, in
             complex float csam = wvec_pilot[i] * w;
             int est = timing_est + i;
 
-            corr_st += rx[est                       ] * csam;
+            corr_st += rx[est                        ] * csam;
             corr_en += rx[est + ofdm->samplesperframe] * csam;
 	    w = w * delta;
 	}
@@ -717,14 +764,14 @@ static float est_freq_offset_pilot_corr(struct OFDM *ofdm, complex float *rx, in
  * ----------------------------------------------
  */
 void ofdm_txframe(struct OFDM *ofdm, complex float *tx, complex float *tx_sym_lin) {
-    complex float aframe[ofdm->ns][ofdm->nc + 2];
+    complex float aframe[ofdm->np * ofdm->ns][ofdm->nc + 2];
     complex float asymbol[ofdm->m];
     complex float asymbol_cp[ofdm->samplespersymbol];
     int i, j, k, m;
 
     /* initialize aframe to complex zero */
 
-    for (i = 0; i < ofdm->ns; i++) {
+    for (i = 0; i < (ofdm->np * ofdm->ns); i++) {
         for (j = 0; j < (ofdm->nc + 2); j++) {
             aframe[i][j] = 0.0f;
         }
@@ -754,7 +801,7 @@ void ofdm_txframe(struct OFDM *ofdm, complex float *tx, complex float *tx_sym_li
 
     /* OFDM up-convert symbol by symbol so we can add CP */
 
-    for (i = 0, m = 0; i < ofdm->ns; i++, m += ofdm->samplespersymbol) {
+    for (i = 0, m = 0; i < (ofdm->np * ofdm->ns); i++, m += ofdm->samplespersymbol) {
         idft(ofdm, asymbol, aframe[i]);
 
         /* Copy the last Ncp samples to the front */
@@ -1489,6 +1536,7 @@ void ofdm_sync_state_machine(struct OFDM *ofdm, uint8_t *rx_uw) {
             ofdm->frame_count = 0;
             ofdm->sync_counter = 0;
             ofdm->sync_start = true;
+            ofdm->modem_frame = 0;
             ofdm->clock_offset_counter = 0;
             next_state = trial;
         }
@@ -1497,62 +1545,77 @@ void ofdm_sync_state_machine(struct OFDM *ofdm, uint8_t *rx_uw) {
     if ((ofdm->sync_state == synced) || (ofdm->sync_state == trial)) {
         ofdm->frame_count++;
 
-        /*
-         * freq offset est may be too far out, and has aliases every 1/Ts, so
-         * we use a Unique Word to get a really solid indication of sync.
-         */
-        ofdm->uw_errors = 0;
+        if (ofdm->modem_frame == 0) {
+            /*
+             * freq offset est may be too far out, and has aliases every 1/Ts, so
+             * we use a Unique Word to get a really solid indication of sync.
+             */
+            ofdm->uw_errors = 0;
 
-        for (i = 0; i < ofdm->nuwbits; i++) {
-            ofdm->uw_errors += ofdm->tx_uw[i] ^ rx_uw[i];
-        }
-
-        /*
-         * during trial sync we don't tolerate errors so much, we look
-         * for 3 consecutive frames with low error rate to confirm sync
-         */
-        if (ofdm->sync_state == trial) {
-            if (ofdm->uw_errors > 2) {
-                /* if we exceed thresh stay in trial sync */
-
-                ofdm->sync_counter++;
-                ofdm->frame_count = 0;
+            for (i = 0; i < ofdm->nuwbits; i++) {
+                ofdm->uw_errors += ofdm->tx_uw[i] ^ rx_uw[i];
             }
 
-            if (ofdm->sync_counter == 2) {
-                /* if we get two bad frames drop sync and start again */
+            /*
+             * during trial sync we don't tolerate errors so much, we look
+             * for 3 consecutive frames with low error rate to confirm sync
+             */
+            if (ofdm->sync_state == trial) {
+                if (ofdm->uw_errors > 2) {
+                    /* if we exceed thresh stay in trial sync */
 
-                next_state = search;
-                ofdm->phase_est_bandwidth = high_bw;
-            }
+                    ofdm->sync_counter++;
+                    ofdm->frame_count = 0;
+                }
 
-            if (ofdm->frame_count == 4) {
-                /* three good frames, sync is OK! */
+                if (ofdm->sync_counter == 2) {
+                    /* if we get two bad frames drop sync and start again */
 
-                next_state = synced;
-                /* change to low bandwidth, but more accurate phase estimation */
-                /* but only if not locked to high */
+                    next_state = search;
+                    ofdm->phase_est_bandwidth = high_bw;
+                }
 
-                if (ofdm->phase_est_bandwidth_mode != LOCKED_PHASE_EST) {
+                if (ofdm->frame_count >= 4) {
+                    /* three good frames, sync is OK! */
+
+                    next_state = synced;
+                    /* change to low bandwidth, but more accurate phase estimation */
+                    /* but only if not locked to high */
+
+                    if (ofdm->phase_est_bandwidth_mode != LOCKED_PHASE_EST) {
+                        ofdm->phase_est_bandwidth = low_bw;
+                    }
+                }
+                
+                if (ofdm->uw_errors < 2) {
+                    next_state = synced;
                     ofdm->phase_est_bandwidth = low_bw;
+                } else {
+                    next_state = search;
                 }
             }
-        }
 
-        /* once we have synced up we tolerate a higher error rate to wait out fades */
+            /* once we have synced up we tolerate a higher error rate to wait out fades */
 
-        if (ofdm->sync_state == synced) {
-            if (ofdm->uw_errors > 2) {
-                ofdm->sync_counter++;
-            } else {
-                ofdm->sync_counter = 0;
+            if (ofdm->sync_state == synced) {
+                if (ofdm->uw_errors > 2) {
+                    ofdm->sync_counter++;
+                } else {
+                    ofdm->sync_counter = 0;
+                }
+
+                if ((ofdm->sync_mode == autosync) && (ofdm->sync_counter >= 6)) {
+                    /* run of consecutive bad frames ... drop sync */
+
+                    next_state = search;
+                    ofdm->phase_est_bandwidth = high_bw;
+                }
             }
 
-            if ((ofdm->sync_mode == autosync) && (ofdm->sync_counter > 6)) {
-                /* run of consecutive bad frames ... drop sync */
+            ofdm->modem_frame++;
 
-                next_state = search;
-                ofdm->phase_est_bandwidth = high_bw;
+            if (ofdm->modem_frame >= ofdm->np) {
+                ofdm->modem_frame = 0;
             }
         }
     }
@@ -1560,6 +1623,137 @@ void ofdm_sync_state_machine(struct OFDM *ofdm, uint8_t *rx_uw) {
     ofdm->last_sync_state = ofdm->sync_state;
     ofdm->sync_state = next_state;
 }
+
+#ifdef OCTAVECODE
+/*-------------------------------------------------------
+ * sync_state_machine_data - data waveform version
+ *-------------------------------------------------------
+ */
+function states = sync_state_machine2(states, rx_uw)
+{
+  ofdm_load_const;
+  next_state = states.sync_state;
+  states.sync_start = states.sync_end = 0;
+  
+  if strcmp(states.sync_state,'search') 
+    if states.timing_valid
+      states.sync_start = 1;
+      states.sync_counter = 0;
+      next_state = 'trial';
+    end
+  end
+
+  states.uw_errors = sum(xor(tx_uw,rx_uw));
+ 
+  if strcmp(states.sync_state,'trial')
+    if strcmp(states.sync_state,'trial')
+      if states.uw_errors < states.bad_uw_errors;
+        next_state = "synced";
+        states.frame_count = Nuwframes;
+        states.modem_frame = Nuwframes;
+      else
+        states.sync_counter++;
+        if states.sync_counter > Np
+          next_state = "search";
+        end
+      end
+    end
+  end
+
+  // Note we don't every lose sync, we assume there are a known number of frames being sent,
+  // or the packets contain an "end of stream" information.
+  
+  if strcmp(states.sync_state,'synced')    
+    states.frame_count++;
+    states.modem_frame++;
+    
+    if (states.modem_frame >= states.Np)
+        states.modem_frame = 0;
+    end
+  end
+  
+  states.last_sync_state = states.sync_state;
+  states.sync_state = next_state;
+}
+
+/*------------------------------------------------------------------------------
+ * codec_to_frame_packing - Set up a bunch of constants to support modem frame
+ *                      construction from LDPC codewords and codec source bits
+ *------------------------------------------------------------------------------
+ */
+function [code_param Nbitspercodecframe Ncodecframespermodemframe] = codec_to_frame_packing(states, mode)
+{
+  ofdm_load_const;
+  mod_order = 4;
+  bps = 2;
+  modulation = 'QPSK';
+  mapping = 'gray';
+
+  init_cml('~/cml/');
+  if strcmp(mode, "700D")
+    load HRA_112_112.txt
+    code_param = ldpc_init_user(HRA_112_112, modulation, mod_order, mapping);
+    assert(Nbitsperframe == (code_param.coded_bits_per_frame + Nuwbits + Ntxtbits));
+    // unused for this mode
+    Nbitspercodecframe = Ncodecframespermodemframe = 0;
+  end
+
+  if strcmp(mode, "2020")
+    load HRA_504_396.txt
+    code_param = ldpc_init_user(HRA_504_396, modulation, mod_order, mapping);
+    code_param.data_bits_per_frame = 312;
+    code_param.coded_bits_per_frame = code_param.data_bits_per_frame + code_param.ldpc_parity_bits_per_frame;
+    code_param.coded_syms_per_frame = code_param.coded_bits_per_frame/code_param.bits_per_symbol;
+
+    Nbitspercodecframe = 52;
+    Ncodecframespermodemframe = 6;
+
+    Nparity = code_param.ldpc_parity_bits_per_frame;
+    totalbitsperframe = code_param.data_bits_per_frame + Nparity + Nuwbits + Ntxtbits;
+    assert(totalbitsperframe == Nbitsperframe);
+  end
+
+  if strcmp(mode, "datac1") || strcmp(mode, "datac2") || strcmp(mode, "qam16")
+    load H2064_516_sparse.mat
+    code_param = ldpc_init_user(HRA, modulation, mod_order, mapping);
+  end
+
+  if strcmp(mode, "datac3")
+    load H_256_768_22.txt
+    code_param = ldpc_init_user(H_256_768_22, modulation, mod_order, mapping);
+    Nbitspercodecframe = Ncodecframespermodemframe = -1;
+  end
+
+  if strcmp(mode, "datac1") || strcmp(mode, "datac2") || strcmp(mode, "datac3") || strcmp(mode, "qam16")
+    Nparity = code_param.ldpc_parity_bits_per_frame;
+    totalbitsperframe = code_param.data_bits_per_frame + Nparity + Nuwbits + Ntxtbits;
+    assert(totalbitsperframe == Nbitsperpacket);
+    Nbitspercodecframe = Ncodecframespermodemframe = -1;
+  end
+}
+
+
+/*------------------------------------------------------------------------------
+ * fec_encode - Handle FEC encoding
+ *------------------------------------------------------------------------------
+ */
+function [frame_bits bits_per_frame] = fec_encode(states, code_param, mode, payload_bits, ...
+                                                      Ncodecframespermodemframe, Nbitspercodecframe)
+{
+  ofdm_load_const;
+  if strcmp(mode, "700D") || strcmp(mode, "datac1") || strcmp(mode, "datac2") || strcmp(mode, "datac3") || strcmp(mode, "qam16") 
+    frame_bits = LdpcEncode(payload_bits, code_param.H_rows, code_param.P_matrix);
+  elseif strcmp(mode, "2020")
+    Nunused = code_param.ldpc_data_bits_per_frame - code_param.data_bits_per_frame;
+    frame_bits = LdpcEncode([payload_bits zeros(1,Nunused)], code_param.H_rows, code_param.P_matrix);
+    // remove unused data bits
+    frame_bits = [ frame_bits(1:code_param.data_bits_per_frame) frame_bits(code_param.ldpc_data_bits_per_frame+1:end) ];
+  else
+    assert(0);
+  end
+  bits_per_frame = length(frame_bits);
+}
+#endif
 
 /*---------------------------------------------------------------------------* \
 
@@ -1851,4 +2045,3 @@ void ofdm_print_info(struct OFDM *ofdm) {
     fprintf(stderr, "ofdm->dpsk_en = %s\n", ofdm->dpsk_en ? "true" : "false");
     fprintf(stderr, "ofdm->phase_est_bandwidth_mode = %s\n", phase_est_bandwidth_mode[ofdm->phase_est_bandwidth_mode]);
 }
-
