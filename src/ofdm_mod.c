@@ -39,6 +39,7 @@
 
 #include "codec2_ofdm.h"
 #include "ofdm_internal.h"
+#include "ofdm_mode.h"
 #include "gp_interleaver.h"
 #include "interldpc.h"
 #include "varicode.h"
@@ -116,7 +117,6 @@ int main(int argc, char *argv[]) {
 
     int nc = 17;
     int ns = 8;
-    int bps = 2;
     float tcp = 0.0020f;
     float ts = 0.0180f;
     float rx_centre = 1500.0f;
@@ -243,22 +243,17 @@ int main(int argc, char *argv[]) {
         exit(-1);
     }
 
-    ofdm_config->fs = 8000.0f; /* Sample Frequency */
-    ofdm_config->timing_mx_thresh = 0.30f;
-    ofdm_config->ftwindowwidth = 11;
-    ofdm_config->bps = 2; /* Bits per Symbol */
-    ofdm_config->txtbits = 4; /* number of auxiliary data bits */
-    ofdm_config->ns = ns; /* Number of Symbol frames */
+    /* this sets the defaults */
+    ofdm_init_mode("700D", ofdm_config);
 
+    /* set up params that optionally come from the command line */
+    ofdm_config->ns = ns;
     ofdm_config->tx_centre = tx_centre;
     ofdm_config->rx_centre = rx_centre;
     ofdm_config->nc = nc;
     ofdm_config->tcp = tcp;
     ofdm_config->ts = ts;
-    ofdm_config->np = 1;
     ofdm_config->rs = (1.0f / ts); /* Modulating Symbol Rate */
-    ofdm_config->nuwbits = 5 * bps;
-    ofdm_config->bad_uw_errors = 3;
 
     struct OFDM *ofdm = ofdm_create(ofdm_config);
     assert(ofdm != NULL);

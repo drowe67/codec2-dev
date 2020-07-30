@@ -167,6 +167,7 @@ set(CODEC2_SRCS
     newamp1.c
     newamp2.c
     ofdm.c
+    ofdm_mode.c
     phase.c
     quantise.c
     pack.c
