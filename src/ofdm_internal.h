@@ -120,6 +120,7 @@ struct OFDM {
     int samplespersymbol;
     int samplesperframe;
     int max_samplesperframe;
+    int nuwframes;
     int nrxbuf;
     int ntxtbits; /* reserve bits/frame for aux text information */
     int nuwbits; /* Unique word used for positive indication of lock */
