@@ -1526,7 +1526,7 @@ static void ofdm_demod_core(struct OFDM *ofdm, int *rx_bits) {
 }
 
 /*
- * iterate state machine
+ * state machine for 700D/2020
  */
 void ofdm_sync_state_machine(struct OFDM *ofdm, uint8_t *rx_uw) {
     int i;
@@ -1629,9 +1629,8 @@ void ofdm_sync_state_machine(struct OFDM *ofdm, uint8_t *rx_uw) {
     ofdm->sync_state = next_state;
 }
 
-/*-------------------------------------------------------
- * sync_state_machine_data - data waveform version
- *-------------------------------------------------------
+/*
+ * state machine for data modes
  */
 void sync_state_machine2(struct OFDM *ofdm, uint8_t *rx_uw) {
     State next_state = ofdm->sync_state;
