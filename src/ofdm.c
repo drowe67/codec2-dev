@@ -1521,9 +1521,97 @@ static void ofdm_demod_core(struct OFDM *ofdm, int *rx_bits) {
 }
 
 /*
- * iterate state machine
+ * state machine for 700D/2020
  */
 void ofdm_sync_state_machine(struct OFDM *ofdm, uint8_t *rx_uw) {
+    int i;
+
+    State next_state = ofdm->sync_state;
+
+    ofdm->sync_start = false;
+    ofdm->sync_end = false;
+
+    if (ofdm->sync_state == search) {
+        if (ofdm->timing_valid) {
+            ofdm->frame_count = 0;
+            ofdm->sync_counter = 0;
+            ofdm->sync_start = true;
+            ofdm->clock_offset_counter = 0;
+            next_state = trial;
+        }
+    }
+
+    if ((ofdm->sync_state == synced) || (ofdm->sync_state == trial)) {
+        ofdm->frame_count++;
+
+        /*
+         * freq offset est may be too far out, and has aliases every 1/Ts, so
+         * we use a Unique Word to get a really solid indication of sync.
+         */
+        ofdm->uw_errors = 0;
+
+        for (i = 0; i < ofdm->nuwbits; i++) {
+            ofdm->uw_errors += ofdm->tx_uw[i] ^ rx_uw[i];
+        }
+
+        /*
+         * during trial sync we don't tolerate errors so much, we look
+         * for 3 consecutive frames with low error rate to confirm sync
+         */
+        if (ofdm->sync_state == trial) {
+            if (ofdm->uw_errors > 2) {
+                /* if we exceed thresh stay in trial sync */
+
+                ofdm->sync_counter++;
+                ofdm->frame_count = 0;
+            }
+
+            if (ofdm->sync_counter == 2) {
+                /* if we get two bad frames drop sync and start again */
+
+                next_state = search;
+                ofdm->phase_est_bandwidth = high_bw;
+            }
+
+            if (ofdm->frame_count == 4) {
+                /* three good frames, sync is OK! */
+
+                next_state = synced;
+                /* change to low bandwidth, but more accurate phase estimation */
+                /* but only if not locked to high */
+
+                if (ofdm->phase_est_bandwidth_mode != LOCKED_PHASE_EST) {
+                    ofdm->phase_est_bandwidth = low_bw;
+                }
+            }
+        }
+
+        /* once we have synced up we tolerate a higher error rate to wait out fades */
+
+        if (ofdm->sync_state == synced) {
+            if (ofdm->uw_errors > 2) {
+                ofdm->sync_counter++;
+            } else {
+                ofdm->sync_counter = 0;
+            }
+
+            if ((ofdm->sync_mode == autosync) && (ofdm->sync_counter > 6)) {
+                /* run of consecutive bad frames ... drop sync */
+
+                next_state = search;
+                ofdm->phase_est_bandwidth = high_bw;
+            }
+        }
+    }
+
+    ofdm->last_sync_state = ofdm->sync_state;
+    ofdm->sync_state = next_state;
+}
+
+/*
+ * state machine for data modes
+ */
+void ofdm_sync_state_machine2(struct OFDM *ofdm, uint8_t *rx_uw) {
     int i;
 
     State next_state = ofdm->sync_state;
