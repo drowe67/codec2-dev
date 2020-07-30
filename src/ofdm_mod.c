@@ -115,12 +115,11 @@ int main(int argc, char *argv[]) {
     int Nsec = 0;
     int Nrows = 0;
 
-    int nc = 17;
-    int ns = 8;
-    float tcp = 0.0020f;
-    float ts = 0.0180f;
-    float rx_centre = 1500.0f;
-    float tx_centre = 1500.0f;
+    /* sets the default modem config */
+    /* set up custom config for ofdm_create() ..... */
+    struct OFDM_CONFIG *ofdm_config = (struct OFDM_CONFIG *) calloc(1, sizeof (struct OFDM_CONFIG));
+    assert(ofdm_config != NULL);
+    ofdm_init_mode("700D", ofdm_config);
 
     int   data_bits_per_frame = 0;
     struct optparse options;
@@ -164,27 +163,28 @@ int main(int argc, char *argv[]) {
                 if (val > 62 || val < 17) {
                     opt_help();
                 } else {
-                    nc = val;
+                    ofdm_config->nc = val;
                 }
                 break;
             case 'd':
-                tcp = atof(options.optarg);
+                ofdm_config->tcp = atof(options.optarg);
                 break;
             case 'e':
-                ts = atof(options.optarg);
+                ofdm_config->ts = atof(options.optarg);
+                ofdm_config->rs = 1.0f / ofdm_config->ts; 
                 break;
             case 'm':
-                ns = atoi(options.optarg);
+                ofdm_config->ns = atoi(options.optarg);
                 break;
             case 'f':
                 testframes = 1;
                 Nsec = atoi(options.optarg);
                 break;
             case 'h':
-                tx_centre = atof(options.optarg);
+                ofdm_config->tx_centre = atof(options.optarg);
                 break;
             case 'i':
-                rx_centre = atof(options.optarg);
+                ofdm_config->rx_centre = atof(options.optarg);
                 break;
             case 'j':
                 ldpc_en = atoi(options.optarg);
@@ -234,27 +234,7 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    /* set up custom config for ofdm_create() ..... */
-    
-    struct OFDM_CONFIG *ofdm_config;
-    
-    if ((ofdm_config = (struct OFDM_CONFIG *) calloc(1, sizeof (struct OFDM_CONFIG))) == NULL) {
-        fprintf(stderr, "Out of Memory\n");
-        exit(-1);
-    }
-
-    /* this sets the defaults */
-    ofdm_init_mode("700D", ofdm_config);
-
-    /* set up params that optionally come from the command line */
-    ofdm_config->ns = ns;
-    ofdm_config->tx_centre = tx_centre;
-    ofdm_config->rx_centre = rx_centre;
-    ofdm_config->nc = nc;
-    ofdm_config->tcp = tcp;
-    ofdm_config->ts = ts;
-    ofdm_config->rs = (1.0f / ts); /* Modulating Symbol Rate */
-
+    /* init the modem with our (optinally) custom config */
     struct OFDM *ofdm = ofdm_create(ofdm_config);
     assert(ofdm != NULL);
 
