@@ -56,6 +56,7 @@ void opt_help() {
     fprintf(stderr, "\nusage: %s [options]\n\n", progname);
     fprintf(stderr, "  --in      filename    Name of InputOneCharPerBitFile\n");
     fprintf(stderr, "  --out     filename    Name of OutputModemRawFile\n");
+    fprintf(stderr, "  --mode    modeName    Predefined mode 700D|2020|datac1\n");    
     fprintf(stderr, "  --nc      [17..62]    Number of Carriers (17 default, 62 max)\n");
     fprintf(stderr, "  --ns       Nframes    Number of Symbol Frames (8 default)\n");
     fprintf(stderr, "  --tcp        Nsecs    Cyclic Prefix Duration (.002 default)\n");
@@ -140,6 +141,7 @@ int main(int argc, char *argv[]) {
         {"verbose", 'v', OPTPARSE_REQUIRED},
         {"databits", 'p', OPTPARSE_REQUIRED},        
         {"dpsk", 'q', OPTPARSE_NONE},        
+        {"mode", 'g', OPTPARSE_REQUIRED},        
         {0, 0, 0}
     };
 
@@ -179,6 +181,9 @@ int main(int argc, char *argv[]) {
             case 'f':
                 testframes = 1;
                 Nsec = atoi(options.optarg);
+                break;
+            case 'g':
+                ofdm_init_mode(options.optarg, ofdm_config);
                 break;
             case 'h':
                 ofdm_config->tx_centre = atof(options.optarg);
