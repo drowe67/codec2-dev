@@ -242,10 +242,8 @@ void ofdm_ldpc_interleave_tx(struct OFDM *ofdm, struct LDPC *ldpc, complex float
 
     ldpc_encode_frame(ldpc, codeword, tx_bits);
     qpsk_modulate_frame(coded_symbols, codeword, coded_syms_per_frame);
-
     gp_interleave_comp(coded_symbols_inter, coded_symbols, coded_syms_per_frame);
-
-    ofdm_assemble_qpsk_modem_frame_symbols(ofdm, tx_symbols, coded_symbols_inter, txt_bits);
+    ofdm_assemble_qpsk_modem_packet_symbols(ofdm, tx_symbols, coded_symbols_inter, txt_bits);
     ofdm_txframe(ofdm, tx_sams, tx_symbols);
 }
 
