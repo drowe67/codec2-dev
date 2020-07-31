@@ -4,7 +4,7 @@
   AUTHOR......: David Rowe
   DATE CREATED: April 2018
 
-  Helper functions for interleaved LDPC waveforms.
+interleaved   Helper functions for LDPC waveforms.
 
 \*---------------------------------------------------------------------------*/
 
@@ -163,7 +163,7 @@ void qpsk_modulate_frame(COMP tx_symbols[], int codeword[], int n) {
     }
 }
 
-/* measure uncoded (raw) bit errors over interleaver frame, note we
+/* measure uncoded (raw) bit errors over frame, note we
    don't include txt bits as this is done after we dissassemmble the
    frame */
 
@@ -229,10 +229,6 @@ int count_errors(uint8_t tx_bits[], uint8_t rx_bits[], int n) {
 /*
    Given an array of tx_bits, LDPC encodes, interleaves, and OFDM
    modulates.
-
-   Note this could be refactored to save memory, e.g. for embedded
-   applications we could call ofdm_txframe on a frame by frame
-   basis
  */
 
 void ofdm_ldpc_interleave_tx(struct OFDM *ofdm, struct LDPC *ldpc, complex float tx_sams[], uint8_t tx_bits[], uint8_t txt_bits[], struct OFDM_CONFIG *config) {

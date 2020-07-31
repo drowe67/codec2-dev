@@ -1853,7 +1853,7 @@ void ofdm_get_demod_stats(struct OFDM *ofdm, struct MODEM_STATS *stats) {
 /*
  * Assemble modem frame of bits from UW, payload bits, and txt bits
  */
-void ofdm_assemble_qpsk_modem_frame(struct OFDM *ofdm, uint8_t modem_frame[],
+void ofdm_assemble_qpsk_modem_packet(struct OFDM *ofdm, uint8_t modem_frame[],
         uint8_t payload_bits[], uint8_t txt_bits[]) {
     int s, t;
 
@@ -1913,10 +1913,10 @@ void ofdm_assemble_qpsk_modem_frame_symbols(struct OFDM *ofdm, complex float mod
     assert(t == ofdm->ntxtbits);
 }
 
-void ofdm_disassemble_qpsk_modem_frame(struct OFDM *ofdm, uint8_t rx_uw[],
+void ofdm_disassemble_qpsk_modem_packet(struct OFDM *ofdm, uint8_t rx_uw[],
   COMP codeword_syms[], float codeword_amps[], short txt_bits[]) {
     complex float *codeword = (complex float *) &codeword_syms[0]; // complex has same memory layout
-    int Nsymsperframe = ofdm->bitsperframe / 2;
+    int Nsymsperpacket = ofdm->bitsperpacket / 2;
     int Nuwsyms = ofdm->nuwbits / 2;
     int Ntxtsyms = ofdm->ntxtbits / 2;
     int dibit[2];
@@ -1925,7 +1925,7 @@ void ofdm_disassemble_qpsk_modem_frame(struct OFDM *ofdm, uint8_t rx_uw[],
     int p = 0;
     int u = 0;
 
-    for (s = 0; s < (Nsymsperframe - Ntxtsyms); s++) {
+    for (s = 0; s < (Nsymsperpacket - Ntxtsyms); s++) {
         if ((u < Nuwsyms) && (s == ofdm->uw_ind_sym[u])) {
             qpsk_demod(ofdm->rx_np[s], dibit);
 
@@ -1940,9 +1940,9 @@ void ofdm_disassemble_qpsk_modem_frame(struct OFDM *ofdm, uint8_t rx_uw[],
     }
 
     assert(u == Nuwsyms);
-    assert(p == (Nsymsperframe - Nuwsyms - Ntxtsyms));
+    assert(p == (Nsymsperpacket - Nuwsyms - Ntxtsyms));
 
-    for (t = 0; s < Nsymsperframe; s++, t += 2) {
+    for (t = 0; s < Nsymsperpacket; s++, t += 2) {
         qpsk_demod(ofdm->rx_np[s], dibit);
 
         txt_bits[t    ] = dibit[1];

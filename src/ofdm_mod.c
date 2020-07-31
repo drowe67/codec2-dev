@@ -406,7 +406,7 @@ int main(int argc, char *argv[]) {
                     txt_bits[i] = 0;
                 }
 
-                ofdm_assemble_qpsk_modem_frame(ofdm, tx_bits_char, payload_bits, txt_bits);
+                ofdm_assemble_qpsk_modem_packet(ofdm, tx_bits_char, payload_bits, txt_bits);
             }
 
             int tx_bits[Nbitsperpacket];

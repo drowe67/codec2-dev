@@ -230,7 +230,7 @@ int main(int argc, char *argv[])
                 payload_bits[i] = r[i] > 16384;
             }
 
-            ofdm_assemble_qpsk_modem_frame(ofdm, tx_bits, payload_bits, txt_bits);
+            ofdm_assemble_qpsk_modem_packet(ofdm, tx_bits, payload_bits, txt_bits);
 	}
 
 	fwrite(tx_bits, sizeof(char), Nbitsperframe, fout);

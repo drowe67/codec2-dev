@@ -222,7 +222,7 @@ int freedv_comprx_2020(struct freedv *f, COMP demod_in[]) {
         if (ofdm->sync_state == trial) rx_status |= RX_TRIAL_SYNC;
 
         ofdm_demod(ofdm, rx_bits, demod_in);
-        ofdm_disassemble_qpsk_modem_frame(ofdm, rx_uw, payload_syms, payload_amps, txt_bits);
+        ofdm_disassemble_qpsk_modem_packet(ofdm, rx_uw, payload_syms, payload_amps, txt_bits);
 
         f->sync = 1;
         ofdm_get_demod_stats(f->ofdm, &f->stats);

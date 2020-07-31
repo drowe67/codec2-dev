@@ -446,7 +446,7 @@ int main(int argc, char *argv[]) {
 
         if ((ofdm->sync_state == synced) || (ofdm->sync_state == trial)) {
             ofdm_demod_shorts(ofdm, rx_bits, rx_scaled, (OFDM_AMP_SCALE / 2.0f));
-            ofdm_disassemble_qpsk_modem_frame(ofdm, rx_uw, payload_syms, payload_amps, txt_bits);
+            ofdm_disassemble_qpsk_modem_packet(ofdm, rx_uw, payload_syms, payload_amps, txt_bits);
             log_payload_syms = true;
 
             /* SNR estimation and smoothing */
@@ -558,7 +558,7 @@ int main(int argc, char *argv[]) {
                     txt_bits[i] = 0;
                 }
 
-                ofdm_assemble_qpsk_modem_frame(ofdm, tx_bits, payload_bits, txt_bits);
+                ofdm_assemble_qpsk_modem_packet(ofdm, tx_bits, payload_bits, txt_bits);
 
                 Nerrs = 0;
 
