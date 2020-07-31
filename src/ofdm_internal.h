@@ -114,16 +114,16 @@ struct OFDM {
                 /* modem frame.  In other modes (e.g. 700D/2020) Np=1, ie the modem frame */
                 /* is the same length as the packet/FEC frame. */
     int ftwindowwidth;
-    int bitsperframe;
-    int bitsperpacket;
+    int bitsperframe;      /* total bits in all data symbols in modem frame */
+    int bitsperpacket;     /* total bits in all data symbols in a packet */
     int rowsperframe;
     int samplespersymbol;
     int samplesperframe;
     int max_samplesperframe;
     int nuwframes;
     int nrxbuf;
-    int ntxtbits; /* reserve bits/frame for aux text information */
-    int nuwbits; /* Unique word used for positive indication of lock */
+    int ntxtbits;         /* reserve bits/frame for aux text information */
+    int nuwbits;          /* number of unique word bits used to achieve packet frame sync */
     int bad_uw_errors;
 
     float tx_centre; /* TX Center frequency */

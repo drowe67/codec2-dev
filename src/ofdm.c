@@ -253,7 +253,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
 
     ofdm->bitsperframe = (ofdm->ns - 1) * (ofdm->nc * ofdm->bps);   // 238 for nc = 17
     ofdm->bitsperpacket = ofdm->np * ofdm->bitsperframe;
-    ofdm->tpacket = (float)(ofdm->np * ofdm->ns) * (ofdm->tcp + ofdm->ts); /* 20 ms * symbol frames (time for one packet) */
+    ofdm->tpacket = (float)(ofdm->np * ofdm->ns) * (ofdm->tcp + ofdm->ts); /* time for one packet */
     ofdm->rowsperframe = ofdm->bitsperframe / (ofdm->nc * ofdm->bps);
     ofdm->samplespersymbol = (ofdm->m + ofdm->ncp);
     ofdm->samplesperframe = ofdm->ns * ofdm->samplespersymbol;
@@ -842,8 +842,10 @@ void ofdm_txframe(struct OFDM *ofdm, complex float *tx, complex float *tx_sym_li
 struct OFDM_CONFIG *ofdm_get_config_param(struct OFDM *ofdm) { return &ofdm->config; }
 int ofdm_get_nin(struct OFDM *ofdm) {return ofdm->nin;}
 int ofdm_get_samples_per_frame(struct OFDM *ofdm) { return ofdm->samplesperframe;}
+int ofdm_get_samples_per_packet(struct OFDM *ofdm) { return ofdm->samplesperframe*ofdm->np;}
 int ofdm_get_max_samples_per_frame(struct OFDM *ofdm) {return ofdm->max_samplesperframe; }
 int ofdm_get_bits_per_frame(struct OFDM *ofdm) {return  ofdm->bitsperframe; }
+int ofdm_get_bits_per_packet(struct OFDM *ofdm) {return  ofdm->bitsperpacket; }
 void ofdm_set_verbose(struct OFDM *ofdm, int level) { ofdm->verbose = level; }
 
 void ofdm_set_timing_enable(struct OFDM *ofdm, bool val) {
@@ -1541,7 +1543,6 @@ void ofdm_sync_state_machine(struct OFDM *ofdm, uint8_t *rx_uw) {
             ofdm->frame_count = 0;
             ofdm->sync_counter = 0;
             ofdm->sync_start = true;
-            ofdm->modem_frame = 0;
             ofdm->clock_offset_counter = 0;
             next_state = trial;
         }
@@ -1550,77 +1551,62 @@ void ofdm_sync_state_machine(struct OFDM *ofdm, uint8_t *rx_uw) {
     if ((ofdm->sync_state == synced) || (ofdm->sync_state == trial)) {
         ofdm->frame_count++;
 
-        if (ofdm->modem_frame == 0) {
-            /*
-             * freq offset est may be too far out, and has aliases every 1/Ts, so
-             * we use a Unique Word to get a really solid indication of sync.
-             */
-            ofdm->uw_errors = 0;
+        /*
+         * freq offset est may be too far out, and has aliases every 1/Ts, so
+         * we use a Unique Word to get a really solid indication of sync.
+         */
+        ofdm->uw_errors = 0;
 
-            for (i = 0; i < ofdm->nuwbits; i++) {
-                ofdm->uw_errors += ofdm->tx_uw[i] ^ rx_uw[i];
+        for (i = 0; i < ofdm->nuwbits; i++) {
+            ofdm->uw_errors += ofdm->tx_uw[i] ^ rx_uw[i];
+        }
+
+        /*
+         * during trial sync we don't tolerate errors so much, we look
+         * for 3 consecutive frames with low error rate to confirm sync
+         */
+        if (ofdm->sync_state == trial) {
+            if (ofdm->uw_errors > 2) {
+                /* if we exceed thresh stay in trial sync */
+
+                ofdm->sync_counter++;
+                ofdm->frame_count = 0;
             }
 
-            /*
-             * during trial sync we don't tolerate errors so much, we look
-             * for 3 consecutive frames with low error rate to confirm sync
-             */
-            if (ofdm->sync_state == trial) {
-                if (ofdm->uw_errors > 2) {
-                    /* if we exceed thresh stay in trial sync */
+            if (ofdm->sync_counter == 2) {
+                /* if we get two bad frames drop sync and start again */
 
-                    ofdm->sync_counter++;
-                    ofdm->frame_count = 0;
-                }
+                next_state = search;
+                ofdm->phase_est_bandwidth = high_bw;
+            }
 
-                if (ofdm->sync_counter == 2) {
-                    /* if we get two bad frames drop sync and start again */
+            if (ofdm->frame_count == 4) {
+                /* three good frames, sync is OK! */
 
-                    next_state = search;
-                    ofdm->phase_est_bandwidth = high_bw;
-                }
+                next_state = synced;
+                /* change to low bandwidth, but more accurate phase estimation */
+                /* but only if not locked to high */
 
-                if (ofdm->frame_count >= 4) {
-                    /* three good frames, sync is OK! */
-
-                    next_state = synced;
-                    /* change to low bandwidth, but more accurate phase estimation */
-                    /* but only if not locked to high */
-
-                    if (ofdm->phase_est_bandwidth_mode != LOCKED_PHASE_EST) {
-                        ofdm->phase_est_bandwidth = low_bw;
-                    }
-                }
-                
-                if (ofdm->uw_errors < 2) {
-                    next_state = synced;
+                if (ofdm->phase_est_bandwidth_mode != LOCKED_PHASE_EST) {
                     ofdm->phase_est_bandwidth = low_bw;
-                } else {
-                    next_state = search;
                 }
             }
+        }
 
-            /* once we have synced up we tolerate a higher error rate to wait out fades */
+        /* once we have synced up we tolerate a higher error rate to wait out fades */
 
-            if (ofdm->sync_state == synced) {
-                if (ofdm->uw_errors > 2) {
-                    ofdm->sync_counter++;
-                } else {
-                    ofdm->sync_counter = 0;
-                }
-
-                if ((ofdm->sync_mode == autosync) && (ofdm->sync_counter >= 6)) {
-                    /* run of consecutive bad frames ... drop sync */
-
-                    next_state = search;
-                    ofdm->phase_est_bandwidth = high_bw;
-                }
+        if (ofdm->sync_state == synced) {
+            if (ofdm->uw_errors > 2) {
+                ofdm->sync_counter++;
+            } else {
+                ofdm->sync_counter = 0;
             }
 
-            ofdm->modem_frame++;
+            if ((ofdm->sync_mode == autosync) && (ofdm->sync_counter > 6)) {
+                /* run of consecutive bad frames ... drop sync */
 
-            if (ofdm->modem_frame >= ofdm->np) {
-                ofdm->modem_frame = 0;
+                next_state = search;
+                ofdm->phase_est_bandwidth = high_bw;
             }
         }
     }
@@ -1668,7 +1654,7 @@ void sync_state_machine2(struct OFDM *ofdm, uint8_t *rx_uw) {
         }
     }
 
-    // Note we don't every lose sync, we assume there are a known number of frames being sent,
+    // Note we don't ever lose sync, we assume there are a known number of frames being sent,
     // or the packets contain an "end of stream" information.
 
     if (ofdm->sync_state == synced) {
@@ -1866,7 +1852,7 @@ void ofdm_assemble_qpsk_modem_frame(struct OFDM *ofdm, uint8_t modem_frame[],
     int p = 0;
     int u = 0;
 
-    for (s = 0; s < (ofdm->bitsperframe - ofdm->ntxtbits); s++) {
+    for (s = 0; s < (ofdm->bitsperpacket - ofdm->ntxtbits); s++) {
         if ((u < ofdm->nuwbits) && (s == ofdm->uw_ind[u])) {
             modem_frame[s] = ofdm->tx_uw[u++];
         } else {
@@ -1875,7 +1861,7 @@ void ofdm_assemble_qpsk_modem_frame(struct OFDM *ofdm, uint8_t modem_frame[],
     }
 
     assert(u == ofdm->nuwbits);
-    assert(p == (ofdm->bitsperframe - ofdm->nuwbits - ofdm->ntxtbits));
+    assert(p == (ofdm->bitsperpacket - ofdm->nuwbits - ofdm->ntxtbits));
 
     for (t = 0; s < ofdm->bitsperframe; s++, t++) {
         modem_frame[s] = txt_bits[t];
