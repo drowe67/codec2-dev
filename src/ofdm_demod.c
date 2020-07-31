@@ -378,6 +378,7 @@ int main(int argc, char *argv[]) {
     int parityCheckCount = 0;
 
     int Nbitsperframe = ofdm_bitsperframe;
+    int Nbitsperpacket = ofdm_get_bits_per_packet(ofdm);
     int Nmaxsamperframe = ofdm_get_max_samples_per_frame(ofdm);
     // TODO: these constants come up a lot so might be best placed in ofdm_create()
     int Npayloadbitsperframe = ofdm_bitsperframe - ofdm_nuwbits - ofdm_ntxtbits;
@@ -527,11 +528,11 @@ int main(int argc, char *argv[]) {
             } else {
                 /* simple hard decision output for uncoded testing, all bits in frame dumped inlcuding UW and txt */
 
-                for (i = 0; i < Nbitsperframe; i++) {
+                for (i = 0; i < Nbitsperpacket; i++) {
                     rx_bits_char[i] = rx_bits[i];
                 }
 
-                fwrite(rx_bits_char, sizeof (uint8_t), Nbitsperframe, fout);
+                fwrite(rx_bits_char, sizeof (uint8_t), Nbitsperpacket, fout);
             }
 
             /* optional error counting on uncoded data in non-LDPC testframe mode */
@@ -541,39 +542,23 @@ int main(int argc, char *argv[]) {
                    uncoded payload bits.  The psuedo-random generator is the same as Octave so
                    it can interoperate with ofdm_tx.m/ofdm_rx.m */
 
-                int Npayloadbits = Nbitsperframe - (ofdm_nuwbits + ofdm_ntxtbits);
+                int Npayloadbits = Nbitsperpacket - (ofdm_nuwbits + ofdm_ntxtbits);
                 uint16_t r[Npayloadbits];
                 uint8_t payload_bits[Npayloadbits];
                 uint8_t tx_bits[Npayloadbits];
 
                 ofdm_rand(r, Npayloadbits);
-
-                for (i = 0; i < Npayloadbits; i++) {
-                    payload_bits[i] = r[i] > 16384;
-                }
-
-                uint8_t txt_bits[ofdm_ntxtbits];
-
-                for (i = 0; i < ofdm_ntxtbits; i++) {
-                    txt_bits[i] = 0;
-                }
-
+                for (i = 0; i < Npayloadbits; i++) payload_bits[i] = r[i] > 16384;
+                uint8_t txt_bits[ofdm_ntxtbits]; memset(txt_bits, 0, ofdm_ntxtbits);
                 ofdm_assemble_qpsk_modem_packet(ofdm, tx_bits, payload_bits, txt_bits);
 
-                Nerrs = 0;
-
-                for (i = 0; i < Nbitsperframe; i++) {
-                    if (tx_bits[i] != rx_bits[i]) {
-                        Nerrs++;
-                    }
-                }
-
+                for (Nerrs=0, i = 0; i < Nbitsperpacket; i++) if (tx_bits[i] != rx_bits[i]) Nerrs++;
                 Terrs += Nerrs;
-                Tbits += Nbitsperframe;
+                Tbits += Nbitsperpacket;
 
                 if (frame_count >= NDISCARD) {
                     Terrs2 += Nerrs;
-                    Tbits2 += Nbitsperframe;
+                    Tbits2 += Nbitsperpacket;
                 }
             }
 
