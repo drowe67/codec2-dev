@@ -792,18 +792,26 @@ void ofdm_txframe(struct OFDM *ofdm, complex float *tx, complex float *tx_sym_li
      * Place symbols in multi-carrier frame with pilots
      * This will place boundary values of complex zero around data
      */
-    for (i = 1; i <= ofdm->rowsperframe; i++) {
+    int s = 0;
+    for (int r = 0; r < ofdm->np*ofdm->ns; r++) {
 
-        /* copy in the Nc complex values with [0 Nc 0] or (Nc + 2) total */
-
-        for (j = 1; j < (ofdm->nc + 1); j++) {
-            aframe[i][j] = tx_sym_lin[((i - 1) * ofdm->nc) + (j - 1)];
-            if (ofdm->dpsk_en == true) {
-                aframe[i][j] *= aframe[i-1][j];
+        if ((r % ofdm->ns) == 0) {
+            /* copy in a row of complex pilots to first row of each frame */
+            for (i = 0; i < (ofdm->nc + 2); i++) {
+                aframe[r][i] = ofdm->pilots[i];
+            }
+        }
+        else {
+            /* copy in the Nc complex data symbols with [0 Nc 0] or (Nc + 2) total */
+            for (j = 1; j < (ofdm->nc + 1); j++) {
+                aframe[r][j] = tx_sym_lin[s++];
+                if (ofdm->dpsk_en == true) {
+                    aframe[r][j] *= aframe[r-1][j];
+                }
             }
         }
     }
-
+    
     /* OFDM up-convert symbol by symbol so we can add CP */
 
     for (i = 0, m = 0; i < (ofdm->np * ofdm->ns); i++, m += ofdm->samplespersymbol) {
@@ -904,20 +912,20 @@ void ofdm_set_dpsk(struct OFDM *ofdm, bool val) {
  * --------------------------------------
  */
 void ofdm_mod(struct OFDM *ofdm, COMP *result, const int *tx_bits) {
-    int length = ofdm->bitsperframe / ofdm->bps;
+    int length = ofdm->bitsperpacket / ofdm->bps;
     complex float *tx = (complex float *) &result[0]; // complex has same memory layout
     complex float tx_sym_lin[length];
     int dibit[2];
     int s, i;
 
     if (ofdm->bps == 1) {
-        /* Here we will have Nbitsperframe / 1 */
+        /* Here we will have Nbitsperpacket / 1 */
 
         for (s = 0; s < length; s++) {
             tx_sym_lin[s] = (float) (2 * tx_bits[s] - 1);
         }
     } else if (ofdm->bps == 2) {
-        /* Here we will have Nbitsperframe / 2 */
+        /* Here we will have Nbitsperpacket / 2 */
 
         for (s = 0, i = 0; i < length; s += 2, i++) {
             dibit[0] = tx_bits[s + 1] & 0x1;

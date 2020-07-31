@@ -303,7 +303,6 @@ int main(int argc, char *argv[]) {
         txt_bits_char[i] = 0;
     }
 
-    /* TODO packets */
     if (testframes) {
         Npackets = round(Nsec/ofdm->tpacket);
         if (verbose)
