@@ -125,13 +125,13 @@ struct FSK * fsk_create_core(int Fs, int Rs, int M, int P, int Nsym, int f1_tx, 
     assert( (Fs%Rs) == 0 );
     /* Ts/P (Fs/Rs/P) must be an integer */
     assert( ((Fs/Rs)%P) == 0 );
-    /* If P is too low we don't have a good chocie of timing offsets to choose from */
+    /* If P is too low we don't have a good choice of timing offsets to choose from */
     assert( P >= 4 );
     assert( M==2 || M==4);
     
-    fsk = (struct FSK*) malloc(sizeof(struct FSK)); assert(fsk != NULL);
+    fsk = (struct FSK*) calloc(1, sizeof(struct FSK)); assert(fsk != NULL);
      
-    // Need enough bins to with 10% of tone centre
+    // Need enough bins to within 10% of tone centre
     float bin_width_Hz = 0.1*Rs;
     float Ndft = (float)Fs/bin_width_Hz;
     Ndft = pow(2.0, ceil(log2(Ndft)));
@@ -156,6 +156,7 @@ struct FSK * fsk_create_core(int Fs, int Rs, int M, int P, int Nsym, int f1_tx, 
     fsk->est_min = 0;
     fsk->est_max = Fs;
     fsk->est_space = 0.75*Rs;
+    fsk->freq_est_type = 0;
     
     //printf("C.....: M: %d Fs: %d Rs: %d Ts: %d nsym: %d nbit: %d N: %d Ndft: %d fmin: %d fmax: %d\n",
     //       M, fsk->Fs, fsk->Rs, fsk->Ts, fsk->Nsym, fsk->Nbits, fsk->N, fsk->Ndft, fsk->est_min, fsk->est_max);
@@ -168,6 +169,7 @@ struct FSK * fsk_create_core(int Fs, int Rs, int M, int P, int Nsym, int f1_tx, 
         
     fsk->fft_cfg = kiss_fft_alloc(Ndft,0,NULL,NULL); assert(fsk->fft_cfg != NULL);    
     fsk->Sf = (float*)malloc(sizeof(float)*fsk->Ndft); assert(fsk->Sf != NULL);
+    for(i=0;i<Ndft;i++)fsk->Sf[i] = 0;
     
     #ifdef USE_HANN_TABLE
         #ifdef GENERATE_HANN_TABLE_RUNTIME
@@ -178,7 +180,6 @@ struct FSK * fsk_create_core(int Fs, int Rs, int M, int P, int Nsym, int f1_tx, 
         #endif
     #endif
     
-    for(i=0;i<Ndft;i++)fsk->Sf[i] = 0;
     
     fsk->norm_rx_timing = 0;
     
@@ -481,6 +482,7 @@ void fsk_demod_freq_est(struct FSK *fsk, COMP fsk_in[], float *freqs, int M) {
     //fprintf(stderr, "min: %d max: %d st: %d en: %d\n", fsk->est_min, fsk->est_max, st, en);
     
     f_zero = (fsk->est_space*Ndft)/Fs;
+    //fprintf(stderr, "fsk->est_space: %d f_zero = %d\n", fsk->est_space, f_zero);
 
     int numffts = floor((float)nin/(Ndft/2)) - 1;
     for(j=0; j<numffts; j++){
@@ -801,16 +803,16 @@ void fsk_demod_core(struct FSK *fsk, uint8_t rx_bits[], float rx_filt[], COMP fs
             }
         }
         
-        /* Output filter magnitudes for soft decision/LLR calculation */
-        if (rx_filt != NULL) {
-            float sum = 0.0;
-            for(m=0; m<M; m++) {
-                rx_filt[m*nsym+i] = sqrtf(tmax[m]);
-                sum += tmax[m];
-            }
-            rx_sig_pow += max;
-            rx_nse_pow += (sum-max)/(M-1);
+        /* Optionally output filter magnitudes for soft decision/LLR
+           calculation.  Update SNRest always as this is a useful
+           alternative to the earlier EbNo estimator below */
+        float sum = 0.0;
+        for(m=0; m<M; m++) {
+            if (rx_filt != NULL) rx_filt[m*nsym+i] = sqrtf(tmax[m]);
+            sum += tmax[m];
         }
+        rx_sig_pow += max;
+        rx_nse_pow += (sum-max)/(M-1);
 
         /* Accumulate resampled int magnitude for EbNodB estimation */
         /* Standard deviation is calculated by algorithm devised by crafty soviets */
@@ -822,7 +824,6 @@ void fsk_demod_core(struct FSK *fsk, uint8_t rx_bits[], float rx_filt[], COMP fs
         /* Figure the abs value of the max tone */
         meanebno += sqrtf(ft1);
         #endif
-        /* Soft output goes here */
     }
 
     rx_sig_pow = rx_sig_pow/nsym;
