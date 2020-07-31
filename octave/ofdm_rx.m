@@ -94,7 +94,7 @@ function ofdm_rx(filename, mode="700D", error_pattern_filename)
 
       rx_uw = extract_uw(states, rx_syms(end-Nuwframes*Nsymsperframe+1:end));
       
-      % We need the full packet of symbols before disassmbling and checking for bit errors
+      % We need the full packet of symbols before disassembling and checking for bit errors
       if states.modem_frame == (states.Np-1)
         rx_bits = zeros(1,Nbitsperpacket);
         for s=1:Nsymsperpacket

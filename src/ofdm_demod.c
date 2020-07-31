@@ -4,14 +4,8 @@
   AUTHOR......: David Rowe
   DATE CREATED: Mar 2018
 
-  Given an input file of raw file (8kHz, 16 bit shorts) of OFDM modem
-  samples.  Optionally:
-
-    1/ outputs one char per bit (hard decision)
-    2/ bit LLRS, one double per bit, for external LDPC decoder like ldpc_dec
-    3/ LDPC decoded bits, one char per bit
-
-  Also has test frame modes for uncoded and coded operation.
+  Demodulates an input file of raw file (8kHz, 16 bit shorts) OFDM modem
+  samples.  Runs in uncoded or LDPC coded modes.
 
 \*---------------------------------------------------------------------------*/
 
@@ -90,7 +84,6 @@ void opt_help() {
     fprintf(stderr, "  --rx_freq         freq   Set modulation RX centre Frequency (1500.0 default)\n");
     fprintf(stderr, "  --verbose      [1|2|3]   Verbose output level to stderr (default off)\n");
     fprintf(stderr, "  --testframes             Receive test frames and count errors\n");
-    fprintf(stderr, "  --llr                    LLR output boolean, one double per bit\n");
     fprintf(stderr, "  --ldpc           [1|2]   Run LDPC decoder In (224,112) 700D or (504, 396) 2020 mode.\n");
     fprintf(stderr, "  --databits     numBits   Number of data bits used in LDPC codeword.\n");
     fprintf(stderr, "\n");
@@ -137,7 +130,6 @@ int main(int argc, char *argv[]) {
     bool output_specified = false;
     bool log_specified = false;
     bool log_active = false;
-    bool llr_en = false;
     bool dpsk = false;
     
     float time_to_sync = -1;
@@ -160,7 +152,6 @@ int main(int argc, char *argv[]) {
         {"tx_freq", 'f', OPTPARSE_REQUIRED},
         {"rx_freq", 'g', OPTPARSE_REQUIRED},
         {"verbose", 'v', OPTPARSE_REQUIRED},
-        {"llr", 'h', OPTPARSE_NONE},
         {"ldpc", 'i', OPTPARSE_REQUIRED},
         {"nc", 'j', OPTPARSE_REQUIRED},
         {"tcp", 'k', OPTPARSE_REQUIRED},
@@ -205,8 +196,6 @@ int main(int argc, char *argv[]) {
                     fprintf(stderr, "--ldpc 2  (504,396) code used for 2020\n");
                     opt_help();
                 }
-            case 'h': /* fall through */
-                llr_en = true;
                 break;
             case 'f':
                 ofdm_config->tx_centre = atof(options.optarg);
@@ -468,7 +457,7 @@ int main(int argc, char *argv[]) {
 
             snr_est_smoothed_dB = 0.9f * snr_est_smoothed_dB + 0.1f * snr_est_dB;
 
-            if (llr_en == true) {
+            if (ldpc_en) {
 
                 /* first few symbols are used for UW and txt bits, find start of (224,112) LDPC codeword
                    and extract QPSK symbols and amplitude estimates */
@@ -492,55 +481,49 @@ int main(int argc, char *argv[]) {
 
                 float llr[coded_bits_per_frame];
 
-                if (ldpc_en) {
-                    uint8_t out_char[coded_bits_per_frame];
+                uint8_t out_char[coded_bits_per_frame];
 
-                    if (testframes == true) {
-                        Terrs += count_uncoded_errors(&ldpc, ofdm_config, &Nerrs_raw, codeword_symbols_de);
-                        Tbits += coded_bits_per_frame; /* not counting errors in txt bits */
-                    }
-
-                    symbols_to_llrs(llr, codeword_symbols_de, codeword_amps_de,
-                            EsNo, ofdm->mean_amp, coded_syms_per_frame);
-                    
-                    if (ldpc.data_bits_per_frame == ldpc.ldpc_data_bits_per_frame) {
-                        /* all data bits in code word used */
-                        iter = run_ldpc_decoder(&ldpc, out_char, llr, &parityCheckCount);
-                    } else {
-                        /* some unused data bits, set these to known values to strengthen code */
-                        float llr_full_codeword[ldpc.ldpc_coded_bits_per_frame];
-                        int unused_data_bits = ldpc.ldpc_data_bits_per_frame - ldpc.data_bits_per_frame;
-
-                        // received data bits
-                        for (i = 0; i < ldpc.data_bits_per_frame; i++)
-                            llr_full_codeword[i] = llr[i];
-                        // known bits ... so really likely
-                        for (i = ldpc.data_bits_per_frame; i < ldpc.ldpc_data_bits_per_frame; i++)
-                            llr_full_codeword[i] = -100.0;
-                        // parity bits at end
-                        for (i = ldpc.ldpc_data_bits_per_frame; i < ldpc.ldpc_coded_bits_per_frame; i++)
-                            llr_full_codeword[i] = llr[i - unused_data_bits];
-                        
-                        iter = run_ldpc_decoder(&ldpc, out_char, llr_full_codeword, &parityCheckCount);
-                    }
-
-                    if (testframes == true) {
-                        /* construct payload data bits */
-
-                        uint8_t payload_data_bits[data_bits_per_frame];
-                        ofdm_generate_payload_data_bits(payload_data_bits, data_bits_per_frame);
-
-                        Nerrs_coded = count_errors(payload_data_bits, out_char, data_bits_per_frame);
-                        Terrs_coded += Nerrs_coded;
-                        Tbits_coded += data_bits_per_frame;
-                    }
-
-                    fwrite(out_char, sizeof (char), data_bits_per_frame, fout);
-                } else {
-                    /* lpdc_en == false,  external LDPC decoder, so output LLRs */
-                    symbols_to_llrs(llr, codeword_symbols_de, codeword_amps_de, EsNo, ofdm->mean_amp, coded_syms_per_frame);
-                    fwrite(llr, sizeof (double), coded_bits_per_frame, fout);
+                if (testframes == true) {
+                    Terrs += count_uncoded_errors(&ldpc, ofdm_config, &Nerrs_raw, codeword_symbols_de);
+                    Tbits += coded_bits_per_frame; /* not counting errors in txt bits */
                 }
+
+                symbols_to_llrs(llr, codeword_symbols_de, codeword_amps_de,
+                                EsNo, ofdm->mean_amp, coded_syms_per_frame);
+                    
+                if (ldpc.data_bits_per_frame == ldpc.ldpc_data_bits_per_frame) {
+                    /* all data bits in code word used */
+                    iter = run_ldpc_decoder(&ldpc, out_char, llr, &parityCheckCount);
+                } else {
+                    /* some unused data bits, set these to known values to strengthen code */
+                    float llr_full_codeword[ldpc.ldpc_coded_bits_per_frame];
+                    int unused_data_bits = ldpc.ldpc_data_bits_per_frame - ldpc.data_bits_per_frame;
+
+                    // received data bits
+                    for (i = 0; i < ldpc.data_bits_per_frame; i++)
+                        llr_full_codeword[i] = llr[i];
+                    // known bits ... so really likely
+                    for (i = ldpc.data_bits_per_frame; i < ldpc.ldpc_data_bits_per_frame; i++)
+                        llr_full_codeword[i] = -100.0;
+                    // parity bits at end
+                    for (i = ldpc.ldpc_data_bits_per_frame; i < ldpc.ldpc_coded_bits_per_frame; i++)
+                        llr_full_codeword[i] = llr[i - unused_data_bits];
+                        
+                    iter = run_ldpc_decoder(&ldpc, out_char, llr_full_codeword, &parityCheckCount);
+                }
+
+                if (testframes == true) {
+                    /* construct payload data bits */
+
+                    uint8_t payload_data_bits[data_bits_per_frame];
+                    ofdm_generate_payload_data_bits(payload_data_bits, data_bits_per_frame);
+
+                    Nerrs_coded = count_errors(payload_data_bits, out_char, data_bits_per_frame);
+                    Terrs_coded += Nerrs_coded;
+                    Tbits_coded += data_bits_per_frame;
+                }
+
+                fwrite(out_char, sizeof (char), data_bits_per_frame, fout);
             } else {
                 /* simple hard decision output for uncoded testing, all bits in frame dumped inlcuding UW and txt */
 
