@@ -47,6 +47,7 @@
 
 #include "codec2_ofdm.h"
 #include "ofdm_internal.h"
+#include "ofdm_mode.h"
 #include "octave.h"
 #include "mpdecode_core.h"
 #include "gp_interleaver.h"
@@ -77,9 +78,10 @@ void opt_help() {
     fprintf(stderr, "  --in          filename   Name of InputModemRawFile\n");
     fprintf(stderr, "  --out         filename   Name of OutputOneCharPerBitFile\n");
     fprintf(stderr, "  --log         filename   Octave log file for testing\n");
+    fprintf(stderr, "  --mode       modeName    Predefined mode 700D|2020|datac1\n");    
     fprintf(stderr, "  --nc          [17..62]   Number of Carriers (17 default, 62 max)\n");
     fprintf(stderr, "  --np                     Number of packets\n");
-    fprintf(stderr, "  --ns           Nframes   Number of Symbol Frames (8 default)\n");
+    fprintf(stderr, "  --ns           Nframes   One pilot every ns symbols (8 default)\n");
     fprintf(stderr, "  --tcp            Nsecs   Cyclic Prefix Duration (.002 default)\n");
     fprintf(stderr, "  --ts             Nsecs   Symbol Duration (.018 default)\n");
     fprintf(stderr, "  --bandwidth      [0|1]   Select phase est bw mode AUTO low or high (0) or LOCKED high (1) (default 0)\n");
@@ -125,10 +127,6 @@ int main(int argc, char *argv[]) {
     char *log_name = NULL;
 
     int logframes = NFRAMES;
-    int nc = 17;
-    int ns = 8;
-    int np = 1;
-    int bps = 2;
     int verbose = 0;
     int phase_est_bandwidth_mode = AUTO_PHASE_EST;
     int ldpc_en = 0;
@@ -142,18 +140,17 @@ int main(int argc, char *argv[]) {
     bool llr_en = false;
     bool dpsk = false;
     
-    float tcp = 0.002f;
-    float ts = 0.018f;
-    float rx_centre = 1500.0f;
-    float tx_centre = 1500.0f;
-
     float time_to_sync = -1;
     float start_secs = 0.0;
     float len_secs = 0.0;
     float skip_secs = 0.0;
     
-    struct optparse options;
+    /* set up the default modem config */
+    struct OFDM_CONFIG *ofdm_config = (struct OFDM_CONFIG *) calloc(1, sizeof (struct OFDM_CONFIG));
+    assert(ofdm_config != NULL);
+    ofdm_init_mode("700D", ofdm_config);
 
+    struct optparse options;
     struct optparse_long longopts[] = {
         {"in", 'a', OPTPARSE_REQUIRED},
         {"out", 'b', OPTPARSE_REQUIRED},
@@ -175,6 +172,7 @@ int main(int argc, char *argv[]) {
         {"len_secs", 'y', OPTPARSE_REQUIRED},        
         {"skip_secs", 'z', OPTPARSE_REQUIRED},        
         {"dpsk", 'q', OPTPARSE_NONE},        
+        {"mode", 'r', OPTPARSE_REQUIRED},        
         {0, 0, 0}
     };
 
@@ -211,10 +209,10 @@ int main(int argc, char *argv[]) {
                 llr_en = true;
                 break;
             case 'f':
-                tx_centre = atof(options.optarg);
+                ofdm_config->tx_centre = atof(options.optarg);
                 break;
             case 'g':
-                rx_centre = atof(options.optarg);
+                ofdm_config->rx_centre = atof(options.optarg);
                 break;
             case 'j':
                 val = atoi(options.optarg);
@@ -222,20 +220,21 @@ int main(int argc, char *argv[]) {
                 if (val > 62 || val < 17) {
                     opt_help();
                 } else {
-                    nc = val;
+                    ofdm_config->nc = val;
                 }
                 break;
             case 'k':
-                tcp = atof(options.optarg);
+                ofdm_config->tcp = atof(options.optarg);
                 break;
             case 'l':
-                ts = atof(options.optarg);
+                ofdm_config->ts = atof(options.optarg);
+                ofdm_config->rs = 1.0f/ofdm_config->ts;
                 break;
             case 'm':
-                ns = atoi(options.optarg);
+                 ofdm_config->ns = atoi(options.optarg);
                 break;
             case 'n':
-                np = atoi(options.optarg);
+                 ofdm_config->np = atoi(options.optarg);
                 break;
             case 'o':
                 phase_est_bandwidth_mode = atoi(options.optarg);
@@ -245,6 +244,9 @@ int main(int argc, char *argv[]) {
                 break;
             case 'q':
                 dpsk = true;
+                break;
+            case 'r':
+                ofdm_init_mode(options.optarg, ofdm_config);
                 break;
             case 'v':
                 verbose = atoi(options.optarg);
@@ -291,34 +293,10 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    /* set up custom config for ofdm_create() ..... */
-
-    struct OFDM_CONFIG *ofdm_config;
-    if ((ofdm_config = (struct OFDM_CONFIG *) calloc(1, sizeof (struct OFDM_CONFIG))) == NULL) {
-        fprintf(stderr, "Out of Memory\n");
-        exit(-1);
-    }
-
-    ofdm_config->nc = nc;
-    ofdm_config->np = np;
-    ofdm_config->ns = ns; /* Number of Symbol frames */
-    ofdm_config->bps = bps; /* Bits per Symbol */
-    ofdm_config->ts = ts;
-    ofdm_config->tcp = tcp;
-    ofdm_config->tx_centre = tx_centre;
-    ofdm_config->rx_centre = rx_centre;
-    ofdm_config->fs = FS; /* Sample Frequency */
-    ofdm_config->rs = (1.0f / ts);
-    ofdm_config->txtbits = 4; /* number of auxiliary data bits */
-    ofdm_config->nuwbits = 5 * bps;
-    ofdm_config->bad_uw_errors = 3;
-
-    ofdm_config->ftwindowwidth = 11;
-    ofdm_config->timing_mx_thresh = 0.30f;
+    /* Create OFDM modem ----------------------------------------------------*/
 
     struct OFDM *ofdm = ofdm_create(ofdm_config);
     assert(ofdm != NULL);
-
     free(ofdm_config);
 
     ofdm_set_phase_est_bandwidth_mode(ofdm, phase_est_bandwidth_mode);
@@ -629,21 +607,6 @@ int main(int argc, char *argv[]) {
             Nerrs_raw = 0;
             Nerrs_coded = 0;
         }
-
-        #ifdef TT
-        if (ldpc_en) {
-            /* experimental timing gear switching based on LDPC TODO: move into shared function */
-            bool ldpc_decode_ok = parityCheckCount > 0.8*ldpc.NumberParityBits;
-            if (ofdm->sync_state == synced) {
-                if ((ofdm->sync_counter>2) && (ldpc_decode_ok == false)) {
-                    ofdm_set_timing_range(ofdm, WIDE_TIMING);
-                }
-                else {
-                    ofdm_set_timing_range(ofdm, NARROW_TIMING);
-                }
-            }
-        }
-        #endif
         
         if (verbose >= 2) {
            fprintf(stderr, "%3d nin: %4d st: %-6s euw: %2d %1d f: %5.1f pbw: %d eraw: %3d ecdd: %3d iter: %3d pcc: %3d\n",

@@ -111,8 +111,7 @@ int main(int argc, char *argv[]) {
     int Npackets = 0;
     int Nsec = 0;
 
-    /* sets the default modem config */
-    /* set up custom config for ofdm_create() ..... */
+    /* set up the default modem config */
     struct OFDM_CONFIG *ofdm_config = (struct OFDM_CONFIG *) calloc(1, sizeof (struct OFDM_CONFIG));
     assert(ofdm_config != NULL);
     ofdm_init_mode("700D", ofdm_config);
