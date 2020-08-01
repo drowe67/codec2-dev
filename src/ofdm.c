@@ -299,6 +299,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     ofdm->aphase_est_pilot_log = MALLOC(sizeof (float) * (ofdm->rowsperframe * ofdm->nc));
     assert(ofdm->aphase_est_pilot_log != NULL);
 
+    /* set up Unique Word */
     ofdm->tx_uw = MALLOC(sizeof (uint8_t) * ofdm->nuwbits);
     assert(ofdm->tx_uw != NULL);
 
@@ -368,10 +369,9 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     ofdm->foff_metric = 0.0f;
 
     /*
-     * Unique Word symbol placement, designed to get no false syncs at any
-     * freq offset.  Use ofdm_dev.m, debug_false_sync() to test.  Note we
-     * need to pair the UW bits so they fit into symbols.  The LDPC decoder
-     * works on symbols so we can't break up any symbols into UW/LDPC bits.
+     * Unique Word symbol placement.  Note we need to group the UW
+     * bits so they fit into symbols.  The LDPC decoder works on
+     * symbols so we can't break up any symbols into UW/payload bits.
      */
     ofdm->uw_ind = MALLOC(sizeof (int) * ofdm->nuwbits);
     assert(ofdm->uw_ind != NULL);
@@ -1924,7 +1924,7 @@ void ofdm_assemble_qpsk_modem_packet_symbols(struct OFDM *ofdm, complex float mo
  * Disassemble a received packet of symbols into UW bits and payload data symbols
  */
 void ofdm_disassemble_qpsk_modem_packet(struct OFDM *ofdm, complex float rx_syms[], float rx_amps[],
-                                        uint8_t rx_uw[], COMP codeword_syms[], float codeword_amps[], short txt_bits[])
+                                        COMP codeword_syms[], float codeword_amps[], short txt_bits[])
 {
     complex float *codeword = (complex float *) &codeword_syms[0]; // complex has same memory layout
     int Nsymsperpacket = ofdm->bitsperpacket / ofdm->bps;
@@ -1936,14 +1936,10 @@ void ofdm_disassemble_qpsk_modem_packet(struct OFDM *ofdm, complex float rx_syms
     int p = 0;
     int u = 0;
 
-    assert(ofdm->bps == 2);  /* this only works for QPSK at this stage (e.g. UW demod) */
+    assert(ofdm->bps == 2);  /* this only works for QPSK at this stage */
     
     for (s = 0; s < (Nsymsperpacket - Ntxtsyms); s++) {
         if ((u < Nuwsyms) && (s == ofdm->uw_ind_sym[u])) {
-            qpsk_demod(rx_syms[s], dibit);
-
-            rx_uw[2 * u    ] = dibit[1];
-            rx_uw[2 * u + 1] = dibit[0];
             u++;
         } else {
             codeword[p] = rx_syms[s];
@@ -1966,8 +1962,7 @@ void ofdm_disassemble_qpsk_modem_packet(struct OFDM *ofdm, complex float rx_syms
 }
 
 /*
- * extract just the UW from the first few frames of a packet, to check UW
- * during acquisition.
+ * Extract just the UW from the packet
  */
 void ofdm_extract_uw(struct OFDM *ofdm, complex float rx_syms[], float rx_amps[], uint8_t rx_uw[]) {
     int Nsymsperframe = ofdm->bitsperframe / ofdm->bps;
@@ -2004,15 +1999,15 @@ void ofdm_rand(uint16_t r[], int n) {
     }
 }
 
-void ofdm_generate_payload_data_bits(uint8_t payload_data_bits[], int data_bits_per_frame) {
-    uint16_t r[data_bits_per_frame];
+void ofdm_generate_payload_data_bits(uint8_t payload_data_bits[], int n) {
+    uint16_t r[n];
     int i;
 
     /* construct payload data bits */
 
-    ofdm_rand(r, data_bits_per_frame);
+    ofdm_rand(r, n);
 
-    for (i = 0; i < data_bits_per_frame; i++) {
+    for (i = 0; i < n; i++) {
         payload_data_bits[i] = r[i] > 16384;
     }
 }

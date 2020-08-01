@@ -391,8 +391,9 @@ int freedv_comp_short_rx_700d(struct freedv *f, void *demod_in_8kHz, int demod_i
             ofdm_demod_shorts(ofdm, rx_bits, (short*)demod_in_8kHz, new_gain);
         else
             ofdm_demod(ofdm, rx_bits, (COMP*)demod_in_8kHz);
-            
-        ofdm_disassemble_qpsk_modem_packet(ofdm, ofdm->rx_np, ofdm->rx_amp, rx_uw, payload_syms, payload_amps, txt_bits);
+
+        ofdm_extract_uw(ofdm, ofdm->rx_np, ofdm->rx_amp, rx_uw);
+        ofdm_disassemble_qpsk_modem_packet(ofdm, ofdm->rx_np, ofdm->rx_amp, payload_syms, payload_amps, txt_bits);
 
         f->sync = 1;
         ofdm_get_demod_stats(f->ofdm, &f->stats);

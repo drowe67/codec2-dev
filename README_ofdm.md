@@ -36,7 +36,7 @@ Built as part of codec2-dev, see [README](README.md) for build instructions.
    
 1. Generate 10 seconds of uncoded test frame bits, modulate, demodulate, count errors:
    ```
-   $  build_linux/src$ ./ofdm_mod --in /dev/zero --testframes 10 | ./ofdm_demod --in /dev/null --testframes --log demod_dump.txt
+   $  build_linux/src$ ./ofdm_mod --in /dev/zero --testframes 10 | ./ofdm_demod --out /dev/null --testframes --verbose 1
    ```   
    Use Octave to look at plots of C modem operation:
    ```

@@ -49,7 +49,7 @@
 
 #define IS_DIR_SEPARATOR(c)     ((c) == '/')
 
-#define NFRAMES  100               /* just log the first 100 frames          */
+#define NFRAMES  100               /* just log the first 100 frames           */
 #define NDISCARD 20                /* BER2 measure discards first 20 frames   */
 #define FS       8000.0f
 
@@ -386,7 +386,9 @@ int main(int argc, char *argv[]) {
     int Nmaxsamperframe = ofdm_get_max_samples_per_frame(ofdm);
     // TODO: these constants come up a lot so might be best placed in ofdm_create()
     int Npayloadbitsperframe = ofdm_bitsperframe - ofdm_nuwbits - ofdm_ntxtbits;
+    int Npayloadbitsperpacket = Nbitsperpacket - ofdm_nuwbits - ofdm_ntxtbits;
     int Npayloadsymsperframe = Npayloadbitsperframe/ofdm_config->bps;
+    int Npayloadsymsperpacket = Npayloadbitsperpacket/ofdm_config->bps;
 
     complex float rx_syms[Nsymsperpacket]; float rx_amps[Nsymsperpacket];
     for(int i=0; i<Nsymsperpacket; i++) {
@@ -401,9 +403,9 @@ int main(int argc, char *argv[]) {
     uint8_t rx_bits_char[Nbitsperframe];
     uint8_t rx_uw[ofdm_nuwbits];
     short txt_bits[ofdm_ntxtbits];
-    int Nerrs, Terrs, Tbits, Terrs2, Tbits2, Terrs_coded, Tbits_coded, frame_count;
+    int Nerrs, Terrs, Tbits, Terrs2, Tbits2, Terrs_coded, Tbits_coded, frame_count, packet_count;
 
-    Nerrs = Terrs = Tbits = Terrs2 = Tbits2 = Terrs_coded = Tbits_coded = frame_count = 0;
+    Nerrs = Terrs = Tbits = Terrs2 = Tbits2 = Terrs_coded = Tbits_coded = frame_count = packet_count = 0;
 
     float EsNo = 3.0f;
     float snr_est_smoothed_dB = 0.0f;
@@ -411,13 +413,13 @@ int main(int argc, char *argv[]) {
     if (verbose == 2)
         fprintf(stderr, "Warning EsNo: %f hard coded\n", EsNo);
 
-    COMP payload_syms[Npayloadsymsperframe];
-    COMP codeword_symbols[Npayloadsymsperframe];
+    COMP payload_syms[Npayloadsymsperpacket];
+    COMP codeword_symbols[Npayloadsymsperpacket];
 
-    float payload_amps[Npayloadsymsperframe];
-    float codeword_amps[Npayloadsymsperframe];
+    float payload_amps[Npayloadsymsperpacket];
+    float codeword_amps[Npayloadsymsperpacket];
 
-    for (i = 0; i < Npayloadsymsperframe; i++) {
+    for (i = 0; i < Npayloadsymsperpacket; i++) {
         codeword_symbols[i].real = 0.0f;
         codeword_symbols[i].imag = 0.0f;
         codeword_amps[i] = 0.0f;
@@ -444,6 +446,7 @@ int main(int argc, char *argv[]) {
         int offset = start_secs*FS*sizeof(short);
         fseek(fin, offset, SEEK_SET);
     }
+    int uwc;
     
     while ((fread(rx_scaled, sizeof (short), nin_frame, fin) == nin_frame) && !finish) {
 
@@ -468,17 +471,26 @@ int main(int argc, char *argv[]) {
             
             int st_uw = Nsymsperpacket - ofdm->nuwframes*Nsymsperframe;
             ofdm_extract_uw(ofdm, &rx_syms[st_uw], &rx_amps[st_uw], rx_uw);
+            /*
+              for(int i=0; i<ofdm->nuwbits; i++) fprintf(stderr,"%d ", ofdm->tx_uw[i]);
+            fprintf(stderr,"    ");
+            for(int i=0; i<ofdm->nuwbits; i++) fprintf(stderr,"%d ", rx_uw[i]);
+            fprintf(stderr,"\n");
+            */
             log_payload_syms = true;
 
             /* SNR estimation and smoothing */
             float snr_est_dB = 10.0f * log10f((ofdm->sig_var / ofdm->noise_var) * ofdm_config->nc * ofdm_config->rs / 3000.0f);
             snr_est_smoothed_dB = 0.9f * snr_est_smoothed_dB + 0.1f * snr_est_dB;
 
+            uwc=0;
+            for(int i=0; i<ofdm->nuwbits; i++) uwc += rx_uw[i] ^ ofdm->tx_uw[i];
             if (ofdm->modem_frame == (ofdm->np-1)) {
+                
                 /* we have received enough frames to make a complete packet .... */
 
                 /* extract payload symbols from packet */
-                ofdm_disassemble_qpsk_modem_packet(ofdm, rx_syms, rx_amps, rx_uw, payload_syms, payload_amps, txt_bits);
+                ofdm_disassemble_qpsk_modem_packet(ofdm, rx_syms, rx_amps, payload_syms, payload_amps, txt_bits);
 
                 if (ldpc_en) {
 
@@ -573,16 +585,24 @@ int main(int argc, char *argv[]) {
                     for (i = 0; i < Npayloadbits; i++) payload_bits[i] = r[i] > 16384;
                     uint8_t txt_bits[ofdm_ntxtbits]; memset(txt_bits, 0, ofdm_ntxtbits);
                     ofdm_assemble_qpsk_modem_packet(ofdm, tx_bits, payload_bits, txt_bits);
-
+                    int rx_bits[Nbitsperpacket];
+                    assert(ofdm->bps == 2);  /* this only works for QPSK at this stage */
+                    int dibit[2];
+                    for(int s=0; s<Npayloadsymsperpacket; s++) {
+                        qpsk_demod(rx_syms[s], dibit);
+                        rx_bits[2*s  ] = dibit[1];
+                        rx_bits[2*s+1] = dibit[0];
+                    }
                     for (Nerrs=0, i = 0; i < Nbitsperpacket; i++) if (tx_bits[i] != rx_bits[i]) Nerrs++;
                     Terrs += Nerrs;
                     Tbits += Nbitsperpacket;
 
-                    if (frame_count >= NDISCARD) {
+                    if (packet_count >= NDISCARD) {
                         Terrs2 += Nerrs;
                         Tbits2 += Nbitsperpacket;
                     }
                 }
+                packet_count++;
             }
         
             frame_count++;
@@ -606,17 +626,19 @@ int main(int argc, char *argv[]) {
         /* act on any events returned by state machine */
 
         if (ofdm->sync_start == true) {
-            Terrs = Tbits = Terrs2 = Tbits2 = Terrs_coded = Tbits_coded = frame_count = 0;
+            Terrs = Tbits = Terrs2 = Tbits2 = Terrs_coded = Tbits_coded = frame_count = packet_count = 0;
             Nerrs_raw = 0;
             Nerrs_coded = 0;
         }
         
         if (verbose >= 2) {
-           fprintf(stderr, "%3d nin: %4d st: %-6s euw: %2d %1d f: %5.1f pbw: %d eraw: %3d ecdd: %3d iter: %3d pcc: %3d\n",
+           fprintf(stderr, "%3d nin: %4d st: %-6s euw: %2d %1d %1d mf: %2d f: %5.1f pbw: %d eraw: %3d ecdd: %3d iter: %3d pcc: %3d\n",
                     f, nin_frame, 
                     statemode[ofdm->last_sync_state],
                     ofdm->uw_errors,
+                    uwc,
                     ofdm->sync_counter,
+                    ofdm->modem_frame,
                     ofdm->foff_est_hz,
                     ofdm->phase_est_bandwidth,
                     Nerrs_raw, Nerrs_coded, iter, parityCheckCount);
@@ -714,7 +736,7 @@ int main(int argc, char *argv[]) {
         if (verbose != 0) {
             fprintf(stderr, "BER......: %5.4f Tbits: %5d Terrs: %5d\n", uncoded_ber, Tbits, Terrs);
 
-            if ((ldpc_en == 0) && (frame_count > NDISCARD)) {
+            if ((ldpc_en == 0) && (packet_count > NDISCARD)) {
                 fprintf(stderr, "BER2.....: %5.4f Tbits: %5d Terrs: %5d\n", (float) Terrs2 / Tbits2, Tbits2, Terrs2);
             }
         }
