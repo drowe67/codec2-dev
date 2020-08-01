@@ -412,7 +412,8 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     ofdm->sync_start = false;
     ofdm->sync_end = false;
     ofdm->sync_mode = autosync;
-
+    ofdm->modem_frame = 0;
+    
     /* create the OFDM pilot time-domain waveform */
 
     complex float *temp = MALLOC(sizeof (complex float) * ofdm->m);

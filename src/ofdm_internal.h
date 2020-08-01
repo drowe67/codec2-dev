@@ -191,7 +191,7 @@ struct OFDM {
     int uw_errors;
     int sync_counter;
     int frame_count;
-    int modem_frame;
+    int modem_frame; /* increments for every modem frame in packet */
 
     // Boolean
     bool sync_start;

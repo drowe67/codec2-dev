@@ -466,123 +466,125 @@ int main(int argc, char *argv[]) {
             memcpy(&rx_syms[Nsymsperpacket-Nsymsperframe], ofdm->rx_np, sizeof(complex float)*Nsymsperframe);
             memcpy(&rx_amps[Nsymsperpacket-Nsymsperframe], ofdm->rx_amp, sizeof(float)*Nsymsperframe);
             
-            ofdm_disassemble_qpsk_modem_packet(ofdm, rx_syms, rx_amps, rx_uw, payload_syms, payload_amps, txt_bits);
             int st_uw = Nsymsperpacket - ofdm->nuwframes*Nsymsperframe;
             ofdm_extract_uw(ofdm, &rx_syms[st_uw], &rx_amps[st_uw], rx_uw);
             log_payload_syms = true;
 
             /* SNR estimation and smoothing */
-
-            float snr_est_dB = 10.0f *
-                    log10f((ofdm->sig_var / ofdm->noise_var) *
-                    ofdm_config->nc * ofdm_config->rs / 3000.0f);
-
+            float snr_est_dB = 10.0f * log10f((ofdm->sig_var / ofdm->noise_var) * ofdm_config->nc * ofdm_config->rs / 3000.0f);
             snr_est_smoothed_dB = 0.9f * snr_est_smoothed_dB + 0.1f * snr_est_dB;
 
-            if (ldpc_en) {
+            if (ofdm->modem_frame == (ofdm->np-1)) {
+                /* we have received enough frames to make a complete packet .... */
 
-                /* first few symbols are used for UW and txt bits, find start of (224,112) LDPC codeword
-                   and extract QPSK symbols and amplitude estimates */
+                /* extract payload symbols from packet */
+                ofdm_disassemble_qpsk_modem_packet(ofdm, rx_syms, rx_amps, rx_uw, payload_syms, payload_amps, txt_bits);
 
-                assert((ofdm_nuwbits + ofdm_ntxtbits + coded_bits_per_frame) <= ofdm_bitsperframe);
+                if (ldpc_en) {
 
-                /* newest symbols at end of buffer (uses final i from last loop) */
+                    /* first few symbols are used for UW and txt bits, find start of (224,112) LDPC codeword
+                       and extract QPSK symbols and amplitude estimates */
 
-                for (i = 0; i < coded_syms_per_frame; i++) {
-                    codeword_symbols[i] = payload_syms[i];
-                    codeword_amps[i] = payload_amps[i];
-                }
+                    assert((ofdm_nuwbits + ofdm_ntxtbits + coded_bits_per_frame) <= ofdm_bitsperframe);
 
-                /* run de-interleaver */
+                    /* newest symbols at end of buffer (uses final i from last loop) */
 
-                COMP codeword_symbols_de[coded_syms_per_frame];
-                float codeword_amps_de[coded_syms_per_frame];
+                    for (i = 0; i < coded_syms_per_frame; i++) {
+                        codeword_symbols[i] = payload_syms[i];
+                        codeword_amps[i] = payload_amps[i];
+                    }
 
-                gp_deinterleave_comp(codeword_symbols_de, codeword_symbols, coded_syms_per_frame);
-                gp_deinterleave_float(codeword_amps_de, codeword_amps, coded_syms_per_frame);
+                    /* run de-interleaver */
 
-                float llr[coded_bits_per_frame];
+                    COMP codeword_symbols_de[coded_syms_per_frame];
+                    float codeword_amps_de[coded_syms_per_frame];
 
-                uint8_t out_char[coded_bits_per_frame];
+                    gp_deinterleave_comp(codeword_symbols_de, codeword_symbols, coded_syms_per_frame);
+                    gp_deinterleave_float(codeword_amps_de, codeword_amps, coded_syms_per_frame);
 
-                if (testframes == true) {
-                    Terrs += count_uncoded_errors(&ldpc, ofdm_config, &Nerrs_raw, codeword_symbols_de);
-                    Tbits += coded_bits_per_frame; /* not counting errors in txt bits */
-                }
+                    float llr[coded_bits_per_frame];
 
-                symbols_to_llrs(llr, codeword_symbols_de, codeword_amps_de,
-                                EsNo, ofdm->mean_amp, coded_syms_per_frame);
+                    uint8_t out_char[coded_bits_per_frame];
+
+                    if (testframes == true) {
+                        Terrs += count_uncoded_errors(&ldpc, ofdm_config, &Nerrs_raw, codeword_symbols_de);
+                        Tbits += coded_bits_per_frame; /* not counting errors in txt bits */
+                    }
+
+                    symbols_to_llrs(llr, codeword_symbols_de, codeword_amps_de,
+                                    EsNo, ofdm->mean_amp, coded_syms_per_frame);
                     
-                if (ldpc.data_bits_per_frame == ldpc.ldpc_data_bits_per_frame) {
-                    /* all data bits in code word used */
-                    iter = run_ldpc_decoder(&ldpc, out_char, llr, &parityCheckCount);
-                } else {
-                    /* some unused data bits, set these to known values to strengthen code */
-                    float llr_full_codeword[ldpc.ldpc_coded_bits_per_frame];
-                    int unused_data_bits = ldpc.ldpc_data_bits_per_frame - ldpc.data_bits_per_frame;
+                    if (ldpc.data_bits_per_frame == ldpc.ldpc_data_bits_per_frame) {
+                        /* all data bits in code word used */
+                        iter = run_ldpc_decoder(&ldpc, out_char, llr, &parityCheckCount);
+                    } else {
+                        /* some unused data bits, set these to known values to strengthen code */
+                        float llr_full_codeword[ldpc.ldpc_coded_bits_per_frame];
+                        int unused_data_bits = ldpc.ldpc_data_bits_per_frame - ldpc.data_bits_per_frame;
 
-                    // received data bits
-                    for (i = 0; i < ldpc.data_bits_per_frame; i++)
-                        llr_full_codeword[i] = llr[i];
-                    // known bits ... so really likely
-                    for (i = ldpc.data_bits_per_frame; i < ldpc.ldpc_data_bits_per_frame; i++)
-                        llr_full_codeword[i] = -100.0;
-                    // parity bits at end
-                    for (i = ldpc.ldpc_data_bits_per_frame; i < ldpc.ldpc_coded_bits_per_frame; i++)
-                        llr_full_codeword[i] = llr[i - unused_data_bits];
+                        // received data bits
+                        for (i = 0; i < ldpc.data_bits_per_frame; i++)
+                            llr_full_codeword[i] = llr[i];
+                        // known bits ... so really likely
+                        for (i = ldpc.data_bits_per_frame; i < ldpc.ldpc_data_bits_per_frame; i++)
+                            llr_full_codeword[i] = -100.0;
+                        // parity bits at end
+                        for (i = ldpc.ldpc_data_bits_per_frame; i < ldpc.ldpc_coded_bits_per_frame; i++)
+                            llr_full_codeword[i] = llr[i - unused_data_bits];
                         
-                    iter = run_ldpc_decoder(&ldpc, out_char, llr_full_codeword, &parityCheckCount);
+                        iter = run_ldpc_decoder(&ldpc, out_char, llr_full_codeword, &parityCheckCount);
+                    }
+
+                    if (testframes == true) {
+                        /* construct payload data bits */
+
+                        uint8_t payload_data_bits[data_bits_per_frame];
+                        ofdm_generate_payload_data_bits(payload_data_bits, data_bits_per_frame);
+
+                        Nerrs_coded = count_errors(payload_data_bits, out_char, data_bits_per_frame);
+                        Terrs_coded += Nerrs_coded;
+                        Tbits_coded += data_bits_per_frame;
+                    }
+
+                    fwrite(out_char, sizeof (char), data_bits_per_frame, fout);
+                } else {
+                    /* simple hard decision output for uncoded testing, all bits in frame dumped inlcuding UW and txt */
+
+                    for (i = 0; i < Nbitsperpacket; i++) {
+                        rx_bits_char[i] = rx_bits[i];
+                    }
+
+                    fwrite(rx_bits_char, sizeof (uint8_t), Nbitsperpacket, fout);
                 }
 
-                if (testframes == true) {
-                    /* construct payload data bits */
+                /* optional error counting on uncoded data in non-LDPC testframe mode */
 
-                    uint8_t payload_data_bits[data_bits_per_frame];
-                    ofdm_generate_payload_data_bits(payload_data_bits, data_bits_per_frame);
+                if ((testframes == true) && (ldpc_en ==0)) {
+                    /* build up a test frame consisting of unique word, txt bits, and psuedo-random
+                       uncoded payload bits.  The psuedo-random generator is the same as Octave so
+                       it can interoperate with ofdm_tx.m/ofdm_rx.m */
 
-                    Nerrs_coded = count_errors(payload_data_bits, out_char, data_bits_per_frame);
-                    Terrs_coded += Nerrs_coded;
-                    Tbits_coded += data_bits_per_frame;
+                    int Npayloadbits = Nbitsperpacket - (ofdm_nuwbits + ofdm_ntxtbits);
+                    uint16_t r[Npayloadbits];
+                    uint8_t payload_bits[Npayloadbits];
+                    uint8_t tx_bits[Npayloadbits];
+
+                    ofdm_rand(r, Npayloadbits);
+                    for (i = 0; i < Npayloadbits; i++) payload_bits[i] = r[i] > 16384;
+                    uint8_t txt_bits[ofdm_ntxtbits]; memset(txt_bits, 0, ofdm_ntxtbits);
+                    ofdm_assemble_qpsk_modem_packet(ofdm, tx_bits, payload_bits, txt_bits);
+
+                    for (Nerrs=0, i = 0; i < Nbitsperpacket; i++) if (tx_bits[i] != rx_bits[i]) Nerrs++;
+                    Terrs += Nerrs;
+                    Tbits += Nbitsperpacket;
+
+                    if (frame_count >= NDISCARD) {
+                        Terrs2 += Nerrs;
+                        Tbits2 += Nbitsperpacket;
+                    }
                 }
-
-                fwrite(out_char, sizeof (char), data_bits_per_frame, fout);
-            } else {
-                /* simple hard decision output for uncoded testing, all bits in frame dumped inlcuding UW and txt */
-
-                for (i = 0; i < Nbitsperpacket; i++) {
-                    rx_bits_char[i] = rx_bits[i];
-                }
-
-                fwrite(rx_bits_char, sizeof (uint8_t), Nbitsperpacket, fout);
             }
-
-            /* optional error counting on uncoded data in non-LDPC testframe mode */
-
-            if ((testframes == true) && (ldpc_en ==0)) {
-                /* build up a test frame consisting of unique word, txt bits, and psuedo-random
-                   uncoded payload bits.  The psuedo-random generator is the same as Octave so
-                   it can interoperate with ofdm_tx.m/ofdm_rx.m */
-
-                int Npayloadbits = Nbitsperpacket - (ofdm_nuwbits + ofdm_ntxtbits);
-                uint16_t r[Npayloadbits];
-                uint8_t payload_bits[Npayloadbits];
-                uint8_t tx_bits[Npayloadbits];
-
-                ofdm_rand(r, Npayloadbits);
-                for (i = 0; i < Npayloadbits; i++) payload_bits[i] = r[i] > 16384;
-                uint8_t txt_bits[ofdm_ntxtbits]; memset(txt_bits, 0, ofdm_ntxtbits);
-                ofdm_assemble_qpsk_modem_packet(ofdm, tx_bits, payload_bits, txt_bits);
-
-                for (Nerrs=0, i = 0; i < Nbitsperpacket; i++) if (tx_bits[i] != rx_bits[i]) Nerrs++;
-                Terrs += Nerrs;
-                Tbits += Nbitsperpacket;
-
-                if (frame_count >= NDISCARD) {
-                    Terrs2 += Nerrs;
-                    Tbits2 += Nbitsperpacket;
-                }
-            }
-
+        
             frame_count++;
         }
 
