@@ -407,8 +407,10 @@ int main(int argc, char *argv[]) {
     int iter = 0;
     int parityCheckCount = 0;
 
-    if (ofdm->state_machine == 1) Ndiscard = NDISCARD; /* backwards compatability with 700D/2020        */
-    if (ofdm->state_machine == 2) Ndiscard = 1;        /* much longer packets, so discrd thresh smaller */
+    if (ofdm->data_mode == 0)
+        Ndiscard = NDISCARD; /* backwards compatability with 700D/2020        */
+    else
+        Ndiscard = 1;        /* much longer packets, so discrd thresh smaller */
 
     float EsNo = 3.0f;
     float snr_est_smoothed_dB = 0.0f;
@@ -615,16 +617,10 @@ int main(int argc, char *argv[]) {
         
         nin_frame = ofdm_get_nin(ofdm);
         
-        switch(ofdm->state_machine) {
-        case 1:
+        if (ofdm->data_mode == 0)
             ofdm_sync_state_machine(ofdm, rx_uw);
-            break;
-        case 2:
+        else
             ofdm_sync_state_machine2(ofdm, rx_uw);
-            break;
-        default:
-            assert(0);
-        }
         
         /* act on any events returned by state machine */
 

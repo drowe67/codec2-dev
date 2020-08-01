@@ -33,7 +33,7 @@ void ofdm_init_mode(char mode[], struct OFDM_CONFIG *config) {
     config->bad_uw_errors = 3;
     config->ftwindowwidth = 11;
     config->timing_mx_thresh = 0.30f;
-    config->state_machine = 1;
+    config->data_mode = 0;
     
     if (strcmp(mode,"700D") == 0) {   
     } else if (strcmp(mode,"2020") == 0) {
@@ -41,19 +41,19 @@ void ofdm_init_mode(char mode[], struct OFDM_CONFIG *config) {
     } else if (strcmp(mode,"qam16") == 0) {
         config->ns=5; config->np=5; config->tcp = 0.004; config->ts = 0.016; config->nc = 33;
         config->bps=4; config->txtbits = 0; config->nuwbits = 15*4; config->bad_uw_errors = 5;
-        config->ftwindowwidth = 32;
+        config->ftwindowwidth = 32; config->data_mode = 1;
     } else if (strcmp(mode,"datac1") == 0) {
         config->ns=5; config->np=18; config->tcp = 0.006; config->ts = 0.016; config-> nc = 18;
         config->txtbits = 0; config->nuwbits = 12; config->bad_uw_errors = 2;
-        config->ftwindowwidth = 32; config->state_machine = 2;
+        config->ftwindowwidth = 32; config->data_mode = 1;
     } else if (strcmp(mode,"datac2") == 0) {
         config->ns=5; config->np=36; config->tcp = 0.006; config->ts = 0.016; config->nc = 9;
         config->txtbits = 0; config->nuwbits = 12; config->bad_uw_errors = 1;
-        config->ftwindowwidth = 32; config->state_machine = 2;
+        config->ftwindowwidth = 32; config->data_mode = 1;
     } else if (strcmp(mode,"datac3") == 0) {
         config->ns=5; config->np=11; config->tcp = 0.006; config->ts = 0.016; config->nc = 9;
         config->txtbits = 0; config->nuwbits = 24; config->bad_uw_errors = 5;
-        config->ftwindowwidth = 32; config->timing_mx_thresh = 0.30; config->state_machine = 2;
+        config->ftwindowwidth = 32; config->timing_mx_thresh = 0.30; config->data_mode = 1;
         /* TODO config->tx_uw = [1 1 0 0  1 0 1 0  1 1 1 1  0 0 0 0  1 1 1 1  0 0 0 0]; */
     }
     else {
