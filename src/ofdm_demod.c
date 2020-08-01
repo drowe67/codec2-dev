@@ -377,13 +377,23 @@ int main(int argc, char *argv[]) {
     int iter = 0;
     int parityCheckCount = 0;
 
+    /* some useful constants */
+    
     int Nbitsperframe = ofdm_bitsperframe;
     int Nbitsperpacket = ofdm_get_bits_per_packet(ofdm);
+    int Nsymsperframe = Nbitsperframe / ofdm_config->bps;
+    int Nsymsperpacket = Nbitsperpacket / ofdm_config->bps;
     int Nmaxsamperframe = ofdm_get_max_samples_per_frame(ofdm);
     // TODO: these constants come up a lot so might be best placed in ofdm_create()
     int Npayloadbitsperframe = ofdm_bitsperframe - ofdm_nuwbits - ofdm_ntxtbits;
     int Npayloadsymsperframe = Npayloadbitsperframe/ofdm_config->bps;
 
+    complex float rx_syms[Nsymsperpacket]; float rx_amps[Nsymsperpacket];
+    for(int i=0; i<Nsymsperpacket; i++) {
+        rx_syms[i] = 0.0;
+        rx_amps[i]= 0.0;
+    }
+    
     if (ldpc_en) assert(Npayloadsymsperframe >= coded_syms_per_frame);
 
     short rx_scaled[Nmaxsamperframe];
@@ -447,7 +457,16 @@ int main(int argc, char *argv[]) {
 
         if ((ofdm->sync_state == synced) || (ofdm->sync_state == trial)) {
             ofdm_demod_shorts(ofdm, rx_bits, rx_scaled, (OFDM_AMP_SCALE / 2.0f));
-            ofdm_disassemble_qpsk_modem_packet(ofdm, rx_uw, payload_syms, payload_amps, txt_bits);
+
+            /* accumulate a buffer of data symbols for this packet */
+            for(i=0; i<Nsymsperpacket-Nsymsperframe; i++) {
+                rx_syms[i] = rx_syms[i+Nsymsperframe];
+                rx_amps[i] = rx_amps[i+Nsymsperframe];
+            }
+            memcpy(&rx_syms[Nsymsperpacket-Nsymsperframe], ofdm->rx_np, sizeof(complex float)*Nsymsperframe);
+            memcpy(&rx_amps[Nsymsperpacket-Nsymsperframe], ofdm->rx_amp, sizeof(float)*Nsymsperframe);
+            
+            ofdm_disassemble_qpsk_modem_packet(ofdm, ofdm->rx_np, ofdm->rx_amp, rx_uw, payload_syms, payload_amps, txt_bits);
             log_payload_syms = true;
 
             /* SNR estimation and smoothing */

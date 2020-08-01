@@ -1884,15 +1884,17 @@ void ofdm_assemble_qpsk_modem_packet(struct OFDM *ofdm, uint8_t modem_frame[],
 void ofdm_assemble_qpsk_modem_packet_symbols(struct OFDM *ofdm, complex float modem_packet[],
   COMP payload_syms[], uint8_t txt_bits[]) {
     complex float *payload = (complex float *) &payload_syms[0]; // complex has same memory layout
-    int Nsymsperpacket = ofdm->bitsperpacket / 2;
-    int Nuwsyms = ofdm->nuwbits / 2;
-    int Ntxtsyms = ofdm->ntxtbits / 2;
+    int Nsymsperpacket = ofdm->bitsperpacket / ofdm->bps;
+    int Nuwsyms = ofdm->nuwbits / ofdm->bps;
+    int Ntxtsyms = ofdm->ntxtbits / ofdm->bps;
     int dibit[2];
     int s, t;
 
     int p = 0;
     int u = 0;
 
+    assert(ofdm->bps == 2);  /* this only works for QPSK at this stage (e.g. modem packet mod) */
+    
     for (s = 0; s < (Nsymsperpacket - Ntxtsyms); s++) {
         if ((u < Nuwsyms) && (s == ofdm->uw_ind_sym[u])) {
             modem_packet[s] = ofdm->tx_uw_syms[u++];
@@ -1916,28 +1918,31 @@ void ofdm_assemble_qpsk_modem_packet_symbols(struct OFDM *ofdm, complex float mo
 /*
  * Disassemble a received packet of symbols into UW bits and payload data symbols
  */
-void ofdm_disassemble_qpsk_modem_packet(struct OFDM *ofdm, uint8_t rx_uw[],
-  COMP codeword_syms[], float codeword_amps[], short txt_bits[]) {
+void ofdm_disassemble_qpsk_modem_packet(struct OFDM *ofdm, complex float rx_syms[], float rx_amps[],
+                                        uint8_t rx_uw[], COMP codeword_syms[], float codeword_amps[], short txt_bits[])
+{
     complex float *codeword = (complex float *) &codeword_syms[0]; // complex has same memory layout
-    int Nsymsperpacket = ofdm->bitsperpacket / 2;
-    int Nuwsyms = ofdm->nuwbits / 2;
-    int Ntxtsyms = ofdm->ntxtbits / 2;
+    int Nsymsperpacket = ofdm->bitsperpacket / ofdm->bps;
+    int Nuwsyms = ofdm->nuwbits / ofdm->bps;
+    int Ntxtsyms = ofdm->ntxtbits / ofdm->bps;
     int dibit[2];
     int s, t;
 
     int p = 0;
     int u = 0;
 
+    assert(ofdm->bps == 2);  /* this only works for QPSK at this stage (e.g. UW demod) */
+    
     for (s = 0; s < (Nsymsperpacket - Ntxtsyms); s++) {
         if ((u < Nuwsyms) && (s == ofdm->uw_ind_sym[u])) {
-            qpsk_demod(ofdm->rx_np[s], dibit);
+            qpsk_demod(rx_syms[s], dibit);
 
             rx_uw[2 * u    ] = dibit[1];
             rx_uw[2 * u + 1] = dibit[0];
             u++;
         } else {
-            codeword[p] = ofdm->rx_np[s];
-            codeword_amps[p] = ofdm->rx_amp[s];
+            codeword[p] = rx_syms[s];
+            codeword_amps[p] = rx_amps[s];
             p++;
         }
     }
@@ -1946,7 +1951,7 @@ void ofdm_disassemble_qpsk_modem_packet(struct OFDM *ofdm, uint8_t rx_uw[],
     assert(p == (Nsymsperpacket - Nuwsyms - Ntxtsyms));
 
     for (t = 0; s < Nsymsperpacket; s++, t += 2) {
-        qpsk_demod(ofdm->rx_np[s], dibit);
+        qpsk_demod(rx_syms[s], dibit);
 
         txt_bits[t    ] = dibit[1];
         txt_bits[t + 1] = dibit[0];
