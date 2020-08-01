@@ -409,13 +409,18 @@ endif()
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/unittest
              )
 
-    # First data mode, C Tx to Octave Rx
-    add_test(NAME test_OFDM_modem_datac1
+    # Data mode tests
+    add_test(NAME test_OFDM_modem_datac1_octave
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR};
                             ./src/ofdm_mod --mode datac1 --in /dev/zero --testframes 5 --verbose 1 > test.raw;
                             cd ${CMAKE_CURRENT_SOURCE_DIR}/octave;
                             DISPLAY=\"\" octave-cli -qf --eval 'ofdm_rx(\"${CMAKE_CURRENT_BINARY_DIR}/test.raw\",\"datac1\")'")
-             set_tests_properties(test_OFDM_modem_datac1 PROPERTIES PASS_REGULAR_EXPRESSION "BER..: 0.0000")
+             set_tests_properties(test_OFDM_modem_datac1_octave PROPERTIES PASS_REGULAR_EXPRESSION "BER..: 0.0000")
+    add_test(NAME test_OFDM_modem_datac1
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR};
+                            ./src/ofdm_mod --mode datac1 --in /dev/zero --testframes 5 --verbose 1 |
+                            ./src/ofdm_demod --mode datac1 --out /dev/null --testframes --verbose 2")
+             set_tests_properties(test_OFDM_modem_datac1 PROPERTIES PASS_REGULAR_EXPRESSION "BER......: 0.0000")
            
     # tests ldpc_enc/ldpc_noise/ldpc_dec
     add_test(NAME test_ldpc_enc_dec

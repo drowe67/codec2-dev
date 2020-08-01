@@ -563,7 +563,7 @@ int main(int argc, char *argv[]) {
 
                     fwrite(out_char, sizeof (char), data_bits_per_frame, fout);
                 } else {
-                    /* simple hard decision output for uncoded testing, all bits in frame dumped inlcuding UW and txt */
+                    /* simple hard decision output for uncoded testing, all bits in frame dumped including UW and txt */
 
                     for (i = 0; i < Nbitsperpacket; i++) {
                         rx_bits_char[i] = rx_bits[i];
@@ -730,7 +730,8 @@ int main(int argc, char *argv[]) {
     
     if (testframes == true) {
         float uncoded_ber = (float) Terrs / Tbits;
-
+        float coded_ber = 0.0;
+        
         if (verbose != 0) {
             fprintf(stderr, "BER......: %5.4f Tbits: %5d Terrs: %5d Tpackets: %5d\n", uncoded_ber, Tbits, Terrs, packet_count);
 
@@ -740,16 +741,16 @@ int main(int argc, char *argv[]) {
         }
 
         if (ldpc_en) {
-            float coded_ber = (float) Terrs_coded / Tbits_coded;
+            coded_ber = (float) Terrs_coded / Tbits_coded;
 
             if (verbose != 0)
                 fprintf(stderr, "Coded BER: %5.4f Tbits: %5d Terrs: %5d\n", coded_ber, Tbits_coded, Terrs_coded);
-
-            /* set return code for Ctest, 1 for fail */
-
-            if ((Tbits == 0) || (Tbits_coded == 0) || (uncoded_ber >= 0.1f) || (coded_ber >= 0.01f))
-                return 1;
         }
+        
+        /* set return code for Ctest, 1 for fail */
+
+        if ((Tbits == 0) || (Tbits_coded == 0) || (uncoded_ber >= 0.1f) || (coded_ber >= 0.01f))
+            return 1;
     }
 
     return 0;
