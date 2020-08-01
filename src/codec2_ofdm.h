@@ -71,6 +71,7 @@ void ofdm_demod_shorts(struct OFDM *, int *, short *, float);
 int  ofdm_sync_search(struct OFDM *, COMP *);
 int  ofdm_sync_search_shorts(struct OFDM *, short *, float);
 void ofdm_sync_state_machine(struct OFDM *, uint8_t *);
+void ofdm_sync_state_machine2(struct OFDM *, uint8_t *);
 
 /* getters */
     

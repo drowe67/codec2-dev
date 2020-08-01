@@ -588,9 +588,21 @@ int main(int argc, char *argv[]) {
             frame_count++;
         }
 
+        /* per-frame modem processing */
+        
         nin_frame = ofdm_get_nin(ofdm);
-        ofdm_sync_state_machine(ofdm, rx_uw);
-
+        
+        switch(ofdm->state_machine) {
+        case 1:
+            ofdm_sync_state_machine(ofdm, rx_uw);
+            break;
+        case 2:
+            ofdm_sync_state_machine2(ofdm, rx_uw);
+            break;
+        default:
+            assert(0);
+        }
+        
         /* act on any events returned by state machine */
 
         if (ofdm->sync_start == true) {

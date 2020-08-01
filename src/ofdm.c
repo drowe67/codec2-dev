@@ -203,6 +203,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
         ofdm->bad_uw_errors = 3;
         ofdm->ftwindowwidth = 11;
         ofdm->timing_mx_thresh = 0.30f;
+        ofdm->state_machine = 1;
     } else {
         /* Use the users values */
 
@@ -221,6 +222,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
         ofdm->bad_uw_errors = config->bad_uw_errors;
         ofdm->ftwindowwidth = config->ftwindowwidth;
         ofdm->timing_mx_thresh = config->timing_mx_thresh;
+        ofdm->state_machine = config->state_machine;
     }
 
     ofdm->rs = (1.0f / ofdm->ts);                 /* Modulation Symbol Rate */
@@ -228,9 +230,10 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     ofdm->ncp = (int) (ofdm->tcp * ofdm->fs);     /* 700D: 16 */
     ofdm->inv_m = (1.0f / (float) ofdm->m);
     
-    /* basic sanity check */
+    /* basic sanity checkw */
     assert((int)floorf(ofdm->fs / ofdm->rs) == ofdm->m);
-
+    assert((ofdm->state_machine == 1) || (ofdm->state_machine == 2));
+    
     /* Copy constants into states */
 
     ofdm->config.tx_centre = ofdm->tx_centre;
@@ -248,6 +251,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     ofdm->config.txtbits = ofdm->ntxtbits;
     ofdm->config.bad_uw_errors = ofdm->bad_uw_errors;
     ofdm->config.ftwindowwidth = ofdm->ftwindowwidth;
+    ofdm->config.state_machine = ofdm->state_machine;
     
     /* Calculate sizes from config param */
 
@@ -1627,7 +1631,7 @@ void ofdm_sync_state_machine(struct OFDM *ofdm, uint8_t *rx_uw) {
 /*
  * state machine for data modes
  */
-void sync_state_machine2(struct OFDM *ofdm, uint8_t *rx_uw) {
+void ofdm_sync_state_machine2(struct OFDM *ofdm, uint8_t *rx_uw) {
     State next_state = ofdm->sync_state;
     int i;
 

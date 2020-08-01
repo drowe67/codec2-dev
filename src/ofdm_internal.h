@@ -92,6 +92,7 @@ struct OFDM_CONFIG {
     int nuwbits; /* number of unique word bits */
     int bad_uw_errors;
     int ftwindowwidth;
+    int state_machine; /* state machine to use */
 };
 
 struct OFDM {
@@ -192,7 +193,8 @@ struct OFDM {
     int sync_counter;
     int frame_count;
     int modem_frame; /* increments for every modem frame in packet */
-
+    int state_machine;
+    
     // Boolean
     bool sync_start;
     bool sync_end;
