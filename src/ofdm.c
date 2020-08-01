@@ -259,11 +259,6 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     ofdm->samplesperframe = ofdm->ns * ofdm->samplespersymbol;
     ofdm->max_samplesperframe = ofdm->samplesperframe + (ofdm->samplespersymbol / 4);
     ofdm->nrxbuf = (3 * ofdm->samplesperframe) + (3 * ofdm->samplespersymbol);
-
-    // TODO - not sure about this calculation
-    
-    int symsperframe = ofdm->bitsperframe / ofdm->bps;                          // 119
-    ofdm->nuwframes = (int) ceilf(symsperframe / (ofdm->nuwbits / ofdm->bps));  // 24
     
     ofdm->pilot_samples = (complex float *) MALLOC(sizeof (complex float) * ofdm->samplespersymbol);
     assert(ofdm->pilot_samples != NULL);
@@ -384,7 +379,8 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
      * The Unique Word is placed in different indexes based on
      * the number of carriers requested.
      */
-    for (i = 0, j = 0; i < (ofdm->nuwbits / ofdm->bps); i++, j += ofdm->bps) {
+    int nuwsyms = ofdm->nuwbits / ofdm->bps;
+    for (i = 0, j = 0; i < nuwsyms; i++, j += ofdm->bps) {
         int val = floorf((i + 1) * (ofdm->nc + 1) / ofdm->bps);
         
         ofdm->uw_ind_sym[i] = val;             // symbol index
@@ -394,6 +390,10 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
         }
     }
 
+    // work out how many frames UW is spread over    
+    int symsperframe = ofdm->bitsperframe / ofdm->bps;
+    ofdm->nuwframes = (int) ceilf((float)ofdm->uw_ind_sym[nuwsyms-1]/symsperframe);
+    
     ofdm->tx_uw_syms = MALLOC(sizeof (complex float) * (ofdm->nuwbits / ofdm->bps));
     assert(ofdm->tx_uw_syms != NULL);
 
@@ -1958,6 +1958,30 @@ void ofdm_disassemble_qpsk_modem_packet(struct OFDM *ofdm, complex float rx_syms
     }
 
     assert(t == ofdm->ntxtbits);
+}
+
+/*
+ * extract just the UW from the first few frames of a packet, to check UW
+ * during acquisition.
+ */
+void ofdm_extract_uw(struct OFDM *ofdm, complex float rx_syms[], float rx_amps[], uint8_t rx_uw[]) {
+    int Nsymsperframe = ofdm->bitsperframe / ofdm->bps;
+    int Nuwsyms = ofdm->nuwbits / ofdm->bps;
+    int dibit[2];
+    int s,u;
+
+    assert(ofdm->bps == 2);  /* this only works for QPSK at this stage (e.g. UW demod) */
+    
+    for (s = 0, u = 0; s < Nsymsperframe*ofdm->nuwframes; s++) {
+        if ((u < Nuwsyms) && (s == ofdm->uw_ind_sym[u])) {
+            qpsk_demod(rx_syms[s], dibit);
+            rx_uw[2 * u    ] = dibit[1];
+            rx_uw[2 * u + 1] = dibit[0];
+            u++;
+        }
+    }
+    
+    assert(u == Nuwsyms);
 }
 
 /*

@@ -466,7 +466,9 @@ int main(int argc, char *argv[]) {
             memcpy(&rx_syms[Nsymsperpacket-Nsymsperframe], ofdm->rx_np, sizeof(complex float)*Nsymsperframe);
             memcpy(&rx_amps[Nsymsperpacket-Nsymsperframe], ofdm->rx_amp, sizeof(float)*Nsymsperframe);
             
-            ofdm_disassemble_qpsk_modem_packet(ofdm, ofdm->rx_np, ofdm->rx_amp, rx_uw, payload_syms, payload_amps, txt_bits);
+            ofdm_disassemble_qpsk_modem_packet(ofdm, rx_syms, rx_amps, rx_uw, payload_syms, payload_amps, txt_bits);
+            int st_uw = Nsymsperpacket - ofdm->nuwframes*Nsymsperframe;
+            ofdm_extract_uw(ofdm, &rx_syms[st_uw], &rx_amps[st_uw], rx_uw);
             log_payload_syms = true;
 
             /* SNR estimation and smoothing */
