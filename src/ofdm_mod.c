@@ -377,7 +377,7 @@ int main(int argc, char *argv[]) {
                    it can interoperate with ofdm_tx.m/ofdm_rx.m */
 
                 uint8_t payload_bits[Npayloadbitsperpacket];
-                ofdm_generate_payload_data_bits(payload_bits, Ndatabitsperpacket);
+                ofdm_generate_payload_data_bits(payload_bits, Npayloadbitsperpacket);
                 ofdm_assemble_qpsk_modem_packet(ofdm, tx_bits_char, payload_bits, txt_bits_char);
             }
 

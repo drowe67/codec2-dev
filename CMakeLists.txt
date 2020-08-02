@@ -354,6 +354,18 @@ if(UNITTEST)
              set_tests_properties(test_COHPSK_modem_octave_port PROPERTIES
              PASS_REGULAR_EXPRESSION "fails: 0")
 
+    add_test(NAME test_COHPSK_modem_AWGN_BER
+             COMMAND sh -c "$<TARGET_FILE:cohpsk_get_test_bits> - 5600 | $<TARGET_FILE:cohpsk_mod> - - | $<TARGET_FILE:cohpsk_ch> - - -30  | $<TARGET_FILE:cohpsk_demod> - - | $<TARGET_FILE:cohpsk_put_test_bits> -"
+             )
+           
+    add_test(NAME test_COHPSK_modem_freq_offset
+             COMMAND sh -c "set -x; $<TARGET_FILE:cohpsk_get_test_bits> - 5600 | $<TARGET_FILE:cohpsk_mod> - - | $<TARGET_FILE:cohpsk_ch> - - -40 -f -20 | $<TARGET_FILE:cohpsk_demod> -v - - 2>log.txt | $<TARGET_FILE:cohpsk_put_test_bits> - ; ! grep 'lost sync' log.txt"
+             )
+           
+    # -------------------------------------------------------------------------
+    #                                OFDM Modem
+    # -------------------------------------------------------------------------
+
     add_test(NAME test_OFDM_qam16
              COMMAND sh -c "${CMAKE_CURRENT_BINARY_DIR}/unittest/tqam16")
 
@@ -369,14 +381,22 @@ if(UNITTEST)
              set_tests_properties(test_OFDM_modem_octave_port_Nc_31 PROPERTIES
              PASS_REGULAR_EXPRESSION "fails: 0")
 
-    add_test(NAME test_COHPSK_modem_AWGN_BER
-             COMMAND sh -c "$<TARGET_FILE:cohpsk_get_test_bits> - 5600 | $<TARGET_FILE:cohpsk_mod> - - | $<TARGET_FILE:cohpsk_ch> - - -30  | $<TARGET_FILE:cohpsk_demod> - - | $<TARGET_FILE:cohpsk_put_test_bits> -"
-             )
+    # noise free 700D test, including reading and writing payload bits.  fsk_*_test_bits used as it does it's own frame sync
+    add_test(NAME test_OFDM_modem_700D
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            ./fsk_get_test_bits - 5000 | 
+                            ./ofdm_mod --ldpc 1 | 
+                            ./ofdm_demod  --ldpc 1 | 
+                            ./fsk_put_test_bits - -q")
            
-    add_test(NAME test_COHPSK_modem_freq_offset
-             COMMAND sh -c "set -x; $<TARGET_FILE:cohpsk_get_test_bits> - 5600 | $<TARGET_FILE:cohpsk_mod> - - | $<TARGET_FILE:cohpsk_ch> - - -40 -f -20 | $<TARGET_FILE:cohpsk_demod> -v - - 2>log.txt | $<TARGET_FILE:cohpsk_put_test_bits> - ; ! grep 'lost sync' log.txt"
-             )
-           
+    # noise free 2020 test, including reading and writing payload bits.  fsk_*_test_bits used as it does it's own frame sync
+    add_test(NAME test_OFDM_modem_2020
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            ./fsk_get_test_bits - 5000 | 
+                            ./ofdm_mod --ldpc 2 --mode 2020 -p 312 | 
+                            ./ofdm_demod  --ldpc 2 --mode 2020 -p 312 | 
+                            ./fsk_put_test_bits - -q")
+
     add_test(NAME test_OFDM_modem_AWGN_BER
              COMMAND sh -c "$<TARGET_FILE:ofdm_mod> --in /dev/zero --ldpc 1 --testframes 60 --txbpf | $<TARGET_FILE:cohpsk_ch> - - -20 --Fs 8000 -f -50 | $<TARGET_FILE:ofdm_demod> --out /dev/null --testframes --ldpc 1 --verbose 1"
              )
@@ -425,6 +445,10 @@ endif()
                             ./src/ofdm_demod --mode datac1 --out /dev/null --testframes --verbose 2")
              set_tests_properties(test_OFDM_modem_datac1 PROPERTIES PASS_REGULAR_EXPRESSION "BER......: 0.0000")
            
+    # -------------------------------------------------------------------------
+    #                                LDPC
+    # -------------------------------------------------------------------------
+
     # tests ldpc_enc/ldpc_noise/ldpc_dec
     add_test(NAME test_ldpc_enc_dec
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
@@ -466,11 +490,6 @@ endif()
                             ./ldpc_enc /dev/zero - --sd --code H_128_256_5 --testframes 200 | 
                             ./ldpc_noise - - 0.5 | 
                             ./ldpc_dec - /dev/null --code H_128_256_5 --sd --testframes"
-             )
-
-    # basic test of C utils
-    add_test(NAME test_FSK_modem_mod_demod
-             COMMAND sh -c "$<TARGET_FILE:fsk_get_test_bits> - 10000 | $<TARGET_FILE:fsk_mod> 2 8000 100 1200 100 - - | $<TARGET_FILE:fsk_demod> -l 2 8000 100 - - | $<TARGET_FILE:fsk_put_test_bits> -"
              )
 
     add_test(NAME test_freedv_api_1600

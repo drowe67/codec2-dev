@@ -542,14 +542,10 @@ int main(int argc, char *argv[]) {
                        uncoded payload bits.  The psuedo-random generator is the same as Octave so
                        it can interoperate with ofdm_tx.m/ofdm_rx.m */
 
-                    int Npayloadbits = Nbitsperpacket - (ofdm_nuwbits + ofdm_ntxtbits);
-                    uint16_t r[Npayloadbits];
-                    uint8_t payload_bits[Npayloadbits];
-                    uint8_t tx_bits[Npayloadbits];
-
-                    ofdm_rand(r, Npayloadbits);
-                    for (i = 0; i < Npayloadbits; i++) payload_bits[i] = r[i] > 16384;
+                    uint8_t payload_bits[Npayloadbitsperframe];
                     uint8_t txt_bits[ofdm_ntxtbits]; memset(txt_bits, 0, ofdm_ntxtbits);
+                    uint8_t tx_bits[Nbitsperpacket];
+                    ofdm_generate_payload_data_bits(payload_bits, Npayloadbitsperpacket);
                     ofdm_assemble_qpsk_modem_packet(ofdm, tx_bits, payload_bits, txt_bits);
 
                     /* count errors across UW, payload, txt bits */
