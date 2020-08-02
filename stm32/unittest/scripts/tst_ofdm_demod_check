@@ -271,7 +271,7 @@ if (config_testframes):
                 _, ref_ber2, _, ref_tbits2, _, ref_terrs2 = line.split()
             elif (line[0:3] == "BER"):
                 print(line, end="")
-                _, ref_ber, _, ref_tbits, _, ref_terrs = line.split()
+                _, ref_ber, _, ref_tbits, _, ref_terrs, _, ref_tpackets = line.split()
             elif (line[0:9] == "Coded BER"):
                 print(line, end="")
                 _, _, ref_ber2, _, ref_tbits2, _, ref_terrs2 = line.split()
