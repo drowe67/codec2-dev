@@ -61,6 +61,9 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Debug")
 endif()
 
+# Build universal ARM64 and x86_64 binaries on Mac.
+set(CMAKE_OSX_ARCHITECTURES "x86_64;arm64e")
+
 #
 # Find the git hash if this is a working copy.
 #
