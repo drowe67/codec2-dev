@@ -247,7 +247,8 @@ int main(int argc, char *argv[]) {
             ofdm_demod_shorts(ofdm, rx_bits, rx_scaled, (OFDM_AMP_SCALE/2));
             if (config_profile) PROFILE_SAMPLE_AND_LOG2(ofdm_demod_demod, "  ofdm_demod_demod");
             if (config_profile) PROFILE_SAMPLE(ofdm_demod_diss);
-            ofdm_disassemble_qpsk_modem_frame(ofdm, rx_uw, payload_syms, payload_amps, txt_bits);
+            ofdm_extract_uw(ofdm, ofdm->rx_np, ofdm->rx_amp, rx_uw);
+            ofdm_disassemble_qpsk_modem_packet(ofdm, ofdm->rx_np, ofdm->rx_amp, payload_syms, payload_amps, txt_bits);
             if (config_profile) PROFILE_SAMPLE_AND_LOG2(ofdm_demod_diss, "  ofdm_demod_diss");
             log_payload_syms_flag = 1;
 
@@ -348,7 +349,7 @@ int main(int argc, char *argv[]) {
                     txt_bits[i] = 0;
                 }
 
-                ofdm_assemble_qpsk_modem_frame(ofdm, tx_bits, payload_bits, txt_bits);
+                ofdm_assemble_qpsk_modem_packet(ofdm, tx_bits, payload_bits, txt_bits);
 
                 Nerrs = 0;
                 for(i=0; i<ofdm_bitsperframe; i++) {
