@@ -141,12 +141,11 @@ complex float qam16_mod(int *bits) {
 }
 
 void qam16_demod(complex float symbol, int *bits) {
-    complex float rotate = symbol * cmplx(ROT45);
     float dist[16];
     int i;
 
     for (i = 0; i < 16; i++) {
-        dist[i] = cnormf(rotate - (qam16[i] / 3.0f));
+        dist[i] = cnormf(symbol - qam16[i]);
     }
     
     int row = 0;
