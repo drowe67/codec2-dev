@@ -246,7 +246,7 @@ int main(int argc, char *argv[]) {
     int ofdm_nuwbits = (ofdm_config->ns - 1) * ofdm_config->bps - ofdm_config->txtbits;
     int ofdm_ntxtbits = ofdm_config->txtbits;
 
-    /* Set up default LPDC code.  We could add other codes here if we like */
+    /* Set up LPDC code */
 
     struct LDPC ldpc;
     
@@ -375,7 +375,7 @@ int main(int argc, char *argv[]) {
             }
 
             complex float tx_sams[Nsamperpacket];
-            ofdm_ldpc_interleave_tx(ofdm, &ldpc, tx_sams, tx_bits_char, txt_bits_char, ofdm_config);
+            ofdm_ldpc_interleave_tx(ofdm, &ldpc, tx_sams, tx_bits_char, txt_bits_char);
 
             for (i = 0; i < Nsamperpacket; i++) {
                 tx_scaled[i] = OFDM_AMP_SCALE * crealf(tx_sams[i]);

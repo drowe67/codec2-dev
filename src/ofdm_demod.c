@@ -332,13 +332,12 @@ int main(int argc, char *argv[]) {
     int Nsymsperframe = Nbitsperframe / ofdm_config->bps;
     int Nsymsperpacket = Nbitsperpacket / ofdm_config->bps;
     int Nmaxsamperframe = ofdm_get_max_samples_per_frame(ofdm);
-    // TODO: these constants come up a lot so might be best placed in ofdm_create()
     int Npayloadbitsperframe = ofdm_bitsperframe - ofdm_nuwbits - ofdm_ntxtbits;
     int Npayloadbitsperpacket = Nbitsperpacket - ofdm_nuwbits - ofdm_ntxtbits;
     int Npayloadsymsperframe = Npayloadbitsperframe/ofdm_config->bps;
     int Npayloadsymsperpacket = Npayloadbitsperpacket/ofdm_config->bps;
     
-    /* Set up default LPDC code.  We could add other codes here if we like */
+    /* Set up LPDC codes */
 
     struct LDPC ldpc;
     COMP payload_syms[Npayloadsymsperpacket];
@@ -458,7 +457,7 @@ int main(int argc, char *argv[]) {
             memcpy(&rx_syms[Nsymsperpacket-Nsymsperframe], ofdm->rx_np, sizeof(complex float)*Nsymsperframe);
             memcpy(&rx_amps[Nsymsperpacket-Nsymsperframe], ofdm->rx_amp, sizeof(float)*Nsymsperframe);
 
-            /* look for UW as frames enter packet buffer, not UW may span several modem frames */
+            /* look for UW as frames enter packet buffer, note UW may span several modem frames */
             int st_uw = Nsymsperpacket - ofdm->nuwframes*Nsymsperframe;
             ofdm_extract_uw(ofdm, &rx_syms[st_uw], &rx_amps[st_uw], rx_uw);
 
@@ -477,7 +476,6 @@ int main(int argc, char *argv[]) {
                     assert((ofdm_nuwbits + ofdm_ntxtbits + Npayloadbitsperpacket) <= Nbitsperpacket);
 
                     /* run de-interleaver */
-
                     COMP payload_syms_de[Npayloadsymsperpacket];
                     float payload_amps_de[Npayloadsymsperpacket];
                     gp_deinterleave_comp(payload_syms_de, payload_syms, Npayloadsymsperpacket);
@@ -518,7 +516,6 @@ int main(int argc, char *argv[]) {
 
                     if (testframes == true) {
                         /* construct payload data bits */
-
                         uint8_t payload_data_bits[Ndatabitsperframe];
                         ofdm_generate_payload_data_bits(payload_data_bits, Ndatabitsperframe);
 

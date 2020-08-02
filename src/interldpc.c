@@ -226,23 +226,22 @@ int count_errors(uint8_t tx_bits[], uint8_t rx_bits[], int n) {
 }
 
 /*
-   Given an array of tx_bits, LDPC encodes, interleaves, and OFDM
-   modulates.
+   Given an array of tx_bits, LDPC encodes, interleaves, and OFDM modulates
  */
 
-void ofdm_ldpc_interleave_tx(struct OFDM *ofdm, struct LDPC *ldpc, complex float tx_sams[], uint8_t tx_bits[], uint8_t txt_bits[], struct OFDM_CONFIG *config) {
-    int coded_syms_per_frame = ldpc->coded_syms_per_frame;
-    int coded_bits_per_frame = ldpc->coded_bits_per_frame;
-    int ofdm_bitsperframe = ofdm_get_bits_per_frame(ofdm);
-    int codeword[coded_bits_per_frame];
-    COMP coded_symbols[coded_syms_per_frame];
-    COMP coded_symbols_inter[coded_syms_per_frame];
-    complex float tx_symbols[ofdm_bitsperframe / config->bps];
+void ofdm_ldpc_interleave_tx(struct OFDM *ofdm, struct LDPC *ldpc, complex float tx_sams[], uint8_t tx_bits[], uint8_t txt_bits[]) {
+    int Npayloadsymsperpacket = ldpc->coded_syms_per_frame;
+    int Npayloadbitsperpacket = ldpc->coded_bits_per_frame;
+    int Nbitsperpacket = ofdm_get_bits_per_packet(ofdm);
+    int codeword[Npayloadbitsperpacket];
+    COMP payload_symbols[Npayloadsymsperpacket];
+    COMP payload_symbols_inter[Npayloadsymsperpacket];
+    complex float tx_symbols[Nbitsperpacket/ ofdm->bps];
 
     ldpc_encode_frame(ldpc, codeword, tx_bits);
-    qpsk_modulate_frame(coded_symbols, codeword, coded_syms_per_frame);
-    gp_interleave_comp(coded_symbols_inter, coded_symbols, coded_syms_per_frame);
-    ofdm_assemble_qpsk_modem_packet_symbols(ofdm, tx_symbols, coded_symbols_inter, txt_bits);
+    qpsk_modulate_frame(payload_symbols, codeword, Npayloadsymsperpacket);
+    gp_interleave_comp(payload_symbols_inter, payload_symbols, Npayloadsymsperpacket);
+    ofdm_assemble_qpsk_modem_packet_symbols(ofdm, tx_symbols, payload_symbols_inter, txt_bits);
     ofdm_txframe(ofdm, tx_sams, tx_symbols);
 }
 
