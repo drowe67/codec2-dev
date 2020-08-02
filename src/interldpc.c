@@ -61,7 +61,7 @@ void printf_n(COMP v[], int n) {
     }
 }
 
-void set_up_ldpc_constants(struct LDPC *ldpc, int code_length, int parity_bits, int bps) {
+void set_up_ldpc_constants(struct LDPC *ldpc, int code_length, int parity_bits) {
     /* following provided for convenience and to match Octave variable names */
 
     /* these remain fixed */
@@ -76,13 +76,11 @@ void set_up_ldpc_constants(struct LDPC *ldpc, int code_length, int parity_bits, 
     
     ldpc->data_bits_per_frame = ldpc->ldpc_data_bits_per_frame;
     ldpc->coded_bits_per_frame = ldpc->ldpc_coded_bits_per_frame;
-    ldpc->coded_syms_per_frame = ldpc->coded_bits_per_frame / bps;
 }
 
-void set_data_bits_per_frame(struct LDPC *ldpc, int new_data_bits_per_frame, int bps) {
+void set_data_bits_per_frame(struct LDPC *ldpc, int new_data_bits_per_frame) {
     ldpc->data_bits_per_frame = new_data_bits_per_frame;
     ldpc->coded_bits_per_frame = ldpc->data_bits_per_frame + ldpc->NumberParityBits;
-    ldpc->coded_syms_per_frame = ldpc->coded_bits_per_frame / bps;
 }
     
 // TODO: this should be in (n,k) = (224,112) format, fix some time
@@ -102,7 +100,7 @@ void set_up_hra_112_112(struct LDPC *ldpc, struct OFDM_CONFIG *config) {
 
     /* provided for convenience and to match Octave variable names */
 
-    set_up_ldpc_constants(ldpc, HRA_112_112_CODELENGTH, HRA_112_112_NUMBERPARITYBITS, config->bps);
+    set_up_ldpc_constants(ldpc, HRA_112_112_CODELENGTH, HRA_112_112_NUMBERPARITYBITS);
 }
 
 // Note code #defines below should be in (n,k) = (504,396)
@@ -120,7 +118,7 @@ void set_up_hra_504_396(struct LDPC *ldpc, struct OFDM_CONFIG *config) {
     ldpc->H_rows = (uint16_t *) HRAb_396_504_H_rows;
     ldpc->H_cols = (uint16_t *) HRAb_396_504_H_cols;
 
-    set_up_ldpc_constants(ldpc, HRAb_396_504_CODELENGTH, HRAb_396_504_NUMBERPARITYBITS, config->bps);
+    set_up_ldpc_constants(ldpc, HRAb_396_504_CODELENGTH, HRAb_396_504_NUMBERPARITYBITS);
 }
 
 void ldpc_encode_frame(struct LDPC *ldpc, int codeword[], unsigned char tx_bits_char[]) {
@@ -169,7 +167,7 @@ void qpsk_modulate_frame(COMP tx_symbols[], int codeword[], int n) {
 int count_uncoded_errors(struct LDPC *ldpc, struct OFDM_CONFIG *config, int *Nerrs_raw, COMP codeword_symbols_de[]) {
     int i, Nerrs, Terrs;
 
-    int coded_syms_per_frame = ldpc->coded_syms_per_frame;
+    int coded_syms_per_frame = ldpc->coded_bits_per_frame/config->bps;
     int coded_bits_per_frame = ldpc->coded_bits_per_frame;
     int data_bits_per_frame = ldpc->data_bits_per_frame;
     int rx_bits_raw[coded_bits_per_frame];
@@ -230,7 +228,7 @@ int count_errors(uint8_t tx_bits[], uint8_t rx_bits[], int n) {
  */
 
 void ofdm_ldpc_interleave_tx(struct OFDM *ofdm, struct LDPC *ldpc, complex float tx_sams[], uint8_t tx_bits[], uint8_t txt_bits[]) {
-    int Npayloadsymsperpacket = ldpc->coded_syms_per_frame;
+    int Npayloadsymsperpacket = ldpc->coded_bits_per_frame/ofdm->bps;
     int Npayloadbitsperpacket = ldpc->coded_bits_per_frame;
     int Nbitsperpacket = ofdm_get_bits_per_packet(ofdm);
     int codeword[Npayloadbitsperpacket];

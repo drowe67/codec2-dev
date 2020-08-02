@@ -123,7 +123,7 @@ int main(int argc, char *argv[]) {
     int verbose = 0;
     int phase_est_bandwidth_mode = AUTO_PHASE_EST;
     int ldpc_en = 0;
-    int Ndatabitsperframe = 0;
+    int Ndatabitsperpacket = 0;
 
     bool testframes = false;
     bool input_specified = false;
@@ -229,7 +229,7 @@ int main(int argc, char *argv[]) {
                 phase_est_bandwidth_mode = atoi(options.optarg);
                 break;
             case 'p':
-                Ndatabitsperframe = atoi(options.optarg);
+                Ndatabitsperpacket = atoi(options.optarg);
                 break;
             case 'q':
                 dpsk = true;
@@ -350,19 +350,19 @@ int main(int argc, char *argv[]) {
             set_up_hra_504_396(&ldpc, ofdm_config);
 
         /* here is where we can change data bits per frame to a number smaller than LDPC code input data bits_per_frame */
-        if (Ndatabitsperframe) {
-            set_data_bits_per_frame(&ldpc, Ndatabitsperframe, ofdm_config->bps);
+        if (Ndatabitsperpacket) {
+            set_data_bits_per_frame(&ldpc, Ndatabitsperpacket);
         }
     
-        Ndatabitsperframe = ldpc.data_bits_per_frame;
+        Ndatabitsperpacket = ldpc.data_bits_per_frame;
  
-        assert(Ndatabitsperframe <= ldpc.ldpc_data_bits_per_frame);
+        assert(Ndatabitsperpacket <= ldpc.ldpc_data_bits_per_frame);
         assert(Npayloadbitsperpacket <= ldpc.ldpc_coded_bits_per_frame);
         
         if (verbose > 1) {
             fprintf(stderr, "LDPC codeword data bits = %d\n", ldpc.ldpc_data_bits_per_frame);
             fprintf(stderr, "LDPC codeword total bits  = %d\n", ldpc.ldpc_coded_bits_per_frame);
-            fprintf(stderr, "LDPC codeword data bits used = %d\n", Ndatabitsperframe);
+            fprintf(stderr, "LDPC codeword data bits used = %d\n", Ndatabitsperpacket);
             fprintf(stderr, "LDPC codeword total length in modem packet = %d\n", Npayloadbitsperpacket);
         }
     }
@@ -492,7 +492,7 @@ int main(int argc, char *argv[]) {
                     symbols_to_llrs(llr, payload_syms_de, payload_amps_de,
                                     EsNo, ofdm->mean_amp, Npayloadsymsperpacket);
 
-                    assert(Ndatabitsperframe == ldpc.data_bits_per_frame);
+                    assert(Ndatabitsperpacket == ldpc.data_bits_per_frame);
                     if (ldpc.data_bits_per_frame == ldpc.ldpc_data_bits_per_frame) {
                         /* all data bits in code word used */
                         iter = run_ldpc_decoder(&ldpc, out_char, llr, &parityCheckCount);
@@ -516,15 +516,15 @@ int main(int argc, char *argv[]) {
 
                     if (testframes == true) {
                         /* construct payload data bits */
-                        uint8_t payload_data_bits[Ndatabitsperframe];
-                        ofdm_generate_payload_data_bits(payload_data_bits, Ndatabitsperframe);
+                        uint8_t payload_data_bits[Ndatabitsperpacket];
+                        ofdm_generate_payload_data_bits(payload_data_bits, Ndatabitsperpacket);
 
-                        Nerrs_coded = count_errors(payload_data_bits, out_char, Ndatabitsperframe);
+                        Nerrs_coded = count_errors(payload_data_bits, out_char, Ndatabitsperpacket);
                         Terrs_coded += Nerrs_coded;
-                        Tbits_coded += Ndatabitsperframe;
+                        Tbits_coded += Ndatabitsperpacket;
                     }
 
-                    fwrite(out_char, sizeof (char), Ndatabitsperframe, fout);
+                    fwrite(out_char, sizeof (char), Ndatabitsperpacket, fout);
                 } else {
                     /* simple hard decision output for uncoded testing, all bits in frame dumped including UW and txt */
 

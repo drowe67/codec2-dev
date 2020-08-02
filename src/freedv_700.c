@@ -109,7 +109,7 @@ void freedv_700d_open(struct freedv *f) {
     f->ldpc->max_iter = 10; /* limit LDPC decoder iterations to limit CPU load */
 #endif	
     /* Code length 224 divided by 2 bits per symbol = 112 symbols per frame */
-    int coded_syms_per_frame = f->ldpc->coded_syms_per_frame;
+    int coded_syms_per_frame = f->ldpc->coded_bits_per_frame/f->ofdm->bps;
         
     f->modem_frame_count_tx = f->modem_frame_count_rx = 0;
         
@@ -348,7 +348,7 @@ int freedv_comp_short_rx_700d(struct freedv *f, void *demod_in_8kHz, int demod_i
     
     int    data_bits_per_frame = ldpc->data_bits_per_frame;
     int    coded_bits_per_frame = ldpc->coded_bits_per_frame;
-    int    coded_syms_per_frame = ldpc->coded_syms_per_frame;
+    int    coded_syms_per_frame = ldpc->coded_bits_per_frame/ofdm->bps;
     COMP  *codeword_symbols = f->codeword_symbols;
     float *codeword_amps = f->codeword_amps;
     int    rx_bits[f->ofdm_bitsperframe];

@@ -54,8 +54,8 @@ void freedv_2020_open(struct freedv *f) {
     assert(f->ldpc != NULL);
         
     set_up_hra_504_396(f->ldpc, &f->ofdm->config);
-    set_data_bits_per_frame(f->ldpc, data_bits_per_frame, f->ofdm->config.bps);
-    int coded_syms_per_frame = f->ldpc->coded_syms_per_frame;
+    set_data_bits_per_frame(f->ldpc, data_bits_per_frame);
+    int coded_syms_per_frame = f->ldpc->coded_bits_per_frame/f->ofdm->bps;
         
     f->ofdm_bitsperframe = ofdm_get_bits_per_frame(f->ofdm);
     f->ofdm_nuwbits = (f->ofdm->config.ns - 1) * f->ofdm->config.bps - f->ofdm->config.txtbits;
@@ -68,7 +68,7 @@ void freedv_2020_open(struct freedv *f) {
         fprintf(stderr, "ldpc_coded_bits_per_frame  = %d\n", f->ldpc->ldpc_coded_bits_per_frame);
         fprintf(stderr, "data_bits_per_frame = %d\n", data_bits_per_frame);
         fprintf(stderr, "coded_bits_per_frame  = %d\n", f->ldpc->coded_bits_per_frame);
-        fprintf(stderr, "coded_syms_per_frame  = %d\n", f->ldpc->coded_syms_per_frame);
+        fprintf(stderr, "coded_syms_per_frame  = %d\n", f->ldpc->coded_bits_per_frame/f->ofdm->bps);
         fprintf(stderr, "ofdm_bits_per_frame  = %d\n", f->ofdm_bitsperframe);
     }
         
@@ -188,7 +188,7 @@ int freedv_comprx_2020(struct freedv *f, COMP demod_in[]) {
     
     int    data_bits_per_frame = ldpc->data_bits_per_frame;
     int    coded_bits_per_frame = ldpc->coded_bits_per_frame;
-    int    coded_syms_per_frame = ldpc->coded_syms_per_frame;
+    int    coded_syms_per_frame = ldpc->coded_bits_per_frame/ofdm->bps;
     COMP  *codeword_symbols = f->codeword_symbols;
     float *codeword_amps = f->codeword_amps;
     int    rx_bits[f->ofdm_bitsperframe];
