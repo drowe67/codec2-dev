@@ -29,6 +29,7 @@
 #include "ofdm_internal.h"
 #include "mpdecode_core.h"
 #include "gp_interleaver.h"
+#include "ldpc_codes.h"
 #include "interldpc.h"
 #include "debug_alloc.h"
 #include "filter.h"
@@ -104,7 +105,7 @@ void freedv_700d_open(struct freedv *f) {
     f->ldpc = (struct LDPC*)MALLOC(sizeof(struct LDPC));
     assert(f->ldpc != NULL);
 
-    set_up_hra_112_112(f->ldpc, ofdm_config);
+    ldpc_codes_setup(f->ldpc, "HRA_112_112");
 #ifdef __EMBEDDED__
     f->ldpc->max_iter = 10; /* limit LDPC decoder iterations to limit CPU load */
 #endif	

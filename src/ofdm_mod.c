@@ -41,6 +41,7 @@
 #include "ofdm_internal.h"
 #include "ofdm_mode.h"
 #include "gp_interleaver.h"
+#include "ldpc_codes.h"
 #include "interldpc.h"
 #include "varicode.h"
 
@@ -255,10 +256,10 @@ int main(int argc, char *argv[]) {
     struct LDPC ldpc;
     if (ldpc_en) {
         if (ldpc_en == 1)
-            set_up_hra_112_112(&ldpc, ofdm_config);
+            ldpc_codes_setup(&ldpc, "HRA_112_112");
         else
-            set_up_hra_504_396(&ldpc, ofdm_config);
-
+            ldpc_codes_setup(&ldpc, "HRAb_396_504");
+        
         /* here is where we can change data bits per frame to a number smaller than LDPC code input data bits_per_frame */
         if (Ndatabitsperpacket) {
             set_data_bits_per_frame(&ldpc, Ndatabitsperpacket);

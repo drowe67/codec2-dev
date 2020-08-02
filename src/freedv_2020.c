@@ -29,6 +29,7 @@
 #include "ofdm_internal.h"
 #include "mpdecode_core.h"
 #include "gp_interleaver.h"
+#include "ldpc_codes.h"
 #include "interldpc.h"
 #include "debug_alloc.h"
 
@@ -53,7 +54,7 @@ void freedv_2020_open(struct freedv *f) {
     f->ldpc = (struct LDPC*)MALLOC(sizeof(struct LDPC));
     assert(f->ldpc != NULL);
         
-    set_up_hra_504_396(f->ldpc, &f->ofdm->config);
+    ldpc_codes_setup(f->ldpc, "HRAb_396_504");
     set_data_bits_per_frame(f->ldpc, data_bits_per_frame);
     int coded_syms_per_frame = f->ldpc->coded_bits_per_frame/f->ofdm->bps;
         

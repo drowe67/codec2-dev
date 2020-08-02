@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "ldpc_codes.h"
+#include "interldpc.h"
 #include "H2064_516_sparse.h"  
 #include "HRA_112_112.h"  
 #include "HRAb_396_504.h"
@@ -151,5 +152,12 @@ int ldpc_codes_find(char name[]) {
         if (strcmp(ldpc_codes[c].name, name) == 0)
             code_index = c;
     return code_index;
+}
+
+void ldpc_codes_setup(struct LDPC *ldpc, char name[]) {
+    int code_index;
+    code_index = ldpc_codes_find(name);
+    memcpy(ldpc,&ldpc_codes[code_index], sizeof(struct LDPC));
+    set_up_ldpc_constants(ldpc, ldpc->CodeLength, ldpc->NumberParityBits);
 }
 

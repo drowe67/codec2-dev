@@ -41,6 +41,7 @@
 
 #include "codec2_ofdm.h"
 #include "ofdm_internal.h"
+#include "ldpc_codes.h"
 #include "interldpc.h"
 #include "varicode.h"
 
@@ -149,7 +150,7 @@ int main(int argc, char *argv[])
     ofdm_ntxtbits = ofdm_config->txtbits;
 
     /* Set up default LPDC code.  We could add other codes here if we like */
-    set_up_hra_112_112(&ldpc, ofdm_config);
+    ldpc_codes_setup(&ldpc, "HRA_112_112");
 
     int data_bits_per_frame = ldpc.data_bits_per_frame;
 
