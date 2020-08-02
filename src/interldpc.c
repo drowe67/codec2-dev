@@ -163,9 +163,8 @@ void qpsk_modulate_frame(COMP tx_symbols[], int codeword[], int n) {
     }
 }
 
-/* measure uncoded (raw) bit errors over frame, note we
-   don't include txt bits as this is done after we dissassemmble the
-   frame */
+/* Count uncoded (raw) bit errors over frame, note we don't include UW
+   of txt bits as this is done after we dissassemmble the frame */
 
 int count_uncoded_errors(struct LDPC *ldpc, struct OFDM_CONFIG *config, int *Nerrs_raw, COMP codeword_symbols_de[]) {
     int i, Nerrs, Terrs;
