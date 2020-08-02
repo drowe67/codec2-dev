@@ -740,16 +740,18 @@ int main(int argc, char *argv[]) {
             }
         }
 
+        /* set return code for Ctest, 1 for fail */
+
         if (ldpc_en) {
             coded_ber = (float) Terrs_coded / Tbits_coded;
 
             if (verbose != 0)
                 fprintf(stderr, "Coded BER: %5.4f Tbits: %5d Terrs: %5d\n", coded_ber, Tbits_coded, Terrs_coded);
+            if ((Tbits_coded == 0) || (coded_ber >= 0.01f))
+                return 1;
         }
         
-        /* set return code for Ctest, 1 for fail */
-
-        if ((Tbits == 0) || (Tbits_coded == 0) || (uncoded_ber >= 0.1f) || (coded_ber >= 0.01f))
+        if ((Tbits == 0) || (uncoded_ber >= 0.1f))
             return 1;
     }
 
