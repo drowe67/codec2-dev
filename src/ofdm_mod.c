@@ -269,12 +269,11 @@ int main(int argc, char *argv[]) {
     else {
         Ndatabitsperpacket = Npayloadbitsperpacket;
     }
-    fprintf(stderr, "Ndatabitsperpacket = %d\n", Ndatabitsperpacket);
 
     if (verbose) {
         ofdm_set_verbose(ofdm, verbose);
-        fprintf(stderr, "Nsamperpacket: %d, Npayloadbitsperpacket: %d \n",
-                Nsamperpacket, Npayloadbitsperpacket);
+        fprintf(stderr, "Ndatabitsperpacket: %d Npayloadbitsperpacket: %d Nsamperpacket: %d\n",
+                Ndatabitsperpacket, Npayloadbitsperpacket, Nsamperpacket);
     }
 
     if (testframes) {
@@ -308,7 +307,7 @@ int main(int argc, char *argv[]) {
 
     /* main loop ----------------------------------------------------------------*/
 
-    int frame = 0;
+    int packet = 0;
     uint8_t data_bits[Ndatabitsperpacket];
     while (fread(data_bits, sizeof (uint8_t), Ndatabitsperpacket, fin) == Ndatabitsperpacket) {
 
@@ -383,9 +382,9 @@ int main(int argc, char *argv[]) {
             fwrite(tx_scaled, sizeof (short), Nsamperpacket, fout);
         }
 
-        frame++;
+        packet++;
 
-        if (testframes && (frame >= Npackets))
+        if (testframes && (packet >= Npackets))
             break;
     }
 
@@ -396,7 +395,7 @@ int main(int argc, char *argv[]) {
         fclose(fout);
 
     if (verbose)
-        fprintf(stderr, "%d frames processed\n", frame);
+        fprintf(stderr, "%d packets processed\n", packet);
 
     ofdm_destroy(ofdm);
 

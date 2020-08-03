@@ -73,7 +73,7 @@ struct LDPC ldpc_codes[] = {
 
     /* rate 1/3 code, works at raw BER of 14% */
     {
-        "H_256_768",
+        "H_256_768_22",
         H_256_768_22_MAX_ITER,
         0,
         1,
