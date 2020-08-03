@@ -54,11 +54,6 @@
 #define NDISCARD 20                /* BER2 measure discards first 20 frames   */
 #define FS       8000.0f
 
-static int ofdm_bitsperframe;
-static int ofdm_rowsperframe;
-static int ofdm_nuwbits;
-static int ofdm_ntxtbits;
-
 static const char *progname;
 
 static const char *statemode[] = {
@@ -292,10 +287,10 @@ int main(int argc, char *argv[]) {
     /* Get a copy of the actual modem config (ofdm_create() fills in more parameters) */
     ofdm_config = ofdm_get_config_param(ofdm);
 
-    ofdm_bitsperframe = ofdm_get_bits_per_frame(ofdm);
-    ofdm_rowsperframe = ofdm_bitsperframe / (ofdm_config->nc * ofdm_config->bps);
-    ofdm_nuwbits = (ofdm_config->ns - 1) * ofdm_config->bps - ofdm_config->txtbits;
-    ofdm_ntxtbits = ofdm_config->txtbits;
+    int ofdm_bitsperframe = ofdm_get_bits_per_frame(ofdm);
+    int ofdm_rowsperframe = ofdm_bitsperframe / (ofdm_config->nc * ofdm_config->bps);
+    int ofdm_nuwbits = ofdm_config->nuwbits;
+    int ofdm_ntxtbits = ofdm_config->txtbits;
 
     float phase_est_pilot_log[ofdm_rowsperframe * NFRAMES][ofdm_config->nc];
     COMP rx_np_log[ofdm_rowsperframe * ofdm_config->nc * NFRAMES];
@@ -538,7 +533,7 @@ int main(int argc, char *argv[]) {
                        uncoded payload bits.  The psuedo-random generator is the same as Octave so
                        it can interoperate with ofdm_tx.m/ofdm_rx.m */
 
-                    uint8_t payload_bits[Npayloadbitsperframe];
+                    uint8_t payload_bits[Npayloadbitsperpacket];
                     uint8_t txt_bits[ofdm_ntxtbits]; memset(txt_bits, 0, ofdm_ntxtbits);
                     uint8_t tx_bits[Nbitsperpacket];
                     ofdm_generate_payload_data_bits(payload_bits, Npayloadbitsperpacket);

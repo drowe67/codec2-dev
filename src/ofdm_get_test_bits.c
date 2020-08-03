@@ -136,9 +136,7 @@ int main(int argc, char *argv[])
     assert(ofdm != NULL);
 
     int ofdm_bitsperpacket = ofdm_get_bits_per_packet(ofdm);
-    int ofdm_nuwbits = ofdm->nuwbits;
-    int ofdm_ntxtbits = ofdm->ntxtbits;
-    int Ndatabitsperpacket = ofdm_bitsperpacket - ofdm_nuwbits - ofdm_ntxtbits;
+    int Ndatabitsperpacket = ofdm_bitsperpacket - ofdm->nuwbits - ofdm->ntxtbits;
     
     /* Optionally set up default LPDC code */
     if (ldpc_en) {

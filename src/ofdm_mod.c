@@ -239,9 +239,7 @@ int main(int argc, char *argv[]) {
     /* ste up some useful constants */
     
     int Nbitsperpacket = ofdm_get_bits_per_packet(ofdm);
-    int ofdm_nuwbits = ofdm_config->nuwbits;
-    int ofdm_ntxtbits = ofdm_config->txtbits;
-    int Npayloadbitsperpacket = Nbitsperpacket - ofdm_nuwbits - ofdm_ntxtbits;
+    int Npayloadbitsperpacket = Nbitsperpacket - ofdm->nuwbits - ofdm->ntxtbits;
     int Nsamperpacket = ofdm_get_samples_per_packet(ofdm);
 
     /* Set up LPDC code */
