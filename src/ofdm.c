@@ -203,7 +203,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
         ofdm->ftwindowwidth = 11;
         ofdm->timing_mx_thresh = 0.30f;
         ofdm->data_mode = 0;
-        ofdm->codename = "HRA_112_11";
+        ofdm->codename = "HRA_112_112";
     } else {
         /* Use the users values */
 

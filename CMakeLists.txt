@@ -381,16 +381,22 @@ if(UNITTEST)
              set_tests_properties(test_OFDM_modem_octave_port_Nc_31 PROPERTIES
              PASS_REGULAR_EXPRESSION "fails: 0")
 
-    # noise free 700D test, including reading and writing payload bits.  fsk_*_test_bits used as it does it's own frame sync
+    # noise free uncoded 700D test, including reading and writing payload bits
     add_test(NAME test_OFDM_modem_700D
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
-                            ./fsk_get_test_bits - 5000 | 
+                            ./ofdm_get_test_bits - | 
+                            ./ofdm_mod | 
+                            ./ofdm_demod  --testframes")
+           
+    # noise free coded 700D test, including reading and writing payload bits
+    add_test(NAME test_OFDM_modem_700D_ldpc
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            ./ofdm_get_test_bits - --ldpc | 
                             ./ofdm_mod --ldpc | 
-                            ./ofdm_demod  --ldpc | 
-                            ./fsk_put_test_bits - -q")
+                            ./ofdm_demod --ldpc --testframes")
            
     # noise free 2020 test, including reading and writing payload bits.  fsk_*_test_bits used as it does it's own frame sync
-    add_test(NAME test_OFDM_modem_2020
+    add_test(NAME test_OFDM_modem_2020_ldpc
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
                             ./fsk_get_test_bits - 5000 | 
                             ./ofdm_mod --ldpc --mode 2020 -p 312 | 
