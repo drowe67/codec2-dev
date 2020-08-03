@@ -69,6 +69,7 @@
 #include "codec2_ofdm.h"
 #include "ofdm_internal.h"
 #include "mpdecode_core.h"
+#include "ldpc_codes.h"
 #include "interldpc.h"
 #include "gp_interleaver.h"
 #include "test_bits_ofdm.h"
@@ -168,7 +169,7 @@ int main(int argc, char *argv[]) {
     /* Get a copy of the actual modem config */
     ofdm_config = ofdm_get_config_param(ofdm);
 
-    set_up_hra_112_112(&ldpc, ofdm_config);
+    ldpc_codes_setup(&ldpc, "HRA_112_112");
 
     ofdm_bitsperframe = ofdm_get_bits_per_frame(ofdm);
     ofdm_rowsperframe = ofdm_bitsperframe / (ofdm_config->nc * ofdm_config->bps);
@@ -182,7 +183,7 @@ int main(int argc, char *argv[]) {
 
     int data_bits_per_frame = ldpc.data_bits_per_frame;
     int coded_bits_per_frame = ldpc.coded_bits_per_frame;
-    int coded_syms_per_frame = ldpc.coded_syms_per_frame;
+    int coded_syms_per_frame = ldpc.coded_bits_per_frame/ofdm->bps;
 
     short   rx_scaled[Nmaxsamperframe];
     int     rx_bits[ofdm_bitsperframe];

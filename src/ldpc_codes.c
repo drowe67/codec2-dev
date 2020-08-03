@@ -20,23 +20,6 @@
 #include "H_128_256_5.h"
 
 struct LDPC ldpc_codes[] = {
-
-    /* default Wenet High Alitiude Balloon rate 0.8 code */
-    {
-        "H2064_516_sparse",
-        MAX_ITER,
-        0,
-        1,
-        1,
-        CODELENGTH,
-        NUMBERPARITYBITS,
-        NUMBERROWSHCOLS,
-        MAX_ROW_WEIGHT,
-        MAX_COL_WEIGHT,
-        H_rows,
-        H_cols
-    },
-
     /* short rate 1/2 code for FreeDV 700D */
     {
         "HRA_112_112",
@@ -51,6 +34,25 @@ struct LDPC ldpc_codes[] = {
         HRA_112_112_MAX_COL_WEIGHT,
         (uint16_t *)HRA_112_112_H_rows,
         (uint16_t *)HRA_112_112_H_cols
+#ifdef __EMBEDDED__
+    }
+#else
+    },
+    
+    /* default Wenet High Alitiude Balloon rate 0.8 code */
+    {
+        "H2064_516_sparse",
+        MAX_ITER,
+        0,
+        1,
+        1,
+        CODELENGTH,
+        NUMBERPARITYBITS,
+        NUMBERROWSHCOLS,
+        MAX_ROW_WEIGHT,
+        MAX_COL_WEIGHT,
+        H_rows,
+        H_cols
     },
 
     /* rate 0.8 code used for FreeDV 2020 */
@@ -132,6 +134,7 @@ struct LDPC ldpc_codes[] = {
         (uint16_t *)H_128_256_5_H_rows,
         (uint16_t *)H_128_256_5_H_cols
     }
+#endif
 };
 
 int ldpc_codes_num(void) { return sizeof(ldpc_codes)/sizeof(struct LDPC); }

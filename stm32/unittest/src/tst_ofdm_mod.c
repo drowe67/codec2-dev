@@ -69,6 +69,7 @@
 #include "semihosting.h"
 #include "codec2_ofdm.h"
 #include "ofdm_internal.h"
+#include "ldpc_codes.h"
 #include "interldpc.h"
 #include "gp_interleaver.h"
 
@@ -127,12 +128,12 @@ int main(int argc, char *argv[]) {
     /* Get a copy of the actual modem config */
     ofdm_config = ofdm_get_config_param(ofdm);
 
-    set_up_hra_112_112(&ldpc, ofdm_config);
+    ldpc_codes_setup(&ldpc, "HRA_112_112");
 
     if (config_ldpc_en) {
         Nbitsperframe = ldpc.data_bits_per_frame;
     } else {
-        Nbitsperframe = ofdm_get_bits_per_frame(ofdm);
+        Nbitsperframe = ofdm_get_bits_per_frame(ofdm) - ofdm->nuwbits - ofdm->ntxtbits;
     }
 
     Nsamperframe = ofdm_get_samples_per_frame(ofdm);
@@ -177,17 +178,20 @@ int main(int argc, char *argv[]) {
             if (config_ldpc_en) {
 
                 complex float tx_sams[Nsamperframe];
-                ofdm_ldpc_interleave_tx(ofdm, &ldpc, tx_sams, tx_bits_char, txt_bits_char, ofdm_config);
+                ofdm_ldpc_interleave_tx(ofdm, &ldpc, tx_sams, tx_bits_char, txt_bits_char);
 
                     for(i=0; i<Nsamperframe; i++) {
                         tx_scaled[i] = OFDM_AMP_SCALE * crealf(tx_sams[i]);
                     }
 
              } else { // !config_ldpc_en
-                int tx_bits[Nbitsperframe];
 
+                uint8_t tx_frame[ofdm_get_bits_per_frame(ofdm)];
+                ofdm_assemble_qpsk_modem_packet(ofdm, tx_frame, tx_bits_char, txt_bits_char);
+
+                int tx_bits[Nbitsperframe];
                 for(i=0; i<Nbitsperframe; i++) {
-                    tx_bits[i] = tx_bits_char[i];
+                    tx_bits[i] = tx_frame[i];
                 }
 
 	        if (config_verbose >=3) {
