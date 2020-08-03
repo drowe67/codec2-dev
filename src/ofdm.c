@@ -231,7 +231,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     ofdm->ncp = (int) (ofdm->tcp * ofdm->fs);     /* 700D: 16 */
     ofdm->inv_m = (1.0f / (float) ofdm->m);
     
-    /* basic sanity checkw */
+    /* basic sanity checks */
     assert((int)floorf(ofdm->fs / ofdm->rs) == ofdm->m);
     assert((ofdm->data_mode == 0) || (ofdm->data_mode == 1));
     
