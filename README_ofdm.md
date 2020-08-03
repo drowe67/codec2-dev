@@ -147,16 +147,16 @@ The rate 1/2 LDPC code can correct up to about 10% raw BER, so a good test is to
 
 1. HF Multipath:
    ```
-   octave:580> ofdm_tx("ofdm_test.raw","700D",60,4,'hf',20,-0.1)
+   octave:580> ofdm_tx("ofdm_test.raw","700D",60,2,'mpm',20)
    octave:581> ofdm_rx("ofdm_test.raw")
-   BER2.: 0.0997 Tbits: 93752 Terrs:  9344
+   BER2.: 0.0803 Tbits: 84728 Terrs:  6803
    ```
    
 1. AWGN:
    ```
-   octave:582> ofdm_tx("ofdm_test.raw","700D",60,0,'awgn')
+   octave:582> ofdm_tx("ofdm_test.raw","700D",60,-2,'awgn')
    octave:583> ofdm_rx("ofdm_test.raw")
-   BER2.: 0.0827 Tbits: 96846 Terrs:  8008
+   BER2.: 0.0885 Tbits: 84252 Terrs:  7459
    ```
    
 ## C Acceptance Tests
