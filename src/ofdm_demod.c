@@ -154,7 +154,7 @@ int main(int argc, char *argv[]) {
         {"tx_freq", 'f', OPTPARSE_REQUIRED},
         {"rx_freq", 'g', OPTPARSE_REQUIRED},
         {"verbose", 'v', OPTPARSE_REQUIRED},
-        {"ldpc", 'i', OPTPARSE_REQUIRED},
+        {"ldpc", 'i', OPTPARSE_NONE},
         {"nc", 'j', OPTPARSE_REQUIRED},
         {"tcp", 'k', OPTPARSE_REQUIRED},
         {"ts", 'l', OPTPARSE_REQUIRED},
@@ -192,12 +192,7 @@ int main(int argc, char *argv[]) {
                 testframes = true;
                 break;
             case 'i':
-                ldpc_en = atoi(options.optarg);
-                if ((ldpc_en != 1) && (ldpc_en !=2)) {
-                    fprintf(stderr, "--ldpc 1  (224,112) code used for 700D\n");
-                    fprintf(stderr, "--ldpc 2  (504,396) code used for 2020\n");
-                    opt_help();
-                }
+                ldpc_en = 1;
                 break;
             case 'f':
                 ofdm_config->tx_centre = atof(options.optarg);

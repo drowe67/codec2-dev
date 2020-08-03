@@ -385,20 +385,20 @@ if(UNITTEST)
     add_test(NAME test_OFDM_modem_700D
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
                             ./fsk_get_test_bits - 5000 | 
-                            ./ofdm_mod --ldpc 1 | 
-                            ./ofdm_demod  --ldpc 1 | 
+                            ./ofdm_mod --ldpc | 
+                            ./ofdm_demod  --ldpc | 
                             ./fsk_put_test_bits - -q")
            
     # noise free 2020 test, including reading and writing payload bits.  fsk_*_test_bits used as it does it's own frame sync
     add_test(NAME test_OFDM_modem_2020
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
                             ./fsk_get_test_bits - 5000 | 
-                            ./ofdm_mod --ldpc 2 --mode 2020 -p 312 | 
-                            ./ofdm_demod  --ldpc 2 --mode 2020 -p 312 | 
+                            ./ofdm_mod --ldpc --mode 2020 -p 312 | 
+                            ./ofdm_demod  --ldpc --mode 2020 -p 312 | 
                             ./fsk_put_test_bits - -q")
 
     add_test(NAME test_OFDM_modem_AWGN_BER
-             COMMAND sh -c "$<TARGET_FILE:ofdm_mod> --in /dev/zero --ldpc 1 --testframes 60 --txbpf | $<TARGET_FILE:cohpsk_ch> - - -20 --Fs 8000 -f -50 | $<TARGET_FILE:ofdm_demod> --out /dev/null --testframes --ldpc 1 --verbose 1"
+             COMMAND sh -c "$<TARGET_FILE:ofdm_mod> --in /dev/zero --ldpc --testframes 60 --txbpf | $<TARGET_FILE:cohpsk_ch> - - -20 --Fs 8000 -f -50 | $<TARGET_FILE:ofdm_demod> --out /dev/null --testframes --ldpc --verbose 1"
              )
 
     configure_file(unittest/ofdm_fade.sh.in unittest/ofdm_fade.sh)
@@ -520,12 +520,12 @@ if(LPCNET)
     add_test(NAME test_freedv_api_2020_to_ofdm_demod
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
                                ./freedv_tx 2020 ../../wav/wia_16kHz.wav - --testframes | 
-                               ./ofdm_demod --mode 2020 --verbose 1 --ldpc 2 -p 312 --testframes > /dev/null"
+                               ./ofdm_demod --mode 2020 --verbose 1 --ldpc -p 312 --testframes > /dev/null"
              )
 
     add_test(NAME test_freedv_api_2020_from_ofdm_mod
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
-                            ./ofdm_mod --in /dev/zero --mode 2020 --verbose 1 --ldpc 2 -p 312 --testframes 10 | 
+                            ./ofdm_mod --in /dev/zero --mode 2020 --verbose 1 --ldpc -p 312 --testframes 10 | 
                             ./freedv_rx 2020 - /dev/null --testframes"
              )
 

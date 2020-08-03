@@ -131,7 +131,7 @@ int main(int argc, char *argv[]) {
         {"testframes", 'f', OPTPARSE_REQUIRED},
         {"tx_freq", 'h', OPTPARSE_REQUIRED},
         {"rx_freq", 'i', OPTPARSE_REQUIRED},
-        {"ldpc", 'j', OPTPARSE_REQUIRED},
+        {"ldpc", 'j', OPTPARSE_NONE},
         {"txbpf", 'k', OPTPARSE_NONE},
         {"text", 'l', OPTPARSE_NONE},
         {"verbose", 'v', OPTPARSE_REQUIRED},
@@ -189,12 +189,7 @@ int main(int argc, char *argv[]) {
                 ofdm_config->rx_centre = atof(options.optarg);
                 break;
             case 'j':
-                ldpc_en = atoi(options.optarg);
-                if ((ldpc_en != 1) && (ldpc_en !=2)) {
-                    fprintf(stderr, "--ldpc 1  (224,112) code used for 700D\n");
-                    fprintf(stderr, "--ldpc 2  (504,396) code used for 2020\n");
-                    exit(1);
-                }
+                ldpc_en = 1;
                 break;
             case 'k':
                 txbpf_en = 1;
