@@ -130,10 +130,12 @@ int main(int argc, char *argv[]) {
 
     ldpc_codes_setup(&ldpc, "HRA_112_112");
 
+    Nbitsperframe = ofdm_get_bits_per_frame(ofdm);
+    int Ndatabitsperframe;
     if (config_ldpc_en) {
-        Nbitsperframe = ldpc.data_bits_per_frame;
+        Ndatabitsperframe = ldpc.data_bits_per_frame;
     } else {
-        Nbitsperframe = ofdm_get_bits_per_frame(ofdm) - ofdm->nuwbits - ofdm->ntxtbits;
+        Ndatabitsperframe = ofdm_get_bits_per_frame(ofdm) - ofdm->nuwbits - ofdm->ntxtbits;
     }
 
     Nsamperframe = ofdm_get_samples_per_frame(ofdm);
@@ -146,7 +148,7 @@ int main(int argc, char *argv[]) {
 
     int ofdm_ntxtbits =  ofdm_config->txtbits;
 
-    uint8_t tx_bits_char[Nbitsperframe];
+    uint8_t tx_bits_char[Ndatabitsperframe];
     int16_t tx_scaled[Nsamperframe];
     uint8_t txt_bits_char[ofdm_ntxtbits];
 
@@ -170,7 +172,7 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
-    while (read(sin, tx_bits_char, sizeof(char) * Nbitsperframe) == Nbitsperframe) {
+    while (read(sin, tx_bits_char, sizeof(char) * Ndatabitsperframe) == Ndatabitsperframe) {
         fprintf(stderr, "Frame %d\n", frame);
 
         if (config_profile) { PROFILE_SAMPLE(ofdm_mod_start); }
@@ -180,13 +182,13 @@ int main(int argc, char *argv[]) {
                 complex float tx_sams[Nsamperframe];
                 ofdm_ldpc_interleave_tx(ofdm, &ldpc, tx_sams, tx_bits_char, txt_bits_char);
 
-                    for(i=0; i<Nsamperframe; i++) {
-                        tx_scaled[i] = OFDM_AMP_SCALE * crealf(tx_sams[i]);
-                    }
+                for(i=0; i<Nsamperframe; i++) {
+                    tx_scaled[i] = OFDM_AMP_SCALE * crealf(tx_sams[i]);
+                }
 
              } else { // !config_ldpc_en
 
-                uint8_t tx_frame[ofdm_get_bits_per_frame(ofdm)];
+                uint8_t tx_frame[Nbitsperframe];
                 ofdm_assemble_qpsk_modem_packet(ofdm, tx_frame, tx_bits_char, txt_bits_char);
 
                 int tx_bits[Nbitsperframe];
