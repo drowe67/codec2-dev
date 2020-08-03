@@ -203,6 +203,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
         ofdm->ftwindowwidth = 11;
         ofdm->timing_mx_thresh = 0.30f;
         ofdm->data_mode = 0;
+        ofdm->codename = "HRA_112_11";
     } else {
         /* Use the users values */
 
@@ -222,6 +223,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
         ofdm->ftwindowwidth = config->ftwindowwidth;
         ofdm->timing_mx_thresh = config->timing_mx_thresh;
         ofdm->data_mode = config->data_mode;
+        ofdm->codename = config->codename;
     }
 
     ofdm->rs = (1.0f / ofdm->ts);                 /* Modulation Symbol Rate */
@@ -251,6 +253,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     ofdm->config.bad_uw_errors = ofdm->bad_uw_errors;
     ofdm->config.ftwindowwidth = ofdm->ftwindowwidth;
     ofdm->config.data_mode = ofdm->data_mode;
+    ofdm->config.codename = ofdm->codename;
     
     /* Calculate sizes from config param */
 

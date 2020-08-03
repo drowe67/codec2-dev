@@ -407,30 +407,23 @@ if(UNITTEST)
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/unittest
              )
            
-    configure_file(unittest/ofdm_phase_est_bw.sh.in unittest/ofdm_phase_est_bw.sh)
     add_test(NAME test_OFDM_modem_phase_est_bw
-             COMMAND ${CMAKE_CURRENT_BINARY_DIR}/unittest/ofdm_phase_est_bw.sh
-             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/unittest
-             )
+             COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/unittest;
+                            PATH=$PATH:${CMAKE_CURRENT_BINARY_DIR}/src ./ofdm_phase_est_bw.sh")
            
-    configure_file(unittest/ofdm_time_sync.sh.in unittest/ofdm_time_sync.sh)
+    add_test(NAME test_OFDM_modem_fading_DPSK_BER
+             COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/unittest;
+                            PATH=$PATH:${CMAKE_CURRENT_BINARY_DIR}/src ./ofdm_fade_dpsk.sh")
+
     add_test(NAME test_OFDM_modem_time_sync_700D
-             COMMAND ${CMAKE_CURRENT_BINARY_DIR}/unittest/ofdm_time_sync.sh 700D
-             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/unittest
-             )
+             COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/unittest;
+                            PATH=$PATH:${CMAKE_CURRENT_BINARY_DIR}/src ./ofdm_time_sync.sh 700D")
            
 if(LPCNET)
     add_test(NAME test_OFDM_modem_time_sync_2020
-             COMMAND ${CMAKE_CURRENT_BINARY_DIR}/unittest/ofdm_time_sync.sh 2020
-             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/unittest
-             )
+             COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/unittest;
+                            PATH=$PATH:${CMAKE_CURRENT_BINARY_DIR}/src ./ofdm_time_sync.sh 2020")
 endif()
-
-    configure_file(unittest/ofdm_fade_dpsk.sh.in unittest/ofdm_fade_dpsk.sh)
-    add_test(NAME test_OFDM_modem_fading_DPSK_BER
-             COMMAND ${CMAKE_CURRENT_BINARY_DIR}/unittest/ofdm_fade_dpsk.sh
-             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/unittest
-             )
 
     # Data mode tests
     add_test(NAME test_OFDM_modem_datac1_octave

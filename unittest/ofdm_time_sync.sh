@@ -3,7 +3,6 @@
 # David June 2019
 # Tests ofdm modem sync time, using real, off air files
 
-PATH=$PATH:@CMAKE_CURRENT_BINARY_DIR@/src
 onerun=$(mktemp)
 results=$(mktemp)
 
@@ -15,7 +14,7 @@ do
                    --start_secs $start_secs --len_secs 5 2>/dev/null > $onerun
     fi;
     if [ "$1" = "2020" ]; then
-        ofdm_demod --nc 31 --ts 0.0205 --in ../wav/david4.wav --out /dev/null --verbose 2 --ldpc 2 -p 312 \
+        ofdm_demod --mode 2020 --in ../wav/david4.wav --out /dev/null --verbose 2 --ldpc 2 -p 312 \
                    --start_secs $start_secs  --len_secs 5 2>/dev/null > $onerun
     fi;
     [ ! $? -eq 0 ] && { echo "error running ofdm_demod"; exit 1; }

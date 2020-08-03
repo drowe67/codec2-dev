@@ -76,23 +76,24 @@ typedef enum {
  */
 
 struct OFDM_CONFIG {
-    float tx_centre; /* TX Centre Audio Frequency */
-    float rx_centre; /* RX Centre Audio Frequency */
-    float fs;  /* Sample Frequency */
-    float rs;  /* Symbol Rate */
-    float ts;  /* symbol duration */
-    float tcp; /* Cyclic Prefix duration */
+    float tx_centre;   /* TX Centre Audio Frequency */
+    float rx_centre;   /* RX Centre Audio Frequency */
+    float fs;          /* Sample Frequency */
+    float rs;          /* Symbol Rate */
+    float ts;          /* symbol duration */
+    float tcp;         /* Cyclic Prefix duration */
     float timing_mx_thresh;
 
-    int nc;  /* Number of carriers */
-    int ns;  /* Number of Symbol frames */
-    int np;  /* number of modem frames per packet */
-    int bps;   /* Bits per Symbol */
-    int txtbits; /* number of auxiliary data bits */
-    int nuwbits; /* number of unique word bits */
+    int nc;            /* Number of carriers */
+    int ns;            /* Number of Symbol frames */
+    int np;            /* number of modem frames per packet */
+    int bps;           /* Bits per Symbol */
+    int txtbits;       /* number of auxiliary data bits */
+    int nuwbits;       /* number of unique word bits */
     int bad_uw_errors;
     int ftwindowwidth;
-    int data_mode; /* non-zero if this is a data mode */
+    int data_mode;     /* non-zero if this is a data mode */
+    char *codename;    /* name of LDPC code used with this mode */
 };
 
 struct OFDM {
@@ -203,6 +204,8 @@ struct OFDM {
     bool phase_est_en;
     bool tx_bpf_en;
     bool dpsk_en;
+
+    char *codename;
 };
 
 /* Prototypes */

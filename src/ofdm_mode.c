@@ -34,10 +34,11 @@ void ofdm_init_mode(char mode[], struct OFDM_CONFIG *config) {
     config->ftwindowwidth = 11;
     config->timing_mx_thresh = 0.30f;
     config->data_mode = 0;
+    config->codename = "HRA_112_112";
     
     if (strcmp(mode,"700D") == 0) {   
     } else if (strcmp(mode,"2020") == 0) {
-         config->ts = 0.0205;  config->nc = 31;
+         config->ts = 0.0205;  config->nc = 31; config->codename = "HRAb_396_504";
     } else if (strcmp(mode,"qam16") == 0) {
         config->ns=5; config->np=5; config->tcp = 0.004; config->ts = 0.016; config->nc = 33;
         config->bps=4; config->txtbits = 0; config->nuwbits = 15*4; config->bad_uw_errors = 5;

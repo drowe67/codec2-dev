@@ -141,7 +141,8 @@ int main(int argc, char *argv[]) {
     /* set up the default modem config */
     struct OFDM_CONFIG *ofdm_config = (struct OFDM_CONFIG *) calloc(1, sizeof (struct OFDM_CONFIG));
     assert(ofdm_config != NULL);
-    ofdm_init_mode("700D", ofdm_config);
+    char mode[32] = "700D";
+    ofdm_init_mode(mode, ofdm_config);
 
     struct optparse options;
     struct optparse_long longopts[] = {
@@ -236,7 +237,8 @@ int main(int argc, char *argv[]) {
                 dpsk = true;
                 break;
             case 'r':
-                ofdm_init_mode(options.optarg, ofdm_config);
+                strcpy(mode, options.optarg);
+                ofdm_init_mode(mode, ofdm_config);
                 break;
             case 'v':
                 verbose = atoi(options.optarg);
@@ -345,10 +347,8 @@ int main(int argc, char *argv[]) {
     float payload_amps[Npayloadsymsperpacket];
     
     if (ldpc_en) {
-        if (ldpc_en == 1)
-            ldpc_codes_setup(&ldpc, "HRA_112_112");
-        else
-            ldpc_codes_setup(&ldpc, "HRAb_396_504");
+        ldpc_codes_setup(&ldpc, ofdm->codename);
+        if (verbose > 1) { fprintf(stderr, "using: %s\n", ofdm->codename); }
 
         /* here is where we can change data bits per frame to a number smaller than LDPC code input data bits_per_frame */
         if (Ndatabitsperpacket) {

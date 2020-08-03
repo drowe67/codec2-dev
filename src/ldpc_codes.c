@@ -8,6 +8,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include "assert.h"
 #include "ldpc_codes.h"
 #include "interldpc.h"
 #include "H2064_516_sparse.h"  
@@ -147,10 +148,11 @@ void ldpc_codes_list() {
 }
 
 int ldpc_codes_find(char name[]) {
-    int code_index = 0;
+    int code_index = -1;
     for(int c=0; c<ldpc_codes_num(); c++)
         if (strcmp(ldpc_codes[c].name, name) == 0)
             code_index = c;
+    assert(code_index != -1); /* code not found */
     return code_index;
 }
 
