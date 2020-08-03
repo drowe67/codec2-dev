@@ -133,7 +133,7 @@ $  ./freedv_tx 2400B ../../raw/ve9qrp_10s.raw - | sox -t raw -r 48000 -s -2 - -t
 ## FreeDV 2020 tests with FreeDV API
 
 ```
-$ cat ~/LPCNet/wav/wia.wav | ~/LPCNet/build_linux/src/lpcnet_enc -s | ./ofdm_mod --mode 2020 --verbose 1 -p 312 | ./ofdm_demod --mode 2020 --verbose 1 --ldpc -p 312 | ~/LPCNet/build_linux/src/lpcnet_dec -s | aplay -f S16_LE -r 16000
+$ cat ~/LPCNet/wav/wia.wav | ~/LPCNet/build_linux/src/lpcnet_enc -s | ./ofdm_mod --mode 2020 --ldpc --verbose 1 -p 312 | ./ofdm_demod --mode 2020 --verbose 1 --ldpc -p 312 | ~/LPCNet/build_linux/src/lpcnet_dec -s | aplay -f S16_LE -r 16000
 ```
 Listen the reference tx:
 ```

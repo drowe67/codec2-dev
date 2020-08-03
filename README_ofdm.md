@@ -36,7 +36,7 @@ Built as part of codec2-dev, see [README](README.md) for build instructions.
    
 1. Generate 10 seconds of uncoded test frame bits, modulate, demodulate, count errors:
    ```
-   $  build_linux/src$ ./ofdm_mod --in /dev/zero --testframes 10 | ./ofdm_demod --out /dev/null --testframes --verbose 1
+   $  build_linux/src$ ./ofdm_mod --in /dev/zero --testframes 10 | ./ofdm_demod --out /dev/null --testframes --verbose 1 --log demod_dump.txt
    ```   
    Use Octave to look at plots of C modem operation:
    ```
@@ -53,8 +53,7 @@ Built as part of codec2-dev, see [README](README.md) for build instructions.
    octave:1> ofdm_rx("ofdm_test.raw")
    ```
    The Octave modulator ofdm_tx can simulate channel impairments, for
-   example AWGN noise at an Eb/No of 4dB measured on 1400 bit/s raw
-   uncoded bits:
+   example AWGN noise at 4dB SNR:
    ```
      octave:1> ofdm_tx("ofdm_test.raw", "700D", 10, 4)
    ```
@@ -63,7 +62,7 @@ Built as part of codec2-dev, see [README](README.md) for build instructions.
      build_linux/src$ ./ofdm_demod --in ../../octave/ofdm_test.raw --out /dev/null --testframes --verbose 1
    ```
 
-1. Run mod/demod with LDPC FEC; 60 seconds, 3dB Eb/No, Eb/No measured on 700 bit/s payload data bits.  For rate 1/2 code this is equivalent to 0dB on 1400 bit/s uncoded bits (0dB Eb/No argument for ofdm_tx())
+1. Run mod/demod with LDPC FEC; 60 seconds, 3dB SNR:
    ```
      octave:6> ofdm_ldpc_tx('ofdm_test.raw',"700D",60,3)
      octave:7> ofdm_ldpc_rx('ofdm_test.raw',"700D")
@@ -80,7 +79,7 @@ Built as part of codec2-dev, see [README](README.md) for build instructions.
    
 1. Listen to signal through simulated fading channel in C:
    ```
-   build_linux/src$ ./c2enc 700C ../../raw/ve9qrp_10s.raw - --bitperchar | ./ofdm_mod --ldpc | ./cohpsk_ch - - -20 -Fs 8000 --slow -f -5 | aplay -f S16
+   build_linux/src$ ./c2enc 700C ../../raw/ve9qrp_10s.raw - --bitperchar | ./ofdm_mod --ldpc | ./cohpsk_ch - - -20 --Fs 8000 --slow -f -5 | aplay -f S16
    ```
    
 1. Run test frames through simulated channel in C:
@@ -95,30 +94,30 @@ Built as part of codec2-dev, see [README](README.md) for build instructions.
    
 1. FreeDV 1600 on the same channel conditions, roughly same quality at 8dB higher SNR:
    ```
-   build_linux/src$ ./freedv_tx 1600 ../../raw/ve9qrp_10s.raw - - | ./cohpsk_ch - - -30 --Fs 8000 -f -10 --fast | ./freedv_rx 1600 - -  | aplay -f S16
+   build_linux/src$ ./freedv_tx 1600 ../../raw/ve9qrp_10s.raw - | ./cohpsk_ch - - -30 --Fs 8000 -f -10 --fast | ./freedv_rx 1600 - - | aplay -f S16
    ```
    
 1. Using FreeDV API test programs:
    ``` 
    build_linux/src$ ./freedv_tx 700D ../../raw/hts1a.raw - --testframes | ./freedv_rx 700D - /dev/null --testframes
    build_linux/src$ ./freedv_tx 700D ../../raw/hts1a.raw - | ./freedv_rx 700D - - | aplay -f S16
-   build_linux/src$ ./freedv_tx 700D ../../raw/ve9qrp.raw - - | ./cohpsk_ch - - -26 --Fs 8000 -f -10 --fast | ./freedv_rx 700D - - | aplay -f S16
+   build_linux/src$ ./freedv_tx 700D ../../raw/ve9qrp.raw - | ./cohpsk_ch - - -26 --Fs 8000 -f -10 --fast | ./freedv_rx 700D - - | aplay -f S16
    ```
    
 ## FreeDV 2020 extensions
 
 1. 37 Carrier waveform with a (504,396) code:
    ```
-   build_linux/src$ nc=37; ./ofdm_mod --in /dev/zero --testframes 300 --nc $nc --ldpc 2 --verbose 1 | ./cohpsk_ch - - -22.5 --Fs 8000 -f 10 --ssbfilt 1 | ./ofdm_demod --out /dev/null --testframes --nc $nc --verbose 1 --ldpc 2
+   build_linux/src$ nc=37; ./ofdm_mod --in /dev/zero --testframes 300 --mode 2020 --nc $nc --ldpc --verbose 1 | ./cohpsk_ch - - -22.5 --Fs 8000 -f 10 --ssbfilt 1 | ./ofdm_demod --out /dev/null --testframes --mode 2020 --nc $nc --verbose 1 --ldpc
    
    SNR3k(dB):  4.05 C/No: 38.8 PAPR: 10.8 
    BER......: 0.0348 Tbits: 1044792 Terrs: 36345
    Coded BER: 0.0094 Tbits: 820908 Terrs:  7717
    ```
 
-1.  20.5ms symbol period, 31 carrier waveform, (504,396) code, but only 312 data bits used, so we don't send unused data bits.  This means we need less carriers (so more power per carrier), and code rate is increased slightly (sorta).  Anyhoo, it works about 1.7dB better:
+1.  20.5ms symbol period, 31 carrier waveform, (504,396) code, but only 312 data bits used, so we don't send unused data bits.  This means we need less carriers (so more power per carrier), and code rate is increased slightly (sorta).  Anyhoo, it works about 1.5dB better:
     ```
-    build_linux/src$ nc=31; ./ofdm_mod --in /dev/zero --testframes 300 --ts 0.0205 --nc $nc --ldpc 2 --verbose 1 -p 312 | ./cohpsk_ch - - -21.6 --Fs 8000 -f 10 --ssbfilt 1 | ./ofdm_demod --out /dev/null --testframes --ts 0.0205 --nc $nc --verbose 1 --ldpc 2 -p 312
+    build_linux/src$ ./ofdm_mod --in /dev/zero --testframes 300 --mode 2020 --ldpc 1 --verbose 1 -p 312 | ./cohpsk_ch - - -22 --Fs 8000 -f 10 --ssbfilt 1 | ./ofdm_demod --out /dev/null --testframes --mode 2020 --verbose 1 --ldpc -p 312
 
     SNR3k(dB):  2.21 C/No: 37.0 PAPR:  9.6 
     BER......: 0.0505 Tbits: 874020 Terrs: 44148
