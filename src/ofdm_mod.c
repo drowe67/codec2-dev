@@ -290,8 +290,8 @@ int main(int argc, char *argv[]) {
         ofdm_set_dpsk(ofdm, 1);
     }
 
-    uint8_t txt_bits[ofdm_ntxtbits];
-    memset(txt_bits, 0, ofdm_ntxtbits);
+    uint8_t txt_bits[ofdm->ntxtbits];
+    memset(txt_bits, 0, ofdm->ntxtbits);
     char text_str[] = "cq cq cq hello world\r"; // Add text bits to match other tests
     char *ptr_text = text_str;
 
@@ -322,7 +322,7 @@ int main(int argc, char *argv[]) {
 
                 if (use_text) {
                     // Get text bits
-                    int nspare = ofdm_ntxtbits;
+                    int nspare = ofdm->ntxtbits;
                     int k;
 
                     for (k = 0; k < nspare; k++) {
