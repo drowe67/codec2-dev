@@ -76,21 +76,24 @@ typedef enum {
  */
 
 struct OFDM_CONFIG {
-    float tx_centre; /* TX Centre Audio Frequency */
-    float rx_centre; /* RX Centre Audio Frequency */
-    float fs;  /* Sample Frequency */
-    float rs;  /* Modulation Symbol Rate */
-    float ts;  /* symbol duration */
-    float tcp; /* Cyclic Prefix duration */
+    float tx_centre;   /* TX Centre Audio Frequency */
+    float rx_centre;   /* RX Centre Audio Frequency */
+    float fs;          /* Sample Frequency */
+    float rs;          /* Symbol Rate */
+    float ts;          /* symbol duration */
+    float tcp;         /* Cyclic Prefix duration */
     float timing_mx_thresh;
 
-    int nc;  /* Number of carriers */
-    int ns;  /* Number of Symbol frames */
-    int bps;   /* Bits per Symbol */
-    int txtbits; /* number of auxiliary data bits */
+    int nc;            /* Number of carriers */
+    int ns;            /* Number of Symbol frames */
+    int np;            /* number of modem frames per packet */
+    int bps;           /* Bits per Symbol */
+    int txtbits;       /* number of auxiliary data bits */
+    int nuwbits;       /* number of unique word bits */
+    int bad_uw_errors;
     int ftwindowwidth;
-
-    int samples_per_frame;
+    int data_mode;     /* non-zero if this is a data mode */
+    char *codename;    /* name of LDPC code used with this mode */
 };
 
 struct OFDM {
@@ -107,15 +110,23 @@ struct OFDM {
     int bps; 	/* Bits per symbol */
     int m; 	/* duration of each symbol in samples */
     int ncp; 	/* duration of CP in samples */
-
+    int np;     /* number of modem frames per packet. In some modes we want */
+                /* the total packet of data to span multiple modem frames, e.g. HF data */
+                /* and/or when the FEC codeword is larger than the one */
+                /* modem frame.  In other modes (e.g. 700D/2020) Np=1, ie the modem frame */
+                /* is the same length as the packet/FEC frame. */
     int ftwindowwidth;
-    int bitsperframe;
+    int bitsperframe;      /* total bits in all data symbols in modem frame */
+    int bitsperpacket;     /* total bits in all data symbols in a packet */
     int rowsperframe;
+    int samplespersymbol;
     int samplesperframe;
     int max_samplesperframe;
+    int nuwframes;
     int nrxbuf;
-    int ntxtbits; /* reserve bits/frame for aux text information */
-    int nuwbits; /* Unique word used for positive indication of lock */
+    int ntxtbits;         /* reserve bits/frame for aux text information */
+    int nuwbits;          /* number of unique word bits used to achieve packet frame sync */
+    int bad_uw_errors;
 
     float tx_centre; /* TX Center frequency */
     float rx_centre; /* RX Center frequency */
@@ -123,6 +134,7 @@ struct OFDM {
     float ts; /* Symbol cycle time */
     float rs; /* Symbol rate */
     float tcp; /* Cyclic prefix duration */
+    float tpacket; /* time for one packet in ms */
     float inv_m; /* 1/m */
     float tx_nlower; /* TX lowest carrier freq */
     float rx_nlower; /* RX lowest carrier freq */
@@ -149,8 +161,6 @@ struct OFDM {
     // State enums
     State sync_state;
     State last_sync_state;
-    State sync_state_interleaver;
-    State last_sync_state_interleaver;
 
     // Sync enums
     Sync sync_mode;
@@ -183,8 +193,9 @@ struct OFDM {
     int uw_errors;
     int sync_counter;
     int frame_count;
-    int frame_count_interleaver;
-
+    int modem_frame; /* increments for every modem frame in packet */
+    int data_mode;
+    
     // Boolean
     bool sync_start;
     bool sync_end;
@@ -192,17 +203,22 @@ struct OFDM {
     bool foff_est_en;
     bool phase_est_en;
     bool tx_bpf_en;
-    bool dpsk;
+    bool dpsk_en;
+
+    char *codename;
 };
 
 /* Prototypes */
 
 complex float qpsk_mod(int *);
+complex float qam16_mod(int *);
 void qpsk_demod(complex float, int *);
+void qam16_demod(complex float, int *);
 void ofdm_txframe(struct OFDM *, complex float *, complex float []);
-void ofdm_assemble_modem_frame(struct OFDM *, uint8_t [], uint8_t [], uint8_t []);
-void ofdm_assemble_modem_frame_symbols(struct OFDM *, complex float [], COMP [], uint8_t []);
-void ofdm_disassemble_modem_frame(struct OFDM *, uint8_t [], COMP [], float [], short []);
+void ofdm_assemble_qpsk_modem_packet(struct OFDM *, uint8_t [], uint8_t [], uint8_t []);
+void ofdm_assemble_qpsk_modem_packet_symbols(struct OFDM *, complex float [], COMP [], uint8_t []);
+void ofdm_disassemble_qpsk_modem_packet(struct OFDM *, complex float rx_syms[], float rx_amps[], COMP [], float [], short []);
+void ofdm_extract_uw(struct OFDM *ofdm, complex float rx_syms[], float rx_amps[], uint8_t rx_uw[]);
 void ofdm_rand(uint16_t [], int);
 void ofdm_generate_payload_data_bits(uint8_t [], int);
 int ofdm_get_phase_est_bandwidth_mode(struct OFDM *);
@@ -213,4 +229,3 @@ void ofdm_set_phase_est_bandwidth_mode(struct OFDM *, int);
 #endif
 
 #endif
-

@@ -8,17 +8,21 @@ STM32F4 Discovery board.
 
 ## Quickstart
 
-Required:
-* You must have numpy for Python3 installed
-* You must have an arm-none-eabi-gdb install and in your path (see codec2/stm32/README.md)
-* You must have STM32F4xx_DSP_StdPeriph_Lib_V1.8.0 (see codec2/stm32/README.md)
-* You must build openocd from source and have it in your path (see below)
+Requirements:
+* python3/numpy
+* arm-none-eabi-gdb install and in your path (see codec2/stm32/README.md)
+* STM32F4xx_DSP_StdPeriph_Lib_V1.8.0 (see codec2/stm32/README.md)
+* build openocd from source and have it in your path (see below)
 
-Build codec2 for Linux, then the stm32, and run tests on stm32 Discovery:
+Build codec2 for x86 Linux and run the ctests.  This generates several artifacts required for the stm32 tests:
 
 ```
 $ cd ~/codec2
-$ mkdir build_linux && cd build_linux && cmake .. && make
+$ mkdir build_linux && cd build_linux && cmake .. && make && ctest
+```
+
+Now build for the stm32, and run the stm32 ctests:
+```
 $ cd ~/codec2/stm32 && mkdir build_stm32 && cd build_stm32
 $ cmake -DCMAKE_TOOLCHAIN_FILE=../cmake/STM32_Toolchain.cmake -DPERIPHLIBDIR=~/Downloads/STM32F4xx_DSP_StdPeriph_Lib_V1.8.0 ..
 $ make
@@ -84,7 +88,44 @@ When each test runs, a directory is created, and several log files generated.
    $ CFLAGS=-DEBUG_ALLOC cmake -DCMAKE_TOOLCHAIN_FILE=../cmake/STM32_Toolchain.cmake \
      -DPERIPHLIBDIR=~/Downloads/STM32F4xx_DSP_StdPeriph_Lib_V1.8.0 ..
    ```
-   
+
+## Sequence of a Test
+
+Consider the example:
+```
+build_stm32$ ctest -R tst_ldpc_dec_noise
+```
+
+1. The test is kicked off based on `src/CMakeLists.txt`, which calls `scipts/run_stm32_tst`
+1. `run_stm32_tst` calls the test setup script, e.g. `tst_ldpc_dec_setup`.  Typically, this will run a host version to generate a reference.
+1. `run_stm32_tst` runs the stm32 executable on the Discovery, e.g. `tst_ldpc_dec`, the source is in `src/tst_ldpc_dec.c`
+1. The steup and check scripts can handle many sub cases, e.g. `ideal` and `noise`.
+1. `run_stm32_tst` calls the test check script, e.g. `tst_ldpc_dec_check` which typically compares the host generated reference to the output from the stm32.
+1. As the test runs, various files are generated in `test_run/tst_ldpc_dec_noise`
+1. When debugging it's useful to run the ctest with the verbose option:
+   ```
+   $ ctest -V -R tst_ldpc_dec_noise
+   ```
+   Set the `-x` at the top of the scripts to trace execution:
+   ```
+   #!/bin/bash -x
+   #
+   # tst_ldpc_enc_check
+
+   ```
+      
+## Directory Structure
+
+   | Path | Description |
+   | --- | --- |
+   | `scripts`   | Scripts for unittest system
+   | `src`       | stm32 C sources
+   | `\src\CMakeLists.txt` | ctests are defined here 
+   | `lib/python`| Python library files
+   | `lib/octave`| Octave library files
+   | `test_run`  | Files created by each test as it runs
+
+
 ## Running the tests remotely
 
 If the stm32 hardware is connected on a different pc with linux, the tests can be run remotely.
@@ -99,29 +140,6 @@ Test will run slower, roughly 3 times.
 ```
 UT_SSH_PARAMS="-p 22 -q remoteuser@remotemachine" ctest -V
 ```
-
-## Objectives
-
-It is important to have a robust set of tests for the functionality
-of any software project, especially when there are multiple developers.
-
-It is easier to test small units of code first as stand alone functions.
-
-The more automated the test system is the easier it is to run and thus
-the more likely people are to run it.
-
-
-## Directory Structure
-
-   |Path        |        Description|
-   |------------|-------------------|
-   |`scripts`   |   Where scripts for this unittest system are found and run
-   |`src`       | Where the stm32 sources are
-   |`lib`       | Where includable files for this unittest system are found
-   |`lib/python`|    python library files
-   |`lib/octave`|    octave library files
-   |`test_run`  |Each test is run in a subdirectory here.
-
 
 ## Debug and Semihosting
 

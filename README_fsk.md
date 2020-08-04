@@ -14,7 +14,7 @@ This modem can demodulate FSK signals that sound like [this sample](doc/lockdown
 
 ## Credits
 
-The Octave version of the modem was developed by David Rowe.  Brady O'Brien ported the modem to C, and wrote the C/Octave tests.  The modem is being maintained by David Rowe.  Mark Jessop has helped improve the modem operation by testing against various balloon telemtry waveforms.
+The Octave version of the modem was developed by David Rowe.  Brady O'Brien ported the modem to C, and wrote the C/Octave tests.  The modem is being maintained by David Rowe.  Mark Jessop has helped improve the modem operation by testing against various balloon telemtry waveforms.  Bill Cowley has developed the Log Likelihood Ratio (LLR) algorithms for 4FSK.
 
 ## Quickstart
 
@@ -61,27 +61,59 @@ The Octave version of the modem was developed by David Rowe.  Brady O'Brien port
 
 1. You can visualise the C modem operation with a companion python script, for example:
    ```
-   ./fsk_get_test_bits - 10000 | ./fsk_mod -p 10 4 8000 400 400 400 - - | ./fsk_demod -p 10 -t1 4 8000 400 - /dev/null 2>stats.txt
-   python ../../octave/plot_fsk_demod_stats.py stats.txt
+   $ ./fsk_get_test_bits - 10000 | ./fsk_mod -p 10 4 8000 400 400 400 - - | ./fsk_demod -p 10 -t1 4 8000 400 - /dev/null 2>stats.txt
+   $ python ../../octave/plot_fsk_demod_stats.py stats.txt
    ```
 
-1. Send some digital voice using FSK at 800 bits/s, the try the two 2400 bits/s FSK modes:
+1. Send some digital voice using FSK at 800 bits/s, and try the two 2400 bits/s FSK modes:
    ```
-   ./freedv_tx 800XA ../../raw/ve9qrp.raw - | ./freedv_rx 800XA - - -vv | aplay -f S16_LE
-   ./freedv_tx 2400A ../../raw/ve9qrp.raw - | ./freedv_rx 2400A - - -vv | aplay -f S16_LE
-   ./freedv_tx 2400B ../../raw/ve9qrp.raw - | ./freedv_rx 2400B - - -vv | aplay -f S16_LE
+   $ ./freedv_tx 800XA ../../raw/ve9qrp.raw - | ./freedv_rx 800XA - - -vv | aplay -f S16_LE
+   $ ./freedv_tx 2400A ../../raw/ve9qrp.raw - | ./freedv_rx 2400A - - -vv | aplay -f S16_LE
+   $ ./freedv_tx 2400B ../../raw/ve9qrp.raw - | ./freedv_rx 2400B - - -vv | aplay -f S16_LE
    ```
+
+1. LDPC encoded 4FSK, with framing:
+   ```
+   $ cd ~/codec2/build_linux/src
+   $ ./ldpc_enc /dev/zero - --code H_256_512_4 --testframes 200 |
+     ./framer - - 512 5186 | ./fsk_mod 4 8000 100 1000 100 - - |
+     ./cohpsk_ch - - -24 --Fs 8000  |
+     ./fsk_demod -s 4 8000 100 - - |
+     ./deframer - - 512 5186  |
+     ./ldpc_dec - /dev/null --code H_256_512_4 --testframes
+   <snip>
+   SNR3k(dB): -7.74 C/No: 27.0 PAPR:  3.0 
+   Raw   Tbits: 100352 Terr:   6701 BER: 0.067
+   Coded Tbits:  50176 Terr:    139 BER: 0.003
+         Tpkts:    196 Tper:      4 PER: 0.020
+   ```
+   In this example the unique word is the 16 bit sequence `5186`.  Se also several ctests using these application. Other codes are also available:
+   ```
+   $ ./ldpc_enc --listcodes
+
+   H2064_516_sparse     rate 0.80 (2580,2064) 
+   HRA_112_112          rate 0.50 (224,112) 
+   HRAb_396_504         rate 0.79 (504,396) 
+   H_256_768            rate 0.33 (768,256) 
+   H_256_512_4          rate 0.50 (512,256) 
+   HRAa_1536_512        rate 0.75 (2048,1536) 
+   H_128_256_5          rate 0.50 (256,128)
+   ```
+   If you change the code you also need to change the `frameSizeBits` argument in `framer/deframer` (`512` in the example above).
    
 1. FSK modem C files in ```codec2/src```:
 
    | File | Description |
    | ---  | --- |
-   | fsk.c/fsk.h | Core FSK modem library |
+   | fsk.c/fsk.h | core FSK modem library |
    | fsk_mod.c | command line modulator |
    | fsk_demod.c | command line demodulator |
    | fsk_get_test_bits.c | source of test bits |
    | fsk_put_test_bits.c | test bit sync, counts bit errors and packet errors |
    | fsk_mod_ext_vco.c | modulator that uses an external FSK oscillator |
+   | framer.c | adds a unique word to a frame of bits to implement frame sync for LDPC codewords |
+   | deframer.c | locates and strips a unique word to implement frame sync for LDPC codewords |
+   | tollr.c | converts bits to LLRs for testing LDPC framing |
 
 1. GNU Octave files in ```codec2/octave```:
 
@@ -90,8 +122,12 @@ The Octave version of the modem was developed by David Rowe.  Brady O'Brien port
    | fsk_lib.m | Core FSK modem library |
    | fsk_lib_demo.m | A demonstration of fsk_lib, runs a single point BER test |
    | fsk_demod_file.m | Demodulates FSK signals from a file, useful for debugging FSK waveforms |
-   | fsk_lock_down.m | simulations to support the "lock down" waveform |
+   | fsk_lock_down.m | simulations to support the "lock down" low SNR waveform |
    | tfsk.m | automated test that compares the C and Octave versions of the modem |
+   | fsk_cml.m | Symbol rate experiments with FSK modem LLR estimation and LDPC |
+   | fsk_cml_sam.m | Sample rate experiments with FSK modem LLR estimation and LDPC |
+   | fsk_llr_plot.m | Plots curves from fsk_cml.m & fsk_cml_sam.m |
+   | fsk_lib_ldpc_demo.m | CML library LLR routines and LDPC codes with fsk_lib.m |
    
    You can run many of them from the Octave command line:
    ```
@@ -114,23 +150,13 @@ The Octave version of the modem was developed by David Rowe.  Brady O'Brien port
    ```
    These are written in ```codec2/CmakeLists.txt```, inspect them to find out how we test the modem.
 
-1. The Octave version is useful for peering inside the modem, for example when debugging.  Here is an example of debugging a Wenet sample:
-   ```
-   $ octave --no-gui
-   octave:1> fsk_horus_as_a_lib=1; fsk_horus; demod_file("../raw/wenet_sample.c8",test_frame_mode=9, 0, 100, max_frames=50);
-   ```
-   Running this pops up a bunch of plots. Here is the 3D plot the modem spectrum evolving over time, using a 128 point FFT:
-   ![Wenet spectrum 3D](doc/wenet_spectrum_3d.png)
-
-   This is a 2FSK signal so we should see two tones.  However there are three tones. The lowest one is a "DC line" common in signals from RTL-SDRs or those with coarse quantisation.  This DC tone was confusing the "peak" frequency estimator.
-
-   To work around this problem we can tell the C version of the modem to ignore low frequency tones with the ```fsk_lower``` option:
+1. ```fsk_demod_file.m``` is useful for peering inside the modem, for example when debugging.
    ```
    $ cd ~/codec2/build_linux/src
-   $ cat /home/david/codec2/raw/wenet_sample.c8 | ./fsk_demod --cu8 --fsk_lower 500 -s 2 8000 1000 - - | ./drs232_ldpc - /dev/null
-   packets: 17 packet_errors: 0 PER: 0.000
+   $ ./fsk_get_test_bits - 1000 | ./fsk_mod 2 8000 100 1000 1000 - ../../octave/fsk.s16
+   $ octave --no-gui
+   octave:1> fsk_demod_file("fsk.s16",format="s16",8000,100,2)
    ```
-   This successfully decodes all 17 packets in the sample with no errors, yayyy!
    
 ## Further Reading
 
@@ -145,3 +171,4 @@ The Octave version of the modem was developed by David Rowe.  Brady O'Brien port
    1. [FreeDV 2400A and 2400B](http://www.rowetel.com/?p=5219), digital speech for VHF/UHF radios.
    1. [HF FSK with Rpitx](http://www.rowetel.com/?p=6317), a zero hardware FSK transmitter using a Pi
    1. [Eb/No and SNR worked Example](http://www.rowetel.com/wordpress/?p=4621)
+   1. [FSK LLR LDPC Code Experiments](https://github.com/drowe67/codec2/pull/129)

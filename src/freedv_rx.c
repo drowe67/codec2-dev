@@ -52,7 +52,7 @@ int main(int argc, char *argv[]) {
     int                        sync;
     float                      snr_est;
     float                      clock_offset;
-    int                        use_testframes, interleave_frames, verbose, discard, use_complex, use_dpsk;
+    int                        use_testframes, verbose, discard, use_complex, use_dpsk;
     int                        use_squelch;
     float                      squelch = 0;
     int                        i;
@@ -63,7 +63,7 @@ int main(int argc, char *argv[]) {
         sprintf(f2020,"|2020");
         #endif     
 	printf("usage: %s 1600|700C|700D|2400A|2400B|800XA%s InputModemSpeechFile OutputSpeechRawFile\n"
-               " [--testframes] [--interleaver depth] [-v] [--discard] [--usecomplex] [--dpsk] [--squelch leveldB]\n", argv[0],f2020);
+               " [--testframes] [-v] [--discard] [--usecomplex] [--dpsk] [--squelch leveldB]\n", argv[0],f2020);
 	printf("e.g    %s 1600 hts1a_fdmdv.raw hts1a_out.raw\n", argv[0]);
 	exit(1);
     }
@@ -97,22 +97,20 @@ int main(int argc, char *argv[]) {
 	exit(1);
     }
 
-    use_testframes = 0; interleave_frames = 1; verbose = 0; discard = 0; use_complex = 0; use_dpsk = 0;
-    use_squelch = 0;
+    use_testframes = verbose = discard = use_complex = use_dpsk = use_squelch = 0;
     
     if (argc > 4) {
         for (i = 4; i < argc; i++) {
-            if (strcmp(argv[i], "--testframes") == 0)  use_testframes = 1;
-            else if (strcmp(argv[i], "--interleave") == 0) { interleave_frames = atoi(argv[i+1]); i++; }
+            if (strcmp(argv[i], "--testframes") == 0) use_testframes = 1;
             else if (strcmp(argv[i], "-v") == 0) verbose = 1;
             else if (strcmp(argv[i], "-vv") == 0) verbose = 2;
             else if (strcmp(argv[i], "--discard") == 0) discard = 1;
             else if (strcmp(argv[i], "--usecomplex") == 0) use_complex = 1;
             else if (strcmp(argv[i], "--squelch") == 0) {
-                squelch = atof(argv[i+1]); i++;
+                squelch = atof(argv[i + 1]);
+                i++;
                 use_squelch = 1;
-            }
-            else if (strcmp(argv[i], "--dpsk") == 0) use_dpsk = 1;
+            } else if (strcmp(argv[i], "--dpsk") == 0) use_dpsk = 1;
             else {
                 fprintf(stderr, "unkown option: %s\n", argv[i]);
                 exit(1);
@@ -120,17 +118,7 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    /* use the "advanced" version of freedv_open to provide a little
-       extra info, in this case the interleaver depth */
-    if ((mode == FREEDV_MODE_700D) || (mode == FREEDV_MODE_2020)) {
-        struct freedv_advanced adv;
-        adv.interleave_frames = interleave_frames;
-        freedv = freedv_open_advanced(mode, &adv);
-    }
-    else {
-        /* however this is how we start FreeDV most of the time */
-        freedv = freedv_open(mode);
-    }
+    freedv = freedv_open(mode);
     assert(freedv != NULL);
 
     /* set up a few options, calling these is optional -------------------------*/
@@ -163,13 +151,13 @@ int main(int argc, char *argv[]) {
                for testing 700D which has a different code path for
                short samples) */
             COMP demod_in_complex[nin];
+            
             for(int i=0; i<nin; i++) {
                 demod_in_complex[i].real = (float)demod_in[i];
-                demod_in_complex[i].imag = 0.0;
+                demod_in_complex[i].imag = 0.0f;
             }
             nout = freedv_comprx(freedv, speech_out, demod_in_complex);
-        }
-        else {
+        } else {
             // most common interface - real shorts in, real shorts out
             nout = freedv_rx(freedv, speech_out, demod_in);
         }
@@ -225,7 +213,7 @@ int main(int argc, char *argv[]) {
                     (double)coded_ber, Tbits_coded, Terrs_coded);
 
             /* set return code for Ctest */
-            if ((uncoded_ber < 0.1) && (coded_ber < 0.01))
+            if ((uncoded_ber < 0.1f) && (coded_ber < 0.01f))
                 return 0;
             else
                 return 1;

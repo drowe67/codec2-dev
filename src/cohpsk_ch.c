@@ -33,12 +33,12 @@
 #include <math.h>
 #include <errno.h>
 
+#include "codec2_fdmdv.h"
 #include "codec2_cohpsk.h"
 #include "comp_prim.h"
 #include "noise_samples.h"
 #include "ht_coeff.h"
 #include "ssbfilt_coeff.h"
-#include "codec2_fdmdv.h"
 
 #include "debug_alloc.h"
 
@@ -266,7 +266,7 @@ int main(int argc, char *argv[])
 	                          Channel
 	\*---------------------------------------------------------*/
 
-        fdmdv_freq_shift(ch_fdm, ch_in, foff_hz, &phase_ch, BUF_N);
+        fdmdv_freq_shift_coh(ch_fdm, ch_in, foff_hz, Fs, &phase_ch, BUF_N);
 
         /* optional HF fading -------------------------------------*/
 

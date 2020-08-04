@@ -39,15 +39,13 @@
 
 #include "codec2_ofdm.h"
 #include "ofdm_internal.h"
-#include "interldpc.h"
+#include "ofdm_mode.h"
 #include "gp_interleaver.h"
+#include "ldpc_codes.h"
+#include "interldpc.h"
 #include "varicode.h"
 
 #define IS_DIR_SEPARATOR(c)     ((c) == '/')
-
-static int ofdm_bitsperframe;
-static int ofdm_nuwbits;
-static int ofdm_ntxtbits;
 
 static const char *progname;
 
@@ -55,12 +53,12 @@ void opt_help() {
     fprintf(stderr, "\nusage: %s [options]\n\n", progname);
     fprintf(stderr, "  --in      filename    Name of InputOneCharPerBitFile\n");
     fprintf(stderr, "  --out     filename    Name of OutputModemRawFile\n");
+    fprintf(stderr, "  --mode    modeName    Predefined mode 700D|2020|datac1\n");    
     fprintf(stderr, "  --nc      [17..62]    Number of Carriers (17 default, 62 max)\n");
-    fprintf(stderr, "  --ns       Nframes    Number of Symbol Frames (8 default)\n");
+    fprintf(stderr, "  --ns       symbols    One pilot every ns symbols (8 default)\n");
     fprintf(stderr, "  --tcp        Nsecs    Cyclic Prefix Duration (.002 default)\n");
     fprintf(stderr, "  --ts         Nsecs    Symbol Duration (.018 default)\n");
     fprintf(stderr, "  --testframes Nsecs    Transmit test frames (adjusts test frames for raw and LDPC modes)\n");
-    fprintf(stderr, "  --interleave depth    Interleave depth for LDPC frames, e.g. 1,2,4,8,16 (default is 1)\n");
     fprintf(stderr, "  --tx_freq     freq    Set an optional modulation TX centre frequency (1500.0 default)\n");
     fprintf(stderr, "  --rx_freq     freq    Set an optional modulation RX centre frequency (1500.0 default)\n\n");
     fprintf(stderr, "  --verbose  [1|2|3]    Verbose output level to stderr (default off)\n");
@@ -76,7 +74,7 @@ void opt_help() {
 
 int main(int argc, char *argv[]) {
     char *fin_name, *fout_name;
-    int i, j, opt, val;
+    int i, opt, val;
 
     char *pn = argv[0] + strlen(argv[0]);
 
@@ -84,12 +82,6 @@ int main(int argc, char *argv[]) {
         --pn;
 
     progname = pn;
-
-    /* See if they want help */
-
-    if (argc == 1) {
-        opt_help();
-    }
 
     /* Turn off stream buffering */
 
@@ -102,7 +94,6 @@ int main(int argc, char *argv[]) {
     /* set for LDPC coded or uncoded frames */
 
     int ldpc_en = 0;
-    int interleave_frames = 1;
 
     int input_specified = 0;
     int output_specified = 0;
@@ -112,18 +103,16 @@ int main(int argc, char *argv[]) {
     int use_text = 0;
     int dpsk = 0;
 
-    int Nframes = 0;
+    int Npackets = 0;
     int Nsec = 0;
-    int Nrows = 0;
 
-    int nc = 17;
-    int ns = 8;
-    float tcp = 0.0020f;
-    float ts = 0.0180f;
-    float rx_centre = 1500.0f;
-    float tx_centre = 1500.0f;
+    /* set up the default modem config */
+    struct OFDM_CONFIG *ofdm_config = (struct OFDM_CONFIG *) calloc(1, sizeof (struct OFDM_CONFIG));
+    assert(ofdm_config != NULL);
+    char mode[32] = "700D";
+    ofdm_init_mode(mode, ofdm_config);
 
-    int   data_bits_per_frame = 0;
+    int   Ndatabitsperpacket = 0;
     struct optparse options;
 
     struct optparse_long longopts[] = {
@@ -134,15 +123,16 @@ int main(int argc, char *argv[]) {
         {"tcp", 'd', OPTPARSE_REQUIRED},
         {"ts", 'e', OPTPARSE_REQUIRED},
         {"testframes", 'f', OPTPARSE_REQUIRED},
-        {"interleave", 'g', OPTPARSE_REQUIRED},
-        {"tx_freq", 'h', OPTPARSE_REQUIRED},
+        {"tx_freq", 'n', OPTPARSE_REQUIRED},
         {"rx_freq", 'i', OPTPARSE_REQUIRED},
-        {"ldpc", 'j', OPTPARSE_REQUIRED},
+        {"ldpc", 'j', OPTPARSE_NONE},
         {"txbpf", 'k', OPTPARSE_NONE},
         {"text", 'l', OPTPARSE_NONE},
         {"verbose", 'v', OPTPARSE_REQUIRED},
         {"databits", 'p', OPTPARSE_REQUIRED},        
         {"dpsk", 'q', OPTPARSE_NONE},        
+        {"mode", 'g', OPTPARSE_REQUIRED},        
+        {"help", 'h', OPTPARSE_NONE},        
         {0, 0, 0}
     };
 
@@ -151,6 +141,7 @@ int main(int argc, char *argv[]) {
     while ((opt = optparse_long(&options, longopts, NULL)) != -1) {
         switch (opt) {
             case '?':
+            case 'h':
                 opt_help();
             case 'a':
                 fin_name = options.optarg;
@@ -166,38 +157,35 @@ int main(int argc, char *argv[]) {
                 if (val > 62 || val < 17) {
                     opt_help();
                 } else {
-                    nc = val;
+                    ofdm_config->nc = val;
                 }
                 break;
             case 'd':
-                tcp = atof(options.optarg);
+                ofdm_config->tcp = atof(options.optarg);
                 break;
             case 'e':
-                ts = atof(options.optarg);
+                ofdm_config->ts = atof(options.optarg);
+                ofdm_config->rs = 1.0f / ofdm_config->ts; 
                 break;
             case 'm':
-                ns = atoi(options.optarg);
+                ofdm_config->ns = atoi(options.optarg);
                 break;
             case 'f':
                 testframes = 1;
                 Nsec = atoi(options.optarg);
                 break;
             case 'g':
-                interleave_frames = atoi(options.optarg);
+                strcpy(mode, options.optarg);
+                ofdm_init_mode(mode, ofdm_config);
                 break;
-            case 'h':
-                tx_centre = atof(options.optarg);
+            case 'n':
+                ofdm_config->tx_centre = atof(options.optarg);
                 break;
             case 'i':
-                rx_centre = atof(options.optarg);
+                ofdm_config->rx_centre = atof(options.optarg);
                 break;
             case 'j':
-                ldpc_en = atoi(options.optarg);
-                if ((ldpc_en != 1) && (ldpc_en !=2)) {
-                    fprintf(stderr, "--ldpc 1  (224,112) code used for 700D\n");
-                    fprintf(stderr, "--ldpc 2  (504,396) code used for 2020\n");
-                    exit(1);
-                }
+                ldpc_en = 1;
                 break;
             case 'k':
                 txbpf_en = 1;
@@ -206,7 +194,7 @@ int main(int argc, char *argv[]) {
                 use_text = 1;
                 break;
             case 'p':
-                data_bits_per_frame = atoi(options.optarg);
+                Ndatabitsperpacket = atoi(options.optarg);
                 break;
             case 'q':
                 dpsk = 1;
@@ -239,29 +227,7 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    /* set up custom config for ofdm_create() ..... */
-    
-    struct OFDM_CONFIG *ofdm_config;
-    if ((ofdm_config = (struct OFDM_CONFIG *) calloc(1, sizeof (struct OFDM_CONFIG))) == NULL) {
-        fprintf(stderr, "Out of Memory\n");
-        exit(-1);
-    }
-
-    ofdm_config->fs = 8000.0f; /* Sample Frequency */
-    ofdm_config->timing_mx_thresh = 0.30f;
-    ofdm_config->ftwindowwidth = 11;
-    ofdm_config->bps = 2; /* Bits per Symbol */
-    ofdm_config->txtbits = 4; /* number of auxiliary data bits */
-    ofdm_config->ns = ns; /* Number of Symbol frames */
-
-    ofdm_config->tx_centre = tx_centre;
-    ofdm_config->rx_centre = rx_centre;
-    ofdm_config->nc = nc;
-    ofdm_config->tcp = tcp;
-    ofdm_config->ts = ts;
-
-    ofdm_config->rs = (1.0f / ts); /* Modulating Symbol Rate */
-
+    /* init the modem with our (optinally) custom config */
     struct OFDM *ofdm = ofdm_create(ofdm_config);
     assert(ofdm != NULL);
 
@@ -270,73 +236,50 @@ int main(int argc, char *argv[]) {
     /* Get a copy of the completed modem config (ofdm_create() fills in more parameters) */
     ofdm_config = ofdm_get_config_param(ofdm);
 
-    ofdm_bitsperframe = ofdm_get_bits_per_frame(ofdm);
-    ofdm_nuwbits = (ofdm_config->ns - 1) * ofdm_config->bps - ofdm_config->txtbits;
-    ofdm_ntxtbits = ofdm_config->txtbits;
+    /* ste up some useful constants */
+    
+    int Nbitsperpacket = ofdm_get_bits_per_packet(ofdm);
+    int Npayloadbitsperpacket = Nbitsperpacket - ofdm->nuwbits - ofdm->ntxtbits;
+    int Nsamperpacket = ofdm_get_samples_per_packet(ofdm);
 
-    /* Set up default LPDC code.  We could add other codes here if we like */
+    /* Set up LPDC code */
 
     struct LDPC ldpc;
-    
-    int Nbitsperframe;
-    int coded_bits_per_frame;
-
     if (ldpc_en) {
-        if (ldpc_en == 1)
-            set_up_hra_112_112(&ldpc, ofdm_config);
-        else
-            set_up_hra_504_396(&ldpc, ofdm_config);
-
+        ldpc_codes_setup(&ldpc, ofdm->codename);
+        if (verbose > 1) { fprintf(stderr, "using: %s\n", ofdm->codename); }
+      
         /* here is where we can change data bits per frame to a number smaller than LDPC code input data bits_per_frame */
-
-        if (data_bits_per_frame)
-            set_data_bits_per_frame(&ldpc, data_bits_per_frame, ofdm_config->bps);
-        
-        data_bits_per_frame = ldpc.data_bits_per_frame;
-        coded_bits_per_frame = ldpc.coded_bits_per_frame;
+        if (Ndatabitsperpacket) {
+            set_data_bits_per_frame(&ldpc, Ndatabitsperpacket);
+        }
+    
+        Ndatabitsperpacket = ldpc.data_bits_per_frame;
  
-        assert(data_bits_per_frame <= ldpc.ldpc_data_bits_per_frame);
-        assert(coded_bits_per_frame <= ldpc.ldpc_coded_bits_per_frame);
+        assert(Ndatabitsperpacket <= ldpc.ldpc_data_bits_per_frame);
+        assert(Npayloadbitsperpacket <= ldpc.ldpc_coded_bits_per_frame);
         
         if (verbose > 1) {
-            fprintf(stderr, "ldpc_data_bits_per_frame = %d\n", ldpc.ldpc_data_bits_per_frame);
-            fprintf(stderr, "ldpc_coded_bits_per_frame  = %d\n", ldpc.ldpc_coded_bits_per_frame);
-            fprintf(stderr, "data_bits_per_frame = %d\n", data_bits_per_frame);
-            fprintf(stderr, "coded_bits_per_frame  = %d\n", coded_bits_per_frame);
-            fprintf(stderr, "ofdm_bits_per_frame  = %d\n", ofdm_bitsperframe);
-            fprintf(stderr, "interleave_frames: %d\n", interleave_frames);
+            fprintf(stderr, "LDPC codeword data bits = %d\n", ldpc.ldpc_data_bits_per_frame);
+            fprintf(stderr, "LDPC codeword total bits  = %d\n", ldpc.ldpc_coded_bits_per_frame);
+            fprintf(stderr, "LDPC codeword data bits used = %d\n", Ndatabitsperpacket);
+            fprintf(stderr, "LDPC codeword total length in modem packet = %d\n", Npayloadbitsperpacket);
         }
-
-        assert((ofdm_nuwbits + ofdm_ntxtbits + coded_bits_per_frame) <= ofdm_bitsperframe); /* sanity check */
-        
-        Nbitsperframe = interleave_frames*data_bits_per_frame;
-    } else {
-        /* vanilla uncoded input bits mode */
-        Nbitsperframe = ofdm_bitsperframe;
     }
-
-    int Nsamperframe = ofdm_get_samples_per_frame(ofdm);
+    else {
+        Ndatabitsperpacket = Npayloadbitsperpacket;
+    }
 
     if (verbose) {
         ofdm_set_verbose(ofdm, verbose);
-        fprintf(stderr, "Nsamperframe: %d, interleave_frames: %d, Nbitsperframe: %d \n",
-                Nsamperframe, interleave_frames, Nbitsperframe);
-    }
-
-    uint8_t tx_bits_char[Nbitsperframe];
-    short tx_scaled[Nsamperframe];
-    uint8_t txt_bits_char[ofdm_ntxtbits * interleave_frames];
-
-    for (i = 0; i < ofdm_ntxtbits * interleave_frames; i++) {
-        txt_bits_char[i] = 0;
+        fprintf(stderr, "Ndatabitsperpacket: %d Npayloadbitsperpacket: %d Nsamperpacket: %d\n",
+                Ndatabitsperpacket, Npayloadbitsperpacket, Nsamperpacket);
     }
 
     if (testframes) {
-        Nrows = Nsec * ofdm_config->rs;
-        Nframes = floor((Nrows - 1) / ofdm_config->ns);
-
+        Npackets = round(Nsec/ofdm->tpacket);
         if (verbose)
-            fprintf(stderr, "Nframes: %d\n", Nframes);
+            fprintf(stderr, "Npackets: %d\n", Npackets);
     }
 
     if (txbpf_en) {
@@ -346,6 +289,8 @@ int main(int argc, char *argv[]) {
         ofdm_set_dpsk(ofdm, 1);
     }
 
+    uint8_t txt_bits[ofdm->ntxtbits];
+    memset(txt_bits, 0, ofdm->ntxtbits);
     char text_str[] = "cq cq cq hello world\r"; // Add text bits to match other tests
     char *ptr_text = text_str;
 
@@ -353,18 +298,21 @@ int main(int argc, char *argv[]) {
     int nvaricode_bits = 0;
     int varicode_bit_index = 0;
 
+    complex float tx_sams[Nsamperpacket];
+    short   tx_scaled[Nsamperpacket];
+
     if (verbose > 1) {
 	ofdm_print_info(ofdm);
     }
 
     /* main loop ----------------------------------------------------------------*/
 
-    int frame = 0;
-
-    while (fread(tx_bits_char, sizeof (uint8_t), Nbitsperframe, fin) == Nbitsperframe) {
+    int packet = 0;
+    uint8_t data_bits[Ndatabitsperpacket];
+    while (fread(data_bits, sizeof (uint8_t), Ndatabitsperpacket, fin) == Ndatabitsperpacket) {
 
         if (ldpc_en) {
-            /* fancy interleaved LDPC encoded frames ----------------------------*/
+            /* fancy LDPC encoded frames ----------------------------*/
 
             /* optionally overwrite input data with test frame of
                payload data bits known to demodulator */
@@ -373,12 +321,12 @@ int main(int argc, char *argv[]) {
 
                 if (use_text) {
                     // Get text bits
-                    int nspare = ofdm_ntxtbits*interleave_frames;
+                    int nspare = ofdm->ntxtbits;
                     int k;
 
                     for (k = 0; k < nspare; k++) {
                         if (nvaricode_bits) {
-                            txt_bits_char[k] = tx_varicode_bits[varicode_bit_index++];
+                            txt_bits[k] = tx_varicode_bits[varicode_bit_index++];
                             nvaricode_bits--;
                         }
 
@@ -396,88 +344,47 @@ int main(int argc, char *argv[]) {
                     }
                 }
 
-                uint16_t r[data_bits_per_frame];
-
-                ofdm_rand(r, data_bits_per_frame);
-
-                for (j = 0; j < interleave_frames; j++) {
-                    for (i = 0; i < data_bits_per_frame; i++) {
-                        tx_bits_char[j * data_bits_per_frame + i] = r[i] > 16384;
-                    }
-                }
+                ofdm_generate_payload_data_bits(data_bits, Ndatabitsperpacket);
             }
 
-            complex float tx_sams[interleave_frames * Nsamperframe];
-            ofdm_ldpc_interleave_tx(ofdm, &ldpc, tx_sams, tx_bits_char, txt_bits_char, interleave_frames, ofdm_config);
+            ofdm_ldpc_interleave_tx(ofdm, &ldpc, tx_sams, data_bits, txt_bits);
 
-            for (j = 0; j < interleave_frames; j++) {
-                for (i = 0; i < Nsamperframe; i++) {
-                    tx_scaled[i] = OFDM_AMP_SCALE * crealf(tx_sams[j * Nsamperframe + i]);
-                }
-
-                fwrite(tx_scaled, sizeof (short), Nsamperframe, fout);
+            for (i = 0; i < Nsamperpacket; i++) {
+                tx_scaled[i] = OFDM_AMP_SCALE * crealf(tx_sams[i]);
             }
+
+            fwrite(tx_scaled, sizeof (short), Nsamperpacket, fout);
         } else {
             /* just modulate uncoded raw bits ------------------------------------*/
 
+            /* in uncoded mode entire payload is input data bits */
+            assert(Ndatabitsperpacket == Npayloadbitsperpacket);
+            
             if (testframes) {
                 /* build up a test frame consisting of unique word, txt bits, and psuedo-random
                    uncoded payload bits.  The psuedo-random generator is the same as Octave so
                    it can interoperate with ofdm_tx.m/ofdm_rx.m */
 
-                int Npayloadbits = Nbitsperframe - (ofdm_nuwbits + ofdm_ntxtbits);
-                uint16_t r[Npayloadbits];
-                uint8_t payload_bits[Npayloadbits];
-
-                ofdm_rand(r, Npayloadbits);
-
-                for (i = 0; i < Npayloadbits; i++) {
-                    payload_bits[i] = r[i] > 16384;
-                }
-
-                uint8_t txt_bits[ofdm_ntxtbits];
-
-                for (i = 0; i < ofdm_ntxtbits; i++) {
-                    txt_bits[i] = 0;
-                }
-
-                ofdm_assemble_modem_frame(ofdm, tx_bits_char, payload_bits, txt_bits);
+                ofdm_generate_payload_data_bits(data_bits, Npayloadbitsperpacket);
             }
-
-            int tx_bits[Nbitsperframe];
-
-            for (i = 0; i < Nbitsperframe; i++) {
-                tx_bits[i] = tx_bits_char[i];
-            }
-
-	    if (verbose >=3) {
-                fprintf(stderr, "\ntx_bits:\n");
-                for (i = 0; i < Nbitsperframe; i++) {
-                    fprintf(stderr, "  %3d %8d\n", i, tx_bits[i]);
-                }
-            }
-
-            COMP tx_sams[Nsamperframe];
+            
+            /* assemble packet of bits then modulate */
+            uint8_t tx_bits_char[Nbitsperpacket];
+            ofdm_assemble_qpsk_modem_packet(ofdm, tx_bits_char, data_bits, txt_bits);
+            int tx_bits[Nbitsperpacket];
+            for (i = 0; i < Nbitsperpacket; i++) tx_bits[i] = tx_bits_char[i];
+            COMP tx_sams[Nsamperpacket];
             ofdm_mod(ofdm, tx_sams, tx_bits);
 
-	    if (verbose >=3) {
-                fprintf(stderr, "\ntx_sams:\n");
-                for (i = 0; i < Nsamperframe; i++) {
-                    fprintf(stderr, "  %3d % f\n", i, (double)tx_sams[i].real);
-                }
-            }
-
             /* scale and save to disk as shorts */
-
-            for (i = 0; i < Nsamperframe; i++)
+            for (i = 0; i < Nsamperpacket; i++)
                 tx_scaled[i] = tx_sams[i].real * OFDM_AMP_SCALE;
-
-            fwrite(tx_scaled, sizeof (short), Nsamperframe, fout);
+            fwrite(tx_scaled, sizeof (short), Nsamperpacket, fout);
         }
 
-        frame++;
+        packet++;
 
-        if (testframes && (frame >= Nframes))
+        if (testframes && (packet >= Npackets))
             break;
     }
 
@@ -488,7 +395,7 @@ int main(int argc, char *argv[]) {
         fclose(fout);
 
     if (verbose)
-        fprintf(stderr, "%d frames processed\n", frame);
+        fprintf(stderr, "%d packets processed\n", packet);
 
     ofdm_destroy(ofdm);
 

@@ -94,13 +94,7 @@ int main(int argc, char *argv[]) {
     semihosting_init();
 
     ////////
-    // Static config
-    int interleave_frames = 1; 
-
-    ////////
-    struct freedv_advanced adv;
-    adv.interleave_frames = interleave_frames;
-    freedv = freedv_open_advanced(FREEDV_MODE_700D, &adv);
+    freedv = freedv_open(FREEDV_MODE_700D);
 
     freedv_set_snr_squelch_thresh(freedv, -100.0);
     freedv_set_squelch_en(freedv, 0);

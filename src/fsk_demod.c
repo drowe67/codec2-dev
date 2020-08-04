@@ -1,12 +1,11 @@
 /*---------------------------------------------------------------------------*\
 
   FILE........: fsk_demod.c
-  AUTHOR......: Brady O'Brien
+  AUTHOR......: Brady O'Brien and David Rowe
   DATE CREATED: 8 January 2016
 
-  C test driver for fsk_demod in fsk.c. Reads in a stream of 32 bit cpu endian
-  floats and writes out the detected bits
-   
+  Command line FSK demodulator.  Reads in FSK samples, writes demodulated 
+  output bits.   
 
 \*---------------------------------------------------------------------------*/
 
@@ -39,6 +38,7 @@
 
 #include "fsk.h"
 #include "codec2_fdmdv.h"
+#include "mpdecode_core.h"
 #include "modem_stats.h"
 
 /* cleanly exit when we get a SIGTERM */
@@ -60,7 +60,8 @@ int main(int argc,char *argv[]){
     uint8_t *bitbuf = NULL;
     int16_t *rawbuf;
     COMP *modbuf;
-    float *sdbuf = NULL;
+    float *rx_filt = NULL;
+    float *llrs = NULL;
     int i,j,Ndft;
     int soft_dec_mode = 0;
     stats_loop = 0;
@@ -75,7 +76,7 @@ int main(int argc,char *argv[]){
     int user_fsk_upper = 0;
     int nsym = FSK_DEFAULT_NSYM;
     int mask = 0;
-    int tx_tone_separation = 100;
+    int tone_separation = 100;
     
     int o = 0;
     int opt_idx = 0;
@@ -143,7 +144,7 @@ int main(int argc,char *argv[]){
             break;
         case 'm':
             mask = 1;
-            tx_tone_separation = atoi(optarg);
+            tone_separation = atoi(optarg);
             break;
         case 'h':
         case '?':
@@ -171,8 +172,9 @@ int main(int argc,char *argv[]){
         fprintf(stderr,"                    r, if provided, sets the number of modem frames between statistic printouts.\n");
         fprintf(stderr," -s --soft-dec      The output file will be in a soft-decision format, with one 32-bit float per bit.\n");
         fprintf(stderr,"                    If -s is not used, the output will be in a 1 byte-per-bit format.\n");
-        fprintf(stderr," -p P               The demod internals operate at a rate of Fs/P, default %d\n", FSK_DEFAULT_P);
-        fprintf(stderr,"                    P must be divisible by the symbol rate. Smaller P values will result in faster\n");
+        fprintf(stderr," -p P               Number of timing offsets we have to choose from, default %d.\n", FSK_DEFAULT_P);
+        fprintf(stderr,"                    Fs/Rs/P must be an integer.  Smaller values result in faster operation, but\n");
+        fprintf(stderr,"                    coarse sampling. Try to keep >= 8\n");
         fprintf(stderr,"                    processing but lower demodulation performance. Default %d\n", FSK_DEFAULT_P);
         fprintf(stderr," --fsk_lower freq   lower limit of freq estimator (default 0 for real input, -Fs/2  for complex input)\n");
         fprintf(stderr," --fsk_upper freq   upper limit of freq estimator (default Fs/2)\n");
@@ -205,8 +207,7 @@ int main(int argc,char *argv[]){
     }
 
     /* set up FSK */
-    #define UNUSED 1000
-    fsk = fsk_create_hbr(Fs,Rs,M,P,nsym,UNUSED,tx_tone_separation);
+    fsk = fsk_create_hbr(Fs,Rs,M,P,nsym,FSK_NONE,tone_separation);
 
     /* set freq estimator limits */
     if (!user_fsk_lower) {
@@ -256,9 +257,10 @@ int main(int argc,char *argv[]){
     }
     
     /* allocate buffers for processing */
-    if(soft_dec_mode){
-        sdbuf = (float*)malloc(sizeof(float)*fsk->Nbits); assert(sdbuf != NULL);
-    }else{
+    if (soft_dec_mode) {
+        rx_filt = (float*)malloc(sizeof(float)*fsk->mode*fsk->Nsym); assert(rx_filt != NULL);
+        llrs = (float*)malloc(sizeof(float)*fsk->Nbits); assert(llrs != NULL);
+    } else {
         bitbuf = (uint8_t*)malloc(sizeof(uint8_t)*fsk->Nbits); assert(bitbuf != NULL);
     }
     rawbuf = (int16_t*)malloc(bytes_per_sample*(fsk->N+fsk->Ts*2)*complex_input);
@@ -300,14 +302,31 @@ int main(int argc,char *argv[]){
             }            
         }
 
-        if(soft_dec_mode){
-            fsk_demod_sd(fsk,sdbuf,modbuf);
-        }else{
+        if (soft_dec_mode) {
+            int bps = log2(fsk->mode);
+            assert(fsk->Nbits == bps*fsk->Nsym);
+            /* output bit LLRs */
+            fsk_demod_sd(fsk, rx_filt, modbuf);
+            fsk_rx_filt_to_llrs(llrs, rx_filt, fsk->v_est, fsk->SNRest, fsk->mode, fsk->Nsym);
+            /*
+            fprintf(stderr, "v_est: %f SNRest: %f\n", fsk->v_est, fsk->SNRest);            
+            for(int i=0; i<fsk->Nsym; i++) {
+                for(int m=0; m<fsk->mode; m++)
+                    fprintf(stderr, "% 5.0f  ", rx_filt[fsk->Nsym*m+i]);
+                for(int b=0; b<bps; b++)
+                    fprintf(stderr, "% 5.0f  ", llrs[i*bps+b]);                    
+                fprintf(stderr, "\n");
+            }
+            fprintf(stderr, "------\n");
+            */
+        } else {
             fsk_demod(fsk,bitbuf,modbuf);
         }
         
         testframe_detected = 0;
         if (testframe_mode) {
+            assert(soft_dec_mode == 0);
+            
             /* attempt to find a testframe and update stats */
             /* update silding window of input bits */
 
@@ -316,12 +335,7 @@ int main(int argc,char *argv[]){
                 for(i=0; i<TEST_FRAME_SIZE-1; i++) {
                     bitbuf_rx[i] = bitbuf_rx[i+1];
                 }
-                if (soft_dec_mode == 1) {
-                    bitbuf_rx[TEST_FRAME_SIZE-1] = sdbuf[j] < 0.0;
-                }
-                else {
-                    bitbuf_rx[TEST_FRAME_SIZE-1] = bitbuf[j];
-                }
+                bitbuf_rx[TEST_FRAME_SIZE-1] = bitbuf[j];
 
                 /* compare to know tx frame.  If they are time aligned, there
                    will be a fairly low bit error rate */
@@ -411,8 +425,8 @@ int main(int argc,char *argv[]){
         }
 
         if(soft_dec_mode){
-            fwrite(sdbuf,sizeof(float),fsk->Nbits,fout);
-        }else{
+            fwrite(llrs,sizeof(float),fsk->Nbits,fout);
+        } else{
             fwrite(bitbuf,sizeof(uint8_t),fsk->Nbits,fout);
         }
 
@@ -427,9 +441,10 @@ int main(int argc,char *argv[]){
         free(bitbuf_rx);
     }
     
-    if(soft_dec_mode){
-        free(sdbuf);
-    }else{
+    if (soft_dec_mode) {
+        free(rx_filt);
+        free(llrs);
+    } else{
         free(bitbuf);
     }
     

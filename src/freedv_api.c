@@ -5,7 +5,11 @@
   DATE CREATED: August 2014
 
   Library of API functions that implement FreeDV "modes", useful for
-  embedding FreeDV in other programs.
+  embedding FreeDV in other programs.  Please see:
+
+  1. README_freedv.md
+  2. Notes function use in freedv_api.c
+  3. The sample freedv_tx.c and freedv_rx.c programs
 
 \*---------------------------------------------------------------------------*/
 
@@ -107,6 +111,7 @@ struct freedv *freedv_open(int mode) {
     return freedv_open_advanced(mode, NULL);
 }
 
+// Ignoring adv parameter
 struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
     struct freedv *f;
     
@@ -123,9 +128,9 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
 
     if (FDV_MODE_ACTIVE( FREEDV_MODE_1600, mode)) freedv_1600_open(f);
     if (FDV_MODE_ACTIVE( FREEDV_MODE_700C, mode)) freedv_700c_open(f);
-    if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, mode)) freedv_700d_open(f, adv);
+    if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, mode)) freedv_700d_open(f);
 #ifdef __LPCNET__
-    if (FDV_MODE_ACTIVE( FREEDV_MODE_2020, mode)) freedv_2020_open(f, adv);
+    if (FDV_MODE_ACTIVE( FREEDV_MODE_2020, mode)) freedv_2020_open(f);
 #endif    
     if (FDV_MODE_ACTIVE( FREEDV_MODE_2400A, mode)) freedv_2400a_open(f);
     if (FDV_MODE_ACTIVE( FREEDV_MODE_2400B, mode) ) freedv_2400b_open(f);
@@ -169,8 +174,6 @@ void freedv_close(struct freedv *freedv) {
     }
 
     if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, freedv->mode)) {
-        if (freedv->interleave_frames > 1)
-            FREE(freedv->mod_out);
         FREE(freedv->codeword_symbols);
         FREE(freedv->codeword_amps);
         FREE(freedv->ldpc);
@@ -178,8 +181,6 @@ void freedv_close(struct freedv *freedv) {
     }
 
     if (FDV_MODE_ACTIVE( FREEDV_MODE_2020, freedv->mode)) {
-        if (freedv->interleave_frames > 1)
-            FREE(freedv->mod_out);
         FREE(freedv->codeword_symbols);
         FREE(freedv->codeword_amps);
         FREE(freedv->ldpc);
@@ -318,8 +319,6 @@ void freedv_comptx(struct freedv *f, COMP mod_out[], short speech_in[]) {
         freedv_comptx_700c(f, mod_out);
     }
 
-    /* special treatment due to interleaver */
-    
     if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode)) {
 
         /* buffer up bits until we get enough encoded bits for interleaver */
@@ -330,27 +329,10 @@ void freedv_comptx(struct freedv *f, COMP mod_out[], short speech_in[]) {
             speech_in += codec2_samples_per_frame(f->codec2);
         }
 
-	/* Only use extra local buffer if needed for interleave > 1 */
-	if (f->interleave_frames == 1) {
-            freedv_comptx_700d(f, mod_out);
-	} else {
-            /* call modulate function when we have enough frames to run interleaver */
-            assert((f->modem_frame_count_tx >= 0) && (f->modem_frame_count_tx < f->interleave_frames));
-            f->modem_frame_count_tx++;
-            if (f->modem_frame_count_tx == f->interleave_frames) {
-                freedv_comptx_700d(f, f->mod_out);
-                f->modem_frame_count_tx = 0;
-            }
-            /* output n_nom_modem_samples at a time from modulated buffer */
-            for(int i=0; i<f->n_nat_modem_samples; i++) {
-                mod_out[i] = f->mod_out[f->modem_frame_count_tx * f->n_nat_modem_samples+i];
-            }
-	}
+        freedv_comptx_700d(f, mod_out);
     }
     
 #ifdef __LPCNET__
-    /* special treatment due to interleaver */
-    
     if (FDV_MODE_ACTIVE( FREEDV_MODE_2020, f->mode)) {
        
         /* buffer up bits until we get enough encoded bits for interleaver */
@@ -361,22 +343,7 @@ void freedv_comptx(struct freedv *f, COMP mod_out[], short speech_in[]) {
             speech_in += lpcnet_samples_per_frame(f->lpcnet);
         }
 
-	/* Only use extra local buffer if needed for interleave > 1 */
-	if (f->interleave_frames == 1) {
-            freedv_comptx_2020(f, mod_out);
-	} else {
-            /* call modulate function when we have enough frames to run interleaver */
-            assert((f->modem_frame_count_tx >= 0) && (f->modem_frame_count_tx < f->interleave_frames));
-            f->modem_frame_count_tx++;
-            if (f->modem_frame_count_tx == f->interleave_frames) {
-                freedv_comptx_2020(f, f->mod_out);
-                f->modem_frame_count_tx = 0;
-            }
-            /* output n_nom_modem_samples at a time from modulated buffer */
-            for(int i=0; i<f->n_nat_modem_samples; i++) {
-                mod_out[i] = f->mod_out[f->modem_frame_count_tx * f->n_nat_modem_samples+i];
-            }
-	}
+        freedv_comptx_2020(f, mod_out);
     }
 #endif
     
@@ -395,9 +362,7 @@ void freedv_rawdatatx(struct freedv *f, short mod_out[], unsigned char *packed_p
     /* FSK modes used packed bits */
     if(FDV_MODE_ACTIVE( FREEDV_MODE_2400A, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_2400B, f->mode) ||
        FDV_MODE_ACTIVE( FREEDV_MODE_800XA, f->mode) ) {
-        int bytes_per_codec_frame = (f->bits_per_codec_frame + 7) / 8;
-	int codec_frames = f->bits_per_modem_frame / f->bits_per_codec_frame;
-        memcpy(f->tx_payload_bits, packed_payload_bits, bytes_per_codec_frame * codec_frames);
+	freedv_codec_frames_from_rawdata(f, f->tx_payload_bits,  packed_payload_bits);
         freedv_tx_fsk_voice(f, mod_out);
         return; /* output is already real */
     }
@@ -415,7 +380,7 @@ void freedv_rawdatatx(struct freedv *f, short mod_out[], unsigned char *packed_p
 
     if (FDV_MODE_ACTIVE( FREEDV_MODE_1600, f->mode)) freedv_comptx_fdmdv_1600(f, tx_fdm);
     if (FDV_MODE_ACTIVE( FREEDV_MODE_700C, f->mode)) freedv_comptx_700c(f, tx_fdm);
-    if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode)) { assert(f->interleave_frames == 1); freedv_comptx_700d(f, tx_fdm); }
+    if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode)) freedv_comptx_700d(f, tx_fdm);
 
     /* convert complex to real */
     for(int i=0; i<f->n_nom_modem_samples; i++)
@@ -453,6 +418,86 @@ int freedv_nin(struct freedv *f) {
     else
         return f->nin;
 }
+
+int freedv_codec_frames_from_rawdata(struct freedv *f, unsigned char *codec_frames, unsigned char *rawdata)
+{
+    int cbit = 7;
+    int cbyte = 0;
+    int rbit = 7;
+    int rbyte = 0;
+    int modem_bits = freedv_get_bits_per_modem_frame(f);
+    int codec_bits = freedv_get_bits_per_codec_frame(f);
+    int nr_cbits = 0;
+    int i;
+    
+    codec_frames[0] = 0;
+    for (i = 0; i < modem_bits; i++) {
+        codec_frames[cbyte] |= ((rawdata[rbyte] >> rbit) & 1) << cbit;
+
+        rbit--;
+        if (rbit < 0) {
+            rbit = 7;
+            rbyte++;
+        }
+	
+        cbit--;
+        if (cbit < 0) {
+            cbit = 7;
+	    cbyte++;
+	    codec_frames[cbyte] = 0;
+	}
+	nr_cbits++;
+	if (nr_cbits == codec_bits) {
+            if (cbit) {
+                cbyte++;
+                codec_frames[cbyte] = 0;
+            }
+            cbit = 7;
+	    nr_cbits = 0;
+	}
+    }
+    return f->n_codec_frames;
+}
+
+int freedv_rawdata_from_codec_frames(struct freedv *f, unsigned char *rawdata, unsigned char *codec_frames)
+{
+    int cbit = 7;
+    int cbyte = 0;
+    int rbit = 7;
+    int rbyte = 0;
+    int modem_bits = freedv_get_bits_per_modem_frame(f);
+    int codec_bits = freedv_get_bits_per_codec_frame(f);
+    int nr_cbits = 0;
+    int i;
+    
+    rawdata[rbyte] = 0;
+    for (i = 0; i < modem_bits; i++) {
+        rawdata[rbyte] |= ((codec_frames[cbyte] >> cbit) & 1) << rbit;
+
+        rbit--;
+        if (rbit < 0) {
+            rbit = 7;
+            rbyte++;
+	    rawdata[rbyte] = 0;
+        }
+	
+        cbit--;
+        if (cbit < 0) {
+            cbit = 7;
+	    cbyte++;
+	}
+	
+	nr_cbits++;
+	if (nr_cbits == codec_bits) {
+            if (cbit)
+                cbyte++;
+            cbit = 7;
+	    nr_cbits = 0;
+	}
+    }
+    return f->n_codec_frames;
+}
+
 
 /*---------------------------------------------------------------------------*\
 
@@ -530,20 +575,21 @@ int freedv_rx(struct freedv *f, short speech_out[], short demod_in[]) {
     if ( (FDV_MODE_ACTIVE( FREEDV_MODE_1600, f->mode)) || (FDV_MODE_ACTIVE( FREEDV_MODE_700C, f->mode))
          || (FDV_MODE_ACTIVE( FREEDV_MODE_2020, f->mode))) {
 
-        float gain = 1.0;
+        float gain = 1.0f;
         
         assert(nin <= f->n_max_modem_samples);
         COMP rx_fdm[f->n_max_modem_samples];
+        
         for(i=0; i<nin; i++) {
             rx_fdm[i].real = gain*(float)demod_in[i];
-            rx_fdm[i].imag = 0.0;
+            rx_fdm[i].imag = 0.0f;
         }
         return freedv_comprx(f, speech_out, rx_fdm);
     }
 
     /* special low memory version for 700D, to help with stm32 port */
     if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode)) {
-        float gain = 2.0; /* keep levels the same as Octave simulations and C unit tests for real signals */
+        float gain = 2.0f; /* keep levels the same as Octave simulations and C unit tests for real signals */
         return freedv_shortrx(f, speech_out, demod_in, gain);
     }
     
@@ -571,7 +617,7 @@ int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]) {
     }
 
     if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode)) {
-        rx_status = freedv_comp_short_rx_700d(f, (void*)demod_in, 0, 1.0);
+        rx_status = freedv_comp_short_rx_700d(f, (void*)demod_in, 0, 2.0f); // was 1.0 ??
     }
     
     if (FDV_MODE_ACTIVE( FREEDV_MODE_2020, f->mode)) {
@@ -581,8 +627,10 @@ int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]) {
     }
 
     short demod_in_short[f->nin_prev];
+    
     for(int i=0; i<f->nin_prev; i++)
         demod_in_short[i] = demod_in[i].real;
+    
     return freedv_bits_to_speech(f, speech_out, demod_in_short, rx_status);
 }
 
@@ -696,8 +744,7 @@ int freedv_bits_to_speech(struct freedv *f, short speech_out[], short demod_in[]
         
        if (f->squelch_en == 0) {
            decode_speech = 1;
-       }
-       else {
+       } else {
            /* squelch is enabled */
            
            /* anti-burble case - don't decode on trial sync unless the
@@ -723,33 +770,24 @@ int freedv_bits_to_speech(struct freedv *f, short speech_out[], short demod_in[]
             int bits_per_codec_frame = lpcnet_bits_per_frame(f->lpcnet);
             int data_bits_per_frame = f->ldpc->data_bits_per_frame;
             int frames = data_bits_per_frame/bits_per_codec_frame;            
-        
-            if (f->modem_frame_count_rx < f->interleave_frames) {
-                nout = f->n_speech_samples;
-                for (int i = 0; i < frames; i++) {
-                    lpcnet_dec(f->lpcnet, (char*)f->rx_payload_bits + (i + frames*f->modem_frame_count_rx)* bits_per_codec_frame, speech_out);
-                    speech_out += lpcnet_samples_per_frame(f->lpcnet);
-                }
-                f->modem_frame_count_rx++;
+
+            nout = f->n_speech_samples;
+            for (int i = 0; i < frames; i++) {
+                lpcnet_dec(f->lpcnet, (char*) f->rx_payload_bits + (i + frames * f->modem_frame_count_rx) * bits_per_codec_frame, speech_out);
+                speech_out += lpcnet_samples_per_frame(f->lpcnet);
             }
-          
- #endif          
-        }
-        else {
+            f->modem_frame_count_rx++;
+#endif    
+        } else {
             /* codec 2 decoder */
 
             if(FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode)) {
-
-                /* 700D a bit special due to interleaving */
-
-                if (f->modem_frame_count_rx < f->interleave_frames) {
-                    nout = f->n_speech_samples;
-                    for (int i = 0; i <f->n_codec_frames; i++) {
-                        codec2_decode_upacked(f, speech_out, f->rx_payload_bits + (i + f->n_codec_frames*f->modem_frame_count_rx)*f->bits_per_codec_frame);
-                        speech_out += codec2_samples_per_frame(f->codec2);
-                    }
-                    f->modem_frame_count_rx++;
+                nout = f->n_speech_samples;
+                for (int i = 0; i < f->n_codec_frames; i++) {
+                    codec2_decode_upacked(f, speech_out, f->rx_payload_bits + (i + f->n_codec_frames * f->modem_frame_count_rx) * f->bits_per_codec_frame);
+                    speech_out += codec2_samples_per_frame(f->codec2);
                 }
+                f->modem_frame_count_rx++;
             } else { 
                 /* non-interleaved Codec 2 modes */
                 
@@ -803,25 +841,17 @@ int freedv_rawdatarx(struct freedv *f, unsigned char *packed_payload_bits, short
         rx_status = freedv_comprx_fsk(f, rx_fdm);
         f->rx_status = rx_status;
         if (rx_status & RX_BITS) {
-            int bytes_per_codec_frame = (f->bits_per_codec_frame + 7) / 8;
-	    int codec_frames = f->bits_per_modem_frame / f->bits_per_codec_frame;
-            ret = bytes_per_codec_frame * codec_frames;
-            memcpy(packed_payload_bits, f->rx_payload_bits, ret);
+	    ret = (freedv_get_bits_per_modem_frame(f) + 7) / 8;
+	    freedv_rawdata_from_codec_frames(f, packed_payload_bits, f->rx_payload_bits);
         }
         return ret;
     }
 
     if (FDV_MODE_ACTIVE( FREEDV_MODE_1600, f->mode)) rx_status = freedv_comprx_fdmdv_1600(f, rx_fdm);
     if (FDV_MODE_ACTIVE( FREEDV_MODE_700C, f->mode)) rx_status = freedv_comprx_700c(f, rx_fdm);
-
-    /* we're not supporting the interleaver atm */
-    if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode)) {
-        assert(f->interleave_frames == 1);
-        rx_status = freedv_comp_short_rx_700d(f, (void*)demod_in, 1, 2.0);
-    }
+    if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode)) rx_status = freedv_comp_short_rx_700d(f, (void*)demod_in, 1, 2.0f);
 
     if (rx_status & RX_BITS) {
-
 	ret = (f->bits_per_modem_frame+7)/8;
         memset(packed_payload_bits, 0, ret);
         /* pack bits */
@@ -857,6 +887,22 @@ int freedv_rawdatarx(struct freedv *f, unsigned char *packed_payload_bits, short
 int freedv_get_version(void)
 {
     return VERSION;
+}
+
+/*---------------------------------------------------------------------------* \
+
+  FUNCTION....: freedv_get_hash
+  AUTHOR......: David Rowe
+  DATE CREATED: July 2020
+
+  Return the a string with the Git hash of the repo used to build this code.
+
+\*---------------------------------------------------------------------------*/
+
+static char git_hash[] = GIT_HASH;
+char *freedv_get_hash(void)
+{
+    return git_hash;
 }
 
 /*---------------------------------------------------------------------------*\
@@ -1128,7 +1174,7 @@ int freedv_get_sync                       (struct freedv *f) {return f->stats.sy
 struct CODEC2 *freedv_get_codec2	  (struct freedv *f){return  f->codec2;}
 int freedv_get_bits_per_codec_frame       (struct freedv *f){return f->bits_per_codec_frame;}
 int freedv_get_bits_per_modem_frame       (struct freedv *f){return f->bits_per_modem_frame;}
-int freedv_get_uncorrected_errors          (struct freedv *f) {return f->rx_status & RX_BIT_ERRORS;}
+int freedv_get_uncorrected_errors         (struct freedv *f) {return f->rx_status & RX_BIT_ERRORS;}
 
 int freedv_get_n_max_speech_samples(struct freedv *f) {
     /* When "passing through" demod samples to the speech output
@@ -1142,12 +1188,9 @@ int freedv_get_n_max_speech_samples(struct freedv *f) {
         return f->n_speech_samples;
 }
 
+// Now dummy obsolete call
 int freedv_get_sync_interleaver(struct freedv *f) {
-    if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_2020, f->mode)) {
-        return f->ofdm->sync_state_interleaver == synced;
-    }
-
-    return 0;
+    return 1;
 }
 
 int freedv_get_sz_error_pattern(struct freedv *f) 
@@ -1155,8 +1198,7 @@ int freedv_get_sz_error_pattern(struct freedv *f)
     if (FDV_MODE_ACTIVE( FREEDV_MODE_700C, f->mode)) {
         /* if diversity disabled callback sends error pattern for upper and lower carriers */
         return f->sz_error_pattern * (2 - f->test_frames_diversity);
-    }
-    else {
+    } else {
         return f->sz_error_pattern;
     }
 }
@@ -1170,7 +1212,7 @@ void freedv_get_modem_extended_stats(struct freedv *f, struct MODEM_STATS *stats
     if (FDV_MODE_ACTIVE( FREEDV_MODE_2400A, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_800XA, f->mode)) {
         fsk_get_demod_stats(f->fsk, stats);
         float EbNodB = stats->snr_est;                       /* fsk demod actually estimates Eb/No     */
-        stats->snr_est = EbNodB + 10.0*log10f(800.0/3000.0); /* so convert to SNR Rb=800, noise B=3000 */
+        stats->snr_est = EbNodB + 10.0f*log10f(800.0f/3000.0f); /* so convert to SNR Rb=800, noise B=3000 */
     }
 
     if (FDV_MODE_ACTIVE( FREEDV_MODE_2400B, f->mode)) {
@@ -1184,6 +1226,5 @@ void freedv_get_modem_extended_stats(struct freedv *f, struct MODEM_STATS *stats
     if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_2020, f->mode)) {
         ofdm_get_demod_stats(f->ofdm, stats);
     }
-    
 }
 

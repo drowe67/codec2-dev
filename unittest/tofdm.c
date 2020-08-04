@@ -82,8 +82,9 @@ static int ofdm_ftwindowwidth;
 static int ofdm_bitsperframe;
 static int ofdm_rowsperframe;
 static int ofdm_samplesperframe;
+static int ofdm_samplespersymbol;
 static int ofdm_max_samplesperframe;
-static int ofdm_rxbuf;
+static int ofdm_nrxbuf;
 static int ofdm_ntxtbits;           /* reserve bits/frame for auxillary text information */
 static int ofdm_nuwbits;            /* Unique word, used for positive indication of lock */
 
@@ -215,10 +216,11 @@ int main(int argc, char *argv[])
     ofdm_bitsperframe = ofdm_get_bits_per_frame(ofdm);
     ofdm_rowsperframe = ofdm_bitsperframe / (ofdm_config->nc * ofdm_config->bps);
     ofdm_samplesperframe = ofdm_get_samples_per_frame(ofdm);
+    ofdm_samplespersymbol = (ofdm->m + ofdm->ncp);
     ofdm_max_samplesperframe = ofdm_get_max_samples_per_frame(ofdm);
-    ofdm_rxbuf = 3 * ofdm_samplesperframe + 3 * (ofdm_m + ofdm_ncp);
+    ofdm_nrxbuf = 3 * ofdm_samplesperframe + 3 * ofdm_samplespersymbol;
     ofdm_ntxtbits = ofdm_config->txtbits;
-    ofdm_nuwbits = (ofdm_config->ns - 1) * ofdm_config->bps - ofdm_config->txtbits;
+    ofdm_nuwbits = ofdm_config->nuwbits;
 
     int tx_bits[ofdm_samplesperframe];
     COMP tx[ofdm_samplesperframe];         /* one frame of tx samples */
@@ -232,7 +234,7 @@ int main(int argc, char *argv[])
     COMP tx_log[ofdm_samplesperframe*NFRAMES];
     COMP rx_log[ofdm_samplesperframe*NFRAMES];
     COMP rxbuf_in_log[ofdm_max_samplesperframe*NFRAMES];
-    COMP rxbuf_log[ofdm_rxbuf*NFRAMES];
+    COMP rxbuf_log[ofdm_nrxbuf*NFRAMES];
     COMP rx_sym_log[(ofdm_ns + 3)*NFRAMES][ofdm_nc + 2];
     float phase_est_pilot_log[ofdm_rowsperframe*NFRAMES][ofdm_nc];
     COMP rx_np_log[ofdm_rowsperframe*ofdm_nc*NFRAMES];
@@ -315,7 +317,7 @@ int main(int argc, char *argv[])
                 txt_bits[i] = 0;
 
             uint8_t tx_bits_char[ofdm_bitsperframe];
-            ofdm_assemble_modem_frame(ofdm, tx_bits_char, payload_bits, txt_bits);
+            ofdm_assemble_qpsk_modem_packet(ofdm, tx_bits_char, payload_bits, txt_bits);
             for(i=0; i<ofdm_bitsperframe; i++)
                 tx_bits[i] = tx_bits_char[i];
         }
@@ -346,7 +348,7 @@ int main(int argc, char *argv[])
 
     int Nsam = ofdm_samplesperframe*NFRAMES;
     int prx = 0;
-    int nin = ofdm_samplesperframe + 2*(ofdm_m+ofdm_ncp);
+    int nin = ofdm_samplesperframe + 2*ofdm_samplespersymbol;
 
     int  lnew;
     COMP rxbuf_in[ofdm_max_samplesperframe];
@@ -354,7 +356,7 @@ int main(int argc, char *argv[])
 #define FRONT_LOAD
 #ifdef FRONT_LOAD
     for (i=0; i<nin; i++,prx++) {
-         ofdm->rxbuf[ofdm_rxbuf-nin+i] = rx_log[prx].real + rx_log[prx].imag * I;
+         ofdm->rxbuf[ofdm_nrxbuf-nin+i] = rx_log[prx].real + rx_log[prx].imag * I;
     }
 #endif
     
@@ -456,7 +458,7 @@ int main(int argc, char *argv[])
             float *ldpc_codeword_symbol_amps = &ofdm->rx_amp[(ofdm_nuwbits+ofdm_ntxtbits)/ofdm_bps];
                 
             Demod2D(symbol_likelihood, ldpc_codeword_symbols, S_matrix, EsNo, ldpc_codeword_symbol_amps, ofdm->mean_amp, CODED_BITSPERFRAME/ofdm_bps);
-            Somap(bit_likelihood, symbol_likelihood, CODED_BITSPERFRAME/ofdm_bps);
+            Somap(bit_likelihood, symbol_likelihood, 1<<ofdm_bps, ofdm_bps, CODED_BITSPERFRAME/ofdm_bps);
 
             float  llr[CODED_BITSPERFRAME];
             int    parityCheckCount;
@@ -485,9 +487,9 @@ int main(int argc, char *argv[])
 	memcpy(&rxbuf_in_log[nin_tot], rxbuf_in, sizeof(COMP)*nin);
         nin_tot += nin;
 
-        for(i=0; i<ofdm_rxbuf; i++) {
-            rxbuf_log[ofdm_rxbuf*f+i].real = crealf(ofdm->rxbuf[i]);
-            rxbuf_log[ofdm_rxbuf*f+i].imag = cimagf(ofdm->rxbuf[i]);
+        for(i=0; i<ofdm_nrxbuf; i++) {
+            rxbuf_log[ofdm_nrxbuf*f+i].real = crealf(ofdm->rxbuf[i]);
+            rxbuf_log[ofdm_nrxbuf*f+i].imag = cimagf(ofdm->rxbuf[i]);
         }
 
         for (i = 0; i < (ofdm_ns + 3); i++) {
@@ -544,12 +546,12 @@ int main(int argc, char *argv[])
     fout = fopen("tofdm_out.txt","wt");
     assert(fout != NULL);
     fprintf(fout, "# Created by tofdm.c\n");
-    octave_save_complex(fout, "pilot_samples_c", (COMP*)ofdm->pilot_samples, 1, ofdm_m+ofdm_ncp, ofdm_m+ofdm_ncp);
+    octave_save_complex(fout, "pilot_samples_c", (COMP*)ofdm->pilot_samples, 1, ofdm_samplespersymbol, ofdm_samplespersymbol);
     octave_save_int(fout, "tx_bits_log_c", tx_bits_log, 1, ofdm_bitsperframe*NFRAMES);
     octave_save_complex(fout, "tx_log_c", (COMP*)tx_log, 1, ofdm_samplesperframe*NFRAMES,  ofdm_samplesperframe*NFRAMES);
     octave_save_complex(fout, "rx_log_c", (COMP*)rx_log, 1, ofdm_samplesperframe*NFRAMES,  ofdm_samplesperframe*NFRAMES);
     octave_save_complex(fout, "rxbuf_in_log_c", (COMP*)rxbuf_in_log, 1, nin_tot, nin_tot);
-    octave_save_complex(fout, "rxbuf_log_c", (COMP*)rxbuf_log, 1, ofdm_rxbuf*NFRAMES,  ofdm_rxbuf*NFRAMES);
+    octave_save_complex(fout, "rxbuf_log_c", (COMP*)rxbuf_log, 1, ofdm_nrxbuf*NFRAMES,  ofdm_nrxbuf*NFRAMES);
     octave_save_complex(fout, "rx_sym_log_c", (COMP*)rx_sym_log, (ofdm_ns + 3)*NFRAMES, ofdm_nc + 2, ofdm_nc + 2);
     octave_save_float(fout, "phase_est_pilot_log_c", (float*)phase_est_pilot_log, ofdm_rowsperframe*NFRAMES, ofdm_nc, ofdm_nc);
     octave_save_float(fout, "rx_amp_log_c", (float*)rx_amp_log, 1, ofdm_rowsperframe*ofdm_nc*NFRAMES, ofdm_rowsperframe*ofdm_nc*NFRAMES);

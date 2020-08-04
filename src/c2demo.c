@@ -7,11 +7,6 @@
   Encodes and decodes a file of raw speech samples using Codec 2.
   Demonstrates use of Codec 2 function API.
 
-  Note to convert a wave file to raw and vice-versa:
-
-    $ sox file.wav -r 8000 -s -2 file.raw
-    $ sox -r 8000 -s -2 file.raw file.wav
-
 \*---------------------------------------------------------------------------*/
 
 /*
@@ -47,12 +42,7 @@ int main(int argc, char *argv[])
     FILE          *fout;
     short         *buf;
     unsigned char *bits;
-    int            nsam, nbit, i, r;
-
-    for(i=0; i<10; i++) {
-        r = codec2_rand();
-        printf("[%d] r = %d\n", i, r);
-    }
+    int            nsam, nbit;
 
     if (argc != 3) {
 	printf("usage: %s InputRawSpeechFile OutputRawSpeechFile\n", argv[0]);

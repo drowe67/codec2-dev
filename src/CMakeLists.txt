@@ -167,6 +167,7 @@ set(CODEC2_SRCS
     newamp1.c
     newamp2.c
     ofdm.c
+    ofdm_mode.c
     phase.c
     quantise.c
     pack.c
@@ -197,6 +198,10 @@ set(CODEC2_SRCS
     HRA_112_112.c
     HRAb_396_504.c
     H_256_768_22.c
+    H_256_512_4.c
+    HRAa_1536_512.c
+    H_128_256_5.c
+    ldpc_codes.c
     lpcnet_freq.c
 )
 
@@ -321,6 +326,12 @@ target_link_libraries(fsk_get_test_bits)
 add_executable(fsk_put_test_bits fsk_put_test_bits.c)
 target_link_libraries(fsk_put_test_bits ${CMAKE_REQUIRED_LIBRARIES} codec2)
 
+add_executable(framer framer.c)
+target_link_libraries(framer)
+
+add_executable(deframer deframer.c)
+target_link_libraries(deframer)
+
 add_executable(fm_demod fm_demod.c fm.c)
 target_link_libraries(fm_demod m ${CMAKE_REQUIRED_LIBRARIES})
 
@@ -329,9 +340,6 @@ target_link_libraries(cohpsk_mod ${CMAKE_REQUIRED_LIBRARIES} codec2)
 
 add_executable(ofdm_get_test_bits ofdm_get_test_bits.c)
 target_link_libraries(ofdm_get_test_bits ${CMAKE_REQUIRED_LIBRARIES} codec2)
-
-add_executable(ofdm_gen_test_bits ofdm_gen_test_bits.c)
-target_link_libraries(ofdm_gen_test_bits ${CMAKE_REQUIRED_LIBRARIES} codec2)
 
 add_executable(ofdm_put_test_bits ofdm_put_test_bits.c)
 target_link_libraries(ofdm_put_test_bits ${CMAKE_REQUIRED_LIBRARIES} codec2)
@@ -365,6 +373,8 @@ target_link_libraries(cohpsk_put_test_bits ${CMAKE_REQUIRED_LIBRARIES} codec2)
 
 add_executable(cohpsk_ch cohpsk_ch.c)
 target_link_libraries(cohpsk_ch ${CMAKE_REQUIRED_LIBRARIES} codec2)
+
+add_executable(tollr tollr.c)
 
 add_executable(ldpc_noise ldpc_noise.c)
 target_link_libraries(ldpc_noise m)

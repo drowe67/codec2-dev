@@ -1009,7 +1009,6 @@ function rx_uw = extract_uw(states, rx_syms, rx_amps)
 
   % now demodulate UW bits  
   rx_uw = zeros(1,Nuwbits);
-  txt_bits = zeros(1,Ntxtbits);
   
   for s=1:Nuwsyms
     if bps == 2

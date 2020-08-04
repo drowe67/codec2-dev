@@ -72,28 +72,58 @@ int main(int argc, char **argv)
     assert(frame_bits == 56);
     printf("%d Passed\n", frame_bits);
 
+    /* Note: A codec frame is only 3.5 bytes!
+       so the fourth and eight bytes will be half empty!
+    */
+    unsigned char payload[8] = { 0x12, 0x34, 0x56, 0x70, 0x89, 0xab, 0xcd, 0xe0 };
+    unsigned char payload_tx[7] = { 0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde };
+
+    printf("freedv_codec_frames_from_rawdata() ");
+    unsigned char codec_frames[8] = { 0 };
+    freedv_codec_frames_from_rawdata(f, codec_frames, payload_tx);
+    int fails = 0;
+    for (i = 0; i < 8; i++) {
+	if (codec_frames[i] != payload[i]) {
+	    printf("byte %d: 0x%02x does not match expected 0x%02x\n", i, codec_frames[i], payload[i]);
+	    fails++;
+	}    
+    }
+    if (fails)
+    	goto fail;
+    printf("Passed\n");
+    
+    printf("freedv_rawdata_from_codec_frames() ");
+    unsigned char rawdata[7] = { 0 };
+    freedv_rawdata_from_codec_frames(f, rawdata, payload);
+    fails = 0;
+    for (i = 0; i < 7; i++) {
+	if (rawdata[i] != payload_tx[i]) {
+	    printf("byte %d: 0x%02x does not match expected 0x%02x\n", i, rawdata[i], payload_tx[i]);
+	    fails++;
+	}
+    }
+    if (fails)
+    	goto fail;
+    printf("Passed\n");
+
     printf("freedv_rawdatatx()/freedv_rawdatarx() ");
     int frames = 0;
-    int fails = 0;
+    fails = 0;
     {
         short mod[nom_samples * 10];
-	/* Note: A codec frame is only 3.5 bytes!
-	   so the fourth and eight bytes will be half empty!
-	 */
-        unsigned char payload[8] = { 0x11, 0x22, 0x33, 0x40, 0x55, 0x66, 0x77, 0x80 };
         for (i = 0; i < 10; i ++) {
-	    freedv_rawdatatx(f, mod + i * nom_samples, payload);
+	    freedv_rawdatatx(f, mod + i * nom_samples, payload_tx);
         }
         int nin = 0;
         for (i = 0; i < nom_samples * 9; i += nin) {
             nin = freedv_nin(f);
-	    unsigned char rx_payload[8] = {0};
-            int r = freedv_rawdatarx(f, rx_payload, mod + i);
-            if (r) {
+	    unsigned char payload_rx[8] = {0};
+            int r = freedv_rawdatarx(f, payload_rx, mod + i);
+            if (r == 7) {
 	        int b;
-                for (b = 0; b < 8; b++) {
-	    	    if (payload[b] != rx_payload[b]) {
-		        printf("Received codec bits 0x%02x do not match expected 0x%02x\n", rx_payload[b], payload[b]);
+                for (b = 0; b < 7; b++) {
+	    	    if (payload_tx[b] != payload_rx[b]) {
+		        printf("Received codec bits 0x%02x do not match expected 0x%02x\n", payload_rx[b], payload_tx[b]);
 		        fails++;
                     }
                 }
@@ -105,6 +135,9 @@ int main(int argc, char **argv)
     	printf("Did not decode any frames successfully\n");
 	goto fail;
     }
+    if (fails)
+    	goto fail;
+    printf("Passed\n");
 
     printf("Tests passed\n");
     return 0;

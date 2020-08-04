@@ -64,7 +64,7 @@ int main(int argc, char *argv[]) {
     int         iter, total_iters;
     int         Tbits, Terrs, Tbits_raw, Terrs_raw;
 
-    int   nread, offset, frame;
+    int   nread, frame;
 
     semihosting_init();
 
@@ -129,46 +129,40 @@ int main(int argc, char *argv[]) {
     }
     setvbuf(fout, fout_buffer,_IOFBF,sizeof(fout_buffer));
 
-
-    double *input_double = calloc(CodeLength, sizeof(double));
     float  *input_float  = calloc(CodeLength, sizeof(float));
 
     nread = CodeLength;
-    offset = 0;
-    fprintf(stderr, "CodeLength: %d offset: %d\n", CodeLength, offset);
+    fprintf(stderr, "CodeLength: %d\n", CodeLength);
 
     frame = 0;
-    while(fread(&input_double[offset], sizeof(double) , nread, fin) == nread) {
+    while(fread(input_float, sizeof(float) , nread, fin) == nread) {
        fprintf(stderr, "frame %d\n", frame);
 
        if (testframes) {
             char in_char;
             for (i=0; i<data_bits_per_frame; i++) {
-                in_char = input_double[i] < 0;
+                in_char = input_float[i] < 0;
                 if (in_char != ibits[i]) {
                     Terrs_raw++;
                 }
                 Tbits_raw++;
             }
             for (i=0; i<NumberParityBits; i++) {
-                in_char = input_double[i+data_bits_per_frame] < 0;
+                in_char = input_float[i+data_bits_per_frame] < 0;
                 if (in_char != pbits[i]) {
                     Terrs_raw++;
                 }
                 Tbits_raw++;
             }
         }
-        sd_to_llr(input_float, input_double, CodeLength);
+        float llr[CodeLength];
+        sd_to_llr(llr, input_float, CodeLength);
 
         PROFILE_SAMPLE(ldpc_decode);
-        iter = run_ldpc_decoder(&ldpc, out_data, input_float, &parityCheckCount);
+        iter = run_ldpc_decoder(&ldpc, out_data, llr, &parityCheckCount);
         PROFILE_SAMPLE_AND_LOG2(ldpc_decode, "ldpc_decode");
         //fprintf(stderr, "iter: %d\n", iter);
         total_iters += iter;
-
-        for(i=0; i<offset; i++) {
-            input_float[i] = input_float[i+offset];
-        }
 
         fwrite(out_data, sizeof(char), data_bits_per_frame, fout);
 

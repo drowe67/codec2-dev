@@ -69,6 +69,7 @@
 #include "codec2_ofdm.h"
 #include "ofdm_internal.h"
 #include "mpdecode_core.h"
+#include "ldpc_codes.h"
 #include "interldpc.h"
 #include "gp_interleaver.h"
 #include "test_bits_ofdm.h"
@@ -122,8 +123,7 @@ int main(int argc, char *argv[]) {
     int          config_log_payload_syms;
     int          config_profile;
 
-    int          i, j, f;
-    int          interleave_frames;
+    int          i;
     int          Nerrs, Terrs, Tbits, Terrs2, Tbits2, frame_count;
     int          Tbits_coded, Terrs_coded;
 
@@ -148,17 +148,11 @@ int main(int argc, char *argv[]) {
     config_log_payload_syms = config[3] - '0';
     config_profile = config[4] - '0';
     fclose(fcfg);
-    //
-    interleave_frames = 1;
 
-    int Nerrs_raw[interleave_frames];
-    int Nerrs_coded[interleave_frames];
-    int iter[interleave_frames];
-    int parityCheckCount[interleave_frames];
-
-    for(i=0; i<interleave_frames; i++) {
-        Nerrs_raw[i] = Nerrs_coded[i] = iter[i] = parityCheckCount[i] = 0;
-    }
+    int Nerrs_raw = 0;
+    int Nerrs_coded = 0;
+    int iter = 0;
+    int parityCheckCount = 0;
 
     PROFILE_VAR(ofdm_demod_start, ofdm_demod_sync_search,
                 ofdm_demod_demod, ofdm_demod_diss, ofdm_demod_snr);
@@ -169,33 +163,15 @@ int main(int argc, char *argv[]) {
     ofdm_demod_snr = 0;
     if (config_profile) machdep_profile_init();
 
-    if ((ofdm_config = (struct OFDM_CONFIG *) CALLOC(1, sizeof (struct OFDM_CONFIG))) == NULL) {
-        fprintf(stderr, "Out of Memory\n");
-        exit(1);
-    }
-
-    ofdm_config->fs = 8000.0;			/* Sample Frequency */
-    ofdm_config->ofdm_timing_mx_thresh = 0.30;
-    ofdm_config->ftwindowwidth = 11;
-    ofdm_config->bps = 2;   			/* Bits per Symbol */
-    ofdm_config->txtbits = 4; 			/* number of auxiliary data bits */
-    ofdm_config->ns = 8;  			/* Number of Symbol frames */
-
-    ofdm_config->rs = (1.0f / ofdm_config->ts); /* Symbol Rate */
-
-    /* config options can change here, non yet */
-
-    ofdm = ofdm_create(ofdm_config);
+    ofdm = ofdm_create(NULL);
     assert(ofdm != NULL);
 
-    FREE(ofdm_config);
-
     /* Get a copy of the actual modem config */
-    ofdm_config = ofdm_get_config_param();
+    ofdm_config = ofdm_get_config_param(ofdm);
 
-    set_up_hra_112_112(&ldpc, ofdm_config);
+    ldpc_codes_setup(&ldpc, "HRA_112_112");
 
-    ofdm_bitsperframe = ofdm_get_bits_per_frame();
+    ofdm_bitsperframe = ofdm_get_bits_per_frame(ofdm);
     ofdm_rowsperframe = ofdm_bitsperframe / (ofdm_config->nc * ofdm_config->bps);
     ofdm_nuwbits = (ofdm_config->ns - 1) * ofdm_config->bps - ofdm_config->txtbits;
     ofdm_ntxtbits = ofdm_config->txtbits;
@@ -203,18 +179,18 @@ int main(int argc, char *argv[]) {
 
     ofdm_set_verbose(ofdm, config_verbose);
 
-    int Nmaxsamperframe = ofdm_get_max_samples_per_frame();
+    int Nmaxsamperframe = ofdm_get_max_samples_per_frame(ofdm);
 
     int data_bits_per_frame = ldpc.data_bits_per_frame;
     int coded_bits_per_frame = ldpc.coded_bits_per_frame;
-    int coded_syms_per_frame = ldpc.coded_syms_per_frame;
+    int coded_syms_per_frame = ldpc.coded_bits_per_frame/ofdm->bps;
 
     short   rx_scaled[Nmaxsamperframe];
     int     rx_bits[ofdm_bitsperframe];
     char    rx_bits_char[ofdm_bitsperframe];
     uint8_t rx_uw[ofdm_nuwbits];
     short   txt_bits[ofdm_ntxtbits];
-    f = 0;
+    int f = 0;
     Nerrs = Terrs = Tbits = Terrs2 = Tbits2 = Terrs_coded = Tbits_coded = frame_count = 0;
 
     float snr_est_smoothed_dB = 0.0;
@@ -223,8 +199,8 @@ int main(int argc, char *argv[]) {
 
     COMP  payload_syms[coded_syms_per_frame];
     float payload_amps[coded_syms_per_frame];
-    COMP  codeword_symbols[interleave_frames*coded_syms_per_frame];
-    float codeword_amps[interleave_frames*coded_syms_per_frame];
+    COMP  codeword_symbols[coded_syms_per_frame];
+    float codeword_amps[coded_syms_per_frame];
 
     FILE* fin = fopen("stm_in.raw", "rb");
     if (fin == NULL) {
@@ -272,7 +248,8 @@ int main(int argc, char *argv[]) {
             ofdm_demod_shorts(ofdm, rx_bits, rx_scaled, (OFDM_AMP_SCALE/2));
             if (config_profile) PROFILE_SAMPLE_AND_LOG2(ofdm_demod_demod, "  ofdm_demod_demod");
             if (config_profile) PROFILE_SAMPLE(ofdm_demod_diss);
-            ofdm_disassemble_modem_frame(ofdm, rx_uw, payload_syms, payload_amps, txt_bits);
+            ofdm_extract_uw(ofdm, ofdm->rx_np, ofdm->rx_amp, rx_uw);
+            ofdm_disassemble_qpsk_modem_packet(ofdm, ofdm->rx_np, ofdm->rx_amp, payload_syms, payload_amps, txt_bits);
             if (config_profile) PROFILE_SAMPLE_AND_LOG2(ofdm_demod_diss, "  ofdm_demod_diss");
             log_payload_syms_flag = 1;
 
@@ -294,73 +271,46 @@ int main(int argc, char *argv[]) {
                 assert((ofdm_nuwbits + ofdm_ntxtbits + coded_bits_per_frame) 
                         == ofdm_bitsperframe);
 
-                /* now we need to buffer for de-interleaving */
-
-                /* shift interleaved symbol buffers to make room for new symbols */
-                for(i=0, j=coded_syms_per_frame; 
-                    j<interleave_frames*coded_syms_per_frame; 
-                    i++,j++) {
-                    codeword_symbols[i] = codeword_symbols[j];
-                    codeword_amps[i] = codeword_amps[j];
-                }
-
                 /* newest symbols at end of buffer (uses final i from last loop) */
-                for(i=(interleave_frames-1)*coded_syms_per_frame,j=0; 
-                    i<interleave_frames*coded_syms_per_frame; 
-                    i++,j++) {
-                    codeword_symbols[i] = payload_syms[j];
-                    codeword_amps[i]    = payload_amps[j];
+                for(i=0; i < coded_syms_per_frame; i++) {
+                    codeword_symbols[i] = payload_syms[i];
+                    codeword_amps[i]    = payload_amps[i];
                 }
 
                 /* run de-interleaver */
-                COMP  codeword_symbols_de[interleave_frames*coded_syms_per_frame];
-                float codeword_amps_de[interleave_frames*coded_syms_per_frame];
+                COMP  codeword_symbols_de[coded_syms_per_frame];
+                float codeword_amps_de[coded_syms_per_frame];
 
-                gp_deinterleave_comp (codeword_symbols_de, codeword_symbols, 
-                                        interleave_frames*coded_syms_per_frame);
-                gp_deinterleave_float(codeword_amps_de, codeword_amps, 
-                                        interleave_frames*coded_syms_per_frame);
+                gp_deinterleave_comp (codeword_symbols_de, codeword_symbols, coded_syms_per_frame);
+                gp_deinterleave_float(codeword_amps_de, codeword_amps, coded_syms_per_frame);
 
                 float llr[coded_bits_per_frame];
 
                 if (config_ldpc_en) {
                     uint8_t out_char[coded_bits_per_frame];
 
-                    interleaver_sync_state_machine(ofdm, &ldpc, ofdm_config, 
-                                codeword_symbols_de, codeword_amps_de, EsNo,
-                                interleave_frames, iter, parityCheckCount, Nerrs_coded);
-
-                    if ((ofdm->sync_state_interleaver == synced) && 
-                            (ofdm->frame_count_interleaver == interleave_frames)) {
-                        ofdm->frame_count_interleaver = 0;
-
                         if (config_testframes) {
-                            Terrs += count_uncoded_errors(&ldpc, ofdm_config, Nerrs_raw, 
-                                        interleave_frames, codeword_symbols_de);
-                            Tbits += coded_bits_per_frame*interleave_frames; 
+                            Terrs += count_uncoded_errors(&ldpc, ofdm_config, &Nerrs_raw, codeword_symbols_de);
+                            Tbits += coded_bits_per_frame; 
                         }
 
-                        for (j=0; j<interleave_frames; j++) {
-                            symbols_to_llrs(llr, &codeword_symbols_de[j*coded_syms_per_frame],
-                                                 &codeword_amps_de[j*coded_syms_per_frame],
+                            symbols_to_llrs(llr, codeword_symbols_de, codeword_amps_de,
                                                  EsNo, ofdm->mean_amp, coded_syms_per_frame);
-                            iter[j] = run_ldpc_decoder(&ldpc, out_char, llr, &parityCheckCount[j]);
+                            iter = run_ldpc_decoder(&ldpc, out_char, llr, &parityCheckCount);
 
-                            //fprintf(stderr,"j: %d iter: %d pcc: %d\n", j, iter[j], parityCheckCount[j]);
+                            //fprintf(stderr,"iter: %d pcc: %d\n", iter, parityCheckCount);
 
                             if (config_testframes) {
                                 /* construct payload data bits */
                                 uint8_t payload_data_bits[data_bits_per_frame];
                                 ofdm_generate_payload_data_bits(payload_data_bits, data_bits_per_frame);
                                 
-                                Nerrs_coded[j] = count_errors(payload_data_bits, out_char, data_bits_per_frame);
-                                Terrs_coded += Nerrs_coded[j];
+                                Nerrs_coded = count_errors(payload_data_bits, out_char, data_bits_per_frame);
+                                Terrs_coded += Nerrs_coded;
                                 Tbits_coded += data_bits_per_frame;
                             }
 
                             fwrite(out_char, sizeof(char), data_bits_per_frame, fout);
-                        }
-                    } /* if interleaver synced ..... */
                 } else { 
                     /* lpdc_en == 0,  external LDPC decoder, so output LLRs */
                     symbols_to_llrs(llr, codeword_symbols_de, codeword_amps_de, EsNo, ofdm->mean_amp, coded_syms_per_frame);
@@ -391,7 +341,7 @@ int main(int argc, char *argv[]) {
 
                 for(i=0; i<Npayloadbits; i++) {
                     payload_bits[i] = r[i] > 16384;
-                    //fprintf(stderr,"%d %d ", r[j], tx_bits_char[i]);
+                    //fprintf(stderr,"%d %d ", r[i], tx_bits_char[i]);
                 }
 
                 uint8_t txt_bits[ofdm_ntxtbits];
@@ -400,7 +350,7 @@ int main(int argc, char *argv[]) {
                     txt_bits[i] = 0;
                 }
 
-                ofdm_assemble_modem_frame(ofdm, tx_bits, payload_bits, txt_bits);
+                ofdm_assemble_qpsk_modem_packet(ofdm, tx_bits, payload_bits, txt_bits);
 
                 Nerrs = 0;
                 for(i=0; i<ofdm_bitsperframe; i++) {
@@ -427,24 +377,15 @@ int main(int argc, char *argv[]) {
         /* act on any events returned by state machine */
 
         if (ofdm->sync_start) {
-            Terrs = Tbits = Terrs2 = Tbits2 = Terrs_coded = Tbits_coded = frame_count = 0;
-            for(i=0; i<interleave_frames; i++) {
-                Nerrs_raw[i] = Nerrs_coded[i] = 0;
-            }
-
+            Terrs = Tbits = Terrs2 = Tbits2 = Terrs_coded = Tbits_coded = frame_count = Nerrs_raw = Nerrs_coded = 0;
         }
 
-        int r = 0;
         if (config_testframes && config_verbose) {
-            r = (ofdm->frame_count_interleaver - 1 ) % interleave_frames;
             fprintf(stderr, "%3d st: %-6s", f, statemode[ofdm->last_sync_state]);
-            fprintf(stderr, " euw: %2d %1d f: %5.1f ist: %-6s %2d eraw: %3d ecdd: %3d iter: %3d pcc: %3d",
+            fprintf(stderr, " euw: %2d %1d f: %5.1f eraw: %3d ecdd: %3d iter: %3d pcc: %3d\n",
                 ofdm->uw_errors, ofdm->sync_counter,
                 (double)ofdm->foff_est_hz,
-                statemode[ofdm->last_sync_state_interleaver], 
-                ofdm->frame_count_interleaver,
-                Nerrs_raw[r], Nerrs_coded[r], iter[r], parityCheckCount[r]);
-            fprintf(stderr, "\n");
+                Nerrs_raw, Nerrs_coded, iter, parityCheckCount);
         }
 
         if (config_log_payload_syms) {
