@@ -354,6 +354,21 @@ if(UNITTEST)
              set_tests_properties(test_COHPSK_modem_octave_port PROPERTIES
              PASS_REGULAR_EXPRESSION "fails: 0")
 
+    add_test(NAME test_COHPSK_modem_AWGN_BER
+             COMMAND sh -c "$<TARGET_FILE:cohpsk_get_test_bits> - 5600 | $<TARGET_FILE:cohpsk_mod> - - | $<TARGET_FILE:cohpsk_ch> - - -30  | $<TARGET_FILE:cohpsk_demod> - - | $<TARGET_FILE:cohpsk_put_test_bits> -"
+             )
+           
+    add_test(NAME test_COHPSK_modem_freq_offset
+             COMMAND sh -c "set -x; $<TARGET_FILE:cohpsk_get_test_bits> - 5600 | $<TARGET_FILE:cohpsk_mod> - - | $<TARGET_FILE:cohpsk_ch> - - -40 -f -20 | $<TARGET_FILE:cohpsk_demod> -v - - 2>log.txt | $<TARGET_FILE:cohpsk_put_test_bits> - ; ! grep 'lost sync' log.txt"
+             )
+           
+    # -------------------------------------------------------------------------
+    #                                OFDM Modem
+    # -------------------------------------------------------------------------
+
+    add_test(NAME test_OFDM_qam16
+             COMMAND sh -c "${CMAKE_CURRENT_BINARY_DIR}/unittest/tqam16")
+
     add_test(NAME test_OFDM_modem_octave_port
              COMMAND sh -c "PATH_TO_TOFDM=${CMAKE_CURRENT_BINARY_DIR}/unittest/tofdm DISPLAY=\"\" octave-cli --no-gui -qf ${CMAKE_CURRENT_SOURCE_DIR}/octave/tofdm.m"
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/octave)
@@ -366,16 +381,30 @@ if(UNITTEST)
              set_tests_properties(test_OFDM_modem_octave_port_Nc_31 PROPERTIES
              PASS_REGULAR_EXPRESSION "fails: 0")
 
-    add_test(NAME test_COHPSK_modem_AWGN_BER
-             COMMAND sh -c "$<TARGET_FILE:cohpsk_get_test_bits> - 5600 | $<TARGET_FILE:cohpsk_mod> - - | $<TARGET_FILE:cohpsk_ch> - - -30  | $<TARGET_FILE:cohpsk_demod> - - | $<TARGET_FILE:cohpsk_put_test_bits> -"
-             )
+    # noise free uncoded 700D test, including reading and writing payload bits
+    add_test(NAME test_OFDM_modem_700D
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            ./ofdm_get_test_bits - | 
+                            ./ofdm_mod | 
+                            ./ofdm_demod  --testframes > /dev/null")
            
-    add_test(NAME test_COHPSK_modem_freq_offset
-             COMMAND sh -c "set -x; $<TARGET_FILE:cohpsk_get_test_bits> - 5600 | $<TARGET_FILE:cohpsk_mod> - - | $<TARGET_FILE:cohpsk_ch> - - -40 -f -20 | $<TARGET_FILE:cohpsk_demod> -v - - 2>log.txt | $<TARGET_FILE:cohpsk_put_test_bits> - ; ! grep 'lost sync' log.txt"
-             )
+    # noise free coded 700D test, including reading and writing payload bits
+    add_test(NAME test_OFDM_modem_700D_ldpc
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            ./ofdm_get_test_bits - --ldpc | 
+                            ./ofdm_mod --ldpc | 
+                            ./ofdm_demod --ldpc --testframes > /dev/null")
            
+    # noise free 2020 test, including reading and writing payload bits.  fsk_*_test_bits used as it does it's own frame sync
+    add_test(NAME test_OFDM_modem_2020_ldpc
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            ./fsk_get_test_bits - 5000 | 
+                            ./ofdm_mod --ldpc --mode 2020 -p 312 | 
+                            ./ofdm_demod  --ldpc --mode 2020 -p 312 | 
+                            ./fsk_put_test_bits - -q")
+
     add_test(NAME test_OFDM_modem_AWGN_BER
-             COMMAND sh -c "$<TARGET_FILE:ofdm_mod> --in /dev/zero --ldpc 1 --testframes 60 --txbpf | $<TARGET_FILE:cohpsk_ch> - - -20 --Fs 8000 -f -50 | $<TARGET_FILE:ofdm_demod> --out /dev/null --testframes --ldpc 1 --verbose 1"
+             COMMAND sh -c "$<TARGET_FILE:ofdm_mod> --in /dev/zero --ldpc --testframes 60 --txbpf | $<TARGET_FILE:cohpsk_ch> - - -20 --Fs 8000 -f -50 | $<TARGET_FILE:ofdm_demod> --out /dev/null --testframes --ldpc --verbose 1"
              )
 
     configure_file(unittest/ofdm_fade.sh.in unittest/ofdm_fade.sh)
@@ -384,31 +413,50 @@ if(UNITTEST)
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/unittest
              )
            
-    configure_file(unittest/ofdm_phase_est_bw.sh.in unittest/ofdm_phase_est_bw.sh)
     add_test(NAME test_OFDM_modem_phase_est_bw
-             COMMAND ${CMAKE_CURRENT_BINARY_DIR}/unittest/ofdm_phase_est_bw.sh
-             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/unittest
-             )
+             COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/unittest;
+                            PATH=$PATH:${CMAKE_CURRENT_BINARY_DIR}/src ./ofdm_phase_est_bw.sh")
            
-    configure_file(unittest/ofdm_time_sync.sh.in unittest/ofdm_time_sync.sh)
+    add_test(NAME test_OFDM_modem_fading_DPSK_BER
+             COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/unittest;
+                            PATH=$PATH:${CMAKE_CURRENT_BINARY_DIR}/src ./ofdm_fade_dpsk.sh")
+
     add_test(NAME test_OFDM_modem_time_sync_700D
-             COMMAND ${CMAKE_CURRENT_BINARY_DIR}/unittest/ofdm_time_sync.sh 700D
-             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/unittest
-             )
+             COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/unittest;
+                            PATH=$PATH:${CMAKE_CURRENT_BINARY_DIR}/src ./ofdm_time_sync.sh 700D")
            
 if(LPCNET)
     add_test(NAME test_OFDM_modem_time_sync_2020
-             COMMAND ${CMAKE_CURRENT_BINARY_DIR}/unittest/ofdm_time_sync.sh 2020
-             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/unittest
-             )
+             COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/unittest;
+                            PATH=$PATH:${CMAKE_CURRENT_BINARY_DIR}/src ./ofdm_time_sync.sh 2020")
 endif()
 
-    configure_file(unittest/ofdm_fade_dpsk.sh.in unittest/ofdm_fade_dpsk.sh)
-    add_test(NAME test_OFDM_modem_fading_DPSK_BER
-             COMMAND ${CMAKE_CURRENT_BINARY_DIR}/unittest/ofdm_fade_dpsk.sh
-             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/unittest
-             )
+    # -------------------------------------------------------------------------
+    #                                OFDM Data modes
+    # -------------------------------------------------------------------------
+
+    # C Tx, Octave Rx
+    add_test(NAME test_OFDM_modem_datac1_octave
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR};
+                            ./src/ofdm_mod --mode datac1 --in /dev/zero --testframes 5 --verbose 1 > test.raw;
+                            cd ${CMAKE_CURRENT_SOURCE_DIR}/octave;
+                            DISPLAY=\"\" octave-cli -qf --eval 'ofdm_rx(\"${CMAKE_CURRENT_BINARY_DIR}/test.raw\",\"datac1\")'")
+             set_tests_properties(test_OFDM_modem_datac1_octave PROPERTIES PASS_REGULAR_EXPRESSION "BER..: 0.0000")
+    # C Tx, C Rx, uncoded       
+    add_test(NAME test_OFDM_modem_datac1
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            ./ofdm_mod   --mode datac1 --in  /dev/zero --testframes 10 --verbose 1 |
+                            ./ofdm_demod --mode datac1 --out /dev/null --testframes   --verbose 1")
+    # C Tx, C Rx, coded       
+    add_test(NAME test_OFDM_modem_datac1_ldpc
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            ./ofdm_mod   --mode datac1 --in  /dev/zero --testframes 10 --ldpc --verbose 1 | 
+                            ./ofdm_demod --mode datac1 --out /dev/null  --testframes    --ldpc --verbose 1")
            
+    # -------------------------------------------------------------------------
+    #                                LDPC
+    # -------------------------------------------------------------------------
+
     # tests ldpc_enc/ldpc_noise/ldpc_dec
     add_test(NAME test_ldpc_enc_dec
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
@@ -424,11 +472,11 @@ endif()
                             ./ldpc_dec - /dev/null --code HRAb_396_504 --sd --testframes"
              )
 
-    add_test(NAME test_ldpc_enc_dec_H_256_768
+    add_test(NAME test_ldpc_enc_dec_H_256_768_22
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
-                            ./ldpc_enc /dev/zero - --sd --code H_256_768 --testframes 200 | 
+                            ./ldpc_enc /dev/zero - --sd --code H_256_768_22 --testframes 200 | 
                             ./ldpc_noise - - 3.0 | 
-                            ./ldpc_dec - /dev/null --code H_256_768 --sd --testframes"
+                            ./ldpc_dec - /dev/null --code H_256_768_22 --sd --testframes"
              )
 
     add_test(NAME test_ldpc_enc_dec_H_256_512_4
@@ -450,11 +498,6 @@ endif()
                             ./ldpc_enc /dev/zero - --sd --code H_128_256_5 --testframes 200 | 
                             ./ldpc_noise - - 0.5 | 
                             ./ldpc_dec - /dev/null --code H_128_256_5 --sd --testframes"
-             )
-
-    # basic test of C utils
-    add_test(NAME test_FSK_modem_mod_demod
-             COMMAND sh -c "$<TARGET_FILE:fsk_get_test_bits> - 10000 | $<TARGET_FILE:fsk_mod> 2 8000 100 1200 100 - - | $<TARGET_FILE:fsk_demod> -l 2 8000 100 - - | $<TARGET_FILE:fsk_put_test_bits> -"
              )
 
     add_test(NAME test_freedv_api_1600
@@ -492,12 +535,12 @@ if(LPCNET)
     add_test(NAME test_freedv_api_2020_to_ofdm_demod
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
                                ./freedv_tx 2020 ../../wav/wia_16kHz.wav - --testframes | 
-                               ./ofdm_demod --ts 0.0205 --nc 31 --verbose 1 --ldpc 2 -p 312 --testframes > /dev/null"
+                               ./ofdm_demod --mode 2020 --verbose 1 --ldpc -p 312 --testframes > /dev/null"
              )
 
     add_test(NAME test_freedv_api_2020_from_ofdm_mod
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
-                            ./ofdm_mod --in /dev/zero --ts 0.0205 --nc 31 --verbose 1 --ldpc 2 -p 312 --testframes 10 | 
+                            ./ofdm_mod --in /dev/zero --mode 2020 --verbose 1 --ldpc -p 312 --testframes 10 | 
                             ./freedv_rx 2020 - /dev/null --testframes"
              )
 

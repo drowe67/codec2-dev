@@ -29,6 +29,7 @@
 #include "ofdm_internal.h"
 #include "mpdecode_core.h"
 #include "gp_interleaver.h"
+#include "ldpc_codes.h"
 #include "interldpc.h"
 #include "debug_alloc.h"
 #include "filter.h"
@@ -104,12 +105,12 @@ void freedv_700d_open(struct freedv *f) {
     f->ldpc = (struct LDPC*)MALLOC(sizeof(struct LDPC));
     assert(f->ldpc != NULL);
 
-    set_up_hra_112_112(f->ldpc, ofdm_config);
+    ldpc_codes_setup(f->ldpc, "HRA_112_112");
 #ifdef __EMBEDDED__
     f->ldpc->max_iter = 10; /* limit LDPC decoder iterations to limit CPU load */
 #endif	
     /* Code length 224 divided by 2 bits per symbol = 112 symbols per frame */
-    int coded_syms_per_frame = f->ldpc->coded_syms_per_frame;
+    int coded_syms_per_frame = f->ldpc->coded_bits_per_frame/f->ofdm->bps;
         
     f->modem_frame_count_tx = f->modem_frame_count_rx = 0;
         
@@ -218,7 +219,7 @@ void freedv_comptx_700d(struct freedv *f, COMP mod_out[]) {
     complex float tx_sams[f->n_nat_modem_samples];
     COMP asam;
     
-    ofdm_ldpc_interleave_tx(f->ofdm, f->ldpc, tx_sams, f->tx_payload_bits, txt_bits, &f->ofdm->config);
+    ofdm_ldpc_interleave_tx(f->ofdm, f->ldpc, tx_sams, f->tx_payload_bits, txt_bits);
 
     for(i=0; i< f->n_nat_modem_samples; i++) {
         asam.real = crealf(tx_sams[i]);
@@ -348,7 +349,7 @@ int freedv_comp_short_rx_700d(struct freedv *f, void *demod_in_8kHz, int demod_i
     
     int    data_bits_per_frame = ldpc->data_bits_per_frame;
     int    coded_bits_per_frame = ldpc->coded_bits_per_frame;
-    int    coded_syms_per_frame = ldpc->coded_syms_per_frame;
+    int    coded_syms_per_frame = ldpc->coded_bits_per_frame/ofdm->bps;
     COMP  *codeword_symbols = f->codeword_symbols;
     float *codeword_amps = f->codeword_amps;
     int    rx_bits[f->ofdm_bitsperframe];
@@ -391,8 +392,9 @@ int freedv_comp_short_rx_700d(struct freedv *f, void *demod_in_8kHz, int demod_i
             ofdm_demod_shorts(ofdm, rx_bits, (short*)demod_in_8kHz, new_gain);
         else
             ofdm_demod(ofdm, rx_bits, (COMP*)demod_in_8kHz);
-            
-        ofdm_disassemble_qpsk_modem_frame(ofdm, rx_uw, payload_syms, payload_amps, txt_bits);
+
+        ofdm_extract_uw(ofdm, ofdm->rx_np, ofdm->rx_amp, rx_uw);
+        ofdm_disassemble_qpsk_modem_packet(ofdm, ofdm->rx_np, ofdm->rx_amp, payload_syms, payload_amps, txt_bits);
 
         f->sync = 1;
         ofdm_get_demod_stats(f->ofdm, &f->stats);

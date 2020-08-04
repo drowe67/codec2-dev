@@ -13,5 +13,6 @@ extern struct LDPC ldpc_codes[];
 int ldpc_codes_num(void);
 void ldpc_codes_list();
 int ldpc_codes_find(char name[]);
+void ldpc_codes_setup(struct LDPC *ldpc, char name[]);
 
 #endif

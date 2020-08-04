@@ -786,6 +786,5 @@ void ldpc_print_info(struct LDPC *ldpc) {
     fprintf(stderr, "ldpc->max_col_weight = %d\n", ldpc->max_col_weight);
     fprintf(stderr, "ldpc->data_bits_per_frame = %d\n", ldpc->data_bits_per_frame);
     fprintf(stderr, "ldpc->coded_bits_per_frame = %d\n", ldpc->coded_bits_per_frame);
-    fprintf(stderr, "ldpc->coded_syms_per_frame = %d\n", ldpc->coded_syms_per_frame);
 }
 

@@ -167,6 +167,7 @@ set(CODEC2_SRCS
     newamp1.c
     newamp2.c
     ofdm.c
+    ofdm_mode.c
     phase.c
     quantise.c
     pack.c
@@ -339,9 +340,6 @@ target_link_libraries(cohpsk_mod ${CMAKE_REQUIRED_LIBRARIES} codec2)
 
 add_executable(ofdm_get_test_bits ofdm_get_test_bits.c)
 target_link_libraries(ofdm_get_test_bits ${CMAKE_REQUIRED_LIBRARIES} codec2)
-
-add_executable(ofdm_gen_test_bits ofdm_gen_test_bits.c)
-target_link_libraries(ofdm_gen_test_bits ${CMAKE_REQUIRED_LIBRARIES} codec2)
 
 add_executable(ofdm_put_test_bits ofdm_put_test_bits.c)
 target_link_libraries(ofdm_put_test_bits ${CMAKE_REQUIRED_LIBRARIES} codec2)
