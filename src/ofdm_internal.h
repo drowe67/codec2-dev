@@ -95,6 +95,7 @@ struct OFDM_CONFIG {
     int ftwindowwidth;
     int data_mode;     /* non-zero if this is a data mode */
     char *codename;    /* name of LDPC code used with this mode */
+    uint8_t tx_uw[MAX_UW_BITS]; /* user defined unique word */
 };
 
 struct OFDM {

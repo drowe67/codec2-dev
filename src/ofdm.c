@@ -225,6 +225,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
         ofdm->timing_mx_thresh = config->timing_mx_thresh;
         ofdm->data_mode = config->data_mode;
         ofdm->codename = config->codename;
+        memcpy(ofdm->tx_uw, config->tx_uw, ofdm->nuwbits);
     }
 
     ofdm->rs = (1.0f / ofdm->ts);                 /* Modulation Symbol Rate */
@@ -235,6 +236,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     /* basic sanity checks */
     assert((int)floorf(ofdm->fs / ofdm->rs) == ofdm->m);
     assert((ofdm->data_mode == 0) || (ofdm->data_mode == 1));
+    assert(ofdm->nuwbits <= MAX_UW_BITS);
     
     /* Copy constants into states */
 
@@ -255,6 +257,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     ofdm->config.ftwindowwidth = ofdm->ftwindowwidth;
     ofdm->config.data_mode = ofdm->data_mode;
     ofdm->config.codename = ofdm->codename;
+    memcpy(ofdm->config.tx_uw, ofdm->tx_uw, ofdm->nuwbits);
     
     /* Calculate sizes from config param */
 
@@ -497,7 +500,6 @@ void ofdm_destroy(struct OFDM *ofdm) {
     FREE(ofdm->rx_np);
     FREE(ofdm->rx_amp);
     FREE(ofdm->aphase_est_pilot_log);
-    //FREE(ofdm->tx_uw);
     FREE(ofdm->tx_uw_syms);
     FREE(ofdm->uw_ind);
     FREE(ofdm->uw_ind_sym);
