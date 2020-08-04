@@ -46,7 +46,8 @@ extern "C"
 
 #define TAU         (2.0f * M_PI)
 #define ROT45       (M_PI / 4.0f)
-
+#define MAX_UW_BITS 32
+    
 #define cmplx(value) (cosf(value) + sinf(value) * I)
 #define cmplxconj(value) (cosf(value) + sinf(value) * -I)
 
@@ -154,7 +155,7 @@ struct OFDM {
     float *rx_amp;
     float *aphase_est_pilot_log;
 
-    uint8_t *tx_uw;
+    uint8_t tx_uw[MAX_UW_BITS];
     int *uw_ind;
     int *uw_ind_sym;
 

@@ -204,6 +204,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
         ofdm->timing_mx_thresh = 0.30f;
         ofdm->data_mode = 0;
         ofdm->codename = "HRA_112_112";
+        memset(ofdm->tx_uw, 0, ofdm->nuwbits);
     } else {
         /* Use the users values */
 
@@ -301,14 +302,6 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     ofdm->aphase_est_pilot_log = MALLOC(sizeof (float) * (ofdm->rowsperframe * ofdm->nc));
     assert(ofdm->aphase_est_pilot_log != NULL);
 
-    /* set up Unique Word */
-    ofdm->tx_uw = MALLOC(sizeof (uint8_t) * ofdm->nuwbits);
-    assert(ofdm->tx_uw != NULL);
-
-    for (i = 0; i < ofdm->nuwbits; i++) {
-        ofdm->tx_uw[i] = 0;
-    }
-
     /* Null pointers to unallocated buffers */
     ofdm->tx_bpf = NULL;
 
@@ -403,8 +396,12 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     ofdm->tx_uw_syms = MALLOC(sizeof (complex float) * (ofdm->nuwbits / ofdm->bps));
     assert(ofdm->tx_uw_syms != NULL);
 
-    for (i = 0; i < (ofdm->nuwbits / ofdm->bps); i++) {
-        ofdm->tx_uw_syms[i] = 1.0f;      // qpsk_mod(0:0)
+    assert(ofdm->bps == 2); // TODO generalise
+    for (int s = 0; s < (ofdm->nuwbits / ofdm->bps); s++) {
+        int dibit[2];
+        dibit[1] = ofdm->tx_uw[2*s];
+        dibit[0] = ofdm->tx_uw[2*s+1];
+        ofdm->tx_uw_syms[s] = qpsk_mod(dibit);
     }
 
     /* sync state machine */
@@ -500,7 +497,7 @@ void ofdm_destroy(struct OFDM *ofdm) {
     FREE(ofdm->rx_np);
     FREE(ofdm->rx_amp);
     FREE(ofdm->aphase_est_pilot_log);
-    FREE(ofdm->tx_uw);
+    //FREE(ofdm->tx_uw);
     FREE(ofdm->tx_uw_syms);
     FREE(ofdm->uw_ind);
     FREE(ofdm->uw_ind_sym);
