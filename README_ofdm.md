@@ -183,6 +183,21 @@ Here are some useful tests for the LDPC coded C version of the modem, useful to 
    
    Note: 10% Raw BER operating point on both channels, as per design.
 
+# Data Modes
+
+The OFDM modem can also support datac1/catac2/datac3 modes for packet data.  The OFDM modem was originally designed for very short (28 bit) voice codec packets.  For data, packets of hundreds to thousands of bits a desirable so we can use long, powerful FEC codewords, and reduce overhead.  The datac1/datac2/datac3 QPSK modes are currently under development:
+
+Here is an example of running the datac3 mode in a low SNR AWGN channel:
+
+```
+./src/ofdm_mod --mode datac3 --ldpc --in  /dev/zero --testframes 60 --verbose 1 | ./src/cohpsk_ch - - -20 --Fs 8000 | ./src/ofdm_demod --mode datac3 --ldpc --out /dev/null --testframes -v 1
+<snip>
+SNR3k(dB): -3.54 C/No: 31.2 PAPR: 10.4 
+BER......: 0.1082 Tbits: 36096 Terrs:  3905 Tpackets:    47
+Coded BER: 0.0000 Tbits: 12032 Terrs:     0
+```
+Note despite the raw BER of 10%, 47/50 packets are received error free.
+
 # C Code
 
 | File | Description |
