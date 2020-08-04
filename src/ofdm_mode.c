@@ -54,11 +54,13 @@ void ofdm_init_mode(char mode[], struct OFDM_CONFIG *config) {
         config->ftwindowwidth = 32; config->data_mode = 1; config->codename = "H2064_516_sparse";
     } else if (strcmp(mode,"datac3") == 0) {
         config->ns=5; config->np=11; config->tcp = 0.006; config->ts = 0.016; config->nc = 9;
-        config->txtbits = 0; config->nuwbits = 24; config->bad_uw_errors = 5; /* TODO 5 */
+        config->txtbits = 0; 
         config->ftwindowwidth = 32; config->timing_mx_thresh = 0.30; config->data_mode = 1;
         config->codename = "H_256_768_22";
-        /* TODO custom UW */
+        /* custom UW - we use a longer UW with higher bad_uw_errors threshold due to high raw BER */
+        config->nuwbits = 24; config->bad_uw_errors = 5;
         uint8_t uw[] = {1,1,0,0, 1,0,1,0,  1,1,1,1, 0,0,0,0, 1,1,1,1, 0,0,0,0};
+        assert(sizeof(uw) == config->nuwbits);
         memcpy(config->tx_uw, uw, config->nuwbits);
     }
     else {

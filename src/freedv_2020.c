@@ -27,6 +27,7 @@
 
 #include "codec2_ofdm.h"
 #include "ofdm_internal.h"
+#include "ofdm_mode.h"
 #include "mpdecode_core.h"
 #include "gp_interleaver.h"
 #include "ldpc_codes.h"
@@ -41,20 +42,15 @@ void freedv_2020_open(struct freedv *f) {
     f->snr_squelch_thresh = 4.0;
     f->squelch_en = 0;
         
-    /* Get a copy of the 700D modem config as template then modify for 2020 */
-    f->ofdm = ofdm_create(NULL);
     struct OFDM_CONFIG ofdm_config;
-    memcpy(&ofdm_config, ofdm_get_config_param(f->ofdm), sizeof(ofdm_config));
-    ofdm_destroy(f->ofdm);
-    
-    ofdm_config.nc = 31; int data_bits_per_frame = 312;
-    ofdm_config.ts = 0.0205;
+    ofdm_init_mode("2020", &ofdm_config);
     f->ofdm = ofdm_create(&ofdm_config);
             
     f->ldpc = (struct LDPC*)MALLOC(sizeof(struct LDPC));
     assert(f->ldpc != NULL);
         
-    ldpc_codes_setup(f->ldpc, "HRAb_396_504");
+    ldpc_codes_setup(f->ldpc, f->ofdm->codename);
+    int data_bits_per_frame = 312;
     set_data_bits_per_frame(f->ldpc, data_bits_per_frame);
     int coded_syms_per_frame = f->ldpc->coded_bits_per_frame/f->ofdm->bps;
         
