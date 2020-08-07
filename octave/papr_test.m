@@ -25,6 +25,8 @@
     [ ] results
         + we can trade of PAPR with bandwidth, lower PAPR, more bandwidth
         + filtering bring sthe PAPR up again
+    [ ] what will happen when LDPC demodulated?
+        + will decoder struggle due to non-linearity
 #}
 
 1;
@@ -78,7 +80,10 @@ function [ber papr_log] = run_sim(Nsym, EbNodB, plot_en=0, filt_en=0, method="")
             tx_(ind) = 6*exp(j*angle(tx(ind)));
         end
         if strcmp(method, "compand")
-          tx_mag = interp1([0 1 3 5 6 20], [0 1 4 5.5 6 7], abs(tx), "pchip");
+          %tx_mag = interp1([0 1 3 5 6 20], [0 1 4 5.5 6 7], abs(tx), "pchip");
+          # power law compander x = a*y^power, y = (x/a) ^ (1/power)
+          threshold=6; power=3; a=threshold/(threshold^power);
+          tx_mag = (abs(tx)/a) .^ (1/power);
           tx_ = tx_mag.*exp(j*angle(tx));
         end
 
@@ -122,7 +127,9 @@ function [ber papr_log] = run_sim(Nsym, EbNodB, plot_en=0, filt_en=0, method="")
           figure(1); clf;
           plot(abs(tx(1:5*M))); hold on; plot(abs(tx_(1:5*M))); hold off;
           axis([0 5*M 0 max(abs(tx))]);
-          figure(2); clf; hist(abs(tx),25);
+          figure(2); clf; [hh nn] = hist(abs(tx),25,1);
+          cdf = empirical_cdf((1:Nc),abs(tx));
+          plotyy(nn,hh,1:Nc,cdf); title('PDF and CDF');
           % heat map type scatter plot
           figure(3); clf;
           rx_sym = reshape(rx_sym, Nsym*Nc, 1);
