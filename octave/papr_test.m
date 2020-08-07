@@ -5,11 +5,11 @@
   TODO:
     [X] measure BER
     [X] heat map type scatter diagram
-    [ ] curves with different clipping thresholds
     [X] clipping
     [X] companding
+    [X] curves with different clipping thresholds
     [ ] set threshold at CDF
-    [ ] filter
+    [X] filter
         + complex or real?
         + might introduce phase shift ... make demodulation tricky
     [ ] way to put plots on top of each other
@@ -22,9 +22,13 @@
     [ ] down the track ... other types of channels
         + does it mess up HF multipath much
     [ ] Tx a companded waveform and see if it really helps average power
-    [ ] results
-        + we can trade of PAPR with bandwidth, lower PAPR, more bandwidth
-        + filtering bring sthe PAPR up again
+    [ ] results/discussion
+        + non-linear technqiues spread the energy in freq
+        we can trade of PAPR with bandwidth, lower PAPR, more bandwidth
+        + filtering brings the PAPR up again
+        + PAPR helps SNR, but multipath is a much tougher problem
+        + non-linear technqiques will mess with QAM more (I think - simulate?)
+        + so we may hit a wall at high data rates
     [ ] what will happen when LDPC demodulated?
         + will decoder struggle due to non-linearity
 #}
@@ -47,7 +51,7 @@ function two_bits = qpsk_demod(symbol)
     two_bits = [bit1 bit0];
 endfunction
 
-function [ber papr_log] = run_sim(Nsym, EbNodB, plot_en=0, filt_en=0, method="")
+function [ber papr] = run_sim(Nsym, EbNodB, plot_en=0, filt_en=0, method="", threshold=6)
     Nc   = 16;
     M    = 160;   % number of samples in each symbol
     bps  = 2;     % two bits per symbol for QPSK
@@ -76,24 +80,30 @@ function [ber papr_log] = run_sim(Nsym, EbNodB, plot_en=0, filt_en=0, method="")
 
         tx_ = tx;
         if strcmp(method, "clip")
-            ind = find(abs(tx) > 6);
-            tx_(ind) = 6*exp(j*angle(tx(ind)));
+          ind = find(abs(tx) > threshold);
+          tx_(ind) = threshold*exp(j*angle(tx(ind)));
         end
-        if strcmp(method, "compand")
-          %tx_mag = interp1([0 1 3 5 6 20], [0 1 4 5.5 6 7], abs(tx), "pchip");
+        if strcmp(method, "compand1")
+          tx_mag = interp1([0 1 3 5 6 20], [0 1 4 5.5 6 7], abs(tx), "pchip");
+          tx_ = tx_mag.*exp(j*angle(tx));
+        end
+        if strcmp(method, "compand2")
           # power law compander x = a*y^power, y = (x/a) ^ (1/power)
-          threshold=6; power=3; a=threshold/(threshold^power);
+          power=2; a=threshold/(threshold^power);
           tx_mag = (abs(tx)/a) .^ (1/power);
           tx_ = tx_mag.*exp(j*angle(tx));
         end
-
+        
         if filt_en
           Nfilt=40;
           b = fir1(Nfilt,1.5*Nc/M);
           tx_ = filter(b,1,[tx_ zeros(1,Nfilt/2)]);
           tx_ = [tx_(Nfilt/2+1:end)];
         end
-        
+
+        % normalise power after any non-linear shennanigans, so that noise addition is correct
+        tx_ *= mean(abs(tx))/mean(abs(tx_));
+                
         % AWGN channel
 
         EsNodB = EbNodB(e) + 10*log10(bps);
@@ -136,7 +146,7 @@ function [ber papr_log] = run_sim(Nsym, EbNodB, plot_en=0, filt_en=0, method="")
           h_data = [real(rx_sym)'; imag(rx_sym)']';
           h = log10(hist3(h_data,[50 50])+1);
           colormap("default"); imagesc(h);
-          figure(4); clf; plot(real(rx_sym), imag(rx_sym), '+'); axis([-2 2 -2 2])
+          figure(4); clf; plot(real(rx_sym), imag(rx_sym), '+'); axis([-2 2 -2 2]);
           figure(5); clf; Tx_ = 10*log10(abs(fft(tx_))); plot(fftshift(Tx_));
           mx = 10*ceil(max(Tx_)/10); axis([1 length(Tx_) mx-60 mx]);
         end
@@ -145,22 +155,40 @@ function [ber papr_log] = run_sim(Nsym, EbNodB, plot_en=0, filt_en=0, method="")
         papr2 = 20*log10(max(abs(tx_))/mean(abs(tx_)));
         papr_log = [papr_log papr2];
         ber(e) = Terrs/Tbits;
-        printf("EbNodB: %3.1f PAPR: %5.2f %5.2f Tbits: %6d Terrs: %6d BER: %5.3f\n", EbNodB(e), papr1, papr2, Tbits, Terrs, ber(e))
+        printf("EbNodB: %3.1f %3.1f PAPR: %5.2f %5.2f Tbits: %6d Terrs: %6d BER: %5.3f\n", EbNodB(e), 20*log10(mean(abs(tx_))), papr1, papr2, Tbits, Terrs, ber(e))
     end
 
     papr = mean(papr_log);
 end
 
-run_sim(1000,100,plot_en=1, filt_en=1, "compand")
+% single point with lots of plots -----------
+run_sim(1000,100,plot_en=1, filt_en=1, "clip", threshold=5)
 
+% curves -------------------------------------
 Nsym=1000;
 EbNodB=3:8;
 [ber1 papr1] = run_sim(Nsym,EbNodB, 0, filt_en=1);
-[ber2 papr2] = run_sim(Nsym,EbNodB, 0, filt_en=1, "clip");
-[ber3 papr3] = run_sim(Nsym,EbNodB, 0, filt_en=1, "compand");
+[ber2 papr2] = run_sim(Nsym,EbNodB, 0, filt_en=1, "clip", threshold=6);
+[ber3 papr3] = run_sim(Nsym,EbNodB, 0, filt_en=1, "clip", threshold=5);
+[ber4 papr4] = run_sim(Nsym,EbNodB, 0, filt_en=1, "compand1");
+[ber5 papr5] = run_sim(Nsym,EbNodB, 0, filt_en=1, "compand2");
 
 figure(6); clf;
 semilogy(EbNodB, ber1,sprintf('b;vanilla OFDM %3.1f;',papr1)); hold on;
-semilogy(EbNodB, ber2,sprintf('r;clip %3.1f;',papr2)); 
-semilogy(EbNodB, ber3,sprintf('g;compand %3.1f;',papr3)); hold off;
+semilogy(EbNodB, ber2,sprintf('r;clip6 %3.1f;',papr2)); 
+semilogy(EbNodB, ber3,sprintf('g;clip5 %3.1f;',papr3));
+semilogy(EbNodB, ber4,sprintf('c;compand1 %3.1f;',papr4));
+semilogy(EbNodB, ber5,sprintf('m;compand2 %3.1f;',papr5));
+hold off;
 axis([min(EbNodB) max(EbNodB) 1E-4 1E-1]); grid;
+xlabel('Eb/No');
+
+figure(7); clf;
+semilogy(EbNodB+papr1, ber1,sprintf('b;vanilla OFDM %3.1f;',papr1)); hold on;
+semilogy(EbNodB+papr2, ber2,sprintf('r;clip6 %3.1f;',papr2)); 
+semilogy(EbNodB+papr3, ber3,sprintf('g;clip5 %3.1f;',papr3));
+semilogy(EbNodB+papr4, ber4,sprintf('c;compand1 %3.1f;',papr4));
+semilogy(EbNodB+papr5, ber5,sprintf('m;compand2 %3.1f;',papr5));
+hold off;
+xlabel('Peak Eb/No');
+axis([6 20 1E-4 1E-1]); grid;
