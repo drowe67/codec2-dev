@@ -31,6 +31,8 @@
         + so we may hit a wall at high data rates
         + are people already doing this by default, e.g. some slight compression in radio?  OTA test rqd,
           some sort of controlled test, like clipping rate
+        + diversity idea doesn't seem to work in term os PAPR - but - 1 2Nc waveform will be much more
+          robust to multipath (and multipath first), so any PAPR reduction will go further.
     [ ] what will happen when LDPC demodulated?
         + will decoder struggle due to non-linearity
 #}
@@ -54,7 +56,7 @@ function two_bits = qpsk_demod(symbol)
 endfunction
 
 function [ber papr] = run_sim(Nsym, EbNodB, plot_en=0, filt_en=0, method="", threshold=6)
-    Nc   = 16;
+    Nc   = 8;
     M    = 160;   % number of samples in each symbol
     bps  = 2;     % two bits per symbol for QPSK
 
@@ -72,7 +74,7 @@ function [ber papr] = run_sim(Nsym, EbNodB, plot_en=0, filt_en=0, method="", thr
         tx_phases = pi/2*floor((rand(Nsym,Nc)*Nphases));
         if strcmp(method,"diversity")
           % duplicate carriers but with opposite phase
-          tx_phases = [tx_phases (tx_phases-pi)];
+          tx_phases = [tx_phases (tx_phases-pi/2)];
         end
         tx_sym = gain*exp(j*tx_phases);
               
@@ -133,7 +135,7 @@ function [ber papr] = run_sim(Nsym, EbNodB, plot_en=0, filt_en=0, method="", thr
          
           if strcmp(method,"diversity")
             for c=1:Nc
-              rx_sym(s,c) += rx_sym(s,c+Nc)*exp(j*pi);
+              rx_sym(s,c) += rx_sym(s,c+Nc)*exp(j*pi/2);
             end
           end
           
@@ -180,17 +182,17 @@ function [ber papr] = run_sim(Nsym, EbNodB, plot_en=0, filt_en=0, method="", thr
 end
 
 % single point with lots of plots -----------
-run_sim(1000, EbNo=4, plot_en=1, filt_en=1, "diversity", threshold=5);
+run_sim(1000, EbNo=4, plot_en=1, filt_en=1, "diversity", threshold=3);
 
 % curves -------------------------------------
-Nsym=100;
+Nsym=1000;
 EbNodB=2:8;
 [ber1 papr1] = run_sim(Nsym,EbNodB, 0, filt_en=1);
-[ber2 papr2] = run_sim(Nsym,EbNodB, 0, filt_en=1, "clip", threshold=6);
-[ber3 papr3] = run_sim(Nsym,EbNodB, 0, filt_en=1, "clip", threshold=5);
+[ber2 papr2] = run_sim(Nsym,EbNodB, 0, filt_en=1, "clip", threshold=5);
+[ber3 papr3] = run_sim(Nsym,EbNodB, 0, filt_en=1, "clip", threshold=4);
 [ber4 papr4] = run_sim(Nsym,EbNodB, 0, filt_en=1, "compand1");
-[ber5 papr5] = run_sim(Nsym,EbNodB, 0, filt_en=1, "compand2");
-[ber6 papr6] = run_sim(Nsym,EbNodB, 0, filt_en=1, "diversity");
+[ber5 papr5] = run_sim(Nsym,EbNodB, 0, filt_en=1, "compand2", threshold=4);
+[ber6 papr6] = run_sim(Nsym,EbNodB, 0, filt_en=1, "diversity", threshold=3);
 
 figure(6); clf;
 semilogy(EbNodB, ber1,sprintf('b+-;vanilla OFDM %3.1f;',papr1),'markersize', 10, 'linewidth', 2); hold on;
