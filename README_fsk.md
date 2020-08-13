@@ -26,13 +26,13 @@ The Octave version of the modem was developed by David Rowe.  Brady O'Brien port
 1. Generate 1000 test bits, modulate them using 2FSK using a 8000 Hz sample rate, 100 bits/s, play on your sound card:
    ```    
    $ cd ~/codec2/build_linux/src
-   $ /fsk_get_test_bits - 1000 | ./fsk_mod 2 8000 100 1200 1200 - - | aplay -f S16_LE
+   $ ./fsk_get_test_bits - 1000 | ./fsk_mod 2 8000 100 1200 1200 - - | aplay -f S16_LE
    ```
     The low tone frequency is 1200Hz, and the upper tone 1200 + 1200 = 2400Hz.
 
 1. Add the demodulator and measure the bit error rate over 10,000 bits of 100 bit/s 2FSK:
    ```
-   $ ./fsk_get_test_bits - 10000 | ./fsk_mod 2 8000 100 1200 100 - - | ./fsk_demod -l 2 8000 100 - - | ./fsk_put_test_bits -
+   $ ./fsk_get_test_bits - 10000 | ./fsk_mod 2 8000 100 1200 100 - - | ./fsk_demod 2 8000 100 - - | ./fsk_put_test_bits -
    <snip>
    [0099] BER 0.000, bits tested   9900, bit errors    0
    PASS
@@ -41,7 +41,7 @@ The Octave version of the modem was developed by David Rowe.  Brady O'Brien port
    
 1. Same thing but this time with 4FSK, and less verbose output:
    ```
-   $ ./fsk_get_test_bits - 10000 | ./fsk_mod 4 8000 100 1200 100 - - | ./fsk_demod -l 4 8000 100 - - | ./fsk_put_test_bits -q -
+   $ ./fsk_get_test_bits - 10000 | ./fsk_mod 4 8000 100 1200 100 - - | ./fsk_demod 4 8000 100 - - | ./fsk_put_test_bits -q -
    <snip>
    [0099] BER 0.000, bits tested   9900, bit errors    0
    PASS
@@ -49,7 +49,7 @@ The Octave version of the modem was developed by David Rowe.  Brady O'Brien port
 
 1. Lets add some channel noise:
    ```
-   $ ./fsk_get_test_bits - 10000 | ./fsk_mod 2 8000 100 1200 100 - - | ./cohpsk_ch - - -26 --Fs 8000 | ./fsk_demod -l 2 8000 100 - - | ./fsk_put_test_bits -b 0.015 -
+   $ ./fsk_get_test_bits - 10000 | ./fsk_mod 2 8000 100 1200 100 - - | ./cohpsk_ch - - -26 --Fs 8000 | ./fsk_demod 2 8000 100 - - | ./fsk_put_test_bits -b 0.015 -
    <snip>
    SNR3k(dB): -5.76 C/No: 29.0 PAPR:  3.0 
    [0099] BER 0.010, bits tested   9900, bit errors  103
