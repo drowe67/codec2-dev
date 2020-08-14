@@ -143,7 +143,7 @@ int main(int argc, char *argv[]) {
         for (i=0; i<j; i++) {
             out_s8[i] = out[i] >> 8;
         }
-        fwrite(&out_s8, sizeof(int8_t), j, fout);
+        fwrite(&out_s8, sizeof(int8_t)*channels, j, fout);
     }
 
     fclose(fout);

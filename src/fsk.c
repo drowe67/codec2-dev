@@ -269,7 +269,7 @@ void fsk_destroy(struct FSK *fsk){
   AUTHOR......: Brady O'Brien
   DATE CREATED: 11 February 2016
   
-  FSK modulator function, real valued output samples.
+  FSK modulator function, real valued output samples with amplitude 2.
 
 \*---------------------------------------------------------------------------*/
 
@@ -327,7 +327,7 @@ void fsk_mod(struct FSK *fsk,float fsk_out[],uint8_t tx_bits[]){
   AUTHOR......: Brady O'Brien
   DATE CREATED: 11 February 2016
   
-  FSK modulator function, complex valued output samples.
+  FSK modulator function, complex valued output samples with magnitude 1.
 
 \*---------------------------------------------------------------------------*/
 
@@ -367,7 +367,7 @@ void fsk_mod_c(struct FSK *fsk,COMP fsk_out[],uint8_t tx_bits[]){
         /* Spin the oscillator for a symbol period */
         for(j=0; j<Ts; j++){
             tx_phase_c = cmult(tx_phase_c,dph);
-            fsk_out[i*Ts+j] = fcmult(2,tx_phase_c);
+            fsk_out[i*Ts+j] = tx_phase_c;
         }
     }
     
