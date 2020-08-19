@@ -118,7 +118,7 @@ function fsk_demod_file(filename, format="s16", Fs=8000, Rs=50, M=2, P=8, max_se
     RxdB = 20*log10(abs(fftshift(Rx)));
     mx = 10*ceil(max(RxdB/10));
     f = -Nfft/2:Nfft/2-1;
-    plot(f, RxdB);
+    plot(f*Fs/Nfft, RxdB);
     axis([-Fs/2 Fs/2 mx-80 mx])
     xlabel('Frequency (Hz)');
     if length(rx) > Fs
