@@ -28,15 +28,15 @@ case "${TEST_OPT}" in
     plain )
     	# Config is <unused>, <unused>, <ldpc_en>, <unused> <profile>
     	echo "00000000" > stm_cfg.txt
-	ofdm_gen_test_bits --out stm_in.raw --frames 10 --verbose > setup.log 2>&1
+	ofdm_get_test_bits --out stm_in.raw --frames 10 --verbose > setup.log 2>&1
         ofdm_mod --in stm_in.raw --out ref_mod_out.raw --verbose 1 > ref_gen_log.txt 2>&1
 	;;
 
     ldpc )
     	# Config is <unused>, <unused>, <ldpc_en>, <unused> <profile>
     	echo "00100000" > stm_cfg.txt
-	ofdm_gen_test_bits --out stm_in.raw --frames 10 --ldpc --verbose > setup.log 2>&1
-        ofdm_mod --in stm_in.raw --out ref_mod_out.raw --ldpc 1 --verbose 1 > ref_gen_log.txt 2>&1
+	ofdm_get_test_bits --out stm_in.raw --frames 10 --ldpc --verbose > setup.log 2>&1
+        ofdm_mod --in stm_in.raw --out ref_mod_out.raw --ldpc --verbose 1 > ref_gen_log.txt 2>&1
 	;;
 
     esac

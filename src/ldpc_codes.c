@@ -8,7 +8,9 @@
 
 #include <stdio.h>
 #include <string.h>
+#include "assert.h"
 #include "ldpc_codes.h"
+#include "interldpc.h"
 #include "H2064_516_sparse.h"  
 #include "HRA_112_112.h"  
 #include "HRAb_396_504.h"
@@ -18,23 +20,6 @@
 #include "H_128_256_5.h"
 
 struct LDPC ldpc_codes[] = {
-
-    /* default Wenet High Alitiude Balloon rate 0.8 code */
-    {
-        "H2064_516_sparse",
-        MAX_ITER,
-        0,
-        1,
-        1,
-        CODELENGTH,
-        NUMBERPARITYBITS,
-        NUMBERROWSHCOLS,
-        MAX_ROW_WEIGHT,
-        MAX_COL_WEIGHT,
-        H_rows,
-        H_cols
-    },
-
     /* short rate 1/2 code for FreeDV 700D */
     {
         "HRA_112_112",
@@ -49,6 +34,25 @@ struct LDPC ldpc_codes[] = {
         HRA_112_112_MAX_COL_WEIGHT,
         (uint16_t *)HRA_112_112_H_rows,
         (uint16_t *)HRA_112_112_H_cols
+#ifdef __EMBEDDED__
+    }
+#else
+    },
+    
+    /* default Wenet High Alitiude Balloon rate 0.8 code */
+    {
+        "H2064_516_sparse",
+        MAX_ITER,
+        0,
+        1,
+        1,
+        CODELENGTH,
+        NUMBERPARITYBITS,
+        NUMBERROWSHCOLS,
+        MAX_ROW_WEIGHT,
+        MAX_COL_WEIGHT,
+        H_rows,
+        H_cols
     },
 
     /* rate 0.8 code used for FreeDV 2020 */
@@ -69,7 +73,7 @@ struct LDPC ldpc_codes[] = {
 
     /* rate 1/3 code, works at raw BER of 14% */
     {
-        "H_256_768",
+        "H_256_768_22",
         H_256_768_22_MAX_ITER,
         0,
         1,
@@ -130,6 +134,7 @@ struct LDPC ldpc_codes[] = {
         (uint16_t *)H_128_256_5_H_rows,
         (uint16_t *)H_128_256_5_H_cols
     }
+#endif
 };
 
 int ldpc_codes_num(void) { return sizeof(ldpc_codes)/sizeof(struct LDPC); }
@@ -146,10 +151,18 @@ void ldpc_codes_list() {
 }
 
 int ldpc_codes_find(char name[]) {
-    int code_index = 0;
+    int code_index = -1;
     for(int c=0; c<ldpc_codes_num(); c++)
         if (strcmp(ldpc_codes[c].name, name) == 0)
             code_index = c;
+    assert(code_index != -1); /* code not found */
     return code_index;
+}
+
+void ldpc_codes_setup(struct LDPC *ldpc, char name[]) {
+    int code_index;
+    code_index = ldpc_codes_find(name);
+    memcpy(ldpc,&ldpc_codes[code_index], sizeof(struct LDPC));
+    set_up_ldpc_constants(ldpc, ldpc->CodeLength, ldpc->NumberParityBits);
 }
 

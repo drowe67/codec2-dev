@@ -63,7 +63,7 @@ struct FSK {
     int mode;               /* 2FSK or 4FSK */
     float tc;               /* time constant for smoothing FFTs */
     int est_min;            /* Minimum frequency for freq. estimator */
-    int est_max;            /* Maximum frequency for freq. estimaotr */
+    int est_max;            /* Maximum frequency for freq. estimator */
     int est_space;          /* Minimum frequency spacing for freq. estimator */
     float* hann_table;	    /* Precomputed or runtime computed hann window table */
     
