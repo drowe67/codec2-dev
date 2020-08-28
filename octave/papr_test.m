@@ -8,12 +8,14 @@
     [X] clipping
     [X] companding
     [X] curves with different clipping thresholds
-    [ ] set threshold at CDF
     [X] filter
         + complex or real?
         + might introduce phase shift ... make demodulation tricky
-    [ ] way to put plots on top of each other
-    [ ] tx diversity
+    [X] way to put plots on top of each other
+    [X] tx diversity
+    [ ] PAPR versus carriers for random data
+    [ ] set threshold at CDF %
+    [ ] plot compander
     [ ] think about how to measure/objective
         + can we express BER as a function of peak power?
         + or maybe showing RMS power being boosted
@@ -21,20 +23,22 @@
         + do we need to recalculate tx power?
     [ ] down the track ... other types of channels
         + does it mess up HF multipath much
+        + impact likely less
     [ ] Tx a companded waveform and see if it really helps average power
     [ ] results/discussion
         + non-linear technqiues spread the energy in freq
-        we can trade of PAPR with bandwidth, lower PAPR, more bandwidth
+        + we can trade of PAPR with bandwidth, lower PAPR, more bandwidth
         + filtering brings the PAPR up again
         + PAPR helps SNR, but multipath is a much tougher problem
         + non-linear technqiques will mess with QAM more (I think - simulate?)
         + so we may hit a wall at high data rates
         + are people already doing this by default, e.g. some slight compression in radio?  OTA test rqd,
           some sort of controlled test, like clipping rate
-        + diversity idea doesn't seem to work in term os PAPR - but - 1 2Nc waveform will be much more
+        + diversity idea doesn't seem to work in term of PAPR - but - 1 2Nc waveform will be much more
           robust to multipath (and multipath first), so any PAPR reduction will go further.
+        + bigger improvements at higher Nc, e.g. 6dB at Nc=17.  Will need to test on real PAs
     [ ] what will happen when LDPC demodulated?
-        + will decoder struggle due to non-linearity
+        + will decoder struggle due to non-linearity?
 #}
 
 1;
@@ -55,11 +59,16 @@ function two_bits = qpsk_demod(symbol)
     two_bits = [bit1 bit0];
 endfunction
 
+% "Genie" OFDM modem simulation that assumes ideal sync
+
 function [ber papr] = run_sim(Nsym, EbNodB, plot_en=0, filt_en=0, method="", threshold=6)
     Nc   = 8;
-    M    = 160;   % number of samples in each symbol
-    bps  = 2;     % two bits per symbol for QPSK
+    M    = 160;    % number of samples in each symbol
+    bps  = 2;      % two bits per symbol for QPSK
+    Ncp  = 16;     % cyclic prefix samples
 
+    phase_est = 1; % perform phase estimation/correction
+    
     if strcmp(method,"diversity")
       Nd = 2; gain = 1/sqrt(2);
     else
@@ -88,10 +97,13 @@ function [ber papr] = run_sim(Nsym, EbNodB, plot_en=0, filt_en=0, method="", thr
           for c=1:Nc*Nd
             atx += exp(j*(0:M-1)*(c*w+woff))*tx_sym(s,c);
           end
-          tx = [tx atx];
+          % insert cyclic prefix and build up stream of time domain symbols
+          tx = [tx atx(end-Ncp+1:end) atx];
         end
         Nsam = length(tx);
 
+        % bunch of PAPR reduction options
+        
         tx_ = tx;
         if strcmp(method, "clip") || strcmp(method, "diversity")
           ind = find(abs(tx) > threshold);
@@ -114,9 +126,25 @@ function [ber papr] = run_sim(Nsym, EbNodB, plot_en=0, filt_en=0, method="", thr
           tx_ = filter(b,1,[tx_ zeros(1,Nfilt/2)]);
           tx_ = [tx_(Nfilt/2+1:end)];
         end
+
         % normalise power after any non-linear shennanigans, so that noise addition is correct
+
         tx_ *= sqrt(mean(abs(tx).^2)/mean(abs(tx_).^2));
-                
+        tx_ *= exp(j*pi/4);
+        
+        if phase_est
+            % auxillary rx to get ideal phase ests on signal after multipath but before AWGN noise is added
+
+            rx_phase = zeros(Nsym,Nc);
+            for s=1:Nsym
+              st = (s-1)*(M+Ncp)+1+Ncp; en = st+M-1;
+              for c=1:Nc*Nd
+                arx_sym = sum(exp(-j*(0:M-1)*(c*w+woff)) .* tx_(st:en))/M;
+                rx_phase(s,c) = arx_sym * conj(tx_sym(s,c));
+              end
+            end
+        end
+        
         % AWGN channel
 
         EsNodB = EbNodB(e) + 10*log10(bps);
@@ -128,17 +156,17 @@ function [ber papr] = run_sim(Nsym, EbNodB, plot_en=0, filt_en=0, method="", thr
 
         rx_sym = zeros(Nsym,Nc);
         for s=1:Nsym
-          st = (s-1)*M+1; en = s*M;
+          st = (s-1)*(M+Ncp)+1+Ncp; en = st+M-1;
           for c=1:Nc*Nd
             rx_sym(s,c) = sum(exp(-j*(0:M-1)*(c*w+woff)) .* rx(st:en))/M;
+            if phase_est rx_sym(s,c) *= conj(rx_phase(s,c)); end
           end
-         
+          
           if strcmp(method,"diversity")
             for c=1:Nc
               rx_sym(s,c) += rx_sym(s,c+Nc)*exp(j*pi/2);
             end
-          end
-          
+          end          
         end
         
         % count bit errors
@@ -181,39 +209,48 @@ function [ber papr] = run_sim(Nsym, EbNodB, plot_en=0, filt_en=0, method="", thr
     papr = mean(papr_log);
 end
 
+% AWGN BER versus Eb/No curves -------------------------------------
+
+function curves_awgn
+    Nsym=1000;
+    EbNodB=2:8;
+    [ber1 papr1] = run_sim(Nsym,EbNodB, 0, filt_en=1);
+    [ber2 papr2] = run_sim(Nsym,EbNodB, 0, filt_en=1, "clip", threshold=5);
+    [ber3 papr3] = run_sim(Nsym,EbNodB, 0, filt_en=1, "clip", threshold=4);
+    [ber4 papr4] = run_sim(Nsym,EbNodB, 0, filt_en=1, "compand1");
+    [ber5 papr5] = run_sim(Nsym,EbNodB, 0, filt_en=1, "compand2", threshold=4);
+    [ber6 papr6] = run_sim(Nsym,EbNodB, 0, filt_en=1, "diversity", threshold=3);
+
+    figure(6); clf;
+    semilogy(EbNodB, ber1,sprintf('b+-;vanilla OFDM %3.1f;',papr1),'markersize', 10, 'linewidth', 2); hold on;
+    semilogy(EbNodB, ber2,sprintf('r+-;clip6 %3.1f;',papr2),'markersize', 10, 'linewidth', 2); 
+    semilogy(EbNodB, ber3,sprintf('g+-;clip5 %3.1f;',papr3),'markersize', 10, 'linewidth', 2);
+    semilogy(EbNodB, ber4,sprintf('c+-;compand1 %3.1f;',papr4),'markersize', 10, 'linewidth', 2);
+    semilogy(EbNodB, ber5,sprintf('m+-;compand2 %3.1f;',papr5),'markersize', 10, 'linewidth', 2);
+    semilogy(EbNodB, ber6,sprintf('bk+-;diversity %3.1f;',papr6),'markersize', 10, 'linewidth', 2);
+    hold off;
+    axis([min(EbNodB) max(EbNodB) 1E-4 1E-1]); grid;
+    xlabel('Eb/No');
+    print("papr_BER_EbNo.png","-dpng");
+
+    figure(7); clf;
+    semilogy(EbNodB+papr1, ber1,sprintf('b+-;vanilla OFDM %3.1f;',papr1),'markersize', 10, 'linewidth', 2); hold on;
+    semilogy(EbNodB+papr2, ber2,sprintf('r+-;clip6 %3.1f;',papr2),'markersize', 10, 'linewidth', 2); 
+    semilogy(EbNodB+papr3, ber3,sprintf('g+-;clip5 %3.1f;',papr3),'markersize', 10, 'linewidth', 2);
+    semilogy(EbNodB+papr4, ber4,sprintf('c+-;compand1 %3.1f;',papr4),'markersize', 10, 'linewidth', 2);
+    semilogy(EbNodB+papr5, ber5,sprintf('m+-;compand2 %3.1f;',papr5),'markersize', 10, 'linewidth', 2);
+    semilogy(EbNodB+papr6, ber6,sprintf('bk+-;diversity %3.1f;',papr6),'markersize', 10, 'linewidth', 2);
+    hold off;
+    xlabel('Peak Eb/No');
+    axis([6 20 1E-4 1E-1]); grid;
+    print("papr_BER_peakEbNo.png","-dpng");
+end
+
+pkg load statistics;
+more off;
+
 % single point with lots of plots -----------
-run_sim(1000, EbNo=4, plot_en=1, filt_en=1, "diversity", threshold=3);
 
-% curves -------------------------------------
-Nsym=1000;
-EbNodB=2:8;
-[ber1 papr1] = run_sim(Nsym,EbNodB, 0, filt_en=1);
-[ber2 papr2] = run_sim(Nsym,EbNodB, 0, filt_en=1, "clip", threshold=5);
-[ber3 papr3] = run_sim(Nsym,EbNodB, 0, filt_en=1, "clip", threshold=4);
-[ber4 papr4] = run_sim(Nsym,EbNodB, 0, filt_en=1, "compand1");
-[ber5 papr5] = run_sim(Nsym,EbNodB, 0, filt_en=1, "compand2", threshold=4);
-[ber6 papr6] = run_sim(Nsym,EbNodB, 0, filt_en=1, "diversity", threshold=3);
+%run_sim(1000, EbNo=4, plot_en=1, filt_en=1, "diversity", threshold=3);
+run_sim(1000, EbNo=4, plot_en=1);
 
-figure(6); clf;
-semilogy(EbNodB, ber1,sprintf('b+-;vanilla OFDM %3.1f;',papr1),'markersize', 10, 'linewidth', 2); hold on;
-semilogy(EbNodB, ber2,sprintf('r+-;clip6 %3.1f;',papr2),'markersize', 10, 'linewidth', 2); 
-semilogy(EbNodB, ber3,sprintf('g+-;clip5 %3.1f;',papr3),'markersize', 10, 'linewidth', 2);
-semilogy(EbNodB, ber4,sprintf('c+-;compand1 %3.1f;',papr4),'markersize', 10, 'linewidth', 2);
-semilogy(EbNodB, ber5,sprintf('m+-;compand2 %3.1f;',papr5),'markersize', 10, 'linewidth', 2);
-semilogy(EbNodB, ber6,sprintf('bk+-;diversity %3.1f;',papr6),'markersize', 10, 'linewidth', 2);
-hold off;
-axis([min(EbNodB) max(EbNodB) 1E-4 1E-1]); grid;
-xlabel('Eb/No');
-print("papr_BER_EbNo.png","-dpng");
-
-figure(7); clf;
-semilogy(EbNodB+papr1, ber1,sprintf('b+-;vanilla OFDM %3.1f;',papr1),'markersize', 10, 'linewidth', 2); hold on;
-semilogy(EbNodB+papr2, ber2,sprintf('r+-;clip6 %3.1f;',papr2),'markersize', 10, 'linewidth', 2); 
-semilogy(EbNodB+papr3, ber3,sprintf('g+-;clip5 %3.1f;',papr3),'markersize', 10, 'linewidth', 2);
-semilogy(EbNodB+papr4, ber4,sprintf('c+-;compand1 %3.1f;',papr4),'markersize', 10, 'linewidth', 2);
-semilogy(EbNodB+papr5, ber5,sprintf('m+-;compand2 %3.1f;',papr5),'markersize', 10, 'linewidth', 2);
-semilogy(EbNodB+papr6, ber6,sprintf('bk+-;diversity %3.1f;',papr6),'markersize', 10, 'linewidth', 2);
-hold off;
-xlabel('Peak Eb/No');
-axis([6 20 1E-4 1E-1]); grid;
-print("papr_BER_peakEbNo.png","-dpng");
