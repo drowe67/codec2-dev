@@ -3,7 +3,7 @@
    David Rowe
    Jan 2017
 
-   Fast linear interpolator for high oversam[pling rates.  Upsample
+   Fast linear interpolator for high oversampling rates.  Upsample
    with a decent filter first such that the signal is "low pass" wrt
    to the input sample rate.
 

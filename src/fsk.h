@@ -188,7 +188,7 @@ uint32_t fsk_nin(struct FSK *fsk);
  * uint8_t rx_bits[] - Buffer for Nbits unpacked bits to be written
  * float fsk_in[] - nin samples of modulated FSK
  */
-void fsk_demod(struct FSK *fsk, uint8_t rx_bits[],COMP fsk_in[]);
+void fsk_demod(struct FSK *fsk, uint8_t rx_bits[], COMP fsk_in[]);
 
 /*
  * Soft decision demodulation
