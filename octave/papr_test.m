@@ -68,6 +68,7 @@ function [ber papr] = run_sim(Nsym, EbNodB, plot_en=0, filt_en=0, method="", thr
     Ncp  = 16;     % cyclic prefix samples
 
     phase_est = 1; % perform phase estimation/correction
+    timing = 0;
     
     if strcmp(method,"diversity")
       Nd = 2; gain = 1/sqrt(2);
@@ -86,8 +87,11 @@ function [ber papr] = run_sim(Nsym, EbNodB, plot_en=0, filt_en=0, method="", thr
           tx_phases = [tx_phases (tx_phases-pi/2)];
         end
         tx_sym = gain*exp(j*tx_phases);
-              
-        w = 2*pi/M; woff = (-Nc*Nd/2+0.5)*2*pi/M;
+
+        % carrier frequencies, centre about 0
+        st = floor(Nc*Nd/2);
+        w = 2*pi/M*(-st:-st+Nc*Nd-1);
+        
         tx = [];
 
         % generate OFDM signal
@@ -95,7 +99,7 @@ function [ber papr] = run_sim(Nsym, EbNodB, plot_en=0, filt_en=0, method="", thr
         for s=1:Nsym
           atx = zeros(1,M);
           for c=1:Nc*Nd
-            atx += exp(j*(0:M-1)*(c*w+woff))*tx_sym(s,c);
+            atx += exp(j*(0:M-1)*w(c))*tx_sym(s,c);
           end
           % insert cyclic prefix and build up stream of time domain symbols
           tx = [tx atx(end-Ncp+1:end) atx];
@@ -130,16 +134,15 @@ function [ber papr] = run_sim(Nsym, EbNodB, plot_en=0, filt_en=0, method="", thr
         % normalise power after any non-linear shennanigans, so that noise addition is correct
 
         tx_ *= sqrt(mean(abs(tx).^2)/mean(abs(tx_).^2));
-        tx_ *= exp(j*pi/4);
         
         if phase_est
             % auxillary rx to get ideal phase ests on signal after multipath but before AWGN noise is added
 
             rx_phase = zeros(Nsym,Nc);
             for s=1:Nsym
-              st = (s-1)*(M+Ncp)+1+Ncp; en = st+M-1;
+              st = (s-1)*(M+Ncp)+1+timing; en = st+M-1;
               for c=1:Nc*Nd
-                arx_sym = sum(exp(-j*(0:M-1)*(c*w+woff)) .* tx_(st:en))/M;
+                arx_sym = sum(exp(-j*(0:M-1)*w(c)) .* tx_(st:en))/M;
                 rx_phase(s,c) = arx_sym * conj(tx_sym(s,c));
               end
             end
@@ -156,9 +159,9 @@ function [ber papr] = run_sim(Nsym, EbNodB, plot_en=0, filt_en=0, method="", thr
 
         rx_sym = zeros(Nsym,Nc);
         for s=1:Nsym
-          st = (s-1)*(M+Ncp)+1+Ncp; en = st+M-1;
+          st = (s-1)*(M+Ncp)+1+timing; en = st+M-1;
           for c=1:Nc*Nd
-            rx_sym(s,c) = sum(exp(-j*(0:M-1)*(c*w+woff)) .* rx(st:en))/M;
+            rx_sym(s,c) = sum(exp(-j*(0:M-1)*w(c)) .* rx(st:en))/M;
             if phase_est rx_sym(s,c) *= conj(rx_phase(s,c)); end
           end
           
