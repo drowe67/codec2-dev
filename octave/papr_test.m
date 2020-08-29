@@ -37,6 +37,14 @@
         + diversity idea doesn't seem to work in term of PAPR - but - 1 2Nc waveform will be much more
           robust to multipath (and multipath first), so any PAPR reduction will go further.
         + bigger improvements at higher Nc, e.g. 6dB at Nc=17.  Will need to test on real PAs
+    [ ] multipath results
+        + do these techniques mess up phase estimation?  Try AWGN with phase est on.
+          initial looks OK, 4dB, maybe repeat and log, try A/B
+        + non linear gives more scatter, when this has amplitude excursions up and down, this thicker
+          scatter produces more errors.  This suggests PAPR reduction is of less help for
+          multipath.
+        + it's possible (but I had thought unlikely) that compression will give more peak power,
+          negating the advantage of diversity (or FEC).  Interesting idea.  
     [ ] what will happen when LDPC demodulated?
         + will decoder struggle due to non-linearity?
 #}
@@ -62,7 +70,7 @@ endfunction
 % "Genie" OFDM modem simulation that assumes ideal sync
 
 function [ber papr] = run_sim(Nsym, EbNodB, channel='awgn', plot_en=0, filt_en=0, method="", threshold=6)
-    Nc   = 8;
+    Nc   = 16;
     M    = 160;    % number of samples in each symbol
     bps  = 2;      % two bits per symbol for QPSK
     Ncp  = 16;     % cyclic prefix samples
@@ -149,11 +157,11 @@ function [ber papr] = run_sim(Nsym, EbNodB, channel='awgn', plot_en=0, filt_en=0
         % multipath channel
 
         if strcmp(channel,'multipath')
-          rx = spread1(1:Nsam).*rx + spread2(1:Nsam).*[zeros(1,path_delay) rx(path_delay+1:end)];
+          rx = spread1(1:Nsam).*rx + spread2(1:Nsam).*[zeros(1,path_delay) rx(1:end-path_delay)];
         end
         
         % normalise power after any multipath and non-linear shennanigans, so that noise addition is correct
-        norm = sqrt(mean(abs(tx).^2)/mean(abs(rx).^2))
+        norm = sqrt(mean(abs(tx).^2)/mean(abs(rx).^2));
         rx *= norm;
         
         if phase_est
@@ -222,31 +230,32 @@ function [ber papr] = run_sim(Nsym, EbNodB, channel='awgn', plot_en=0, filt_en=0
           figure(4); clf; plot(real(rx_sym), imag(rx_sym), '+'); axis([-2 2 -2 2]);
           figure(5); clf; Tx_ = 10*log10(abs(fft(tx_))); plot(fftshift(Tx_));
           mx = 10*ceil(max(Tx_)/10); axis([1 length(Tx_) mx-60 mx]);
+          figure(6); plot_specgram(real(rx.*exp(j*2*pi*(0:Nsam-1)/4)));
         end
 
         papr1 = 20*log10(max(abs(tx))/mean(abs(tx)));
         papr2 = 20*log10(max(abs(tx_))/mean(abs(tx_)));
         papr_log = [papr_log papr2];
         ber(e) = Terrs/Tbits;
-        printf("EbNodB: %3.1f %3.1f PAPR: %5.2f %5.2f Tbits: %6d Terrs: %6d BER: %5.3f\n", EbNodB(e), 10*log10(mean(abs(tx_).^2)), papr1, papr2, Tbits, Terrs, ber(e))
+        printf("EbNodB: %4.1f %4.1f PAPR: %5.2f %5.2f Tbits: %6d Terrs: %6d BER: %5.3f\n", EbNodB(e), 10*log10(mean(abs(tx_).^2)), papr1, papr2, Tbits, Terrs, ber(e))
     end
 
     papr = mean(papr_log);
 end
 
-% AWGN BER versus Eb/No curves -------------------------------------
+% BER versus Eb/No curves -------------------------------------
 
-function curves_awgn
+function curves(channel='awgn')
     Nsym=1000;
-    EbNodB=2:8;
-    [ber1 papr1] = run_sim(Nsym,EbNodB, 0, filt_en=1);
-    [ber2 papr2] = run_sim(Nsym,EbNodB, 0, filt_en=1, "clip", threshold=5);
-    [ber3 papr3] = run_sim(Nsym,EbNodB, 0, filt_en=1, "clip", threshold=4);
-    [ber4 papr4] = run_sim(Nsym,EbNodB, 0, filt_en=1, "compand1");
-    [ber5 papr5] = run_sim(Nsym,EbNodB, 0, filt_en=1, "compand2", threshold=4);
-    [ber6 papr6] = run_sim(Nsym,EbNodB, 0, filt_en=1, "diversity", threshold=3);
+    EbNodB=2:2:16;
+    [ber1 papr1] = run_sim(Nsym,EbNodB, channel, 0, filt_en=1);
+    [ber2 papr2] = run_sim(Nsym,EbNodB, channel, 0, filt_en=1, "clip", threshold=5);
+    [ber3 papr3] = run_sim(Nsym,EbNodB, channel, 0, filt_en=1, "clip", threshold=4);
+    [ber4 papr4] = run_sim(Nsym,EbNodB, channel, 0, filt_en=1, "compand1");
+    [ber5 papr5] = run_sim(Nsym,EbNodB, channel, 0, filt_en=1, "compand2", threshold=4);
+    [ber6 papr6] = run_sim(Nsym,EbNodB, channel, 0, filt_en=1, "diversity", threshold=3);
 
-    figure(6); clf;
+    figure(7); clf;
     semilogy(EbNodB, ber1,sprintf('b+-;vanilla OFDM %3.1f;',papr1),'markersize', 10, 'linewidth', 2); hold on;
     semilogy(EbNodB, ber2,sprintf('r+-;clip6 %3.1f;',papr2),'markersize', 10, 'linewidth', 2); 
     semilogy(EbNodB, ber3,sprintf('g+-;clip5 %3.1f;',papr3),'markersize', 10, 'linewidth', 2);
@@ -254,11 +263,12 @@ function curves_awgn
     semilogy(EbNodB, ber5,sprintf('m+-;compand2 %3.1f;',papr5),'markersize', 10, 'linewidth', 2);
     semilogy(EbNodB, ber6,sprintf('bk+-;diversity %3.1f;',papr6),'markersize', 10, 'linewidth', 2);
     hold off;
-    axis([min(EbNodB) max(EbNodB) 1E-4 1E-1]); grid;
-    xlabel('Eb/No');
-    print("papr_BER_EbNo.png","-dpng");
+    axis([min(EbNodB) max(EbNodB) 1E-3 1E-1]); grid;
+    xlabel('Eb/No'); title(channel)
+    fn = sprintf("papr_%s_BER_EbNo.png", channel);
+    print(fn,"-dpng");
 
-    figure(7); clf;
+    figure(8); clf;
     semilogy(EbNodB+papr1, ber1,sprintf('b+-;vanilla OFDM %3.1f;',papr1),'markersize', 10, 'linewidth', 2); hold on;
     semilogy(EbNodB+papr2, ber2,sprintf('r+-;clip6 %3.1f;',papr2),'markersize', 10, 'linewidth', 2); 
     semilogy(EbNodB+papr3, ber3,sprintf('g+-;clip5 %3.1f;',papr3),'markersize', 10, 'linewidth', 2);
@@ -267,8 +277,9 @@ function curves_awgn
     semilogy(EbNodB+papr6, ber6,sprintf('bk+-;diversity %3.1f;',papr6),'markersize', 10, 'linewidth', 2);
     hold off;
     xlabel('Peak Eb/No');
-    axis([6 20 1E-4 1E-1]); grid;
-    print("papr_BER_peakEbNo.png","-dpng");
+    axis([6 20 1E-3 1E-1]); grid; title(channel)
+    fn = sprintf("papr_%s_BER_peakEbNo.png", channel);
+    print(fn,"-dpng");
 end
 
 
@@ -277,6 +288,6 @@ more off;
 
 % single point with lots of plots -----------
 
-%run_sim(1000, EbNo=4, plot_en=1, filt_en=1, "diversity", threshold=3);
-run_sim(1000, EbNo=10, channel='multipath', plot_en=1);
-
+%run_sim(1000, EbNo=100, channel='multipath', plot_en=1, filt_en=1, "clip", threshold=5);
+%run_sim(1000, EbNo=10, channel='multipath', plot_en=1, filt_en=0, "diversity", threshold=5);
+curves('multipath');
