@@ -8,6 +8,7 @@
 #ifndef C2WIDEBAND_H 
 #define	C2WIDEBAND_H 
 
+#include "compiler.h"
 #include "defines.h"
 #include "phase.h"
 #include "quantise.h"
@@ -38,7 +39,9 @@ void calculate_Am_freqs_kHz(float Wo, int L, float p_Am_freqs_kHz[]);
 void resample_const_rate_f_mel(C2CONST *c2const, MODEL * model, float K, float* rate_K_surface, float* rate_K_sample_freqs_kHz);
 void correct_rate_K_vec(MODEL *model, float rate_K_vec[], float rate_K_sample_freqs_kHz[], float Am_freqs_kHz[], float orig_AmdB[],  int K, float Wo, int L, int Fs, float rate_K_vec_corrected[]);
 void batch_rate_K_dct2(C2CONST *c2const, MODEL model_frames[], int frames, int vq_en, int plots, int* voicing, float *mean_);
+#ifndef NO_C99
 void rate_K_dct2(C2CONST *c2const, int n_block_frames, MODEL model_block[n_block_frames], WIDEBAND_MAP * wb_map);
+#endif
 void wideband_enc_dec(C2CONST *c2const, int n_block_frames, MODEL model_block[], WIDEBAND_MAP * wb_map,
         MODEL model_block_[], float * p_dct2_sd,  int * p_qn , float rate_K_surface_block[][C2WB_K], float rate_K_surface_block_[][C2WB_K]);
 void codec2_decode_wb(struct CODEC2 *c2, short speech[], const unsigned char * bits);

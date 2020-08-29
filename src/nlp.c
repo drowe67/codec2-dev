@@ -25,6 +25,7 @@
   along with this program; if not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "compiler.h"
 #include "defines.h"
 #include "nlp.h"
 #include "dump.h"
@@ -294,7 +295,11 @@ float nlp(
 
         m /= 2; n /= 2;
 
+#ifdef NO_C99
+        float *Sn8k = alloca(n * sizeof(float));
+#else
         float Sn8k[n];
+#endif
         fdmdv_16_to_8(Sn8k, &nlp->Sn16k[FDMDV_OS_TAPS_16K], n);
 
         /* Square latest input samples */

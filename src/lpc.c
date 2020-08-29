@@ -33,7 +33,9 @@
 
 #include <assert.h>
 #include <math.h>
+#include <stdlib.h>
 #include "defines.h"
+#include "compiler.h"
 #include "lpc.h"
 
 /*---------------------------------------------------------------------------*\
@@ -150,6 +152,41 @@ void autocorrelate(
 
 \*---------------------------------------------------------------------------*/
 
+#ifdef NO_C99
+void levinson_durbin(
+  float R[],		/* order+1 autocorrelation coeff */
+  float lpcs[],		/* order+1 LPC's */
+  int order		/* order of the LPC analysis */
+)
+{
+  const int cols = order+1;
+  float *a = alloca((order+1)*cols*sizeof(float));
+  float sum, e, k;
+  int i,j;				/* loop variables */
+
+  e = R[0];				/* Equation 38a, Makhoul */
+
+  for(i=1; i<=order; i++) {
+    sum = 0.0;
+    for(j=1; j<=i-1; j++)
+      sum += a[(i-1)*cols+j]*R[i-j];
+    k = -1.0*(R[i] + sum)/e;		/* Equation 38b, Makhoul */
+    if (fabsf(k) > 1.0)
+      k = 0.0;
+
+    a[i*cols+i] = k;
+
+    for(j=1; j<=i-1; j++)
+      a[i*cols+j] = a[(i-1)*cols+j] + k*a[(i-1)*cols+i-j];	/* Equation 38c, Makhoul */
+
+    e *= (1-k*k);				/* Equation 38d, Makhoul */
+  }
+
+  for(i=1; i<=order; i++)
+    lpcs[i] = a[order*cols+i];
+  lpcs[0] = 1.0;
+}
+#else
 void levinson_durbin(
   float R[],		/* order+1 autocorrelation coeff */
   float lpcs[],		/* order+1 LPC's */
@@ -182,6 +219,7 @@ void levinson_durbin(
     lpcs[i] = a[order][i];
   lpcs[0] = 1.0;
 }
+#endif
 
 /*---------------------------------------------------------------------------*\
 
@@ -266,8 +304,13 @@ void find_aks(
   float *E	/* residual energy */
 )
 {
+#ifdef NO_C99
+  float *Wn = alloca(LPC_MAX_N*sizeof(float));
+  float *R = alloca((order+1)*sizeof(float));
+#else
   float Wn[LPC_MAX_N];	/* windowed frame of Nsam speech samples */
   float R[order+1];	/* order+1 autocorrelation values of Sn[] */
+#endif
   int i;
 
   assert(Nsam < LPC_MAX_N);

@@ -25,6 +25,7 @@
   along with this program; if not,see <http://www.gnu.org/licenses/>.
 */
 
+#include "compiler.h"
 #include "defines.h"
 #include "phase.h"
 #include "kiss_fft.h"
@@ -237,7 +238,14 @@ void mag_to_phase(float phase[],             /* Nfft/2+1 output phase samples in
                   codec2_fft_cfg fft_inv_cfg
                   )
 {
+#ifdef NO_C99
+    COMP *Sdb = alloca(Nfft*sizeof(COMP));
+    COMP *c = alloca(Nfft*sizeof(COMP));
+    COMP *cf = alloca(Nfft*sizeof(COMP));
+    COMP *Cf = alloca(Nfft*sizeof(COMP));
+#else
     COMP Sdb[Nfft], c[Nfft], cf[Nfft], Cf[Nfft];
+#endif
     int  Ns = Nfft/2+1;
     int  i;
 

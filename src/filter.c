@@ -24,8 +24,6 @@
 #include "filter_coef.h"
 #include "debug_alloc.h"
 
-#define cmplx(value) (cosf(value) + sinf(value) * I)
-
 /*
  * This is a library of filter functions. They were copied from Quisk and converted to single precision.
  */
@@ -46,8 +44,8 @@ void quisk_filt_cfInit(struct quisk_cfFilter * filter, float * coefs, int taps) 
     // be real or complex.
     filter->dCoefs = coefs;
     filter->cpxCoefs = NULL;
-    filter->cSamples = (complex float *)MALLOC(taps * sizeof(complex float));
-    memset(filter->cSamples, 0, taps * sizeof(complex float));
+    filter->cSamples = (complexf_t *)MALLOC(taps * sizeof(complexf_t));
+    memset(filter->cSamples, 0, taps * sizeof(complexf_t));
     filter->ptcSamp = filter->cSamples;
     filter->nTaps = taps;
     filter->cBuf = NULL;
@@ -97,13 +95,13 @@ void quisk_filt_destroy(struct quisk_cfFilter * filter) {
 
 \*---------------------------------------------------------------------------*/
 
-int quisk_cfInterpDecim(complex float * cSamples, int count, struct quisk_cfFilter * filter, int interp, int decim) {
+int quisk_cfInterpDecim(complexf_t * cSamples, int count, struct quisk_cfFilter * filter, int interp, int decim) {
     // Interpolate by interp, and then decimate by decim.
     // This uses the float coefficients of filter (not the complex).  Samples are complex.
     int i, k, nOut;
     float * ptCoef;
-    complex float * ptSample;
-    complex float csample;
+    complexf_t * ptSample;
+    complexf_t csample;
 
     if (count > filter->nBuf) {    // increase size of sample buffer
         filter->nBuf = count * 2;
@@ -111,10 +109,10 @@ int quisk_cfInterpDecim(complex float * cSamples, int count, struct quisk_cfFilt
         if (filter->cBuf)
             FREE(filter->cBuf);
 
-        filter->cBuf = (complex float *)MALLOC(filter->nBuf * sizeof(complex float));
+        filter->cBuf = (complexf_t *)MALLOC(filter->nBuf * sizeof(complexf_t));
     }
 
-    memcpy(filter->cBuf, cSamples, count * sizeof(complex float));
+    memcpy(filter->cBuf, cSamples, count * sizeof(complexf_t));
     nOut = 0;
 
     for (i = 0; i < count; i++) {
@@ -124,16 +122,16 @@ int quisk_cfInterpDecim(complex float * cSamples, int count, struct quisk_cfFilt
         while (filter->decim_index < interp) {
             ptSample = filter->ptcSamp;
             ptCoef = filter->dCoefs + filter->decim_index;
-            csample = 0;
+            csample = complexf_0;
 
             for (k = 0; k < filter->nTaps / interp; k++, ptCoef += interp) {
-                csample += *ptSample * *ptCoef;
+                csample = complexf_add(csample, complexf_mulr(*ptSample, *ptCoef));
 
                 if (--ptSample < filter->cSamples)
                     ptSample = filter->cSamples + filter->nTaps - 1;
             }
 
-            cSamples[nOut] = csample * interp;
+            cSamples[nOut] = complexf_mulr(csample, (float)interp);
             nOut++;
             filter->decim_index += decim;
         }
@@ -162,22 +160,22 @@ int quisk_cfInterpDecim(complex float * cSamples, int count, struct quisk_cfFilt
 
 \*---------------------------------------------------------------------------*/
 #if 0
-int quisk_ccfInterpDecim(complex float * cSamples, int count, struct quisk_cfFilter * filter, int interp, int decim) {
+int quisk_ccfInterpDecim(complexf_t * cSamples, int count, struct quisk_cfFilter * filter, int interp, int decim) {
     // Interpolate by interp, and then decimate by decim.
     // This uses the complex coefficients of filter (not the real).  Samples are complex.
     int i, k, nOut;
-    complex float * ptCoef;
-    complex float * ptSample;
-    complex float csample;
+    complexf_t * ptCoef;
+    complexf_t * ptSample;
+    complexf_t csample;
 
     if (count > filter->nBuf) {    // increase size of sample buffer
         filter->nBuf = count * 2;
         if (filter->cBuf)
             FREE(filter->cBuf);
-        filter->cBuf = (complex float *)MALLOC(filter->nBuf * sizeof(complex float));
+        filter->cBuf = (complexf_t *)MALLOC(filter->nBuf * sizeof(complexf_t));
     }
 
-    memcpy(filter->cBuf, cSamples, count * sizeof(complex float));
+    memcpy(filter->cBuf, cSamples, count * sizeof(complexf_t));
     nOut = 0;
 
     for (i = 0; i < count; i++) {
@@ -229,14 +227,15 @@ void quisk_cfTune(struct quisk_cfFilter * filter, float freq) {
     int i;
 
     if ( ! filter->cpxCoefs)
-        filter->cpxCoefs = (complex float *)MALLOC(filter->nTaps * sizeof(complex float));
+        filter->cpxCoefs = (complexf_t *)MALLOC(filter->nTaps * sizeof(complexf_t));
 
     tune = 2.0 * M_PI * freq;
     D = (filter->nTaps - 1.0) / 2.0;
 
     for (i = 0; i < filter->nTaps; i++) {
         float tval = tune * (i - D);
-        filter->cpxCoefs[i] = cmplx(tval) * filter->dCoefs[i];
+        complexf_t tvalc = complexf_init(cosf(tval), sinf(tval));
+        filter->cpxCoefs[i] = complexf_mulr(tvalc, filter->dCoefs[i]);
     }
 }
 
@@ -253,20 +252,20 @@ void quisk_cfTune(struct quisk_cfFilter * filter, float freq) {
 
 \*---------------------------------------------------------------------------*/
 
-void quisk_ccfFilter(complex float * inSamples, complex float * outSamples, int count, struct quisk_cfFilter * filter) {
+void quisk_ccfFilter(complexf_t * inSamples, complexf_t * outSamples, int count, struct quisk_cfFilter * filter) {
     int i, k;
-    complex float * ptSample;
-    complex float * ptCoef;
-    complex float accum;
+    complexf_t * ptSample;
+    complexf_t * ptCoef;
+    complexf_t accum;
 
     for (i = 0; i < count; i++) {
         *filter->ptcSamp = inSamples[i];
-        accum = 0;
+        accum = complexf_0;
         ptSample = filter->ptcSamp;
         ptCoef = filter->cpxCoefs;
 
         for (k = 0; k < filter->nTaps; k++, ptCoef++) {
-            accum += *ptSample  *  *ptCoef;
+            accum = complexf_add(accum, complexf_mul(*ptSample, *ptCoef));
 
             if (--ptSample < filter->cSamples)
                 ptSample = filter->cSamples + filter->nTaps - 1;

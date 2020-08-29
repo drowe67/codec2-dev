@@ -298,7 +298,7 @@ int main(int argc, char *argv[]) {
     int nvaricode_bits = 0;
     int varicode_bit_index = 0;
 
-    complex float tx_sams[Nsamperpacket];
+    complexf_t tx_sams[Nsamperpacket];
     short   tx_scaled[Nsamperpacket];
 
     if (verbose > 1) {

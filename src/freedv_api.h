@@ -33,6 +33,16 @@
 #ifndef __FREEDV_API__
 #define __FREEDV_API__
 
+#if defined _WIN32 || defined __CYGWIN__
+#ifdef __GNUC__
+#define API_EXPORT __attribute__ ((dllexport))
+#else
+#define API_EXPORT __declspec(dllexport)
+#endif
+#else
+#define API_EXPORT __attribute__ ((visibility ("default")))
+#endif
+
 // This declares a single-precision (float) complex number
 #include <sys/types.h>
 
@@ -129,97 +139,97 @@ typedef void (*freedv_callback_datatx)(void *, unsigned char *packet, size_t *si
 
 // open, close ----------------------------------------------------------------
 
-struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv);
-struct freedv *freedv_open(int mode);
-void freedv_close   (struct freedv *freedv);
+API_EXPORT struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv);
+API_EXPORT struct freedv *freedv_open(int mode);
+API_EXPORT void freedv_close   (struct freedv *freedv);
 
 // Transmit -------------------------------------------------------------------
 
-void freedv_tx        (struct freedv *freedv, short mod_out[], short speech_in[]);
-void freedv_comptx    (struct freedv *freedv, COMP  mod_out[], short speech_in[]);
-void freedv_rawdatatx (struct freedv *f, short mod_out[], unsigned char *packed_payload_bits);
-void freedv_datatx    (struct freedv *f, short mod_out[]);
-int  freedv_data_ntxframes (struct freedv *freedv);
+API_EXPORT void freedv_tx        (struct freedv *freedv, short mod_out[], short speech_in[]);
+API_EXPORT void freedv_comptx    (struct freedv *freedv, COMP  mod_out[], short speech_in[]);
+API_EXPORT void freedv_rawdatatx (struct freedv *f, short mod_out[], unsigned char *packed_payload_bits);
+API_EXPORT void freedv_datatx    (struct freedv *f, short mod_out[]);
+API_EXPORT int  freedv_data_ntxframes (struct freedv *freedv);
 
 // Receive -------------------------------------------------------------------
 
-int freedv_nin       (struct freedv *freedv);
-int freedv_rx        (struct freedv *freedv, short speech_out[], short demod_in[]);
-int freedv_shortrx   (struct freedv *freedv, short speech_out[], short demod_in[], float gain);
-int freedv_floatrx   (struct freedv *freedv, short speech_out[], float demod_in[]);
-int freedv_comprx    (struct freedv *freedv, short speech_out[], COMP  demod_in[]);
-int freedv_rawdatarx (struct freedv *freedv, unsigned char *packed_payload_bits, short demod_in[]);
+API_EXPORT int freedv_nin       (struct freedv *freedv);
+API_EXPORT int freedv_rx        (struct freedv *freedv, short speech_out[], short demod_in[]);
+API_EXPORT int freedv_shortrx   (struct freedv *freedv, short speech_out[], short demod_in[], float gain);
+API_EXPORT int freedv_floatrx   (struct freedv *freedv, short speech_out[], float demod_in[]);
+API_EXPORT int freedv_comprx    (struct freedv *freedv, short speech_out[], COMP  demod_in[]);
+API_EXPORT int freedv_rawdatarx (struct freedv *freedv, unsigned char *packed_payload_bits, short demod_in[]);
 
 // Rawdata -------------------------------------------------------------------
 
-int freedv_codec_frames_from_rawdata(struct freedv *freedv, unsigned char *codec_frames, unsigned char *rawdata);
-int freedv_rawdata_from_codec_frames(struct freedv *freedv, unsigned char *rawdata, unsigned char *codec_frames);
+API_EXPORT int freedv_codec_frames_from_rawdata(struct freedv *freedv, unsigned char *codec_frames, unsigned char *rawdata);
+API_EXPORT int freedv_rawdata_from_codec_frames(struct freedv *freedv, unsigned char *rawdata, unsigned char *codec_frames);
 
 // Set parameters ------------------------------------------------------------
 
-void freedv_set_callback_txt            (struct freedv *freedv, freedv_callback_rx rx, freedv_callback_tx tx, void *callback_state);
-void freedv_set_callback_protocol       (struct freedv *freedv, freedv_callback_protorx rx, freedv_callback_prototx tx, void *callback_state);
-void freedv_set_callback_data           (struct freedv *freedv, freedv_callback_datarx datarx, freedv_callback_datatx datatx, void *callback_state);
-void freedv_set_test_frames		(struct freedv *freedv, int test_frames);
-void freedv_set_test_frames_diversity	(struct freedv *freedv, int test_frames_diversity);
-void freedv_set_smooth_symbols		(struct freedv *freedv, int smooth_symbols);
-void freedv_set_squelch_en		(struct freedv *freedv, int squelch_en);
-void freedv_set_snr_squelch_thresh	(struct freedv *freedv, float snr_squelch_thresh);
-void freedv_set_clip	                (struct freedv *freedv, int val);
-void freedv_set_total_bit_errors    	(struct freedv *freedv, int val);
-void freedv_set_total_bits              (struct freedv *freedv, int val);
-void freedv_set_total_bit_errors_coded  (struct freedv *freedv, int val);
-void freedv_set_total_bits_coded        (struct freedv *freedv, int val);
-void freedv_set_callback_error_pattern  (struct freedv *freedv, freedv_calback_error_pattern cb, void *state);
-void freedv_set_varicode_code_num       (struct freedv *freedv, int val);
-void freedv_set_data_header             (struct freedv *freedv, unsigned char *header);
-void freedv_set_carrier_ampl            (struct freedv *freedv, int c, float ampl);
-void freedv_set_sync                    (struct freedv *freedv, int sync_cmd);
-void freedv_set_verbose                 (struct freedv *freedv, int verbosity);
-void freedv_set_tx_bpf                  (struct freedv *freedv, int val);
-void freedv_set_dpsk                    (struct freedv *freedv, int val);
-void freedv_set_ext_vco                 (struct freedv *f, int val);
-void freedv_set_phase_est_bandwidth_mode(struct freedv *f, int val);
-void freedv_set_eq                      (struct freedv *f, int val);
+API_EXPORT void freedv_set_callback_txt            (struct freedv *freedv, freedv_callback_rx rx, freedv_callback_tx tx, void *callback_state);
+API_EXPORT void freedv_set_callback_protocol       (struct freedv *freedv, freedv_callback_protorx rx, freedv_callback_prototx tx, void *callback_state);
+API_EXPORT void freedv_set_callback_data           (struct freedv *freedv, freedv_callback_datarx datarx, freedv_callback_datatx datatx, void *callback_state);
+API_EXPORT void freedv_set_test_frames		(struct freedv *freedv, int test_frames);
+API_EXPORT void freedv_set_test_frames_diversity	(struct freedv *freedv, int test_frames_diversity);
+API_EXPORT void freedv_set_smooth_symbols		(struct freedv *freedv, int smooth_symbols);
+API_EXPORT void freedv_set_squelch_en		(struct freedv *freedv, int squelch_en);
+API_EXPORT void freedv_set_snr_squelch_thresh	(struct freedv *freedv, float snr_squelch_thresh);
+API_EXPORT void freedv_set_clip	                (struct freedv *freedv, int val);
+API_EXPORT void freedv_set_total_bit_errors    	(struct freedv *freedv, int val);
+API_EXPORT void freedv_set_total_bits              (struct freedv *freedv, int val);
+API_EXPORT void freedv_set_total_bit_errors_coded  (struct freedv *freedv, int val);
+API_EXPORT void freedv_set_total_bits_coded        (struct freedv *freedv, int val);
+API_EXPORT void freedv_set_callback_error_pattern  (struct freedv *freedv, freedv_calback_error_pattern cb, void *state);
+API_EXPORT void freedv_set_varicode_code_num       (struct freedv *freedv, int val);
+API_EXPORT void freedv_set_data_header             (struct freedv *freedv, unsigned char *header);
+API_EXPORT void freedv_set_carrier_ampl            (struct freedv *freedv, int c, float ampl);
+API_EXPORT void freedv_set_sync                    (struct freedv *freedv, int sync_cmd);
+API_EXPORT void freedv_set_verbose                 (struct freedv *freedv, int verbosity);
+API_EXPORT void freedv_set_tx_bpf                  (struct freedv *freedv, int val);
+API_EXPORT void freedv_set_dpsk                    (struct freedv *freedv, int val);
+API_EXPORT void freedv_set_ext_vco                 (struct freedv *f, int val);
+API_EXPORT void freedv_set_phase_est_bandwidth_mode(struct freedv *f, int val);
+API_EXPORT void freedv_set_eq                      (struct freedv *f, int val);
       
 // Get parameters -------------------------------------------------------------------------
 
 struct MODEM_STATS;
 
-int freedv_get_version(void);
-char *freedv_get_hash(void);
-int freedv_get_mode                 (struct freedv *freedv);
-void freedv_get_modem_stats         (struct freedv *freedv, int *sync, float *snr_est);
-void freedv_get_modem_extended_stats(struct freedv *freedv, struct MODEM_STATS *stats);
-int freedv_get_test_frames	    (struct freedv *freedv);
+API_EXPORT int freedv_get_version(void);
+API_EXPORT char *freedv_get_hash(void);
+API_EXPORT int freedv_get_mode                 (struct freedv *freedv);
+API_EXPORT void freedv_get_modem_stats         (struct freedv *freedv, int *sync, float *snr_est);
+API_EXPORT void freedv_get_modem_extended_stats(struct freedv *freedv, struct MODEM_STATS *stats);
+API_EXPORT int freedv_get_test_frames	    (struct freedv *freedv);
 
-int freedv_get_speech_sample_rate   (struct freedv *freedv);
-int freedv_get_n_speech_samples	    (struct freedv *freedv);
-int freedv_get_n_max_speech_samples (struct freedv *freedv);
+API_EXPORT int freedv_get_speech_sample_rate   (struct freedv *freedv);
+API_EXPORT int freedv_get_n_speech_samples	    (struct freedv *freedv);
+API_EXPORT int freedv_get_n_max_speech_samples (struct freedv *freedv);
 
-int freedv_get_modem_sample_rate    (struct freedv *freedv);
-int freedv_get_modem_symbol_rate    (struct freedv *freedv);
-int freedv_get_n_max_modem_samples  (struct freedv *freedv);
-int freedv_get_n_nom_modem_samples  (struct freedv *freedv);
+API_EXPORT int freedv_get_modem_sample_rate    (struct freedv *freedv);
+API_EXPORT int freedv_get_modem_symbol_rate    (struct freedv *freedv);
+API_EXPORT int freedv_get_n_max_modem_samples  (struct freedv *freedv);
+API_EXPORT int freedv_get_n_nom_modem_samples  (struct freedv *freedv);
 
 // bit error rate stats
-int freedv_get_total_bits	    (struct freedv *freedv);
-int freedv_get_total_bit_errors	    (struct freedv *freedv);
-int freedv_get_total_bits_coded     (struct freedv *freedv);
-int freedv_get_total_bit_errors_coded(struct freedv *freedv);
-int freedv_get_uncorrected_errors   (struct freedv *freedv);
+API_EXPORT int freedv_get_total_bits	    (struct freedv *freedv);
+API_EXPORT int freedv_get_total_bit_errors	    (struct freedv *freedv);
+API_EXPORT int freedv_get_total_bits_coded     (struct freedv *freedv);
+API_EXPORT int freedv_get_total_bit_errors_coded(struct freedv *freedv);
+API_EXPORT int freedv_get_uncorrected_errors   (struct freedv *freedv);
 
-int freedv_get_sync		    (struct freedv *freedv);
-int freedv_get_sync_interleaver	    (struct freedv *freedv);
+API_EXPORT int freedv_get_sync		    (struct freedv *freedv);
+API_EXPORT int freedv_get_sync_interleaver	    (struct freedv *freedv);
 
 // access to speech codec states
-struct FSK * freedv_get_fsk         (struct freedv *f);
-struct CODEC2 *freedv_get_codec2    (struct freedv *freedv);
+API_EXPORT struct FSK * freedv_get_fsk         (struct freedv *f);
+API_EXPORT struct CODEC2 *freedv_get_codec2    (struct freedv *freedv);
 
-int freedv_get_bits_per_codec_frame (struct freedv *freedv);
-int freedv_get_bits_per_modem_frame (struct freedv *freedv);
-int freedv_get_sz_error_pattern     (struct freedv *freedv);
-int freedv_get_protocol_bits        (struct freedv *freedv);
+API_EXPORT int freedv_get_bits_per_codec_frame (struct freedv *freedv);
+API_EXPORT int freedv_get_bits_per_modem_frame (struct freedv *freedv);
+API_EXPORT int freedv_get_sz_error_pattern     (struct freedv *freedv);
+API_EXPORT int freedv_get_protocol_bits        (struct freedv *freedv);
 
 #ifdef __cplusplus
 }

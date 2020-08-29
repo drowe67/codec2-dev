@@ -191,11 +191,23 @@ On Ubuntu 17 and above:
    
 ## Building for Windows on a Windows machine
 
+To build with MinGW gcc:
  ```
  mkdir build_windows (Or what ever you want to call your build dir)
- cmake -G "MinGW Makefiles" -D CMAKE_MAKE_PROGRAM=mingw32-make.exe
+ cd build_windows
+ cmake .. -G "MinGW Makefiles" -D CMAKE_MAKE_PROGRAM=mingw32-make.exe
  Or if you use ninja for building cmake -G "Ninja" ..
  mingw32-make or ninja  depends on what you used in the last command
  wait for it to build.
  ```
 
+To build with Microsoft Visual Studio 2017 or 2019:
+ ```
+ mkdir build_windows (Or what ever you want to call your build dir)
+ cd build_windows
+ cmake .. -G "Visual Studio 15 2017 Win64" -DCMAKE_BUILD_TYPE=Release
+ or
+ cmake .. -G "Visual Studio 16 2019" -A x64 -DCMAKE_BUILD_TYPE=Release
+ cmake --build . --config Release --target codec2
+ ```
+Currently this will just build ./src/Release/codec2.dll, but not the demo apps.

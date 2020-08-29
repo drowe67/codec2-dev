@@ -31,6 +31,7 @@
 #include <string.h>
 #include <math.h>
 
+#include "compiler.h"
 #include "defines.h"
 #include "dump.h"
 #include "quantise.h"
@@ -146,11 +147,19 @@ void encode_lspds_scalar(
 )
 {
     int   i,k,m;
+#ifdef NO_C99
+    float *lsp_hz = alloca(order*sizeof(float));
+    float *lsp__hz = alloca(order*sizeof(float));
+    float *dlsp = alloca(order*sizeof(float));
+    float *dlsp_ = alloca(order*sizeof(float));
+    float *wt = alloca(order*sizeof(float));
+#else
     float lsp_hz[order];
     float lsp__hz[order];
     float dlsp[order];
     float dlsp_[order];
     float wt[order];
+#endif
     const float *cb;
     float se;
 
@@ -197,8 +206,13 @@ void decode_lspds_scalar(
 )
 {
     int   i,k;
+#ifdef NO_C99
+    float *lsp__hz = alloca(order*sizeof(float));
+    float *dlsp_ = alloca(order*sizeof(float));
+#else
     float lsp__hz[order];
     float dlsp_[order];
+#endif
     const float *cb;
 
      for(i=0; i<order; i++) {
@@ -275,8 +289,17 @@ int find_nearest_weighted(const float *codebook, int nb_entries, float *x, const
 void lspjvm_quantise(float *x, float *xq, int order)
 {
   int i, n1, n2, n3;
+#ifdef NO_C99
+  float *err = alloca(order*sizeof(float));
+  float *err2 = alloca(order*sizeof(float));
+  float *err3 = alloca(order*sizeof(float));
+  float *w = alloca(order*sizeof(float));
+  float *w2 = alloca(order*sizeof(float));
+  float *w3 = alloca(order*sizeof(float));
+#else
   float err[order], err2[order], err3[order];
   float w[order], w2[order], w3[order];
+#endif
   const float *codebook1 = lsp_cbjvm[0].cb;
   const float *codebook2 = lsp_cbjvm[1].cb;
   const float *codebook3 = lsp_cbjvm[2].cb;
@@ -731,8 +754,13 @@ float speech_to_uq_lsps(float lsp[],
 )
 {
     int   i, roots;
+#ifdef NO_C99
+    float *Wn = alloca(m_pitch*sizeof(float));
+    float *R = alloca((order+1)*sizeof(float));
+#else
     float Wn[m_pitch];
     float R[order+1];
+#endif
     float e, E;
 
     e = 0.0;
@@ -789,7 +817,11 @@ void encode_lsps_scalar(int indexes[], float lsp[], int order)
 {
     int    i,k,m;
     float  wt[1];
+#ifdef NO_C99
+    float *lsp_hz = alloca(order*sizeof(float));
+#else
     float  lsp_hz[order];
+#endif
     const float * cb;
     float se;
 
@@ -824,7 +856,11 @@ void encode_lsps_scalar(int indexes[], float lsp[], int order)
 void decode_lsps_scalar(float lsp[], int indexes[], int order)
 {
     int    i,k;
+#ifdef NO_C99
+    float  *lsp_hz = alloca(order*sizeof(float));
+#else
     float  lsp_hz[order];
+#endif
     const float * cb;
 
     for(i=0; i<order; i++) {
@@ -852,8 +888,17 @@ void decode_lsps_scalar(float lsp[], int indexes[], int order)
 void encode_lsps_vq(int *indexes, float *x, float *xq, int order)
 {
   int i, n1, n2, n3;
+#ifdef NO_C99
+  float *err = alloca(order*sizeof(float));
+  float *err2 = alloca(order*sizeof(float));
+  float *err3 = alloca(order*sizeof(float));
+  float *w = alloca(order*sizeof(float));
+  float *w2 = alloca(order*sizeof(float));
+  float *w3 = alloca(order*sizeof(float));
+#else
   float err[order], err2[order], err3[order];
   float w[order], w2[order], w3[order];
+#endif
   const float *codebook1 = lsp_cbjvm[0].cb;
   const float *codebook2 = lsp_cbjvm[1].cb;
   const float *codebook3 = lsp_cbjvm[2].cb;

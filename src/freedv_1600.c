@@ -16,6 +16,7 @@
 #include <string.h>
 #include <math.h>
 
+#include "compiler.h"
 #include "codec2_fdmdv.h"
 #include "golay23.h"
 #include "codec2.h"
@@ -64,7 +65,11 @@ void freedv_1600_open(struct freedv *f) {
 void freedv_comptx_fdmdv_1600(struct freedv *f, COMP mod_out[]) {
     int    i, j;
     int    data, codeword1, data_flag_index;
+#ifdef NO_C99
+    COMP   *tx_fdm = alloca(f->n_nat_modem_samples*sizeof(COMP));
+#else
     COMP   tx_fdm[f->n_nat_modem_samples];
+#endif
 
     // spare bit in frame that codec defines.  Use this 1
     // bit/frame to send txt messages
@@ -147,7 +152,11 @@ int freedv_comprx_fdmdv_1600(struct freedv *f, COMP demod_in[]) {
     int                 reliable_sync_bit;
     int                 rx_status = 0;
     
+#ifdef NO_C99
+    COMP *ademod_in = alloca(f->nin*sizeof(COMP));
+#else
     COMP ademod_in[f->nin];
+#endif
     for(i=0; i<f->nin; i++)
         ademod_in[i] = fcmult(1.0/FDMDV_SCALE, demod_in[i]);
 
@@ -216,7 +225,11 @@ int freedv_comprx_fdmdv_1600(struct freedv *f, COMP demod_in[]) {
             }
             else {
                 int   test_frame_sync, bit_errors, ntest_bits, k;
+#ifdef NO_C99
+                short *error_pattern = alloca(fdmdv_error_pattern_size(f->fdmdv)*sizeof(short));
+#else
                 short error_pattern[fdmdv_error_pattern_size(f->fdmdv)];
+#endif
 
                 for(k=0; k<2; k++) {
                     /* test frames, so lets sync up to the test frames and count any errors */

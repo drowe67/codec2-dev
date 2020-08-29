@@ -12,6 +12,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <assert.h>
+#include "compiler.h"
 #include "mpdecode_core.h"
 #ifndef USE_ORIGINAL_PHI0
 #include "phi0.h"
@@ -642,7 +643,12 @@ void Somap(float  bit_likelihood[],      /* number_bits, bps*number_symbols */
            int    number_symbols)
 {
     int    n,i,j,k,mask;
+#ifdef NO_C99
+    float *num = alloca(bps*sizeof(float));
+    float *den = alloca(bps*sizeof(float));
+#else
     float num[bps], den[bps];
+#endif
     float metric;
 
     for (n=0; n<number_symbols; n++) { /* loop over symbols */
@@ -682,8 +688,13 @@ void Somap(float  bit_likelihood[],      /* number_bits, bps*number_symbols */
 void symbols_to_llrs(float llr[], COMP rx_qpsk_symbols[], float rx_amps[], float EsNo, float mean_amp, int nsyms) {
     int i;
 
+#ifdef NO_C99
+    float *symbol_likelihood = alloca(nsyms*QPSK_CONSTELLATION_SIZE*sizeof(float));
+    float *bit_likelihood = alloca(nsyms*QPSK_BITS_PER_SYMBOL*sizeof(float));
+#else
     float symbol_likelihood[nsyms*QPSK_CONSTELLATION_SIZE];
     float bit_likelihood[nsyms*QPSK_BITS_PER_SYMBOL];
+#endif
 
     Demod2D(symbol_likelihood, rx_qpsk_symbols, S_matrix, EsNo, rx_amps, mean_amp, nsyms);
     Somap(bit_likelihood, symbol_likelihood, QPSK_CONSTELLATION_SIZE, QPSK_BITS_PER_SYMBOL, nsyms);
@@ -764,8 +775,13 @@ static void FskDemod(float out[], float yr[], float v_est, float SNR, int M, int
 void fsk_rx_filt_to_llrs(float llr[], float rx_filt[], float v_est, float SNRest, int M, int nsyms) {
     int i;
     int bps = log2(M);
+#ifdef NO_C99
+    float *symbol_likelihood = alloca(M*nsyms);
+    float *bit_likelihood = alloca(bps*nsyms);
+#else
     float symbol_likelihood[M*nsyms];
     float bit_likelihood[bps*nsyms];
+#endif
 
     FskDemod(symbol_likelihood, rx_filt, v_est, SNRest, M, nsyms);
     Somap(bit_likelihood, symbol_likelihood, M, bps, nsyms);

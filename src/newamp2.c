@@ -36,6 +36,7 @@
 #include <string.h>
 #include <math.h>
 
+#include "compiler.h"
 #include "defines.h"
 #include "phase.h"
 #include "quantise.h"
@@ -126,7 +127,11 @@ void n2_rate_K_mbest_encode(int *indexes, float *x, float *xq, int ndim)
   int i, n1;
   const float *codebook1 = newamp2vq_cb[0].cb;
   struct MBEST *mbest_stage1;
+#ifdef NO_C99
+  float *w = alloca(ndim*sizeof(float));
+#else
   float w[ndim];
+#endif
   int   index[1];
 
   /* codebook is compiled for a fixed K */
@@ -169,7 +174,12 @@ void n2_rate_K_mbest_encode(int *indexes, float *x, float *xq, int ndim)
 
 void n2_resample_rate_L(C2CONST *c2const, MODEL *model, float rate_K_vec[], float rate_K_sample_freqs_kHz[], int K,int plosive_flag)
 {
+#ifdef NO_C99
+   float *rate_K_vec_term = alloca((K+2)*sizeof(float));
+   float *rate_K_sample_freqs_kHz_term = alloca((K+2)*sizeof(float));
+#else
    float rate_K_vec_term[K+2], rate_K_sample_freqs_kHz_term[K+2];
+#endif
    float AmdB[MAX_AMP+1], rate_L_sample_freqs_kHz[MAX_AMP+1];
    int m,k;
 
@@ -223,7 +233,11 @@ void n2_post_filter_newamp2(float vec[], float sample_freq_kHz[], int K, float p
       and normalise.  Plenty of room for experiment here as well.
     */
     
+#ifdef NO_C99
+    float *pre = alloca(K*sizeof(float));
+#else
     float pre[K];
+#endif
     float e_before = 0.0;
     float e_after = 0.0;
     for(k=0; k<K; k++) {
@@ -461,6 +475,8 @@ void newamp2_interpolate(float interpolated_surface_[], float left_vec[], float 
 
 \*---------------------------------------------------------------------------*/
 
+#define M 4
+
 void newamp2_indexes_to_model(C2CONST *c2const,
                               MODEL  model_[],
                               COMP   H[],
@@ -476,9 +492,14 @@ void newamp2_indexes_to_model(C2CONST *c2const,
                               float pf_gain,
                               int flag16k)
 {
-    float rate_K_vec_[K], rate_K_vec_no_mean_[K], mean_, Wo_right;
+#ifdef NO_C99
+    float *rate_K_vec_ = alloca(K*sizeof(float));
+    float *rate_K_vec_no_mean_ = alloca(K*sizeof(float));
+#else
+    float rate_K_vec_[K], rate_K_vec_no_mean_[K];
+#endif
+    float mean_, Wo_right;
     int   voicing_right, k;
-    int   M = 4;
 
     /* extract latest rate K vector */
 

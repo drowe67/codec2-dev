@@ -209,7 +209,11 @@ void freedv_close(struct freedv *freedv) {
 
 static void codec2_encode_upacked(struct freedv *f, uint8_t unpacked_bits[], short speech_in[]) {
     int n_packed = (f->bits_per_codec_frame + 7) / 8;
+#ifdef NO_C99
+    uint8_t *packed_codec_bits = alloca(n_packed);
+#else
     uint8_t packed_codec_bits[n_packed];
+#endif
     
     codec2_encode(f->codec2, packed_codec_bits, speech_in);
     
@@ -267,7 +271,11 @@ static void codec2_encode_upacked(struct freedv *f, uint8_t unpacked_bits[], sho
 
 void freedv_tx(struct freedv *f, short mod_out[], short speech_in[]) {
     assert(f != NULL);
+#ifdef NO_C99
+    COMP *tx_fdm = alloca(f->n_nom_modem_samples*sizeof(COMP));
+#else
     COMP tx_fdm[f->n_nom_modem_samples];
+#endif
     int  i;
     assert((FDV_MODE_ACTIVE( FREEDV_MODE_1600, f->mode))  || (FDV_MODE_ACTIVE( FREEDV_MODE_700C, f->mode))  ||
            (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode))  || 
@@ -357,7 +365,11 @@ void freedv_comptx(struct freedv *f, COMP mod_out[], short speech_in[]) {
 /* a way to send raw frames of bytes, or speech data that was compressed externally, real short output */
 void freedv_rawdatatx(struct freedv *f, short mod_out[], unsigned char *packed_payload_bits) {
     assert(f != NULL);
+#ifdef NO_C99
+    COMP *tx_fdm = alloca(f->n_nom_modem_samples*sizeof(COMP));
+#else
     COMP tx_fdm[f->n_nom_modem_samples];
+#endif
 
     /* FSK modes used packed bits */
     if(FDV_MODE_ACTIVE( FREEDV_MODE_2400A, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_2400B, f->mode) ||
@@ -565,7 +577,11 @@ int freedv_rx(struct freedv *f, short speech_out[], short demod_in[]) {
        
     /* FSK RX happens in real floats, so convert to those and call their demod here */
     if( (FDV_MODE_ACTIVE( FREEDV_MODE_2400A, f->mode)) || (FDV_MODE_ACTIVE( FREEDV_MODE_2400B, f->mode)) || (FDV_MODE_ACTIVE( FREEDV_MODE_800XA, f->mode)) ){
+#ifdef NO_C99
+        float *rx_float = alloca(f->n_max_modem_samples*sizeof(float));
+#else
         float rx_float[f->n_max_modem_samples];
+#endif
         for(i=0; i<nin; i++) {
             rx_float[i] = ((float)demod_in[i]);
         }
@@ -578,7 +594,11 @@ int freedv_rx(struct freedv *f, short speech_out[], short demod_in[]) {
         float gain = 1.0f;
         
         assert(nin <= f->n_max_modem_samples);
+#ifdef NO_C99
+        COMP *rx_fdm = alloca(f->n_max_modem_samples*sizeof(COMP));
+#else
         COMP rx_fdm[f->n_max_modem_samples];
+#endif
         
         for(i=0; i<nin; i++) {
             rx_fdm[i].real = gain*(float)demod_in[i];
@@ -626,7 +646,11 @@ int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]) {
 #endif
     }
 
+#ifdef NO_C99
+    short *demod_in_short = alloca(f->nin_prev*sizeof(short));
+#else
     short demod_in_short[f->nin_prev];
+#endif
     
     for(int i=0; i<f->nin_prev; i++)
         demod_in_short[i] = demod_in[i].real;
@@ -658,7 +682,11 @@ int freedv_shortrx(struct freedv *f, short speech_out[], short demod_in[], float
 
 static void codec2_decode_upacked(struct freedv *f, short speech_out[], uint8_t unpacked_bits[]) {
     int n_packed = (f->bits_per_codec_frame + 7) / 8;
+#ifdef NO_C99
+    uint8_t *packed_codec_bits = alloca(n_packed*sizeof(uint8_t));
+#else
     uint8_t packed_codec_bits[n_packed];
+#endif
     memset(packed_codec_bits, 0, n_packed);
     
     /* pack bits, MSB received first */
@@ -722,7 +750,11 @@ int freedv_bits_to_speech(struct freedv *f, short speech_out[], short demod_in[]
                    rate, so we need to resample */
                 nout = 2*f->nin_prev;
                 assert(nout <= freedv_get_n_max_speech_samples(f));
+#ifdef NO_C99
+                float *tmp = alloca(nout*sizeof(float));
+#else
                 float tmp[nout];
+#endif
                 for(int i=0; i<nout/2; i++)
                     f->passthrough_2020[FDMDV_OS_TAPS_16K+i] = demod_in[i];
                 fdmdv_8_to_16(tmp, &f->passthrough_2020[FDMDV_OS_TAPS_16K], nout/2);
@@ -829,7 +861,11 @@ int freedv_rawdatarx(struct freedv *f, unsigned char *packed_payload_bits, short
     assert(nin <= f->n_max_modem_samples);
     f->nin_prev = nin;
     
+#ifdef NO_C99
+    COMP *rx_fdm = alloca(f->n_max_modem_samples*sizeof(COMP));
+#else
     COMP rx_fdm[f->n_max_modem_samples];
+#endif
     
     for(i=0; i<nin; i++) {
         rx_fdm[i].real = (float)demod_in[i];

@@ -370,7 +370,7 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    complex float rx_syms[Nsymsperpacket]; float rx_amps[Nsymsperpacket];
+    complexf_t rx_syms[Nsymsperpacket]; float rx_amps[Nsymsperpacket];
     for(int i=0; i<Nsymsperpacket; i++) {
         rx_syms[i] = 0.0;
         rx_amps[i]= 0.0;
@@ -445,7 +445,7 @@ int main(int argc, char *argv[]) {
                 rx_syms[i] = rx_syms[i+Nsymsperframe];
                 rx_amps[i] = rx_amps[i+Nsymsperframe];
             }
-            memcpy(&rx_syms[Nsymsperpacket-Nsymsperframe], ofdm->rx_np, sizeof(complex float)*Nsymsperframe);
+            memcpy(&rx_syms[Nsymsperpacket-Nsymsperframe], ofdm->rx_np, sizeof(complexf_t)*Nsymsperframe);
             memcpy(&rx_amps[Nsymsperpacket-Nsymsperframe], ofdm->rx_amp, sizeof(float)*Nsymsperframe);
 
             /* look for UW as frames enter packet buffer, note UW may span several modem frames */

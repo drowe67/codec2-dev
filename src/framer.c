@@ -30,6 +30,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
+#include "compiler.h"
 #include "fsk.h"
 
 unsigned int toInt(char c)
@@ -70,7 +71,11 @@ int main(int argc,char *argv[]){
     
     size_t framesize = atoi(argv[3]);
     char *uw_hex = argv[4];
+#ifdef NO_C99
+    uint8_t *uw = alloca(4*strlen(uw_hex));
+#else
     uint8_t uw[4*strlen(uw_hex)];
+#endif
     int uwsize = 0;
     for(int c=0; c<strlen(uw_hex); c++)
         for(int i=0; i<4; i++)
@@ -84,7 +89,11 @@ int main(int argc,char *argv[]){
 
     /* main loop */
 
+#ifdef NO_C99
+    uint8_t *frame = alloca(framesize);
+#else
     uint8_t frame[framesize];
+#endif
     while(fread(frame,sizeof(uint8_t),framesize,fin) == framesize) {
         fwrite(uw,sizeof(uint8_t),uwsize,fout);
         fwrite(frame,sizeof(uint8_t),framesize,fout);

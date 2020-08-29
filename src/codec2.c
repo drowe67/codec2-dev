@@ -33,6 +33,7 @@
 #include <string.h>
 #include <math.h>
 
+#include "compiler.h"
 #include "defines.h"
 #include "codec2_fft.h"
 #include "sine.h"
@@ -53,6 +54,14 @@
 #include "c2wideband.h"
 
 #include "debug_alloc.h"
+
+
+#define K700 20
+#define M700 4
+
+#define K450 29
+#define M450 4
+
 
 /*---------------------------------------------------------------------------* \
 
@@ -1546,32 +1555,32 @@ void codec2_encode_700c(struct CODEC2 *c2, unsigned char * bits, short speech[])
         analyse_one_frame(c2, &model, &speech[i*c2->n_samp]);
     }
 
-    int K = 20;
-    float rate_K_vec[K], mean;
-    float rate_K_vec_no_mean[K], rate_K_vec_no_mean_[K];
+    float rate_K_vec[K700];
+    float rate_K_vec_no_mean[K700], rate_K_vec_no_mean_[K700];
+    float mean;
 
     newamp1_model_to_indexes(&c2->c2const, 
                              indexes, 
                              &model, 
                              rate_K_vec, 
                              c2->rate_K_sample_freqs_kHz,
-                             K,
+                             K700,
                              &mean,
                              rate_K_vec_no_mean,
                              rate_K_vec_no_mean_, &c2->se, c2->eq, c2->eq_en);
-    c2->nse += K;
+    c2->nse += K700;
 
 #ifndef CORTEX_M4
     /* dump features for deep learning experiments */
     if (c2->fmlfeat != NULL) {
         fwrite(&mean, 1, sizeof(float), c2->fmlfeat);
-        fwrite(rate_K_vec_no_mean, K, sizeof(float), c2->fmlfeat);
-        fwrite(rate_K_vec_no_mean_, K, sizeof(float), c2->fmlfeat);
+        fwrite(rate_K_vec_no_mean, K700, sizeof(float), c2->fmlfeat);
+        fwrite(rate_K_vec_no_mean_, K700, sizeof(float), c2->fmlfeat);
 	MODEL model_; memcpy(&model_, &model, sizeof(model));
-	float rate_K_vec_[K];
-	for(int k=0; k<K; k++)
+	float rate_K_vec_[K700];
+	for(int k=0; k<K700; k++)
 	    rate_K_vec_[k] = rate_K_vec_no_mean_[k] + mean;
-	resample_rate_L(&c2->c2const, &model_, rate_K_vec_, c2->rate_K_sample_freqs_kHz, K);
+	resample_rate_L(&c2->c2const, &model_, rate_K_vec_, c2->rate_K_sample_freqs_kHz, K700);
         fwrite(&model_.A, MAX_AMP, sizeof(float), c2->fmlfeat);
     }
     if (c2->fmlmodel != NULL)
@@ -1613,9 +1622,8 @@ void codec2_decode_700c(struct CODEC2 *c2, short speech[], const unsigned char *
     indexes[2] = unpack_natural_or_gray(bits, &nbit, 4, 0);
     indexes[3] = unpack_natural_or_gray(bits, &nbit, 6, 0);
     
-    int M = 4;
-    COMP  HH[M][MAX_AMP+1];
-    float interpolated_surface_[M][NEWAMP1_K];
+    COMP  HH[M700][MAX_AMP+1];
+    float interpolated_surface_[M700][NEWAMP1_K];
 
     newamp1_indexes_to_model(&c2->c2const,
                              model,
@@ -1633,7 +1641,7 @@ void codec2_decode_700c(struct CODEC2 *c2, short speech[], const unsigned char *
                              c2->post_filter_en);
 
 
-   for(i=0; i<M; i++) {
+   for(i=0; i<M700; i++) {
        if (c2->fmlfeat != NULL) {
 	   /* We use standard nb_features=55 feature records for compatability with train_lpcnet.py */
 	   float features[55] = {0};
@@ -1730,7 +1738,7 @@ float codec2_get_energy(struct CODEC2 *c2, const unsigned char *bits)
 	   ( CODEC2_MODE_ACTIVE(CODEC2_MODE_450PWB, c2->mode))
 	   );
     MODEL model;
-    float xq_dec[2] = {};
+    float xq_dec[2] = {0.0};
     int e_index, WoE_index;
     float e;
     unsigned int nbit;
@@ -1816,16 +1824,16 @@ float codec2_get_energy(struct CODEC2 *c2, const unsigned char *bits)
 void codec2_encode_450(struct CODEC2 *c2, unsigned char * bits, short speech[])
 {
 	MODEL        model;
-    int          indexes[4], i,h, M=4;
+    int          indexes[4], i,h;
     unsigned int nbit = 0;
     int plosiv = 0;
-    float energydelta[M];
-	int spectralCounter;
+    float energydelta[M450];
+    int spectralCounter;
 
     assert(c2 != NULL);
 
     memset(bits, '\0',  ((codec2_bits_per_frame(c2) + 7) / 8));
-    for(i=0; i<M; i++){
+    for(i=0; i<M450; i++){
         analyse_one_frame(c2, &model, &speech[i*c2->n_samp]);
         energydelta[i] = 0;
         spectralCounter = 0;
@@ -1865,9 +1873,10 @@ void codec2_encode_450(struct CODEC2 *c2, unsigned char * bits, short speech[])
     c2->energy_prev = energydelta[3];
     
 
-    int K = 29;
-    float rate_K_vec[K], mean;
-    float rate_K_vec_no_mean[K], rate_K_vec_no_mean_[K];
+    float rate_K_vec[K450];
+    float rate_K_vec_no_mean[K450], rate_K_vec_no_mean_[K450];
+    float mean;
+
     if(plosiv > 0){
 		plosiv = 1;
 	}
@@ -1876,7 +1885,7 @@ void codec2_encode_450(struct CODEC2 *c2, unsigned char * bits, short speech[])
                              &model, 
                              rate_K_vec, 
                              c2->n2_rate_K_sample_freqs_kHz,
-                             K,
+                             K450,
                              &mean,
                              rate_K_vec_no_mean,
                              rate_K_vec_no_mean_,
@@ -1917,9 +1926,8 @@ void codec2_decode_450(struct CODEC2 *c2, short speech[], const unsigned char * 
     indexes[2] = unpack_natural_or_gray(bits, &nbit, 3, 0);
     indexes[3] = unpack_natural_or_gray(bits, &nbit, 6, 0);
     
-    int M = 4;
-    COMP  HH[M][MAX_AMP+1];
-    float interpolated_surface_[M][NEWAMP2_K];
+    COMP  HH[M450][MAX_AMP+1];
+    float interpolated_surface_[M450][NEWAMP2_K];
     int pwbFlag = 0;
 
     newamp2_indexes_to_model(&c2->c2const,
@@ -1938,7 +1946,7 @@ void codec2_decode_450(struct CODEC2 *c2, short speech[], const unsigned char * 
                              pwbFlag);
 
 
-   for(i=0; i<M; i++) {
+   for(i=0; i<M450; i++) {
        synthesise_one_frame(c2, &speech[c2->n_samp*i], &model[i], &HH[i][0], 1.5);
    }
 }
@@ -1970,9 +1978,8 @@ void codec2_decode_450pwb(struct CODEC2 *c2, short speech[], const unsigned char
     indexes[2] = unpack_natural_or_gray(bits, &nbit, 3, 0);
     indexes[3] = unpack_natural_or_gray(bits, &nbit, 6, 0);
     
-    int M = 4;
-    COMP  HH[M][MAX_AMP+1];
-    float interpolated_surface_[M][NEWAMP2_16K_K];
+    COMP  HH[M450][MAX_AMP+1];
+    float interpolated_surface_[M450][NEWAMP2_16K_K];
     int pwbFlag = 1;
 
     newamp2_indexes_to_model(&c2->c2const,
@@ -1991,7 +1998,7 @@ void codec2_decode_450pwb(struct CODEC2 *c2, short speech[], const unsigned char
                              pwbFlag);
 
 
-   for(i=0; i<M; i++) {
+   for(i=0; i<M450; i++) {
        synthesise_one_frame(c2, &speech[c2->n_samp*i], &model[i], &HH[i][0], 1.5);
    }
 }
@@ -2253,7 +2260,11 @@ void codec2_load_codebook(struct CODEC2 *codec2_state, int num, char *filename) 
 	exit(1);
     }
     //fprintf(stderr, "reading newamp1vq_cb[%d] k=%d m=%d\n", num, newamp1vq_cb[num].k, newamp1vq_cb[num].m);
+#ifdef NO_C99
+    float *tmp = alloca((newamp1vq_cb[num].k*newamp1vq_cb[num].m)*sizeof(float));
+#else
     float tmp[newamp1vq_cb[num].k*newamp1vq_cb[num].m];
+#endif
     int nread = fread(tmp, sizeof(float), newamp1vq_cb[num].k*newamp1vq_cb[num].m, f);
     float *p = (float*)newamp1vq_cb[num].cb;
     for(int i=0; i<newamp1vq_cb[num].k*newamp1vq_cb[num].m; i++)

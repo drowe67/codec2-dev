@@ -34,6 +34,7 @@
 #include <string.h>
 #include <math.h>
 
+#include "compiler.h"
 #include "defines.h"
 #include "phase.h"
 #include "quantise.h"
@@ -165,8 +166,13 @@ float rate_K_mbest_encode(int *indexes, float *x, float *xq, int ndim, int mbest
   const float *codebook1 = newamp1vq_cb[0].cb;
   const float *codebook2 = newamp1vq_cb[1].cb;
   struct MBEST *mbest_stage1, *mbest_stage2;
+#ifdef NO_C99
+  float *target = alloca(ndim*sizeof(float));
+  float *w = alloca(ndim*sizeof(float));
+#else
   float target[ndim];
   float w[ndim];
+#endif
   int   index[MBEST_STAGES];
   float mse, tmp;
 
@@ -241,7 +247,11 @@ void post_filter_newamp1(float vec[], float sample_freq_kHz[], int K, float pf_g
       and normalise.  Plenty of room for experiment here as well.
     */
     
+#ifdef NO_C99
+    float *pre = alloca(K*sizeof(float));
+#else
     float pre[K];
+#endif
     float e_before = 0.0;
     float e_after = 0.0;
     for(k=0; k<K; k++) {
@@ -324,7 +334,12 @@ void interp_Wo_v(float Wo_[], int L_[], int voicing_[], float Wo1, float Wo2, in
 
 void resample_rate_L(C2CONST *c2const, MODEL *model, float rate_K_vec[], float rate_K_sample_freqs_kHz[], int K)
 {
+#ifdef NO_C99
+   float *rate_K_vec_term = alloca((K+2)*sizeof(float));
+   float *rate_K_sample_freqs_kHz_term = alloca((K+2)*sizeof(float));
+#else
    float rate_K_vec_term[K+2], rate_K_sample_freqs_kHz_term[K+2];
+#endif
    float AmdB[MAX_AMP+1], rate_L_sample_freqs_kHz[MAX_AMP+1];
    int m,k;
 
@@ -367,7 +382,13 @@ void determine_phase(C2CONST *c2const, COMP H[], MODEL *model, int Nfft, codec2_
 {
     int i,m,b;
     int Ns = Nfft/2+1;
+#ifdef NO_C99
+    float *Gdbfk = alloca(Ns*sizeof(float));
+    float *sample_freqs_kHz = alloca(Ns*sizeof(float));
+    float *phase = alloca(Ns*sizeof(float));
+#else
     float Gdbfk[Ns], sample_freqs_kHz[Ns], phase[Ns];
+#endif
     float AmdB[MAX_AMP+1], rate_L_sample_freqs_kHz[MAX_AMP+1];
 
     for(m=1; m<=model->L; m++) {
@@ -404,7 +425,15 @@ void determine_autoc(C2CONST *c2const, float Rk[], int order, MODEL *model, int 
 {
     int i,m;
     int Ns = Nfft/2+1;
+#ifdef NO_C99
+    float *Gdbfk = alloca(Ns*sizeof(float));
+    float *sample_freqs_kHz = alloca(Ns*sizeof(float));
+    COMP *S = alloca(Nfft*sizeof(COMP));
+    COMP *R = alloca(Nfft*sizeof(COMP));
+#else
     float Gdbfk[Ns], sample_freqs_kHz[Ns];
+    COMP S[Nfft], R[Nfft];
+#endif
     float AmdB[MAX_AMP+1], rate_L_sample_freqs_kHz[MAX_AMP+1];
 
     /* interpolate in the log domain */
@@ -419,8 +448,6 @@ void determine_autoc(C2CONST *c2const, float Rk[], int order, MODEL *model, int 
     }
 
     interp_para(Gdbfk, &rate_L_sample_freqs_kHz[1], &AmdB[1], model->L, sample_freqs_kHz, Ns);
-
-    COMP S[Nfft], R[Nfft];
 
     /* install negative frequency components, convert to mag squared of spectrum */
     S[0].real = pow(10.0, Gdbfk[0]/10.0);
@@ -606,6 +633,8 @@ void newamp1_indexes_to_rate_K_vec(float  rate_K_vec_[],
 
 \*---------------------------------------------------------------------------*/
 
+#define M 4
+
 void newamp1_indexes_to_model(C2CONST *c2const,
                               MODEL  model_[],
                               COMP   H[],
@@ -621,9 +650,14 @@ void newamp1_indexes_to_model(C2CONST *c2const,
                               float  user_rate_K_vec_no_mean_[],
                               int    post_filter_en)
 {
-    float rate_K_vec_[K], rate_K_vec_no_mean_[K], mean_, Wo_right;
+#ifdef NO_C99
+    float *rate_K_vec_ = alloca(K*sizeof(float));
+    float *rate_K_vec_no_mean_ = alloca(K*sizeof(float));
+#else
+    float rate_K_vec_[K], rate_K_vec_no_mean_[K];
+#endif
+    float mean_, Wo_right;
     int   voicing_right, k;
-    int   M = 4;
 
     /* extract latest rate K vector */
 

@@ -37,6 +37,7 @@
 #include <string.h>
 #include <math.h>
 
+#include "compiler.h"
 #include "codec2_cohpsk.h"
 #include "cohpsk_defs.h"
 #include "cohpsk_internal.h"
@@ -306,8 +307,8 @@ void qpsk_symbols_to_bits(struct COHPSK *coh, float rx_bits[], COMP ct_symb_buf[
     COMP  y[NPILOTSFRAME+2], yfit;
     COMP  rx_symb_linear[NSYMROW*COHPSK_NC*ND];
     COMP  m, b;
-    COMP   __attribute__((unused)) corr, rot, pi_on_4, phi_rect, div_symb;
-    float mag,  __attribute__((unused)) phi_,  __attribute__((unused)) amp_;
+    COMP   ATTRIBUTE_UNUSED corr, rot, pi_on_4, phi_rect, div_symb;
+    float mag,  ATTRIBUTE_UNUSED phi_, ATTRIBUTE_UNUSED amp_;
     float sum_x, sum_xx, noise_var;
     COMP  s;
 
@@ -1173,7 +1174,7 @@ void cohpsk_get_demod_stats(struct COHPSK *coh, struct MODEM_STATS *stats)
             stats->rx_symbols[r][c] = cmult(coh->rx_symb[r][c], pi_4);
         }
     }
-#endif    
+#endif
 }
 
 

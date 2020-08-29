@@ -85,7 +85,11 @@ else()
 endif()
 
 # Set default C flags.
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wno-strict-overflow")
+if(NOT MSVC)
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wno-strict-overflow")
+else()
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /D_USE_MATH_DEFINES /wd4244 /wd4305 /wd4996 /DNO_C99")
+endif()
 
 # Check for what C standard is supported.
 include(CheckCCompilerFlag)
@@ -96,8 +100,8 @@ if(COMPILER_SUPPORTS_GNU11)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=gnu11")
 elseif(COMPILER_SUPPORTS_GNU99)
    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=gnu99")
-else()
-   message(SEND_ERROR "Compiler doesn't seem to support at least gnu99, might cause problems" )
+elseif(NOT MSVC)
+   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DNO_C99")
 endif()
 
 # -fPIC is implied on MinGW...
@@ -105,8 +109,13 @@ if(NOT WIN32)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC")
 endif()
 
-set(CMAKE_C_FLAGS_DEBUG "-g -O2 -DDUMP")
-set(CMAKE_C_FLAGS_RELEASE "-O3")
+if(NOT MSVC)
+    set(CMAKE_C_FLAGS_DEBUG "-g -O2 -DDUMP")
+    set(CMAKE_C_FLAGS_RELEASE "-O3")
+else()
+    set(CMAKE_C_FLAGS_DEBUG "/DEBUG /DDUMP")
+    set(CMAKE_C_FLAGS_RELEASE "/O2")
+endif()
 
 #
 # Setup Windows/MinGW specifics here.

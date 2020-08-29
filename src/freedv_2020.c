@@ -164,7 +164,7 @@ void freedv_comptx_2020(struct freedv *f, COMP mod_out[]) {
 
     /* OK now ready to LDPC encode, interleave, and OFDM modulate */
     
-    complex float tx_sams[f->n_nat_modem_samples];
+    complexf_t tx_sams[f->n_nat_modem_samples];
     COMP asam;
     
     ofdm_ldpc_interleave_tx(f->ofdm, f->ldpc, tx_sams, tx_bits, txt_bits);

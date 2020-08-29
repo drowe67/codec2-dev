@@ -16,6 +16,7 @@
 #include <string.h>
 #include <math.h>
 
+#include "compiler.h"
 #include "fsk.h"
 #include "fmfsk.h"
 #include "codec2.h"
@@ -296,7 +297,11 @@ int freedv_comprx_fsk(struct freedv *f, COMP demod_in[]) {
     } else{      
         /* 2400B needs real input samples */
         int n = fmfsk_nin(f->fmfsk);
+#ifdef NO_C99
+        float *demod_in_float = alloca(n*sizeof(float));
+#else
         float demod_in_float[n];
+#endif
         for(i=0; i<n; i++) {
             demod_in_float[i] = demod_in[i].real;
         }
@@ -334,7 +339,11 @@ int freedv_floatrx(struct freedv *f, short speech_out[], float demod_in[]) {
     
     assert(nin <= f->n_max_modem_samples);
     
+#ifdef NO_C99
+    COMP *rx_fdm = alloca(f->n_max_modem_samples*sizeof(COMP));
+#else
     COMP rx_fdm[f->n_max_modem_samples];
+#endif
     for(i=0; i<nin; i++) {
         rx_fdm[i].real = demod_in[i];
         rx_fdm[i].imag = 0;

@@ -28,6 +28,7 @@
   along with this program; if not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "compiler.h"
 #include "defines.h"
 #include "lsp.h"
 #include <math.h>
@@ -93,7 +94,11 @@ cheb_poly_eva(float *coef,float x,int order)
 {
     int i;
     float *t,*u,*v,sum;
+#ifdef NO_C99
+    float *T = alloca(((order / 2) + 1)*sizeof(float));
+#else
     float T[(order / 2) + 1];
+#endif
 
     /* Initialise pointers */
 
@@ -147,8 +152,13 @@ int lpc_to_lsp (float *a, int order, float *freq, int nb, float delta)
     float *pt;                	/* ptr used for cheb_poly_eval()
 				   whether P' or Q' 			*/
     int roots=0;              	/* number of roots found 	        */
+#ifdef NO_C99
+    float *Q = alloca((order + 1)*sizeof(float));
+    float *P = alloca((order + 1)*sizeof(float));
+#else
     float Q[order + 1];
     float P[order + 1];
+#endif
 
     flag = 1;
     m = order/2;            	/* order of P'(z) & Q'(z) polynimials 	*/
@@ -268,8 +278,13 @@ void lsp_to_lpc(float *lsp, float *ak, int order)
     int i,j;
     float xout1,xout2,xin1,xin2;
     float *pw,*n1,*n2,*n3,*n4 = 0;
+#ifdef NO_C99
+    float *freq = alloca(order*sizeof(float));
+    float *Wp = alloca(((order * 4) + 2)*sizeof(float));
+#else
     float freq[order];
     float Wp[(order * 4) + 2];
+#endif
 
     /* convert from radians to the x=cos(w) domain */
 

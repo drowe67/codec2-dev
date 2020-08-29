@@ -32,6 +32,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
+#include "compiler.h"
 
 #define OVERSAMPLE 100
 
@@ -83,8 +84,13 @@ int main(int argc,char *argv[]){
     assert(legacy_mode || rpitx_mode);
     fprintf(stderr, "legacy_mode: %d rpitx_mode: %d\n", legacy_mode, rpitx_mode);
     
+#ifdef NO_C99
+    uint8_t *tx_bits = alloca(log2m);
+    int16_t *rawbuf = alloca(os*sizeof(int16_t));
+#else
     uint8_t tx_bits[log2m];
     int16_t rawbuf[os];
+#endif
 
     /* Modulate m bits to levels to drive external VCO */
 

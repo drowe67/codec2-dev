@@ -28,6 +28,8 @@
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
+#include "compiler.h"
 #include "fsk.h"
 
 unsigned int toInt(char c)
@@ -69,7 +71,11 @@ int main(int argc,char *argv[]){
     
     size_t framesize = atoi(argv[3]);
     char *uw_hex = argv[4];
+#ifdef NO_C99
+    uint8_t *uw = alloca(4*strlen(uw_hex));
+#else
     uint8_t uw[4*strlen(uw_hex)];
+#endif
     int uwsize = 0;
     for(int c=0; c<strlen(uw_hex); c++)
         for(int i=0; i<4; i++)
@@ -95,7 +101,12 @@ int main(int argc,char *argv[]){
     
     /* main loop */
 
-    uint8_t twoframes[2*framedsize]; memset(twoframes, 0, 2*framedsize);
+#ifdef NO_C99
+    uint8_t *twoframes = alloca(2*framedsize);
+#else
+    uint8_t twoframes[2*framedsize];
+#endif
+    memset(twoframes, 0, 2*framedsize);
     int state = 0; int thresh1 = 0.1*uwsize; int thresh2 = 0.4*uwsize; int baduw = 0;
     fprintf(stderr, "thresh1: %d thresh2: %d\n", thresh1, thresh2);
     int best_location, errors;

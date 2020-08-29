@@ -35,6 +35,16 @@
   extern "C" {
 #endif
 
+#if defined _WIN32 || defined __CYGWIN__
+#ifdef __GNUC__
+#define API_EXPORT __attribute__ ((dllexport))
+#else
+#define API_EXPORT __declspec(dllexport)
+#endif
+#else
+#define API_EXPORT __attribute__ ((visibility ("default")))
+#endif
+
 #define CODEC2_MODE_3200 	0
 #define CODEC2_MODE_2400 	1
 #define CODEC2_MODE_1600 	2
@@ -89,30 +99,30 @@
 
 struct CODEC2;
 
-struct CODEC2 *  codec2_create(int mode);
-void codec2_destroy(struct CODEC2 *codec2_state);
-void codec2_encode(struct CODEC2 *codec2_state, unsigned char * bits, short speech_in[]);
-void codec2_decode(struct CODEC2 *codec2_state, short speech_out[], const unsigned char *bits);
-void codec2_decode_ber(struct CODEC2 *codec2_state, short speech_out[], const unsigned char *bits, float ber_est);
-int  codec2_samples_per_frame(struct CODEC2 *codec2_state);
-int  codec2_bits_per_frame(struct CODEC2 *codec2_state);
+API_EXPORT struct CODEC2 *  codec2_create(int mode);
+API_EXPORT void codec2_destroy(struct CODEC2 *codec2_state);
+API_EXPORT void codec2_encode(struct CODEC2 *codec2_state, unsigned char * bits, short speech_in[]);
+API_EXPORT void codec2_decode(struct CODEC2 *codec2_state, short speech_out[], const unsigned char *bits);
+API_EXPORT void codec2_decode_ber(struct CODEC2 *codec2_state, short speech_out[], const unsigned char *bits, float ber_est);
+API_EXPORT int  codec2_samples_per_frame(struct CODEC2 *codec2_state);
+API_EXPORT int  codec2_bits_per_frame(struct CODEC2 *codec2_state);
 
-void codec2_set_lpc_post_filter(struct CODEC2 *codec2_state, int enable, int bass_boost, float beta, float gamma);
-int  codec2_get_spare_bit_index(struct CODEC2 *codec2_state);
-int  codec2_rebuild_spare_bit(struct CODEC2 *codec2_state, char unpacked_bits[]);
-void codec2_set_natural_or_gray(struct CODEC2 *codec2_state, int gray);
-void codec2_set_softdec(struct CODEC2 *c2, float *softdec);
-float codec2_get_energy(struct CODEC2 *codec2_state, const unsigned char *bits);
+API_EXPORT void codec2_set_lpc_post_filter(struct CODEC2 *codec2_state, int enable, int bass_boost, float beta, float gamma);
+API_EXPORT int  codec2_get_spare_bit_index(struct CODEC2 *codec2_state);
+API_EXPORT int  codec2_rebuild_spare_bit(struct CODEC2 *codec2_state, char unpacked_bits[]);
+API_EXPORT void codec2_set_natural_or_gray(struct CODEC2 *codec2_state, int gray);
+API_EXPORT void codec2_set_softdec(struct CODEC2 *c2, float *softdec);
+API_EXPORT float codec2_get_energy(struct CODEC2 *codec2_state, const unsigned char *bits);
       
 // support for ML and VQ experiments
-void codec2_open_mlfeat(struct CODEC2 *codec2_state, char *feat_filename, char *model_filename);
-void codec2_load_codebook(struct CODEC2 *codec2_state, int num, char *filename);
-float codec2_get_var(struct CODEC2 *codec2_state);
-float *codec2_enable_user_ratek(struct CODEC2 *codec2_state, int *K);
+API_EXPORT void codec2_open_mlfeat(struct CODEC2 *codec2_state, char *feat_filename, char *model_filename);
+API_EXPORT void codec2_load_codebook(struct CODEC2 *codec2_state, int num, char *filename);
+API_EXPORT float codec2_get_var(struct CODEC2 *codec2_state);
+API_EXPORT float *codec2_enable_user_ratek(struct CODEC2 *codec2_state, int *K);
 
 // 700C post filter and equaliser
-void codec2_700c_post_filter(struct CODEC2 *codec2_state, int en);
-void codec2_700c_eq(struct CODEC2 *codec2_state, int en);
+API_EXPORT void codec2_700c_post_filter(struct CODEC2 *codec2_state, int en);
+API_EXPORT void codec2_700c_eq(struct CODEC2 *codec2_state, int en);
       
 #ifdef __cplusplus
 }
