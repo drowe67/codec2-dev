@@ -61,21 +61,29 @@ endfunction
 
 % "Genie" OFDM modem simulation that assumes ideal sync
 
-function [ber papr] = run_sim(Nsym, EbNodB, plot_en=0, filt_en=0, method="", threshold=6)
+function [ber papr] = run_sim(Nsym, EbNodB, channel='awgn', plot_en=0, filt_en=0, method="", threshold=6)
     Nc   = 8;
     M    = 160;    % number of samples in each symbol
     bps  = 2;      % two bits per symbol for QPSK
     Ncp  = 16;     % cyclic prefix samples
-
-    phase_est = 1; % perform phase estimation/correction
-    timing = 0;
+    Fs   = 8000;
     
+    phase_est = 1; % perform phase estimation/correction
+    timing = Ncp;
+
     if strcmp(method,"diversity")
       Nd = 2; gain = 1/sqrt(2);
     else
       Nd = 1; gain = 1.0;
     end
     
+    if strcmp(channel,'multipath')
+      dopplerSpreadHz = 1; path_delay = Ncp/2;
+      Nsam = floor(Nsym*(M+Ncp)*1.1);
+      spread1 = doppler_spread(dopplerSpreadHz, Fs, Nsam);
+      spread2 = doppler_spread(dopplerSpreadHz, Fs, Nsam);
+    end
+
     papr_log = [];
     for e=1:length(EbNodB)
         % generate a 2D array of QPSK symbols
@@ -106,6 +114,11 @@ function [ber papr] = run_sim(Nsym, EbNodB, plot_en=0, filt_en=0, method="", thr
         end
         Nsam = length(tx);
 
+        if strcmp(channel,'multipath')
+          assert(length(spread1) >= Nsam);
+          assert(length(spread2) >= Nsam);
+        end
+        
         % bunch of PAPR reduction options
         
         tx_ = tx;
@@ -131,9 +144,17 @@ function [ber papr] = run_sim(Nsym, EbNodB, plot_en=0, filt_en=0, method="", thr
           tx_ = [tx_(Nfilt/2+1:end)];
         end
 
-        % normalise power after any non-linear shennanigans, so that noise addition is correct
+        rx = tx_;
+        
+        % multipath channel
 
-        tx_ *= sqrt(mean(abs(tx).^2)/mean(abs(tx_).^2));
+        if strcmp(channel,'multipath')
+          rx = spread1(1:Nsam).*rx + spread2(1:Nsam).*[zeros(1,path_delay) rx(path_delay+1:end)];
+        end
+        
+        % normalise power after any multipath and non-linear shennanigans, so that noise addition is correct
+        norm = sqrt(mean(abs(tx).^2)/mean(abs(rx).^2))
+        rx *= norm;
         
         if phase_est
             % auxillary rx to get ideal phase ests on signal after multipath but before AWGN noise is added
@@ -142,18 +163,19 @@ function [ber papr] = run_sim(Nsym, EbNodB, plot_en=0, filt_en=0, method="", thr
             for s=1:Nsym
               st = (s-1)*(M+Ncp)+1+timing; en = st+M-1;
               for c=1:Nc*Nd
-                arx_sym = sum(exp(-j*(0:M-1)*w(c)) .* tx_(st:en))/M;
+                arx_sym = sum(exp(-j*(0:M-1)*w(c)) .* rx(st:en))/M;
                 rx_phase(s,c) = arx_sym * conj(tx_sym(s,c));
               end
             end
+            rx_phase = exp(j*arg(rx_phase));
         end
-        
+
         % AWGN channel
 
         EsNodB = EbNodB(e) + 10*log10(bps);
         variance = M/(10^(EsNodB/10));
         noise = sqrt(variance/2)*randn(1,Nsam) + j*sqrt(variance/2)*randn(1,Nsam);
-        rx = tx_ + noise;
+        rx += noise;
 
         % demodulate
 
@@ -249,11 +271,12 @@ function curves_awgn
     print("papr_BER_peakEbNo.png","-dpng");
 end
 
+
 pkg load statistics;
 more off;
 
 % single point with lots of plots -----------
 
 %run_sim(1000, EbNo=4, plot_en=1, filt_en=1, "diversity", threshold=3);
-run_sim(1000, EbNo=4, plot_en=1);
+run_sim(1000, EbNo=10, channel='multipath', plot_en=1);
 
