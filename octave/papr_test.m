@@ -1,51 +1,40 @@
 % papr_test.m
 %
+% Experiments with PAPR reduction using clipping/compression
+%
+% OFDM Tx -> compress -> filter -> normalise power -> channel -> OFDM Rx
+
 #{
 
   TODO:
-    [X] measure BER
-    [X] heat map type scatter diagram
-    [X] clipping
-    [X] companding
-    [X] curves with different clipping thresholds
-    [X] filter
-        + complex or real?
-        + might introduce phase shift ... make demodulation tricky
-    [X] way to put plots on top of each other
-    [X] tx diversity
+    [ ] set threshold at CDF %, make indep of Nc
+    [ ] peak BER versus average
+        + could we be wiping out some frames with too much compression?
+        + calculate localised BER
+        + what is the average BER/frame?
     [ ] PAPR versus carriers for random data
-    [ ] set threshold at CDF %
-    [ ] plot compander
-    [ ] think about how to measure/objective
-        + can we express BER as a function of peak power?
-        + or maybe showing RMS power being boosted
-        + take into account clipping and higher rms power on BER
-        + do we need to recalculate tx power?
-    [ ] down the track ... other types of channels
-        + does it mess up HF multipath much
-        + impact likely less
-    [ ] Tx a companded waveform and see if it really helps average power
+    [ ] example single run
+    [ ] AWGN run with all schemes
+    [ ] multipath run with all schemes
+    [ ] reduce to clip with threshold, plot AWGN and multipath with various compression rates
     [ ] results/discussion
+        + PAPR helps SNR, but multipath is a much tougher problem
         + non-linear technqiues spread the energy in freq
         + we can trade of PAPR with bandwidth, lower PAPR, more bandwidth
         + filtering brings the PAPR up again
-        + PAPR helps SNR, but multipath is a much tougher problem
         + non-linear technqiques will mess with QAM more (I think - simulate?)
         + so we may hit a wall at high data rates
-        + are people already doing this by default, e.g. some slight compression in radio?  OTA test rqd,
-          some sort of controlled test, like clipping rate
-        + diversity idea doesn't seem to work in term of PAPR - but - 1 2Nc waveform will be much more
-          robust to multipath (and multipath first), so any PAPR reduction will go further.
-        + bigger improvements at higher Nc, e.g. 6dB at Nc=17.  Will need to test on real PAs
-    [ ] multipath results
-        + do these techniques mess up phase estimation?  Try AWGN with phase est on.
-          initial looks OK, 4dB, maybe repeat and log, try A/B
-        + non linear gives more scatter, when this has amplitude excursions up and down, this thicker
-          scatter produces more errors.  This suggests PAPR reduction is of less help for
-          multipath.
-        + it's possible (but I had thought unlikely) that compression will give more peak power,
-          negating the advantage of diversity (or FEC).  Interesting idea.  
-    [ ] what will happen when LDPC demodulated?
+        + are people already doing this by default, e.g. some slight compression in radio?  OTA test/test on
+          real PAs
+       [ ] Effect on scatter
+           + can see CP 0.4dB offset, I think that's correct
+           + seeing cross type scatter with no noise, this makes intuitive sense, as we reduce magnitide of some
+             symbols
+           + Nc=9, thresh=3, looks like fading on the scatter diagram
+           + Perhaps that makes sense, as amplitudes of some symbols are suppressed by compression
+           + but we get a heavy advantage from increased PAPR, when signal is normalised up
+       [ ] discuss multipath results   
+    [ ] what will happen when LDPC decoded?
         + will decoder struggle due to non-linearity?
 #}
 
@@ -70,7 +59,7 @@ endfunction
 % "Genie" OFDM modem simulation that assumes ideal sync
 
 function [ber papr] = run_sim(Nsym, EbNodB, channel='awgn', plot_en=0, filt_en=0, method="", threshold=6)
-    Nc   = 16;
+    Nc   = 8;
     M    = 160;    % number of samples in each symbol
     bps  = 2;      % two bits per symbol for QPSK
     Ncp  = 16;     % cyclic prefix samples
@@ -107,17 +96,17 @@ function [ber papr] = run_sim(Nsym, EbNodB, channel='awgn', plot_en=0, filt_en=0
         % carrier frequencies, centre about 0
         st = floor(Nc*Nd/2);
         w = 2*pi/M*(-st:-st+Nc*Nd-1);
-        
-        tx = [];
-
+         
         % generate OFDM signal
 
+        tx = [];
         for s=1:Nsym
           atx = zeros(1,M);
           for c=1:Nc*Nd
             atx += exp(j*(0:M-1)*w(c))*tx_sym(s,c);
           end
           % insert cyclic prefix and build up stream of time domain symbols
+          % note CP costs us 10*log10((Ncp+M)/M) in Eb, as energy in CP isn't used for demodulation
           tx = [tx atx(end-Ncp+1:end) atx];
         end
         Nsam = length(tx);
@@ -130,17 +119,21 @@ function [ber papr] = run_sim(Nsym, EbNodB, channel='awgn', plot_en=0, filt_en=0
         % bunch of PAPR reduction options
         
         tx_ = tx;
+
+        % determine threshold based on CDF
+        if strcmp(method, "clip") || strcmp(method, "diversity") || strcmp(method, "compand")
+          cdf = empirical_cdf((1:Nc),abs(tx));
+          threshold_level = find(cdf >= threshold)(1);
+          % printf("threshold: %f threshold_level: %f\n", threshold, threshold_level);
+        end
+        
         if strcmp(method, "clip") || strcmp(method, "diversity")
-          ind = find(abs(tx) > threshold);
-          tx_(ind) = threshold*exp(j*angle(tx(ind)));
+          ind = find(abs(tx) > threshold_level);
+          tx_(ind) = threshold_level*exp(j*angle(tx(ind)));
         end
-        if strcmp(method, "compand1")
-          tx_mag = interp1([0 1 3 5 6 20], [0 1 4 5.5 6 7], abs(tx), "pchip");
-          tx_ = tx_mag.*exp(j*angle(tx));
-        end
-        if strcmp(method, "compand2")
+        if strcmp(method, "compand")
           # power law compander x = a*y^power, y = (x/a) ^ (1/power)
-          power=2; a=threshold/(threshold^power);
+          power=2; a=threshold_level/(threshold_level^power);
           tx_mag = (abs(tx)/a) .^ (1/power);
           tx_ = tx_mag.*exp(j*angle(tx));
         end
@@ -160,9 +153,12 @@ function [ber papr] = run_sim(Nsym, EbNodB, channel='awgn', plot_en=0, filt_en=0
           rx = spread1(1:Nsam).*rx + spread2(1:Nsam).*[zeros(1,path_delay) rx(1:end-path_delay)];
         end
         
-        % normalise power after any multipath and non-linear shennanigans, so that noise addition is correct
+        % normalise power after any multipath and non-linear shennanigans, so that Eb/No is set up
+        % correctly.  norm_pwr should be constant for all test conditions.
+        
         norm = sqrt(mean(abs(tx).^2)/mean(abs(rx).^2));
         rx *= norm;
+        norm_pwr = 10*log10(mean(abs(rx).^2));
         
         if phase_est
             % auxillary rx to get ideal phase ests on signal after multipath but before AWGN noise is added
@@ -219,7 +215,6 @@ function [ber papr] = run_sim(Nsym, EbNodB, channel='awgn', plot_en=0, filt_en=0
           plot(abs(tx(1:5*M))); hold on; plot(abs(tx_(1:5*M))); hold off;
           axis([0 5*M 0 max(abs(tx))]);
           figure(2); clf; [hh nn] = hist(abs(tx),25,1);
-          cdf = empirical_cdf((1:Nc),abs(tx));
           plotyy(nn,hh,1:Nc,cdf); title('PDF and CDF');
           % heat map type scatter plot
           figure(3); clf;
@@ -237,7 +232,8 @@ function [ber papr] = run_sim(Nsym, EbNodB, channel='awgn', plot_en=0, filt_en=0
         papr2 = 20*log10(max(abs(tx_))/mean(abs(tx_)));
         papr_log = [papr_log papr2];
         ber(e) = Terrs/Tbits;
-        printf("EbNodB: %4.1f %4.1f PAPR: %5.2f %5.2f Tbits: %6d Terrs: %6d BER: %5.3f\n", EbNodB(e), 10*log10(mean(abs(tx_).^2)), papr1, papr2, Tbits, Terrs, ber(e))
+        printf("EbNodB: %4.1f %3.1f %4.1f PAPR: %5.2f %5.2f Tbits: %6d Terrs: %6d BER: %5.3f\n",
+               EbNodB(e), norm, norm_pwr, papr1, papr2, Tbits, Terrs, ber(e))
     end
 
     papr = mean(papr_log);
@@ -247,21 +243,20 @@ end
 
 function curves(channel='awgn')
     Nsym=1000;
-    EbNodB=2:2:16;
+    EbNodB=2:2:8;
+
     [ber1 papr1] = run_sim(Nsym,EbNodB, channel, 0, filt_en=1);
-    [ber2 papr2] = run_sim(Nsym,EbNodB, channel, 0, filt_en=1, "clip", threshold=5);
-    [ber3 papr3] = run_sim(Nsym,EbNodB, channel, 0, filt_en=1, "clip", threshold=4);
-    [ber4 papr4] = run_sim(Nsym,EbNodB, channel, 0, filt_en=1, "compand1");
-    [ber5 papr5] = run_sim(Nsym,EbNodB, channel, 0, filt_en=1, "compand2", threshold=4);
-    [ber6 papr6] = run_sim(Nsym,EbNodB, channel, 0, filt_en=1, "diversity", threshold=3);
+    [ber2 papr2] = run_sim(Nsym,EbNodB, channel, 0, filt_en=1, "clip", threshold=0.8);
+    [ber3 papr3] = run_sim(Nsym,EbNodB, channel, 0, filt_en=1, "clip", threshold=0.6);
+    [ber4 papr4] = run_sim(Nsym,EbNodB, channel, 0, filt_en=1, "compand", threshold=0.6);
+    [ber5 papr5] = run_sim(Nsym,EbNodB, channel, 0, filt_en=1, "diversity", threshold=0.6);
 
     figure(7); clf;
     semilogy(EbNodB, ber1,sprintf('b+-;vanilla OFDM %3.1f;',papr1),'markersize', 10, 'linewidth', 2); hold on;
-    semilogy(EbNodB, ber2,sprintf('r+-;clip6 %3.1f;',papr2),'markersize', 10, 'linewidth', 2); 
-    semilogy(EbNodB, ber3,sprintf('g+-;clip5 %3.1f;',papr3),'markersize', 10, 'linewidth', 2);
-    semilogy(EbNodB, ber4,sprintf('c+-;compand1 %3.1f;',papr4),'markersize', 10, 'linewidth', 2);
-    semilogy(EbNodB, ber5,sprintf('m+-;compand2 %3.1f;',papr5),'markersize', 10, 'linewidth', 2);
-    semilogy(EbNodB, ber6,sprintf('bk+-;diversity %3.1f;',papr6),'markersize', 10, 'linewidth', 2);
+    semilogy(EbNodB, ber2,sprintf('r+-;clip 0.8 %3.1f;',papr2),'markersize', 10, 'linewidth', 2); 
+    semilogy(EbNodB, ber3,sprintf('g+-;clip 0.6 %3.1f;',papr3),'markersize', 10, 'linewidth', 2);
+    semilogy(EbNodB, ber4,sprintf('c+-;compand 0.6 %3.1f;',papr4),'markersize', 10, 'linewidth', 2);
+    semilogy(EbNodB, ber5,sprintf('bk+-;diversity 0.6 %3.1f;',papr5),'markersize', 10, 'linewidth', 2);
     hold off;
     axis([min(EbNodB) max(EbNodB) 1E-3 1E-1]); grid;
     xlabel('Eb/No'); title(channel)
@@ -270,14 +265,13 @@ function curves(channel='awgn')
 
     figure(8); clf;
     semilogy(EbNodB+papr1, ber1,sprintf('b+-;vanilla OFDM %3.1f;',papr1),'markersize', 10, 'linewidth', 2); hold on;
-    semilogy(EbNodB+papr2, ber2,sprintf('r+-;clip6 %3.1f;',papr2),'markersize', 10, 'linewidth', 2); 
-    semilogy(EbNodB+papr3, ber3,sprintf('g+-;clip5 %3.1f;',papr3),'markersize', 10, 'linewidth', 2);
-    semilogy(EbNodB+papr4, ber4,sprintf('c+-;compand1 %3.1f;',papr4),'markersize', 10, 'linewidth', 2);
-    semilogy(EbNodB+papr5, ber5,sprintf('m+-;compand2 %3.1f;',papr5),'markersize', 10, 'linewidth', 2);
-    semilogy(EbNodB+papr6, ber6,sprintf('bk+-;diversity %3.1f;',papr6),'markersize', 10, 'linewidth', 2);
+    semilogy(EbNodB+papr2, ber2,sprintf('r+-;clip 0.8 %3.1f;',papr2),'markersize', 10, 'linewidth', 2); 
+    semilogy(EbNodB+papr3, ber3,sprintf('g+-;clip 0.6 %3.1f;',papr3),'markersize', 10, 'linewidth', 2);
+    semilogy(EbNodB+papr4, ber4,sprintf('c+-;compand 0.6 %3.1f;',papr4),'markersize', 10, 'linewidth', 2);
+    semilogy(EbNodB+papr5, ber5,sprintf('bk+-;diversity 0.6 %3.1f;',papr5),'markersize', 10, 'linewidth', 2);
     hold off;
     xlabel('Peak Eb/No');
-    axis([6 20 1E-3 1E-1]); grid; title(channel)
+    axis([min(EbNodB)+papr2 max(EbNodB)+papr1 1E-3 1E-1]); grid; title(channel)
     fn = sprintf("papr_%s_BER_peakEbNo.png", channel);
     print(fn,"-dpng");
 end
@@ -290,4 +284,4 @@ more off;
 
 %run_sim(1000, EbNo=100, channel='multipath', plot_en=1, filt_en=1, "clip", threshold=5);
 %run_sim(1000, EbNo=10, channel='multipath', plot_en=1, filt_en=0, "diversity", threshold=5);
-curves('multipath');
+curves('awgn');
