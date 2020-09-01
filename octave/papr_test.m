@@ -7,7 +7,7 @@
 #{
 
   TODO:
-    [ ] set threshold at CDF %, make indep of Nc
+    [X] set threshold at CDF %, make indep of Nc
     [ ] peak BER versus average
         + could we be wiping out some frames with too much compression?
         + calculate localised BER
@@ -59,6 +59,9 @@ endfunction
 % "Genie" OFDM modem simulation that assumes ideal sync
 
 function [ber papr] = run_sim(Nsym, EbNodB, channel='awgn', plot_en=0, filt_en=0, method="", threshold=6)
+    rand('seed',1);
+    randn('seed',1);
+    
     Nc   = 8;
     M    = 160;    % number of samples in each symbol
     bps  = 2;      % two bits per symbol for QPSK
@@ -215,7 +218,7 @@ function [ber papr] = run_sim(Nsym, EbNodB, channel='awgn', plot_en=0, filt_en=0
           plot(abs(tx(1:5*M))); hold on; plot(abs(tx_(1:5*M))); hold off;
           axis([0 5*M 0 max(abs(tx))]);
           figure(2); clf; [hh nn] = hist(abs(tx),25,1);
-          plotyy(nn,hh,1:Nc,cdf); title('PDF and CDF');
+          plotyy(nn,hh,1:Nc,cdf); title('PDF and CDF'); grid;
           % heat map type scatter plot
           figure(3); clf;
           rx_sym = reshape(rx_sym(:,1:Nc), Nsym*Nc, 1);
@@ -241,15 +244,14 @@ end
 
 % BER versus Eb/No curves -------------------------------------
 
-function curves(channel='awgn')
-    Nsym=1000;
-    EbNodB=2:2:8;
+% first pass at trying out a few different schemes
+function curves_experiment1(channel='awgn', Nsym=1000, EbNodB=2:8)
 
-    [ber1 papr1] = run_sim(Nsym,EbNodB, channel, 0, filt_en=1);
-    [ber2 papr2] = run_sim(Nsym,EbNodB, channel, 0, filt_en=1, "clip", threshold=0.8);
-    [ber3 papr3] = run_sim(Nsym,EbNodB, channel, 0, filt_en=1, "clip", threshold=0.6);
-    [ber4 papr4] = run_sim(Nsym,EbNodB, channel, 0, filt_en=1, "compand", threshold=0.6);
-    [ber5 papr5] = run_sim(Nsym,EbNodB, channel, 0, filt_en=1, "diversity", threshold=0.6);
+    [ber1 papr1] = run_sim(Nsym, EbNodB, channel, 0, filt_en=1);
+    [ber2 papr2] = run_sim(Nsym, EbNodB, channel, 0, filt_en=1, "clip", threshold=0.8);
+    [ber3 papr3] = run_sim(Nsym, EbNodB, channel, 0, filt_en=1, "clip", threshold=0.6);
+    [ber4 papr4] = run_sim(Nsym, EbNodB, channel, 0, filt_en=1, "compand", threshold=0.6);
+    [ber5 papr5] = run_sim(Nsym, EbNodB, channel, 0, filt_en=1, "diversity", threshold=0.6);
 
     figure(7); clf;
     semilogy(EbNodB, ber1,sprintf('b+-;vanilla OFDM %3.1f;',papr1),'markersize', 10, 'linewidth', 2); hold on;
@@ -259,8 +261,8 @@ function curves(channel='awgn')
     semilogy(EbNodB, ber5,sprintf('bk+-;diversity 0.6 %3.1f;',papr5),'markersize', 10, 'linewidth', 2);
     hold off;
     axis([min(EbNodB) max(EbNodB) 1E-3 1E-1]); grid;
-    xlabel('Eb/No'); title(channel)
-    fn = sprintf("papr_%s_BER_EbNo.png", channel);
+    xlabel('Eb/No'); title(sprintf("%s Nc = %d", channel, Nc))
+    fn = sprintf("papr_exp1_%s_BER_EbNo.png", channel);
     print(fn,"-dpng");
 
     figure(8); clf;
@@ -271,8 +273,43 @@ function curves(channel='awgn')
     semilogy(EbNodB+papr5, ber5,sprintf('bk+-;diversity 0.6 %3.1f;',papr5),'markersize', 10, 'linewidth', 2);
     hold off;
     xlabel('Peak Eb/No');
-    axis([min(EbNodB)+papr2 max(EbNodB)+papr1 1E-3 1E-1]); grid; title(channel)
-    fn = sprintf("papr_%s_BER_peakEbNo.png", channel);
+    axis([min(EbNodB)+papr2 max(EbNodB)+papr1 1E-3 1E-1]); grid; title(sprintf("%s Nc = %d", channel, Nc))
+    fn = sprintf("papr_exp1_%s_BER_peakEbNo.png", channel);
+    print(fn,"-dpng");
+end
+
+
+% vary threshold and plot BER v Eb/No curves
+function curves_experiment2(channel='awgn', Nsym=1000, EbNodB=2:8)
+
+    [ber1 papr1] = run_sim(Nsym, EbNodB, channel, 0, filt_en=1);
+    [ber2 papr2] = run_sim(Nsym, EbNodB, channel, 0, filt_en=1, "clip", threshold=0.8);
+    [ber3 papr3] = run_sim(Nsym, EbNodB, channel, 0, filt_en=1, "clip", threshold=0.6);
+    [ber4 papr4] = run_sim(Nsym, EbNodB, channel, 0, filt_en=1, "clip", threshold=0.4);
+    [ber5 papr5] = run_sim(Nsym, EbNodB, channel, 0, filt_en=1, "clip", threshold=0.2);
+
+    figure(7); clf;
+    semilogy(EbNodB, ber1,sprintf('b+-;vanilla OFDM %3.1f;',papr1),'markersize', 10, 'linewidth', 2); hold on;
+    semilogy(EbNodB, ber2,sprintf('r+-;clip 0.8 %3.1f;',papr2),'markersize', 10, 'linewidth', 2); 
+    semilogy(EbNodB, ber3,sprintf('g+-;clip 0.6 %3.1f;',papr3),'markersize', 10, 'linewidth', 2);
+    semilogy(EbNodB, ber4,sprintf('c+-;clip 0.4 %3.1f;',papr4),'markersize', 10, 'linewidth', 2);
+    semilogy(EbNodB, ber5,sprintf('bk+-;clip 0.2 %3.1f;',papr5),'markersize', 10, 'linewidth', 2);
+    hold off;
+    axis([min(EbNodB) max(EbNodB) 1E-3 1E-1]); grid;
+    xlabel('Eb/No'); title(sprintf("%s Nc = %d", channel, Nc))
+    fn = sprintf("papr_exp2_%s_BER_EbNo.png", channel);
+    print(fn,"-dpng");
+
+    figure(8); clf;
+    semilogy(EbNodB+papr1, ber1,sprintf('b+-;vanilla OFDM %3.1f;',papr1),'markersize', 10, 'linewidth', 2); hold on;
+    semilogy(EbNodB+papr2, ber2,sprintf('r+-;clip 0.8 %3.1f;',papr2),'markersize', 10, 'linewidth', 2); 
+    semilogy(EbNodB+papr3, ber3,sprintf('g+-;clip 0.6 %3.1f;',papr3),'markersize', 10, 'linewidth', 2);
+    semilogy(EbNodB+papr4, ber4,sprintf('c+-;clip 0.4 %3.1f;',papr4),'markersize', 10, 'linewidth', 2);
+    semilogy(EbNodB+papr5, ber5,sprintf('bk+-;clip 0.2 %3.1f;',papr5),'markersize', 10, 'linewidth', 2);
+    hold off;
+    xlabel('Peak Eb/No');
+    axis([min(EbNodB)+papr2 max(EbNodB)+papr1 1E-3 1E-1]); grid; title(sprintf("%s Nc = %d", channel, Nc))
+    fn = sprintf("papr_exp2_%s_BER_peakEbNo.png", channel);
     print(fn,"-dpng");
 end
 
@@ -284,4 +321,5 @@ more off;
 
 %run_sim(1000, EbNo=100, channel='multipath', plot_en=1, filt_en=1, "clip", threshold=5);
 %run_sim(1000, EbNo=10, channel='multipath', plot_en=1, filt_en=0, "diversity", threshold=5);
-curves('awgn');
+%curves_experiment2('awgn', Nsym=1000);
+curves_experiment2('multipath', Nsym=3000, EbNodB=2:2:16);
