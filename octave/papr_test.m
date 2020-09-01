@@ -8,19 +8,20 @@
 
   TODO:
     [X] set threshold at CDF %, make indep of Nc
-    [ ] peak BER versus average
+    [X] peak BER versus average
         + could we be wiping out some frames with too much compression?
         + calculate localised BER
         + what is the average BER/frame?
-    [ ] PAPR versus carriers for random data
-    [ ] example single run
-    [ ] AWGN run with all schemes
-    [ ] multipath run with all schemes
-    [ ] reduce to clip with threshold, plot AWGN and multipath with various compression rates
+    [X] PAPR versus carriers for random data
+    [X] example single run
+        + show multipath type cross
+    [X] AWGN run with all schemes
+    [X] multipath run with all schemes
+    [X] reduce to clip with threshold, plot AWGN and multipath with various compression rates
     [ ] results/discussion
         + PAPR helps SNR, but multipath is a much tougher problem
-        + non-linear technqiues spread the energy in freq
-        + we can trade of PAPR with bandwidth, lower PAPR, more bandwidth
+        + non-linear techniques spread the energy in freq
+        + we can trade off PAPR with bandwidth, lower PAPR, more bandwidth
         + filtering brings the PAPR up again
         + non-linear technqiques will mess with QAM more (I think - simulate?)
         + so we may hit a wall at high data rates
@@ -58,11 +59,10 @@ endfunction
 
 % "Genie" OFDM modem simulation that assumes ideal sync
 
-function [ber papr] = run_sim(Nsym, EbNodB, channel='awgn', plot_en=0, filt_en=0, method="", threshold=6)
+function [ber papr] = run_sim(Nc, Nsym, EbNodB, channel='awgn', plot_en=0, filt_en=0, method="", threshold=1)
     rand('seed',1);
     randn('seed',1);
     
-    Nc   = 8;
     M    = 160;    % number of samples in each symbol
     bps  = 2;      % two bits per symbol for QPSK
     Ncp  = 16;     % cyclic prefix samples
@@ -72,6 +72,8 @@ function [ber papr] = run_sim(Nsym, EbNodB, channel='awgn', plot_en=0, filt_en=0
     timing = Ncp;
 
     if strcmp(method,"diversity")
+      % total power of tx symbol after combination the same.  Scatter plot positions
+      % different but also twice as much noise (bandwidth)
       Nd = 2; gain = 1/sqrt(2);
     else
       Nd = 1; gain = 1.0;
@@ -124,9 +126,14 @@ function [ber papr] = run_sim(Nsym, EbNodB, channel='awgn', plot_en=0, filt_en=0
         tx_ = tx;
 
         % determine threshold based on CDF
+        cdf = empirical_cdf((1:Nc),abs(tx));
         if strcmp(method, "clip") || strcmp(method, "diversity") || strcmp(method, "compand")
-          cdf = empirical_cdf((1:Nc),abs(tx));
-          threshold_level = find(cdf >= threshold)(1);
+          if threshold < 1
+            threshold_level = find(cdf >= threshold)(1);
+          else
+            threshold_level = 10*Nc;
+          end
+          
           % printf("threshold: %f threshold_level: %f\n", threshold, threshold_level);
         end
         
@@ -156,10 +163,11 @@ function [ber papr] = run_sim(Nsym, EbNodB, channel='awgn', plot_en=0, filt_en=0
           rx = spread1(1:Nsam).*rx + spread2(1:Nsam).*[zeros(1,path_delay) rx(1:end-path_delay)];
         end
         
-        % normalise power after any multipath and non-linear shennanigans, so that Eb/No is set up
-        % correctly.  norm_pwr should be constant for all test conditions.
+        % normalise power after multipath, so that Eb/No is set up
+        % correctly.  norm_pwr should be constant for all test
+        % conditions.
         
-        norm = sqrt(mean(abs(tx).^2)/mean(abs(rx).^2));
+        norm = sqrt(mean(abs(tx_).^2)/mean(abs(rx).^2));
         rx *= norm;
         norm_pwr = 10*log10(mean(abs(rx).^2));
         
@@ -185,7 +193,6 @@ function [ber papr] = run_sim(Nsym, EbNodB, channel='awgn', plot_en=0, filt_en=0
         rx += noise;
 
         % demodulate
-
         rx_sym = zeros(Nsym,Nc);
         for s=1:Nsym
           st = (s-1)*(M+Ncp)+1+timing; en = st+M-1;
@@ -203,14 +210,17 @@ function [ber papr] = run_sim(Nsym, EbNodB, channel='awgn', plot_en=0, filt_en=0
         
         % count bit errors
 
-        Tbits = Terrs = 0;
+        Tbits = Terrs = 0; ErrPerSym = zeros(1,Nsym);
         for s=1:Nsym
+          Nerrs = 0;
           for c=1:Nc
             tx_bits = qpsk_demod(tx_sym(s,c));
             rx_bits = qpsk_demod(rx_sym(s,c));
             Tbits += bps;
-            Terrs += sum(xor(tx_bits,rx_bits));
+            Nerrs += sum(xor(tx_bits,rx_bits));
           end
+          ErrPerSym(s) = Nerrs;
+          Terrs += Nerrs;
         end
 
         if plot_en
@@ -219,16 +229,11 @@ function [ber papr] = run_sim(Nsym, EbNodB, channel='awgn', plot_en=0, filt_en=0
           axis([0 5*M 0 max(abs(tx))]);
           figure(2); clf; [hh nn] = hist(abs(tx),25,1);
           plotyy(nn,hh,1:Nc,cdf); title('PDF and CDF'); grid;
-          % heat map type scatter plot
-          figure(3); clf;
-          rx_sym = reshape(rx_sym(:,1:Nc), Nsym*Nc, 1);
-          h_data = [real(rx_sym)'; imag(rx_sym)']';
-          h = log10(hist3(h_data,[50 50])+1);
-          colormap("default"); imagesc(h);
-          figure(4); clf; plot(real(rx_sym), imag(rx_sym), '+'); axis([-2 2 -2 2]);
-          figure(5); clf; Tx_ = 10*log10(abs(fft(tx_))); plot(fftshift(Tx_));
+          figure(3); clf; plot(real(rx_sym(:,1:Nc)), imag(rx_sym(:,1:Nc)), '+'); axis([-2 2 -2 2]);
+          figure(4); clf; Tx_ = 10*log10(abs(fft(tx_))); plot(fftshift(Tx_));
           mx = 10*ceil(max(Tx_)/10); axis([1 length(Tx_) mx-60 mx]);
-          figure(6); plot_specgram(real(rx.*exp(j*2*pi*(0:Nsam-1)/4)));
+          figure(5); plot_specgram(real(rx.*exp(j*2*pi*(0:Nsam-1)/4)));
+          figure(6); clf; stem(ErrPerSym);          
         end
 
         papr1 = 20*log10(max(abs(tx))/mean(abs(tx)));
@@ -245,13 +250,13 @@ end
 % BER versus Eb/No curves -------------------------------------
 
 % first pass at trying out a few different schemes
-function curves_experiment1(channel='awgn', Nsym=1000, EbNodB=2:8)
+function curves_experiment1(Nc=8, channel='awgn', Nsym=1000, EbNodB=2:8)
 
-    [ber1 papr1] = run_sim(Nsym, EbNodB, channel, 0, filt_en=1);
-    [ber2 papr2] = run_sim(Nsym, EbNodB, channel, 0, filt_en=1, "clip", threshold=0.8);
-    [ber3 papr3] = run_sim(Nsym, EbNodB, channel, 0, filt_en=1, "clip", threshold=0.6);
-    [ber4 papr4] = run_sim(Nsym, EbNodB, channel, 0, filt_en=1, "compand", threshold=0.6);
-    [ber5 papr5] = run_sim(Nsym, EbNodB, channel, 0, filt_en=1, "diversity", threshold=0.6);
+    [ber1 papr1] = run_sim(Nc, Nsym, EbNodB, channel, 0, filt_en=1);
+    [ber2 papr2] = run_sim(Nc, Nsym, EbNodB, channel, 0, filt_en=1, "clip", threshold=0.8);
+    [ber3 papr3] = run_sim(Nc, Nsym, EbNodB, channel, 0, filt_en=1, "clip", threshold=0.6);
+    [ber4 papr4] = run_sim(Nc, Nsym, EbNodB, channel, 0, filt_en=1, "compand", threshold=0.6);
+    [ber5 papr5] = run_sim(Nc, Nsym, EbNodB, channel, 0, filt_en=1, "diversity", threshold=0.6);
 
     figure(7); clf;
     semilogy(EbNodB, ber1,sprintf('b+-;vanilla OFDM %3.1f;',papr1),'markersize', 10, 'linewidth', 2); hold on;
@@ -280,13 +285,14 @@ end
 
 
 % vary threshold and plot BER v Eb/No curves
-function curves_experiment2(channel='awgn', Nsym=1000, EbNodB=2:8)
+function curves_experiment2(Nc=8, channel='awgn', Nsym=1000, EbNodB=2:16)
 
-    [ber1 papr1] = run_sim(Nsym, EbNodB, channel, 0, filt_en=1);
-    [ber2 papr2] = run_sim(Nsym, EbNodB, channel, 0, filt_en=1, "clip", threshold=0.8);
-    [ber3 papr3] = run_sim(Nsym, EbNodB, channel, 0, filt_en=1, "clip", threshold=0.6);
-    [ber4 papr4] = run_sim(Nsym, EbNodB, channel, 0, filt_en=1, "clip", threshold=0.4);
-    [ber5 papr5] = run_sim(Nsym, EbNodB, channel, 0, filt_en=1, "clip", threshold=0.2);
+    [ber1 papr1] = run_sim(Nc, Nsym, EbNodB, channel, 0, filt_en=1);
+    [ber2 papr2] = run_sim(Nc, Nsym, EbNodB, channel, 0, filt_en=1, "clip", threshold=0.8);
+    [ber3 papr3] = run_sim(Nc, Nsym, EbNodB, channel, 0, filt_en=1, "clip", threshold=0.6);
+    [ber4 papr4] = run_sim(Nc, Nsym, EbNodB, channel, 0, filt_en=1, "clip", threshold=0.4);
+    [ber5 papr5] = run_sim(Nc, Nsym, EbNodB, channel, 0, filt_en=1, "clip", threshold=0.2);
+    [ber6 papr6] = run_sim(Nc, Nsym, EbNodB, channel, 0, filt_en=1, "diversity", threshold=0.8);
 
     figure(7); clf;
     semilogy(EbNodB, ber1,sprintf('b+-;vanilla OFDM %3.1f;',papr1),'markersize', 10, 'linewidth', 2); hold on;
@@ -294,6 +300,7 @@ function curves_experiment2(channel='awgn', Nsym=1000, EbNodB=2:8)
     semilogy(EbNodB, ber3,sprintf('g+-;clip 0.6 %3.1f;',papr3),'markersize', 10, 'linewidth', 2);
     semilogy(EbNodB, ber4,sprintf('c+-;clip 0.4 %3.1f;',papr4),'markersize', 10, 'linewidth', 2);
     semilogy(EbNodB, ber5,sprintf('bk+-;clip 0.2 %3.1f;',papr5),'markersize', 10, 'linewidth', 2);
+    semilogy(EbNodB, ber6,sprintf('m+-;diversity 0.8 %3.1f;', papr6),'markersize', 10, 'linewidth', 2);
     hold off;
     axis([min(EbNodB) max(EbNodB) 1E-3 1E-1]); grid;
     xlabel('Eb/No'); title(sprintf("%s Nc = %d", channel, Nc))
@@ -306,6 +313,7 @@ function curves_experiment2(channel='awgn', Nsym=1000, EbNodB=2:8)
     semilogy(EbNodB+papr3, ber3,sprintf('g+-;clip 0.6 %3.1f;',papr3),'markersize', 10, 'linewidth', 2);
     semilogy(EbNodB+papr4, ber4,sprintf('c+-;clip 0.4 %3.1f;',papr4),'markersize', 10, 'linewidth', 2);
     semilogy(EbNodB+papr5, ber5,sprintf('bk+-;clip 0.2 %3.1f;',papr5),'markersize', 10, 'linewidth', 2);
+    semilogy(EbNodB+papr6, ber6,sprintf('m+-;diversity 0.8 %3.1f;', papr6),'markersize', 10, 'linewidth', 2);
     hold off;
     xlabel('Peak Eb/No');
     axis([min(EbNodB)+papr2 max(EbNodB)+papr1 1E-3 1E-1]); grid; title(sprintf("%s Nc = %d", channel, Nc))
@@ -313,13 +321,28 @@ function curves_experiment2(channel='awgn', Nsym=1000, EbNodB=2:8)
     print(fn,"-dpng");
 end
 
+% PAPR against number of carriers Nc
+function curves_experiment3(Nsym=1000)
+
+    paper = zeros(1,32);
+    Nc = 2:2:32;
+    for i = 1:length(Nc)
+      aNc = Nc(i);
+      [aber apapr] = run_sim(aNc, Nsym, 100);
+      papr(aNc) = apapr;
+    end  
+
+    figure(9); clf;
+    plot(Nc, papr(Nc)); xlabel('Number of Carriers Nc'); ylabel('PAPR (dB)'); grid;
+end
 
 pkg load statistics;
 more off;
 
 % single point with lots of plots -----------
 
-%run_sim(1000, EbNo=100, channel='multipath', plot_en=1, filt_en=1, "clip", threshold=5);
-%run_sim(1000, EbNo=10, channel='multipath', plot_en=1, filt_en=0, "diversity", threshold=5);
-%curves_experiment2('awgn', Nsym=1000);
-curves_experiment2('multipath', Nsym=3000, EbNodB=2:2:16);
+%run_sim(8, 8, EbNo=100, channel='awgn', plot_en=1, filt_en=1, "diversity", threshold=0.8);
+%run_sim(8, 1000, EbNo=10, channel='multipath', plot_en=1, filt_en=0, "diversity", threshold=5);
+curves_experiment2(Nc=8, 'awgn', Nsym=1000);
+%curves_experiment2(Nc=8,'multipath', Nsym=3000, EbNodB=2:2:16);
+%curves_experiment3()
