@@ -101,7 +101,7 @@ function [ber papr] = run_sim(Nc, Nsym, EbNodB, channel='awgn', plot_en=0, filt_
         % carrier frequencies, centre about 0
         st = floor(Nc*Nd/2);
         w = 2*pi/M*(-st:-st+Nc*Nd-1);
-         
+        
         % generate OFDM signal
 
         tx = [];
@@ -115,14 +115,13 @@ function [ber papr] = run_sim(Nc, Nsym, EbNodB, channel='awgn', plot_en=0, filt_
           tx = [tx atx(end-Ncp+1:end) atx];
         end
         Nsam = length(tx);
-
+        
         if strcmp(channel,'multipath')
           assert(length(spread1) >= Nsam);
           assert(length(spread2) >= Nsam);
         end
         
         % bunch of PAPR reduction options
-        
         tx_ = tx;
 
         % determine threshold based on CDF
@@ -159,6 +158,18 @@ function [ber papr] = run_sim(Nc, Nsym, EbNodB, channel='awgn', plot_en=0, filt_
         
         % multipath channel
 
+        if phase_est
+            % estimate phase of each symbol before multipath simulation
+
+            rx_phase1 = zeros(Nsym,Nc);
+            for s=1:Nsym
+              st = (s-1)*(M+Ncp)+1+timing; en = st+M-1;
+              for c=1:Nc*Nd
+                rx_phase1(s,c) = sum(exp(-j*(0:M-1)*w(c)) .* rx(st:en))/M;
+              end
+            end
+        end
+        
         if strcmp(channel,'multipath')
           rx = spread1(1:Nsam).*rx + spread2(1:Nsam).*[zeros(1,path_delay) rx(1:end-path_delay)];
         end
@@ -179,7 +190,7 @@ function [ber papr] = run_sim(Nc, Nsym, EbNodB, channel='awgn', plot_en=0, filt_
               st = (s-1)*(M+Ncp)+1+timing; en = st+M-1;
               for c=1:Nc*Nd
                 arx_sym = sum(exp(-j*(0:M-1)*w(c)) .* rx(st:en))/M;
-                rx_phase(s,c) = arx_sym * conj(tx_sym(s,c));
+                rx_phase(s,c) = arx_sym * conj(rx_phase1(s,c));
               end
             end
             rx_phase = exp(j*arg(rx_phase));
@@ -304,7 +315,7 @@ function curves_experiment2(Nc=8, channel='awgn', Nsym=1000, EbNodB=2:16)
     hold off;
     axis([min(EbNodB) max(EbNodB) 1E-3 1E-1]); grid;
     xlabel('Eb/No'); title(sprintf("%s Nc = %d", channel, Nc))
-    fn = sprintf("papr_exp2_%s_BER_EbNo.png", channel);
+    fn = sprintf("papr_exp2_Nc%d_%s_BER_EbNo.png", Nc, channel);
     print(fn,"-dpng");
 
     figure(8); clf;
@@ -317,7 +328,7 @@ function curves_experiment2(Nc=8, channel='awgn', Nsym=1000, EbNodB=2:16)
     hold off;
     xlabel('Peak Eb/No');
     axis([min(EbNodB)+papr2 max(EbNodB)+papr1 1E-3 1E-1]); grid; title(sprintf("%s Nc = %d", channel, Nc))
-    fn = sprintf("papr_exp2_%s_BER_peakEbNo.png", channel);
+    fn = sprintf("papr_exp2_Nc%d_%s_BER_peakEbNo.png", Nc, channel);
     print(fn,"-dpng");
 end
 
@@ -334,6 +345,39 @@ function curves_experiment3(Nsym=1000)
 
     figure(9); clf;
     plot(Nc, papr(Nc)); xlabel('Number of Carriers Nc'); ylabel('PAPR (dB)'); grid;
+    fn = sprintf("papr_exp3_Nc.png");
+    print(fn,"-dpng");
+end
+
+% vary threshold and plot BER v Eb/No curves
+function curves_experiment4(Nc=8, channel='multipath', Nsym=3000, EbNodB=2:2:16)
+
+    [ber1 papr1] = run_sim(Nc, Nsym, EbNodB, channel, 0, filt_en=1);
+    [ber2 papr2] = run_sim(Nc, Nsym, EbNodB, channel, 0, filt_en=1, "diversity", threshold=1);
+    [ber3 papr3] = run_sim(Nc, Nsym, EbNodB, channel, 0, filt_en=1, "diversity", threshold=0.8);
+    [ber4 papr4] = run_sim(Nc, Nsym, EbNodB, channel, 0, filt_en=1, "diversity", threshold=0.6);
+
+    figure(7); clf;
+    semilogy(EbNodB, ber1,sprintf('b+-;vanilla OFDM %3.1f;',papr1),'markersize', 10, 'linewidth', 2); hold on;
+    semilogy(EbNodB, ber2,sprintf('r+-;diversity 1.0 %3.1f;',papr2),'markersize', 10, 'linewidth', 2); 
+    semilogy(EbNodB, ber3,sprintf('g+-;diversity 0.8 %3.1f;',papr3),'markersize', 10, 'linewidth', 2);
+    semilogy(EbNodB, ber4,sprintf('c+-;diversity 0.6 %3.1f;',papr4),'markersize', 10, 'linewidth', 2);
+    hold off;
+    axis([min(EbNodB) max(EbNodB) 1E-3 1E-1]); grid;
+    xlabel('Eb/No'); title(sprintf("%s Nc = %d", channel, Nc))
+    fn = sprintf("papr_exp4_Nc%d_%s_BER_EbNo.png", Nc, channel);
+    print(fn,"-dpng");
+
+    figure(8); clf;
+    semilogy(EbNodB+papr1, ber1,sprintf('b+-;vanilla OFDM %3.1f;',papr1),'markersize', 10, 'linewidth', 2); hold on;
+    semilogy(EbNodB+papr2, ber2,sprintf('r+-;diversity 1.0 %3.1f;',papr2),'markersize', 10, 'linewidth', 2); 
+    semilogy(EbNodB+papr3, ber3,sprintf('g+-;diversity 0.8 %3.1f;',papr3),'markersize', 10, 'linewidth', 2);
+    semilogy(EbNodB+papr4, ber4,sprintf('c+-;diversity 0.6 %3.1f;',papr4),'markersize', 10, 'linewidth', 2);
+    hold off;
+    xlabel('Peak Eb/No');
+    axis([min(EbNodB)+papr4 max(EbNodB)+papr1 1E-3 1E-1]); grid; title(sprintf("%s Nc = %d", channel, Nc))
+    fn = sprintf("papr_exp4_Nc%d_%s_BER_peakEbNo.png", Nc, channel);
+    print(fn,"-dpng");
 end
 
 pkg load statistics;
@@ -341,8 +385,10 @@ more off;
 
 % single point with lots of plots -----------
 
+%run_sim(8, 1000, EbNo=100, channel='multipath', plot_en=1, filt_en=0, "clip", thresh=1)
 %run_sim(8, 8, EbNo=100, channel='awgn', plot_en=1, filt_en=1, "diversity", threshold=0.8);
 %run_sim(8, 1000, EbNo=10, channel='multipath', plot_en=1, filt_en=0, "diversity", threshold=5);
-curves_experiment2(Nc=8, 'awgn', Nsym=1000);
-%curves_experiment2(Nc=8,'multipath', Nsym=3000, EbNodB=2:2:16);
+%curves_experiment2(Nc=16, 'awgn', Nsym=1000);
+%curves_experiment2(Nc=16,'multipath', Nsym=3000, EbNodB=2:2:16);
 %curves_experiment3()
+curves_experiment4()
