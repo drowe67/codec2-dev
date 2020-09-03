@@ -119,8 +119,8 @@ function [ber papr] = run_sim(Nc, Nsym, EbNodB, channel='awgn', plot_en=0, filt_
         end
         
         if filt_en
-          Nfilt=40;
-          b = fir1(Nfilt,1.5*Nc*Nd/M);
+          Nfilt=80;
+          b = fir1(Nfilt,2*Nc*Nd/M);
           tx_ = filter(b,1,[tx_ zeros(1,Nfilt/2)]);
           tx_ = [tx_(Nfilt/2+1:end)];
         end
@@ -309,7 +309,7 @@ function curves_experiment2(Nc=8, channel='awgn', Nsym=1000, EbNodB=2:16)
 end
 
 % PAPR against number of carriers Nc
-function curves_experiment3(Nsym=1000)
+function curves_experiment3(Nsym=3000)
 
     paper = zeros(1,32);
     Nc = 2:2:32;
@@ -364,7 +364,6 @@ function curves_experiment5(Nc=8, channel='awgn', Nsym=1000, EbNodB=2:10)
     [ber3 papr3] = run_sim(Nc, Nsym, EbNodB, channel, 0, filt_en=1, "clip", threshold=0.6, norm=1);
     [ber4 papr4] = run_sim(Nc, Nsym, EbNodB, channel, 0, filt_en=1, "clip", threshold=0.4, norm=1);
     [ber5 papr5] = run_sim(Nc, Nsym, EbNodB, channel, 0, filt_en=1, "clip", threshold=0.2, norm=1);
-    [ber6 papr6] = run_sim(Nc, Nsym, EbNodB, channel, 0, filt_en=1, "diversity", threshold=0.8, norm=1);
 
     figure(7); clf;
     semilogy(EbNodB, ber1,sprintf('b+-;vanilla OFDM %3.1f;',papr1),'markersize', 10, 'linewidth', 2); hold on;
@@ -372,7 +371,6 @@ function curves_experiment5(Nc=8, channel='awgn', Nsym=1000, EbNodB=2:10)
     semilogy(EbNodB, ber3,sprintf('g+-;clip 0.6 %3.1f;',papr3),'markersize', 10, 'linewidth', 2);
     semilogy(EbNodB, ber4,sprintf('c+-;clip 0.4 %3.1f;',papr4),'markersize', 10, 'linewidth', 2);
     semilogy(EbNodB, ber5,sprintf('bk+-;clip 0.2 %3.1f;',papr5),'markersize', 10, 'linewidth', 2);
-    semilogy(EbNodB, ber6,sprintf('m+-;diversity 0.8 %3.1f;', papr6),'markersize', 10, 'linewidth', 2);
     hold off;
     axis([min(EbNodB) max(EbNodB) 1E-3 1E-1]); grid;
     xlabel('Eb/No'); title(sprintf("%s Nc = %d", channel, Nc))
@@ -385,11 +383,11 @@ more off;
 
 % single point with lots of plots -----------
 
-%run_sim(8, 1000, EbNo=100, channel='awgn', plot_en=1, filt_en=0);
+%run_sim(8, 1000, EbNo=100, channel='awgn', plot_en=1, filt_en=1);
 %run_sim(8, 8, EbNo=100, channel='awgn', plot_en=1, filt_en=1, "diversity", threshold=0.8);
 %run_sim(8, 1000, EbNo=10, channel='multipath', plot_en=1, filt_en=0, "diversity", threshold=5);
-%curves_experiment2(Nc=16, 'awgn', Nsym=1000);
-%curves_experiment2(Nc=16,'multipath', Nsym=3000, EbNodB=2:2:16);
-%curves_experiment3()
+curves_experiment2(Nc=16, 'awgn', Nsym=1000);
+curves_experiment2(Nc=16,'multipath', Nsym=3000, EbNodB=2:2:16);
+curves_experiment3()
 %curves_experiment4()
-curves_experiment5()
+%curves_experiment5()
