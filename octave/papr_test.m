@@ -28,6 +28,18 @@ function two_bits = qpsk_demod(symbol)
     two_bits = [bit1 bit0];
 endfunction
 
+function papr = calc_papr(tx)
+  papr = 10*log10(max(abs(tx).^2)/mean(abs(tx).^2));
+end
+
+% test PAPR calculation with a two tone signal of known PAPR (3dB)
+function test_papr
+  f1=800; f2=1200; Fs=8000; n=(0:Fs-1);
+  tx=exp(j*2*pi*n*f1/Fs) + exp(j*2*pi*n*f2/Fs);
+  papr = calc_papr(tx);
+  assert(abs(papr-3.0) < 0.05, 'test_papr() failed!')
+end
+
 % "Genie" OFDM modem simulation that assumes ideal sync
 
 function [ber papr] = run_sim(Nc, Nsym, EbNodB, channel='awgn', plot_en=0, filt_en=0, method="", threshold=1, norm_ebno=0)
@@ -223,8 +235,8 @@ function [ber papr] = run_sim(Nc, Nsym, EbNodB, channel='awgn', plot_en=0, filt_
           figure(6); clf; stem(ErrPerSym);          
         end
 
-        papr1 = 20*log10(max(abs(tx))/mean(abs(tx)));
-        papr2 = 20*log10(max(abs(tx_))/mean(abs(tx_)));
+        papr1 = calc_papr(tx);
+        papr2 = calc_papr(tx_);
         papr_log = [papr_log papr2];
         ber(e) = Terrs/Tbits;
         printf("EbNodB: %4.1f %3.1f %4.1f PAPR: %5.2f %5.2f Tbits: %6d Terrs: %6d BER: %5.3f\n",
@@ -381,13 +393,15 @@ end
 pkg load statistics;
 more off;
 
+test_papr;
+
 % single point with lots of plots -----------
 
 %run_sim(8, 1000, EbNo=100, channel='awgn', plot_en=1, filt_en=1);
 %run_sim(8, 8, EbNo=100, channel='awgn', plot_en=1, filt_en=1, "diversity", threshold=0.8);
 %run_sim(8, 1000, EbNo=10, channel='multipath', plot_en=1, filt_en=0, "diversity", threshold=5);
-curves_experiment2(Nc=16, 'awgn', Nsym=1000);
+%curves_experiment2(Nc=16, 'awgn', Nsym=1000);
 curves_experiment2(Nc=16,'multipath', Nsym=3000, EbNodB=2:2:16);
-curves_experiment3()
+%curves_experiment3()
 %curves_experiment4()
-%curves_experiment5()
+%curves_experiment5(Nc=16)

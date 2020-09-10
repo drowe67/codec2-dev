@@ -62,11 +62,13 @@ function ofdm_tx(filename, mode="700D", Nsec, SNR3kdB=100, channel='awgn', freq_
     tx = ofdm_clip(states, tx, threshold_level);
   end
   % note this is PAPR of complex signal, PAPR of real signal will be 3dB larger
-  cpapr = 20*log10(max(abs(tx))/mean(abs(tx)));
+  cpapr = 10*log10(max(abs(tx).^2)/mean(abs(tx).^2));
   
   % channel simulation and save to disk
   
   printf("Packets: %3d CPAPR: %4.1f SNR(3k): %3.1f dB foff: %3.1f Hz ", Npackets, cpapr, SNR3kdB, freq_offset_Hz);
   rx = channel_simulate(Fs, SNR3kdB, freq_offset_Hz, channel, tx);
-  frx=fopen(filename,"wb"); fwrite(frx, states.amp_scale*rx, "short"); fclose(frx);
+  rx *= 1E4/max(rx);;
+  printf("peak: %f\n", max(rx));
+  frx=fopen(filename,"wb"); fwrite(frx, rx, "short"); fclose(frx);
 endfunction

@@ -44,7 +44,7 @@ function rx = channel_simulate(Fs, SNR3kdB, freq_offset_Hz, channel, tx)
   rx = rx .* exp(j*woffset*(1:Nsam));
 
   rx = real(rx); S = rx*rx';
-  rpapr = 20*log10(max(abs(rx))/mean(abs(rx)));
+  rpapr = 10*log10(max(abs(rx).^2)/mean(abs(rx).^2));
 
   % SNR in a 4k bandwidth will be lower than 3k as total noise power N is higher
   SNR4kdB = SNR3kdB - 10*log10(Fs/2) + 10*log10(3000); SNR = 10^(SNR4kdB/10);
