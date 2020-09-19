@@ -39,12 +39,16 @@ int main(int argc,char *argv[]){
     FILE *fin,*fout;
     int complex = 0;
     int bytes_per_sample = 2;
+    float amp = (float)FDMDV_SCALE;
     
-    char usage[] = "usage: %s [-p P] [-c] Mode SampleFreq SymbolFreq TxFreq1 TxFreqSpace InputOneBitPerCharFile OutputModRawFile\n-c complex signed 16 bit output format\n";
+    char usage[] = "usage: %s [-p P] [-c] [-a amp] Mode SampleFreq SymbolFreq TxFreq1 TxFreqSpace InputOneBitPerCharFile OutputModRawFile\n-a amp  maximum amplitude of FSK signal\n-c      complex signed 16 bit output format\n";
 
     int opt;
-    while ((opt = getopt(argc, argv, "p:c")) != -1) {
+    while ((opt = getopt(argc, argv, "a:p:c")) != -1) {
         switch (opt) {
+        case 'a':
+            amp = atof(optarg)/2.0;  /* fsk_mod amplitdue is +/-2 */
+            break;
         case 'c':
             complex = 1; bytes_per_sample = 4;
             break;
@@ -97,14 +101,14 @@ int main(int argc,char *argv[]){
         
     uint8_t bitbuf[fsk->Nbits];
     
-    while( fread(bitbuf,sizeof(uint8_t),fsk->Nbits,fin) == fsk->Nbits ){
+    while( fread(bitbuf,sizeof(uint8_t),fsk->Nbits,fin) == fsk->Nbits ) {
         if (complex == 0) {
             float modbuf[fsk->N];
             int16_t rawbuf[fsk->N];
             /* 16 bit signed short real output */
             fsk_mod(fsk,modbuf,bitbuf);
             for(i=0; i<fsk->N; i++)
-                rawbuf[i] = (int16_t)(modbuf[i]*(float)FDMDV_SCALE);
+                rawbuf[i] = (int16_t)(modbuf[i]*amp);
             fwrite(rawbuf,bytes_per_sample,fsk->N,fout);
        } else {
             /* 16 bit signed char complex output */
@@ -112,8 +116,8 @@ int main(int argc,char *argv[]){
             int16_t rawbuf[2*fsk->N];
             fsk_mod_c(fsk,(COMP*)modbuf,bitbuf);
             for(i=0; i<fsk->N; i++) {
-                rawbuf[2*i] = (int16_t)(modbuf[i].real*(float)FDMDV_SCALE);
-                rawbuf[2*i+1] = (int16_t)(modbuf[i].imag*(float)FDMDV_SCALE);
+                rawbuf[2*i] = (int16_t)(modbuf[i].real*amp);
+                rawbuf[2*i+1] = (int16_t)(modbuf[i].imag*amp);
             }            
             fwrite(rawbuf,bytes_per_sample,fsk->N,fout);
         }
