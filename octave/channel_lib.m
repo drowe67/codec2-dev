@@ -44,6 +44,7 @@ function rx = channel_simulate(Fs, SNR3kdB, freq_offset_Hz, channel, tx)
   rx = rx .* exp(j*woffset*(1:Nsam));
 
   rx = real(rx); S = rx*rx';
+  rpapr = 10*log10(max(abs(rx).^2)/mean(abs(rx).^2));
 
   % SNR in a 4k bandwidth will be lower than 3k as total noise power N is higher
   SNR4kdB = SNR3kdB - 10*log10(Fs/2) + 10*log10(3000); SNR = 10^(SNR4kdB/10);
@@ -53,7 +54,7 @@ function rx = channel_simulate(Fs, SNR3kdB, freq_offset_Hz, channel, tx)
   rx += n;
   % check our sums are OK to within 0.25 dB
   SNR4kdB_measured = 10*log10(S/(n*n')); assert (abs(SNR4kdB - SNR4kdB_measured) < 0.25);
-  printf("meas SNR3k: %3.2f dB\n", 10*log10(S/(n*n')) + 10*log10(4000) - 10*log10(3000));
+  printf("RPAPR: %4.1f meas SNR3k: %3.2f dB\n", rpapr, 10*log10(S/(n*n')) + 10*log10(4000) - 10*log10(3000));
 
   % add a few seconds of no signal either side
   rx = [sigma*randn(1,Fs) rx sigma*randn(1,Fs/2)];

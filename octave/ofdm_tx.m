@@ -24,7 +24,7 @@
 % Note EbNodB is for payload data bits, so will be 10log10(rate) higher than
 % raw EbNodB used in ofdm_tx() at uncoded bit rate
 
-function ofdm_tx(filename, mode="700D", Nsec, SNR3kdB=100, channel='awgn', freq_offset_Hz=0, dfoff_hz_per_sec = 0, initial_noise_sams=0, tx_filter=0)
+function ofdm_tx(filename, mode="700D", Nsec, SNR3kdB=100, channel='awgn', freq_offset_Hz=0, tx_clip=0)
   ofdm_lib;
   channel_lib;
   randn('seed',1);
@@ -54,15 +54,26 @@ function ofdm_tx(filename, mode="700D", Nsec, SNR3kdB=100, channel='awgn', freq_
     tx = [tx ofdm_mod(states, tx_bits)];
   end
 
+  % optional clipper to improve PAPR
+
+  if tx_clip != 0
+    threshold_level = ofdm_determine_clip_threshold(tx, tx_clip);
+    tx = ofdm_clip(states, tx, threshold_level);
+  end
+  % note this is PAPR of complex signal, PAPR of real signal will be 3dB larger
+  cpapr = 10*log10(max(abs(tx).^2)/mean(abs(tx).^2));
+  
   % channel simulation and save to disk
   
-  printf("Packets: %3d SNR(3k): %3.1f dB foff: %3.1f Hz ", Npackets, SNR3kdB, freq_offset_Hz);
+  printf("Packets: %3d CPAPR: %4.1f SNR(3k): %3.1f dB foff: %3.1f Hz ", Npackets, cpapr, SNR3kdB, freq_offset_Hz);
   rx = channel_simulate(Fs, SNR3kdB, freq_offset_Hz, channel, tx);
+
   % multipath models can lead to clipping of int16 samples
   num_clipped = length(find(abs(rx> 32767)));
   while num_clipped/length(rx) > 0.001
     rx /= 2;
     num_clipped = length(find(abs(rx> 32767)));
   end
+  
   frx=fopen(filename,"wb"); fwrite(frx, states.amp_scale*rx, "short"); fclose(frx);
 endfunction

@@ -1439,6 +1439,7 @@ function test_bits_ofdm_file
 
 endfunction
 
+
 % Get rid of nasty unfiltered stuff either side of OFDM signal
 % This may need to be tweaked, or better yet made a function of Nc, if Nc changes
 %
@@ -1480,3 +1481,22 @@ function bpf_coeff = make_ofdm_bpf(write_c_header_file)
 endfunction
 
 
+% returns level threshold such that threshold_cdf of the tx magnitudes are beneath that level
+function threshold_level = ofdm_determine_clip_threshold(tx, threshold_cdf)
+  Nsteps = 25;
+  mx = max(abs(tx));
+  cdf = empirical_cdf(mx*(1:Nsteps)/Nsteps,abs(tx));
+  threshold_level = find(cdf >= threshold_cdf)(1)*mx/25;
+  printf("threshold_cdf: %f threshold_level: %f\n", threshold_cdf, threshold_level);
+  figure(1); clf; [hh nn] = hist(abs(tx),Nsteps,1);
+  plotyy(nn,hh,mx*(1:Nsteps)/Nsteps,cdf); title('PDF and CDF Estimates'); grid;
+end
+
+
+function tx = ofdm_clip(states, tx, threshold_level)
+  ofdm_load_const;
+  tx_ = tx;
+  ind = find(abs(tx) > threshold_level);
+  tx(ind) = threshold_level*exp(j*angle(tx(ind)));
+  figure(2); clf; plot(abs(tx_(1:5*M))); hold on; plot(abs(tx(1:5*M))); hold off; 
+end
