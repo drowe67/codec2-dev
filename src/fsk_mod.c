@@ -99,6 +99,9 @@ int main(int argc,char *argv[]){
         exit(1);
     }
         
+    /* Mote we use the same buffer sizes as demod (fsk->Nbits, fsk->N)
+       for convenience, but other sizes are possible for the
+       FSK modulator. */
     uint8_t bitbuf[fsk->Nbits];
     
     while( fread(bitbuf,sizeof(uint8_t),fsk->Nbits,fin) == fsk->Nbits ) {
@@ -106,7 +109,7 @@ int main(int argc,char *argv[]){
             float modbuf[fsk->N];
             int16_t rawbuf[fsk->N];
             /* 16 bit signed short real output */
-            fsk_mod(fsk,modbuf,bitbuf);
+            fsk_mod(fsk,modbuf,bitbuf,fsk->Nbits);
             for(i=0; i<fsk->N; i++)
                 rawbuf[i] = (int16_t)(modbuf[i]*amp);
             fwrite(rawbuf,bytes_per_sample,fsk->N,fout);
@@ -114,7 +117,7 @@ int main(int argc,char *argv[]){
             /* 16 bit signed char complex output */
             COMP modbuf[fsk->N];
             int16_t rawbuf[2*fsk->N];
-            fsk_mod_c(fsk,(COMP*)modbuf,bitbuf);
+            fsk_mod_c(fsk,(COMP*)modbuf,bitbuf,fsk->Nbits);
             for(i=0; i<fsk->N; i++) {
                 rawbuf[2*i] = (int16_t)(modbuf[i].real*amp);
                 rawbuf[2*i+1] = (int16_t)(modbuf[i].imag*amp);

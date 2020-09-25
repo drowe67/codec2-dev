@@ -87,10 +87,10 @@ struct freedv {
 
     int                  n_speech_samples;       // number of speech samples we need for each freedv_tx() call
                                                  // num of speech samples output by freedv_rx() call
-    int                  n_nom_modem_samples;    // size of tx and most rx modem sample buffers
+    int                  n_nom_modem_samples;    // size of tx modem sample buffers
     int                  n_max_modem_samples;    // make your rx modem sample buffers this big
     int                  n_nat_modem_samples;    // tx modem sample block length as used by the modem before interpolation to output
-                                                 // usually the same as n_nom_modem_samples, except for 700..700C
+                                                 // usually the same as n_nom_modem_samples, except for 700C
     int                  modem_sample_rate;      // Caller is responsible for meeting this
     int                  modem_symbol_rate;      // Useful for ext_vco operation on 2400A and 800XA
     int                  speech_sample_rate;     // 8 kHz or 16 kHz (high fidelity)
@@ -188,6 +188,7 @@ void freedv_2020_open(struct freedv *f);
 void freedv_2400a_open(struct freedv *f);
 void freedv_2400b_open(struct freedv *f);
 void freedv_800xa_open(struct freedv *f);
+void freedv_fsk_ldpc_open(struct freedv *f, struct freedv_advanced *adv);
 
 // each mode has tx and rx functions in various flavours for real and complex valued samples
 

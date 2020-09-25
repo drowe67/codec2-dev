@@ -42,7 +42,7 @@
   extern "C" {
 #endif
 
-// available modes
+// available speech modes
 #define FREEDV_MODE_1600        0
 #define FREEDV_MODE_2400A       3
 #define FREEDV_MODE_2400B       4
@@ -50,6 +50,9 @@
 #define FREEDV_MODE_700C        6
 #define FREEDV_MODE_700D        7
 #define FREEDV_MODE_2020        8
+
+// available data modes
+#define FREEDV_MODE_FSK_LDPC    9
 
 // Sample rates used
 #define FREEDV_FS_8000          8000
@@ -85,6 +88,9 @@
 #if !defined(FREEDV_MODE_2020_EN)
         #define FREEDV_MODE_2020_EN FREEDV_MODE_EN_DEFAULT
 #endif
+#if !defined(FREEDV_MODE_FSK_LDPC_EN)
+        #define FREEDV_MODE_FSK_LDPC_EN FREEDV_MODE_EN_DEFAULT
+#endif
 
 #define FDV_MODE_ACTIVE(mode_name, var)  ((mode_name##_EN) == 0 ? 0: (var) == mode_name)
 
@@ -96,9 +102,17 @@
 // struct that hold state information for one freedv instance
 struct freedv;
 
-// Dummy structure for (currently) deprecated call
+// Some modes allow extra configuration parameters
 struct freedv_advanced {
-    int interleave_frames;
+    int interleave_frames;                   // currently ignored, was previously used to configure 700D interleaver
+    
+    // parameters for FREEDV_MODE_FSK_LDPC
+    int M;                                   // 2 or 4 FSK
+    int Rs;                                  // Symbol rate Hz
+    int Fs;                                  // Sample rate Hz
+    int first_tone;                          // Freq of first tone Hz
+    int tone_spacing;                        // Spacing between tones Hz
+    char *codename;                          // LDPC codename, from codes listed in ldpc_codes.c
 };
 
 // Called when text message char is decoded

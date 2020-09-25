@@ -25,7 +25,12 @@
 #include "freedv_api_internal.h"
 #include "comp_prim.h"
 #include "debug_alloc.h"
+#include "ldpc_codes.h"
+#include "interldpc.h"
 
+/* 16 bit 0x5186 Unique word for fsk_ldpc modes */
+static uint8_t fsk_ldpc_uw[] = {0,1,0,1, 0,0,0,1, 1,0,0,0, 0,1,1,0}; 
+    
 void freedv_2400a_open(struct freedv *f) {
     f->n_protocol_bits = 20;
     f->deframer = fvhff_create_deframer(FREEDV_VHF_FRAME_A,0);
@@ -114,6 +119,49 @@ void freedv_800xa_open(struct freedv *f) {
     f->rx_payload_bits = MALLOC(n_packed_bytes); assert(f->rx_payload_bits != NULL);  
 }
 
+
+void freedv_fsk_ldpc_open(struct freedv *f, struct freedv_advanced *adv) {
+    /* TODO - do we want a default mode to help get started?  Maybe do this in demo program */
+    assert(adv != NULL);
+
+    /* TODO: can we reuse this framer-framework? */
+    f->deframer = fvhff_create_deframer(FREEDV_HF_FRAME_B,0);
+    assert(f->deframer != NULL);
+
+    /* set up modem */
+    assert((adv->Fs % adv->Rs) == 0);  // Fs/Rs must be an integer
+    int P = adv->Fs/adv->Rs;
+    assert(P >= 8);                    // Good idea for P >= 8
+    while ((P >= 8) && ((P % 2) == 0)) // reduce internal oversampling rate P as far as we can, keep it an integer
+        P /= 2;
+    if (f->verbose) fprintf(stderr, "Fs: %d Rs: %d M: %d P: %d\n", adv->Fs, adv->Rs, adv->M, P);
+    f->fsk = fsk_create_hbr(adv->Fs, adv->Rs, adv->M, P, FSK_DEFAULT_NSYM, adv->first_tone, adv->tone_spacing);
+    assert(f->fsk != NULL);
+    fsk_stats_normalise_eye(f->fsk, 0);
+
+    /* set up LDPC code */
+    int code_index = ldpc_codes_find(adv->codename);
+    assert(code_index != -1);
+    f->ldpc = (struct LDPC*)MALLOC(sizeof(struct LDPC)); assert(f->ldpc != NULL);
+    ldpc_codes_setup(f->ldpc, adv->codename);
+    if (f->verbose) fprintf(stderr, "Using: %s\n", f->ldpc->name);
+
+    f->bits_per_modem_frame = f->ldpc->coded_bits_per_frame + sizeof(fsk_ldpc_uw);
+    
+    /* sample buffer size for tx modem samples, we modulate a full frame */
+    f->n_nom_modem_samples = f->fsk->Ts*(f->bits_per_modem_frame/(f->fsk->mode>>1));
+    f->n_nat_modem_samples = f->n_nom_modem_samples;
+
+    /* maximum sample buffer size for rx modem samples, note we only
+       demodulate partial frames on each call to fsk_demod() */
+    f->n_max_modem_samples = f->fsk->N + (f->fsk->Ts);
+
+    f->nin = f->nin_prev = fsk_nin(f->fsk);
+    f->modem_sample_rate = adv->Fs;
+    f->modem_symbol_rate = adv->Rs;
+}
+
+
 /* TX routines for 2400 FSK modes, after codec2 encoding */
 void freedv_tx_fsk_voice(struct freedv *f, short mod_out[]) {
     int  i;
@@ -162,13 +210,13 @@ void freedv_tx_fsk_voice(struct freedv *f, short mod_out[]) {
     /* do 4fsk mod */
     if(FDV_MODE_ACTIVE( FREEDV_MODE_2400A, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_800XA, f->mode)){
         if (f->ext_vco) {
-            fsk_mod_ext_vco(f->fsk,tx_float,(uint8_t*)(f->tx_bits));
+            fsk_mod_ext_vco(f->fsk,tx_float,(uint8_t*)(f->tx_bits), f->fsk->Nbits);
             for(i=0; i<f->n_nom_modem_samples; i++){
                 mod_out[i] = (short)tx_float[i];
             }
         }
         else {
-            fsk_mod(f->fsk,tx_float,(uint8_t*)(f->tx_bits));
+            fsk_mod(f->fsk,tx_float,(uint8_t*)(f->tx_bits),f->fsk->Nbits);
             /* Convert float samps to short */
             for(i=0; i<f->n_nom_modem_samples; i++){
                 mod_out[i] = (short)(tx_float[i]*FSK_SCALE*NORM_PWR_FSK);
@@ -231,7 +279,7 @@ void freedv_comptx_fsk_voice(struct freedv *f, COMP mod_out[]) {
 
     /* do 4fsk mod */
     if(FDV_MODE_ACTIVE( FREEDV_MODE_2400A, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_800XA, f->mode)){
-        fsk_mod_c(f->fsk,mod_out,(uint8_t*)(f->tx_bits));
+        fsk_mod_c(f->fsk,mod_out,(uint8_t*)(f->tx_bits), f->fsk->Nbits);
         /* Convert float samps to short */
         for(i=0; i<f->n_nom_modem_samples; i++){
         	mod_out[i] = fcmult(NORM_PWR_FSK,mod_out[i]);
@@ -260,14 +308,14 @@ void freedv_tx_fsk_data(struct freedv *f, short mod_out[]) {
     tx_float = alloca(sizeof(float)*f->n_nom_modem_samples);
         
     /* do 4fsk mod */
-    if(FDV_MODE_ACTIVE( FREEDV_MODE_2400A, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_800XA, f->mode)){
-        fsk_mod(f->fsk,tx_float,(uint8_t*)(f->tx_bits));
+    if (FDV_MODE_ACTIVE( FREEDV_MODE_2400A, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_800XA, f->mode)){
+        fsk_mod(f->fsk,tx_float,(uint8_t*)(f->tx_bits), f->fsk->Nbits);
         /* Convert float samps to short */
         for(i=0; i<f->n_nom_modem_samples; i++){
             mod_out[i] = (short)(tx_float[i]*FSK_SCALE);
         }
     /* do me-fsk mod */
-    }else if(FDV_MODE_ACTIVE( FREEDV_MODE_2400B, f->mode)){
+    } else if(FDV_MODE_ACTIVE( FREEDV_MODE_2400B, f->mode)){
         fmfsk_mod(f->fmfsk,tx_float,(uint8_t*)(f->tx_bits));
         /* Convert float samps to short */
         for(i=0; i<f->n_nom_modem_samples; i++){

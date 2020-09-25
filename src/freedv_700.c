@@ -172,8 +172,7 @@ void freedv_700d_open(struct freedv *f) {
   The freedv tx interface ouputs n_nom_modem_samples, which a single
   OFDM modem frame, 112 payload bits or 4 speech codec frames.  So
   this function must always have 1280 speech samples as input, and
-  1280 modem samples as output, regradless of interleaver_frames.  For
-  interleaver_frames > 1, we need to buffer samples.
+  1280 modem samples as output.
 */
 
 void freedv_comptx_700d(struct freedv *f, COMP mod_out[]) {

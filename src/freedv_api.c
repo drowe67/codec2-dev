@@ -111,14 +111,13 @@ struct freedv *freedv_open(int mode) {
     return freedv_open_advanced(mode, NULL);
 }
 
-// Ignoring adv parameter
 struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
     struct freedv *f;
     
-    if (false == (FDV_MODE_ACTIVE( FREEDV_MODE_1600,mode) || FDV_MODE_ACTIVE( FREEDV_MODE_2400A,mode) || 
-		FDV_MODE_ACTIVE( FREEDV_MODE_2400B,mode) || FDV_MODE_ACTIVE( FREEDV_MODE_800XA,mode) || 
-		FDV_MODE_ACTIVE( FREEDV_MODE_700C,mode) || FDV_MODE_ACTIVE( FREEDV_MODE_700D,mode)  ||
-                  FDV_MODE_ACTIVE( FREEDV_MODE_2020,mode)) ) return NULL;
+    if (false == (FDV_MODE_ACTIVE(FREEDV_MODE_1600,mode)  || FDV_MODE_ACTIVE(FREEDV_MODE_2400A,mode) || 
+		  FDV_MODE_ACTIVE(FREEDV_MODE_2400B,mode) || FDV_MODE_ACTIVE(FREEDV_MODE_800XA,mode) || 
+		  FDV_MODE_ACTIVE(FREEDV_MODE_700C,mode)  || FDV_MODE_ACTIVE(FREEDV_MODE_700D,mode)  ||
+                  FDV_MODE_ACTIVE(FREEDV_MODE_2020,mode)  || FDV_MODE_ACTIVE(FREEDV_MODE_FSK_LDPC,mode) ) ) return NULL;
 
     /* set everything to zero just in case */
     f = (struct freedv*)CALLOC(1, sizeof(struct freedv));
@@ -135,6 +134,7 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
     if (FDV_MODE_ACTIVE( FREEDV_MODE_2400A, mode)) freedv_2400a_open(f);
     if (FDV_MODE_ACTIVE( FREEDV_MODE_2400B, mode) ) freedv_2400b_open(f);
     if (FDV_MODE_ACTIVE( FREEDV_MODE_800XA, mode)) freedv_800xa_open(f);
+    if (FDV_MODE_ACTIVE( FREEDV_MODE_FSK_LDPC, mode)) freedv_fsk_ldpc_open(f, adv);
 
     varicode_decode_init(&f->varicode_dec_states, 1);
 
