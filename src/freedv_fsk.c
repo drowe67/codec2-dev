@@ -121,20 +121,15 @@ void freedv_800xa_open(struct freedv *f) {
 
 
 void freedv_fsk_ldpc_open(struct freedv *f, struct freedv_advanced *adv) {
-    /* TODO - do we want a default mode to help get started?  Maybe do this in demo program */
     assert(adv != NULL);
-
-    /* TODO: can we reuse this framer-framework? */
-    f->deframer = fvhff_create_deframer(FREEDV_HF_FRAME_B,0);
-    assert(f->deframer != NULL);
 
     /* set up modem */
     assert((adv->Fs % adv->Rs) == 0);  // Fs/Rs must be an integer
     int P = adv->Fs/adv->Rs;
     assert(P >= 8);                    // Good idea for P >= 8
-    while ((P >= 8) && ((P % 2) == 0)) // reduce internal oversampling rate P as far as we can, keep it an integer
+    while ((P > 10) && ((P % 2) == 0)) // reduce internal oversampling rate P as far as we can, keep it an integer
         P /= 2;
-    if (f->verbose) fprintf(stderr, "Fs: %d Rs: %d M: %d P: %d\n", adv->Fs, adv->Rs, adv->M, P);
+    //fprintf(stderr, "Fs: %d Rs: %d M: %d P: %d\n", adv->Fs, adv->Rs, adv->M, P);
     f->fsk = fsk_create_hbr(adv->Fs, adv->Rs, adv->M, P, FSK_DEFAULT_NSYM, adv->first_tone, adv->tone_spacing);
     assert(f->fsk != NULL);
     fsk_stats_normalise_eye(f->fsk, 0);
@@ -144,12 +139,14 @@ void freedv_fsk_ldpc_open(struct freedv *f, struct freedv_advanced *adv) {
     assert(code_index != -1);
     f->ldpc = (struct LDPC*)MALLOC(sizeof(struct LDPC)); assert(f->ldpc != NULL);
     ldpc_codes_setup(f->ldpc, adv->codename);
-    if (f->verbose) fprintf(stderr, "Using: %s\n", f->ldpc->name);
+    //fprintf(stderr, "Using: %s\n", f->ldpc->name);
 
-    f->bits_per_modem_frame = f->ldpc->coded_bits_per_frame + sizeof(fsk_ldpc_uw);
+    f->bits_per_modem_frame = f->ldpc->data_bits_per_frame;
+    int bits_per_frame = f->ldpc->coded_bits_per_frame + sizeof(fsk_ldpc_uw);
+    f->tx_payload_bits = malloc(f->bits_per_modem_frame); assert(f->tx_payload_bits != NULL);
     
     /* sample buffer size for tx modem samples, we modulate a full frame */
-    f->n_nom_modem_samples = f->fsk->Ts*(f->bits_per_modem_frame/(f->fsk->mode>>1));
+    f->n_nom_modem_samples = f->fsk->Ts*(bits_per_frame/(f->fsk->mode>>1));
     f->n_nat_modem_samples = f->n_nom_modem_samples;
 
     /* maximum sample buffer size for rx modem samples, note we only
@@ -325,7 +322,31 @@ void freedv_tx_fsk_data(struct freedv *f, short mod_out[]) {
 }
 
 
-// float input samples version
+void freedv_tx_fsk_ldpc_data(struct freedv *f, short mod_out[]) {
+    int bits_per_frame = f->ldpc->coded_bits_per_frame + sizeof(fsk_ldpc_uw);
+    //fprintf(stderr, "bits_per_frame: %d bits_per_modem_frame: %d\n", bits_per_frame, f->bits_per_modem_frame);
+    uint8_t frame[bits_per_frame];
+    float tx_float[f->n_nom_modem_samples];
+    int   i;
+    
+    assert(f->mode == FREEDV_MODE_FSK_LDPC);
+   
+    /* insert UW */
+    memcpy(frame, fsk_ldpc_uw, sizeof(fsk_ldpc_uw));
+    /* insert data bits */
+    memcpy(frame + sizeof(fsk_ldpc_uw), f->tx_payload_bits, f->bits_per_modem_frame);
+    /* insert parity bits */
+    encode(f->ldpc, frame + sizeof(fsk_ldpc_uw), frame + sizeof(fsk_ldpc_uw) + f->bits_per_modem_frame);  
+
+    fsk_mod(f->fsk, tx_float, frame, bits_per_frame);
+
+    /* Convert float samps to short */
+    for(i=0; i<f->n_nom_modem_samples; i++){
+        mod_out[i] = (short)(tx_float[i]*FSK_SCALE);
+    }
+}
+
+
 int freedv_comprx_fsk(struct freedv *f, COMP demod_in[]) {
     /* Varicode and protocol bits */
     uint8_t vc_bits[2];

@@ -34,12 +34,13 @@
 #include <stdint.h>
 
 #include "freedv_api.h"
+#include "ofdm_internal.h"
 
 int main(int argc, char *argv[]) {
     FILE                     *fin, *fout;
     struct freedv            *freedv;
     int                       mode;
-    int                       use_clip, use_txbpf;
+    int                       use_clip, use_txbpf, testframes, Nframes = 0;
     int                       i;
 
     if (argc < 4) {
@@ -48,7 +49,7 @@ int main(int argc, char *argv[]) {
         sprintf(f2020,"|2020");
         #endif     
         printf("usage: %s 700C|700D|800XA|FSK_LDPC%s InputBinaryDataFile OutputModemRawFile\n"
-               "  [--clip 0|1] [--txbpf 0|1]\n", argv[0], f2020);
+               "  [--clip 0|1] [--txbpf 0|1] [--testframes Nframes]\n", argv[0], f2020);
         printf("e.g    %s 700D dataBytes.bin dataBytes_700d.raw\n", argv[0]);
         exit(1);
     }
@@ -77,12 +78,17 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
-    use_clip = 0; use_txbpf = 0;
+    use_clip = 0; use_txbpf = 0; testframes = 0;
     
     if (argc > 4) {
         for (i = 4; i < argc; i++) {
             if (strcmp(argv[i], "--clip") == 0) { use_clip = atoi(argv[i+1]); i++; }
             else if (strcmp(argv[i], "--txbpf") == 0) { use_txbpf = atoi(argv[i+1]); i++; }
+            else if (strcmp(argv[i], "--testframes") == 0) {
+                testframes = 1;
+                Nframes = atoi(argv[i+1]); i++;
+                fprintf(stderr, "Nframes: %d\n", Nframes);
+            }
             else {
                 fprintf(stderr, "unkown option: %s\n", argv[i]);
                 exit(1);
@@ -105,17 +111,49 @@ int main(int argc, char *argv[]) {
     uint8_t bytes_in[bytes_per_modem_frame];
     short   mod_out[n_mod_out];
 
+    /* optionally set up a known testframe */
+    uint8_t testframe_bytes[bytes_per_modem_frame];
+    memset(testframe_bytes, 0, bytes_per_modem_frame);
+    if (testframes) {
+        int bits_per_frame = freedv_get_bits_per_modem_frame(freedv);
+        uint8_t testframe_bits[bits_per_frame];
+        ofdm_generate_payload_data_bits(testframe_bits, bits_per_frame);
+        /* pack bits, MSB first */
+        int bit = 7, byte = 0;
+        for(int i=0; i<bits_per_frame; i++) {
+            testframe_bytes[byte] |= (testframe_bits[i] << bit);
+            bit--;
+            if (bit < 0) {
+                bit = 7;
+                byte++;
+            }
+        }
+    }
+    fprintf(stderr, "\n");
+    
     /* OK main loop  --------------------------------------- */
 
+    int frames = 0;
     while(fread(bytes_in, sizeof(uint8_t), bytes_per_modem_frame, fin) == bytes_per_modem_frame) {
+        if (testframes) {
+            memcpy(bytes_in, testframe_bytes, bytes_per_modem_frame);
+        }
+
         freedv_rawdatatx(freedv, mod_out, bytes_in);
         fwrite(mod_out, sizeof(short), n_mod_out, fout);
     
         /* if using pipes we don't want the usual buffering to occur */
         if (fout == stdout) fflush(stdout);
         if (fin == stdin) fflush(stdin);
+
+        frames++;       
+        if (testframes && (frames >= Nframes)) {
+            goto finished;
+        }
+
     }
 
+ finished:
     /* A few extra output buffers so demod can complete */
     for(int i=0; i< n_mod_out; i++) mod_out[i] = 0;
     fwrite(mod_out, sizeof(short), n_mod_out, fout);

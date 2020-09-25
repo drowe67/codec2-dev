@@ -108,7 +108,12 @@ char *rx_sync_flags_to_text[] = {
 \*---------------------------------------------------------------------------*/
 
 struct freedv *freedv_open(int mode) {
-    return freedv_open_advanced(mode, NULL);
+    struct freedv_advanced adv = {0,2,100,8000,1000,200, "H_256_512_4"};
+    if (mode == FREEDV_MODE_FSK_LDPC)
+        return freedv_open_advanced(mode, &adv);
+    else
+        return freedv_open_advanced(mode, NULL);
+        
 }
 
 struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
@@ -359,7 +364,7 @@ void freedv_rawdatatx(struct freedv *f, short mod_out[], unsigned char *packed_p
     assert(f != NULL);
     COMP tx_fdm[f->n_nom_modem_samples];
 
-    /* FSK modes used packed bits */
+    /* Some FSK modes used packed bits */
     if(FDV_MODE_ACTIVE( FREEDV_MODE_2400A, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_2400B, f->mode) ||
        FDV_MODE_ACTIVE( FREEDV_MODE_800XA, f->mode) ) {
 	freedv_codec_frames_from_rawdata(f, f->tx_payload_bits,  packed_payload_bits);
@@ -377,10 +382,15 @@ void freedv_rawdatatx(struct freedv *f, short mod_out[], unsigned char *packed_p
             byte++;
         }
     }
-
+    
     if (FDV_MODE_ACTIVE( FREEDV_MODE_1600, f->mode)) freedv_comptx_fdmdv_1600(f, tx_fdm);
     if (FDV_MODE_ACTIVE( FREEDV_MODE_700C, f->mode)) freedv_comptx_700c(f, tx_fdm);
     if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode)) freedv_comptx_700d(f, tx_fdm);
+
+    if (FDV_MODE_ACTIVE( FREEDV_MODE_FSK_LDPC, f->mode)) {
+        freedv_tx_fsk_ldpc_data(f, mod_out);
+        return;
+    }
 
     /* convert complex to real */
     for(int i=0; i<f->n_nom_modem_samples; i++)

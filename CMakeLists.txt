@@ -792,6 +792,14 @@ endif(NOT APPLE)
                             ./deframer - - 504 5186  | 
                             ./ldpc_dec - /dev/null --code HRAb_396_504 --testframes")
 
+     # FreeDV API Tx FSK LDPC 
+     add_test(NAME test_freedv_tx_fsk_ldpc
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            ./freedv_data_raw_tx FSK_LDPC /dev/zero - --testframes 10 |
+                            ./fsk_demod -s 2 8000 100 - - | 
+                            ./deframer - - 512 5186  | 
+                            ./ldpc_dec - /dev/null --code H_256_512_4 --testframes")
+           
      # 800XA framer test
      add_test(NAME test_fsk_vhf_framer
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src; 
