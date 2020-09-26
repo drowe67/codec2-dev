@@ -338,10 +338,9 @@ void freedv_tx_fsk_data(struct freedv *f, short mod_out[]) {
 
 
 /* FreeDV FSK_LDPC mode tx */
-void freedv_tx_fsk_ldpc_data(struct freedv *f, short mod_out[]) {
+void freedv_tx_fsk_ldpc_data(struct freedv *f, COMP mod_out[]) {
     int bits_per_frame = f->ldpc->coded_bits_per_frame + sizeof(fsk_ldpc_uw);
     uint8_t frame[bits_per_frame];
-    float tx_float[f->n_nom_modem_samples];
     int   i;
     
     assert(f->mode == FREEDV_MODE_FSK_LDPC);
@@ -355,11 +354,12 @@ void freedv_tx_fsk_ldpc_data(struct freedv *f, short mod_out[]) {
     /* insert parity bits */
     encode(f->ldpc, frame + sizeof(fsk_ldpc_uw), frame + sizeof(fsk_ldpc_uw) + f->bits_per_modem_frame);  
 
-    fsk_mod(f->fsk, tx_float, frame, bits_per_frame);
+    fsk_mod_c(f->fsk, mod_out, frame, bits_per_frame);
 
     /* Convert float samps to short */
-    for(i=0; i<f->n_nom_modem_samples; i++){
-        mod_out[i] = (short)(tx_float[i]*FSK_SCALE);
+    for(i=0; i<f->n_nom_modem_samples; i++) {
+        mod_out[i].real *= FSK_SCALE;
+        mod_out[i].imag *= FSK_SCALE;
     }
 }
 
