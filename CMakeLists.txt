@@ -781,7 +781,8 @@ endif(NOT APPLE)
      # 4FSK LDPC modem with framer at Rs=100 (uncoded Rb=200), rate 0.8 code
      # SNR = Eb/No + 10*log10(Rb/B) = 5 + 10*log10(200/3000) = -6.7dB
      # Coded Ebc/No = Eb/No - 10*log1010(0.8) = 5 - 10*log10(0.8) = 6.0dB
-     # This ignores the UW overhead
+     # (calculation ignores small UW overhead).  See also test_freedv_fsk_ldpc below
+     # which is the same thing bundled up into a FreeDV "mode"
      add_test(NAME test_fsk_4fsk_ldpc
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
                             ./ldpc_enc /dev/zero - --code HRAb_396_504 --testframes 200 | 
@@ -792,14 +793,6 @@ endif(NOT APPLE)
                             ./deframer - - 504 5186  | 
                             ./ldpc_dec - /dev/null --code HRAb_396_504 --testframes")
 
-     # FreeDV API Tx FSK LDPC 
-     add_test(NAME test_freedv_tx_fsk_ldpc
-             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
-                            ./freedv_data_raw_tx FSK_LDPC /dev/zero - --testframes 10 |
-                            ./fsk_demod -s 2 8000 100 - - | 
-                            ./deframer - - 512 5186  | 
-                            ./ldpc_dec - /dev/null --code H_256_512_4 --testframes")
-           
      # 800XA framer test
      add_test(NAME test_fsk_vhf_framer
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src; 
@@ -816,13 +809,19 @@ endif(NOT APPLE)
              WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/unittest
              )
            
-     # using FreeDV API/codec 2 modems to send raw data frames
-     add_test(NAME test_freedv_data_raw
+     # FreeDV API raw data - OFDM LDPC
+     add_test(NAME test_freedv_data_raw_ofdm
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
                             head -c 140 </dev/urandom > binaryIn.bin;
                             ./freedv_data_raw_tx 700D binaryIn.bin - | 
                             ./freedv_data_raw_rx 700D - - -v | 
-                            diff /dev/stdin binaryIn.bin"
-             )
+                            diff /dev/stdin binaryIn.bin")
+
+     # FreeDV API raw data - FSK LDPC 
+     add_test(NAME test_freedv_data_raw_fsk_ldpc
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            ./freedv_data_raw_tx FSK_LDPC /dev/zero - --testframes 10 |
+                            ./cohpsk_ch - - 0 --Fs 8000 |
+                            ./freedv_data_raw_rx FSK_LDPC - /dev/null --testframes")           
 
 endif(UNITTEST)

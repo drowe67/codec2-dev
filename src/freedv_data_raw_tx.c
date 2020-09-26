@@ -5,7 +5,7 @@
   DATE CREATED: May 2020
 
   Demonstrates transmitting frames of raw data bytes (instead of
-  compressed speech) using the FreeDV API and modems.
+  compressed speech) using the FreeDV API.
 
 \*---------------------------------------------------------------------------*/
 
@@ -154,10 +154,12 @@ int main(int argc, char *argv[]) {
     }
 
  finished:
-    /* A few extra output buffers so demod can complete */
+    /* A few extra output buffers so demods can complete last frame */
     for(int i=0; i< n_mod_out; i++) mod_out[i] = 0;
     fwrite(mod_out, sizeof(short), n_mod_out, fout);
-    fwrite(mod_out, sizeof(short), n_mod_out, fout);
+    /* ofdm modes need and extra frame */
+    if (mode != FREEDV_MODE_FSK_LDPC)
+        fwrite(mod_out, sizeof(short), n_mod_out, fout);
 
     freedv_close(freedv);
     fclose(fin);

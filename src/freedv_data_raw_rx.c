@@ -5,7 +5,7 @@
   DATE CREATED: May 2020
 
   Demonstrates receiving frames of raw data bytes (instead of
-  compressed speech) using the FreeDV API and modems.
+  compressed speech) using the FreeDV API.
 
 \*---------------------------------------------------------------------------*/
 
@@ -110,8 +110,7 @@ int main(int argc, char *argv[]) {
 
     /* We need to work out how many samples the demod needs on each
        call (nin).  This is used to adjust for differences in the tx
-       and rx sample clock frequencies.  Note also the number of
-       output speech samples "nout" is time varying. */
+       and rx sample clock frequencies */
 
     nin = freedv_nin(freedv);
     while(fread(demod_in, sizeof(short), nin, fin) == nin) {
@@ -120,7 +119,7 @@ int main(int argc, char *argv[]) {
         nbytes = freedv_rawdatarx(freedv, bytes_out, demod_in);
         nin = freedv_nin(freedv);
 
-        /* we don't want to output any data if FEC decoding indicates it has known bit errors */
+        /* Output data if FEC decoding indicates it has no uncorrected bit errors */
         if (!freedv_get_uncorrected_errors(freedv)) {
             fwrite(bytes_out, sizeof(uint8_t), nbytes, fout);
             nbytes_total += nbytes;
@@ -140,7 +139,7 @@ int main(int argc, char *argv[]) {
     fclose(fout);
     fprintf(stderr, "frames processed: %d  output bytes: %d\n", frame, nbytes_total);
 
-    /* finish up with some stats */
+    /* in testframe mode finish up with some stats */
     
     if (freedv_get_test_frames(freedv)) {
         int Tbits = freedv_get_total_bits(freedv);
