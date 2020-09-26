@@ -145,6 +145,7 @@ void freedv_fsk_ldpc_open(struct freedv *f, struct freedv_advanced *adv) {
     f->bits_per_modem_frame = f->ldpc->data_bits_per_frame;
     int bits_per_frame = f->ldpc->coded_bits_per_frame + sizeof(fsk_ldpc_uw);
     f->tx_payload_bits = malloc(f->bits_per_modem_frame); assert(f->tx_payload_bits != NULL);
+    f->rx_payload_bits = malloc(f->bits_per_modem_frame); assert(f->rx_payload_bits != NULL);
     
     /* sample buffer size for tx modem samples, we modulate a full frame */
     f->n_nom_modem_samples = f->fsk->Ts*(bits_per_frame/(f->fsk->mode>>1));
@@ -369,7 +370,8 @@ int freedv_rx_fsk_ldpc_data(struct freedv *f, COMP demod_in[]) {
     struct FSK *fsk = f->fsk;
     float rx_filt[fsk->mode*fsk->Nsym];
     float llrs[fsk->Nbits];
-        
+    int   rx_status = 0;
+    
     /* demodulate to bit LLRs */
     
     fsk_demod_sd(fsk, rx_filt, demod_in);
@@ -403,7 +405,7 @@ int freedv_rx_fsk_ldpc_data(struct freedv *f, COMP demod_in[]) {
 
         fprintf(stderr, "state: %d nbits: %d newbits: %d best_location: %d ",
                 f->fsk_ldpc_state, f->fsk_ldpc_nbits, f->fsk_ldpc_newbits, f->fsk_ldpc_best_location);
-        int errors;
+        int errors = 0;
         int next_state = f->fsk_ldpc_state;
         switch(f->fsk_ldpc_state) {
         case 0:
@@ -425,7 +427,6 @@ int freedv_rx_fsk_ldpc_data(struct freedv *f, COMP demod_in[]) {
             /* work out where UW should be */
             f->fsk_ldpc_best_location += bits_per_frame - f->fsk_ldpc_newbits;
             /* check UW still OK */
-            errors = 0;
             for(int u=0; u<sizeof(fsk_ldpc_uw); u++)
                 errors += f->twoframes_hard[f->fsk_ldpc_best_location+u] ^ fsk_ldpc_uw[u];
             fprintf(stderr, "%d errors: %d bad_uw: %d\n", f->fsk_ldpc_best_location, errors, f->fsk_ldpc_baduw);
@@ -441,13 +442,33 @@ int freedv_rx_fsk_ldpc_data(struct freedv *f, COMP demod_in[]) {
         f->fsk_ldpc_state = next_state;
         f->fsk_ldpc_nbits -= bits_per_frame;
         f->fsk_ldpc_newbits = 0;
+        
+        if (f->fsk_ldpc_state == 1) {
+            int parityCheckCount;
+            int iter = run_ldpc_decoder(f->ldpc, f->rx_payload_bits,
+                                        &f->twoframes_llr[f->fsk_ldpc_best_location+sizeof(fsk_ldpc_uw)],
+                                        &parityCheckCount);
+            fprintf(stderr, "iter: %d parityCheckCount: %d\n", iter, parityCheckCount);
+            rx_status |= RX_BITS;
+            if (parityCheckCount != f->ldpc->NumberParityBits)
+                rx_status |= RX_BIT_ERRORS;
+            if (f->test_frames) {
+                uint8_t payload_data_bits[f->bits_per_modem_frame];
+                ofdm_generate_payload_data_bits(payload_data_bits, f->bits_per_modem_frame);
+                int Nerrs_coded = count_errors(payload_data_bits, f->rx_payload_bits, f->bits_per_modem_frame);
+                fprintf(stderr, "Nerrs_coded: %d\n", Nerrs_coded);
+                f->total_bit_errors_coded += Nerrs_coded;
+                f->total_bits_coded += f->bits_per_modem_frame;
+            }
+        }
     }
 
-    return 0;
+    if (f->fsk_ldpc_state == 1) rx_status |= RX_SYNC;
     
-    // LDPC decode
+    return rx_status;
+    
     // output perodically
-    // testframe mode - shoul that be internal for tx/rx?
+    // testframe mode - should that be internal for tx/rx?
 }
 
 
