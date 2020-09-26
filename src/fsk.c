@@ -256,6 +256,7 @@ struct FSK * fsk_create_hbr(int Fs, int Rs, int M, int P, int Nsym, int f1_tx, i
 \*---------------------------------------------------------------------------*/
 
 void fsk_destroy(struct FSK *fsk){
+    free(fsk->Sf);
     free(fsk->f_dc);
     free(fsk->fft_cfg);
     free(fsk->stats);

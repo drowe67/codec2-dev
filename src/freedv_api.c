@@ -203,7 +203,14 @@ void freedv_close(struct freedv *freedv) {
     
     if (FDV_MODE_ACTIVE( FREEDV_MODE_2400B, freedv->mode)){
         fmfsk_destroy(freedv->fmfsk);
-		fvhff_destroy_deframer(freedv->deframer);
+        fvhff_destroy_deframer(freedv->deframer);
+    }
+    
+    if (FDV_MODE_ACTIVE( FREEDV_MODE_FSK_LDPC, freedv->mode)){
+        fsk_destroy(freedv->fsk);
+        FREE(freedv->ldpc);
+        FREE(freedv->twoframes_hard);
+        FREE(freedv->twoframes_llr);
     }
     
     FREE(freedv);
