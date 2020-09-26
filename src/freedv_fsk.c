@@ -132,6 +132,7 @@ void freedv_fsk_ldpc_open(struct freedv *f, struct freedv_advanced *adv) {
     //fprintf(stderr, "Fs: %d Rs: %d M: %d P: %d\n", adv->Fs, adv->Rs, adv->M, P);
     f->fsk = fsk_create_hbr(adv->Fs, adv->Rs, adv->M, P, FSK_DEFAULT_NSYM, adv->first_tone, adv->tone_spacing);
     assert(f->fsk != NULL);
+    fsk_set_freq_est_limits(f->fsk, 0, adv->Fs/2);
     fsk_stats_normalise_eye(f->fsk, 0);
 
     /* set up LDPC code */
@@ -156,6 +157,19 @@ void freedv_fsk_ldpc_open(struct freedv *f, struct freedv_advanced *adv) {
     f->nin = f->nin_prev = fsk_nin(f->fsk);
     f->modem_sample_rate = adv->Fs;
     f->modem_symbol_rate = adv->Rs;
+
+    /* deframer set up */
+    f->twoframes_hard = malloc(2*bits_per_frame); assert(f->twoframes_hard != NULL);
+    memset(f->twoframes_hard, 0, 2*bits_per_frame);
+    f->twoframes_llr = (float*)malloc(2*bits_per_frame*sizeof(float)); assert(f->twoframes_llr != NULL);
+    for(int i=0; i<2*bits_per_frame; i++) f->twoframes_llr[i] = 0.0;
+    f->fsk_ldpc_state = 0;
+    f->fsk_ldpc_thresh1 = 0.1*sizeof(fsk_ldpc_uw);
+    f->fsk_ldpc_thresh2 = 0.4*sizeof(fsk_ldpc_uw);
+    f->fsk_ldpc_baduw = 0;
+    fprintf(stderr, "thresh1: %d thresh2: %d\n", f->fsk_ldpc_thresh1, f->fsk_ldpc_thresh2);
+    f->fsk_ldpc_nbits = f->fsk_ldpc_newbits = 0;
+    f->fsk_ldpc_best_location = 0;
 }
 
 
@@ -322,15 +336,17 @@ void freedv_tx_fsk_data(struct freedv *f, short mod_out[]) {
 }
 
 
+/* FreeDV FSK_LDPC mode tx */
 void freedv_tx_fsk_ldpc_data(struct freedv *f, short mod_out[]) {
     int bits_per_frame = f->ldpc->coded_bits_per_frame + sizeof(fsk_ldpc_uw);
-    //fprintf(stderr, "bits_per_frame: %d bits_per_modem_frame: %d\n", bits_per_frame, f->bits_per_modem_frame);
     uint8_t frame[bits_per_frame];
     float tx_float[f->n_nom_modem_samples];
     int   i;
     
     assert(f->mode == FREEDV_MODE_FSK_LDPC);
    
+    /* lets build up the frame to Tx ............. */
+
     /* insert UW */
     memcpy(frame, fsk_ldpc_uw, sizeof(fsk_ldpc_uw));
     /* insert data bits */
@@ -344,6 +360,94 @@ void freedv_tx_fsk_ldpc_data(struct freedv *f, short mod_out[]) {
     for(i=0; i<f->n_nom_modem_samples; i++){
         mod_out[i] = (short)(tx_float[i]*FSK_SCALE);
     }
+}
+
+
+/* FreeDV FSK_LDPC mode rx */
+int freedv_rx_fsk_ldpc_data(struct freedv *f, COMP demod_in[]) {
+    int bits_per_frame = f->ldpc->coded_bits_per_frame + sizeof(fsk_ldpc_uw);
+    struct FSK *fsk = f->fsk;
+    float rx_filt[fsk->mode*fsk->Nsym];
+    float llrs[fsk->Nbits];
+        
+    /* demodulate to bit LLRs */
+    
+    fsk_demod_sd(fsk, rx_filt, demod_in);
+    fsk_rx_filt_to_llrs(llrs, rx_filt, fsk->v_est, fsk->SNRest, fsk->mode, fsk->Nsym);
+    f->nin = fsk_nin(f->fsk);
+    f->snr_est = fsk->SNRest;
+
+    /* OK we have fsk->Nbits new bits/symbols, place them at the end of the buffers */
+
+    memmove(f->twoframes_llr,
+            &f->twoframes_llr[fsk->Nbits],
+            (2*bits_per_frame-fsk->Nbits)*sizeof(float));
+    memcpy(&f->twoframes_llr[2*bits_per_frame-fsk->Nbits], llrs, fsk->Nbits*sizeof(float));
+    memmove(f->twoframes_hard,
+            &f->twoframes_hard[fsk->Nbits],
+            2*bits_per_frame-fsk->Nbits);
+
+    /* convert bit LLRs to hard decisions */
+    for(int i=0; i<fsk->Nbits; i++) {
+        if (llrs[i] < 0)
+            f->twoframes_hard[2*bits_per_frame - fsk->Nbits + i] = 1;
+        else
+            f->twoframes_hard[2*bits_per_frame - fsk->Nbits + i] = 0;
+    }
+    f->fsk_ldpc_nbits += fsk->Nbits;
+    f->fsk_ldpc_newbits += fsk->Nbits;
+
+    if (f->fsk_ldpc_nbits > bits_per_frame) {
+        // OK we have accumulated at least one new frame of bits, lets run
+        // deframer state machine
+
+        fprintf(stderr, "state: %d nbits: %d newbits: %d best_location: %d ",
+                f->fsk_ldpc_state, f->fsk_ldpc_nbits, f->fsk_ldpc_newbits, f->fsk_ldpc_best_location);
+        int errors;
+        int next_state = f->fsk_ldpc_state;
+        switch(f->fsk_ldpc_state) {
+        case 0:
+            /* out of sync - look for UW */
+            f->fsk_ldpc_best_location = 0;
+            int best_errors = sizeof(fsk_ldpc_uw);
+            for(int i=0; i<bits_per_frame; i++) {
+                errors = 0;
+                for(int u=0; u<sizeof(fsk_ldpc_uw); u++)
+                    errors += f->twoframes_hard[i+u] ^ fsk_ldpc_uw[u];
+                //fprintf(stderr, "  errors: %d %d %d\n", i, errors, best_errors);
+                if (errors < best_errors) { best_errors = errors; f->fsk_ldpc_best_location = i; }
+            }
+            if (best_errors <= f->fsk_ldpc_thresh1) {
+                fprintf(stderr, "  found UW!\n"); next_state = 1; f->fsk_ldpc_baduw = 0;
+            }
+            break;
+        case 1: /* in sync */
+            /* work out where UW should be */
+            f->fsk_ldpc_best_location += bits_per_frame - f->fsk_ldpc_newbits;
+            /* check UW still OK */
+            errors = 0;
+            for(int u=0; u<sizeof(fsk_ldpc_uw); u++)
+                errors += f->twoframes_hard[f->fsk_ldpc_best_location+u] ^ fsk_ldpc_uw[u];
+            fprintf(stderr, "%d errors: %d bad_uw: %d\n", f->fsk_ldpc_best_location, errors, f->fsk_ldpc_baduw);
+            if (errors >= f->fsk_ldpc_thresh2) {
+                f->fsk_ldpc_baduw++;
+                if (f->fsk_ldpc_baduw == 3) {
+                    fprintf(stderr, "  lost UW!\n"); next_state = 0;
+                }
+            }
+            else f->fsk_ldpc_baduw = 0;
+            break;
+        }
+        f->fsk_ldpc_state = next_state;
+        f->fsk_ldpc_nbits -= bits_per_frame;
+        f->fsk_ldpc_newbits = 0;
+    }
+
+    return 0;
+    
+    // LDPC decode
+    // output perodically
+    // testframe mode - shoul that be internal for tx/rx?
 }
 
 

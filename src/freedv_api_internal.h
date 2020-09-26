@@ -177,6 +177,12 @@ struct freedv {
     void (*freedv_get_next_proto)(void *callback_state, char *proto_bits_packed);
     void *proto_callback_state;
     int n_protocol_bits;
+
+    /* states needed for FSK LDPC deframer */
+    uint8_t *twoframes_hard;
+    float   *twoframes_llr;
+    int      fsk_ldpc_state, fsk_ldpc_thresh1, fsk_ldpc_thresh2, fsk_ldpc_baduw, fsk_ldpc_best_location;
+    int      fsk_ldpc_nbits, fsk_ldpc_newbits;
 };
 
 // open function for each mode
@@ -207,9 +213,11 @@ int freedv_comprx_2020(struct freedv *f, COMP demod_in[]);
 void freedv_comptx_fsk_voice(struct freedv *f, COMP mod_out[]);
 void freedv_tx_fsk_voice(struct freedv *f, short mod_out[]);
 void freedv_tx_fsk_data(struct freedv *f, short mod_out[]);
-void freedv_tx_fsk_ldpc_data(struct freedv *f, short mod_out[]);
 int freedv_comprx_fsk(struct freedv *f, COMP demod_in[]);
 int freedv_floatrx(struct freedv *f, short speech_out[], float demod_in[]);
+
+void freedv_tx_fsk_ldpc_data(struct freedv *f, short mod_out[]);
+int freedv_rx_fsk_ldpc_data(struct freedv *f, COMP demod_in[]);
       
 int freedv_bits_to_speech(struct freedv *f, short speech_out[], short demod_in[], int rx_status);
       

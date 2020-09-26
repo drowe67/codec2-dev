@@ -710,7 +710,7 @@ static void codec2_decode_upacked(struct freedv *f, short speech_out[], uint8_t 
   Deal with 700D first frame burble, and different sync states from OFDM modes like 700D
   Output no samples if squelched, we assume it's OK for the audio sink to run dry
   A FIFO required on output to smooth sample flow to audio sink
-  Don't decode when we are sendingtest frames
+  Don't decode when we are sending test frames
 
 \*---------------------------------------------------------------------------*/
 
@@ -860,6 +860,9 @@ int freedv_rawdatarx(struct freedv *f, unsigned char *packed_payload_bits, short
     if (FDV_MODE_ACTIVE( FREEDV_MODE_1600, f->mode)) rx_status = freedv_comprx_fdmdv_1600(f, rx_fdm);
     if (FDV_MODE_ACTIVE( FREEDV_MODE_700C, f->mode)) rx_status = freedv_comprx_700c(f, rx_fdm);
     if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode)) rx_status = freedv_comp_short_rx_700d(f, (void*)demod_in, 1, 2.0f);
+    if (FDV_MODE_ACTIVE( FREEDV_MODE_FSK_LDPC, f->mode)) {
+        rx_status = freedv_rx_fsk_ldpc_data(f, rx_fdm);
+    }
 
     if (rx_status & RX_BITS) {
 	ret = (f->bits_per_modem_frame+7)/8;

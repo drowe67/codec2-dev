@@ -50,7 +50,7 @@ int main(int argc, char *argv[]) {
         #ifdef __LPCNET__
         sprintf(f2020,"|2020");
         #endif     
-	printf("usage: %s 700C|700D|800XA%s InputModemSpeechFile OutputSpeechRawFile\n"
+	printf("usage: %s 700C|700D|800XA|FSK_LDPC%s InputModemSpeechFile BinaryDataFile\n"
                " [-v] \n", argv[0],f2020);
 	printf("e.g    %s 700D dataBytes_700d.raw dataBytes_rx.bin\n", argv[0]);
 	exit(1);
@@ -62,6 +62,7 @@ int main(int argc, char *argv[]) {
     #ifdef __LPCNET__
     if (!strcmp(argv[1],"2020")) mode = FREEDV_MODE_2020;
     #endif
+    if (!strcmp(argv[1],"FSK_LDPC")) mode = FREEDV_MODE_FSK_LDPC;
     if (mode == -1) {
         fprintf(stderr, "Error in mode: %s\n", argv[1]);
         exit(1);
