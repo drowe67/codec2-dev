@@ -337,23 +337,30 @@ void freedv_tx_fsk_data(struct freedv *f, short mod_out[]) {
 }
 
 
-/* FreeDV FSK_LDPC mode tx */
-void freedv_tx_fsk_ldpc_data(struct freedv *f, COMP mod_out[]) {
-    int bits_per_frame = f->ldpc->coded_bits_per_frame + sizeof(fsk_ldpc_uw);
-    uint8_t frame[bits_per_frame];
-    int   i;
-    
-    assert(f->mode == FREEDV_MODE_FSK_LDPC);
-   
+int freedv_tx_fsk_ldpc_bits_per_frame(struct freedv *f) { return f->ldpc->coded_bits_per_frame + sizeof(fsk_ldpc_uw); }
+
+/* in a separate function so callable by other FSK Txs */
+void freedv_tx_fsk_ldpc_framer(struct freedv *f, uint8_t frame[], uint8_t payload_data[]) {
+
     /* lets build up the frame to Tx ............. */
 
     /* insert UW */
     memcpy(frame, fsk_ldpc_uw, sizeof(fsk_ldpc_uw));
     /* insert data bits */
-    memcpy(frame + sizeof(fsk_ldpc_uw), f->tx_payload_bits, f->bits_per_modem_frame);
+    memcpy(frame + sizeof(fsk_ldpc_uw), payload_data, f->bits_per_modem_frame);
     /* insert parity bits */
     encode(f->ldpc, frame + sizeof(fsk_ldpc_uw), frame + sizeof(fsk_ldpc_uw) + f->bits_per_modem_frame);  
+}
 
+/* FreeDV FSK_LDPC mode tx */
+void freedv_tx_fsk_ldpc_data(struct freedv *f, COMP mod_out[]) {
+    int bits_per_frame = freedv_tx_fsk_ldpc_bits_per_frame(f);
+    uint8_t frame[bits_per_frame];
+    int   i;
+    
+    assert(f->mode == FREEDV_MODE_FSK_LDPC);
+   
+    freedv_tx_fsk_ldpc_framer(f, frame, f->tx_payload_bits);    
     fsk_mod_c(f->fsk, mod_out, frame, bits_per_frame);
 
     /* Convert float samps to short */
@@ -366,7 +373,7 @@ void freedv_tx_fsk_ldpc_data(struct freedv *f, COMP mod_out[]) {
 
 /* FreeDV FSK_LDPC mode rx */
 int freedv_rx_fsk_ldpc_data(struct freedv *f, COMP demod_in[]) {
-    int bits_per_frame = f->ldpc->coded_bits_per_frame + sizeof(fsk_ldpc_uw);
+    int bits_per_frame = freedv_tx_fsk_ldpc_bits_per_frame(f);
     struct FSK *fsk = f->fsk;
     float rx_filt[fsk->mode*fsk->Nsym];
     float llrs[fsk->Nbits];
