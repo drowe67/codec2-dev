@@ -57,11 +57,11 @@
 #define CODEC_MODE_LPCNET_1733 100
 
 // Return code flags for freedv_*rx* functions
-#define RX_TRIAL_SYNC       0x1       // set if demodulator has trial sync
-#define RX_SYNC             0x2       // set if demodulator has sync
-#define RX_BITS             0x4       // set if data bits have been returned
-#define RX_BIT_ERRORS       0x8       // set if there are some uncorrectable errors in the data bits
-
+#define RX_TRIAL_SYNC       0x1       // demodulator has trial sync
+#define RX_SYNC             0x2       // demodulator has sync
+#define RX_BITS             0x4       // data bits have been returned
+#define RX_BIT_ERRORS       0x8       // FEC may not have corrected all bit errors (not all parity checks OK)
+                                      
 extern char *rx_sync_flags_to_text[]; // converts flags above to more meaningful text
       
 struct freedv {

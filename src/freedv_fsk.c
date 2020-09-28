@@ -336,7 +336,6 @@ void freedv_tx_fsk_data(struct freedv *f, short mod_out[]) {
     }
 }
 
-
 int freedv_tx_fsk_ldpc_bits_per_frame(struct freedv *f) { return f->ldpc->coded_bits_per_frame + sizeof(fsk_ldpc_uw); }
 
 /* in a separate function so callable by other FSK Txs */
@@ -383,7 +382,7 @@ int freedv_rx_fsk_ldpc_data(struct freedv *f, COMP demod_in[]) {
     
     fsk_demod_sd(fsk, rx_filt, demod_in);
     fsk_rx_filt_to_llrs(llrs, rx_filt, fsk->v_est, fsk->SNRest, fsk->mode, fsk->Nsym);
-    f->nin = fsk_nin(f->fsk);
+    f->nin = fsk_nin(fsk);
     f->snr_est = fsk->SNRest;
 
     /* OK we have fsk->Nbits new bits/symbols, place them at the end of the buffers */
@@ -410,11 +409,8 @@ int freedv_rx_fsk_ldpc_data(struct freedv *f, COMP demod_in[]) {
 
     if (f->fsk_ldpc_nbits > bits_per_frame) {
         // OK we have accumulated at least one new frame of bits, lets run
-        // deframer state machine
+        // frame based processing
 
-        if (f->verbose)
-            fprintf(stderr, "state: %d nbits: %d newbits: %d best_location: %d\n",
-                    f->fsk_ldpc_state, f->fsk_ldpc_nbits, f->fsk_ldpc_newbits, f->fsk_ldpc_best_location);
         int errors = 0;
         int next_state = f->fsk_ldpc_state;
         switch(f->fsk_ldpc_state) {
@@ -429,7 +425,6 @@ int freedv_rx_fsk_ldpc_data(struct freedv *f, COMP demod_in[]) {
                 if (errors < best_errors) { best_errors = errors; f->fsk_ldpc_best_location = i; }
             }
             if (best_errors <= f->fsk_ldpc_thresh1) {
-                if (f->verbose) fprintf(stderr, "  found UW!\n");
                 next_state = 1; f->fsk_ldpc_baduw = 0;
             }
             break;
@@ -440,11 +435,9 @@ int freedv_rx_fsk_ldpc_data(struct freedv *f, COMP demod_in[]) {
             /* check UW still OK */
             for(int u=0; u<sizeof(fsk_ldpc_uw); u++)
                 errors += f->twoframes_hard[f->fsk_ldpc_best_location+u] ^ fsk_ldpc_uw[u];
-            if (f->verbose) fprintf(stderr, "%d errors: %d bad_uw: %d\n", f->fsk_ldpc_best_location, errors, f->fsk_ldpc_baduw);
             if (errors >= f->fsk_ldpc_thresh2) {
                 f->fsk_ldpc_baduw++;
                 if (f->fsk_ldpc_baduw == 3) {
-                    //fprintf(stderr, "  lost UW!\n");
                     next_state = 0;
                 }
             }
@@ -454,13 +447,12 @@ int freedv_rx_fsk_ldpc_data(struct freedv *f, COMP demod_in[]) {
         f->fsk_ldpc_state = next_state;
         f->fsk_ldpc_nbits -= bits_per_frame;
         f->fsk_ldpc_newbits = 0;
-        
+
+        int Nerrs_raw, Nerrs_coded, iter, parityCheckCount;
         if (f->fsk_ldpc_state == 1) {
-            int parityCheckCount;
-            run_ldpc_decoder(f->ldpc, f->rx_payload_bits,
-                             &f->twoframes_llr[f->fsk_ldpc_best_location+sizeof(fsk_ldpc_uw)],
-                             &parityCheckCount);
-            if (f->verbose) fprintf(stderr, "parityCheckCount: %d\n",parityCheckCount);
+            iter = run_ldpc_decoder(f->ldpc, f->rx_payload_bits,
+                                    &f->twoframes_llr[f->fsk_ldpc_best_location+sizeof(fsk_ldpc_uw)],
+                                    &parityCheckCount);
             rx_status |= RX_BITS;
             if (parityCheckCount != f->ldpc->NumberParityBits)
                 rx_status |= RX_BIT_ERRORS;
@@ -473,19 +465,30 @@ int freedv_rx_fsk_ldpc_data(struct freedv *f, COMP demod_in[]) {
                 encode(f->ldpc, tx_frame + sizeof(fsk_ldpc_uw), tx_frame + sizeof(fsk_ldpc_uw) + f->bits_per_modem_frame);  
                 
                 /* count uncoded (raw) errors across UW, payload bits, parity bits */
-                int Nerrs_raw = count_errors(tx_frame, f->twoframes_hard + f->fsk_ldpc_best_location, bits_per_frame);
+                Nerrs_raw = count_errors(tx_frame, f->twoframes_hard + f->fsk_ldpc_best_location, bits_per_frame);
                 f->total_bit_errors += Nerrs_raw;
                 f->total_bits += bits_per_frame;
 
                 /* count coded errors across just payload bits */
-                int Nerrs_coded = count_errors(tx_frame + sizeof(fsk_ldpc_uw), f->rx_payload_bits, f->bits_per_modem_frame);
+                Nerrs_coded = count_errors(tx_frame + sizeof(fsk_ldpc_uw), f->rx_payload_bits, f->bits_per_modem_frame);
                 f->total_bit_errors_coded += Nerrs_coded;
                 f->total_bits_coded += f->bits_per_modem_frame;
             }
         }
-    }
 
-    if (f->fsk_ldpc_state == 1) rx_status |= RX_SYNC;
+        if (f->fsk_ldpc_state == 1) rx_status |= RX_SYNC; /* need this set before verbose logging */
+        if (f->verbose) {
+            fprintf(stderr, "%3d nbits: %3d state: %d uw_loc: %d uw_err: %d bad_uw: %d snrdB: %4.1f eraw: %3d ecdd: %3d "
+                            "iter: %3d pcc: %d rxst: %s\n",
+                    f->frames++, f->fsk_ldpc_nbits, f->fsk_ldpc_state, f->fsk_ldpc_best_location, errors,
+                    f->fsk_ldpc_baduw, 10.0*log10(fsk->SNRest), Nerrs_raw, Nerrs_coded, iter, parityCheckCount,
+                    rx_sync_flags_to_text[rx_status]);
+        }
+    }
+    else {
+        /* set RX_SYNC flag even if we don't perform frame processing */
+        if (f->fsk_ldpc_state == 1) rx_status |= RX_SYNC;
+    }
     
     return rx_status;
 }
