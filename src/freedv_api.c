@@ -108,7 +108,7 @@ char *rx_sync_flags_to_text[] = {
 \*---------------------------------------------------------------------------*/
 
 struct freedv *freedv_open(int mode) {
-    struct freedv_advanced adv = {0,2,100,8000,1000,200, "H_256_512_4"};
+    struct freedv_advanced adv = {0,2,1000,8000,1000,1000, "H_256_512_4"};
     if (mode == FREEDV_MODE_FSK_LDPC)
         return freedv_open_advanced(mode, &adv);
     else

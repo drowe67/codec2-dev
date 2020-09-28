@@ -823,11 +823,11 @@ endif(NOT APPLE)
                             ./freedv_data_raw_rx 700D - - -v | 
                             diff /dev/stdin binaryIn.bin")
 
-     # FreeDV API raw data - FSK LDPC 
+     # FreeDV API raw data - FSK LDPC with enough noise for several % raw BER to give FEC a work out
      add_test(NAME test_freedv_data_raw_fsk_ldpc
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
                             ./freedv_data_raw_tx FSK_LDPC /dev/zero - --testframes 10 |
-                            ./cohpsk_ch - - 0 --Fs 8000 |
+                            ./cohpsk_ch - - -8 --Fs 8000 |
                             ./freedv_data_raw_rx FSK_LDPC - /dev/null --testframes")           
 
 endif(UNITTEST)
