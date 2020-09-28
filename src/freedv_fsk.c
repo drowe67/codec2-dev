@@ -168,7 +168,7 @@ void freedv_fsk_ldpc_open(struct freedv *f, struct freedv_advanced *adv) {
     f->fsk_ldpc_thresh1 = 0.1*sizeof(fsk_ldpc_uw);
     f->fsk_ldpc_thresh2 = 0.4*sizeof(fsk_ldpc_uw);
     f->fsk_ldpc_baduw = 0;
-    fprintf(stderr, "thresh1: %d thresh2: %d\n", f->fsk_ldpc_thresh1, f->fsk_ldpc_thresh2);
+    //fprintf(stderr, "thresh1: %d thresh2: %d\n", f->fsk_ldpc_thresh1, f->fsk_ldpc_thresh2);
     f->fsk_ldpc_nbits = f->fsk_ldpc_newbits = 0;
     f->fsk_ldpc_best_location = 0;
 }
@@ -412,8 +412,9 @@ int freedv_rx_fsk_ldpc_data(struct freedv *f, COMP demod_in[]) {
         // OK we have accumulated at least one new frame of bits, lets run
         // deframer state machine
 
-        //fprintf(stderr, "state: %d nbits: %d newbits: %d best_location: %d ",
-        //        f->fsk_ldpc_state, f->fsk_ldpc_nbits, f->fsk_ldpc_newbits, f->fsk_ldpc_best_location);
+        if (f->verbose)
+            fprintf(stderr, "state: %d nbits: %d newbits: %d best_location: %d\n",
+                    f->fsk_ldpc_state, f->fsk_ldpc_nbits, f->fsk_ldpc_newbits, f->fsk_ldpc_best_location);
         int errors = 0;
         int next_state = f->fsk_ldpc_state;
         switch(f->fsk_ldpc_state) {
@@ -428,7 +429,7 @@ int freedv_rx_fsk_ldpc_data(struct freedv *f, COMP demod_in[]) {
                 if (errors < best_errors) { best_errors = errors; f->fsk_ldpc_best_location = i; }
             }
             if (best_errors <= f->fsk_ldpc_thresh1) {
-                //fprintf(stderr, "  found UW!\n");
+                if (f->verbose) fprintf(stderr, "  found UW!\n");
                 next_state = 1; f->fsk_ldpc_baduw = 0;
             }
             break;
@@ -439,7 +440,7 @@ int freedv_rx_fsk_ldpc_data(struct freedv *f, COMP demod_in[]) {
             /* check UW still OK */
             for(int u=0; u<sizeof(fsk_ldpc_uw); u++)
                 errors += f->twoframes_hard[f->fsk_ldpc_best_location+u] ^ fsk_ldpc_uw[u];
-            //fprintf(stderr, "%d errors: %d bad_uw: %d\n", f->fsk_ldpc_best_location, errors, f->fsk_ldpc_baduw);
+            if (f->verbose) fprintf(stderr, "%d errors: %d bad_uw: %d\n", f->fsk_ldpc_best_location, errors, f->fsk_ldpc_baduw);
             if (errors >= f->fsk_ldpc_thresh2) {
                 f->fsk_ldpc_baduw++;
                 if (f->fsk_ldpc_baduw == 3) {
@@ -459,6 +460,7 @@ int freedv_rx_fsk_ldpc_data(struct freedv *f, COMP demod_in[]) {
             run_ldpc_decoder(f->ldpc, f->rx_payload_bits,
                              &f->twoframes_llr[f->fsk_ldpc_best_location+sizeof(fsk_ldpc_uw)],
                              &parityCheckCount);
+            if (f->verbose) fprintf(stderr, "parityCheckCount: %d\n",parityCheckCount);
             rx_status |= RX_BITS;
             if (parityCheckCount != f->ldpc->NumberParityBits)
                 rx_status |= RX_BIT_ERRORS;

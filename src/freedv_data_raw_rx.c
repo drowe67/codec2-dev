@@ -125,7 +125,7 @@ int main(int argc, char *argv[]) {
             nbytes_total += nbytes;
         }
         
-        if (verbose == 1) {
+        if (verbose == 2) {
             fprintf(stderr, "frame: %d nin: %d sync: %d nbytes: %d uncorrected: %d\n",
                     frame, nin, freedv_get_sync(freedv), nbytes, freedv_get_uncorrected_errors(freedv));
         }
