@@ -425,6 +425,7 @@ int freedv_rx_fsk_ldpc_data(struct freedv *f, COMP demod_in[]) {
                 if (errors < best_errors) { best_errors = errors; f->fsk_ldpc_best_location = i; }
             }
             if (best_errors <= f->fsk_ldpc_thresh1) {
+                errors = best_errors;
                 next_state = 1; f->fsk_ldpc_baduw = 0;
             }
             break;
@@ -448,7 +449,7 @@ int freedv_rx_fsk_ldpc_data(struct freedv *f, COMP demod_in[]) {
         f->fsk_ldpc_nbits -= bits_per_frame;
         f->fsk_ldpc_newbits = 0;
 
-        int Nerrs_raw, Nerrs_coded, iter, parityCheckCount;
+        int Nerrs_raw=0, Nerrs_coded=0, iter=0, parityCheckCount=0;
         if (f->fsk_ldpc_state == 1) {
             iter = run_ldpc_decoder(f->ldpc, f->rx_payload_bits,
                                     &f->twoframes_llr[f->fsk_ldpc_best_location+sizeof(fsk_ldpc_uw)],
@@ -478,7 +479,7 @@ int freedv_rx_fsk_ldpc_data(struct freedv *f, COMP demod_in[]) {
 
         if (f->fsk_ldpc_state == 1) rx_status |= RX_SYNC; /* need this set before verbose logging */
         if (f->verbose) {
-            fprintf(stderr, "%3d nbits: %3d state: %d uw_loc: %d uw_err: %d bad_uw: %d snrdB: %4.1f eraw: %3d ecdd: %3d "
+            fprintf(stderr, "%3d nbits: %3d state: %d uw_loc: %3d uw_err: %2d bad_uw: %d snrdB: %4.1f eraw: %3d ecdd: %3d "
                             "iter: %3d pcc: %d rxst: %s\n",
                     f->frames++, f->fsk_ldpc_nbits, f->fsk_ldpc_state, f->fsk_ldpc_best_location, errors,
                     f->fsk_ldpc_baduw, 10.0*log10(fsk->SNRest), Nerrs_raw, Nerrs_coded, iter, parityCheckCount,

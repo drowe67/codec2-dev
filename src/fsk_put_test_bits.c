@@ -48,7 +48,7 @@ int main(int argc,char *argv[]){
     int packed_in = 0;
     
     char usage[] = "usage: %s [-f frameSizeBits] [-t VaildFrameBERThreshold] [-b BERPass] [-p numPacketsPass] [-k] InputOneBitPerByte\n"
-                   "  [-k] packet byte input";
+                   "  [-k] packet byte input\n";
 
     int opt;
     while ((opt = getopt(argc, argv, "f:b:p:hqt:k")) != -1) {
