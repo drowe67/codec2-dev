@@ -34,6 +34,7 @@
 #include <stdint.h>
 
 #include "freedv_api.h"
+#include "fsk.h"
 #include "ofdm_internal.h"
 
 int main(int argc, char *argv[]) {
@@ -154,13 +155,14 @@ int main(int argc, char *argv[]) {
     }
 
  finished:
-    /* A few extra output buffers so demods can complete last frame */
     for(int i=0; i< n_mod_out; i++) mod_out[i] = 0;
-    fwrite(mod_out, sizeof(short), n_mod_out, fout);
-    /* ofdm modes need and extra frame */
-    if (mode != FREEDV_MODE_FSK_LDPC)
+    if (mode != FREEDV_MODE_FSK_LDPC) {
+        /* for OFDM modes a few extra empty output buffers so demods can complete last frame */
         fwrite(mod_out, sizeof(short), n_mod_out, fout);
-
+    } else {
+        fwrite(mod_out, sizeof(short), n_mod_out, fout);
+    }
+    
     freedv_close(freedv);
     fclose(fin);
     fclose(fout);

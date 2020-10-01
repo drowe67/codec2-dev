@@ -827,7 +827,7 @@ endif(NOT APPLE)
      add_test(NAME test_freedv_data_raw_fsk_ldpc
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
                             ./freedv_data_raw_tx FSK_LDPC /dev/zero - --testframes 10 |
-                            ./cohpsk_ch - - -8 --Fs 8000 |
+                            ./cohpsk_ch - - 0 --Fs 8000 |
                             ./freedv_data_raw_rx FSK_LDPC - /dev/null --testframes")           
 
 endif(UNITTEST)

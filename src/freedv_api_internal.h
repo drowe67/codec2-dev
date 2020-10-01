@@ -182,7 +182,7 @@ struct freedv {
     uint8_t *twoframes_hard;
     float   *twoframes_llr;
     int      fsk_ldpc_state, fsk_ldpc_thresh1, fsk_ldpc_thresh2, fsk_ldpc_baduw, fsk_ldpc_best_location;
-    int      fsk_ldpc_nbits, fsk_ldpc_newbits;
+    int      fsk_ldpc_nbits, fsk_ldpc_newbits, fsk_ldpc_baduw_thresh;
 };
 
 // open function for each mode
