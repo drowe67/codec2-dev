@@ -179,10 +179,12 @@ struct freedv {
     int n_protocol_bits;
 
     /* states needed for FSK LDPC deframer */
-    uint8_t *twoframes_hard;
+    float   *frame_llr;
+    int      frame_llr_size, frame_llr_nbits;
     float   *twoframes_llr;
-    int      fsk_ldpc_state, fsk_ldpc_thresh1, fsk_ldpc_thresh2, fsk_ldpc_baduw, fsk_ldpc_best_location;
-    int      fsk_ldpc_nbits, fsk_ldpc_newbits, fsk_ldpc_baduw_thresh;
+    uint8_t *twoframes_hard;
+    int      fsk_ldpc_thresh1, fsk_ldpc_thresh2, fsk_ldpc_baduw_thresh;
+    int      fsk_ldpc_state,  fsk_ldpc_best_location, fsk_ldpc_baduw;
 };
 
 // open function for each mode

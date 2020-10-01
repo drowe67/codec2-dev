@@ -155,14 +155,10 @@ int main(int argc, char *argv[]) {
     }
 
  finished:
+    /* few empty frames to allow rx to finish processing */
     for(int i=0; i< n_mod_out; i++) mod_out[i] = 0;
-    if (mode != FREEDV_MODE_FSK_LDPC) {
-        /* for OFDM modes a few extra empty output buffers so demods can complete last frame */
-        fwrite(mod_out, sizeof(short), n_mod_out, fout);
-        fwrite(mod_out, sizeof(short), n_mod_out, fout);
-    } else {
-        fwrite(mod_out, sizeof(short), n_mod_out, fout);
-    }
+    fwrite(mod_out, sizeof(short), n_mod_out, fout);
+    fwrite(mod_out, sizeof(short), n_mod_out, fout);
     
     freedv_close(freedv);
     fclose(fin);

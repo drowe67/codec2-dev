@@ -161,6 +161,10 @@ void freedv_fsk_ldpc_open(struct freedv *f, struct freedv_advanced *adv) {
     f->modem_symbol_rate = adv->Rs;
 
     /* deframer set up */
+    f->frame_llr_size = 2*bits_per_frame;
+    f->frame_llr = (float*)malloc(f->frame_llr_size*sizeof(float)); assert(f->frame_llr != NULL);
+    f->frame_llr_nbits = 0;
+    
     f->twoframes_hard = malloc(2*bits_per_frame); assert(f->twoframes_hard != NULL);
     memset(f->twoframes_hard, 0, 2*bits_per_frame);
     f->twoframes_llr = (float*)malloc(2*bits_per_frame*sizeof(float)); assert(f->twoframes_llr != NULL);
@@ -172,9 +176,8 @@ void freedv_fsk_ldpc_open(struct freedv *f, struct freedv_advanced *adv) {
     f->fsk_ldpc_baduw_thresh=1;
     
     //fprintf(stderr, "thresh1: %d thresh2: %d\n", f->fsk_ldpc_thresh1, f->fsk_ldpc_thresh2);
-    f->fsk_ldpc_baduw = 0; f->fsk_ldpc_nbits = f->fsk_ldpc_newbits = 0;
+    f->fsk_ldpc_baduw = 0;
     f->fsk_ldpc_best_location = 0;  f->fsk_ldpc_state = 0;
-
 }
 
 
@@ -379,41 +382,41 @@ int freedv_rx_fsk_ldpc_data(struct freedv *f, COMP demod_in[]) {
     int bits_per_frame = freedv_tx_fsk_ldpc_bits_per_frame(f);
     struct FSK *fsk = f->fsk;
     float rx_filt[fsk->mode*fsk->Nsym];
-    float llrs[fsk->Nbits];
     int   rx_status = 0;
-    
-    /* demodulate to bit LLRs */
-    
+
+    /* Couple of layers of buffers to move chunks of fsk->Nbits into a
+       double buffer we can use for frame sync.  There are other ways
+       of doing this, e.g. FIFOs */
+
+    /* demodulate to bit LLRs which are placed at end of buffer */    
     fsk_demod_sd(fsk, rx_filt, demod_in);
-    fsk_rx_filt_to_llrs(llrs, rx_filt, fsk->v_est, fsk->SNRest, fsk->mode, fsk->Nsym);
+    fsk_rx_filt_to_llrs(&f->frame_llr[f->frame_llr_nbits],
+                        rx_filt, fsk->v_est, fsk->SNRest, fsk->mode, fsk->Nsym);
     f->nin = fsk_nin(fsk);
     f->snr_est = fsk->SNRest;
+    f->frame_llr_nbits += fsk->Nbits;
+    assert(f->frame_llr_nbits < f->frame_llr_size);
 
-    /* OK we have fsk->Nbits new bits/symbols, place them at the end of the buffers */
+    if (f->frame_llr_nbits >= bits_per_frame) {
+        /* We have an entire frame of llrs, place them at the end of the double buffer */
+        memmove(f->twoframes_llr, &f->twoframes_llr[bits_per_frame], bits_per_frame*sizeof(float));
+        memcpy(&f->twoframes_llr[bits_per_frame], f->frame_llr, bits_per_frame*sizeof(float));
 
-    memmove(f->twoframes_llr,
-            &f->twoframes_llr[fsk->Nbits],
-            (2*bits_per_frame-fsk->Nbits)*sizeof(float));
-    memcpy(&f->twoframes_llr[2*bits_per_frame-fsk->Nbits], llrs, fsk->Nbits*sizeof(float));
-    memmove(f->twoframes_hard,
-            &f->twoframes_hard[fsk->Nbits],
-            2*bits_per_frame-fsk->Nbits);
+        /* update new hard decisions buffer (used for UW search) */
+        memmove(f->twoframes_hard, &f->twoframes_hard[bits_per_frame], bits_per_frame);
+        for(int i=0; i<bits_per_frame; i++) {
+            if (f->frame_llr[i] < 0)
+                f->twoframes_hard[bits_per_frame + i] = 1;
+            else
+                f->twoframes_hard[bits_per_frame + i] = 0;
+        }
 
-    /* convert bit LLRs to hard decisions */
-    for(int i=0; i<fsk->Nbits; i++) {
-        if (llrs[i] < 0)
-            f->twoframes_hard[2*bits_per_frame - fsk->Nbits + i] = 1;
-        else
-            f->twoframes_hard[2*bits_per_frame - fsk->Nbits + i] = 0;
-    }
-
-    /* used to track where UW (and latest frame) will be */
-    f->fsk_ldpc_nbits += fsk->Nbits;
-    f->fsk_ldpc_newbits += fsk->Nbits;
-
-    if (f->fsk_ldpc_nbits > bits_per_frame) {
-        // OK we have accumulated at least one new frame of bits, lets run
-        // frame based processing
+        /* update single frame buffer */
+        memmove(f->frame_llr, &f->frame_llr[bits_per_frame], (f->frame_llr_nbits-bits_per_frame)*sizeof(float));
+        f->frame_llr_nbits -= bits_per_frame;
+        assert(f->frame_llr_nbits >= 0);
+        
+        // OK lets run frame based processing
 
         int errors = 0;
         int next_state = f->fsk_ldpc_state;
@@ -430,13 +433,11 @@ int freedv_rx_fsk_ldpc_data(struct freedv *f, COMP demod_in[]) {
             }
             if (best_errors <= f->fsk_ldpc_thresh1) {
                 errors = best_errors;
-                next_state = 1; f->fsk_ldpc_baduw = 0;
+                next_state = 1;
+                f->fsk_ldpc_baduw = 0;
             }
             break;
         case 1: /* in sync */
-            /* work out where UW should be, this is tricky as we don't input exactly bits_per_frame, 
-               but rather some multiple of fsk->Nbits */
-            f->fsk_ldpc_best_location += bits_per_frame - f->fsk_ldpc_newbits;
             assert(f->fsk_ldpc_best_location >= 0);
             assert(f->fsk_ldpc_best_location < bits_per_frame);
             
@@ -453,14 +454,14 @@ int freedv_rx_fsk_ldpc_data(struct freedv *f, COMP demod_in[]) {
             break;
         }
         f->fsk_ldpc_state = next_state;
-        f->fsk_ldpc_nbits -= bits_per_frame;
-        f->fsk_ldpc_newbits = 0;
 
         int Nerrs_raw=0, Nerrs_coded=0, iter=0, parityCheckCount=0;
         if (f->fsk_ldpc_state == 1) {
-            iter = run_ldpc_decoder(f->ldpc, f->rx_payload_bits,
+            uint8_t decoded_codeword[f->ldpc->ldpc_coded_bits_per_frame];
+            iter = run_ldpc_decoder(f->ldpc, decoded_codeword,
                                     &f->twoframes_llr[f->fsk_ldpc_best_location+sizeof(fsk_ldpc_uw)],
                                     &parityCheckCount);
+            memcpy(f->rx_payload_bits, decoded_codeword, f->bits_per_modem_frame);
             rx_status |= RX_BITS;
             if (parityCheckCount != f->ldpc->NumberParityBits)
                 rx_status |= RX_BIT_ERRORS;
@@ -488,7 +489,7 @@ int freedv_rx_fsk_ldpc_data(struct freedv *f, COMP demod_in[]) {
         if (f->verbose) {
             fprintf(stderr, "%3d nbits: %3d state: %d uw_loc: %3d uw_err: %2d bad_uw: %d snrdB: %4.1f eraw: %3d ecdd: %3d "
                             "iter: %3d pcc: %3d rxst: %s\n",
-                    f->frames++, f->fsk_ldpc_nbits, f->fsk_ldpc_state, f->fsk_ldpc_best_location, errors,
+                    f->frames++, f->frame_llr_nbits, f->fsk_ldpc_state, f->fsk_ldpc_best_location, errors,
                     f->fsk_ldpc_baduw, 10.0*log10(fsk->SNRest), Nerrs_raw, Nerrs_coded, iter, parityCheckCount,
                     rx_sync_flags_to_text[rx_status]);
         }
