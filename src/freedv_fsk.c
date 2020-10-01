@@ -28,8 +28,8 @@
 #include "ldpc_codes.h"
 #include "interldpc.h"
 
-/* 16 bit 0x5186 Unique word for fsk_ldpc modes */
-static uint8_t fsk_ldpc_uw[] = {0,1,0,1, 0,0,0,1, 1,0,0,0, 0,1,1,0}; 
+/* 32 bit 0x5186fe15 Unique word for fsk_ldpc modes */
+static uint8_t fsk_ldpc_uw[] = {0,1,0,1, 0,0,0,1, 1,0,0,0, 0,1,1,0, 1,1,1,1, 1,1,1,0, 0,0,0,1, 0,1,0,1}; 
     
 void freedv_2400a_open(struct freedv *f) {
     f->n_protocol_bits = 20;
@@ -140,6 +140,7 @@ void freedv_fsk_ldpc_open(struct freedv *f, struct freedv_advanced *adv) {
     assert(code_index != -1);
     f->ldpc = (struct LDPC*)MALLOC(sizeof(struct LDPC)); assert(f->ldpc != NULL);
     ldpc_codes_setup(f->ldpc, adv->codename);
+    f->ldpc->max_iter = 15;
     //fprintf(stderr, "Using: %s\n", f->ldpc->name);
 
     f->bits_per_modem_frame = f->ldpc->data_bits_per_frame;
@@ -164,13 +165,16 @@ void freedv_fsk_ldpc_open(struct freedv *f, struct freedv_advanced *adv) {
     memset(f->twoframes_hard, 0, 2*bits_per_frame);
     f->twoframes_llr = (float*)malloc(2*bits_per_frame*sizeof(float)); assert(f->twoframes_llr != NULL);
     for(int i=0; i<2*bits_per_frame; i++) f->twoframes_llr[i] = 0.0;
-    f->fsk_ldpc_state = 0;
-    f->fsk_ldpc_thresh1 = 0.1*sizeof(fsk_ldpc_uw);
-    f->fsk_ldpc_thresh2 = 0.4*sizeof(fsk_ldpc_uw);
-    f->fsk_ldpc_baduw = 0;
+    
+    /* currently configured a simple frame-frame approach */
+    f->fsk_ldpc_thresh1 = 5;
+    f->fsk_ldpc_thresh2 = 5;
+    f->fsk_ldpc_baduw_thresh=1;
+    
     //fprintf(stderr, "thresh1: %d thresh2: %d\n", f->fsk_ldpc_thresh1, f->fsk_ldpc_thresh2);
-    f->fsk_ldpc_nbits = f->fsk_ldpc_newbits = 0;
-    f->fsk_ldpc_best_location = 0;
+    f->fsk_ldpc_baduw = 0; f->fsk_ldpc_nbits = f->fsk_ldpc_newbits = 0;
+    f->fsk_ldpc_best_location = 0;  f->fsk_ldpc_state = 0;
+
 }
 
 
@@ -436,9 +440,9 @@ int freedv_rx_fsk_ldpc_data(struct freedv *f, COMP demod_in[]) {
             /* check UW still OK */
             for(int u=0; u<sizeof(fsk_ldpc_uw); u++)
                 errors += f->twoframes_hard[f->fsk_ldpc_best_location+u] ^ fsk_ldpc_uw[u];
-            if (errors >= f->fsk_ldpc_thresh2) {
+            if (errors > f->fsk_ldpc_thresh2) {
                 f->fsk_ldpc_baduw++;
-                if (f->fsk_ldpc_baduw == 3) {
+                if (f->fsk_ldpc_baduw >= f->fsk_ldpc_baduw_thresh) {
                     next_state = 0;
                 }
             }
@@ -480,7 +484,7 @@ int freedv_rx_fsk_ldpc_data(struct freedv *f, COMP demod_in[]) {
         if (f->fsk_ldpc_state == 1) rx_status |= RX_SYNC; /* need this set before verbose logging */
         if (f->verbose) {
             fprintf(stderr, "%3d nbits: %3d state: %d uw_loc: %3d uw_err: %2d bad_uw: %d snrdB: %4.1f eraw: %3d ecdd: %3d "
-                            "iter: %3d pcc: %d rxst: %s\n",
+                            "iter: %3d pcc: %3d rxst: %s\n",
                     f->frames++, f->fsk_ldpc_nbits, f->fsk_ldpc_state, f->fsk_ldpc_best_location, errors,
                     f->fsk_ldpc_baduw, 10.0*log10(fsk->SNRest), Nerrs_raw, Nerrs_coded, iter, parityCheckCount,
                     rx_sync_flags_to_text[rx_status]);
