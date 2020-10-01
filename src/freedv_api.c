@@ -209,8 +209,9 @@ void freedv_close(struct freedv *freedv) {
     if (FDV_MODE_ACTIVE( FREEDV_MODE_FSK_LDPC, freedv->mode)){
         fsk_destroy(freedv->fsk);
         FREE(freedv->ldpc);
-        FREE(freedv->twoframes_hard);
+        FREE(freedv->frame_llr);
         FREE(freedv->twoframes_llr);
+        FREE(freedv->twoframes_hard);
     }
     
     FREE(freedv);
