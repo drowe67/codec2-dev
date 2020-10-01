@@ -159,6 +159,7 @@ int main(int argc, char *argv[]) {
     if (mode != FREEDV_MODE_FSK_LDPC) {
         /* for OFDM modes a few extra empty output buffers so demods can complete last frame */
         fwrite(mod_out, sizeof(short), n_mod_out, fout);
+        fwrite(mod_out, sizeof(short), n_mod_out, fout);
     } else {
         fwrite(mod_out, sizeof(short), n_mod_out, fout);
     }

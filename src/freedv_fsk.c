@@ -437,6 +437,9 @@ int freedv_rx_fsk_ldpc_data(struct freedv *f, COMP demod_in[]) {
             /* work out where UW should be, this is tricky as we don't input exactly bits_per_frame, 
                but rather some multiple of fsk->Nbits */
             f->fsk_ldpc_best_location += bits_per_frame - f->fsk_ldpc_newbits;
+            assert(f->fsk_ldpc_best_location >= 0);
+            assert(f->fsk_ldpc_best_location < bits_per_frame);
+            
             /* check UW still OK */
             for(int u=0; u<sizeof(fsk_ldpc_uw); u++)
                 errors += f->twoframes_hard[f->fsk_ldpc_best_location+u] ^ fsk_ldpc_uw[u];
