@@ -151,10 +151,12 @@ void freedv_close   (struct freedv *freedv);
 
 void freedv_tx             (struct freedv *freedv, short mod_out[], short speech_in[]);
 void freedv_comptx         (struct freedv *freedv, COMP  mod_out[], short speech_in[]);
-void freedv_rawdatatx      (struct freedv *f, short mod_out[], unsigned char *packed_payload_bits);
-void freedv_rawdatacomptx  (struct freedv *f, COMP mod_out[], unsigned char *packed_payload_bits);
 void freedv_datatx         (struct freedv *f, short mod_out[]);
 int  freedv_data_ntxframes (struct freedv *freedv);
+void freedv_rawdatatx      (struct freedv *f, short mod_out[], unsigned char *packed_payload_bits);
+void freedv_rawdatacomptx  (struct freedv *f, COMP mod_out[], unsigned char *packed_payload_bits);
+int  freedv_rawdatapreambletx      (struct freedv *f, short mod_out[]);
+int  freedv_rawdatapreamblecomptx  (struct freedv *f, COMP mod_out[]);
 
 // Receive -------------------------------------------------------------------
 
@@ -194,6 +196,7 @@ void freedv_set_carrier_ampl            (struct freedv *freedv, int c, float amp
 void freedv_set_sync                    (struct freedv *freedv, int sync_cmd);
 void freedv_set_verbose                 (struct freedv *freedv, int verbosity);
 void freedv_set_tx_bpf                  (struct freedv *freedv, int val);
+void freedv_set_tx_amp                  (struct freedv *freedv, float amp);
 void freedv_set_dpsk                    (struct freedv *freedv, int val);
 void freedv_set_ext_vco                 (struct freedv *f, int val);
 void freedv_set_phase_est_bandwidth_mode(struct freedv *f, int val);

@@ -159,7 +159,8 @@ void freedv_fsk_ldpc_open(struct freedv *f, struct freedv_advanced *adv) {
     f->nin = f->nin_prev = fsk_nin(f->fsk);
     f->modem_sample_rate = adv->Fs;
     f->modem_symbol_rate = adv->Rs;
-
+    f->tx_amp = FSK_SCALE;
+    
     /* deframer set up */
     f->frame_llr_size = 2*bits_per_frame;
     f->frame_llr = (float*)malloc(f->frame_llr_size*sizeof(float)); assert(f->frame_llr != NULL);
@@ -369,11 +370,18 @@ void freedv_tx_fsk_ldpc_data(struct freedv *f, COMP mod_out[]) {
     freedv_tx_fsk_ldpc_framer(f, frame, f->tx_payload_bits);    
     fsk_mod_c(f->fsk, mod_out, frame, bits_per_frame);
 
-    /* Convert float samps to short */
+    /* scale samples */
     for(i=0; i<f->n_nom_modem_samples; i++) {
-        mod_out[i].real *= FSK_SCALE;
-        mod_out[i].imag *= FSK_SCALE;
+        mod_out[i].real *= f->tx_amp;
+        mod_out[i].imag *= f->tx_amp;
     }
+}
+
+void freedv_tx_fsk_ldpc_data_preamble(struct freedv *f, COMP mod_out[]) {
+    struct FSK *fsk = f->fsk;    
+    uint8_t preamble[fsk->Nbits];
+    for(int i=0; i<fsk->Nbits; i++) preamble[i] = rand() & 0x1;
+    fsk_mod_c(fsk, mod_out, preamble, fsk->Nbits);    
 }
 
 

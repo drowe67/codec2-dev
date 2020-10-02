@@ -38,15 +38,22 @@
 #include "fsk.h"
 #include "ofdm_internal.h"
 
+void comp_to_short(short mod_out_short[], COMP mod_out_comp[], int n_mod_out) {
+    for(int i=0; i<n_mod_out; i++) {
+        mod_out_short[2*i] = (short)(mod_out_comp[i].real);
+        mod_out_short[2*i+1] = (short)(mod_out_comp[i].imag);
+    }            
+}
+
 int main(int argc, char *argv[]) {
     FILE                     *fin, *fout;
     struct freedv_advanced    adv = {0,2,100,8000,1000,200, "H_256_512_4"};
     struct freedv            *freedv;
     int                       mode;
     int                       use_clip, use_txbpf, testframes, Nframes = 0;
-    int                       i;
     int                       use_complex = 0;
     float                     amp = FSK_SCALE;
+    int                       shorts_per_sample = 1;
     
     char f2020[80] = {0};
     if (argc < 4) {
@@ -102,6 +109,7 @@ int main(int argc, char *argv[]) {
             break;
         case 'c':
             use_complex = 1;
+            shorts_per_sample = 2;
             break;
         case 't':
             testframes = 1;
@@ -172,7 +180,8 @@ int main(int argc, char *argv[]) {
     /* these are optional ------------------ */
     freedv_set_clip(freedv, use_clip);
     freedv_set_tx_bpf(freedv, use_txbpf);
-
+    freedv_set_tx_amp(freedv, amp);
+    
     /* for streaming bytes it's much easier to use modes that have a multiple of 8 payload bits/frame */
     int bytes_per_modem_frame = freedv_get_bits_per_modem_frame(freedv)/8;
     fprintf(stderr, "bits_per_modem_frame: %d bytes_per_modem_frame: %d\n", freedv_get_bits_per_modem_frame(freedv), bytes_per_modem_frame);
@@ -180,10 +189,16 @@ int main(int argc, char *argv[]) {
     int     n_mod_out = freedv_get_n_nom_modem_samples(freedv);
     uint8_t bytes_in[bytes_per_modem_frame];
 
-    if (mode == FREEDV_MODE_FSK_LDPC)
+    if (mode == FREEDV_MODE_FSK_LDPC) {
         fprintf(stderr, "Frequency: Fs: %4.1f kHz Rs: %4.1f kHz Tone1: %4.1f kHz Shift: %4.1f kHz M: %d \n",
                 (float)adv.Fs/1E3, (float)adv.Rs/1E3, (float)adv.first_tone/1E3, (float)adv.tone_spacing/1E3, adv.M);
 
+        if (adv.tone_spacing < adv.Rs) {
+            fprintf(stderr, "Need shift: %d > Rs: %d\n", adv.tone_spacing, adv.Rs);
+            exit(1);
+        }
+    }
+    
     /* optionally set up a known testframe */
     uint8_t testframe_bytes[bytes_per_modem_frame];
     memset(testframe_bytes, 0, bytes_per_modem_frame);
@@ -203,31 +218,35 @@ int main(int argc, char *argv[]) {
         }
     }
     fprintf(stderr, "\n");
+
+    short mod_out_short[2*n_mod_out];
+    COMP  mod_out_comp[n_mod_out];
+
+    int n_preamble = 0;
+    if (mode == FREEDV_MODE_FSK_LDPC) {
+        if (use_complex == 0) {
+            n_preamble = freedv_rawdatapreambletx(freedv, mod_out_short);
+        } else {
+            n_preamble = freedv_rawdatapreamblecomptx(freedv, mod_out_comp);
+            comp_to_short(mod_out_short, mod_out_comp, n_preamble);
+        }
+        fwrite(mod_out_short, sizeof(short), shorts_per_sample*n_preamble, fout);
+    }
     
     /* OK main loop  --------------------------------------- */
 
     int frames = 0;
     while(fread(bytes_in, sizeof(uint8_t), bytes_per_modem_frame, fin) == bytes_per_modem_frame) {
-        if (testframes) {
+        if (testframes)
             memcpy(bytes_in, testframe_bytes, bytes_per_modem_frame);
-        }
 
         if (use_complex == 0) {
-            /* 16 bit signed short real output */
-            short mod_out[n_mod_out];
-            freedv_rawdatatx(freedv, mod_out, bytes_in);
-            fwrite(mod_out, sizeof(short), n_mod_out, fout);
-       } else {
-            /* 16 bit signed char complex output */
-            COMP mod_out[n_mod_out];
-            short rawbuf[2*n_mod_out];
-            freedv_rawdatacomptx(freedv, mod_out, bytes_in);
-            for(i=0; i<n_mod_out; i++) {
-                rawbuf[2*i] = (short)(mod_out[i].real);
-                rawbuf[2*i+1] = (short)(mod_out[i].imag);
-            }            
-            fwrite(rawbuf,sizeof(short),2*n_mod_out,fout);
+            freedv_rawdatatx(freedv, mod_out_short, bytes_in);
+        } else {
+            freedv_rawdatacomptx(freedv, mod_out_comp, bytes_in);
+            comp_to_short(mod_out_short, mod_out_comp, n_mod_out);
         }
+        fwrite(mod_out_short, sizeof(short), shorts_per_sample*n_mod_out, fout);
     
         /* if using pipes we don't want the usual buffering to occur */
         if (fout == stdout) fflush(stdout);
@@ -237,17 +256,23 @@ int main(int argc, char *argv[]) {
         if (testframes && (frames >= Nframes)) {
             goto finished;
         }
-
     }
 
  finished:
-    if (use_complex == 0) {
-        /* few empty frames to allow rx to finish processing */
-        short mod_out[n_mod_out];
-        for(int i=0; i< n_mod_out; i++) mod_out[i] = 0;
-        fwrite(mod_out, sizeof(short), n_mod_out, fout);
-        fwrite(mod_out, sizeof(short), n_mod_out, fout);
+    if (mode == FREEDV_MODE_FSK_LDPC) {
+        /* postamble - make sure enough bits for estimators after last packet */
+        if (use_complex == 0) {
+            n_preamble = freedv_rawdatapreambletx(freedv, mod_out_short);
+        } else {
+            n_preamble = freedv_rawdatapreamblecomptx(freedv, mod_out_comp);
+            comp_to_short(mod_out_short, mod_out_comp, n_preamble);
+        }
+        fwrite(mod_out_short, sizeof(short), shorts_per_sample*n_preamble, fout);
     }
+
+    for(int i=0; i<shorts_per_sample*n_mod_out; i++) mod_out_short[i] = 0;
+    fwrite(mod_out_short, sizeof(short), shorts_per_sample*n_mod_out, fout);
+    fwrite(mod_out_short, sizeof(short), shorts_per_sample*n_mod_out, fout);
     
     freedv_close(freedv);
     fclose(fin);

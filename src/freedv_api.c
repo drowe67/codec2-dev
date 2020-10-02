@@ -412,6 +412,28 @@ void freedv_rawdatatx(struct freedv *f, short mod_out[], unsigned char *packed_p
         mod_out[i] = mod_out_comp[i].real;
 }
 
+int freedv_rawdatapreamblecomptx(struct freedv *f, COMP mod_out[]) {
+    assert(f != NULL);
+    assert(f->mode == FREEDV_MODE_FSK_LDPC);
+    assert(f->fsk->N < f->n_nom_modem_samples); /* caller probably using an array of this size */
+
+    freedv_tx_fsk_ldpc_data_preamble(f, mod_out);
+    
+    return f->fsk->N;
+}
+
+int freedv_rawdatapreambletx(struct freedv *f, short mod_out[]) {
+    assert(f != NULL);
+    COMP mod_out_comp[f->fsk->N];
+
+    freedv_rawdatapreamblecomptx(f, mod_out_comp);
+    
+    /* convert complex to real */
+    for(int i=0; i<f->fsk->N; i++)
+        mod_out[i] = mod_out_comp[i].real;
+
+    return f->fsk->N;
+}
 
 /* VHF packet data tx function */
 void freedv_datatx (struct freedv *f, short mod_out[]) {
@@ -1099,6 +1121,7 @@ void freedv_set_clip                      (struct freedv *f, int val) {f->clip =
 void freedv_set_varicode_code_num         (struct freedv *f, int val) {varicode_set_code_num(&f->varicode_dec_states, val);}
 void freedv_set_ext_vco                   (struct freedv *f, int val) {f->ext_vco = val;}
 void freedv_set_snr_squelch_thresh        (struct freedv *f, float val) {f->snr_squelch_thresh = val;}
+void freedv_set_tx_amp                    (struct freedv *f, float amp) {f->tx_amp = amp;}
 
 /* Band Pass Filter to cleanup OFDM tx waveform, only supported by FreeDV 700D */
 

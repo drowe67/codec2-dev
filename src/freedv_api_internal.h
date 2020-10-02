@@ -67,7 +67,7 @@ extern char *rx_sync_flags_to_text[]; // converts flags above to more meaningful
 struct freedv {
     int                  mode;
 
-    // states for various modems we support
+    // states for various modules we support
     struct CODEC2       *codec2;
     struct FDMDV        *fdmdv;
     struct COHPSK       *cohpsk;
@@ -143,7 +143,8 @@ struct freedv {
     int                  verbose;
     int                  ext_vco;                            /* 2400A/800XA use external VCO flag */
     float               *passthrough_2020;                   /* 2020 interpolating filter */
-
+    float                tx_amp;                             /* amplitude of tx samples */
+    
     int                  ofdm_bitsperframe;
     int                  ofdm_nuwbits;
     int                  ofdm_ntxtbits;
@@ -178,7 +179,7 @@ struct freedv {
     void *proto_callback_state;
     int n_protocol_bits;
 
-    /* states needed for FSK LDPC deframer */
+    /* states needed for FSK LDPC */
     float   *frame_llr;
     int      frame_llr_size, frame_llr_nbits;
     float   *twoframes_llr;
@@ -219,6 +220,7 @@ int freedv_comprx_fsk(struct freedv *f, COMP demod_in[]);
 int freedv_floatrx(struct freedv *f, short speech_out[], float demod_in[]);
 
 void freedv_tx_fsk_ldpc_data(struct freedv *f, COMP mod_out[]);
+void freedv_tx_fsk_ldpc_data_preamble(struct freedv *f, COMP mod_out[]);
 int freedv_rx_fsk_ldpc_data(struct freedv *f, COMP demod_in[]);
       
 int freedv_bits_to_speech(struct freedv *f, short speech_out[], short demod_in[], int rx_status);
