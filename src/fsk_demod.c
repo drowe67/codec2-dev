@@ -154,7 +154,7 @@ int main(int argc,char *argv[]){
     }
     int dx = optind;
     
-    if( (argc - dx) < 5){
+    if( (argc - dx) < 5) {
         fprintf(stderr, "Too few arguments\n");
         goto helpmsg;
     }

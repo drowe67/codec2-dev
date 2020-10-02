@@ -41,13 +41,15 @@ int main(int argc,char *argv[]){
     int bytes_per_sample = 2;
     float amp = (float)FDMDV_SCALE;
     
-    char usage[] = "usage: %s [-p P] [-c] [-a amp] Mode SampleFreq SymbolFreq TxFreq1 TxFreqSpace InputOneBitPerCharFile OutputModRawFile\n-a amp  maximum amplitude of FSK signal\n-c      complex signed 16 bit output format\n";
+    char usage[] = "usage: %s [-p P] [-c] [-a amp] Mode SampleFreq SymbolFreq TxFreq1 TxFreqSpace InputOneBitPerCharFile OutputModRawFile\n"
+                   "-a amp  maximum amplitude of FSK signal\n"
+                   "-c      complex signed 16 bit output format\n";
 
     int opt;
     while ((opt = getopt(argc, argv, "a:p:c")) != -1) {
         switch (opt) {
         case 'a':
-            amp = atof(optarg)/2.0;  /* fsk_mod amplitdue is +/-2 */
+            amp = atof(optarg)/2.0;  /* fsk_mod amplitude is +/-2 */
             break;
         case 'c':
             complex = 1; bytes_per_sample = 4;
