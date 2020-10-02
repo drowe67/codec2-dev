@@ -630,7 +630,7 @@ if (NOT APPLE)
      add_test(NAME test_memory_leak_FreeDV_FSK_LDPC_tx
              COMMAND sh -c "cd  ${CMAKE_CURRENT_BINARY_DIR}/src;
                             valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes \
-                            ./freedv_data_raw_tx FSK_LDPC /dev/zero /dev/null --testframes 10")
+                            ./freedv_data_raw_tx --testframes 10 FSK_LDPC /dev/zero /dev/null")
              set_tests_properties(test_memory_leak_FreeDV_FSK_LDPC_tx PROPERTIES PASS_REGULAR_EXPRESSION "ERROR SUMMARY: 0 errors")
 
 if(LPCNET)
@@ -826,7 +826,7 @@ endif(NOT APPLE)
      # FreeDV API raw data - FSK LDPC with enough noise for several % raw BER to give FEC a work out
      add_test(NAME test_freedv_data_raw_fsk_ldpc
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
-                            ./freedv_data_raw_tx FSK_LDPC /dev/zero - --testframes 10 |
+                            ./freedv_data_raw_tx --testframes 10 FSK_LDPC /dev/zero - |
                             ./cohpsk_ch - - 0 --Fs 8000 |
                             ./freedv_data_raw_rx FSK_LDPC - /dev/null --testframes")           
 

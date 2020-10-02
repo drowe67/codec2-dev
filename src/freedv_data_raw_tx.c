@@ -32,6 +32,7 @@
 #include <string.h>
 #include <errno.h>
 #include <stdint.h>
+#include <getopt.h>
 
 #include "freedv_api.h"
 #include "fsk.h"
@@ -39,65 +40,133 @@
 
 int main(int argc, char *argv[]) {
     FILE                     *fin, *fout;
+    struct freedv_advanced    adv = {0,2,100,8000,1000,200, "H_256_512_4"};
     struct freedv            *freedv;
     int                       mode;
     int                       use_clip, use_txbpf, testframes, Nframes = 0;
     int                       i;
-
+    int                       use_complex = 0;
+    float                     amp = FSK_SCALE;
+    
+    char f2020[80] = {0};
     if (argc < 4) {
-        char f2020[80] = {0};
+    helpmsg:
         #ifdef __LPCNET__
         sprintf(f2020,"|2020");
         #endif     
-        printf("usage: %s 700C|700D|800XA|FSK_LDPC%s InputBinaryDataFile OutputModemRawFile\n"
-               "  [--clip 0|1] [--txbpf 0|1] [--testframes Nframes]\n", argv[0], f2020);
-        printf("e.g    %s 700D dataBytes.bin dataBytes_700d.raw\n", argv[0]);
+        fprintf(stderr, "usage: %s  [options] 700C|700D|800XA|FSK_LDPC%s InputBinaryDataFile OutputModemRawFile\n"
+               "\n"
+               "  --testframes N  send N test frames\n"
+               "  -a amp          maximum amplitude of FSK signal\n"
+               "  -c              complex signed 16 bit output format (default real)\n"
+               "  --clip  0|1     clipping for reduced PAPR\n"
+               "  --txbpf 0|1     bandpass filter\n"
+               "\n"
+               "For FSK_LDPC only:\n\n"
+               "  -m      2|4     number of FSK tones\n"        
+               "  --Fs    FreqHz  sample rate (default 8000)\n"
+               "  --Rs    FreqHz  symbol rate (default 100)\n"
+               "  --tone1 FreqHz  freq of first tone (default 1000)\n"
+               "  --shift FreqHz  shift between tones (default 200)\n\n"
+               , argv[0], f2020);
+        fprintf(stderr, "example: $ %s 700D dataBytes.bin samples.s16\n", argv[0]);
+        fprintf(stderr, "example: $ %s FSK_LDPC -c --testframes 10 /dev/zero samples.iq16\n\n", argv[0]);
         exit(1);
+    }
+
+    use_clip = 0; use_txbpf = 0; testframes = 0; use_complex = 0;
+    
+    int o = 0;
+    int opt_idx = 0;
+    while( o != -1 ){
+        static struct option long_opts[] = {
+            {"testframes", required_argument,  0, 't'},
+            {"help",       no_argument,        0, 'h'},
+            {"txbpf",      required_argument,  0, 'b'},
+            {"clip",       required_argument,  0, 'l'},
+            {"Fs",         required_argument,  0, 'f'},
+            {"Rs",         required_argument,  0, 'r'},
+            {"tone1",      required_argument,  0, '1'},
+            {"shift",      required_argument,  0, 's'},
+            {0, 0, 0, 0}
+        };
+        
+        o = getopt_long(argc,argv,"a:ct:hb:l:f:r:1:s:m:",long_opts,&opt_idx);
+        
+        switch(o) {
+        case 'a':
+            amp = atof(optarg)/2.0;
+            break;
+        case 'b':
+            use_txbpf = atoi(optarg);
+            break;
+        case 'c':
+            use_complex = 1;
+            break;
+        case 't':
+            testframes = 1;
+            Nframes = atoi(optarg);
+            break;
+        case 'l':
+            use_clip = atoi(optarg);
+            break;
+        case 'm':
+            adv.M = atoi(optarg);
+            break;
+        case 'f':
+            adv.Fs = atoi(optarg);
+            break;
+        case 'r':
+            adv.Rs = atoi(optarg);
+            break;
+        case '1':
+            adv.first_tone = atoi(optarg);
+            break;
+         case 's':
+            adv.tone_spacing = atoi(optarg);
+            break;
+        case 'h':
+        case '?':
+            goto helpmsg;
+            break;
+        }
+    }
+    int dx = optind;
+    
+    if( (argc - dx) < 3) {
+        fprintf(stderr, "too few arguments.\n");
+        goto helpmsg;
     }
 
     mode = -1;
-    if (!strcmp(argv[1],"700C")) mode = FREEDV_MODE_700C;
-    if (!strcmp(argv[1],"700D")) mode = FREEDV_MODE_700D;
+    if (!strcmp(argv[dx],"700C")) mode = FREEDV_MODE_700C;
+    if (!strcmp(argv[dx],"700D")) mode = FREEDV_MODE_700D;
     #ifdef __LPCNET__
-    if (!strcmp(argv[1],"2020")) mode = FREEDV_MODE_2020;
+    if (!strcmp(argv[dx],"2020")) mode = FREEDV_MODE_2020;
     #endif
-    if (!strcmp(argv[1],"FSK_LDPC")) mode = FREEDV_MODE_FSK_LDPC;
+    if (!strcmp(argv[dx],"FSK_LDPC")) mode = FREEDV_MODE_FSK_LDPC;
     if (mode == -1) {
         fprintf(stderr, "Error in mode: %s\n", argv[1]);
+        goto helpmsg;        
+    }
+
+    if (strcmp(argv[dx+1], "-")  == 0) fin = stdin;
+    else if ( (fin = fopen(argv[dx+1],"rb")) == NULL ) {
+        fprintf(stderr, "Error opening input file of bytes: %s: %s.\n", argv[2], strerror(errno));
         exit(1);
     }
 
-    if (strcmp(argv[2], "-")  == 0) fin = stdin;
-    else if ( (fin = fopen(argv[2],"rb")) == NULL ) {
-        fprintf(stderr, "Error opening input fle of bytes: %s: %s.\n", argv[2], strerror(errno));
-        exit(1);
-    }
-
-    if (strcmp(argv[3], "-") == 0) fout = stdout;
-    else if ( (fout = fopen(argv[3],"wb")) == NULL ) {
+    if (strcmp(argv[dx+2], "-") == 0) fout = stdout;
+    else if ( (fout = fopen(argv[dx+2],"wb")) == NULL ) {
         fprintf(stderr, "Error opening output modem sample file: %s: %s.\n", argv[3], strerror(errno));
         exit(1);
     }
 
-    use_clip = 0; use_txbpf = 0; testframes = 0;
-    
-    if (argc > 4) {
-        for (i = 4; i < argc; i++) {
-            if (strcmp(argv[i], "--clip") == 0) { use_clip = atoi(argv[i+1]); i++; }
-            else if (strcmp(argv[i], "--txbpf") == 0) { use_txbpf = atoi(argv[i+1]); i++; }
-            else if (strcmp(argv[i], "--testframes") == 0) {
-                testframes = 1;
-                Nframes = atoi(argv[i+1]); i++;
-                fprintf(stderr, "Nframes: %d\n", Nframes);
-            }
-            else {
-                fprintf(stderr, "unkown option: %s\n", argv[i]);
-                exit(1);
-            }
-        }
-    }
-
-    freedv = freedv_open(mode);
+    if (mode != FREEDV_MODE_FSK_LDPC)
+        freedv = freedv_open(mode);
+    else
+        freedv = freedv_open_advanced(mode, &adv);
+        
     assert(freedv != NULL);
 
     /* these are optional ------------------ */
@@ -110,7 +179,10 @@ int main(int argc, char *argv[]) {
     assert((freedv_get_bits_per_modem_frame(freedv) % 8) == 0);
     int     n_mod_out = freedv_get_n_nom_modem_samples(freedv);
     uint8_t bytes_in[bytes_per_modem_frame];
-    short   mod_out[n_mod_out];
+
+    if (mode == FREEDV_MODE_FSK_LDPC)
+        fprintf(stderr, "Frequency: Fs: %4.1f kHz Rs: %4.1f kHz Tone1: %4.1f kHz Shift: %4.1f kHz M: %d \n",
+                (float)adv.Fs/1E3, (float)adv.Rs/1E3, (float)adv.first_tone/1E3, (float)adv.tone_spacing/1E3, adv.M);
 
     /* optionally set up a known testframe */
     uint8_t testframe_bytes[bytes_per_modem_frame];
@@ -140,8 +212,22 @@ int main(int argc, char *argv[]) {
             memcpy(bytes_in, testframe_bytes, bytes_per_modem_frame);
         }
 
-        freedv_rawdatatx(freedv, mod_out, bytes_in);
-        fwrite(mod_out, sizeof(short), n_mod_out, fout);
+        if (use_complex == 0) {
+            /* 16 bit signed short real output */
+            short mod_out[n_mod_out];
+            freedv_rawdatatx(freedv, mod_out, bytes_in);
+            fwrite(mod_out, sizeof(short), n_mod_out, fout);
+       } else {
+            /* 16 bit signed char complex output */
+            COMP mod_out[n_mod_out];
+            short rawbuf[2*n_mod_out];
+            freedv_rawdatacomptx(freedv, mod_out, bytes_in);
+            for(i=0; i<n_mod_out; i++) {
+                rawbuf[2*i] = (short)(mod_out[i].real);
+                rawbuf[2*i+1] = (short)(mod_out[i].imag);
+            }            
+            fwrite(rawbuf,sizeof(short),2*n_mod_out,fout);
+        }
     
         /* if using pipes we don't want the usual buffering to occur */
         if (fout == stdout) fflush(stdout);
@@ -155,10 +241,13 @@ int main(int argc, char *argv[]) {
     }
 
  finished:
-    /* few empty frames to allow rx to finish processing */
-    for(int i=0; i< n_mod_out; i++) mod_out[i] = 0;
-    fwrite(mod_out, sizeof(short), n_mod_out, fout);
-    fwrite(mod_out, sizeof(short), n_mod_out, fout);
+    if (use_complex == 0) {
+        /* few empty frames to allow rx to finish processing */
+        short mod_out[n_mod_out];
+        for(int i=0; i< n_mod_out; i++) mod_out[i] = 0;
+        fwrite(mod_out, sizeof(short), n_mod_out, fout);
+        fwrite(mod_out, sizeof(short), n_mod_out, fout);
+    }
     
     freedv_close(freedv);
     fclose(fin);
