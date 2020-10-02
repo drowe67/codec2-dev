@@ -486,7 +486,7 @@ int freedv_rx_fsk_ldpc_data(struct freedv *f, COMP demod_in[]) {
         }
 
         if (f->fsk_ldpc_state == 1) rx_status |= RX_SYNC; /* need this set before verbose logging */
-        if (f->verbose) {
+        if (((f->verbose == 1) && (rx_status & RX_BITS)) || (f->verbose == 2)) {
             fprintf(stderr, "%3d nbits: %3d state: %d uw_loc: %3d uw_err: %2d bad_uw: %d snrdB: %4.1f eraw: %3d ecdd: %3d "
                             "iter: %3d pcc: %3d rxst: %s\n",
                     f->frames++, f->frame_llr_nbits, f->fsk_ldpc_state, f->fsk_ldpc_best_location, errors,
