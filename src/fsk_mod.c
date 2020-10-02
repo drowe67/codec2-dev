@@ -39,16 +39,19 @@ int main(int argc,char *argv[]){
     FILE *fin,*fout;
     int complex = 0;
     int bytes_per_sample = 2;
-    float amplitude = FDMDV_SCALE;
+    float amp = FDMDV_SCALE;
     int test_mode = 0;
     
-    char usage[] = "usage: %s [-p P] [-c] [-a Amplitude] [-t] Mode SampleFreq SymbolFreq TxFreq1 TxFreqSpace InputOneBitPerCharFile OutputModRawFile\n-c complex signed 16 bit output format\n-a Amplitude of signal\n-t test mode unmodulated carrier\n";
+    char usage[] = "usage: %s [-p P] [-c] [-a Amplitude] [-t] Mode SampleFreq SymbolFreq TxFreq1 TxFreqSpace InputOneBitPerCharFile OutputModRawFile\n"
+                   "  -c            complex signed 16 bit output format\n"
+                   "  -a Amplitude  Amplitude of signal\n"
+                   "  -t test mode unmodulated carrier, useful for setting levels\n";
 
     int opt;
     while ((opt = getopt(argc, argv, "a:p:ct")) != -1) {
         switch (opt) {
         case 'a':
-            amplitude = atof(optarg);
+            amp = atof(optarg)/2.0;  /* fsk_mod amplitude is +/-2 */
             break;
         case 'c':
             complex = 1; bytes_per_sample = 4;
@@ -103,6 +106,9 @@ int main(int argc,char *argv[]){
         exit(1);
     }
         
+    /* Mote we use the same buffer sizes as demod (fsk->Nbits, fsk->N)
+       for convenience, but other sizes are possible for the
+       FSK modulator. */
     uint8_t bitbuf[fsk->Nbits];
     
     while( fread(bitbuf,sizeof(uint8_t),fsk->Nbits,fin) == fsk->Nbits ){
@@ -111,18 +117,18 @@ int main(int argc,char *argv[]){
             float modbuf[fsk->N];
             int16_t rawbuf[fsk->N];
             /* 16 bit signed short real output */
-            fsk_mod(fsk,modbuf,bitbuf);
+            fsk_mod(fsk,modbuf,bitbuf,fsk->Nbits);
             for(i=0; i<fsk->N; i++)
-                rawbuf[i] = (int16_t)(modbuf[i]*amplitude);
+                rawbuf[i] = (int16_t)(modbuf[i]*amp);
             fwrite(rawbuf,bytes_per_sample,fsk->N,fout);
        } else {
             /* 16 bit signed char complex output */
             COMP modbuf[fsk->N];
             int16_t rawbuf[2*fsk->N];
-            fsk_mod_c(fsk,(COMP*)modbuf,bitbuf);
+            fsk_mod_c(fsk,(COMP*)modbuf,bitbuf,fsk->Nbits);
             for(i=0; i<fsk->N; i++) {
-                rawbuf[2*i] = (int16_t)(modbuf[i].real*amplitude);
-                rawbuf[2*i+1] = (int16_t)(modbuf[i].imag*amplitude);
+                rawbuf[2*i] = (int16_t)(modbuf[i].real*amp);
+                rawbuf[2*i+1] = (int16_t)(modbuf[i].imag*amp);
             }            
             fwrite(rawbuf,bytes_per_sample,fsk->N,fout);
         }

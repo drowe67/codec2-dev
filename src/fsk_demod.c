@@ -154,7 +154,7 @@ int main(int argc,char *argv[]){
     }
     int dx = optind;
     
-    if( (argc - dx) < 5){
+    if( (argc - dx) < 5) {
         fprintf(stderr, "Too few arguments\n");
         goto helpmsg;
     }
@@ -308,17 +308,6 @@ int main(int argc,char *argv[]){
             /* output bit LLRs */
             fsk_demod_sd(fsk, rx_filt, modbuf);
             fsk_rx_filt_to_llrs(llrs, rx_filt, fsk->v_est, fsk->SNRest, fsk->mode, fsk->Nsym);
-            /*
-            fprintf(stderr, "v_est: %f SNRest: %f\n", fsk->v_est, fsk->SNRest);            
-            for(int i=0; i<fsk->Nsym; i++) {
-                for(int m=0; m<fsk->mode; m++)
-                    fprintf(stderr, "% 5.0f  ", rx_filt[fsk->Nsym*m+i]);
-                for(int b=0; b<bps; b++)
-                    fprintf(stderr, "% 5.0f  ", llrs[i*bps+b]);                    
-                fprintf(stderr, "\n");
-            }
-            fprintf(stderr, "------\n");
-            */
         } else {
             fsk_demod(fsk,bitbuf,modbuf);
         }

@@ -9,7 +9,7 @@ Also included:
   + High performance coherent OFDM modem for HF channels [README_ofdm](README_ofdm.md)
   + High performance non-coherent FSK modem [README_fsk](README_fsk.md)
   + An STM32 embedded version of FreeDV 1600/700D for the [SM1000](stm32/README.md)
-  + Coherent PSK [README_cohpsk](README_cohpsk.md) for HF channels
+  + Coherent PSK modem [README_cohpsk](README_cohpsk.md) for HF channels
   + FDMDV DPSK modem [README_fdmdv](README_fdmdv.md) for HF channels
 
 ## Quickstart
@@ -60,6 +60,33 @@ Also included:
    $ ./src/c2enc 1300 ../raw/hts1a.raw - | ./src/c2dec 1300 - - | aplay -f S16_LE
    ```
    
+## FreeDV 2020 support (building with LPCNet)
+
+1. Build codec2 initially without LPCNet
+   ```
+   $ cd ~
+   $ git clone https://github.com/drowe67/codec2.git
+   $ cd codec2 && mkdir build_linux && cd build_linux
+   $ cmake ../
+   $ make
+   ```
+
+1. Build LPCNet:
+   ```
+   $ cd ~
+   $ git clone https://github.com/drowe67/LPCNet
+   $ cd LPCNet && mkdir build_linux && cd build_linux
+   $ cmake -DCODEC2_BUILD_DIR=~/codec2/build_linux ../ 
+   $ make
+   ```
+
+1. (Re)build Codec 2 with LPCNet support:
+   ```
+   $ cd ~/codec2/build_linux && rm -Rf *
+   $ cmake -DLPCNET_BUILD_DIR=~/LPCNet/build_linux ..
+   $ make
+   ```
+
 ## Programs
 
 + ```c2demo``` encodes a file of speech samples, then decodes them and saves the result.

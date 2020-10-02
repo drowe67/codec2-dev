@@ -172,7 +172,7 @@ int main(int argc,char *argv[]){
         modbufp = modbuf;
         bitbufp = bitbuf;
         while( bitbufp < bitbuf+bitbufsize){
-            fsk_mod(fsk, modbufp, bitbufp);
+            fsk_mod(fsk, modbufp, bitbufp, fsk->Nbits);
             modbufp += fsk->N;
             bitbufp += fsk->Nbits;
         }

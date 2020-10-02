@@ -5,7 +5,7 @@
   DATE CREATED: May 2020
 
   Demonstrates receiving frames of raw data bytes (instead of
-  compressed speech) using the FreeDV API and modems.
+  compressed speech) using the FreeDV API.
 
 \*---------------------------------------------------------------------------*/
 
@@ -42,7 +42,7 @@ int main(int argc, char *argv[]) {
     struct freedv             *freedv;
     int                        nin, nbytes, nbytes_total = 0, frame = 0;
     int                        mode;
-    int                        verbose;
+    int                        verbose, use_testframes;
     int                        i;
     
     if (argc < 4) {
@@ -50,7 +50,7 @@ int main(int argc, char *argv[]) {
         #ifdef __LPCNET__
         sprintf(f2020,"|2020");
         #endif     
-	printf("usage: %s 700C|700D|800XA%s InputModemSpeechFile OutputSpeechRawFile\n"
+	printf("usage: %s 700C|700D|800XA|FSK_LDPC%s InputModemSpeechFile BinaryDataFile\n"
                " [-v] \n", argv[0],f2020);
 	printf("e.g    %s 700D dataBytes_700d.raw dataBytes_rx.bin\n", argv[0]);
 	exit(1);
@@ -62,6 +62,7 @@ int main(int argc, char *argv[]) {
     #ifdef __LPCNET__
     if (!strcmp(argv[1],"2020")) mode = FREEDV_MODE_2020;
     #endif
+    if (!strcmp(argv[1],"FSK_LDPC")) mode = FREEDV_MODE_FSK_LDPC;
     if (mode == -1) {
         fprintf(stderr, "Error in mode: %s\n", argv[1]);
         exit(1);
@@ -81,11 +82,12 @@ int main(int argc, char *argv[]) {
 	exit(1);
     }
 
-    verbose = 0;
+    verbose = 0; use_testframes = 0;
     
     if (argc > 4) {
         for (i = 4; i < argc; i++) {
             if (strcmp(argv[i], "-v") == 0) verbose = 1;
+            else if (strcmp(argv[i], "--testframes") == 0) use_testframes = 1;
             else if (strcmp(argv[i], "-vv") == 0) verbose = 2;
             else {
                 fprintf(stderr, "unkown option: %s\n", argv[i]);
@@ -97,6 +99,7 @@ int main(int argc, char *argv[]) {
     freedv = freedv_open(mode);
     assert(freedv != NULL);
     freedv_set_verbose(freedv, verbose);
+    freedv_set_test_frames(freedv, use_testframes);
 
     /* for streaming bytes it's much easier use the modes that have a multiple of 8 payload bits/frame */
     assert((freedv_get_bits_per_modem_frame(freedv) % 8) == 0);
@@ -107,8 +110,7 @@ int main(int argc, char *argv[]) {
 
     /* We need to work out how many samples the demod needs on each
        call (nin).  This is used to adjust for differences in the tx
-       and rx sample clock frequencies.  Note also the number of
-       output speech samples "nout" is time varying. */
+       and rx sample clock frequencies */
 
     nin = freedv_nin(freedv);
     while(fread(demod_in, sizeof(short), nin, fin) == nin) {
@@ -117,13 +119,13 @@ int main(int argc, char *argv[]) {
         nbytes = freedv_rawdatarx(freedv, bytes_out, demod_in);
         nin = freedv_nin(freedv);
 
-        /* we don't want to output any data if FEC decoding indicates it has known bit errors */
+        /* Output data if FEC decoding indicates it has no uncorrected bit errors */
         if (!freedv_get_uncorrected_errors(freedv)) {
             fwrite(bytes_out, sizeof(uint8_t), nbytes, fout);
             nbytes_total += nbytes;
         }
         
-        if (verbose == 1) {
+        if (verbose == 2) {
             fprintf(stderr, "frame: %d nin: %d sync: %d nbytes: %d uncorrected: %d\n",
                     frame, nin, freedv_get_sync(freedv), nbytes, freedv_get_uncorrected_errors(freedv));
         }
@@ -131,12 +133,34 @@ int main(int argc, char *argv[]) {
 	/* if using pipes we probably don't want the usual buffering */
         if (fout == stdout) fflush(stdout);
         if (fin == stdin) fflush(stdin);
-
     }
 
     fclose(fin);
     fclose(fout);
     fprintf(stderr, "frames processed: %d  output bytes: %d\n", frame, nbytes_total);
+
+    /* in testframe mode finish up with some stats */
+    
+    if (freedv_get_test_frames(freedv)) {
+        int Tbits = freedv_get_total_bits(freedv);
+        int Terrs = freedv_get_total_bit_errors(freedv);
+        float uncoded_ber = (float)Terrs/Tbits;
+        fprintf(stderr, "BER......: %5.4f Tbits: %5d Terrs: %5d\n", 
+		(double)uncoded_ber, Tbits, Terrs);
+        if ((mode == FREEDV_MODE_700D) || (mode == FREEDV_MODE_2020) || (mode == FREEDV_MODE_FSK_LDPC)) {
+            int Tbits_coded = freedv_get_total_bits_coded(freedv);
+            int Terrs_coded = freedv_get_total_bit_errors_coded(freedv);
+            float coded_ber = (float)Terrs_coded/Tbits_coded;
+            fprintf(stderr, "Coded BER: %5.4f Tbits: %5d Terrs: %5d\n",
+                    (double)coded_ber, Tbits_coded, Terrs_coded);
+
+            /* set return code for Ctest */
+            if ((uncoded_ber < 0.1f) && (coded_ber < 0.01f))
+                return 0;
+            else
+                return 1;
+        }
+    }
 
     freedv_close(freedv);
     return 0;

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -x
 #
 # tst_ofdm_mod_check
 #
@@ -28,7 +28,7 @@ declare -i Fails=0
 case "${TEST_OPT}" in
 
     plain) LDPC="";;
-    ldpc) LDPC="--ldpc 1";;
+    ldpc) LDPC="--ldpc";;
     esac
 
 echo -e "\nReference check"

@@ -36,7 +36,7 @@
 
       Note: we tuned a few kHz down to put the test tone in the 2000 to 4000 Hz range.
       
-  a) HackRF:
+  b) HackRF:
   
     Term 1:
 
@@ -46,11 +46,18 @@
     
     $ hackrf_transfer -r - -f 434995000 -s 4000000 -a 1 -p 1 -l 40 -g 32 | \
       csdr convert_s8_f | csdr fir_decimate_cc 50 | csdr convert_f_s16 | \
-      nc localhost -u 735
+      nc localhost -u 7355
 
     Note: HackRF needed a bit of tuning to get test tone in 2000 to 4000 Hz range. This
     can be tricky with the command line method, easier with gqrx.
-    
+
+  c) rtlsdr (assuming sig gen set to 144.5MHz, -100dBm) 
+
+    Term 1:
+
+    $ ./rtl_sdr -g 50 -s 2400000 -f 144.498E6 - | csdr convert_u8_f | csdr fir_decimate_cc 50 | \
+      csdr convert_f_s16 | octave --no-gui -qf ~/codec2/octave/nf_from_stdio.m 48000 complex
+
   TODO:
     [ ] work out why noise power st bounces around so much, signal power seems stable
     [ ] reduce CPU load, in particular of plotting
@@ -93,8 +100,8 @@ while c
   end
   S = fft(s.*hanning(Fs));
   SdB = 20*log10(abs(S));
-  figure(1); plot(real(s)); axis([0 Fs -3E4 3E4]);
-  figure(2); plot(SdB); axis([0 12000 40 160]);
+  figure(1); plot(real(s)); axis([0 Fs -4E4 4E4]);
+  figure(2); plot(SdB); axis([0 12000 40 180]);
 
   % assume sine wave is between 2000 and 4000 Hz, and dominates energy in that
   % region.  Noise is between 5000 - 10000 Hz

@@ -224,7 +224,7 @@ int main(int argc, char *argv[])
         fprintf(stderr, "      Tpkts: %6d Tper: %6d PER: %4.3f\n", Tpackets, Tpacketerrs, Tpacketerrs/(Tpackets+1E-12));
 
         /* set return code for Ctest */
-        if (coded_ber < 0.01)
+        if (Tpackets && (coded_ber < 0.01))
             return 0;
         else
             return 1;

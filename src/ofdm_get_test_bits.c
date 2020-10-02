@@ -4,7 +4,7 @@
   AUTHOR......: David Rowe
   DATE CREATED: Mar 2018
 
-  Generates frames of test bits, useful for input to ofdm_mod.
+  Generate input for the OFDM modem in either coded or uncoded mode.
 
 \*---------------------------------------------------------------------------*/
 
@@ -25,6 +25,10 @@
   along with this program; if not, see <http://www.gnu.org/licenses/>.
 */
 
+#define OPTPARSE_IMPLEMENTATION
+#define OPTPARSE_API static
+#include "optparse.h"
+
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -34,72 +38,124 @@
 
 #include "codec2_ofdm.h"
 #include "ofdm_internal.h"
-#include "test_bits_ofdm.h"
+#include "ldpc_codes.h"
+#include "interldpc.h"
+#include "varicode.h"
 
-static struct OFDM_CONFIG *ofdm_config;
+#define IS_DIR_SEPARATOR(c)     ((c) == '/')
 
-static int ofdm_bitsperframe;
-static int ofdm_nuwbits;
-static int ofdm_ntxtbits;
+static const char *progname;
+
+void opt_help() {
+    fprintf(stderr, "\nUsage: %s [options]\n\n", progname);
+    fprintf(stderr, "  --out     filename  Name of OutputOneCharPerBitFile\n");
+    fprintf(stderr, "  --frames  n         Number of frames to output (default 10)\n");
+    fprintf(stderr, "  --ldpc              Frame length (112) for LDPC (else 238) for Plain (default Plain)\n");
+    fprintf(stderr, "  --verbose           Output variable assigned values to stderr\n\n");
+
+    exit(-1);
+}
 
 int main(int argc, char *argv[])
 {
     struct OFDM  *ofdm;
+    struct LDPC  ldpc;
     FILE         *fout;
-    int           Nframes, i, n;
+    char         *fout_name = NULL;
+    int          opt, verbose, Nframes, n;
+    int          ldpc_en, frames, output_specified;
 
-    if (argc < 2) {
-	printf("usage: %s OutputOneCharPerBitFile [-f] numSecsorFrames\n", argv[0]);
-	exit(1);
-    }
+    char *pn = argv[0] + strlen (argv[0]);
 
-    if (strcmp(argv[1], "-") == 0)
-        fout = stdout;
-    else if ( (fout = fopen(argv[1],"wb")) == NULL ) {
-	fprintf(stderr, "Error opening output file: %s: %s.\n",
-         argv[1], strerror(errno));
-	exit(1);
-    }
+    while (pn != argv[0] && !IS_DIR_SEPARATOR (pn[-1]))
+        --pn;
     
+    progname = pn;
+
+    /* Turn off stream buffering */
+
+    setvbuf(stdout, NULL, _IONBF, BUFSIZ);
+
+    fout = stdout;
+    output_specified = 0;
+    frames = 10;
+    ldpc_en = 0;
+    verbose = 0;
+
+    struct optparse options;
+
+    struct optparse_long longopts[] = {
+        {"out",        'o', OPTPARSE_REQUIRED},
+        {"frames",     'n', OPTPARSE_REQUIRED},
+        {"ldpc",       'l', OPTPARSE_NONE},
+        {"verbose",    'v', OPTPARSE_NONE},
+        {0, 0, 0}
+    };
+
+    optparse_init(&options, argv);
+
+    while ((opt = optparse_long(&options, longopts, NULL)) != -1) {
+        switch (opt) {
+            case '?':
+                opt_help();
+            case 'o':
+                fout_name = options.optarg;
+                output_specified = 1;
+                break;
+            case 'n':
+                frames = atoi(options.optarg);
+                break;
+            case 'l':
+                ldpc_en = 1;
+                break;
+            case 'v':
+                verbose = 1;
+        }
+    }
+
+    /* Print remaining arguments to give user a hint */
+
+    char *arg;
+
+    while ((arg = optparse_arg(&options)))
+        fprintf(stderr, "%s\n", arg);
+
+    if (output_specified) {
+        if ((fout = fopen(fout_name, "wb")) == NULL) {
+            fprintf(stderr, "Error opening output bit file: %s\n", fout_name);
+            exit(-1);
+        }
+    }
+
+    Nframes = frames;
+
+    if (verbose)
+        fprintf(stderr, "Nframes: %d\n", Nframes);
+
     ofdm = ofdm_create(NULL);
     assert(ofdm != NULL);
 
-    /* Get a ptr to the actual modem config */
-    ofdm_config = ofdm_get_config_param(ofdm);
-
-    ofdm_bitsperframe = ofdm_get_bits_per_frame(ofdm);
-    ofdm_nuwbits = (ofdm_config->ns - 1) * ofdm_config->bps - ofdm_config->txtbits;
-    ofdm_ntxtbits = ofdm_config->txtbits;
-
-    char  tx_bits_char[ofdm_bitsperframe];
-
-
-    for(i=0; i<ofdm_bitsperframe; i++) {
-        tx_bits_char[i] = test_bits_ofdm[i];
+    int ofdm_bitsperpacket = ofdm_get_bits_per_packet(ofdm);
+    int Ndatabitsperpacket = ofdm_bitsperpacket - ofdm->nuwbits - ofdm->ntxtbits;
+    
+    /* Optionally set up default LPDC code */
+    if (ldpc_en) {
+        fprintf(stderr, "codename: %s\n", ofdm->codename);
+        ldpc_codes_setup(&ldpc, ofdm->codename);
+        Ndatabitsperpacket = ldpc.ldpc_data_bits_per_frame;
     }
 
-    if (strcmp(argv[2], "-f") == 0) {
-        Nframes = atoi(argv[3]);
-    } else {
-        int Nsec = atoi(argv[2]);
-        int Nrows = (int)(Nsec * ofdm_config->rs);
-        Nframes = floorf((Nrows-1)/ofdm_config->ns);
-        fprintf(stderr, "ofdm_bitsperframe: %d Nsec: %d Nrows: %d Nframes: %d\n", ofdm_bitsperframe, Nsec, Nrows, Nframes);
-    }
+    if (verbose)
+        fprintf(stderr, "Ndatabitsperpacket: %d\n", Ndatabitsperpacket);
 
+    fprintf(stderr, "Ndatabitsperpacket = %d\n", Ndatabitsperpacket);
+    uint8_t data_bits[Ndatabitsperpacket];
+    ofdm_generate_payload_data_bits(data_bits, Ndatabitsperpacket);
+    for (n = 0; n<Nframes; n++)
+	fwrite(data_bits, sizeof(char), Ndatabitsperpacket, fout);
 
-    for(n=0; n<Nframes; n++) {
-
-	fwrite(tx_bits_char, sizeof(char), ofdm_bitsperframe, fout);
-
-	/* if this is in a pipeline, we probably don't want the usual
-	   buffering to occur */
-
-        if (fout == stdout)
-            fflush(stdout);
-    }
-
-    fclose(fout);
+    if (output_specified)
+        fclose(fout);
 
     ofdm_destroy(ofdm);
 
