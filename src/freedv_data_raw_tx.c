@@ -251,7 +251,6 @@ int main(int argc, char *argv[]) {
             }
             fwrite(mod_out_short, sizeof(short), shorts_per_sample*n_preamble, fout);
         }
-        fprintf(stderr, "n_preamble: %d\n", n_preamble);
         
         /* OK main loop  --------------------------------------- */
 

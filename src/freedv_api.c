@@ -415,24 +415,24 @@ void freedv_rawdatatx(struct freedv *f, short mod_out[], unsigned char *packed_p
 int freedv_rawdatapreamblecomptx(struct freedv *f, COMP mod_out[]) {
     assert(f != NULL);
     assert(f->mode == FREEDV_MODE_FSK_LDPC);
-    assert(2*f->fsk->N < f->n_nom_modem_samples); /* caller probably using an array of this size */
+    assert(f->fsk->N < f->n_nom_modem_samples); /* caller probably using an array of this size */
 
     freedv_tx_fsk_ldpc_data_preamble(f, mod_out);
     
-    return 2*f->fsk->N;
+    return f->fsk->N;
 }
 
 int freedv_rawdatapreambletx(struct freedv *f, short mod_out[]) {
     assert(f != NULL);
-    COMP mod_out_comp[2*f->fsk->N];
+    COMP mod_out_comp[f->fsk->N];
 
     freedv_rawdatapreamblecomptx(f, mod_out_comp);
     
     /* convert complex to real */
-    for(int i=0; i<2*f->fsk->N; i++)
+    for(int i=0; i<f->fsk->N; i++)
         mod_out[i] = mod_out_comp[i].real;
 
-    return 2*f->fsk->N;
+    return f->fsk->N;
 }
 
 /* VHF packet data tx function */

@@ -378,11 +378,11 @@ void freedv_tx_fsk_ldpc_data(struct freedv *f, COMP mod_out[]) {
 
 void freedv_tx_fsk_ldpc_data_preamble(struct freedv *f, COMP mod_out[]) {
     struct FSK *fsk = f->fsk;    
-    uint8_t preamble[2*fsk->Nbits];
-    for(int i=0; i<2*fsk->Nbits; i++) preamble[i] = (i>>1) & 0x1;
-    fsk_mod_c(fsk, mod_out, preamble, 2*fsk->Nbits);    
+    uint8_t preamble[fsk->Nbits];
+    for(int i=0; i<fsk->Nbits; i++) preamble[i] = (i>>1) & 0x1;
+    fsk_mod_c(fsk, mod_out, preamble, fsk->Nbits);    
     /* scale samples */
-    for(int i=0; i<2*fsk->N; i++) {
+    for(int i=0; i<fsk->N; i++) {
         mod_out[i].real *= f->tx_amp;
         mod_out[i].imag *= f->tx_amp;
     }
