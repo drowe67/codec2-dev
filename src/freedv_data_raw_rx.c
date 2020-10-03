@@ -87,9 +87,9 @@ int main(int argc, char *argv[]) {
     
     if (argc > 4) {
         for (i = 4; i < argc; i++) {
-            if (strcmp(argv[i], "-v") == 0) verbose = 1;
+            if ((strcmp(argv[i], "-v") == 0) || (strcmp(argv[i], "--v")==0)) verbose = 1;
             else if (strcmp(argv[i], "--testframes") == 0) use_testframes = 1;
-            else if (strcmp(argv[i], "--vv") == 0) verbose = 2;
+            else if ((strcmp(argv[i], "--vv") == 0) || (strcmp(argv[i], "-vv") == 0)) verbose = 2;
             else {
                 fprintf(stderr, "unkown option: %s\n", argv[i]);
                 exit(1);

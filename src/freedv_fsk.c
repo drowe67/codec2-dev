@@ -363,7 +363,6 @@ void freedv_tx_fsk_ldpc_framer(struct freedv *f, uint8_t frame[], uint8_t payloa
 void freedv_tx_fsk_ldpc_data(struct freedv *f, COMP mod_out[]) {
     int bits_per_frame = freedv_tx_fsk_ldpc_bits_per_frame(f);
     uint8_t frame[bits_per_frame];
-    int   i;
     
     assert(f->mode == FREEDV_MODE_FSK_LDPC);
    
@@ -371,7 +370,7 @@ void freedv_tx_fsk_ldpc_data(struct freedv *f, COMP mod_out[]) {
     fsk_mod_c(f->fsk, mod_out, frame, bits_per_frame);
 
     /* scale samples */
-    for(i=0; i<f->n_nom_modem_samples; i++) {
+    for(int i=0; i<f->n_nom_modem_samples; i++) {
         mod_out[i].real *= f->tx_amp;
         mod_out[i].imag *= f->tx_amp;
     }
@@ -379,9 +378,14 @@ void freedv_tx_fsk_ldpc_data(struct freedv *f, COMP mod_out[]) {
 
 void freedv_tx_fsk_ldpc_data_preamble(struct freedv *f, COMP mod_out[]) {
     struct FSK *fsk = f->fsk;    
-    uint8_t preamble[fsk->Nbits];
-    for(int i=0; i<fsk->Nbits; i++) preamble[i] = rand() & 0x1;
-    fsk_mod_c(fsk, mod_out, preamble, fsk->Nbits);    
+    uint8_t preamble[2*fsk->Nbits];
+    for(int i=0; i<2*fsk->Nbits; i++) preamble[i] = (i>>1) & 0x1;
+    fsk_mod_c(fsk, mod_out, preamble, 2*fsk->Nbits);    
+    /* scale samples */
+    for(int i=0; i<2*fsk->N; i++) {
+        mod_out[i].real *= f->tx_amp;
+        mod_out[i].imag *= f->tx_amp;
+    }
 }
 
 

@@ -240,6 +240,7 @@ int main(int argc, char *argv[]) {
 
     for(int b=0; b<Nbursts; b++) {
 
+        /* send preamble to help estimators lock up at start of burst */
         int n_preamble = 0;
         if (mode == FREEDV_MODE_FSK_LDPC) {
             if (use_complex == 0) {
@@ -250,7 +251,8 @@ int main(int argc, char *argv[]) {
             }
             fwrite(mod_out_short, sizeof(short), shorts_per_sample*n_preamble, fout);
         }
-    
+        fprintf(stderr, "n_preamble: %d\n", n_preamble);
+        
         /* OK main loop  --------------------------------------- */
 
         int frames = 0;
