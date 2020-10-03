@@ -276,17 +276,6 @@ int main(int argc, char *argv[]) {
             if (testframes && (frames >= Nframes)) break;
         }
 
-        if (mode == FREEDV_MODE_FSK_LDPC) {
-            /* postamble - make sure enough bits for estimators after last packet */
-            if (use_complex == 0) {
-                n_preamble = freedv_rawdatapreambletx(freedv, mod_out_short);
-            } else {
-                n_preamble = freedv_rawdatapreamblecomptx(freedv, mod_out_comp);
-                comp_to_short(mod_out_short, mod_out_comp, n_preamble);
-            }
-            fwrite(mod_out_short, sizeof(short), shorts_per_sample*n_preamble, fout);
-        }
-
         /* some silence at the end to allow demod to complete processing */
         
         for(int i=0; i<shorts_per_sample*n_mod_out; i++) mod_out_short[i] = 0;

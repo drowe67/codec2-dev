@@ -134,7 +134,7 @@ void freedv_fsk_ldpc_open(struct freedv *f, struct freedv_advanced *adv) {
     assert(f->fsk != NULL);
     fsk_set_freq_est_limits(f->fsk, 0, adv->Fs/2);
     fsk_stats_normalise_eye(f->fsk, 0);
-
+    
     /* set up LDPC code */
     int code_index = ldpc_codes_find(adv->codename);
     assert(code_index != -1);
@@ -172,8 +172,8 @@ void freedv_fsk_ldpc_open(struct freedv *f, struct freedv_advanced *adv) {
     for(int i=0; i<2*bits_per_frame; i++) f->twoframes_llr[i] = 0.0;
     
     /* currently configured a simple frame-frame approach */
-    f->fsk_ldpc_thresh1 = 5;
-    f->fsk_ldpc_thresh2 = 5;
+    f->fsk_ldpc_thresh1 = 6;
+    f->fsk_ldpc_thresh2 = 6;
     f->fsk_ldpc_baduw_thresh=1;
     
     //fprintf(stderr, "thresh1: %d thresh2: %d\n", f->fsk_ldpc_thresh1, f->fsk_ldpc_thresh2);
