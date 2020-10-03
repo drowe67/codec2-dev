@@ -390,7 +390,7 @@ int freedv_rx_fsk_ldpc_data(struct freedv *f, COMP demod_in[]) {
     int bits_per_frame = freedv_tx_fsk_ldpc_bits_per_frame(f);
     struct FSK *fsk = f->fsk;
     float rx_filt[fsk->mode*fsk->Nsym];
-    int   rx_status = 0;
+    int   rx_status = 0, seq = 0;
 
     /* Couple of layers of buffers to move chunks of fsk->Nbits into a
        double buffer we can use for frame sync.  There are other ways
@@ -491,15 +491,20 @@ int freedv_rx_fsk_ldpc_data(struct freedv *f, COMP demod_in[]) {
                 f->total_bit_errors_coded += Nerrs_coded;
                 f->total_bits_coded += f->bits_per_modem_frame;
             }
+
+            /* extract packet sequnce numbers optinally placed in first 8 bits */
+            seq = 0;
+            for(int i=0; i<8; i++)
+                seq |= f->rx_payload_bits[i] << (7-i);
         }
 
         if (f->fsk_ldpc_state == 1) rx_status |= RX_SYNC; /* need this set before verbose logging */
         if (((f->verbose == 1) && (rx_status & RX_BITS)) || (f->verbose == 2)) {
-            fprintf(stderr, "%3d nbits: %3d state: %d uw_loc: %3d uw_err: %2d bad_uw: %d snrdB: %4.1f eraw: %3d ecdd: %3d "
-                            "iter: %3d pcc: %3d rxst: %s\n",
+            fprintf(stderr, "%3d nbits: %3d st: %d uwloc: %3d uwerr: %2d bad_uw: %d snrdB: %4.1f eraw: %3d ecdd: %3d "
+                            "iter: %3d pcc: %3d seq: %3d rxst: %s\n",
                     f->frames++, f->frame_llr_nbits, f->fsk_ldpc_state, f->fsk_ldpc_best_location, errors,
                     f->fsk_ldpc_baduw, 10.0*log10(fsk->SNRest), Nerrs_raw, Nerrs_coded, iter, parityCheckCount,
-                    rx_sync_flags_to_text[rx_status]);
+                    seq, rx_sync_flags_to_text[rx_status]);
         }
     }
     else {

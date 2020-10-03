@@ -36,6 +36,7 @@
 #include <stdint.h>
 
 #include "freedv_api.h"
+#include "fsk.h"
 
 int main(int argc, char *argv[]) {
     FILE                      *fin, *fout;
@@ -51,7 +52,7 @@ int main(int argc, char *argv[]) {
         sprintf(f2020,"|2020");
         #endif     
 	printf("usage: %s 700C|700D|800XA|FSK_LDPC%s InputModemSpeechFile BinaryDataFile\n"
-               " [-v] \n", argv[0],f2020);
+               " [-v] [--vv]\n", argv[0],f2020);
 	printf("e.g    %s 700D dataBytes_700d.raw dataBytes_rx.bin\n", argv[0]);
 	exit(1);
     }
@@ -88,7 +89,7 @@ int main(int argc, char *argv[]) {
         for (i = 4; i < argc; i++) {
             if (strcmp(argv[i], "-v") == 0) verbose = 1;
             else if (strcmp(argv[i], "--testframes") == 0) use_testframes = 1;
-            else if (strcmp(argv[i], "-vv") == 0) verbose = 2;
+            else if (strcmp(argv[i], "--vv") == 0) verbose = 2;
             else {
                 fprintf(stderr, "unkown option: %s\n", argv[i]);
                 exit(1);
@@ -100,7 +101,9 @@ int main(int argc, char *argv[]) {
     assert(freedv != NULL);
     freedv_set_verbose(freedv, verbose);
     freedv_set_test_frames(freedv, use_testframes);
-
+    struct FSK *fsk = freedv_get_fsk(freedv);
+    fprintf(stderr, "Nbits: %d N: %d Ndft: %d\n", fsk->Nbits, fsk->N, fsk->Ndft);
+            
     /* for streaming bytes it's much easier use the modes that have a multiple of 8 payload bits/frame */
     assert((freedv_get_bits_per_modem_frame(freedv) % 8) == 0);
     int bytes_per_modem_frame = freedv_get_bits_per_modem_frame(freedv)/8;
@@ -125,7 +128,7 @@ int main(int argc, char *argv[]) {
             nbytes_total += nbytes;
         }
         
-        if (verbose == 2) {
+        if (verbose == 3) {
             fprintf(stderr, "frame: %d nin: %d sync: %d nbytes: %d uncorrected: %d\n",
                     frame, nin, freedv_get_sync(freedv), nbytes, freedv_get_uncorrected_errors(freedv));
         }

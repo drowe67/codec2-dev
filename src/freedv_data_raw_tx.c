@@ -54,6 +54,7 @@ int main(int argc, char *argv[]) {
     int                       use_complex = 0;
     float                     amp = FSK_SCALE;
     int                       shorts_per_sample = 1;
+    int                       Nbursts = 1, sequence_numbers = 0;
     
     char f2020[80] = {0};
     if (argc < 4) {
@@ -63,11 +64,13 @@ int main(int argc, char *argv[]) {
         #endif     
         fprintf(stderr, "usage: %s  [options] 700C|700D|800XA|FSK_LDPC%s InputBinaryDataFile OutputModemRawFile\n"
                "\n"
-               "  --testframes N  send N test frames\n"
+               "  --testframes N  send N test frames per burst\n"
+               "  --bursts     B  send B bursts on N testframes (default 1)\n"
                "  -a amp          maximum amplitude of FSK signal\n"
                "  -c              complex signed 16 bit output format (default real)\n"
                "  --clip  0|1     clipping for reduced PAPR\n"
                "  --txbpf 0|1     bandpass filter\n"
+               "  --seq           send packet sequence numbers (breaks testframe BER counting)\n"
                "\n"
                "For FSK_LDPC only:\n\n"
                "  -m      2|4     number of FSK tones\n"        
@@ -95,10 +98,12 @@ int main(int argc, char *argv[]) {
             {"Rs",         required_argument,  0, 'r'},
             {"tone1",      required_argument,  0, '1'},
             {"shift",      required_argument,  0, 's'},
+            {"bursts",     required_argument,  0, 'e'},
+            {"seq",        no_argument,        0, 'q'},
             {0, 0, 0, 0}
         };
         
-        o = getopt_long(argc,argv,"a:ct:hb:l:f:r:1:s:m:",long_opts,&opt_idx);
+        o = getopt_long(argc,argv,"a:ct:hb:l:e:f:r:1:s:m:q",long_opts,&opt_idx);
         
         switch(o) {
         case 'a':
@@ -110,6 +115,9 @@ int main(int argc, char *argv[]) {
         case 'c':
             use_complex = 1;
             shorts_per_sample = 2;
+            break;
+        case 'e':
+            Nbursts = atoi(optarg);
             break;
         case 't':
             testframes = 1;
@@ -130,8 +138,11 @@ int main(int argc, char *argv[]) {
         case '1':
             adv.first_tone = atoi(optarg);
             break;
-         case 's':
+        case 's':
             adv.tone_spacing = atoi(optarg);
+            break;
+        case 'q':
+            sequence_numbers = 1;
             break;
         case 'h':
         case '?':
@@ -199,6 +210,11 @@ int main(int argc, char *argv[]) {
         }
     }
     
+    if ((Nbursts != 1) && (testframes == 0)) {
+        fprintf(stderr, "Error: --bursts can only be used with --testframes\n");
+        exit(1);
+    }
+    
     /* optionally set up a known testframe */
     uint8_t testframe_bytes[bytes_per_modem_frame];
     memset(testframe_bytes, 0, bytes_per_modem_frame);
@@ -222,57 +238,61 @@ int main(int argc, char *argv[]) {
     short mod_out_short[2*n_mod_out];
     COMP  mod_out_comp[n_mod_out];
 
-    int n_preamble = 0;
-    if (mode == FREEDV_MODE_FSK_LDPC) {
-        if (use_complex == 0) {
-            n_preamble = freedv_rawdatapreambletx(freedv, mod_out_short);
-        } else {
-            n_preamble = freedv_rawdatapreamblecomptx(freedv, mod_out_comp);
-            comp_to_short(mod_out_short, mod_out_comp, n_preamble);
+    for(int b=0; b<Nbursts; b++) {
+
+        int n_preamble = 0;
+        if (mode == FREEDV_MODE_FSK_LDPC) {
+            if (use_complex == 0) {
+                n_preamble = freedv_rawdatapreambletx(freedv, mod_out_short);
+            } else {
+                n_preamble = freedv_rawdatapreamblecomptx(freedv, mod_out_comp);
+                comp_to_short(mod_out_short, mod_out_comp, n_preamble);
+            }
+            fwrite(mod_out_short, sizeof(short), shorts_per_sample*n_preamble, fout);
         }
-        fwrite(mod_out_short, sizeof(short), shorts_per_sample*n_preamble, fout);
-    }
     
-    /* OK main loop  --------------------------------------- */
+        /* OK main loop  --------------------------------------- */
 
-    int frames = 0;
-    while(fread(bytes_in, sizeof(uint8_t), bytes_per_modem_frame, fin) == bytes_per_modem_frame) {
-        if (testframes)
-            memcpy(bytes_in, testframe_bytes, bytes_per_modem_frame);
+        int frames = 0;
+        while(fread(bytes_in, sizeof(uint8_t), bytes_per_modem_frame, fin) == bytes_per_modem_frame) {
+            if (testframes) {
+                memcpy(bytes_in, testframe_bytes, bytes_per_modem_frame);
+                if (sequence_numbers) bytes_in[0] = (frames+1) & 0xff;
+            }
 
-        if (use_complex == 0) {
-            freedv_rawdatatx(freedv, mod_out_short, bytes_in);
-        } else {
-            freedv_rawdatacomptx(freedv, mod_out_comp, bytes_in);
-            comp_to_short(mod_out_short, mod_out_comp, n_mod_out);
+            if (use_complex == 0) {
+                freedv_rawdatatx(freedv, mod_out_short, bytes_in);
+            } else {
+                freedv_rawdatacomptx(freedv, mod_out_comp, bytes_in);
+                comp_to_short(mod_out_short, mod_out_comp, n_mod_out);
+            }
+            fwrite(mod_out_short, sizeof(short), shorts_per_sample*n_mod_out, fout);
+    
+            /* if using pipes we don't want the usual buffering to occur */
+            if (fout == stdout) fflush(stdout);
+            if (fin == stdin) fflush(stdin);
+
+            frames++;       
+            if (testframes && (frames >= Nframes)) break;
         }
+
+        if (mode == FREEDV_MODE_FSK_LDPC) {
+            /* postamble - make sure enough bits for estimators after last packet */
+            if (use_complex == 0) {
+                n_preamble = freedv_rawdatapreambletx(freedv, mod_out_short);
+            } else {
+                n_preamble = freedv_rawdatapreamblecomptx(freedv, mod_out_comp);
+                comp_to_short(mod_out_short, mod_out_comp, n_preamble);
+            }
+            fwrite(mod_out_short, sizeof(short), shorts_per_sample*n_preamble, fout);
+        }
+
+        /* some silence at the end to allow demod to complete processing */
+        
+        for(int i=0; i<shorts_per_sample*n_mod_out; i++) mod_out_short[i] = 0;
         fwrite(mod_out_short, sizeof(short), shorts_per_sample*n_mod_out, fout);
-    
-        /* if using pipes we don't want the usual buffering to occur */
-        if (fout == stdout) fflush(stdout);
-        if (fin == stdin) fflush(stdin);
-
-        frames++;       
-        if (testframes && (frames >= Nframes)) {
-            goto finished;
-        }
+        fwrite(mod_out_short, sizeof(short), shorts_per_sample*n_mod_out, fout);
     }
-
- finished:
-    if (mode == FREEDV_MODE_FSK_LDPC) {
-        /* postamble - make sure enough bits for estimators after last packet */
-        if (use_complex == 0) {
-            n_preamble = freedv_rawdatapreambletx(freedv, mod_out_short);
-        } else {
-            n_preamble = freedv_rawdatapreamblecomptx(freedv, mod_out_comp);
-            comp_to_short(mod_out_short, mod_out_comp, n_preamble);
-        }
-        fwrite(mod_out_short, sizeof(short), shorts_per_sample*n_preamble, fout);
-    }
-
-    for(int i=0; i<shorts_per_sample*n_mod_out; i++) mod_out_short[i] = 0;
-    fwrite(mod_out_short, sizeof(short), shorts_per_sample*n_mod_out, fout);
-    fwrite(mod_out_short, sizeof(short), shorts_per_sample*n_mod_out, fout);
     
     freedv_close(freedv);
     fclose(fin);
