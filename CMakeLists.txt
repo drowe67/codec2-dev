@@ -815,7 +815,11 @@ endif(NOT APPLE)
              WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/unittest
              )
            
-     # FreeDV API raw data - OFDM LDPC
+     # ---------------------------------------------------------
+     # FreeDV API raw data
+     # ---------------------------------------------------------
+     
+     # OFDM LDPC
      add_test(NAME test_freedv_data_raw_ofdm
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
                             head -c 140 </dev/urandom > binaryIn.bin;
@@ -823,11 +827,29 @@ endif(NOT APPLE)
                             ./freedv_data_raw_rx 700D - - -v | 
                             diff /dev/stdin binaryIn.bin")
 
-     # FreeDV API raw data - FSK LDPC with enough noise for several % raw BER to give FEC a work out
-     add_test(NAME test_freedv_data_raw_fsk_ldpc
+     # FSK LDPC default 100 bit/s 2FSK, enough noise for several % raw BER to give
+     # FEC/acquisition a work out, bursts of 1 frame as that stresses acquisition
+     add_test(NAME test_freedv_data_raw_fsk_ldpc_100
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
-                            ./freedv_data_raw_tx --testframes 10 FSK_LDPC /dev/zero - |
-                            ./cohpsk_ch - - -5 --Fs 8000 |
-                            ./freedv_data_raw_rx FSK_LDPC - /dev/null --testframes")           
+                            ./freedv_data_raw_tx --testframes 1 --bursts 10 FSK_LDPC /dev/zero - |
+                            ./cohpsk_ch - - -5 --Fs 8000 --ssbfilt 0 |
+                            ./freedv_data_raw_rx --testframes -v FSK_LDPC - /dev/null")           
+             set_tests_properties(test_freedv_data_raw_fsk_ldpc_100 PROPERTIES PASS_REGULAR_EXPRESSION "output_packets: 10")
+
+     # FSK LDPC 1000 bit/s 2FSK, Fs=40kHz, as different configs can upset acquisition
+     add_test(NAME test_freedv_data_raw_fsk_ldpc_1k
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            ./freedv_data_raw_tx --Fs 40000 --Rs 1000 --tone1 1000 --shift 1000 --testframes 1 --bursts 10 FSK_LDPC /dev/zero - |
+                            ./cohpsk_ch - - -10 --Fs 8000 --ssbfilt 0 |
+                            ./freedv_data_raw_rx --testframes -v --Fs 40000 --Rs 1000 FSK_LDPC - /dev/null")
+             set_tests_properties(test_freedv_data_raw_fsk_ldpc_1k PROPERTIES PASS_REGULAR_EXPRESSION "output_packets: 10")
+
+     # FSK LDPC 10000 bit/s 2FSK, Fs=100kHz, each of the 10 bursts has 100 frames
+     add_test(NAME test_freedv_data_raw_fsk_ldpc_10k
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            ./freedv_data_raw_tx --Fs 100000 --Rs 10000 --tone1 10000 --shift 10000 --testframes 100 --bursts 10 FSK_LDPC /dev/zero - |
+                            ./cohpsk_ch - - -15 --Fs 8000 --ssbfilt 0 | 
+                            ./freedv_data_raw_rx --testframes -v --Fs 100000 --Rs 10000 FSK_LDPC - /dev/null")
+             set_tests_properties(test_freedv_data_raw_fsk_ldpc_10k PROPERTIES PASS_REGULAR_EXPRESSION "output_packets: 1000")
 
 endif(UNITTEST)
