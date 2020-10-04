@@ -172,7 +172,7 @@ void freedv_fsk_ldpc_open(struct freedv *f, struct freedv_advanced *adv) {
     for(int i=0; i<2*bits_per_frame; i++) f->twoframes_llr[i] = 0.0;
     
     /* currently configured a simple frame-frame approach */
-    f->fsk_ldpc_thresh1 = 6;
+    f->fsk_ldpc_thresh1 = 5;
     f->fsk_ldpc_thresh2 = 6;
     f->fsk_ldpc_baduw_thresh=1;
     
