@@ -376,13 +376,13 @@ void freedv_tx_fsk_ldpc_data(struct freedv *f, COMP mod_out[]) {
     }
 }
 
-void freedv_tx_fsk_ldpc_data_preamble(struct freedv *f, COMP mod_out[]) {
+void freedv_tx_fsk_ldpc_data_preamble(struct freedv *f, COMP mod_out[], int npreamble_bits, int npreamble_samples) {
     struct FSK *fsk = f->fsk;    
-    uint8_t preamble[fsk->Nbits];
-    for(int i=0; i<fsk->Nbits; i++) preamble[i] = (i>>1) & 0x1;
-    fsk_mod_c(fsk, mod_out, preamble, fsk->Nbits);    
+    uint8_t preamble[npreamble_bits];
+    for(int i=0; i<npreamble_bits; i++) preamble[i] = (i>>1) & 0x1;
+    fsk_mod_c(fsk, mod_out, preamble, npreamble_bits);    
     /* scale samples */
-    for(int i=0; i<fsk->N; i++) {
+    for(int i=0; i<npreamble_samples; i++) {
         mod_out[i].real *= f->tx_amp;
         mod_out[i].imag *= f->tx_amp;
     }
@@ -428,7 +428,7 @@ int freedv_rx_fsk_ldpc_data(struct freedv *f, COMP demod_in[]) {
         f->frame_llr_nbits -= bits_per_frame;
         assert(f->frame_llr_nbits >= 0);
         
-        // OK lets run frame based processing
+        // OK lets run frame based processing, first the state machine
 
         int errors = 0;
         int next_state = f->fsk_ldpc_state;
@@ -467,6 +467,8 @@ int freedv_rx_fsk_ldpc_data(struct freedv *f, COMP demod_in[]) {
         }
         f->fsk_ldpc_state = next_state;
 
+        /* We may have a valid frame, based on the number on UW errors.  Lets do a LDPC decode and check the CRC */
+        
         int Nerrs_raw=0, Nerrs_coded=0, iter=0, parityCheckCount=0;
         if (f->fsk_ldpc_state == 1) {
             uint8_t decoded_codeword[f->ldpc->ldpc_coded_bits_per_frame];
@@ -496,7 +498,7 @@ int freedv_rx_fsk_ldpc_data(struct freedv *f, COMP demod_in[]) {
                 f->total_bits_coded += f->bits_per_modem_frame;
             }
 
-            /* extract packet sequnce numbers optinally placed in first 8 bits */
+            /* extract packet sequnce numbers optionally placed in first 8 bits */
             seq = 0;
             for(int i=0; i<8; i++)
                 seq |= f->rx_payload_bits[i] << (7-i);

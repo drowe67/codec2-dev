@@ -220,11 +220,11 @@ int freedv_comprx_fsk(struct freedv *f, COMP demod_in[]);
 int freedv_floatrx(struct freedv *f, short speech_out[], float demod_in[]);
 
 void freedv_tx_fsk_ldpc_data(struct freedv *f, COMP mod_out[]);
-void freedv_tx_fsk_ldpc_data_preamble(struct freedv *f, COMP mod_out[]);
+void freedv_tx_fsk_ldpc_data_preamble(struct freedv *f, COMP mod_out[], int npreamble_bits, int npreamble_samples);
 int freedv_rx_fsk_ldpc_data(struct freedv *f, COMP demod_in[]);
       
 int freedv_bits_to_speech(struct freedv *f, short speech_out[], short demod_in[], int rx_status);
-      
+
 #ifdef __cplusplus
 }
 #endif

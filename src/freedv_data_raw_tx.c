@@ -259,6 +259,9 @@ int main(int argc, char *argv[]) {
             if (testframes) {
                 memcpy(bytes_in, testframe_bytes, bytes_per_modem_frame);
                 if (sequence_numbers) bytes_in[0] = (frames+1) & 0xff;
+                //unit16 crc16 = freedv_gen_crc16(bytes_in,bytes_per_modem_frame-2);
+                //bytes_in[bytes_per_modem_frame-2] = crc16 >> 8; 
+                //bytes_in[bytes_per_modem_frame-1] = crc16 & 0xff; 
             }
 
             if (use_complex == 0) {

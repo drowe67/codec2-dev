@@ -43,7 +43,7 @@ int main(int argc, char *argv[]) {
     FILE                      *fin, *fout;
     struct freedv_advanced     adv = {0,2,100,8000,1000,200, "H_256_512_4"};
     struct freedv             *freedv;
-    int                        nin, nbytes, nbytes_total = 0, frame = 0;
+    int                        nin, nbytes, nbytes_total = 0, npackets_total = 0, frame = 0;
     int                        mode;
     int                        verbose = 0, use_testframes = 0;
     
@@ -168,15 +168,15 @@ int main(int argc, char *argv[]) {
         nbytes = freedv_rawdatarx(freedv, bytes_out, demod_in);
         nin = freedv_nin(freedv);
 
-        /* Output data if FEC decoding indicates it has no uncorrected bit errors */
-        if (!freedv_get_uncorrected_errors(freedv)) {
+        if (nbytes) {
             fwrite(bytes_out, sizeof(uint8_t), nbytes, fout);
             nbytes_total += nbytes;
+            npackets_total++;
         }
         
         if (verbose == 3) {
-            fprintf(stderr, "frame: %d nin: %d sync: %d nbytes: %d uncorrected: %d\n",
-                    frame, nin, freedv_get_sync(freedv), nbytes, freedv_get_uncorrected_errors(freedv));
+            fprintf(stderr, "frame: %d nin: %d sync: %d nbytes: %d bits: %d\n",
+                    frame, nin, freedv_get_sync(freedv), nbytes, freedv_get_rx_bits(freedv));
         }
 
 	/* if using pipes we probably don't want the usual buffering */
@@ -186,7 +186,7 @@ int main(int argc, char *argv[]) {
 
     fclose(fin);
     fclose(fout);
-    fprintf(stderr, "frames processed: %d  output bytes: %d\n", frame, nbytes_total);
+    fprintf(stderr, "frames processed: %d  output bytes: %d output_packets: %d \n", frame, nbytes_total, npackets_total);
 
     /* in testframe mode finish up with some stats */
     
