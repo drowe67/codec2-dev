@@ -480,6 +480,14 @@ int freedv_rx_fsk_ldpc_data(struct freedv *f, COMP demod_in[]) {
             if (parityCheckCount != f->ldpc->NumberParityBits)
                 rx_status |= RX_BIT_ERRORS;
 
+            assert((f->bits_per_modem_frame % 8) == 0);
+            int bytes_per_modem_frame = f->bits_per_modem_frame/8;
+            uint8_t rx_payload_bytes[bytes_per_modem_frame];
+            freedv_pack(rx_payload_bytes, f->rx_payload_bits, f->bits_per_modem_frame);
+            uint16_t tx_crc16 = (rx_payload_bytes[bytes_per_modem_frame-2] << 8) | rx_payload_bytes[bytes_per_modem_frame-1];
+            uint16_t rx_crc16 = freedv_gen_crc16(rx_payload_bytes, bytes_per_modem_frame - 2);
+            fprintf(stderr,"tx_crc: 0x%04x rx_crc: 0x%04x\n", tx_crc16, rx_crc16);
+
             if (f->test_frames) {
                 /* regenerate tx test frame */
                 uint8_t tx_frame[bits_per_frame];

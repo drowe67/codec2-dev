@@ -222,16 +222,7 @@ int main(int argc, char *argv[]) {
         int bits_per_frame = freedv_get_bits_per_modem_frame(freedv);
         uint8_t testframe_bits[bits_per_frame];
         ofdm_generate_payload_data_bits(testframe_bits, bits_per_frame);
-        /* pack bits, MSB first */
-        int bit = 7, byte = 0;
-        for(int i=0; i<bits_per_frame; i++) {
-            testframe_bytes[byte] |= (testframe_bits[i] << bit);
-            bit--;
-            if (bit < 0) {
-                bit = 7;
-                byte++;
-            }
-        }
+        freedv_pack(testframe_bytes, testframe_bits, bits_per_frame);
     }
     fprintf(stderr, "\n");
 
@@ -259,9 +250,9 @@ int main(int argc, char *argv[]) {
             if (testframes) {
                 memcpy(bytes_in, testframe_bytes, bytes_per_modem_frame);
                 if (sequence_numbers) bytes_in[0] = (frames+1) & 0xff;
-                //unit16 crc16 = freedv_gen_crc16(bytes_in,bytes_per_modem_frame-2);
-                //bytes_in[bytes_per_modem_frame-2] = crc16 >> 8; 
-                //bytes_in[bytes_per_modem_frame-1] = crc16 & 0xff; 
+                uint16_t crc16 = freedv_gen_crc16(bytes_in, bytes_per_modem_frame-2);
+                bytes_in[bytes_per_modem_frame-2] = crc16 >> 8; 
+                bytes_in[bytes_per_modem_frame-1] = crc16 & 0xff; 
             }
 
             if (use_complex == 0) {
