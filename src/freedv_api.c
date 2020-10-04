@@ -225,17 +225,7 @@ static void codec2_encode_upacked(struct freedv *f, uint8_t unpacked_bits[], sho
     uint8_t packed_codec_bits[n_packed];
     
     codec2_encode(f->codec2, packed_codec_bits, speech_in);
-    
-    /* unpack bits, MSB first */
-    int bit = 7, byte = 0;
-    for(int i=0; i<f->bits_per_codec_frame; i++) {
-        unpacked_bits[i] = (packed_codec_bits[byte] >> bit) & 0x1;
-        bit--;
-        if (bit < 0) {
-            bit = 7;
-            byte++;
-        }
-    }
+    freedv_unpack(unpacked_bits, packed_codec_bits, f->bits_per_codec_frame);
 }
 
 
@@ -368,20 +358,39 @@ void freedv_comptx(struct freedv *f, COMP mod_out[], short speech_in[]) {
 }
 
 
-/* send raw frames of bytes, or speech data that was compressed externally, complex float output */
-void freedv_rawdatacomptx(struct freedv *f, COMP mod_out[], unsigned char *packed_payload_bits) {
-    assert(f != NULL);
-
-    /* unpack bits, MSB first */
+/* pack bits */
+void freedv_pack(uint8_t *bytes, uint8_t *bits, int nbits) {
+    memset(bytes, 0, (nbits+7)/8);
     int bit = 7, byte = 0;
-    for(int i=0; i<f->bits_per_modem_frame; i++) {
-        f->tx_payload_bits[i] = (packed_payload_bits[byte] >> bit) & 0x1;
+    for(int i=0; i<nbits; i++) {
+        bytes[byte] |= bits[i] << bit;
         bit--;
         if (bit < 0) {
             bit = 7;
             byte++;
         }
     }
+}
+
+/* unpack bits, MSB first */
+void freedv_unpack(uint8_t *bits, uint8_t *bytes, int nbits) {
+    int bit = 7, byte = 0;
+    for(int i=0; i<nbits; i++) {
+        bits[i] = (bytes[byte] >> bit) & 0x1;
+        bit--;
+        if (bit < 0) {
+            bit = 7;
+            byte++;
+        }
+    }
+}
+
+/* send raw frames of bytes, or speech data that was compressed externally, complex float output */
+void freedv_rawdatacomptx(struct freedv *f, COMP mod_out[], unsigned char *packed_payload_bits) {
+    assert(f != NULL);
+
+    freedv_unpack(f->tx_payload_bits, packed_payload_bits, f->bits_per_modem_frame);
+
     if (FDV_MODE_ACTIVE( FREEDV_MODE_1600, f->mode)) freedv_comptx_fdmdv_1600(f, mod_out);
     if (FDV_MODE_ACTIVE( FREEDV_MODE_700C, f->mode)) freedv_comptx_700c(f, mod_out);
     if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode)) freedv_comptx_700d(f, mod_out);
@@ -415,21 +424,27 @@ void freedv_rawdatatx(struct freedv *f, short mod_out[], unsigned char *packed_p
 int freedv_rawdatapreamblecomptx(struct freedv *f, COMP mod_out[]) {
     assert(f != NULL);
     assert(f->mode == FREEDV_MODE_FSK_LDPC);
-    assert(f->fsk->N < f->n_nom_modem_samples); /* caller probably using an array of this size */
-
-    freedv_tx_fsk_ldpc_data_preamble(f, mod_out);
+    struct FSK *fsk = f->fsk;
     
-    return f->fsk->N;
+    int npreamble_symbols = 50;
+    int npreamble_bits = npreamble_symbols*(fsk->mode>>1);
+    int npreamble_samples = fsk->Ts*npreamble_symbols;
+    //fprintf(stderr, "%d %d %d Nbits: %d N: %d\n", npreamble_symbols, npreamble_bits, npreamble_samples, fsk->Nbits, fsk->N);
+    
+    assert(npreamble_samples < f->n_nom_modem_samples); /* caller probably using an array of this size */
+    freedv_tx_fsk_ldpc_data_preamble(f, mod_out, npreamble_bits, npreamble_samples);
+    
+    return npreamble_samples;
 }
 
 int freedv_rawdatapreambletx(struct freedv *f, short mod_out[]) {
     assert(f != NULL);
-    COMP mod_out_comp[f->fsk->N];
+    COMP mod_out_comp[f->n_nom_modem_samples];
 
-    freedv_rawdatapreamblecomptx(f, mod_out_comp);
+    int npreamble_samples = freedv_rawdatapreamblecomptx(f, mod_out_comp);
     
     /* convert complex to real */
-    for(int i=0; i<f->fsk->N; i++)
+    for(int i=0; i<npreamble_samples; i++)
         mod_out[i] = mod_out_comp[i].real;
 
     return f->fsk->N;
@@ -706,18 +721,8 @@ int freedv_shortrx(struct freedv *f, short speech_out[], short demod_in[], float
 static void codec2_decode_upacked(struct freedv *f, short speech_out[], uint8_t unpacked_bits[]) {
     int n_packed = (f->bits_per_codec_frame + 7) / 8;
     uint8_t packed_codec_bits[n_packed];
-    memset(packed_codec_bits, 0, n_packed);
-    
-    /* pack bits, MSB received first */
-    int bit = 7, byte = 0;
-    for(int i=0; i<f->bits_per_codec_frame; i++) {
-        packed_codec_bits[byte] |= (unpacked_bits[i] << bit);
-        bit--;
-        if (bit < 0) {
-            bit = 7;
-            byte++;
-        }
-    }
+
+    freedv_pack(packed_codec_bits, unpacked_bits, f->bits_per_codec_frame);
     codec2_decode(f->codec2, speech_out, packed_codec_bits);    
 }
 
@@ -907,17 +912,7 @@ int freedv_rawdatacomprx(struct freedv *f, unsigned char *packed_payload_bits, C
 
     if (rx_status & RX_BITS) {
 	ret = (f->bits_per_modem_frame+7)/8;
-        memset(packed_payload_bits, 0, ret);
-        /* pack bits */
-        int bit = 7, byte = 0;
-        for(int i=0; i<f->bits_per_modem_frame; i++) {
-            packed_payload_bits[byte] |= (f->rx_payload_bits[i] << bit);
-            bit--;
-            if (bit < 0) {
-                bit = 7;
-                byte++;
-            }
-        }
+        freedv_pack(packed_payload_bits, f->rx_payload_bits, f->bits_per_modem_frame);
     }
 
     /* might want to check this for errors, e.g. if reliable data is important */
@@ -1229,7 +1224,7 @@ int freedv_get_sync                       (struct freedv *f) {return f->stats.sy
 struct CODEC2 *freedv_get_codec2	  (struct freedv *f){return  f->codec2;}
 int freedv_get_bits_per_codec_frame       (struct freedv *f){return f->bits_per_codec_frame;}
 int freedv_get_bits_per_modem_frame       (struct freedv *f){return f->bits_per_modem_frame;}
-int freedv_get_uncorrected_errors         (struct freedv *f) {return f->rx_status & RX_BIT_ERRORS;}
+int freedv_get_rx_bits                    (struct freedv *f) {return f->rx_status & RX_BITS;}
 
 int freedv_get_n_max_speech_samples(struct freedv *f) {
     /* When "passing through" demod samples to the speech output
@@ -1283,3 +1278,17 @@ void freedv_get_modem_extended_stats(struct freedv *f, struct MODEM_STATS *stats
     }
 }
 
+// from http://stackoverflow.com/questions/10564491/function-to-calculate-a-crc16-checksum
+
+unsigned short freedv_gen_crc16(unsigned char* data_p, int length) {
+    unsigned char x;
+    unsigned short crc = 0xFFFF;
+
+    while (length--) {
+        x = crc >> 8 ^ *data_p++;
+        x ^= x>>4;
+        crc = (crc << 8) ^ ((unsigned short)(x << 12)) ^ ((unsigned short)(x <<5)) ^ ((unsigned short)x);
+    }
+    
+    return crc;
+}
