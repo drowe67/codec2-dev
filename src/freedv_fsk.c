@@ -465,34 +465,46 @@ int freedv_rx_fsk_ldpc_data(struct freedv *f, COMP demod_in[]) {
             else f->fsk_ldpc_baduw = 0;
             break;
         }
-        f->fsk_ldpc_state = next_state;
-
-        /* We may have a valid frame, based on the number on UW errors.  Lets do a LDPC decode and check the CRC */
         
         int Nerrs_raw=0, Nerrs_coded=0, iter=0, parityCheckCount=0;
-        if (f->fsk_ldpc_state == 1) {
+        if (next_state == 1) {
+            /* We may have a valid frame, based on the number on UW errors.  Lets do a LDPC decode and check the CRC */
+            
             uint8_t decoded_codeword[f->ldpc->ldpc_coded_bits_per_frame];
             iter = run_ldpc_decoder(f->ldpc, decoded_codeword,
                                     &f->twoframes_llr[f->fsk_ldpc_best_location+sizeof(fsk_ldpc_uw)],
                                     &parityCheckCount);
             memcpy(f->rx_payload_bits, decoded_codeword, f->bits_per_modem_frame);
-            rx_status |= RX_BITS;
-            if (parityCheckCount != f->ldpc->NumberParityBits)
-                rx_status |= RX_BIT_ERRORS;
 
+            /* check CRC */
             assert((f->bits_per_modem_frame % 8) == 0);
             int bytes_per_modem_frame = f->bits_per_modem_frame/8;
             uint8_t rx_payload_bytes[bytes_per_modem_frame];
             freedv_pack(rx_payload_bytes, f->rx_payload_bits, f->bits_per_modem_frame);
             uint16_t tx_crc16 = (rx_payload_bytes[bytes_per_modem_frame-2] << 8) | rx_payload_bytes[bytes_per_modem_frame-1];
             uint16_t rx_crc16 = freedv_gen_crc16(rx_payload_bytes, bytes_per_modem_frame - 2);
-            fprintf(stderr,"tx_crc: 0x%04x rx_crc: 0x%04x\n", tx_crc16, rx_crc16);
-
+            if (tx_crc16 == rx_crc16)
+                rx_status |= RX_BITS;
+            else {
+                /* if CRC failed on first frame in packet, this was probably a dud UW match, so go straight back to searching */
+                if (f->fsk_ldpc_state == 0) next_state = 0;
+                rx_status |= RX_BIT_ERRORS;
+            }            
+        }
+        f->fsk_ldpc_state = next_state;
+        
+        if (f->fsk_ldpc_state == 1) {
             if (f->test_frames) {
                 /* regenerate tx test frame */
                 uint8_t tx_frame[bits_per_frame];
                 memcpy(tx_frame, fsk_ldpc_uw, sizeof(fsk_ldpc_uw));
                 ofdm_generate_payload_data_bits(tx_frame + sizeof(fsk_ldpc_uw), f->bits_per_modem_frame);
+                int bytes_per_modem_frame = f->bits_per_modem_frame/8;
+                uint8_t tx_bytes[bytes_per_modem_frame];
+                freedv_pack(tx_bytes, tx_frame + sizeof(fsk_ldpc_uw), f->bits_per_modem_frame);
+                uint16_t tx_crc16 =  freedv_gen_crc16(tx_bytes, bytes_per_modem_frame - 2);
+                uint8_t tx_crc16_bytes[] = { tx_crc16 >> 8, tx_crc16 & 0xff };
+                freedv_unpack(tx_frame + sizeof(fsk_ldpc_uw) + f->bits_per_modem_frame - 16, tx_crc16_bytes, 16);
                 encode(f->ldpc, tx_frame + sizeof(fsk_ldpc_uw), tx_frame + sizeof(fsk_ldpc_uw) + f->bits_per_modem_frame);  
                 
                 /* count uncoded (raw) errors across UW, payload bits, parity bits */
