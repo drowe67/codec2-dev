@@ -47,7 +47,7 @@ int main(int argc, char *argv[]) {
     int                        mode;
     int                        verbose = 0, use_testframes = 0;
     
-    if (argc < 4) {
+    if (argc < 3) {
         char f2020[80] = {0};
     helpmsg:
         #ifdef __LPCNET__
@@ -145,9 +145,11 @@ int main(int argc, char *argv[]) {
     assert(freedv != NULL);
     freedv_set_verbose(freedv, verbose);
     freedv_set_test_frames(freedv, use_testframes);
-    struct FSK *fsk = freedv_get_fsk(freedv);
-    fprintf(stderr, "Nbits: %d N: %d Ndft: %d\n", fsk->Nbits, fsk->N, fsk->Ndft);
-            
+    if (mode == FREEDV_MODE_FSK_LDPC) {
+        struct FSK *fsk = freedv_get_fsk(freedv);
+        fprintf(stderr, "Nbits: %d N: %d Ndft: %d\n", fsk->Nbits, fsk->N, fsk->Ndft);
+    }
+    
     /* for streaming bytes it's much easier use the modes that have a multiple of 8 payload bits/frame */
     assert((freedv_get_bits_per_modem_frame(freedv) % 8) == 0);
     int bytes_per_modem_frame = freedv_get_bits_per_modem_frame(freedv)/8;
