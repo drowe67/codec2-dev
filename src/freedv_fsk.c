@@ -379,7 +379,14 @@ void freedv_tx_fsk_ldpc_data(struct freedv *f, COMP mod_out[]) {
 void freedv_tx_fsk_ldpc_data_preamble(struct freedv *f, COMP mod_out[], int npreamble_bits, int npreamble_samples) {
     struct FSK *fsk = f->fsk;    
     uint8_t preamble[npreamble_bits];
-    for(int i=0; i<npreamble_bits; i++) preamble[i] = (i>>1) & 0x1;
+    // cycle through all 2 and 4FSK symbols, not sure if this is better than random
+    int sym = 0;
+    for(int i=0; i<npreamble_bits; i+=2) {
+        preamble[i]   = (sym>>1) & 0x1;
+        preamble[i+1] = sym & 0x1;
+        sym += 1;
+    }
+    
     fsk_mod_c(fsk, mod_out, preamble, npreamble_bits);    
     /* scale samples */
     for(int i=0; i<npreamble_samples; i++) {
