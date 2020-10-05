@@ -46,6 +46,7 @@ int main(int argc, char *argv[]) {
     int                        nin, nbytes, nbytes_total = 0, npackets_total = 0, frame = 0;
     int                        mode;
     int                        verbose = 0, use_testframes = 0;
+    int                        mask = 0;
     
     if (argc < 3) {
         char f2020[80] = {0};
@@ -54,13 +55,14 @@ int main(int argc, char *argv[]) {
         sprintf(f2020,"|2020");
         #endif     
 	printf("usage: %s [options] 700C|700D|800XA|FSK_LDPC%s InputModemSpeechFile BinaryDataFile\n"
-               "  -v or --vv    verbose options\n"
-               "  --testframes  count raw and coded errors in testframes sent by tx\n"
+               "  -v or --vv      verbose options\n"
+               "  --testframes    count raw and coded errors in testframes sent by tx\n"
                "\n"
                "For FSK_LDPC only:\n\n"
                "  -m      2|4     number of FSK tones\n"        
                "  --Fs    FreqHz  sample rate (default 8000)\n"
                "  --Rs    FreqHz  symbol rate (default 100)\n"
+               "  --mask shiftHz  Use \"mask\" freq estimator (default is \"peak\" estimator)\n"
                , argv[0],f2020);
 	printf("e.g    %s 700D dataBytes_700d.raw dataBytes_rx.bin\n", argv[0]);
 	exit(1);
@@ -74,7 +76,8 @@ int main(int argc, char *argv[]) {
             {"help",       no_argument,        0, 'h'},
             {"Fs",         required_argument,  0, 'f'},
             {"Rs",         required_argument,  0, 'r'},
-            {"vv",         no_argument,  0, 'x'},
+            {"vv",         no_argument,        0, 'x'},
+            {"mask",       required_argument,  0, 'k'},
             {0, 0, 0, 0}
         };
         
@@ -83,6 +86,10 @@ int main(int argc, char *argv[]) {
         switch(o) {
         case 'f':
             adv.Fs = atoi(optarg);
+            break;
+        case 'k':
+            mask = 1;
+            adv.tone_spacing = atoi(optarg);
             break;
         case 'm':
             adv.M = atoi(optarg);
@@ -140,8 +147,12 @@ int main(int argc, char *argv[]) {
 
     if (mode != FREEDV_MODE_FSK_LDPC)
         freedv = freedv_open(mode);
-    else
+    else {
         freedv = freedv_open_advanced(mode, &adv);
+        struct FSK *fsk = freedv_get_fsk(freedv);
+        fsk_set_freq_est_alg(fsk, mask);
+    }
+
     assert(freedv != NULL);
     freedv_set_verbose(freedv, verbose);
     freedv_set_test_frames(freedv, use_testframes);
