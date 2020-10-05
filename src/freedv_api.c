@@ -426,7 +426,7 @@ int freedv_rawdatapreamblecomptx(struct freedv *f, COMP mod_out[]) {
     assert(f->mode == FREEDV_MODE_FSK_LDPC);
     struct FSK *fsk = f->fsk;
     
-    int npreamble_symbols = 50;
+    int npreamble_symbols = 50*(fsk->mode>>1);
     int npreamble_bits = npreamble_symbols*(fsk->mode>>1);
     int npreamble_samples = fsk->Ts*npreamble_symbols;
     //fprintf(stderr, "npreamble_symbols: %d npreamble_bits: %d npreamble_samples: %d Nbits: %d N: %d\n",

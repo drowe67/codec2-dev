@@ -852,4 +852,12 @@ endif(NOT APPLE)
                             ./freedv_data_raw_rx --testframes -v --Fs 100000 --Rs 10000 FSK_LDPC - /dev/null")
              set_tests_properties(test_freedv_data_raw_fsk_ldpc_10k PROPERTIES PASS_REGULAR_EXPRESSION "output_packets: 1000")
 
+     # FSK LDPC Rs=1000 bit/s (Rb=2000) 4FSK, Fs=40kHz, this needs --mask and longer preamble to work, due to lower Es/No, about 2dB over 2FSK
+     add_test(NAME test_freedv_data_raw_fsk_ldpc_2k
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            ./freedv_data_raw_tx -a 8192 -m 4 --Fs 40000 --Rs 1000 --tone1 1000 --shift 1000 --testframes 1 --bursts 10 FSK_LDPC /dev/zero - |
+                             ./cohpsk_ch - - -22 --Fs 8000 --ssbfilt 0 | 
+                             ./freedv_data_raw_rx -m 4 --testframes -v --Fs 40000 --Rs 1000 FSK_LDPC --mask 1000 - /dev/null")
+             set_tests_properties(test_freedv_data_raw_fsk_ldpc_2k PROPERTIES PASS_REGULAR_EXPRESSION "output_packets: 10")
+             
 endif(UNITTEST)
