@@ -75,6 +75,9 @@ These modes use constant amplitude modulation like FSK or FM, and are designed f
 | 2400A | 2016 | 1300 | 4FSK | 2400 | 5kHz | Golay (23,12) | Y |
 | 2400B | 2016 | 1300 | baseband/analog FM | analog FM | 2400 | Golay (23,12) | Y |
 | 800XA | 2017 | 700C |  4FSK | 2000 | 800 | - | N |
+| FSK_LDPC | 2020 | - | 2 or 4 FSK |  user defined | user defined | LDPC | - | - |
+
+The FSK_LDPC mode is used for data, and has user defined bit rate and a variety of LDPC codes available.  It is discussed in [README_data](README_data.md)
 
 ## FreeDV API
 

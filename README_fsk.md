@@ -87,7 +87,7 @@ The Octave version of the modem was developed by David Rowe.  Brady O'Brien port
    Coded Tbits:  50176 Terr:    139 BER: 0.003
          Tpkts:    196 Tper:      4 PER: 0.020
    ```
-   In this example the unique word is the 16 bit sequence `5186`.  Se also several ctests using these application. Other codes are also available:
+   In this example the unique word is the 16 bit sequence `5186`.  See also several ctests using these application. Other codes are also available:
    ```
    $ ./ldpc_enc --listcodes
 
@@ -100,7 +100,9 @@ The Octave version of the modem was developed by David Rowe.  Brady O'Brien port
    H_128_256_5          rate 0.50 (256,128)
    ```
    If you change the code you also need to change the `frameSizeBits` argument in `framer/deframer` (`512` in the example above).
-   
+
+1. The FSK/LDPC/framer steps above have been combined in a FreeDV API mode.  See "FSK LDPC Raw Data Mode" in [README_data.md](README_data.md).
+
 1. FSK modem C files in ```codec2/src```:
 
    | File | Description |
@@ -172,3 +174,6 @@ The Octave version of the modem was developed by David Rowe.  Brady O'Brien port
    1. [HF FSK with Rpitx](http://www.rowetel.com/?p=6317), a zero hardware FSK transmitter using a Pi
    1. [Eb/No and SNR worked Example](http://www.rowetel.com/wordpress/?p=4621)
    1. [FSK LLR LDPC Code Experiments](https://github.com/drowe67/codec2/pull/129)
+   1. [FreeDV API FSK LDPC Raw Data Mode](README_data.md)
+
+
