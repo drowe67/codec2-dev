@@ -171,13 +171,13 @@ int main(int argc, char *argv[]) {
 
     if (strcmp(argv[dx+1], "-")  == 0) fin = stdin;
     else if ( (fin = fopen(argv[dx+1],"rb")) == NULL ) {
-        fprintf(stderr, "Error opening input file of bytes: %s: %s.\n", argv[2], strerror(errno));
+        fprintf(stderr, "Error opening input file of bytes: %s: %s.\n", argv[dx+1], strerror(errno));
         exit(1);
     }
 
     if (strcmp(argv[dx+2], "-") == 0) fout = stdout;
     else if ( (fout = fopen(argv[dx+2],"wb")) == NULL ) {
-        fprintf(stderr, "Error opening output modem sample file: %s: %s.\n", argv[3], strerror(errno));
+        fprintf(stderr, "Error opening output modem sample file: %s: %s.\n", argv[dx+2], strerror(errno));
         exit(1);
     }
 
@@ -195,6 +195,8 @@ int main(int argc, char *argv[]) {
     
     /* for streaming bytes it's much easier to use modes that have a multiple of 8 payload bits/frame */
     int bytes_per_modem_frame = freedv_get_bits_per_modem_frame(freedv)/8;
+    int payload_bytes_per_modem_frame = bytes_per_modem_frame;
+    if (mode == FREEDV_MODE_FSK_LDPC) payload_bytes_per_modem_frame -= 2; /* 16 bits used for the CRC */
     fprintf(stderr, "bits_per_modem_frame: %d bytes_per_modem_frame: %d\n", freedv_get_bits_per_modem_frame(freedv), bytes_per_modem_frame);
     assert((freedv_get_bits_per_modem_frame(freedv) % 8) == 0);
     int     n_mod_out = freedv_get_n_nom_modem_samples(freedv);
@@ -228,6 +230,7 @@ int main(int argc, char *argv[]) {
 
     short mod_out_short[2*n_mod_out];
     COMP  mod_out_comp[n_mod_out];
+    int frames;
 
     for(int b=0; b<Nbursts; b++) {
 
@@ -245,16 +248,22 @@ int main(int argc, char *argv[]) {
         
         /* OK main loop  --------------------------------------- */
 
-        int frames = 0;
-        while(fread(bytes_in, sizeof(uint8_t), bytes_per_modem_frame, fin) == bytes_per_modem_frame) {
+        frames = 0;
+        while(fread(bytes_in, sizeof(uint8_t), payload_bytes_per_modem_frame, fin) == payload_bytes_per_modem_frame) {
             if (testframes) {
                 memcpy(bytes_in, testframe_bytes, bytes_per_modem_frame);
                 if (sequence_numbers) bytes_in[0] = (frames+1) & 0xff;
-                uint16_t crc16 = freedv_gen_crc16(bytes_in, bytes_per_modem_frame-2);
+            }
+            if (mode == FREEDV_MODE_FSK_LDPC) {
+                
+                /* This mode requires a CRC in the last two bytes. TODO: consider moving inside freedv_rawdatatx(),
+                   although there may be some advantage in leaving the CRC visible to upper layers */
+                
+                uint16_t crc16 = freedv_gen_crc16(bytes_in, payload_bytes_per_modem_frame);
                 bytes_in[bytes_per_modem_frame-2] = crc16 >> 8; 
                 bytes_in[bytes_per_modem_frame-1] = crc16 & 0xff; 
             }
-
+            
             if (use_complex == 0) {
                 freedv_rawdatatx(freedv, mod_out_short, bytes_in);
             } else {
