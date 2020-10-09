@@ -179,6 +179,7 @@ void freedv_fsk_ldpc_open(struct freedv *f, struct freedv_advanced *adv) {
     //fprintf(stderr, "thresh1: %d thresh2: %d\n", f->fsk_ldpc_thresh1, f->fsk_ldpc_thresh2);
     f->fsk_ldpc_baduw = 0;
     f->fsk_ldpc_best_location = 0;  f->fsk_ldpc_state = 0;
+    f->fsk_ldpc_snr = 1.0;
 }
 
 
@@ -344,7 +345,9 @@ void freedv_tx_fsk_data(struct freedv *f, short mod_out[]) {
     }
 }
 
-int freedv_tx_fsk_ldpc_bits_per_frame(struct freedv *f) { return f->ldpc->coded_bits_per_frame + sizeof(fsk_ldpc_uw); }
+int freedv_tx_fsk_ldpc_bits_per_frame(struct freedv *f) {
+    return f->ldpc->coded_bits_per_frame + sizeof(fsk_ldpc_uw);
+}
 
 /* in a separate function so callable by other FSK Txs */
 void freedv_tx_fsk_ldpc_framer(struct freedv *f, uint8_t frame[], uint8_t payload_data[]) {
@@ -412,7 +415,6 @@ int freedv_rx_fsk_ldpc_data(struct freedv *f, COMP demod_in[]) {
     fsk_rx_filt_to_llrs(&f->frame_llr[f->frame_llr_nbits],
                         rx_filt, fsk->v_est, fsk->SNRest, fsk->mode, fsk->Nsym);
     f->nin = fsk_nin(fsk);
-    f->snr_est = fsk->SNRest;
     f->frame_llr_nbits += fsk->Nbits;
     assert(f->frame_llr_nbits < f->frame_llr_size);
 
@@ -435,7 +437,15 @@ int freedv_rx_fsk_ldpc_data(struct freedv *f, COMP demod_in[]) {
         f->frame_llr_nbits -= bits_per_frame;
         assert(f->frame_llr_nbits >= 0);
         
-        // OK lets run frame based processing, first the state machine
+        /* Sample SNR which we report back to used in fsk->snr_est.
+           Note that fsk->SNRest is the SNR of the last fsk->Nbits
+           that were placed at the end of the buffer.  We delay this
+           by one frame to report the SNR of the frame we are
+           currently decoding */
+        f->snr_est = 10.0*log10(f->fsk_ldpc_snr);
+        f->fsk_ldpc_snr = fsk->SNRest;
+
+        /* OK lets run frame based processing, starting with state machine */
 
         int errors = 0;
         int next_state = f->fsk_ldpc_state;
@@ -531,12 +541,12 @@ int freedv_rx_fsk_ldpc_data(struct freedv *f, COMP demod_in[]) {
                 seq |= f->rx_payload_bits[i] << (7-i);
         }
 
-        if (f->fsk_ldpc_state == 1) rx_status |= RX_SYNC; /* need this set before verbose logging */
+        if (f->fsk_ldpc_state == 1) rx_status |= RX_SYNC; /* need this set before verbose logging fprintf() */
         if (((f->verbose == 1) && (rx_status & RX_BITS)) || (f->verbose == 2)) {
             fprintf(stderr, "%3d nbits: %3d st: %d uwloc: %3d uwerr: %2d bad_uw: %d snrdB: %4.1f eraw: %3d ecdd: %3d "
                             "iter: %3d pcc: %3d seq: %3d rxst: %s\n",
                     f->frames++, f->frame_llr_nbits, f->fsk_ldpc_state, f->fsk_ldpc_best_location, errors,
-                    f->fsk_ldpc_baduw, 10.0*log10(fsk->SNRest), Nerrs_raw, Nerrs_coded, iter, parityCheckCount,
+                    f->fsk_ldpc_baduw, f->snr_est, Nerrs_raw, Nerrs_coded, iter, parityCheckCount,
                     seq, rx_sync_flags_to_text[rx_status]);
         }
     }
