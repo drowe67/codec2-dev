@@ -545,7 +545,7 @@ int freedv_rx_fsk_ldpc_data(struct freedv *f, COMP demod_in[]) {
         if (((f->verbose == 1) && (rx_status & RX_BITS)) || (f->verbose == 2)) {
             fprintf(stderr, "%3d nbits: %3d st: %d uwloc: %3d uwerr: %2d bad_uw: %d snrdB: %4.1f eraw: %3d ecdd: %3d "
                             "iter: %3d pcc: %3d seq: %3d rxst: %s\n",
-                    f->frames++, f->frame_llr_nbits, f->fsk_ldpc_state, f->fsk_ldpc_best_location, errors,
+                    ++(f->frames), f->frame_llr_nbits, f->fsk_ldpc_state, f->fsk_ldpc_best_location, errors,
                     f->fsk_ldpc_baduw, f->snr_est, Nerrs_raw, Nerrs_coded, iter, parityCheckCount,
                     seq, rx_sync_flags_to_text[rx_status]);
         }
