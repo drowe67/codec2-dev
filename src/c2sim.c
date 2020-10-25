@@ -522,7 +522,6 @@ int main(int argc, char *argv[])
 
     make_analysis_window(&c2const, fft_fwd_cfg, w, W);
     make_synthesis_window(&c2const, Pn);
-    quantise_init();
 
     if (bpfb_en)
         bpf_en = 1;
