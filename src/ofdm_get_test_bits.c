@@ -50,7 +50,7 @@ void opt_help() {
     fprintf(stderr, "\nUsage: %s [options]\n\n", progname);
     fprintf(stderr, "  --out     filename  Name of OutputOneCharPerBitFile\n");
     fprintf(stderr, "  --frames  n         Number of frames to output (default 10)\n");
-    fprintf(stderr, "  --ldpc              Frame length (112) for LDPC (else 238) for Plain (default Plain)\n");
+    fprintf(stderr, "  --length  n         Frame length in bits (default 238)\n");
     fprintf(stderr, "  --verbose           Output variable assigned values to stderr\n\n");
 
     exit(-1);
@@ -58,13 +58,12 @@ void opt_help() {
 
 int main(int argc, char *argv[])
 {
-    struct OFDM  *ofdm;
-    struct LDPC  ldpc;
     FILE         *fout;
     char         *fout_name = NULL;
-    int          opt, verbose, Nframes, n;
-    int          ldpc_en, frames, output_specified;
-
+    int           opt, verbose, n;
+    int           Nframes, output_specified;
+    int           Ndatabitsperpacket;
+    
     char *pn = argv[0] + strlen (argv[0]);
 
     while (pn != argv[0] && !IS_DIR_SEPARATOR (pn[-1]))
@@ -78,8 +77,8 @@ int main(int argc, char *argv[])
 
     fout = stdout;
     output_specified = 0;
-    frames = 10;
-    ldpc_en = 0;
+    Nframes = 10;
+    Ndatabitsperpacket = 224;
     verbose = 0;
 
     struct optparse options;
@@ -87,7 +86,7 @@ int main(int argc, char *argv[])
     struct optparse_long longopts[] = {
         {"out",        'o', OPTPARSE_REQUIRED},
         {"frames",     'n', OPTPARSE_REQUIRED},
-        {"ldpc",       'l', OPTPARSE_NONE},
+        {"length",     'l', OPTPARSE_REQUIRED},
         {"verbose",    'v', OPTPARSE_NONE},
         {0, 0, 0}
     };
@@ -103,10 +102,10 @@ int main(int argc, char *argv[])
                 output_specified = 1;
                 break;
             case 'n':
-                frames = atoi(options.optarg);
+                Nframes = atoi(options.optarg);
                 break;
             case 'l':
-                ldpc_en = 1;
+                Ndatabitsperpacket = atoi(options.optarg);
                 break;
             case 'v':
                 verbose = 1;
@@ -127,28 +126,9 @@ int main(int argc, char *argv[])
         }
     }
 
-    Nframes = frames;
-
     if (verbose)
-        fprintf(stderr, "Nframes: %d\n", Nframes);
+        fprintf(stderr, "Nframes: %d Ndatabitsperframe: %d\n", Nframes, Ndatabitsperpacket);
 
-    ofdm = ofdm_create(NULL);
-    assert(ofdm != NULL);
-
-    int ofdm_bitsperpacket = ofdm_get_bits_per_packet(ofdm);
-    int Ndatabitsperpacket = ofdm_bitsperpacket - ofdm->nuwbits - ofdm->ntxtbits;
-    
-    /* Optionally set up default LPDC code */
-    if (ldpc_en) {
-        fprintf(stderr, "codename: %s\n", ofdm->codename);
-        ldpc_codes_setup(&ldpc, ofdm->codename);
-        Ndatabitsperpacket = ldpc.ldpc_data_bits_per_frame;
-    }
-
-    if (verbose)
-        fprintf(stderr, "Ndatabitsperpacket: %d\n", Ndatabitsperpacket);
-
-    fprintf(stderr, "Ndatabitsperpacket = %d\n", Ndatabitsperpacket);
     uint8_t data_bits[Ndatabitsperpacket];
     ofdm_generate_payload_data_bits(data_bits, Ndatabitsperpacket);
     for (n = 0; n<Nframes; n++)
@@ -156,8 +136,6 @@ int main(int argc, char *argv[])
 
     if (output_specified)
         fclose(fout);
-
-    ofdm_destroy(ofdm);
 
     return 0;
 }
