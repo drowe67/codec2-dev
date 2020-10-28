@@ -103,7 +103,7 @@ int main(int argc, char *argv[])
     #endif
     char  out_file[MAX_STR];
     FILE *fout = NULL;	/* output speech file */
-    int   rateK = 0, newamp1vq = 0, rate_K_dec = 0, perframe=0;
+    int   rateK = 0, newamp1vq = 0, rate_K_dec = 0, perframe=0, newamp1_post_filter=0;
     int   bands = 0, bands_lower_en;
     float bands_lower = -1E32;
     int   K = 20;
@@ -121,6 +121,7 @@ int main(int argc, char *argv[])
         { "rateK", no_argument, &rateK, 1 },
         { "perframe", no_argument, &perframe, 1 },
         { "newamp1vq", no_argument, &newamp1vq, 1 },
+        { "newamp1pf", no_argument, &newamp1_post_filter, 1 },
         { "rateKdec", required_argument, &rate_K_dec, 1 },
         { "rateKout", required_argument, &rateKout, 1 },
         { "bands",required_argument, &bands, 1 },
@@ -830,6 +831,8 @@ int main(int argc, char *argv[])
                 /* two stage VQ */
                 float rate_K_vec_no_mean_[K]; int indexes[2];
                 rate_K_mbest_encode(indexes, rate_K_vec_no_mean, rate_K_vec_no_mean_, K, NEWAMP1_VQ_MBEST_DEPTH);
+                if (newamp1_post_filter)
+                    post_filter_newamp1(rate_K_vec_no_mean_, rate_K_sample_freqs_kHz, K, 1.5);
                 for(int k=0; k<K; k++)
                     rate_K_vec_[k] = rate_K_vec_no_mean_[k] + mean;
 
