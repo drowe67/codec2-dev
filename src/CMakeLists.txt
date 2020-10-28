@@ -266,7 +266,7 @@ target_link_libraries(c2enc ${CMAKE_REQUIRED_LIBRARIES} codec2)
 add_executable(c2dec c2dec.c)
 target_link_libraries(c2dec ${CMAKE_REQUIRED_LIBRARIES} codec2)
 
-add_executable(c2sim c2sim.c)
+add_executable(c2sim c2sim.c sd.c)
 target_link_libraries(c2sim ${CMAKE_REQUIRED_LIBRARIES} codec2)
 
 add_executable(fdmdv_get_test_bits fdmdv_get_test_bits.c fdmdv.c kiss_fft.c codec2_fft.c kiss_fftr.c)
