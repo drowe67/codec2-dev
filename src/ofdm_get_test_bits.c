@@ -139,19 +139,18 @@ int main(int argc, char *argv[])
     uint8_t data_bits[Ndatabitsperpacket];
     ofdm_generate_payload_data_bits(data_bits, Ndatabitsperpacket);
 
-    if (bcb_en) {
-        burst_control = 1;
-	fwrite(&burst_control, 1, 1, fout);
-    }
-    
-    burst_control = 0;
+    burst_control = 1;
     for (n = 0; n<Nframes; n++) {
         if (bcb_en) fwrite(&burst_control, 1, 1, fout);
-	fwrite(data_bits, sizeof(char), Ndatabitsperpacket, fout);
+ 	fwrite(data_bits, sizeof(char), Ndatabitsperpacket, fout);
+        burst_control = 0;
     }
     if (bcb_en) {
+        // dummy end frame just to signal end of burst
         burst_control = 2;
 	fwrite(&burst_control, 1, 1, fout);
+        memset(data_bits, 0, Ndatabitsperpacket);
+ 	fwrite(data_bits, sizeof(char), Ndatabitsperpacket, fout);
     }    
     
     if (output_specified)
