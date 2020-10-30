@@ -103,7 +103,7 @@ int main(int argc, char *argv[])
     #endif
     char  out_file[MAX_STR];
     FILE *fout = NULL;	/* output speech file */
-    int   rateK = 0, newamp1vq = 0, rate_K_dec = 0, perframe=0, newamp1_post_filter=0;
+    int   rateK = 0, newamp1vq = 0, rate_K_dec = 0, perframe=0, newamp1_post_filter = 0, newamp1_output_se;
     int   bands = 0, bands_lower_en;
     float bands_lower = -1E32;
     int   K = 20;
@@ -122,6 +122,7 @@ int main(int argc, char *argv[])
         { "perframe", no_argument, &perframe, 1 },
         { "newamp1vq", no_argument, &newamp1vq, 1 },
         { "newamp1pf", no_argument, &newamp1_post_filter, 1 },
+        { "newamp1se", no_argument, &newamp1_output_se, 1 },
         { "rateKdec", required_argument, &rate_K_dec, 1 },
         { "rateKout", required_argument, &rateKout, 1 },
         { "bands",required_argument, &bands, 1 },
@@ -837,8 +838,11 @@ int main(int argc, char *argv[])
                     rate_K_vec_[k] = rate_K_vec_no_mean_[k] + mean;
 
                 /* running sum of squared error for variance calculation */
+                float a_se = 0.0;
                 for(int k=0; k<K; k++)
-                    se += pow(rate_K_vec_no_mean[k]-rate_K_vec_no_mean_[k],2.0);
+                    a_se += pow(rate_K_vec_no_mean[k]-rate_K_vec_no_mean_[k],2.0);
+                if (newamp1_output_se) printf("%f\n", a_se/K);
+                se += a_se;
                 nse += K;
             }
             else {
