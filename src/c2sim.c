@@ -795,12 +795,15 @@ int main(int argc, char *argv[])
 	if (fbands) {
 	    float bandE[LPCNET_FREQ_MAX_BANDS];
 	    int nbands = lpcnet_compute_band_energy(bandE, Sw, Fs, FFT_ENC);
+
+	    /* clamp energy of frames to a minimum (rather than ignoring, so we get continous time sequences) */
 	    for(int i=0; i<nbands; i++)
 		bands_mean += bandE[i];
 	    bands_mean /= nbands;
-	    //fprintf(stderr, "bands_mean: %f bands_lower %f\n", bands_mean,  bands_lower);
-	    if (bands_mean > bands_lower)
-		assert(fwrite(bandE, sizeof(float), nbands, fbands) == nbands);
+	    if (bands_mean < bands_lower)
+		for(int i=0; i<nbands; i++)
+		    bandE[i] += (bands_lower - bands_mean);
+	    assert(fwrite(bandE, sizeof(float), nbands, fbands) == nbands);
 	}
     
 	/*------------------------------------------------------------*\
