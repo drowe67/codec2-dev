@@ -535,10 +535,10 @@ int freedv_rx_fsk_ldpc_data(struct freedv *f, COMP demod_in[]) {
                 f->total_bits_coded += f->bits_per_modem_frame;
             }
 
-            /* extract packet sequnce numbers optionally placed in first 8 bits */
+            /* extract packet sequnce numbers optionally placed in byte[0] */
             seq = 0;
             for(int i=0; i<8; i++)
-                seq |= f->rx_payload_bits[i] << (7-i);
+                seq |= f->rx_payload_bits[8+i] << (7-i);
         }
 
         if (f->fsk_ldpc_state == 1) rx_status |= FREEDV_RX_SYNC; /* need this set before verbose logging fprintf() */
