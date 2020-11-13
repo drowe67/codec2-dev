@@ -1226,6 +1226,7 @@ struct CODEC2 *freedv_get_codec2	  (struct freedv *f) {return  f->codec2;}
 int freedv_get_bits_per_codec_frame       (struct freedv *f) {return f->bits_per_codec_frame;}
 int freedv_get_bits_per_modem_frame       (struct freedv *f) {return f->bits_per_modem_frame;}
 int freedv_get_rx_status                  (struct freedv *f) {return f->rx_status;}
+void freedv_get_fsk_S_and_N               (struct freedv *f, float *S, float *N) { *S = f->fsk_S[0]; *N = f->fsk_N[0]; }
 
 int freedv_get_n_max_speech_samples(struct freedv *f) {
     /* When "passing through" demod samples to the speech output

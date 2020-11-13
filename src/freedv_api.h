@@ -236,7 +236,8 @@ int freedv_get_total_bit_errors	    (struct freedv *freedv);
 int freedv_get_total_bits_coded     (struct freedv *freedv);
 int freedv_get_total_bit_errors_coded(struct freedv *freedv);
 
-int freedv_get_rx_status             (struct freedv *freedv);
+int freedv_get_rx_status            (struct freedv *freedv);
+void freedv_get_fsk_S_and_N         (struct freedv *freedv, float *S, float *N);
 
 int freedv_get_sync		    (struct freedv *freedv);
 int freedv_get_sync_interleaver	    (struct freedv *freedv);

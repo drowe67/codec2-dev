@@ -180,6 +180,7 @@ void freedv_fsk_ldpc_open(struct freedv *f, struct freedv_advanced *adv) {
     f->fsk_ldpc_baduw = 0;
     f->fsk_ldpc_best_location = 0;  f->fsk_ldpc_state = 0;
     f->fsk_ldpc_snr = 1.0;
+    f->fsk_S[0] = f->fsk_S[1] = f->fsk_N[0] = f->fsk_N[1] = 0.0;
 }
 
 
@@ -444,7 +445,11 @@ int freedv_rx_fsk_ldpc_data(struct freedv *f, COMP demod_in[]) {
            currently decoding */
         f->snr_est = 10.0*log10(f->fsk_ldpc_snr);
         f->fsk_ldpc_snr = fsk->SNRest;
-
+        f->fsk_S[0] = f->fsk_S[1]; f->fsk_N[0] = f->fsk_N[1];
+        /* also store delayed versions of signal and noise power, useful for channel estimation */
+        f->fsk_S[1] = fsk->rx_sig_pow;
+        f->fsk_N[1] = fsk->rx_nse_pow;
+        
         /* OK lets run frame based processing, starting with state machine */
 
         int errors = 0;

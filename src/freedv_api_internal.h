@@ -181,6 +181,7 @@ struct freedv {
     int      fsk_ldpc_thresh1, fsk_ldpc_thresh2, fsk_ldpc_baduw_thresh;
     int      fsk_ldpc_state,  fsk_ldpc_best_location, fsk_ldpc_baduw;
     float    fsk_ldpc_snr;
+    float    fsk_S[2], fsk_N[2];
 };
 
 // open function for each mode
