@@ -43,36 +43,16 @@
 */
 
 static const int b_table[] = {
-    112, 71,    /* interleave 1 700D */
-    210, 131,
-    224, 139,   /* interleave 2 700D */
-    252, 157,   /* interleave 1 2020 */
-    420, 263,
-    448, 277,   /* interleave 4 700D */
-    504, 313,   /* interleave 2 2020 */
-    672, 419,
-    896, 557,   /* interleave 8 700D */
-    1008, 631,  /* interleave 4 2020 */
-    1120, 701,
-    1344, 839,
-    1568, 971,
-    1792, 1109, /* interleave 16 700D */
-    2016, 1249, /* interleave 8 2020 */
-    2240, 1399,
-    2464, 1523,
-    2688, 1663,
-    2912, 1801,
-    3136, 1949,
-    3360, 2081,
-    3584, 2213,
-    4032, 2503  /* interleave 16 2020 */
+    112, 71,    /* 700D: HRA_112_112                          */
+    210, 131,   /* 2020: HRAb_396_504 with 312 data bits used */
+    384, 239,   /* datac3: H_256_768_22                       */
+    1290, 797   /* datac1, datac2: H2064_516_sparse           */
 };
 
 int choose_interleaver_b(int Nbits)
 {
     int i;
-
-    for(i=0; i<sizeof(b_table); i+=2) {
+    for(i=0; i<sizeof(b_table)/sizeof(int); i+=2) {
         if (b_table[i] == Nbits) {
             return b_table[i+1];
         }
@@ -80,7 +60,7 @@ int choose_interleaver_b(int Nbits)
 
     /* if we get to here it means a Nbits we don't have in our table so choke */
     
-    fprintf(stderr, "Nbits: %d, b not found!\n", Nbits);
+    fprintf(stderr, "gp_interleaver: Nbits: %d, b not found!\n", Nbits);
     assert(0);
 }
 

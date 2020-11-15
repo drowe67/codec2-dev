@@ -43,8 +43,7 @@
 
 /* default internal parameters */
 #define FSK_DEFAULT_P     8      /* Number of timing offsets we have to choose from, try to keep P >= 8 */
-#define FSK_DEFAULT_NSYM 50      /* how many symbols we average timing over, more gives a smoother estimate, 
-                                    but slower response */
+#define FSK_DEFAULT_NSYM 50      /* See Nsym below */
 #define FSK_NONE         -1      /* unused parameter */
 
 struct FSK {
@@ -56,7 +55,7 @@ struct FSK {
     int Ts;                 /* samples per symbol */
     int Nmem;               /* size of extra mem for timing adj */
     int P;                  /* oversample rate for timing est/adj */
-    int Nsym;               /* Number of symbols spat out in a processing frame */
+    int Nsym;               /* Number of symbols processed by demodulator in each call, also the timing estimator window */
     int Nbits;              /* Number of bits spat out in a processing frame */
     int f1_tx;              /* f1 for modulator */
     int tone_spacing;       /* Space between TX freqs for modulator (and option mask freq estimator) */
@@ -146,30 +145,33 @@ void fsk_destroy(struct FSK *fsk);
 /*
  * Modulates Nsym bits into N samples
  * 
- * struct FSK *fsk - FSK config/state struct, set up by fsk_create
- * float fsk_out[] - Buffer for N samples of modulated FSK
+ * struct FSK *fsk   - FSK config/state struct, set up by fsk_create
+ * float fsk_out[]   - Buffer for samples of modulated FSK, fsk->Ts*(nbits/(M>>1)) in length
  * uint8_t tx_bits[] - Buffer containing Nbits unpacked bits
+ * int     nbits     - number of bits to transmit
  */
-void fsk_mod(struct FSK *fsk, float fsk_out[], uint8_t tx_bits[]);
+void fsk_mod(struct FSK *fsk, float fsk_out[], uint8_t tx_bits[], int nbits);
 
 /*
  * Modulates Nsym bits into N samples
  * 
- * struct FSK *fsk - FSK config/state struct, set up by fsk_create
- * float fsk_out[] - Buffer for N samples of "voltage" used to modulate an external VCO
+ * struct FSK *fsk   - FSK config/state struct, set up by fsk_create
+ * float fsk_out[]   - Buffer for samples of "voltage" used to modulate an external VCO
+ *                   - fsk->Ts*(nbits/(M>>1)) in length
  * uint8_t tx_bits[] - Buffer containing Nbits unpacked bits
+ * int     nbits     - number of bits to transmit
  */
-void fsk_mod_ext_vco(struct FSK *fsk, float vco_out[], uint8_t tx_bits[]);
+void fsk_mod_ext_vco(struct FSK *fsk, float vco_out[], uint8_t tx_bits[], int nbits);
 
 /*
  * Modulates Nsym bits into N complex samples
  * 
- * struct FSK *fsk - FSK config/state struct, set up by fsk_create
- * comp fsk_out[] - Buffer for N samples of modulated FSK
+ * struct FSK *fsk   - FSK config/state struct, set up by fsk_create
+ * comp fsk_out[]    - Buffer for samples of modulated FSK, fsk->Ts*(nbits/(M>>1)) in length
  * uint8_t tx_bits[] - Buffer containing Nbits unpacked bits
+ * int     nbits     - number of bits to transmit
  */
-void fsk_mod_c(struct FSK *fsk, COMP fsk_out[], uint8_t tx_bits[]);
-
+void fsk_mod_c(struct FSK *fsk, COMP fsk_out[], uint8_t tx_bits[], int nbits);
 
 /*
  * Returns the number of samples needed for the next fsk_demod() cycle
@@ -184,11 +186,11 @@ uint32_t fsk_nin(struct FSK *fsk);
  * Demodulate some number of FSK samples. The number of samples to be 
  *  demodulated can be found by calling fsk_nin().
  * 
- * struct FSK *fsk - FSK config/state struct, set up by fsk_create
- * uint8_t rx_bits[] - Buffer for Nbits unpacked bits to be written
- * float fsk_in[] - nin samples of modulated FSK
+ * struct FSK *fsk   - FSK config/state struct, set up by fsk_create
+ * uint8_t rx_bits[] - Buffer for fsk->Nbits unpacked bits to be written
+ * float fsk_in[]    - nin samples of modulated FSK
  */
-void fsk_demod(struct FSK *fsk, uint8_t rx_bits[],COMP fsk_in[]);
+void fsk_demod(struct FSK *fsk, uint8_t rx_bits[], COMP fsk_in[]);
 
 /*
  * Soft decision demodulation

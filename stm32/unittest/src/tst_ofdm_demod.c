@@ -69,6 +69,7 @@
 #include "codec2_ofdm.h"
 #include "ofdm_internal.h"
 #include "mpdecode_core.h"
+#include "ldpc_codes.h"
 #include "interldpc.h"
 #include "gp_interleaver.h"
 #include "test_bits_ofdm.h"
@@ -168,7 +169,7 @@ int main(int argc, char *argv[]) {
     /* Get a copy of the actual modem config */
     ofdm_config = ofdm_get_config_param(ofdm);
 
-    set_up_hra_112_112(&ldpc, ofdm_config);
+    ldpc_codes_setup(&ldpc, "HRA_112_112");
 
     ofdm_bitsperframe = ofdm_get_bits_per_frame(ofdm);
     ofdm_rowsperframe = ofdm_bitsperframe / (ofdm_config->nc * ofdm_config->bps);
@@ -182,7 +183,7 @@ int main(int argc, char *argv[]) {
 
     int data_bits_per_frame = ldpc.data_bits_per_frame;
     int coded_bits_per_frame = ldpc.coded_bits_per_frame;
-    int coded_syms_per_frame = ldpc.coded_syms_per_frame;
+    int coded_syms_per_frame = ldpc.coded_bits_per_frame/ofdm->bps;
 
     short   rx_scaled[Nmaxsamperframe];
     int     rx_bits[ofdm_bitsperframe];
@@ -247,7 +248,8 @@ int main(int argc, char *argv[]) {
             ofdm_demod_shorts(ofdm, rx_bits, rx_scaled, (OFDM_AMP_SCALE/2));
             if (config_profile) PROFILE_SAMPLE_AND_LOG2(ofdm_demod_demod, "  ofdm_demod_demod");
             if (config_profile) PROFILE_SAMPLE(ofdm_demod_diss);
-            ofdm_disassemble_qpsk_modem_frame(ofdm, rx_uw, payload_syms, payload_amps, txt_bits);
+            ofdm_extract_uw(ofdm, ofdm->rx_np, ofdm->rx_amp, rx_uw);
+            ofdm_disassemble_qpsk_modem_packet(ofdm, ofdm->rx_np, ofdm->rx_amp, payload_syms, payload_amps, txt_bits);
             if (config_profile) PROFILE_SAMPLE_AND_LOG2(ofdm_demod_diss, "  ofdm_demod_diss");
             log_payload_syms_flag = 1;
 
@@ -348,7 +350,7 @@ int main(int argc, char *argv[]) {
                     txt_bits[i] = 0;
                 }
 
-                ofdm_assemble_qpsk_modem_frame(ofdm, tx_bits, payload_bits, txt_bits);
+                ofdm_assemble_qpsk_modem_packet(ofdm, tx_bits, payload_bits, txt_bits);
 
                 Nerrs = 0;
                 for(i=0; i<ofdm_bitsperframe; i++) {

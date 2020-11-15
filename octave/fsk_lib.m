@@ -18,7 +18,8 @@ function states = fsk_init(Fs, Rs, M=2, P=8, nsym=50)
   states.Fs = Fs;
   states.Rs = Rs;
 
-  states.nsym = nsym;                             % need enough symbols for good timing est
+  states.nsym = nsym;                             % Number of symbols processed by demodulator in each call, also
+                                                  % the timing estimator window
   Ts = states.Ts = Fs/Rs;                         % number of samples per symbol
   assert(Ts == floor(Ts), "Fs/Rs must be an integer");
 
@@ -285,7 +286,7 @@ function [rx_bits states] = fsk_demod(states, sf)
   % We have sampled the integrator output at Fs=P samples/symbol, so
   % lets do a single point DFT at w = 2*pi*f/Fs = 2*pi*Rs/(P*Rs)
   %
-  % Note timing non-lineariry derived by experiment.  Not quite sure what I'm doing here.....
+  % Note timing non-linearity derived by experiment.  Not quite sure what I'm doing here.....
   % but it gives 0dB impl loss for 2FSK Eb/No=9dB, testmode 1:
   %   Fs: 8000 Rs: 50 Ts: 160 nsym: 50
   %   frames: 200 Tbits: 9700 Terrs: 93 BER 0.010

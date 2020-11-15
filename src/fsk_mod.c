@@ -37,15 +37,28 @@ int main(int argc,char *argv[]){
     int i;
     int p, user_p = 0;
     FILE *fin,*fout;
-    uint8_t *bitbuf;
-    int16_t *rawbuf;
-    float *modbuf;
+    int complex = 0;
+    int bytes_per_sample = 2;
+    float amp = FDMDV_SCALE;
+    int test_mode = 0;
     
-    char usage[] = "usage: %s [-p P] Mode SampleFreq SymbolFreq TxFreq1 TxFreqSpace InputOneBitPerCharFile OutputModRawFile\n";
+    char usage[] = "usage: %s [-p P] [-c] [-a Amplitude] [-t] Mode SampleFreq SymbolFreq TxFreq1 TxFreqSpace InputOneBitPerCharFile OutputModRawFile\n"
+                   "  -c            complex signed 16 bit output format\n"
+                   "  -a Amplitude  Amplitude of signal\n"
+                   "  -t test mode unmodulated carrier, useful for setting levels\n";
 
     int opt;
-    while ((opt = getopt(argc, argv, "p:")) != -1) {
+    while ((opt = getopt(argc, argv, "a:p:ct")) != -1) {
         switch (opt) {
+        case 'a':
+            amp = atof(optarg)/2.0;  /* fsk_mod amplitude is +/-2 */
+            break;
+        case 'c':
+            complex = 1; bytes_per_sample = 4;
+            break;
+        case 't':
+            test_mode = 1;
+            break;
         case 'p':
             p = atoi(optarg);
             user_p = 1;
@@ -89,36 +102,42 @@ int main(int argc,char *argv[]){
     fsk = fsk_create_hbr(Fs,Rs,M,p,FSK_DEFAULT_NSYM,f1,fs);
     
     if(fin==NULL || fout==NULL || fsk==NULL){
-        fprintf(stderr,"Couldn't open test vector files\n");
-        goto cleanup;
+        fprintf(stderr,"Couldn't open files\n");
+        exit(1);
     }
-    
-    
-    /* allocate buffers for processing */
-    bitbuf = (uint8_t*)malloc(sizeof(uint8_t)*fsk->Nbits);
-    rawbuf = (int16_t*)malloc(sizeof(int16_t)*fsk->N);
-    modbuf = (float*)malloc(sizeof(float)*fsk->N);
-    
-    /* Modulate! */
-    while( fread(bitbuf,sizeof(uint8_t),fsk->Nbits,fin) == fsk->Nbits ){
-        fsk_mod(fsk,modbuf,bitbuf);
-        for(i=0; i<fsk->N; i++){
-			rawbuf[i] = (int16_t)(modbuf[i]*(float)FDMDV_SCALE);
-		}
-        fwrite(rawbuf,sizeof(int16_t),fsk->N,fout);
         
-		if(fin == stdin || fout == stdin){
-			fflush(fin);
-			fflush(fout);
-		}
-    }
-    free(bitbuf);
-    free(rawbuf);
-    free(modbuf);
+    /* Mote we use the same buffer sizes as demod (fsk->Nbits, fsk->N)
+       for convenience, but other sizes are possible for the
+       FSK modulator. */
+    uint8_t bitbuf[fsk->Nbits];
     
-    cleanup:
-    fclose(fin);
-    fclose(fout);
+    while( fread(bitbuf,sizeof(uint8_t),fsk->Nbits,fin) == fsk->Nbits ){
+        if (test_mode) memset(bitbuf,0,fsk->Nbits);
+        if (complex == 0) {
+            float modbuf[fsk->N];
+            int16_t rawbuf[fsk->N];
+            /* 16 bit signed short real output */
+            fsk_mod(fsk,modbuf,bitbuf,fsk->Nbits);
+            for(i=0; i<fsk->N; i++)
+                rawbuf[i] = (int16_t)(modbuf[i]*amp);
+            fwrite(rawbuf,bytes_per_sample,fsk->N,fout);
+       } else {
+            /* 16 bit signed char complex output */
+            COMP modbuf[fsk->N];
+            int16_t rawbuf[2*fsk->N];
+            fsk_mod_c(fsk,(COMP*)modbuf,bitbuf,fsk->Nbits);
+            for(i=0; i<fsk->N; i++) {
+                rawbuf[2*i] = (int16_t)(modbuf[i].real*amp);
+                rawbuf[2*i+1] = (int16_t)(modbuf[i].imag*amp);
+            }            
+            fwrite(rawbuf,bytes_per_sample,fsk->N,fout);
+        }
+               
+        if(fin == stdin || fout == stdin){
+            fflush(fin);
+            fflush(fout);
+        }
+    }
+    
     fsk_destroy(fsk);
-    exit(0);
 }

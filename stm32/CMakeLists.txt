@@ -40,6 +40,29 @@ set(CMAKE_TOOLCHAIN_FILE "../stm32/cmake/STM32_Toolchain.cmake" CACHE STRING "To
 
 ###################################################
 
+#
+# Find the git hash if this is a working copy.
+#
+if(EXISTS ${CMAKE_SOURCE_DIR}/.git)
+    find_package(Git QUIET)
+    if(Git_FOUND)
+        execute_process(
+            COMMAND "${GIT_EXECUTABLE}" describe --always HEAD
+            WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+            RESULT_VARIABLE res
+            OUTPUT_VARIABLE FREEDV_HASH
+            ERROR_QUIET
+            OUTPUT_STRIP_TRAILING_WHITESPACE)
+        message(STATUS "freedv-gui current git hash: ${FREEDV_HASH}")
+        add_definitions(-DGIT_HASH="${FREEDV_HASH}")
+    else()
+        message(WARNING "Git not found. Can not determine current commit hash.")
+        add_definitions(-DGIT_HASH="Unknown")
+    endif()
+else()
+        add_definitions(-DGIT_HASH="None")
+endif()
+
 # Set default C flags.
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -std=gnu11 -mlittle-endian -mthumb -mthumb-interwork --specs=nano.specs -u_printf_float -mcpu=cortex-m4 -ffunction-sections -fdata-sections -O3")
 
@@ -181,6 +204,7 @@ ${CODEC2_SRC}/mbest.c
 ${CODEC2_SRC}/HRA_112_112.c
 ${CODEC2_SRC}/linreg.c
 ${CODEC2_SRC}/mpdecode_core.c
+${CODEC2_SRC}/ldpc_codes.c
 ${CODEC2_SRC}/phi0.c
 ${CODEC2_SRC}/HRAb_396_504.c
 codebook.c

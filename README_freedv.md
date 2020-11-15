@@ -75,6 +75,9 @@ These modes use constant amplitude modulation like FSK or FM, and are designed f
 | 2400A | 2016 | 1300 | 4FSK | 2400 | 5kHz | Golay (23,12) | Y |
 | 2400B | 2016 | 1300 | baseband/analog FM | analog FM | 2400 | Golay (23,12) | Y |
 | 800XA | 2017 | 700C |  4FSK | 2000 | 800 | - | N |
+| FSK_LDPC | 2020 | - | 2 or 4 FSK |  user defined | user defined | LDPC | - | - |
+
+The FSK_LDPC mode is used for data, and has user defined bit rate and a variety of LDPC codes available.  It is discussed in [README_data](README_data.md)
 
 ## FreeDV API
 
@@ -133,11 +136,11 @@ $  ./freedv_tx 2400B ../../raw/ve9qrp_10s.raw - | sox -t raw -r 48000 -s -2 - -t
 ## FreeDV 2020 tests with FreeDV API
 
 ```
-$ cat ~/LPCNet/wav/wia.wav | ~/LPCNet/build_linux/src/lpcnet_enc -s | ./ofdm_mod --ts 0.0205 --nc 31 --ldpc 2 --verbose 1 -p 312 | ./ofdm_demod --ts 0.0205 --nc 31 --verbose 1 --ldpc 2 -p 312 | ~/LPCNet/build_linux/src/lpcnet_dec -s | aplay -f S16_LE -r 16000
+$ cat ~/LPCNet/wav/wia.wav | ~/LPCNet/build_linux/src/lpcnet_enc -s | ./ofdm_mod --mode 2020 --ldpc --verbose 1 -p 312 | ./ofdm_demod --mode 2020 --verbose 1 --ldpc -p 312 | ~/LPCNet/build_linux/src/lpcnet_dec -s | aplay -f S16_LE -r 16000
 ```
 Listen the reference tx:
 ```
-$ cat ~/LPCNet/wav/wia.wav | ~/LPCNet/build_linux/src/lpcnet_enc -s | ./ofdm_mod --ts 0.0205 --nc 31 --ldpc 2 --verbose 1 -p 312 | aplay -f S16_LE
+$ cat ~/LPCNet/wav/wia.wav | ~/LPCNet/build_linux/src/lpcnet_enc -s | ./ofdm_mod --mode 2020 --ldpc --verbose 1 -p 312 | aplay -f S16_LE
 ```
 
 Listen the freedv_tx:
@@ -147,7 +150,7 @@ $ ./freedv_tx 2020 ~/LPCNet/wav/wia.wav - | aplay -f S16_LE
 
 FreeDV API tx, with reference rx from above:
 ```
-$ ./freedv_tx 2020 ~/LPCNet/wav/wia.wav - | ./ofdm_demod --ts 0.0205 --nc 31 --verbose 1 --ldpc 2 -p 312 | ~/LPCNet/build_linux/src/lpcnet_dec -s | aplay -f S16_LE -r 16000
+$ ./freedv_tx 2020 ~/LPCNet/wav/wia.wav - | ./ofdm_demod --mode 2020 --verbose 1 --ldpc -p 312 | ~/LPCNet/build_linux/src/lpcnet_dec -s | aplay -f S16_LE -r 16000
 ```
 
 FreeDV API tx and rx:

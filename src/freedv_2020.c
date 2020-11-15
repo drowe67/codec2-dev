@@ -29,6 +29,7 @@
 #include "ofdm_internal.h"
 #include "mpdecode_core.h"
 #include "gp_interleaver.h"
+#include "ldpc_codes.h"
 #include "interldpc.h"
 #include "debug_alloc.h"
 
@@ -53,9 +54,9 @@ void freedv_2020_open(struct freedv *f) {
     f->ldpc = (struct LDPC*)MALLOC(sizeof(struct LDPC));
     assert(f->ldpc != NULL);
         
-    set_up_hra_504_396(f->ldpc, &f->ofdm->config);
-    set_data_bits_per_frame(f->ldpc, data_bits_per_frame, f->ofdm->config.bps);
-    int coded_syms_per_frame = f->ldpc->coded_syms_per_frame;
+    ldpc_codes_setup(f->ldpc, "HRAb_396_504");
+    set_data_bits_per_frame(f->ldpc, data_bits_per_frame);
+    int coded_syms_per_frame = f->ldpc->coded_bits_per_frame/f->ofdm->bps;
         
     f->ofdm_bitsperframe = ofdm_get_bits_per_frame(f->ofdm);
     f->ofdm_nuwbits = (f->ofdm->config.ns - 1) * f->ofdm->config.bps - f->ofdm->config.txtbits;
@@ -68,7 +69,7 @@ void freedv_2020_open(struct freedv *f) {
         fprintf(stderr, "ldpc_coded_bits_per_frame  = %d\n", f->ldpc->ldpc_coded_bits_per_frame);
         fprintf(stderr, "data_bits_per_frame = %d\n", data_bits_per_frame);
         fprintf(stderr, "coded_bits_per_frame  = %d\n", f->ldpc->coded_bits_per_frame);
-        fprintf(stderr, "coded_syms_per_frame  = %d\n", f->ldpc->coded_syms_per_frame);
+        fprintf(stderr, "coded_syms_per_frame  = %d\n", f->ldpc->coded_bits_per_frame/f->ofdm->bps);
         fprintf(stderr, "ofdm_bits_per_frame  = %d\n", f->ofdm_bitsperframe);
     }
         
@@ -166,7 +167,7 @@ void freedv_comptx_2020(struct freedv *f, COMP mod_out[]) {
     complex float tx_sams[f->n_nat_modem_samples];
     COMP asam;
     
-    ofdm_ldpc_interleave_tx(f->ofdm, f->ldpc, tx_sams, tx_bits, txt_bits, &f->ofdm->config);
+    ofdm_ldpc_interleave_tx(f->ofdm, f->ldpc, tx_sams, tx_bits, txt_bits);
 
     for(i=0; i< f->n_nat_modem_samples; i++) {
         asam.real = crealf(tx_sams[i]);
@@ -188,7 +189,7 @@ int freedv_comprx_2020(struct freedv *f, COMP demod_in[]) {
     
     int    data_bits_per_frame = ldpc->data_bits_per_frame;
     int    coded_bits_per_frame = ldpc->coded_bits_per_frame;
-    int    coded_syms_per_frame = ldpc->coded_syms_per_frame;
+    int    coded_syms_per_frame = ldpc->coded_bits_per_frame/ofdm->bps;
     COMP  *codeword_symbols = f->codeword_symbols;
     float *codeword_amps = f->codeword_amps;
     int    rx_bits[f->ofdm_bitsperframe];
@@ -222,7 +223,8 @@ int freedv_comprx_2020(struct freedv *f, COMP demod_in[]) {
         if (ofdm->sync_state == trial) rx_status |= RX_TRIAL_SYNC;
 
         ofdm_demod(ofdm, rx_bits, demod_in);
-        ofdm_disassemble_qpsk_modem_frame(ofdm, rx_uw, payload_syms, payload_amps, txt_bits);
+        ofdm_extract_uw(ofdm, ofdm->rx_np, ofdm->rx_amp, rx_uw);
+        ofdm_disassemble_qpsk_modem_packet(ofdm, ofdm->rx_np, ofdm->rx_amp, payload_syms, payload_amps, txt_bits);
 
         f->sync = 1;
         ofdm_get_demod_stats(f->ofdm, &f->stats);

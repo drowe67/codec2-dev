@@ -18,7 +18,7 @@
    octave:2> fsk_demod_file("fsk.cs16",format="cs16",8000,100,2)
 #}
 
-function fsk_demod_file(filename, format="s16", Fs=8000, Rs=50, M=2, P=8, max_secs=1E32)
+function fsk_demod_file(filename, format="s16", Fs=8000, Rs=50, M=2, P=8, avoid_dc = 1, max_secs=1E32)
   more off;
   fsk_lib;
   plot_en = 1;
@@ -29,10 +29,12 @@ function fsk_demod_file(filename, format="s16", Fs=8000, Rs=50, M=2, P=8, max_se
     read_complex = 0; sample_size = 'int16'; shift_fs_on_4=0;
   elseif strcmp(format,"cs16") || strcmp(format,"iq16")
     read_complex = 1; sample_size = 'int16'; shift_fs_on_4=0;
-    states.fest_fmin = -Fs/2; states.fest_fmax = Fs/2; 
+    if avoid_dc states.fest_fmin = states.Rs*0.5; else states.fest_fmin = -Fs/2; end;
+   states.fest_fmax = Fs/2; 
   elseif strcmp(format,"iqfloat")
     read_complex = 1; sample_size = 'float32'; shift_fs_on_4=0;
-    states.fest_fmin = -Fs/2; states.fest_fmax = Fs/2; 
+    if avoid_dc states.fest_fmin = states.Rs*0.5; else states.fest_fmin = -Fs/2; end;
+    states.fest_fmax = Fs/2; 
   else
     printf("Error in format: %s\n", format);
     return;
@@ -118,7 +120,7 @@ function fsk_demod_file(filename, format="s16", Fs=8000, Rs=50, M=2, P=8, max_se
     RxdB = 20*log10(abs(fftshift(Rx)));
     mx = 10*ceil(max(RxdB/10));
     f = -Nfft/2:Nfft/2-1;
-    plot(f, RxdB);
+    plot(f*Fs/Nfft, RxdB);
     axis([-Fs/2 Fs/2 mx-80 mx])
     xlabel('Frequency (Hz)');
     if length(rx) > Fs
