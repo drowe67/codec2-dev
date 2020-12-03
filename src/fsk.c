@@ -830,8 +830,8 @@ void fsk_demod_core(struct FSK *fsk, uint8_t rx_bits[], float rx_filt[], COMP fs
         #endif
     }
 
-    rx_sig_pow = rx_sig_pow/nsym;
-    rx_nse_pow = rx_nse_pow/nsym;
+    fsk->rx_sig_pow = rx_sig_pow = rx_sig_pow/nsym;
+    fsk->rx_nse_pow = rx_nse_pow = rx_nse_pow/nsym;
     fsk->v_est = sqrt(rx_sig_pow-rx_nse_pow);
     fsk->SNRest = rx_sig_pow/rx_nse_pow;
     

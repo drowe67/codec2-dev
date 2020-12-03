@@ -58,6 +58,12 @@
 #define FREEDV_FS_8000          8000
 #define FREEDV_FS_16000         16000
 
+// Return code flags for freedv_*rx* functions
+#define FREEDV_RX_TRIAL_SYNC       0x1       // demodulator has trial sync
+#define FREEDV_RX_SYNC             0x2       // demodulator has sync
+#define FREEDV_RX_BITS             0x4       // data bits have been returned
+#define FREEDV_RX_BIT_ERRORS       0x8       // FEC may not have corrected all bit errors (not all parity checks OK)
+                                      
 #ifndef FREEDV_MODE_EN_DEFAULT
 #define FREEDV_MODE_EN_DEFAULT 1
 #endif
@@ -229,7 +235,9 @@ int freedv_get_total_bits	    (struct freedv *freedv);
 int freedv_get_total_bit_errors	    (struct freedv *freedv);
 int freedv_get_total_bits_coded     (struct freedv *freedv);
 int freedv_get_total_bit_errors_coded(struct freedv *freedv);
-int freedv_get_rx_bits              (struct freedv *freedv);
+
+int freedv_get_rx_status            (struct freedv *freedv);
+void freedv_get_fsk_S_and_N         (struct freedv *freedv, float *S, float *N);
 
 int freedv_get_sync		    (struct freedv *freedv);
 int freedv_get_sync_interleaver	    (struct freedv *freedv);

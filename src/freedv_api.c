@@ -761,7 +761,7 @@ int freedv_bits_to_speech(struct freedv *f, short speech_out[], short demod_in[]
     int nout = 0;
     int decode_speech = 0;
    
-    if ((rx_status & RX_SYNC) == 0) {
+    if ((rx_status & FREEDV_RX_SYNC) == 0) {
 
         if (f->squelch_en == 0) {
 
@@ -791,7 +791,7 @@ int freedv_bits_to_speech(struct freedv *f, short speech_out[], short demod_in[]
         }
     }
 
-    if ((rx_status & RX_SYNC) && (rx_status & RX_BITS) && !f->test_frames) {
+    if ((rx_status & FREEDV_RX_SYNC) && (rx_status & FREEDV_RX_BITS) && !f->test_frames) {
        /* following logic is tricky so spell it out clearly, see table
           in: https://github.com/drowe67/codec2/pull/111 */
         
@@ -803,8 +803,8 @@ int freedv_bits_to_speech(struct freedv *f, short speech_out[], short demod_in[]
            /* anti-burble case - don't decode on trial sync unless the
               frame has no bit errors.  This prevents short lived trial
               sync cases generating random bursts of audio */
-           if (rx_status & RX_TRIAL_SYNC) {
-               if ((rx_status & RX_BIT_ERRORS) == 0)
+           if (rx_status & FREEDV_RX_TRIAL_SYNC) {
+               if ((rx_status & FREEDV_RX_BIT_ERRORS) == 0)
                    decode_speech = 1;
            }
            else {
@@ -897,7 +897,7 @@ int freedv_rawdatacomprx(struct freedv *f, unsigned char *packed_payload_bits, C
     if (FDV_MODE_ACTIVE( FREEDV_MODE_2400A, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_2400B, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_800XA, f->mode)){
         rx_status = freedv_comprx_fsk(f, demod_in);
         f->rx_status = rx_status;
-        if (rx_status & RX_BITS) {
+        if (rx_status & FREEDV_RX_BITS) {
 	    ret = (freedv_get_bits_per_modem_frame(f) + 7) / 8;
 	    freedv_rawdata_from_codec_frames(f, packed_payload_bits, f->rx_payload_bits);
         }
@@ -911,7 +911,7 @@ int freedv_rawdatacomprx(struct freedv *f, unsigned char *packed_payload_bits, C
         rx_status = freedv_rx_fsk_ldpc_data(f, demod_in);
     }
 
-    if (rx_status & RX_BITS) {
+    if (rx_status & FREEDV_RX_BITS) {
 	ret = (f->bits_per_modem_frame+7)/8;
         freedv_pack(packed_payload_bits, f->rx_payload_bits, f->bits_per_modem_frame);
     }
@@ -1222,10 +1222,11 @@ int freedv_get_total_bit_errors           (struct freedv *f) {return f->total_bi
 int freedv_get_total_bits_coded           (struct freedv *f) {return f->total_bits_coded;}
 int freedv_get_total_bit_errors_coded     (struct freedv *f) {return f->total_bit_errors_coded;}
 int freedv_get_sync                       (struct freedv *f) {return f->stats.sync;}
-struct CODEC2 *freedv_get_codec2	  (struct freedv *f){return  f->codec2;}
-int freedv_get_bits_per_codec_frame       (struct freedv *f){return f->bits_per_codec_frame;}
-int freedv_get_bits_per_modem_frame       (struct freedv *f){return f->bits_per_modem_frame;}
-int freedv_get_rx_bits                    (struct freedv *f) {return f->rx_status & RX_BITS;}
+struct CODEC2 *freedv_get_codec2	  (struct freedv *f) {return  f->codec2;}
+int freedv_get_bits_per_codec_frame       (struct freedv *f) {return f->bits_per_codec_frame;}
+int freedv_get_bits_per_modem_frame       (struct freedv *f) {return f->bits_per_modem_frame;}
+int freedv_get_rx_status                  (struct freedv *f) {return f->rx_status;}
+void freedv_get_fsk_S_and_N               (struct freedv *f, float *S, float *N) { *S = f->fsk_S[0]; *N = f->fsk_N[0]; }
 
 int freedv_get_n_max_speech_samples(struct freedv *f) {
     /* When "passing through" demod samples to the speech output
