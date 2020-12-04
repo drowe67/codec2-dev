@@ -3,7 +3,7 @@
    David Rowe
    Jan 2017
 
-   Fast linear interpolator for high oversam[pling rates.  Upsample
+   Fast linear interpolator for high oversampling rates.  Upsample
    with a decent filter first such that the signal is "low pass" wrt
    to the input sample rate.
 
@@ -143,7 +143,7 @@ int main(int argc, char *argv[]) {
         for (i=0; i<j; i++) {
             out_s8[i] = out[i] >> 8;
         }
-        fwrite(&out_s8, sizeof(int8_t), j, fout);
+        fwrite(&out_s8, sizeof(int8_t)*channels, j, fout);
     }
 
     fclose(fout);

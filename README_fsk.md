@@ -26,13 +26,13 @@ The Octave version of the modem was developed by David Rowe.  Brady O'Brien port
 1. Generate 1000 test bits, modulate them using 2FSK using a 8000 Hz sample rate, 100 bits/s, play on your sound card:
    ```    
    $ cd ~/codec2/build_linux/src
-   $ /fsk_get_test_bits - 1000 | ./fsk_mod 2 8000 100 1200 1200 - - | aplay -f S16_LE
+   $ ./fsk_get_test_bits - 1000 | ./fsk_mod 2 8000 100 1200 1200 - - | aplay -f S16_LE
    ```
     The low tone frequency is 1200Hz, and the upper tone 1200 + 1200 = 2400Hz.
 
 1. Add the demodulator and measure the bit error rate over 10,000 bits of 100 bit/s 2FSK:
    ```
-   $ ./fsk_get_test_bits - 10000 | ./fsk_mod 2 8000 100 1200 100 - - | ./fsk_demod -l 2 8000 100 - - | ./fsk_put_test_bits -
+   $ ./fsk_get_test_bits - 10000 | ./fsk_mod 2 8000 100 1200 100 - - | ./fsk_demod 2 8000 100 - - | ./fsk_put_test_bits -
    <snip>
    [0099] BER 0.000, bits tested   9900, bit errors    0
    PASS
@@ -41,7 +41,7 @@ The Octave version of the modem was developed by David Rowe.  Brady O'Brien port
    
 1. Same thing but this time with 4FSK, and less verbose output:
    ```
-   $ ./fsk_get_test_bits - 10000 | ./fsk_mod 4 8000 100 1200 100 - - | ./fsk_demod -l 4 8000 100 - - | ./fsk_put_test_bits -q -
+   $ ./fsk_get_test_bits - 10000 | ./fsk_mod 4 8000 100 1200 100 - - | ./fsk_demod 4 8000 100 - - | ./fsk_put_test_bits -q -
    <snip>
    [0099] BER 0.000, bits tested   9900, bit errors    0
    PASS
@@ -49,7 +49,7 @@ The Octave version of the modem was developed by David Rowe.  Brady O'Brien port
 
 1. Lets add some channel noise:
    ```
-   $ ./fsk_get_test_bits - 10000 | ./fsk_mod 2 8000 100 1200 100 - - | ./cohpsk_ch - - -26 --Fs 8000 | ./fsk_demod -l 2 8000 100 - - | ./fsk_put_test_bits -b 0.015 -
+   $ ./fsk_get_test_bits - 10000 | ./fsk_mod 2 8000 100 1200 100 - - | ./cohpsk_ch - - -26 --Fs 8000 | ./fsk_demod 2 8000 100 - - | ./fsk_put_test_bits -b 0.015 -
    <snip>
    SNR3k(dB): -5.76 C/No: 29.0 PAPR:  3.0 
    [0099] BER 0.010, bits tested   9900, bit errors  103
@@ -87,7 +87,7 @@ The Octave version of the modem was developed by David Rowe.  Brady O'Brien port
    Coded Tbits:  50176 Terr:    139 BER: 0.003
          Tpkts:    196 Tper:      4 PER: 0.020
    ```
-   In this example the unique word is the 16 bit sequence `5186`.  Se also several ctests using these application. Other codes are also available:
+   In this example the unique word is the 16 bit sequence `5186`.  See also several ctests using these application. Other codes are also available:
    ```
    $ ./ldpc_enc --listcodes
 
@@ -100,7 +100,9 @@ The Octave version of the modem was developed by David Rowe.  Brady O'Brien port
    H_128_256_5          rate 0.50 (256,128)
    ```
    If you change the code you also need to change the `frameSizeBits` argument in `framer/deframer` (`512` in the example above).
-   
+
+1. The FSK/LDPC/framer steps above have been combined in a FreeDV API mode.  See "FSK LDPC Raw Data Mode" in [README_data.md](README_data.md).
+
 1. FSK modem C files in ```codec2/src```:
 
    | File | Description |
@@ -172,3 +174,6 @@ The Octave version of the modem was developed by David Rowe.  Brady O'Brien port
    1. [HF FSK with Rpitx](http://www.rowetel.com/?p=6317), a zero hardware FSK transmitter using a Pi
    1. [Eb/No and SNR worked Example](http://www.rowetel.com/wordpress/?p=4621)
    1. [FSK LLR LDPC Code Experiments](https://github.com/drowe67/codec2/pull/129)
+   1. [FreeDV API FSK LDPC Raw Data Mode](README_data.md)
+
+

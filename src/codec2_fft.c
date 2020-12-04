@@ -138,7 +138,7 @@ void codec2_fft_inplace(codec2_fft_cfg cfg, codec2_fft_cpx* inout)
     // or to allow kiss_fft to allocate RAM
     // second part is just to play safe since first method
     // is much faster and uses less RAM
-    if (cfg->nfft <= 512)
+    if (cfg->nfft*sizeof(kiss_fft_cpx) <= 512)
     {
         memcpy(in,inout,cfg->nfft*sizeof(kiss_fft_cpx));
         kiss_fft(cfg, in, (kiss_fft_cpx*)inout);
