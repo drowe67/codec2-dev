@@ -158,6 +158,8 @@ struct freedv {
 
     COMP                *codeword_symbols;
     float               *codeword_amps;
+    COMP                *rx_syms;
+    float               *rx_amps;
     int                  modem_frame_count_tx;       // modem frame counter for tx side
     int                  modem_frame_count_rx;       // modem frame counter for rx side
     COMP                *mod_out;                    // output buffer of intereaved frames

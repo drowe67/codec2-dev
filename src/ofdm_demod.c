@@ -473,7 +473,7 @@ int main(int argc, char *argv[]) {
                     gp_deinterleave_comp(payload_syms_de, payload_syms, Npayloadsymsperpacket);
                     gp_deinterleave_float(payload_amps_de, payload_amps, Npayloadsymsperpacket);
 
-                    float llr[Npayloadsymsperpacket];
+                    float llr[Npayloadbitsperpacket];
                     uint8_t out_char[Npayloadbitsperpacket];
 
                     if (testframes == true) {

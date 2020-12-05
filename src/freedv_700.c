@@ -110,16 +110,15 @@ void freedv_700d_open(struct freedv *f) {
 #ifdef __EMBEDDED__
     f->ldpc->max_iter = 10; /* limit LDPC decoder iterations to limit CPU load */
 #endif
-    /* Code length 224 divided by 2 bits per symbol = 112 symbols per frame */
-    int coded_syms_per_frame = f->ldpc->coded_bits_per_frame/f->ofdm->bps;
-
-    f->modem_frame_count_tx = f->modem_frame_count_rx = 0;
-
-    f->codeword_symbols = (COMP*)MALLOC(sizeof(COMP) * coded_syms_per_frame);
-    assert(f->codeword_symbols != NULL);
-
-    f->codeword_amps = (float*)MALLOC(sizeof(float) * coded_syms_per_frame);
-    assert(f->codeword_amps != NULL);
+    int Nsymsperpacket = ofdm_get_bits_per_packet(f->ofdm) / f->ofdm->bps;
+    f->rx_syms = (COMP*)MALLOC(sizeof(COMP) * Nsymsperpacket);
+    assert(f->rx_syms != NULL);
+    f->rx_amps = (float*)MALLOC(sizeof(float) * Nsymsperpacket);
+    assert(f->rx_amps != NULL);
+    for(int i=0; i<Nsymsperpacket; i++) {
+        f->rx_syms[i].real = f->rx_syms[i].imag = 0.0;
+        f->rx_amps[i]= 0.0;
+    }
 
     f->nin = f->nin_prev = ofdm_get_samples_per_frame(f->ofdm);
     f->n_nat_modem_samples = ofdm_get_samples_per_frame(f->ofdm);
@@ -177,11 +176,15 @@ void freedv_ofdm_data_open(struct freedv *f) {
 #ifdef __EMBEDDED__
     f->ldpc->max_iter = 10; /* limit LDPC decoder iterations to limit CPU load */
 #endif
-    int coded_syms_per_frame = f->ldpc->coded_bits_per_frame/f->ofdm->bps;
-    f->codeword_symbols = (COMP*)MALLOC(sizeof(COMP) * coded_syms_per_frame);
-    assert(f->codeword_symbols != NULL);
-    f->codeword_amps = (float*)MALLOC(sizeof(float) * coded_syms_per_frame);
-    assert(f->codeword_amps != NULL);
+    int Nsymsperpacket = ofdm_get_bits_per_packet(f->ofdm) / f->ofdm->bps;
+    f->rx_syms = (COMP*)MALLOC(sizeof(COMP) * Nsymsperpacket);
+    assert(f->rx_syms != NULL);
+    f->rx_amps = (float*)MALLOC(sizeof(float) * Nsymsperpacket);
+    assert(f->rx_amps != NULL);
+    for(int i=0; i<Nsymsperpacket; i++) {
+        f->rx_syms[i].real = f->rx_syms[i].imag = 0.0;
+        f->rx_amps[i]= 0.0;
+    }
 
     f->nin = f->nin_prev = ofdm_get_samples_per_packet(f->ofdm);
     f->n_nat_modem_samples = ofdm_get_samples_per_packet(f->ofdm);
@@ -376,15 +379,25 @@ int freedv_comp_short_rx_ofdm(struct freedv *f, void *demod_in_8kHz, int demod_i
     struct OFDM *ofdm = f->ofdm;
     struct LDPC *ldpc = f->ldpc;
 
+    int Nbitsperframe = ofdm_get_bits_per_frame(ofdm);
+    int Nbitsperpacket = ofdm_get_bits_per_packet(ofdm);
+    int Nsymsperframe = Nbitsperframe / ofdm->bps;
+    int Nsymsperpacket = Nbitsperpacket / ofdm->bps;
+    int Npayloadbitsperframe =  ofdm_get_bits_per_frame(ofdm) - ofdm->nuwbits - ofdm->ntxtbits;
+    int Npayloadbitsperpacket = Nbitsperpacket - ofdm->nuwbits - ofdm->ntxtbits;
+    int Npayloadsymsperframe = Npayloadbitsperframe/ofdm->bps;
+    int Npayloadsymsperpacket = Npayloadbitsperpacket/ofdm->bps;
+
     int    data_bits_per_frame = ldpc->data_bits_per_frame;
     int    coded_bits_per_frame = ldpc->coded_bits_per_frame;
     int    coded_syms_per_frame = ldpc->coded_bits_per_frame/ofdm->bps;
-    COMP  *codeword_symbols = f->codeword_symbols;
-    float *codeword_amps = f->codeword_amps;
+    complex float *rx_syms = (complex float*)f->rx_syms;
+    float *rx_amps = f->rx_amps;
+
     int    rx_bits[f->ofdm_bitsperframe];
     short  txt_bits[f->ofdm_ntxtbits];
-    COMP   payload_syms[coded_syms_per_frame];
-    float  payload_amps[coded_syms_per_frame];
+    COMP   payload_syms[Npayloadsymsperpacket];
+    float  payload_amps[Npayloadsymsperpacket];
 
     int    Nerrs_raw = 0;
     int    Nerrs_coded = 0;
@@ -432,21 +445,21 @@ int freedv_comp_short_rx_ofdm(struct freedv *f, void *demod_in_8kHz, int demod_i
 
         /* newest symbols at end of buffer (uses final i from last loop), note we
            change COMP formats from what modem uses internally */
-
+/*
         for(i=0; i< coded_syms_per_frame; i++) {
             codeword_symbols[i] = payload_syms[i];
             codeword_amps[i]    = payload_amps[i];
          }
-
+         */
         /* run de-interleaver */
 
-        COMP  payload_syms_de[coded_syms_per_frame];
-        float payload_amps_de[coded_syms_per_frame];
-        gp_deinterleave_comp (payload_syms_de, payload_syms, coded_syms_per_frame);
-        gp_deinterleave_float(payload_amps_de, payload_amps, coded_syms_per_frame);
+        COMP  payload_syms_de[Npayloadsymsperpacket];
+        float payload_amps_de[Npayloadsymsperpacket];
+        gp_deinterleave_comp (payload_syms_de, payload_syms, Npayloadsymsperpacket);
+        gp_deinterleave_float(payload_amps_de, payload_amps, Npayloadsymsperpacket);
 
-        float llr[coded_bits_per_frame];
-        uint8_t out_char[coded_bits_per_frame];
+        float llr[Npayloadbitsperpacket];
+        uint8_t out_char[Npayloadbitsperpacket];
 
         if (f->test_frames) {
             int tmp;

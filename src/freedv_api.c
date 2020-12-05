@@ -190,8 +190,8 @@ void freedv_close(struct freedv *freedv) {
     }
 
     if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, freedv->mode)) {
-        FREE(freedv->codeword_symbols);
-        FREE(freedv->codeword_amps);
+        FREE(freedv->rx_syms);
+        FREE(freedv->rx_amps);
         FREE(freedv->ldpc);
         ofdm_destroy(freedv->ofdm);
     }
@@ -229,8 +229,8 @@ void freedv_close(struct freedv *freedv) {
         FDV_MODE_ACTIVE( FREEDV_MODE_DATAC2, freedv->mode) ||
         FDV_MODE_ACTIVE( FREEDV_MODE_DATAC3, freedv->mode))
     {
-        FREE(freedv->codeword_symbols);
-        FREE(freedv->codeword_amps);
+        FREE(freedv->rx_syms);
+        FREE(freedv->rx_amps);
         FREE(freedv->ldpc);
         ofdm_destroy(freedv->ofdm);
     }
