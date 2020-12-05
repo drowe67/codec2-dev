@@ -185,6 +185,7 @@ void freedv_ofdm_data_open(struct freedv *f) {
 
     f->nin = f->nin_prev = ofdm_get_samples_per_packet(f->ofdm);
     f->n_nat_modem_samples = ofdm_get_samples_per_packet(f->ofdm);
+    fprintf(stderr," ofdm_get_samples_per_packet: %d\n", f->n_nat_modem_samples);
     f->n_nom_modem_samples = ofdm_get_samples_per_frame(f->ofdm);
     f->n_max_modem_samples = ofdm_get_max_samples_per_frame(f->ofdm);
     f->modem_sample_rate = f->ofdm->config.fs;
@@ -246,6 +247,7 @@ void freedv_comptx_ofdm(struct freedv *f, COMP mod_out[]) {
 
     complex float tx_sams[f->n_nat_modem_samples];
     COMP asam;
+    fprintf(stderr, "about to modulate\n");
 
     ofdm_ldpc_interleave_tx(f->ofdm, f->ldpc, tx_sams, f->tx_payload_bits, txt_bits);
 

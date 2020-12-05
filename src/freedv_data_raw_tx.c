@@ -202,7 +202,8 @@ int main(int argc, char *argv[]) {
     if (mode == FREEDV_MODE_FSK_LDPC) payload_bytes_per_modem_frame -= 2; /* 16 bits used for the CRC */
     fprintf(stderr, "bits_per_modem_frame: %d bytes_per_modem_frame: %d\n", freedv_get_bits_per_modem_frame(freedv), bytes_per_modem_frame);
     assert((freedv_get_bits_per_modem_frame(freedv) % 8) == 0);
-    int     n_mod_out = freedv_get_n_nom_modem_samples(freedv);
+    int     n_mod_out = freedv_get_n_tx_modem_samples(freedv);
+    fprintf(stderr, "mod_out: %d\n", n_mod_out);
     uint8_t bytes_in[bytes_per_modem_frame];
 
     if (mode == FREEDV_MODE_FSK_LDPC) {
@@ -268,6 +269,7 @@ int main(int argc, char *argv[]) {
             }
 
             if (use_complex == 0) {
+                fprintf(stderr, "Calling freedv_rawdatatx()\n");
                 freedv_rawdatatx(freedv, mod_out_short, bytes_in);
             } else {
                 freedv_rawdatacomptx(freedv, mod_out_comp, bytes_in);

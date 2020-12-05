@@ -126,6 +126,7 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
          FDV_MODE_ACTIVE( FREEDV_MODE_2400B,  mode)  ||
          FDV_MODE_ACTIVE( FREEDV_MODE_800XA,  mode)  ||
          FDV_MODE_ACTIVE( FREEDV_MODE_2020,   mode)   ||
+         FDV_MODE_ACTIVE( FREEDV_MODE_FSK_LDPC, mode) ||
          FDV_MODE_ACTIVE( FREEDV_MODE_DATAC1, mode) ||
          FDV_MODE_ACTIVE( FREEDV_MODE_DATAC2, mode) ||
          FDV_MODE_ACTIVE( FREEDV_MODE_DATAC3, mode))
@@ -409,7 +410,10 @@ void freedv_rawdatacomptx(struct freedv *f, COMP mod_out[], unsigned char *packe
 
     if (FDV_MODE_ACTIVE( FREEDV_MODE_1600, f->mode)) freedv_comptx_fdmdv_1600(f, mod_out);
     if (FDV_MODE_ACTIVE( FREEDV_MODE_700C, f->mode)) freedv_comptx_700c(f, mod_out);
-    if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode)) freedv_comptx_ofdm(f, mod_out);
+    if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode)   ||
+        FDV_MODE_ACTIVE( FREEDV_MODE_DATAC1, f->mode) ||
+        FDV_MODE_ACTIVE( FREEDV_MODE_DATAC2, f->mode) ||
+        FDV_MODE_ACTIVE( FREEDV_MODE_DATAC3, f->mode)) freedv_comptx_ofdm(f, mod_out);
 
     if (FDV_MODE_ACTIVE( FREEDV_MODE_FSK_LDPC, f->mode)) {
         freedv_tx_fsk_ldpc_data(f, mod_out);
@@ -420,7 +424,7 @@ void freedv_rawdatacomptx(struct freedv *f, COMP mod_out[], unsigned char *packe
 /* send raw frames of bytes, or speech data that was compressed externally, real short output */
 void freedv_rawdatatx(struct freedv *f, short mod_out[], unsigned char *packed_payload_bits) {
     assert(f != NULL);
-    COMP mod_out_comp[f->n_nom_modem_samples];
+    COMP mod_out_comp[f->n_nat_modem_samples];
 
     /* Some FSK modes used packed bits, and coincidentally support real samples natively */
     if(FDV_MODE_ACTIVE( FREEDV_MODE_2400A, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_2400B, f->mode) ||
@@ -433,7 +437,7 @@ void freedv_rawdatatx(struct freedv *f, short mod_out[], unsigned char *packed_p
     freedv_rawdatacomptx(f, mod_out_comp, packed_payload_bits);
 
     /* convert complex to real */
-    for(int i=0; i<f->n_nom_modem_samples; i++)
+    for(int i=0; i<f->n_nat_modem_samples; i++)
         mod_out[i] = mod_out_comp[i].real;
 }
 
@@ -1233,6 +1237,7 @@ int freedv_get_modem_sample_rate          (struct freedv *f) {return f->modem_sa
 int freedv_get_modem_symbol_rate          (struct freedv *f) {return f->modem_symbol_rate;}
 int freedv_get_n_max_modem_samples        (struct freedv *f) {return f->n_max_modem_samples;}
 int freedv_get_n_nom_modem_samples        (struct freedv *f) {return f->n_nom_modem_samples;}
+int freedv_get_n_tx_modem_samples        (struct freedv *f) {return f->n_nat_modem_samples;}
 int freedv_get_total_bits                 (struct freedv *f) {return f->total_bits;}
 int freedv_get_total_bit_errors           (struct freedv *f) {return f->total_bit_errors;}
 int freedv_get_total_bits_coded           (struct freedv *f) {return f->total_bits_coded;}
