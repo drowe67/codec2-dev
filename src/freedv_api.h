@@ -8,7 +8,7 @@
   embedding FreeDV in other programs.  Please see:
 
   1. README_freedv.md
-  2. Notes function use in freedv_api.c
+  2. Notes on function use in freedv_api.c
   3. The sample freedv_tx.c and freedv_rx.c programs
 
 \*---------------------------------------------------------------------------*/
@@ -53,6 +53,10 @@
 
 // available data modes
 #define FREEDV_MODE_FSK_LDPC    9
+#define FREEDV_MODE_DATAC1     10
+#define FREEDV_MODE_DATAC2     11
+#define FREEDV_MODE_DATAC3     12
+
 
 // Sample rates used
 #define FREEDV_FS_8000          8000
@@ -62,10 +66,12 @@
 #define FREEDV_MODE_EN_DEFAULT 1
 #endif
 
-// By default we enable all modes.  Disable during compile time e.g
-// -DFREEDV_MODE_1600_EN=0 will enable all but FreeDV 1600.  Or the
-// other way round -DFREEDV_MODE_EN_DEFAULT=0 -DFREEDV_MODE_1600_EN=1
-// will enable only FreeDV 1600
+// These macros allow us to disable unwanted modes at compile tine, for example
+// to save memory on embedded systems or the remove need to link other
+// libraries. By default we enable all modes.  Disable during compile time e.g
+// -DFREEDV_MODE_1600_EN=0 will enable all but FreeDV 1600.  Or the other way
+// round -DFREEDV_MODE_EN_DEFAULT=0 -DFREEDV_MODE_1600_EN=1 will enable only
+// FreeDV 1600
 
 #if !defined(FREEDV_MODE_1600_EN)
         #define FREEDV_MODE_1600_EN FREEDV_MODE_EN_DEFAULT
@@ -91,6 +97,15 @@
 #if !defined(FREEDV_MODE_FSK_LDPC_EN)
         #define FREEDV_MODE_FSK_LDPC_EN FREEDV_MODE_EN_DEFAULT
 #endif
+#if !defined(FREEDV_MODE_DATAC1_EN)
+        #define FREEDV_MODE_DATAC1_EN FREEDV_MODE_EN_DEFAULT
+#endif
+#if !defined(FREEDV_MODE_DATAC2_EN)
+        #define FREEDV_MODE_DATAC2_EN FREEDV_MODE_EN_DEFAULT
+#endif
+#if !defined(FREEDV_MODE_DATAC3_EN)
+        #define FREEDV_MODE_DATAC3_EN FREEDV_MODE_EN_DEFAULT
+#endif
 
 #define FDV_MODE_ACTIVE(mode_name, var)  ((mode_name##_EN) == 0 ? 0: (var) == mode_name)
 
@@ -105,7 +120,7 @@ struct freedv;
 // Some modes allow extra configuration parameters
 struct freedv_advanced {
     int interleave_frames;                   // currently ignored, was previously used to configure 700D interleaver
-    
+
     // parameters for FREEDV_MODE_FSK_LDPC
     int M;                                   // 2 or 4 FSK
     int Rs;                                  // Symbol rate Hz
@@ -136,7 +151,7 @@ typedef void (*freedv_callback_datatx)(void *, unsigned char *packet, size_t *si
 
 
 /*---------------------------------------------------------------------------*\
- 
+
                                  FreeDV API functions
 
 \*---------------------------------------------------------------------------*/
@@ -175,7 +190,7 @@ int freedv_rawdata_from_codec_frames(struct freedv *freedv, unsigned char *rawda
 unsigned short freedv_gen_crc16(unsigned char* data_p, int length);
 void freedv_pack(unsigned char *bytes, unsigned char *bits, int nbits);
 void freedv_unpack(unsigned char *bits, unsigned char *bytes, int nbits);
-      
+
 // Set parameters ------------------------------------------------------------
 
 void freedv_set_callback_txt            (struct freedv *freedv, freedv_callback_rx rx, freedv_callback_tx tx, void *callback_state);
@@ -203,7 +218,7 @@ void freedv_set_dpsk                    (struct freedv *freedv, int val);
 void freedv_set_ext_vco                 (struct freedv *f, int val);
 void freedv_set_phase_est_bandwidth_mode(struct freedv *f, int val);
 void freedv_set_eq                      (struct freedv *f, int val);
-      
+
 // Get parameters -------------------------------------------------------------------------
 
 struct MODEM_STATS;

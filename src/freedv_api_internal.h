@@ -49,8 +49,8 @@
 #endif
 
 // Experimentally derived fudge factors to normalise Tx power across modes
-#define NORM_PWR_COHPSK  1.74   
-#define NORM_PWR_FSK     0.193 
+#define NORM_PWR_COHPSK  1.74
+#define NORM_PWR_FSK     0.193
 #define NORM_PWR_OFDM    1.00
 
 // identifiers for non Codec 2 Speech codecs, make sure no overlap with CODEC2_XXX modes
@@ -61,9 +61,9 @@
 #define RX_SYNC             0x2       // demodulator has sync
 #define RX_BITS             0x4       // data bits have been returned
 #define RX_BIT_ERRORS       0x8       // FEC may not have corrected all bit errors (not all parity checks OK)
-                                      
+
 extern char *rx_sync_flags_to_text[]; // converts flags above to more meaningful text
-      
+
 struct freedv {
     int                  mode;
 
@@ -79,7 +79,7 @@ struct freedv {
 #ifdef __LPCNET__
     struct LPCNetFreeDV *lpcnet;
 #endif
-    
+
     struct freedv_vhf_deframer * deframer;      // Extracts frames from VHF stream
 
     struct quisk_cfFilter * ptFilter7500to8000; // Filters to change to/from 7500 and 8000 sps for 700 .... 700C
@@ -95,20 +95,20 @@ struct freedv {
     int                  modem_symbol_rate;      // Useful for ext_vco operation on 2400A and 800XA
     int                  speech_sample_rate;     // 8 kHz or 16 kHz (high fidelity)
 
-    int                  bits_per_codec_frame;   // one of modem codec frames per modem frame
+    int                  bits_per_codec_frame;
     int                  bits_per_modem_frame;   // number of modem payload bits in each modem frame (usually compressed speech)
     int                  n_codec_frames;         // number of codec frames in each modem frame
     uint8_t             *tx_payload_bits;        // payload bits (usually compressed speech) for a modem frame ...
     uint8_t             *rx_payload_bits;        // ... one bit per char for some modes, packed for others
 
     /* FDMDV buffers for FreeDV 1600 -------------------------------------------------------------*/
-    
+
     int                 *fdmdv_bits;
     int                 *fdmdv_tx_bits;
     int                 *fdmdv_rx_bits;
 
     /* test frame states -------------------------------------------------------------------------*/
-    
+
     int                 *ptest_bits_coh;
     int                 *ptest_bits_coh_end;
 
@@ -144,14 +144,17 @@ struct freedv {
     int                  ext_vco;                            /* 2400A/800XA use external VCO flag */
     float               *passthrough_2020;                   /* 2020 interpolating filter */
     float                tx_amp;                             /* amplitude of tx samples */
-    
+
+    /* useful constants for OFDM modes ------------------------------------------------------------------*/
+
+    int                  ofdm_bitsperpacket;
     int                  ofdm_bitsperframe;
     int                  ofdm_nuwbits;
     int                  ofdm_ntxtbits;
     int                  rx_status;
-    
+
     /* Varicode txt channel states ----------------------------------------------------------------------*/
-    
+
     struct VARICODE_DEC  varicode_dec_states;
     short                tx_varicode_bits[VARICODE_MAX_BITS];
     int                  nvaricode_bits;
@@ -164,14 +167,14 @@ struct freedv {
     int                  modem_frame_count_tx;       // modem frame counter for tx side
     int                  modem_frame_count_rx;       // modem frame counter for rx side
     COMP                *mod_out;                    // output buffer of intereaved frames
-    
+
     /* user defined function ptrs to produce and consume ASCII
       characters using aux txt channel */
 
     char (*freedv_get_next_tx_char)(void *callback_state);
     void (*freedv_put_next_rx_char)(void *callback_state, char c);
     void                *callback_state;
-    
+
     /* user defined functions to produce and consume protocol bits */
     /* Protocol bits are packed MSB-first */
     void (*freedv_put_next_proto)(void *callback_state, char *proto_bits_packed);
@@ -190,7 +193,7 @@ struct freedv {
 };
 
 // open function for each mode
-      
+
 void freedv_1600_open(struct freedv *f);
 void freedv_700c_open(struct freedv *f);
 void freedv_700d_open(struct freedv *f);
@@ -199,16 +202,17 @@ void freedv_2400a_open(struct freedv *f);
 void freedv_2400b_open(struct freedv *f);
 void freedv_800xa_open(struct freedv *f);
 void freedv_fsk_ldpc_open(struct freedv *f, struct freedv_advanced *adv);
+void freedv_ofdm_data_open(struct freedv *f);
 
 // each mode has tx and rx functions in various flavours for real and complex valued samples
 
 void freedv_comptx_fdmdv_1600(struct freedv *f, COMP mod_out[]);
 int freedv_comprx_fdmdv_1600(struct freedv *f, COMP demod_in[]);
-      
+
 void freedv_comptx_700c(struct freedv *f, COMP mod_out[]);
 int freedv_comprx_700c(struct freedv *f, COMP demod_in_8kHz[]);
 
-void freedv_comptx_700d(struct freedv *f, COMP mod_out[]);
+void freedv_comptx_ofdm(struct freedv *f, COMP mod_out[]);
 int freedv_comp_short_rx_700d(struct freedv *f, void *demod_in_8kHz, int demod_in_is_short, float gain);
 
 void freedv_comptx_2020(struct freedv *f, COMP mod_out[]);
@@ -223,7 +227,7 @@ int freedv_floatrx(struct freedv *f, short speech_out[], float demod_in[]);
 void freedv_tx_fsk_ldpc_data(struct freedv *f, COMP mod_out[]);
 void freedv_tx_fsk_ldpc_data_preamble(struct freedv *f, COMP mod_out[], int npreamble_bits, int npreamble_samples);
 int freedv_rx_fsk_ldpc_data(struct freedv *f, COMP demod_in[]);
-      
+
 int freedv_bits_to_speech(struct freedv *f, short speech_out[], short demod_in[], int rx_status);
 
 #ifdef __cplusplus
@@ -231,4 +235,3 @@ int freedv_bits_to_speech(struct freedv *f, short speech_out[], short demod_in[]
 #endif
 
 #endif
-

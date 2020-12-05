@@ -42,7 +42,7 @@ void comp_to_short(short mod_out_short[], COMP mod_out_comp[], int n_mod_out) {
     for(int i=0; i<n_mod_out; i++) {
         mod_out_short[2*i] = (short)(mod_out_comp[i].real);
         mod_out_short[2*i+1] = (short)(mod_out_comp[i].imag);
-    }            
+    }
 }
 
 int main(int argc, char *argv[]) {
@@ -55,14 +55,14 @@ int main(int argc, char *argv[]) {
     float                     amp = FSK_SCALE;
     int                       shorts_per_sample = 1;
     int                       Nbursts = 1, sequence_numbers = 0;
-    
+
     char f2020[80] = {0};
     if (argc < 4) {
     helpmsg:
         #ifdef __LPCNET__
         sprintf(f2020,"|2020");
-        #endif     
-        fprintf(stderr, "usage: %s  [options] 700C|700D|800XA|FSK_LDPC%s InputBinaryDataFile OutputModemRawFile\n"
+        #endif
+        fprintf(stderr, "usage: %s  [options] 700C|700D|800XA|FSK_LDPC|DATAC1%s InputBinaryDataFile OutputModemRawFile\n"
                "\n"
                "  --testframes N  send N test frames per burst\n"
                "  --bursts     B  send B bursts on N testframes (default 1)\n"
@@ -73,7 +73,7 @@ int main(int argc, char *argv[]) {
                "  --seq           send packet sequence numbers (breaks testframe BER counting)\n"
                "\n"
                "For FSK_LDPC only:\n\n"
-               "  -m      2|4     number of FSK tones\n"        
+               "  -m      2|4     number of FSK tones\n"
                "  --Fs    FreqHz  sample rate (default 8000)\n"
                "  --Rs    FreqHz  symbol rate (default 100)\n"
                "  --tone1 FreqHz  freq of first tone (default 1000)\n"
@@ -85,7 +85,7 @@ int main(int argc, char *argv[]) {
     }
 
     use_clip = 0; use_txbpf = 0; testframes = 0; use_complex = 0;
-    
+
     int o = 0;
     int opt_idx = 0;
     while( o != -1 ){
@@ -102,9 +102,9 @@ int main(int argc, char *argv[]) {
             {"seq",        no_argument,        0, 'q'},
             {0, 0, 0, 0}
         };
-        
+
         o = getopt_long(argc,argv,"a:ct:hb:l:e:f:r:1:s:m:q",long_opts,&opt_idx);
-        
+
         switch(o) {
         case 'a':
             amp = atof(optarg)/2.0;
@@ -151,7 +151,7 @@ int main(int argc, char *argv[]) {
         }
     }
     int dx = optind;
-    
+
     if( (argc - dx) < 3) {
         fprintf(stderr, "too few arguments.\n");
         goto helpmsg;
@@ -164,9 +164,12 @@ int main(int argc, char *argv[]) {
     if (!strcmp(argv[dx],"2020")) mode = FREEDV_MODE_2020;
     #endif
     if (!strcmp(argv[dx],"FSK_LDPC")) mode = FREEDV_MODE_FSK_LDPC;
+    if (!strcmp(argv[dx],"DATAC1")) mode = FREEDV_MODE_DATAC1;
+    if (!strcmp(argv[dx],"DATAC2")) mode = FREEDV_MODE_DATAC2;
+    if (!strcmp(argv[dx],"DATAC3")) mode = FREEDV_MODE_DATAC3;
     if (mode == -1) {
-        fprintf(stderr, "Error in mode: %s\n", argv[1]);
-        goto helpmsg;        
+      fprintf(stderr, "Error: unknown mode: %s", argv[dx]);
+      exit(1);
     }
 
     if (strcmp(argv[dx+1], "-")  == 0) fin = stdin;
@@ -185,14 +188,14 @@ int main(int argc, char *argv[]) {
         freedv = freedv_open(mode);
     else
         freedv = freedv_open_advanced(mode, &adv);
-        
+
     assert(freedv != NULL);
 
     /* these are optional ------------------ */
     freedv_set_clip(freedv, use_clip);
     freedv_set_tx_bpf(freedv, use_txbpf);
     freedv_set_tx_amp(freedv, amp);
-    
+
     /* for streaming bytes it's much easier to use modes that have a multiple of 8 payload bits/frame */
     int bytes_per_modem_frame = freedv_get_bits_per_modem_frame(freedv)/8;
     int payload_bytes_per_modem_frame = bytes_per_modem_frame;
@@ -211,12 +214,12 @@ int main(int argc, char *argv[]) {
             exit(1);
         }
     }
-    
+
     if ((Nbursts != 1) && (testframes == 0)) {
         fprintf(stderr, "Error: --bursts can only be used with --testframes\n");
         exit(1);
     }
-    
+
     /* optionally set up a known testframe */
     uint8_t testframe_bytes[bytes_per_modem_frame];
     memset(testframe_bytes, 0, bytes_per_modem_frame);
@@ -245,7 +248,7 @@ int main(int argc, char *argv[]) {
             }
             fwrite(mod_out_short, sizeof(short), shorts_per_sample*n_preamble, fout);
         }
-        
+
         /* OK main loop  --------------------------------------- */
 
         frames = 0;
@@ -255,15 +258,15 @@ int main(int argc, char *argv[]) {
                 if (sequence_numbers) bytes_in[0] = (frames+1) & 0xff;
             }
             if (mode == FREEDV_MODE_FSK_LDPC) {
-                
+
                 /* This mode requires a CRC in the last two bytes. TODO: consider moving inside freedv_rawdatatx(),
                    although there may be some advantage in leaving the CRC visible to upper layers */
-                
+
                 uint16_t crc16 = freedv_gen_crc16(bytes_in, payload_bytes_per_modem_frame);
-                bytes_in[bytes_per_modem_frame-2] = crc16 >> 8; 
-                bytes_in[bytes_per_modem_frame-1] = crc16 & 0xff; 
+                bytes_in[bytes_per_modem_frame-2] = crc16 >> 8;
+                bytes_in[bytes_per_modem_frame-1] = crc16 & 0xff;
             }
-            
+
             if (use_complex == 0) {
                 freedv_rawdatatx(freedv, mod_out_short, bytes_in);
             } else {
@@ -271,26 +274,25 @@ int main(int argc, char *argv[]) {
                 comp_to_short(mod_out_short, mod_out_comp, n_mod_out);
             }
             fwrite(mod_out_short, sizeof(short), shorts_per_sample*n_mod_out, fout);
-    
+
             /* if using pipes we don't want the usual buffering to occur */
             if (fout == stdout) fflush(stdout);
             if (fin == stdin) fflush(stdin);
 
-            frames++;       
+            frames++;
             if (testframes && (frames >= Nframes)) break;
         }
 
         /* some silence at the end to allow demod to complete processing */
-        
+
         for(int i=0; i<shorts_per_sample*n_mod_out; i++) mod_out_short[i] = 0;
         fwrite(mod_out_short, sizeof(short), shorts_per_sample*n_mod_out, fout);
         fwrite(mod_out_short, sizeof(short), shorts_per_sample*n_mod_out, fout);
     }
-    
+
     freedv_close(freedv);
     fclose(fin);
     fclose(fout);
-    
+
     return 0;
 }
-
