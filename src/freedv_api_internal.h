@@ -208,7 +208,7 @@ void freedv_comptx_700c(struct freedv *f, COMP mod_out[]);
 int freedv_comprx_700c(struct freedv *f, COMP demod_in_8kHz[]);
 
 void freedv_comptx_ofdm(struct freedv *f, COMP mod_out[]);
-int freedv_comp_short_rx_700d(struct freedv *f, void *demod_in_8kHz, int demod_in_is_short, float gain);
+int freedv_comp_short_rx_ofdm(struct freedv *f, void *demod_in_8kHz, int demod_in_is_short, float gain);
 
 void freedv_comptx_2020(struct freedv *f, COMP mod_out[]);
 int freedv_comprx_2020(struct freedv *f, COMP demod_in[]);

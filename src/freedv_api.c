@@ -700,7 +700,7 @@ int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]) {
     }
 
     if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode)) {
-        rx_status = freedv_comp_short_rx_700d(f, (void*)demod_in, 0, 2.0f); // was 1.0 ??
+        rx_status = freedv_comp_short_rx_ofdm(f, (void*)demod_in, 0, 2.0f); // was 1.0 ??
     }
 
     if (FDV_MODE_ACTIVE( FREEDV_MODE_2020, f->mode)) {
@@ -730,7 +730,7 @@ int freedv_shortrx(struct freedv *f, short speech_out[], short demod_in[], float
     assert(f->nin <= f->n_max_modem_samples);
 
     if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode)) {
-        rx_status = freedv_comp_short_rx_700d(f, (void*)demod_in, 1, gain);
+        rx_status = freedv_comp_short_rx_ofdm(f, (void*)demod_in, 1, gain);
     }
 
     return freedv_bits_to_speech(f, speech_out, demod_in, rx_status);
@@ -925,7 +925,10 @@ int freedv_rawdatacomprx(struct freedv *f, unsigned char *packed_payload_bits, C
 
     if (FDV_MODE_ACTIVE( FREEDV_MODE_1600, f->mode)) rx_status = freedv_comprx_fdmdv_1600(f, demod_in);
     if (FDV_MODE_ACTIVE( FREEDV_MODE_700C, f->mode)) rx_status = freedv_comprx_700c(f, demod_in);
-    if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode)) rx_status = freedv_comp_short_rx_700d(f, (void*)demod_in, 0, 1.0f);
+    if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode)   ||
+        FDV_MODE_ACTIVE( FREEDV_MODE_DATAC1, f->mode) ||
+        FDV_MODE_ACTIVE( FREEDV_MODE_DATAC2, f->mode) ||
+        FDV_MODE_ACTIVE( FREEDV_MODE_DATAC3, f->mode)) rx_status = freedv_comp_short_rx_ofdm(f, (void*)demod_in, 0, 1.0f);
     if (FDV_MODE_ACTIVE( FREEDV_MODE_FSK_LDPC, f->mode)) {
         rx_status = freedv_rx_fsk_ldpc_data(f, demod_in);
     }

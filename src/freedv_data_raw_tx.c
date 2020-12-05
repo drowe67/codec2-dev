@@ -55,15 +55,14 @@ int main(int argc, char *argv[]) {
     float                     amp = FSK_SCALE;
     int                       shorts_per_sample = 1;
     int                       Nbursts = 1, sequence_numbers = 0;
-    uint8_t                   source_byte = 0;
-    
+
     char f2020[80] = {0};
     if (argc < 4) {
     helpmsg:
         #ifdef __LPCNET__
         sprintf(f2020,"|2020");
         #endif
-        fprintf(stderr, "usage: %s  [options] 700C|700D|800XA|FSK_LDPC|DATAC1%s InputBinaryDataFile OutputModemRawFile\n"
+        fprintf(stderr, "usage: %s  [options] 700C|700D|800XA|FSK_LDPC|DATAC1|DATAC2|DATAC3%s InputBinaryDataFile OutputModemRawFile\n"
                "\n"
                "  --testframes N  send N test frames per burst\n"
                "  --bursts     B  send B bursts on N testframes (default 1)\n"
@@ -71,8 +70,7 @@ int main(int argc, char *argv[]) {
                "  -c              complex signed 16 bit output format (default real)\n"
                "  --clip  0|1     clipping for reduced PAPR\n"
                "  --txbpf 0|1     bandpass filter\n"
-               "  --seq           send packet sequence numbers (breaks testframe BER counting) in byte[1]\n"
-               "  --source Byte   insert a (non-zero) source address att byte[0]\n"
+               "  --seq           send packet sequence numbers (breaks testframe BER counting)\n"
                "\n"
                "For FSK_LDPC only:\n\n"
                "  -m      2|4     number of FSK tones\n"
@@ -102,11 +100,11 @@ int main(int argc, char *argv[]) {
             {"shift",      required_argument,  0, 's'},
             {"bursts",     required_argument,  0, 'e'},
             {"seq",        no_argument,        0, 'q'},
-            {"source",     required_argument,  0, 'd'},
             {0, 0, 0, 0}
         };
-        o = getopt_long(argc,argv,"a:cd:t:hb:l:e:f:r:1:s:m:q",long_opts,&opt_idx);
-        
+
+        o = getopt_long(argc,argv,"a:ct:hb:l:e:f:r:1:s:m:q",long_opts,&opt_idx);
+
         switch(o) {
         case 'a':
             amp = atof(optarg)/2.0;
@@ -117,10 +115,6 @@ int main(int argc, char *argv[]) {
         case 'c':
             use_complex = 1;
             shorts_per_sample = 2;
-            break;
-        case 'd':
-            source_byte = strtol(optarg, NULL, 0);
-            fprintf(stderr,"source byte: 0x%02x\n", source_byte);
             break;
         case 'e':
             Nbursts = atoi(optarg);
@@ -174,7 +168,7 @@ int main(int argc, char *argv[]) {
     if (!strcmp(argv[dx],"DATAC2")) mode = FREEDV_MODE_DATAC2;
     if (!strcmp(argv[dx],"DATAC3")) mode = FREEDV_MODE_DATAC3;
     if (mode == -1) {
-      fprintf(stderr, "Error: unknown mode: %s", argv[dx]);
+      fprintf(stderr, "Error: in mode: %s", argv[dx]);
       exit(1);
     }
 
@@ -262,8 +256,7 @@ int main(int argc, char *argv[]) {
         while(fread(bytes_in, sizeof(uint8_t), payload_bytes_per_modem_frame, fin) == payload_bytes_per_modem_frame) {
             if (testframes) {
                 memcpy(bytes_in, testframe_bytes, bytes_per_modem_frame);
-                if (source_byte) bytes_in[0] = source_byte;
-                if (sequence_numbers) bytes_in[1] = (frames+1) & 0xff;
+                if (sequence_numbers) bytes_in[0] = (frames+1) & 0xff;
             }
             if (mode == FREEDV_MODE_FSK_LDPC) {
 

@@ -364,12 +364,12 @@ int freedv_comprx_700c(struct freedv *f, COMP demod_in_8kHz[]) {
 }
 
 /*
-  700D demod function that can support complex (float) or real (short)
+  OFDM demod function that can support complex (float) or real (short)
   samples.  The real short samples are useful for low memory overhead,
   such at the SM1000.
 */
 
-int freedv_comp_short_rx_700d(struct freedv *f, void *demod_in_8kHz, int demod_in_is_short, float gain) {
+int freedv_comp_short_rx_ofdm(struct freedv *f, void *demod_in_8kHz, int demod_in_is_short, float gain) {
     int   i, k;
     int   n_ascii;
     char  ascii_out;
@@ -440,24 +440,24 @@ int freedv_comp_short_rx_700d(struct freedv *f, void *demod_in_8kHz, int demod_i
 
         /* run de-interleaver */
 
-        COMP  codeword_symbols_de[coded_syms_per_frame];
-        float codeword_amps_de[coded_syms_per_frame];
-        gp_deinterleave_comp (codeword_symbols_de, codeword_symbols, coded_syms_per_frame);
-        gp_deinterleave_float(codeword_amps_de   , codeword_amps   , coded_syms_per_frame);
+        COMP  payload_syms_de[coded_syms_per_frame];
+        float payload_amps_de[coded_syms_per_frame];
+        gp_deinterleave_comp (payload_syms_de, payload_syms, coded_syms_per_frame);
+        gp_deinterleave_float(payload_amps_de, payload_amps, coded_syms_per_frame);
 
         float llr[coded_bits_per_frame];
         uint8_t out_char[coded_bits_per_frame];
 
         if (f->test_frames) {
             int tmp;
-            Nerrs_raw = count_uncoded_errors(ldpc, &f->ofdm->config, &tmp, codeword_symbols_de);
+            Nerrs_raw = count_uncoded_errors(ldpc, &f->ofdm->config, &tmp, payload_syms_de);
             f->total_bit_errors += Nerrs_raw;
             f->total_bits += f->ofdm_bitsperframe;
         }
 
         f->modem_frame_count_rx = 0;
 
-        symbols_to_llrs(llr, codeword_symbols_de, codeword_amps_de,
+        symbols_to_llrs(llr, payload_syms_de, payload_amps_de,
                 EsNo, ofdm->mean_amp, coded_syms_per_frame);
         iter = run_ldpc_decoder(ldpc, out_char, llr, &parityCheckCount);
 
