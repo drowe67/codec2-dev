@@ -180,6 +180,7 @@ void freedv_fsk_ldpc_open(struct freedv *f, struct freedv_advanced *adv) {
     f->fsk_ldpc_baduw = 0;
     f->fsk_ldpc_best_location = 0;  f->fsk_ldpc_state = 0;
     f->fsk_ldpc_snr = 1.0;
+    f->fsk_S[0] = f->fsk_S[1] = f->fsk_N[0] = f->fsk_N[1] = 0.0;
 }
 
 
@@ -444,7 +445,11 @@ int freedv_rx_fsk_ldpc_data(struct freedv *f, COMP demod_in[]) {
            currently decoding */
         f->snr_est = 10.0*log10(f->fsk_ldpc_snr);
         f->fsk_ldpc_snr = fsk->SNRest;
-
+        f->fsk_S[0] = f->fsk_S[1]; f->fsk_N[0] = f->fsk_N[1];
+        /* also store delayed versions of signal and noise power, useful for channel estimation */
+        f->fsk_S[1] = fsk->rx_sig_pow;
+        f->fsk_N[1] = fsk->rx_nse_pow;
+        
         /* OK lets run frame based processing, starting with state machine */
 
         int errors = 0;
@@ -501,11 +506,11 @@ int freedv_rx_fsk_ldpc_data(struct freedv *f, COMP demod_in[]) {
             uint16_t tx_crc16 = (rx_payload_bytes[bytes_per_modem_frame-2] << 8) | rx_payload_bytes[bytes_per_modem_frame-1];
             uint16_t rx_crc16 = freedv_gen_crc16(rx_payload_bytes, bytes_per_modem_frame - 2);
             if (tx_crc16 == rx_crc16)
-                rx_status |= RX_BITS;
+                rx_status |= FREEDV_RX_BITS;
             else {
                 /* if CRC failed on first frame in packet, this was probably a dud UW match, so go straight back to searching */
                 if (f->fsk_ldpc_state == 0) next_state = 0;
-                rx_status |= RX_BIT_ERRORS;
+                rx_status |= FREEDV_RX_BIT_ERRORS;
             }            
         }
         f->fsk_ldpc_state = next_state;
@@ -535,14 +540,14 @@ int freedv_rx_fsk_ldpc_data(struct freedv *f, COMP demod_in[]) {
                 f->total_bits_coded += f->bits_per_modem_frame;
             }
 
-            /* extract packet sequnce numbers optionally placed in first 8 bits */
+            /* extract packet sequnce numbers optionally placed in byte[0] */
             seq = 0;
             for(int i=0; i<8; i++)
-                seq |= f->rx_payload_bits[i] << (7-i);
+                seq |= f->rx_payload_bits[8+i] << (7-i);
         }
 
-        if (f->fsk_ldpc_state == 1) rx_status |= RX_SYNC; /* need this set before verbose logging fprintf() */
-        if (((f->verbose == 1) && (rx_status & RX_BITS)) || (f->verbose == 2)) {
+        if (f->fsk_ldpc_state == 1) rx_status |= FREEDV_RX_SYNC; /* need this set before verbose logging fprintf() */
+        if (((f->verbose == 1) && (rx_status & FREEDV_RX_BITS)) || (f->verbose == 2)) {
             fprintf(stderr, "%3d nbits: %3d st: %d uwloc: %3d uwerr: %2d bad_uw: %d snrdB: %4.1f eraw: %3d ecdd: %3d "
                             "iter: %3d pcc: %3d seq: %3d rxst: %s\n",
                     ++(f->frames), f->frame_llr_nbits, f->fsk_ldpc_state, f->fsk_ldpc_best_location, errors,
@@ -552,7 +557,7 @@ int freedv_rx_fsk_ldpc_data(struct freedv *f, COMP demod_in[]) {
     }
     else {
         /* set RX_SYNC flag even if we don't perform frame processing */
-        if (f->fsk_ldpc_state == 1) rx_status |= RX_SYNC;
+        if (f->fsk_ldpc_state == 1) rx_status |= FREEDV_RX_SYNC;
     }
     
     return rx_status;
@@ -586,7 +591,7 @@ int freedv_comprx_fsk(struct freedv *f, COMP demod_in[]) {
     }
     
     rx_status = fvhff_deframe_bits(f->deframer,f->rx_payload_bits,proto_bits,vc_bits,(uint8_t*)f->tx_bits);
-    if((rx_status & RX_SYNC) && (rx_status & RX_BITS)){
+    if((rx_status & FREEDV_RX_SYNC) && (rx_status & FREEDV_RX_BITS)){
         /* Decode varicode text */
         for(i=0; i<2; i++){
             /* Note: deframe_bits spits out bits in uint8_ts while varicode_decode expects shorts */

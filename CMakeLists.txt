@@ -396,8 +396,8 @@ if(UNITTEST)
     # noise free coded 700D test, including reading and writing payload bits
     add_test(NAME test_OFDM_modem_700D_ldpc
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
-                            ./ofdm_get_test_bits - --ldpc |
-                            ./ofdm_mod --ldpc |
+                            ./ofdm_get_test_bits - --length 112 | 
+                            ./ofdm_mod --ldpc | 
                             ./ofdm_demod --ldpc --testframes > /dev/null")
 
     # noise free 2020 test, including reading and writing payload bits.  fsk_*_test_bits used as it does it's own frame sync

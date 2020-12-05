@@ -163,7 +163,7 @@ int freedv_comprx_fdmdv_1600(struct freedv *f, COMP demod_in[]) {
     }
 
     if (f->sync) {
-        rx_status = RX_SYNC;
+        rx_status = FREEDV_RX_SYNC;
 
         if (f->evenframe == 0) {
             memcpy(f->fdmdv_rx_bits, f->fdmdv_bits, bits_per_fdmdv_frame*sizeof(int));
@@ -212,7 +212,7 @@ int freedv_comprx_fdmdv_1600(struct freedv *f, COMP demod_in[]) {
                 // reconstruct missing bit we steal for data bit and decode
                 codec2_rebuild_spare_bit(f->codec2, (char*)f->rx_payload_bits);
 
-                rx_status |= RX_BITS;
+                rx_status |= FREEDV_RX_BITS;
             }
             else {
                 int   test_frame_sync, bit_errors, ntest_bits, k;

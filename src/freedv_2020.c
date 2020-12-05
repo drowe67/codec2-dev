@@ -215,8 +215,8 @@ int freedv_comprx_2020(struct freedv *f, COMP demod_in[]) {
     /* OK modem is in sync */
 
     if ((ofdm->sync_state == synced) || (ofdm->sync_state == trial)) {
-        rx_status |= RX_SYNC;
-        if (ofdm->sync_state == trial) rx_status |= RX_TRIAL_SYNC;
+        rx_status |= FREEDV_RX_SYNC;
+        if (ofdm->sync_state == trial) rx_status |= FREEDV_RX_TRIAL_SYNC;
 
         ofdm_demod(ofdm, rx_bits, demod_in);
         ofdm_extract_uw(ofdm, ofdm->rx_np, ofdm->rx_amp, rx_uw);
@@ -279,7 +279,7 @@ int freedv_comprx_2020(struct freedv *f, COMP demod_in[]) {
             iter = run_ldpc_decoder(ldpc, out_char, llr_full_codeword, &parityCheckCount);
         }
 
-        if (parityCheckCount != ldpc->NumberParityBits) rx_status |= RX_BIT_ERRORS;
+        if (parityCheckCount != ldpc->NumberParityBits) rx_status |= FREEDV_RX_BIT_ERRORS;
 
         if (f->test_frames) {
             uint8_t payload_data_bits[data_bits_per_frame];
@@ -291,7 +291,7 @@ int freedv_comprx_2020(struct freedv *f, COMP demod_in[]) {
             memcpy(f->rx_payload_bits, out_char, data_bits_per_frame);
         }
 
-        rx_status |= RX_BITS;
+        rx_status |= FREEDV_RX_BITS;
 
         /* If modem is synced we can decode txt bits */
         

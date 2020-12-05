@@ -296,10 +296,9 @@ int freedv_comprx_700c(struct freedv *f, COMP demod_in_8kHz[]) {
     f->snr_est = f->stats.snr_est;
 
     if (sync) {
-        rx_status = RX_SYNC;
-
+        rx_status = FREEDV_RX_SYNC;
         if (f->test_frames == 0) {
-            rx_status |= RX_BITS;
+            rx_status |= FREEDV_RX_BITS;
         }
         else {
 
@@ -415,9 +414,8 @@ int freedv_comp_short_rx_700d(struct freedv *f, void *demod_in_8kHz, int demod_i
      /* OK modem is in sync */
 
     if ((ofdm->sync_state == synced) || (ofdm->sync_state == trial)) {
-        rx_status |= RX_SYNC;
-        if (ofdm->sync_state == trial) rx_status |= RX_TRIAL_SYNC;
-
+        rx_status |= FREEDV_RX_SYNC;
+        if (ofdm->sync_state == trial) rx_status |= FREEDV_RX_TRIAL_SYNC;
         if (demod_in_is_short)
             ofdm_demod_shorts(ofdm, rx_bits, (short*)demod_in_8kHz, new_gain);
         else
@@ -464,7 +462,7 @@ int freedv_comp_short_rx_700d(struct freedv *f, void *demod_in_8kHz, int demod_i
         iter = run_ldpc_decoder(ldpc, out_char, llr, &parityCheckCount);
 
         if (parityCheckCount != ldpc->NumberParityBits)
-            rx_status |= RX_BIT_ERRORS;
+            rx_status |= FREEDV_RX_BIT_ERRORS;
 
         if (f->test_frames) {
             uint8_t payload_data_bits[data_bits_per_frame];
@@ -476,7 +474,7 @@ int freedv_comp_short_rx_700d(struct freedv *f, void *demod_in_8kHz, int demod_i
             memcpy(f->rx_payload_bits, out_char, data_bits_per_frame);
         }
 
-        rx_status |= RX_BITS;
+        rx_status |= FREEDV_RX_BITS;
 
         /* If modem is synced we can decode txt bits */
         for(k=0; k<f->ofdm_ntxtbits; k++)  {

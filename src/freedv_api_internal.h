@@ -56,12 +56,6 @@
 // identifiers for non Codec 2 Speech codecs, make sure no overlap with CODEC2_XXX modes
 #define CODEC_MODE_LPCNET_1733 100
 
-// Return code flags for freedv_*rx* functions
-#define RX_TRIAL_SYNC       0x1       // demodulator has trial sync
-#define RX_SYNC             0x2       // demodulator has sync
-#define RX_BITS             0x4       // data bits have been returned
-#define RX_BIT_ERRORS       0x8       // FEC may not have corrected all bit errors (not all parity checks OK)
-
 extern char *rx_sync_flags_to_text[]; // converts flags above to more meaningful text
 
 struct freedv {
@@ -190,6 +184,7 @@ struct freedv {
     int      fsk_ldpc_thresh1, fsk_ldpc_thresh2, fsk_ldpc_baduw_thresh;
     int      fsk_ldpc_state,  fsk_ldpc_best_location, fsk_ldpc_baduw;
     float    fsk_ldpc_snr;
+    float    fsk_S[2], fsk_N[2];
 };
 
 // open function for each mode
