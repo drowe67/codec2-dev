@@ -167,6 +167,8 @@ void freedv_ofdm_data_open(struct freedv *f) {
     // TODO move OFDM functions from bits per frame to bits per packet
     f->ofdm_bitsperpacket = ofdm_get_bits_per_packet(f->ofdm);
     f->ofdm_bitsperframe = ofdm_get_bits_per_frame(f->ofdm);
+    f->ofdm_nuwbits = ofdm_config.nuwbits;
+    f->ofdm_ntxtbits = ofdm_config.txtbits;
 
     // LDPC set up
     f->ldpc = (struct LDPC*)MALLOC(sizeof(struct LDPC));
@@ -233,10 +235,10 @@ void freedv_comptx_ofdm(struct freedv *f, COMP mod_out[]) {
     /* optionally replace payload bits with test frames known to rx */
 
     if (f->test_frames) {
-        uint8_t payload_data_bits[f->bits_per_modem_frame];
-        ofdm_generate_payload_data_bits(payload_data_bits, f->bits_per_modem_frame);
+        uint8_t payload_data_bits[f->ofdm_bitsperpacket];
+        ofdm_generate_payload_data_bits(payload_data_bits, f->ofdm_bitsperpacket);
 
-        for (i = 0; i < f->bits_per_modem_frame; i++) {
+        for (i = 0; i < f->ofdm_bitsperpacket; i++) {
             f->tx_payload_bits[i] = payload_data_bits[i];
         }
     }
@@ -434,7 +436,11 @@ int freedv_comp_short_rx_ofdm(struct freedv *f, void *demod_in_8kHz, int demod_i
         /* look for UW as frames enter packet buffer, note UW may span several modem frames */
         int st_uw = Nsymsperpacket - ofdm->nuwframes*Nsymsperframe;
         ofdm_extract_uw(ofdm, &rx_syms[st_uw], &rx_amps[st_uw], rx_uw);
-
+        /*
+        for(i=0; i<f->ofdm_nuwbits; i++)
+            fprintf(stderr,"%d%d ", ofdm->tx_uw[i], rx_uw[i]);
+        fprintf(stderr,"\n");
+*/
         #ifdef PREV
         ofdm_extract_uw(ofdm, ofdm->rx_np, ofdm->rx_amp, rx_uw);
         ofdm_disassemble_qpsk_modem_packet(ofdm, ofdm->rx_np, ofdm->rx_amp, payload_syms, payload_amps, txt_bits);
@@ -497,7 +503,6 @@ int freedv_comp_short_rx_ofdm(struct freedv *f, void *demod_in_8kHz, int demod_i
                     f->total_bit_errors++;
                 }
             }
-
             f->total_bits += f->ofdm_nuwbits;
         }
     }
