@@ -250,7 +250,6 @@ void freedv_comptx_ofdm(struct freedv *f, COMP mod_out[]) {
 
     complex float tx_sams[f->n_nat_modem_samples];
     COMP asam;
-    fprintf(stderr, "about to modulate\n");
 
     ofdm_ldpc_interleave_tx(f->ofdm, f->ldpc, tx_sams, f->tx_payload_bits, txt_bits);
 
@@ -379,6 +378,7 @@ int freedv_comp_short_rx_ofdm(struct freedv *f, void *demod_in_8kHz, int demod_i
     struct OFDM *ofdm = f->ofdm;
     struct LDPC *ldpc = f->ldpc;
 
+    /* useful constants */
     int Nbitsperframe = ofdm_get_bits_per_frame(ofdm);
     int Nbitsperpacket = ofdm_get_bits_per_packet(ofdm);
     int Nsymsperframe = Nbitsperframe / ofdm->bps;
@@ -434,90 +434,98 @@ int freedv_comp_short_rx_ofdm(struct freedv *f, void *demod_in_8kHz, int demod_i
         else
             ofdm_demod(ofdm, rx_bits, (COMP*)demod_in_8kHz);
 
+        /* accumulate a buffer of data symbols for this packet */
+        for(i=0; i<Nsymsperpacket-Nsymsperframe; i++) {
+            rx_syms[i] = rx_syms[i+Nsymsperframe];
+            rx_amps[i] = rx_amps[i+Nsymsperframe];
+        }
+        memcpy(&rx_syms[Nsymsperpacket-Nsymsperframe], ofdm->rx_np, sizeof(complex float)*Nsymsperframe);
+        memcpy(&rx_amps[Nsymsperpacket-Nsymsperframe], ofdm->rx_amp, sizeof(float)*Nsymsperframe);
+
+        /* look for UW as frames enter packet buffer, note UW may span several modem frames */
+        int st_uw = Nsymsperpacket - ofdm->nuwframes*Nsymsperframe;
+        ofdm_extract_uw(ofdm, &rx_syms[st_uw], &rx_amps[st_uw], rx_uw);
+
+        #ifdef PREV
         ofdm_extract_uw(ofdm, ofdm->rx_np, ofdm->rx_amp, rx_uw);
         ofdm_disassemble_qpsk_modem_packet(ofdm, ofdm->rx_np, ofdm->rx_amp, payload_syms, payload_amps, txt_bits);
+        #endif
 
         f->sync = 1;
         ofdm_get_demod_stats(f->ofdm, &f->stats);
         f->snr_est = f->stats.snr_est;
 
-        assert((f->ofdm_nuwbits+f->ofdm_ntxtbits+coded_bits_per_frame) == f->ofdm_bitsperframe);
+        if (ofdm->modem_frame == (ofdm->np-1)) {
+            /* we have received enough frames to make a complete packet .... */
+            ofdm_disassemble_qpsk_modem_packet(ofdm, rx_syms, rx_amps, payload_syms, payload_amps, txt_bits);
 
-        /* newest symbols at end of buffer (uses final i from last loop), note we
-           change COMP formats from what modem uses internally */
-/*
-        for(i=0; i< coded_syms_per_frame; i++) {
-            codeword_symbols[i] = payload_syms[i];
-            codeword_amps[i]    = payload_amps[i];
-         }
-         */
-        /* run de-interleaver */
+            COMP payload_syms_de[Npayloadsymsperpacket];
+            float payload_amps_de[Npayloadsymsperpacket];
+            gp_deinterleave_comp (payload_syms_de, payload_syms, Npayloadsymsperpacket);
+            gp_deinterleave_float(payload_amps_de, payload_amps, Npayloadsymsperpacket);
 
-        COMP  payload_syms_de[Npayloadsymsperpacket];
-        float payload_amps_de[Npayloadsymsperpacket];
-        gp_deinterleave_comp (payload_syms_de, payload_syms, Npayloadsymsperpacket);
-        gp_deinterleave_float(payload_amps_de, payload_amps, Npayloadsymsperpacket);
+            float llr[Npayloadbitsperpacket];
+            uint8_t out_char[Npayloadbitsperpacket];
 
-        float llr[Npayloadbitsperpacket];
-        uint8_t out_char[Npayloadbitsperpacket];
-
-        if (f->test_frames) {
-            int tmp;
-            Nerrs_raw = count_uncoded_errors(ldpc, &f->ofdm->config, &tmp, payload_syms_de);
-            f->total_bit_errors += Nerrs_raw;
-            f->total_bits += f->ofdm_bitsperframe;
-        }
-
-        f->modem_frame_count_rx = 0;
-
-        symbols_to_llrs(llr, payload_syms_de, payload_amps_de,
-                EsNo, ofdm->mean_amp, coded_syms_per_frame);
-        iter = run_ldpc_decoder(ldpc, out_char, llr, &parityCheckCount);
-
-        if (parityCheckCount != ldpc->NumberParityBits)
-            rx_status |= FREEDV_RX_BIT_ERRORS;
-
-        if (f->test_frames) {
-            uint8_t payload_data_bits[data_bits_per_frame];
-            ofdm_generate_payload_data_bits(payload_data_bits, data_bits_per_frame);
-            Nerrs_coded = count_errors(payload_data_bits, out_char, data_bits_per_frame);
-            f->total_bit_errors_coded += Nerrs_coded;
-            f->total_bits_coded += data_bits_per_frame;
-        } else {
-            memcpy(f->rx_payload_bits, out_char, data_bits_per_frame);
-        }
-
-        rx_status |= FREEDV_RX_BITS;
-
-        /* If modem is synced we can decode txt bits */
-        for(k=0; k<f->ofdm_ntxtbits; k++)  {
-            //fprintf(stderr, "txt_bits[%d] = %d\n", k, rx_bits[i]);
-            n_ascii = varicode_decode(&f->varicode_dec_states, &ascii_out, &txt_bits[k], 1, 1);
-            if (n_ascii && (f->freedv_put_next_rx_char != NULL)) {
-                (*f->freedv_put_next_rx_char)(f->callback_state, ascii_out);
+            if (f->test_frames) {
+                int tmp;
+                Nerrs_raw = count_uncoded_errors(ldpc, &f->ofdm->config, &tmp, payload_syms_de);
+                f->total_bit_errors += Nerrs_raw;
+                f->total_bits += Npayloadbitsperpacket;
             }
-        }
 
-        /* estimate uncoded BER from UW */
-        for(i=0; i<f->ofdm_nuwbits; i++) {
-            if (rx_uw[i] != ofdm->tx_uw[i]) {
-                f->total_bit_errors++;
+            symbols_to_llrs(llr, payload_syms_de, payload_amps_de,
+                            EsNo, ofdm->mean_amp, Npayloadsymsperpacket);
+            iter = run_ldpc_decoder(ldpc, out_char, llr, &parityCheckCount);
+
+            if (parityCheckCount != ldpc->NumberParityBits)
+                rx_status |= FREEDV_RX_BIT_ERRORS;
+
+            if (f->test_frames) {
+                uint8_t payload_data_bits[data_bits_per_frame];
+                ofdm_generate_payload_data_bits(payload_data_bits, data_bits_per_frame);
+                Nerrs_coded = count_errors(payload_data_bits, out_char, data_bits_per_frame);
+                f->total_bit_errors_coded += Nerrs_coded;
+                f->total_bits_coded += data_bits_per_frame;
+            } else {
+                memcpy(f->rx_payload_bits, out_char, data_bits_per_frame);
             }
-        }
 
-        f->total_bits += f->ofdm_nuwbits;
+            rx_status |= FREEDV_RX_BITS;
+
+            /* If modem is synced we can decode txt bits */
+            for(k=0; k<f->ofdm_ntxtbits; k++)  {
+                //fprintf(stderr, "txt_bits[%d] = %d\n", k, rx_bits[i]);
+                n_ascii = varicode_decode(&f->varicode_dec_states, &ascii_out, &txt_bits[k], 1, 1);
+                if (n_ascii && (f->freedv_put_next_rx_char != NULL)) {
+                    (*f->freedv_put_next_rx_char)(f->callback_state, ascii_out);
+                }
+            }
+
+            /* estimate uncoded BER from UW */
+            for(i=0; i<f->ofdm_nuwbits; i++) {
+                if (rx_uw[i] != ofdm->tx_uw[i]) {
+                    f->total_bit_errors++;
+                }
+            }
+
+            f->total_bits += f->ofdm_nuwbits;
+        }
     }
 
     /* iterate state machine and update nin for next call */
 
     f->nin = ofdm_get_nin(ofdm);
-    ofdm_sync_state_machine(ofdm, rx_uw);
+    if (ofdm->data_mode == 0)
+        ofdm_sync_state_machine(ofdm, rx_uw);
+    else
+        ofdm_sync_state_machine2(ofdm, rx_uw);
 
     if ((f->verbose && (ofdm->last_sync_state == search)) || (f->verbose == 2)) {
         fprintf(stderr, "%3d nin: %4d st: %-6s euw: %2d %1d f: %5.1f phbw: %d snr: %4.1f eraw: %3d ecdd: %3d iter: %3d "
                 "pcc: %3d rxst: %s\n",
                 f->frames++, ofdm->nin, ofdm_statemode[ofdm->last_sync_state], ofdm->uw_errors, ofdm->sync_counter,
-		(double)ofdm->foff_est_hz, ofdm->phase_est_bandwidth,
+	 	            (double)ofdm->foff_est_hz, ofdm->phase_est_bandwidth,
                 f->snr_est, Nerrs_raw, Nerrs_coded, iter, parityCheckCount, rx_sync_flags_to_text[rx_status]);
     }
 

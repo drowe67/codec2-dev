@@ -344,7 +344,7 @@ void freedv_comptx(struct freedv *f, COMP mod_out[], short speech_in[]) {
         /* buffer up bits until we get enough encoded bits for interleaver */
 
         for (int j=0; j<f->n_codec_frames; j++) {
-            int offset = (f->modem_frame_count_tx*f->n_codec_frames + j)*f->bits_per_codec_frame;
+            int offset = j*f->bits_per_codec_frame;
             codec2_encode_upacked(f, f->tx_payload_bits + offset, speech_in);
             speech_in += codec2_samples_per_frame(f->codec2);
         }
@@ -358,7 +358,7 @@ void freedv_comptx(struct freedv *f, COMP mod_out[], short speech_in[]) {
         /* buffer up bits until we get enough encoded bits for interleaver */
 
         for (int j=0; j<f->n_codec_frames; j++) {
-            int offset = (f->modem_frame_count_tx*f->n_codec_frames + j)*f->bits_per_codec_frame;
+            int offset = j*f->bits_per_codec_frame;
             lpcnet_enc(f->lpcnet, speech_in, (char*)f->tx_payload_bits + offset);
             speech_in += lpcnet_samples_per_frame(f->lpcnet);
         }
@@ -845,10 +845,10 @@ int freedv_bits_to_speech(struct freedv *f, short speech_out[], short demod_in[]
 
             nout = f->n_speech_samples;
             for (int i = 0; i < frames; i++) {
-                lpcnet_dec(f->lpcnet, (char*) f->rx_payload_bits + (i + frames * f->modem_frame_count_rx) * bits_per_codec_frame, speech_out);
+                lpcnet_dec(f->lpcnet, (char*) f->rx_payload_bits + i*bits_per_codec_frame, speech_out);
                 speech_out += lpcnet_samples_per_frame(f->lpcnet);
             }
-            f->modem_frame_count_rx++;
+
 #endif
         } else {
             /* codec 2 decoder */
@@ -856,10 +856,9 @@ int freedv_bits_to_speech(struct freedv *f, short speech_out[], short demod_in[]
             if(FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode)) {
                 nout = f->n_speech_samples;
                 for (int i = 0; i < f->n_codec_frames; i++) {
-                    codec2_decode_upacked(f, speech_out, f->rx_payload_bits + (i + f->n_codec_frames * f->modem_frame_count_rx) * f->bits_per_codec_frame);
+                    codec2_decode_upacked(f, speech_out, f->rx_payload_bits + i*f->bits_per_codec_frame);
                     speech_out += codec2_samples_per_frame(f->codec2);
                 }
-                f->modem_frame_count_rx++;
             } else {
                 /* non-interleaved Codec 2 modes */
 
