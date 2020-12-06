@@ -99,6 +99,7 @@ void freedv_700d_open(struct freedv *f) {
     assert(f->ofdm != NULL);
 
     struct OFDM_CONFIG *ofdm_config = ofdm_get_config_param(f->ofdm);
+    f->ofdm_bitsperpacket = ofdm_get_bits_per_packet(f->ofdm);
     f->ofdm_bitsperframe = ofdm_get_bits_per_frame(f->ofdm);
     f->ofdm_nuwbits = (ofdm_config->ns - 1) * ofdm_config->bps - ofdm_config->txtbits;
     f->ofdm_ntxtbits = ofdm_config->txtbits;
