@@ -189,8 +189,8 @@ int main(int argc, char *argv[]) {
         }
 
         if (verbose == 3) {
-            fprintf(stderr, "frame: %d nin: %d sync: %d nbytes: %d bits: %d\n",
-                    frame, nin, freedv_get_sync(freedv), nbytes, freedv_get_rx_bits(freedv));
+            fprintf(stderr, "frame: %d nin: %d sync: %d nbytes: %d status: 0x%02x\n",
+                    frame, nin, freedv_get_sync(freedv), nbytes, freedv_get_rx_status(freedv));
         }
 
 	      /* if using pipes we probably don't want the usual buffering */

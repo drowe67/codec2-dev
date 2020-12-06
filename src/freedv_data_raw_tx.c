@@ -269,7 +269,6 @@ int main(int argc, char *argv[]) {
             }
 
             if (use_complex == 0) {
-                fprintf(stderr, "Calling freedv_rawdatatx()\n");
                 freedv_rawdatatx(freedv, mod_out_short, bytes_in);
             } else {
                 freedv_rawdatacomptx(freedv, mod_out_comp, bytes_in);

@@ -933,7 +933,7 @@ int freedv_rawdatacomprx(struct freedv *f, unsigned char *packed_payload_bits, C
     }
 
     if (rx_status & FREEDV_RX_BITS) {
-	ret = (f->bits_per_modem_frame+7)/8;
+	      ret = (f->bits_per_modem_frame+7)/8;
         freedv_pack(packed_payload_bits, f->rx_payload_bits, f->bits_per_modem_frame);
     }
 
