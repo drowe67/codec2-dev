@@ -165,20 +165,25 @@ void freedv_ofdm_data_open(struct freedv *f) {
     f->ofdm = ofdm_create(&ofdm_config);
     assert(f->ofdm != NULL);
 
-    // TODO move OFDM functions from bits per frame to bits per packet
+    // LDPC set up
+    f->ldpc = (struct LDPC*)MALLOC(sizeof(struct LDPC));
+    assert(f->ldpc != NULL);
+    ldpc_codes_setup(f->ldpc, f->ofdm->codename);
+#ifdef __EMBEDDED__
+    f->ldpc->max_iter = 10; /* limit LDPC decoder iterations to limit CPU load */
+#endif
+
+    // useful constants
     f->ofdm_bitsperpacket = ofdm_get_bits_per_packet(f->ofdm);
     f->ofdm_bitsperframe = ofdm_get_bits_per_frame(f->ofdm);
     f->ofdm_nuwbits = ofdm_config.nuwbits;
     f->ofdm_ntxtbits = ofdm_config.txtbits;
 
-    // LDPC set up
-    f->ldpc = (struct LDPC*)MALLOC(sizeof(struct LDPC));
-    assert(f->ldpc != NULL);
-    fprintf(stderr, "freedv_ofdm_data_open using: %s\n", f->ofdm->codename);
-    ldpc_codes_setup(f->ldpc, f->ofdm->codename);
-#ifdef __EMBEDDED__
-    f->ldpc->max_iter = 10; /* limit LDPC decoder iterations to limit CPU load */
-#endif
+    /* payload bits per FreeDV API "frame".  In OFDM modem nomenclature this is the number of
+       payload data bits per packet, or the number of data bits in a LDPC codeword */
+    f->bits_per_modem_frame = f->ldpc->data_bits_per_frame;
+
+    // buffers for received symbols for one packet/LDPC codeword - may span many OFDM modem frames
     int Nsymsperpacket = ofdm_get_bits_per_packet(f->ofdm) / f->ofdm->bps;
     f->rx_syms = (COMP*)MALLOC(sizeof(COMP) * Nsymsperpacket);
     assert(f->rx_syms != NULL);
@@ -191,14 +196,12 @@ void freedv_ofdm_data_open(struct freedv *f) {
 
     f->nin = f->nin_prev = ofdm_get_nin(f->ofdm);
     f->n_nat_modem_samples = ofdm_get_samples_per_packet(f->ofdm);
-    fprintf(stderr," ofdm_get_samples_per_packet: %d\n", f->n_nat_modem_samples);
     f->n_nom_modem_samples = ofdm_get_samples_per_frame(f->ofdm);
     f->n_max_modem_samples = ofdm_get_max_samples_per_frame(f->ofdm);
     f->modem_sample_rate = f->ofdm->config.fs;
     f->sz_error_pattern = f->ofdm_bitsperpacket;
 
     // Note inconsistency: freedv API modem "frame" is a OFDM modem packet
-    f->bits_per_modem_frame = f->ofdm_bitsperpacket;
     f->tx_payload_bits = (unsigned char*)MALLOC(f->bits_per_modem_frame);
     assert(f->tx_payload_bits != NULL);
     f->rx_payload_bits = (unsigned char*)MALLOC(f->bits_per_modem_frame);
@@ -409,8 +412,7 @@ int freedv_comp_short_rx_ofdm(struct freedv *f, void *demod_in_8kHz, int demod_i
     /* TODO estimate this properly from signal */
     float EsNo = 3.0;
 
-    /* looking for modem sync */
-
+    /* looking for OFDM modem sync */
     if (ofdm->sync_state == search) {
         if (demod_in_is_short)
             ofdm_sync_search_shorts(f->ofdm, (short*)demod_in_8kHz, new_gain);
@@ -419,6 +421,7 @@ int freedv_comp_short_rx_ofdm(struct freedv *f, void *demod_in_8kHz, int demod_i
     }
 
     if ((ofdm->sync_state == synced) || (ofdm->sync_state == trial)) {
+        /* OK we have OFDM modem sync */
         rx_status |= FREEDV_RX_SYNC;
         if (ofdm->sync_state == trial) rx_status |= FREEDV_RX_TRIAL_SYNC;
         if (demod_in_is_short)
@@ -437,22 +440,15 @@ int freedv_comp_short_rx_ofdm(struct freedv *f, void *demod_in_8kHz, int demod_i
         /* look for UW as frames enter packet buffer, note UW may span several modem frames */
         int st_uw = Nsymsperpacket - ofdm->nuwframes*Nsymsperframe;
         ofdm_extract_uw(ofdm, &rx_syms[st_uw], &rx_amps[st_uw], rx_uw);
-        /*
-        for(i=0; i<f->ofdm_nuwbits; i++)
-            fprintf(stderr,"%d%d ", ofdm->tx_uw[i], rx_uw[i]);
-        fprintf(stderr,"\n");
-*/
-        #ifdef PREV
-        ofdm_extract_uw(ofdm, ofdm->rx_np, ofdm->rx_amp, rx_uw);
-        ofdm_disassemble_qpsk_modem_packet(ofdm, ofdm->rx_np, ofdm->rx_amp, payload_syms, payload_amps, txt_bits);
-        #endif
 
+        // update some FreeDV API level stats
         f->sync = 1;
         ofdm_get_demod_stats(f->ofdm, &f->stats);
         f->snr_est = f->stats.snr_est;
 
         if (ofdm->modem_frame == (ofdm->np-1)) {
-            /* we have received enough frames to make a complete packet .... */
+            /* we have received enough modem frames to complete packet and run LDPC decoder */
+
             ofdm_disassemble_qpsk_modem_packet(ofdm, rx_syms, rx_amps, payload_syms, payload_amps, txt_bits);
 
             COMP payload_syms_de[Npayloadsymsperpacket];
@@ -460,20 +456,21 @@ int freedv_comp_short_rx_ofdm(struct freedv *f, void *demod_in_8kHz, int demod_i
             gp_deinterleave_comp (payload_syms_de, payload_syms, Npayloadsymsperpacket);
             gp_deinterleave_float(payload_amps_de, payload_amps, Npayloadsymsperpacket);
 
-            float llr[Npayloadbitsperpacket];
-            uint8_t out_char[Npayloadbitsperpacket];
-
             if (f->test_frames) {
+                /* est uncoded BER from payload bits */
                 int tmp;
                 Nerrs_raw = count_uncoded_errors(ldpc, &f->ofdm->config, &tmp, payload_syms_de);
                 f->total_bit_errors += Nerrs_raw;
                 f->total_bits += Npayloadbitsperpacket;
             }
 
+            float llr[Npayloadbitsperpacket];
+            uint8_t out_char[Npayloadbitsperpacket];
             symbols_to_llrs(llr, payload_syms_de, payload_amps_de,
                             EsNo, ofdm->mean_amp, Npayloadsymsperpacket);
             iter = run_ldpc_decoder(ldpc, out_char, llr, &parityCheckCount);
 
+            rx_status |= FREEDV_RX_BITS;
             if (parityCheckCount != ldpc->NumberParityBits)
                 rx_status |= FREEDV_RX_BIT_ERRORS;
 
@@ -487,9 +484,7 @@ int freedv_comp_short_rx_ofdm(struct freedv *f, void *demod_in_8kHz, int demod_i
                 memcpy(f->rx_payload_bits, out_char, Ndatabitsperpacket);
             }
 
-            rx_status |= FREEDV_RX_BITS;
-
-            /* If modem is synced we can decode txt bits */
+            /* decode txt bits (if used) */
             for(k=0; k<f->ofdm_ntxtbits; k++)  {
                 //fprintf(stderr, "txt_bits[%d] = %d\n", k, rx_bits[i]);
                 n_ascii = varicode_decode(&f->varicode_dec_states, &ascii_out, &txt_bits[k], 1, 1);
@@ -497,8 +492,10 @@ int freedv_comp_short_rx_ofdm(struct freedv *f, void *demod_in_8kHz, int demod_i
                     (*f->freedv_put_next_rx_char)(f->callback_state, ascii_out);
                 }
             }
+        }
 
-            /* estimate uncoded BER from UW */
+        if (ofdm->modem_frame == 0) {
+           /* estimate uncoded BER from UW bits, useful in non test frame modes */
             for(i=0; i<f->ofdm_nuwbits; i++) {
                 if (rx_uw[i] != ofdm->tx_uw[i]) {
                     f->total_bit_errors++;

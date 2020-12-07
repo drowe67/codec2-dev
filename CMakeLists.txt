@@ -396,8 +396,8 @@ if(UNITTEST)
     # noise free coded 700D test, including reading and writing payload bits
     add_test(NAME test_OFDM_modem_700D_ldpc
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
-                            ./ofdm_get_test_bits - --length 112 | 
-                            ./ofdm_mod --ldpc | 
+                            ./ofdm_get_test_bits - --length 112 |
+                            ./ofdm_mod --ldpc |
                             ./ofdm_demod --ldpc --testframes > /dev/null")
 
     # noise free 2020 test, including reading and writing payload bits.  fsk_*_test_bits used as it does it's own frame sync
@@ -841,10 +841,10 @@ endif(NOT APPLE)
      # OFDM LDPC
      add_test(NAME test_freedv_data_raw_ofdm
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
-                            head -c 140 </dev/urandom > binaryIn.bin;
-                            ./freedv_data_raw_tx 700D binaryIn.bin - |
-                            ./freedv_data_raw_rx 700D - - -v |
-                            diff /dev/stdin binaryIn.bin")
+                            head -c $((258*10)) </dev/urandom > binaryIn.bin;
+                            ./freedv_data_raw_tx DATAC2 binaryIn.bin - |
+                            ./freedv_data_raw_rx DATAC2 - binaryOut.bin -v;
+                            diff binaryIn.bin binaryOut.bin")
 
      # FSK LDPC default 100 bit/s 2FSK, enough noise for several % raw BER to give
      # FEC/acquisition a work out, bursts of 1 frame as that stresses acquisition
@@ -853,7 +853,7 @@ endif(NOT APPLE)
                             ./freedv_data_raw_tx --testframes 1 --bursts 10 FSK_LDPC /dev/zero - |
                             ./cohpsk_ch - - -5 --Fs 8000 --ssbfilt 0 |
                             ./freedv_data_raw_rx --testframes -v FSK_LDPC - /dev/null")
-             set_tests_properties(test_freedv_data_raw_fsk_ldpc_100 PROPERTIES PASS_REGULAR_EXPRESSION "output_packets: 10")
+             set_tests_properties(test_freedv_data_raw_fsk_ldpc_100 PROPERTIES PASS_REGULAR_EXPRESSION "output_frames: 10")
 
      # FSK LDPC 1000 bit/s 2FSK, Fs=40kHz, as different configs can upset acquisition
      add_test(NAME test_freedv_data_raw_fsk_ldpc_1k
@@ -861,7 +861,7 @@ endif(NOT APPLE)
                             ./freedv_data_raw_tx --Fs 40000 --Rs 1000 --tone1 1000 --shift 1000 --testframes 1 --bursts 10 FSK_LDPC /dev/zero - |
                             ./cohpsk_ch - - -10 --Fs 8000 --ssbfilt 0 |
                             ./freedv_data_raw_rx --testframes -v --Fs 40000 --Rs 1000 FSK_LDPC - /dev/null")
-             set_tests_properties(test_freedv_data_raw_fsk_ldpc_1k PROPERTIES PASS_REGULAR_EXPRESSION "output_packets: 10")
+             set_tests_properties(test_freedv_data_raw_fsk_ldpc_1k PROPERTIES PASS_REGULAR_EXPRESSION "output_frames: 10")
 
      # FSK LDPC 10000 bit/s 2FSK, Fs=100kHz, each of the 10 bursts has 100 frames
      add_test(NAME test_freedv_data_raw_fsk_ldpc_10k
@@ -869,7 +869,7 @@ endif(NOT APPLE)
                             ./freedv_data_raw_tx --Fs 100000 --Rs 10000 --tone1 10000 --shift 10000 --testframes 100 --bursts 10 FSK_LDPC /dev/zero - |
                             ./cohpsk_ch - - -15 --Fs 8000 --ssbfilt 0 |
                             ./freedv_data_raw_rx --testframes -v --Fs 100000 --Rs 10000 FSK_LDPC - /dev/null")
-             set_tests_properties(test_freedv_data_raw_fsk_ldpc_10k PROPERTIES PASS_REGULAR_EXPRESSION "output_packets: 1000")
+             set_tests_properties(test_freedv_data_raw_fsk_ldpc_10k PROPERTIES PASS_REGULAR_EXPRESSION "output_frames: 1000")
 
      # FSK LDPC Rs=1000 bit/s (Rb=2000) 4FSK, Fs=40kHz, this needs --mask and longer preamble to work, due to lower Es/No, about 2dB over 2FSK
      add_test(NAME test_freedv_data_raw_fsk_ldpc_2k
@@ -877,6 +877,6 @@ endif(NOT APPLE)
                             ./freedv_data_raw_tx -a 8192 -m 4 --Fs 40000 --Rs 1000 --tone1 1000 --shift 1000 --testframes 1 --bursts 10 FSK_LDPC /dev/zero - |
                              ./cohpsk_ch - - -22 --Fs 8000 --ssbfilt 0 |
                              ./freedv_data_raw_rx -m 4 --testframes -v --Fs 40000 --Rs 1000 FSK_LDPC --mask 1000 - /dev/null")
-             set_tests_properties(test_freedv_data_raw_fsk_ldpc_2k PROPERTIES PASS_REGULAR_EXPRESSION "output_packets: 10")
+             set_tests_properties(test_freedv_data_raw_fsk_ldpc_2k PROPERTIES PASS_REGULAR_EXPRESSION "output_frames: 10")
 
 endif(UNITTEST)

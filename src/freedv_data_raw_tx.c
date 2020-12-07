@@ -56,13 +56,9 @@ int main(int argc, char *argv[]) {
     int                       shorts_per_sample = 1;
     int                       Nbursts = 1, sequence_numbers = 0;
 
-    char f2020[80] = {0};
     if (argc < 4) {
     helpmsg:
-        #ifdef __LPCNET__
-        sprintf(f2020,"|2020");
-        #endif
-        fprintf(stderr, "usage: %s  [options] 700C|700D|800XA|FSK_LDPC|DATAC1|DATAC2|DATAC3%s InputBinaryDataFile OutputModemRawFile\n"
+        fprintf(stderr, "usage: %s [options] FSK_LDPC|DATAC1|DATAC2|DATAC3 InputBinaryDataFile OutputModemRawFile\n"
                "\n"
                "  --testframes N  send N test frames per burst\n"
                "  --bursts     B  send B bursts on N testframes (default 1)\n"
@@ -78,7 +74,7 @@ int main(int argc, char *argv[]) {
                "  --Rs    FreqHz  symbol rate (default 100)\n"
                "  --tone1 FreqHz  freq of first tone (default 1000)\n"
                "  --shift FreqHz  shift between tones (default 200)\n\n"
-               , argv[0], f2020);
+               , argv[0]);
         fprintf(stderr, "example: $ %s 700D dataBytes.bin samples.s16\n", argv[0]);
         fprintf(stderr, "example: $ %s FSK_LDPC -c --testframes 10 /dev/zero samples.iq16\n\n", argv[0]);
         exit(1);
@@ -158,11 +154,6 @@ int main(int argc, char *argv[]) {
     }
 
     mode = -1;
-    if (!strcmp(argv[dx],"700C")) mode = FREEDV_MODE_700C;
-    if (!strcmp(argv[dx],"700D")) mode = FREEDV_MODE_700D;
-    #ifdef __LPCNET__
-    if (!strcmp(argv[dx],"2020")) mode = FREEDV_MODE_2020;
-    #endif
     if (!strcmp(argv[dx],"FSK_LDPC")) mode = FREEDV_MODE_FSK_LDPC;
     if (!strcmp(argv[dx],"DATAC1")) mode = FREEDV_MODE_DATAC1;
     if (!strcmp(argv[dx],"DATAC2")) mode = FREEDV_MODE_DATAC2;
@@ -200,10 +191,9 @@ int main(int argc, char *argv[]) {
     int bytes_per_modem_frame = freedv_get_bits_per_modem_frame(freedv)/8;
     int payload_bytes_per_modem_frame = bytes_per_modem_frame;
     if (mode == FREEDV_MODE_FSK_LDPC) payload_bytes_per_modem_frame -= 2; /* 16 bits used for the CRC */
-    fprintf(stderr, "bits_per_modem_frame: %d bytes_per_modem_frame: %d\n", freedv_get_bits_per_modem_frame(freedv), bytes_per_modem_frame);
+    fprintf(stderr, "payload bytes_per_modem_frame: %d\n", bytes_per_modem_frame);
     assert((freedv_get_bits_per_modem_frame(freedv) % 8) == 0);
     int     n_mod_out = freedv_get_n_tx_modem_samples(freedv);
-    fprintf(stderr, "mod_out: %d\n", n_mod_out);
     uint8_t bytes_in[bytes_per_modem_frame];
 
     if (mode == FREEDV_MODE_FSK_LDPC) {
