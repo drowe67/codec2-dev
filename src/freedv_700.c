@@ -239,10 +239,10 @@ void freedv_comptx_ofdm(struct freedv *f, COMP mod_out[]) {
     /* optionally replace payload bits with test frames known to rx */
 
     if (f->test_frames) {
-        uint8_t payload_data_bits[f->ofdm_bitsperpacket];
-        ofdm_generate_payload_data_bits(payload_data_bits, f->ofdm_bitsperpacket);
+        uint8_t payload_data_bits[f->bits_per_modem_frame];
+        ofdm_generate_payload_data_bits(payload_data_bits, f->bits_per_modem_frame);
 
-        for (i = 0; i < f->ofdm_bitsperpacket; i++) {
+        for (i = 0; i < f->bits_per_modem_frame; i++) {
             f->tx_payload_bits[i] = payload_data_bits[i];
         }
     }
@@ -264,6 +264,7 @@ void freedv_comptx_ofdm(struct freedv *f, COMP mod_out[]) {
         cohpsk_clip(mod_out, OFDM_CLIP, f->n_nat_modem_samples);
     }
 }
+
 
 int freedv_comprx_700c(struct freedv *f, COMP demod_in_8kHz[]) {
     int   i;
@@ -368,8 +369,8 @@ int freedv_comprx_700c(struct freedv *f, COMP demod_in_8kHz[]) {
 
 /*
   OFDM demod function that can support complex (float) or real (short)
-  samples.  The real short samples are useful for low memory overhead,
-  such at the SM1000.
+  samples.  The real short samples are useful for low memory platforms such as
+  the SM1000.
 */
 
 int freedv_comp_short_rx_ofdm(struct freedv *f, void *demod_in_8kHz, int demod_in_is_short, float gain) {
@@ -456,32 +457,47 @@ int freedv_comp_short_rx_ofdm(struct freedv *f, void *demod_in_8kHz, int demod_i
             gp_deinterleave_comp (payload_syms_de, payload_syms, Npayloadsymsperpacket);
             gp_deinterleave_float(payload_amps_de, payload_amps, Npayloadsymsperpacket);
 
-            if (f->test_frames) {
-                /* est uncoded BER from payload bits */
-                int tmp;
-                Nerrs_raw = count_uncoded_errors(ldpc, &f->ofdm->config, &tmp, payload_syms_de);
-                f->total_bit_errors += Nerrs_raw;
-                f->total_bits += Npayloadbitsperpacket;
-            }
-
             float llr[Npayloadbitsperpacket];
-            uint8_t out_char[Npayloadbitsperpacket];
+            uint8_t decoded_codeword[Npayloadbitsperpacket];
             symbols_to_llrs(llr, payload_syms_de, payload_amps_de,
                             EsNo, ofdm->mean_amp, Npayloadsymsperpacket);
-            iter = run_ldpc_decoder(ldpc, out_char, llr, &parityCheckCount);
+            iter = run_ldpc_decoder(ldpc, decoded_codeword, llr, &parityCheckCount);
+            memcpy(f->rx_payload_bits, decoded_codeword, Ndatabitsperpacket);
 
-            rx_status |= FREEDV_RX_BITS;
-            if (parityCheckCount != ldpc->NumberParityBits)
-                rx_status |= FREEDV_RX_BIT_ERRORS;
+            if (ofdm->data_mode) {
+                // we need a valid CRC to declare a data packet valid
+                if (freedv_check_crc16_unpacked(f->rx_payload_bits, Ndatabitsperpacket))
+                    rx_status |= FREEDV_RX_BITS;
+                else
+                    rx_status |= FREEDV_RX_BIT_ERRORS;
+            } else {
 
-            if (f->test_frames) {
+                // voice modes aren't as strict - pass everything through to the speech decoder, but flag
+                // frame with possible errors
+                rx_status |= FREEDV_RX_BITS;
+                if (parityCheckCount != ldpc->NumberParityBits)
+                   rx_status |= FREEDV_RX_BIT_ERRORS;
+
+            }
+
+            if (f->test_frames && (rx_status & FREEDV_RX_BITS)) {
+                /* est uncoded BER from payload bits */
+                int tmp;
+                Nerrs_raw = count_uncoded_errors(ldpc, &f->ofdm->config, &tmp, payload_syms_de, ofdm->data_mode);
+                f->total_bit_errors += Nerrs_raw;
+                f->total_bits += Npayloadbitsperpacket;
+
+                /* coded errors from decoded bits */
                 uint8_t payload_data_bits[Ndatabitsperpacket];
                 ofdm_generate_payload_data_bits(payload_data_bits, Ndatabitsperpacket);
-                Nerrs_coded = count_errors(payload_data_bits, out_char, Ndatabitsperpacket);
+                if (ofdm->data_mode) {
+                    uint16_t tx_crc16 = freedv_crc16_unpacked(payload_data_bits, Ndatabitsperpacket - 16);
+                    uint8_t tx_crc16_bytes[] = { tx_crc16 >> 8, tx_crc16 & 0xff };
+                    freedv_unpack(payload_data_bits + Ndatabitsperpacket - 16, tx_crc16_bytes, 16);
+                }
+                Nerrs_coded = count_errors(payload_data_bits, f->rx_payload_bits, Ndatabitsperpacket);
                 f->total_bit_errors_coded += Nerrs_coded;
                 f->total_bits_coded += Ndatabitsperpacket;
-            } else {
-                memcpy(f->rx_payload_bits, out_char, Ndatabitsperpacket);
             }
 
             /* decode txt bits (if used) */
@@ -495,7 +511,7 @@ int freedv_comp_short_rx_ofdm(struct freedv *f, void *demod_in_8kHz, int demod_i
         }
 
         if (ofdm->modem_frame == 0) {
-           /* estimate uncoded BER from UW bits, useful in non test frame modes */
+           /* estimate uncoded BER from UW bits, useful in non-testframe modes */
             for(i=0; i<f->ofdm_nuwbits; i++) {
                 if (rx_uw[i] != ofdm->tx_uw[i]) {
                     f->total_bit_errors++;

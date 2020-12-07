@@ -402,6 +402,26 @@ void freedv_unpack(uint8_t *bits, uint8_t *bytes, int nbits) {
     }
 }
 
+/* compute the CRC16 of a frame of unpacked bits */
+unsigned short freedv_crc16_unpacked(unsigned char unpacked_bits[], int nbits) {
+    assert((nbits % 8) == 0);
+    int nbytes = nbits/8;
+    uint8_t packed_bytes[nbytes];
+    freedv_pack(packed_bytes, unpacked_bits, nbits);
+    return freedv_gen_crc16(packed_bytes, nbytes);
+}
+
+/* Return non-zero if CRC16 of a frame of unpacked bits is correct */
+int freedv_check_crc16_unpacked(unsigned char unpacked_bits[], int nbits) {
+    assert((nbits % 8) == 0);
+    int nbytes = nbits/8;
+    uint8_t packed_bytes[nbytes];
+    freedv_pack(packed_bytes, unpacked_bits, nbits);
+    uint16_t tx_crc16 = (packed_bytes[nbytes-2] << 8) | packed_bytes[nbytes-1];
+    uint16_t rx_crc16 = freedv_crc16_unpacked(unpacked_bits, nbits - 16);
+    return tx_crc16 == rx_crc16;
+}
+
 /* send raw frames of bytes, or speech data that was compressed externally, complex float output */
 void freedv_rawdatacomptx(struct freedv *f, COMP mod_out[], unsigned char *packed_payload_bits) {
     assert(f != NULL);
@@ -784,7 +804,7 @@ int freedv_bits_to_speech(struct freedv *f, short speech_out[], short demod_in[]
 
         if (f->squelch_en == 0) {
 
-            /* attenuate audio 12dB bit as channel noise isn't that pleasant */
+            /* attenuate audio 12dB as channel noise isn't that pleasant */
             float passthrough_gain = 0.25;
 
             /* pass through received samples so we can hear what's going on, e.g. during tuning */
@@ -801,12 +821,12 @@ int freedv_bits_to_speech(struct freedv *f, short speech_out[], short demod_in[]
                 for(int i=0; i<nout; i++)
                     speech_out[i] = passthrough_gain*tmp[i];
             } else {
-	        /* Speech and modem rates might be different */
-	        int rate_factor = f->modem_sample_rate / f-> speech_sample_rate;
+      	        /* Speech and modem rates might be different */
+      	        int rate_factor = f->modem_sample_rate / f-> speech_sample_rate;
                 nout = f->nin_prev / rate_factor;
                 for(int i=0; i<nout; i++)
                     speech_out[i] = passthrough_gain*demod_in[i * rate_factor];
-           }
+            }
         }
     }
 

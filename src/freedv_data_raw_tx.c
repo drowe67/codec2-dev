@@ -190,8 +190,8 @@ int main(int argc, char *argv[]) {
     /* for streaming bytes it's much easier to use modes that have a multiple of 8 payload bits/frame */
     int bytes_per_modem_frame = freedv_get_bits_per_modem_frame(freedv)/8;
     int payload_bytes_per_modem_frame = bytes_per_modem_frame;
-    if (mode == FREEDV_MODE_FSK_LDPC) payload_bytes_per_modem_frame -= 2; /* 16 bits used for the CRC */
-    fprintf(stderr, "payload bytes_per_modem_frame: %d\n", bytes_per_modem_frame);
+    payload_bytes_per_modem_frame -= 2; /* 16 bits used for the CRC */
+    fprintf(stderr, "payload bytes_per_modem_frame: %d\n", payload_bytes_per_modem_frame);
     assert((freedv_get_bits_per_modem_frame(freedv) % 8) == 0);
     int     n_mod_out = freedv_get_n_tx_modem_samples(freedv);
     uint8_t bytes_in[bytes_per_modem_frame];
@@ -248,15 +248,13 @@ int main(int argc, char *argv[]) {
                 memcpy(bytes_in, testframe_bytes, bytes_per_modem_frame);
                 if (sequence_numbers) bytes_in[0] = (frames+1) & 0xff;
             }
-            if (mode == FREEDV_MODE_FSK_LDPC) {
 
-                /* This mode requires a CRC in the last two bytes. TODO: consider moving inside freedv_rawdatatx(),
-                   although there may be some advantage in leaving the CRC visible to upper layers */
+            /* This mode requires a CRC in the last two bytes. TODO: consider moving inside freedv_rawdatatx(),
+               although there may be some advantage in leaving the CRC visible to upper layers */
 
-                uint16_t crc16 = freedv_gen_crc16(bytes_in, payload_bytes_per_modem_frame);
-                bytes_in[bytes_per_modem_frame-2] = crc16 >> 8;
-                bytes_in[bytes_per_modem_frame-1] = crc16 & 0xff;
-            }
+            uint16_t crc16 = freedv_gen_crc16(bytes_in, payload_bytes_per_modem_frame);
+            bytes_in[bytes_per_modem_frame-2] = crc16 >> 8;
+            bytes_in[bytes_per_modem_frame-1] = crc16 & 0xff;
 
             if (use_complex == 0) {
                 freedv_rawdatatx(freedv, mod_out_short, bytes_in);

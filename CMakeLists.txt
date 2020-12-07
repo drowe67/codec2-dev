@@ -839,11 +839,25 @@ endif(NOT APPLE)
      # ---------------------------------------------------------
 
      # OFDM LDPC
-     add_test(NAME test_freedv_data_raw_ofdm
+     add_test(NAME test_freedv_data_raw_ofdm_datac1
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
-                            head -c $((258*10)) </dev/urandom > binaryIn.bin;
+                            head -c $((256*10)) </dev/urandom > binaryIn.bin;
+                            ./freedv_data_raw_tx DATAC1 binaryIn.bin - |
+                            ./freedv_data_raw_rx DATAC1 - binaryOut.bin -v;
+                            diff binaryIn.bin binaryOut.bin")
+
+     add_test(NAME test_freedv_data_raw_ofdm_datac2
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            head -c $((256*10)) </dev/urandom > binaryIn.bin;
                             ./freedv_data_raw_tx DATAC2 binaryIn.bin - |
                             ./freedv_data_raw_rx DATAC2 - binaryOut.bin -v;
+                            diff binaryIn.bin binaryOut.bin")
+
+     add_test(NAME test_freedv_data_raw_ofdm_datac3
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            head -c $((30*10)) </dev/urandom > binaryIn.bin;
+                            ./freedv_data_raw_tx DATAC3 binaryIn.bin - |
+                            ./freedv_data_raw_rx DATAC3 - binaryOut.bin -v;
                             diff binaryIn.bin binaryOut.bin")
 
      # FSK LDPC default 100 bit/s 2FSK, enough noise for several % raw BER to give

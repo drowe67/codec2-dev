@@ -67,7 +67,7 @@
 #define FREEDV_RX_SYNC             0x2       // demodulator has sync
 #define FREEDV_RX_BITS             0x4       // data bits have been returned
 #define FREEDV_RX_BIT_ERRORS       0x8       // FEC may not have corrected all bit errors (not all parity checks OK)
-                                      
+
 #ifndef FREEDV_MODE_EN_DEFAULT
 #define FREEDV_MODE_EN_DEFAULT 1
 #endif
@@ -193,9 +193,11 @@ int freedv_rawdatacomprx (struct freedv *freedv, unsigned char *packed_payload_b
 
 int freedv_codec_frames_from_rawdata(struct freedv *freedv, unsigned char *codec_frames, unsigned char *rawdata);
 int freedv_rawdata_from_codec_frames(struct freedv *freedv, unsigned char *rawdata, unsigned char *codec_frames);
-unsigned short freedv_gen_crc16(unsigned char* data_p, int length);
+unsigned short freedv_gen_crc16(unsigned char* bytes, int nbytes);
 void freedv_pack(unsigned char *bytes, unsigned char *bits, int nbits);
 void freedv_unpack(unsigned char *bits, unsigned char *bytes, int nbits);
+unsigned short freedv_crc16_unpacked(unsigned char *bits, int nbits);
+int freedv_check_crc16_unpacked(unsigned char *unpacked_bits, int nbits);
 
 // Set parameters ------------------------------------------------------------
 

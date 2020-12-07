@@ -247,7 +247,7 @@ int freedv_comprx_2020(struct freedv *f, COMP demod_in[]) {
 
         if (f->test_frames) {
             int tmp;
-            Nerrs_raw = count_uncoded_errors(ldpc, &f->ofdm->config, &tmp, codeword_symbols_de);
+            Nerrs_raw = count_uncoded_errors(ldpc, &f->ofdm->config, &tmp, codeword_symbols_de, 0);
             f->total_bit_errors += Nerrs_raw;
             f->total_bits += f->ofdm_bitsperframe;
         }

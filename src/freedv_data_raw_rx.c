@@ -157,7 +157,8 @@ int main(int argc, char *argv[]) {
     /* for streaming bytes it's much easier use the modes that have a multiple of 8 payload bits/frame */
     assert((freedv_get_bits_per_modem_frame(freedv) % 8) == 0);
     int bytes_per_modem_frame = freedv_get_bits_per_modem_frame(freedv)/8;
-    fprintf(stderr, "payload bytes_per_modem_frame: %d\n", bytes_per_modem_frame);
+    // last two bytes used for CRC
+    fprintf(stderr, "payload bytes_per_modem_frame: %d\n", bytes_per_modem_frame - 2);
     uint8_t bytes_out[bytes_per_modem_frame];
     short  demod_in[freedv_get_n_max_modem_samples(freedv)];
 
@@ -173,8 +174,9 @@ int main(int argc, char *argv[]) {
         nin = freedv_nin(freedv);
 
         if (nbytes) {
-            fwrite(bytes_out, sizeof(uint8_t), nbytes, fout);
-            nbytes_out += nbytes;
+            // dont output CRC
+            fwrite(bytes_out, sizeof(uint8_t), nbytes-2, fout);
+            nbytes_out += nbytes-2;
             nframes_out++;
         }
 
