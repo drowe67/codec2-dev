@@ -47,10 +47,11 @@
 #define SLOW_FADING_DELAY_MS  0.5
 #define PAPR_TARGET           7.0
 
-/*  
+/*
   Use Octave to generate the fading channel models:
 
-     octave:26> cohpsk_ch_fading("../raw/faster_fading_samples.float", 8000, 2.0, 8000*60)
+     octave:24> pkg load signal
+     octave:25> cohpsk_ch_fading("../raw/faster_fading_samples.float", 8000, 2.0, 8000*60)
      octave:26> cohpsk_ch_fading("../raw/fast_fading_samples.float", 8000, 1.0, 8000*60)
      octave:27> cohpsk_ch_fading("../raw/slow_fading_samples.float", 8000, 0.1, 8000*60)
 
@@ -96,7 +97,7 @@ int main(int argc, char *argv[])
     float          tx_pwr, tx_pwr_fade, noise_pwr;
     int            frames, i, j, k, Fs, ret, clipped, ssbfilt_en, complex_out;
     float          sam, peak, inclip, papr, CNo, snr3k;
-  
+
     if (argc > 3) {
         if (strcmp(argv[1], "-")  == 0) fin = stdin;
         else if ( (fin = fopen(argv[1],"rb")) == NULL ) {
@@ -162,15 +163,20 @@ int main(int argc, char *argv[])
     nhfdelay = 0;
     if (fading_en) {
         char fname[256];
-        
+
         if (fading_en == 1) {
-	    sprintf(fname, "%s/%s", raw_dir, SLOW_FADING_FILE_NAME);
+	          sprintf(fname, "%s/%s", raw_dir, SLOW_FADING_FILE_NAME);
             ffading = fopen(fname, "rb");
             if (ffading == NULL) {
             cant_load_fading_file:
                 fprintf(stderr, "-----------------------------------------------------\n");
                 fprintf(stderr, "cohpsk_ch ERROR: Can't find fading file: %s\n", fname);
-                fprintf(stderr, "->See cohpsk_ch.c source for instructions on how to generate this file.\n");
+                fprintf(stderr, "\nAdjust path --raw_dir or use GNU Octave to generate:\n\n");
+                fprintf(stderr, "$ octave --no-gui\n");
+                fprintf(stderr, "octave:24> pkg load signal\n");
+                fprintf(stderr, "octave:25> cohpsk_ch_fading(\"../raw/faster_fading_samples.float\", 8000, 2.0, 8000*60)\n");
+                fprintf(stderr, "octave:26> cohpsk_ch_fading(\"../raw/fast_fading_samples.float\", 8000, 1.0, 8000*60)\n");
+                fprintf(stderr, "octave:27> cohpsk_ch_fading(\"../raw/slow_fading_samples.float\", 8000, 0.1, 8000*60)\n");
                 fprintf(stderr, "-----------------------------------------------------\n");
                 exit(1);
             }
@@ -178,7 +184,7 @@ int main(int argc, char *argv[])
         }
 
         if (fading_en == 2) {
-	    sprintf(fname, "%s/%s", raw_dir, FAST_FADING_FILE_NAME);
+	          sprintf(fname, "%s/%s", raw_dir, FAST_FADING_FILE_NAME);
             ffading = fopen(fname, "rb");
             if (ffading == NULL) goto cant_load_fading_file;
             nhfdelay = floor(FAST_FADING_DELAY_MS*Fs/1000);
@@ -364,7 +370,7 @@ int main(int argc, char *argv[])
         }
 
  	fwrite(bufout, sizeof(short), nout, fout);
-        
+
 	/* if this is in a pipeline, we probably don't want the usual
 	   buffering to occur */
 
@@ -395,4 +401,3 @@ int main(int argc, char *argv[])
     if (ch_fdm_delay != NULL) FREE(ch_fdm_delay);
     return 0;
 }
-

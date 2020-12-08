@@ -68,7 +68,7 @@ void opt_help() {
     fprintf(stderr, "  --in          filename   Name of InputModemRawFile\n");
     fprintf(stderr, "  --out         filename   Name of OutputOneCharPerBitFile\n");
     fprintf(stderr, "  --log         filename   Octave log file for testing\n");
-    fprintf(stderr, "  --mode       modeName    Predefined mode 700D|2020|datac1\n");    
+    fprintf(stderr, "  --mode       modeName    Predefined mode 700D|2020|datac1\n");
     fprintf(stderr, "  --nc          [17..62]   Number of Carriers (17 default, 62 max)\n");
     fprintf(stderr, "  --np                     Number of packets\n");
     fprintf(stderr, "  --ns           Nframes   One pilot every ns symbols (8 default)\n");
@@ -80,7 +80,7 @@ void opt_help() {
     fprintf(stderr, "  --rx_freq         freq   Set modulation RX centre Frequency (1500.0 default)\n");
     fprintf(stderr, "  --verbose      [1|2|3]   Verbose output level to stderr (default off)\n");
     fprintf(stderr, "  --testframes             Receive test frames and count errors\n");
-    fprintf(stderr, "  --ldpc           [1|2]   Run LDPC decoder In (224,112) 700D or (504, 396) 2020 mode.\n");
+    fprintf(stderr, "  --ldpc                   Run LDPC decoder\n");
     fprintf(stderr, "  --databits     numBits   Number of data bits used in LDPC codeword.\n");
     fprintf(stderr, "\n");
     fprintf(stderr, "  --start_secs      secs   Number of seconds delay before we start to demod\n");
@@ -88,7 +88,7 @@ void opt_help() {
     fprintf(stderr, "  --skip_secs   timeSecs   At timeSecs introduce a large timing error by skipping half a frame of samples\n");
     fprintf(stderr, "  --dpsk                   Differential PSK.\n");
     fprintf(stderr, "\n");
-    
+
     exit(-1);
 }
 
@@ -127,12 +127,12 @@ int main(int argc, char *argv[]) {
     bool log_specified = false;
     bool log_active = false;
     bool dpsk = false;
-    
+
     float time_to_sync = -1;
     float start_secs = 0.0;
     float len_secs = 0.0;
     float skip_secs = 0.0;
-    
+
     /* set up the default modem config */
     struct OFDM_CONFIG *ofdm_config = (struct OFDM_CONFIG *) calloc(1, sizeof (struct OFDM_CONFIG));
     assert(ofdm_config != NULL);
@@ -155,12 +155,12 @@ int main(int argc, char *argv[]) {
         {"ts", 'l', OPTPARSE_REQUIRED},
         {"ns", 'm', OPTPARSE_REQUIRED},
         {"np", 'n', OPTPARSE_REQUIRED},
-        {"databits", 'p', OPTPARSE_REQUIRED},        
-        {"start_secs", 'x', OPTPARSE_REQUIRED},        
-        {"len_secs", 'y', OPTPARSE_REQUIRED},        
-        {"skip_secs", 'z', OPTPARSE_REQUIRED},        
-        {"dpsk", 'q', OPTPARSE_NONE},        
-        {"mode", 'r', OPTPARSE_REQUIRED},        
+        {"databits", 'p', OPTPARSE_REQUIRED},
+        {"start_secs", 'x', OPTPARSE_REQUIRED},
+        {"len_secs", 'y', OPTPARSE_REQUIRED},
+        {"skip_secs", 'z', OPTPARSE_REQUIRED},
+        {"dpsk", 'q', OPTPARSE_NONE},
+        {"mode", 'r', OPTPARSE_REQUIRED},
         {0, 0, 0}
     };
 
@@ -244,7 +244,7 @@ int main(int argc, char *argv[]) {
             case 'z':
                  skip_secs = atoi(options.optarg);
                  break;
-                 
+
        }
     }
 
@@ -283,7 +283,7 @@ int main(int argc, char *argv[]) {
 
     ofdm_set_phase_est_bandwidth_mode(ofdm, phase_est_bandwidth_mode);
     ofdm_set_dpsk(ofdm, dpsk);
-    
+
     /* Get a copy of the actual modem config (ofdm_create() fills in more parameters) */
     ofdm_config = ofdm_get_config_param(ofdm);
 
@@ -319,7 +319,7 @@ int main(int argc, char *argv[]) {
     }
 
     /* some useful constants */
-    
+
     int Nbitsperframe = ofdm_bitsperframe;
     int Nbitsperpacket = ofdm_get_bits_per_packet(ofdm);
     int Nsymsperframe = Nbitsperframe / ofdm_config->bps;
@@ -329,13 +329,13 @@ int main(int argc, char *argv[]) {
     int Npayloadbitsperpacket = Nbitsperpacket - ofdm_nuwbits - ofdm_ntxtbits;
     int Npayloadsymsperframe = Npayloadbitsperframe/ofdm_config->bps;
     int Npayloadsymsperpacket = Npayloadbitsperpacket/ofdm_config->bps;
-    
+
     /* Set up LPDC codes */
 
     struct LDPC ldpc;
     COMP payload_syms[Npayloadsymsperpacket];
     float payload_amps[Npayloadsymsperpacket];
-    
+
     if (ldpc_en) {
         ldpc_codes_setup(&ldpc, ofdm->codename);
         if (verbose > 1) { fprintf(stderr, "using: %s\n", ofdm->codename); }
@@ -344,12 +344,12 @@ int main(int argc, char *argv[]) {
         if (Ndatabitsperpacket) {
             set_data_bits_per_frame(&ldpc, Ndatabitsperpacket);
         }
-    
+
         Ndatabitsperpacket = ldpc.data_bits_per_frame;
- 
+
         assert(Ndatabitsperpacket <= ldpc.ldpc_data_bits_per_frame);
         assert(Npayloadbitsperpacket <= ldpc.ldpc_coded_bits_per_frame);
-        
+
         if (verbose > 1) {
             fprintf(stderr, "LDPC codeword data bits = %d\n", ldpc.ldpc_data_bits_per_frame);
             fprintf(stderr, "LDPC codeword total bits  = %d\n", ldpc.ldpc_coded_bits_per_frame);
@@ -357,10 +357,10 @@ int main(int argc, char *argv[]) {
             fprintf(stderr, "LDPC codeword total length in modem packet = %d\n", Npayloadbitsperpacket);
         }
     }
-    
+
     if (verbose != 0) {
         ofdm_set_verbose(ofdm, verbose);
-        
+
         fprintf(stderr, "Phase Estimate Switching: ");
 
         switch (phase_est_bandwidth_mode) {
@@ -375,7 +375,7 @@ int main(int argc, char *argv[]) {
         rx_syms[i] = 0.0;
         rx_amps[i]= 0.0;
     }
-    
+
     short rx_scaled[Nmaxsamperframe];
     int rx_bits[Nbitsperframe];
     uint8_t rx_bits_char[Nbitsperframe];
@@ -387,6 +387,7 @@ int main(int argc, char *argv[]) {
     Terrs = Tbits = Terrs2 = Tbits2 = Terrs_coded = Tbits_coded = frame_count = packet_count = 0;
     int Nerrs_raw = 0;
     int Nerrs_coded = 0;
+    int Tper = 0;
     int iter = 0;
     int parityCheckCount = 0;
 
@@ -397,7 +398,7 @@ int main(int argc, char *argv[]) {
 
     float EsNo = 3.0f;
     float snr_est_smoothed_dB = 0.0f;
-    
+
     if (verbose == 2)
         fprintf(stderr, "Warning EsNo: %f hard coded\n", EsNo);
 
@@ -422,12 +423,12 @@ int main(int argc, char *argv[]) {
         int offset = start_secs*FS*sizeof(short);
         fseek(fin, offset, SEEK_SET);
     }
-     
+
     while ((fread(rx_scaled, sizeof (short), nin_frame, fin) == nin_frame) && !finish) {
 
         bool log_payload_syms = false;
         Nerrs_raw = Nerrs_coded = 0;
-        
+
         /* demod */
 
         if (ofdm->sync_state == search) {
@@ -457,7 +458,7 @@ int main(int argc, char *argv[]) {
             snr_est_smoothed_dB = 0.9f * snr_est_smoothed_dB + 0.1f * snr_est_dB;
 
             if (ofdm->modem_frame == (ofdm->np-1)) {
-                
+
                 /* we have received enough frames to make a complete packet .... */
 
                 /* extract payload symbols from packet */
@@ -471,12 +472,12 @@ int main(int argc, char *argv[]) {
                     float payload_amps_de[Npayloadsymsperpacket];
                     gp_deinterleave_comp(payload_syms_de, payload_syms, Npayloadsymsperpacket);
                     gp_deinterleave_float(payload_amps_de, payload_amps, Npayloadsymsperpacket);
-                    
-                    float llr[Npayloadsymsperpacket];
+
+                    float llr[Npayloadbitsperpacket];
                     uint8_t out_char[Npayloadbitsperpacket];
 
                     if (testframes == true) {
-                        Terrs += count_uncoded_errors(&ldpc, ofdm_config, &Nerrs_raw, payload_syms_de);
+                        Terrs += count_uncoded_errors(&ldpc, ofdm_config, payload_syms_de,0);
                         Tbits += Npayloadbitsperpacket; /* not counting errors in txt bits */
                     }
 
@@ -501,7 +502,7 @@ int main(int argc, char *argv[]) {
                         // parity bits at end
                         for (i = ldpc.ldpc_data_bits_per_frame; i < ldpc.ldpc_coded_bits_per_frame; i++)
                             llr_full_codeword[i] = llr[i - unused_data_bits];
-                        
+
                         iter = run_ldpc_decoder(&ldpc, out_char, llr_full_codeword, &parityCheckCount);
                     }
 
@@ -513,6 +514,7 @@ int main(int argc, char *argv[]) {
                         Nerrs_coded = count_errors(payload_data_bits, out_char, Ndatabitsperpacket);
                         Terrs_coded += Nerrs_coded;
                         Tbits_coded += Ndatabitsperpacket;
+                        if (Nerrs_coded) Tper++;
                     }
 
                     fwrite(out_char, sizeof (char), Ndatabitsperpacket, fout);
@@ -559,19 +561,19 @@ int main(int argc, char *argv[]) {
                 }
                 packet_count++;
             }
-        
+
             frame_count++;
         }
 
         /* per-frame modem processing */
-        
+
         nin_frame = ofdm_get_nin(ofdm);
-        
+
         if (ofdm->data_mode == 0)
             ofdm_sync_state_machine(ofdm, rx_uw);
         else
             ofdm_sync_state_machine2(ofdm, rx_uw);
-        
+
         /* act on any events returned by state machine */
 
         if (ofdm->sync_start == true) {
@@ -579,10 +581,10 @@ int main(int argc, char *argv[]) {
             Nerrs_raw = 0;
             Nerrs_coded = 0;
         }
-        
+
         if (verbose >= 2) {
            fprintf(stderr, "%3d nin: %4d st: %-6s euw: %2d %1d mf: %2d f: %5.1f pbw: %d eraw: %3d ecdd: %3d iter: %3d pcc: %3d\n",
-                    f, nin_frame, 
+                    f, nin_frame,
                     statemode[ofdm->last_sync_state],
                     ofdm->uw_errors,
                     ofdm->sync_counter,
@@ -592,7 +594,7 @@ int main(int argc, char *argv[]) {
                     Nerrs_raw, Nerrs_coded, iter, parityCheckCount);
 
             /* detect a successful sync for time to sync tests */
-            if ((time_to_sync < 0) && ((ofdm->sync_state == synced) || (ofdm->sync_state == trial)))          
+            if ((time_to_sync < 0) && ((ofdm->sync_state == synced) || (ofdm->sync_state == trial)))
                 if ((parityCheckCount > 80) && (iter != 100))
                     time_to_sync = (float)(f+1)*ofdm_get_samples_per_frame(ofdm)/FS;
 
@@ -638,7 +640,7 @@ int main(int argc, char *argv[]) {
             float secs = (float)f*ofdm_get_samples_per_frame(ofdm)/FS;
             if (secs >= len_secs) finish = 1;
         }
-        
+
         if (skip_secs != 0.0) {
             /* big nasty timing error */
             float secs = (float)f*ofdm_get_samples_per_frame(ofdm)/FS;
@@ -648,7 +650,7 @@ int main(int argc, char *argv[]) {
                 skip_secs = 0.0; /* make sure we just introduce one error */
             }
         }
-         
+
         f++;
     }
 
@@ -677,11 +679,11 @@ int main(int argc, char *argv[]) {
 
     if (verbose == 2)
         printf("time_to_sync: %f\n", time_to_sync);
-    
+
     if (testframes == true) {
         float uncoded_ber = (float) Terrs / Tbits;
         float coded_ber = 0.0;
-        
+
         if (verbose != 0) {
             fprintf(stderr, "BER......: %5.4f Tbits: %5d Terrs: %5d Tpackets: %5d\n", uncoded_ber, Tbits, Terrs, packet_count);
 
@@ -695,12 +697,14 @@ int main(int argc, char *argv[]) {
         if (ldpc_en) {
             coded_ber = (float) Terrs_coded / Tbits_coded;
 
-            if (verbose != 0)
+            if (verbose != 0) {
                 fprintf(stderr, "Coded BER: %5.4f Tbits: %5d Terrs: %5d\n", coded_ber, Tbits_coded, Terrs_coded);
+                fprintf(stderr, "Coded PER: %5.4f\n", (float)Tper/packet_count);
+              }
             if ((Tbits_coded == 0) || (coded_ber >= 0.01f))
                 return 1;
         }
-        
+
         if ((Tbits == 0) || (uncoded_ber >= 0.1f))
             return 1;
     }
