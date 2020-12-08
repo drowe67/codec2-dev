@@ -244,7 +244,8 @@ Some notes on this example:
 1. Although the `cohpsk_ch` utility is designed for 8kHz sample rate operation, it just operates on sampled signals, so it's OK to use at higher sample rates.  It does have some internal filtering so best to keep your signal well away from 0 and (sample rate)/2.  The SNR measurement is calibrated to a 3000 Hz noise bandwidth, so won't make much sense at other sample rates.  The third argument `-12` sets the noise level of the channel.
 1. The `--mask` frequency offset algorithm is used, which gives better results on noisy channels, especially for 4FSK.
 
-Also see:
+### Reading Further
+
 1. Examples in the [ctests](CMakeLists.txt).
 1. [FSK_LDPC blog post](http://www.rowetel.com/?p=7467)
 
@@ -264,3 +265,8 @@ Notes:
 1. 16 bits (2 bytes) per frame are reserved for a 16 bit CRC.
 1. AGWN is the SNR for 10% Packet Error Rate (PER) on an AWGN channel.
 1. MPP is the SNR for 10% Packet Error Rate (PER) on a MultiPath Poor channel.
+
+## Reading Further
+
+1. Examples in the [ctests](CMakeLists.txt).
+1. [Codec 2 HF Data Modes Part 1 blog post](http://www.rowetel.com/?p=7167)

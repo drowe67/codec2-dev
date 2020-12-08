@@ -106,16 +106,7 @@ Built as part of codec2-dev, see [README](README.md) for build instructions.
 
 ## FreeDV 2020 extensions
 
-1. 37 Carrier waveform with a (504,396) code:
-   ```
-   build_linux/src$ nc=37; ./ofdm_mod --in /dev/zero --testframes 300 --mode 2020 --nc $nc --ldpc --verbose 1 | ./cohpsk_ch - - -22.5 --Fs 8000 -f 10 --ssbfilt 1 | ./ofdm_demod --out /dev/null --testframes --mode 2020 --nc $nc --verbose 1 --ldpc
-
-   SNR3k(dB):  4.05 C/No: 38.8 PAPR: 10.8
-   BER......: 0.0348 Tbits: 1044792 Terrs: 36345
-   Coded BER: 0.0094 Tbits: 820908 Terrs:  7717
-   ```
-
-1.  20.5ms symbol period, 31 carrier waveform, (504,396) code, but only 312 data bits used, so we don't send unused data bits.  This means we need less carriers (so more power per carrier), and code rate is increased slightly (sorta).  Anyhoo, it works about 1.5dB better:
+1.  20.5ms symbol period, 31 carrier waveform, (504,396) code, but only 312 data bits used, so we don't send unused data bits.  This means we need less carriers (so more power per carrier), and code rate is increased slightly:
     ```
     build_linux/src$ ./ofdm_mod --in /dev/zero --testframes 300 --mode 2020 --ldpc 1 --verbose 1 -p 312 | ./cohpsk_ch - - -22 --Fs 8000 -f 10 --ssbfilt 1 | ./ofdm_demod --out /dev/null --testframes --mode 2020 --verbose 1 --ldpc -p 312
 
