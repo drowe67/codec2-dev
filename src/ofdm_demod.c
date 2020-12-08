@@ -477,7 +477,7 @@ int main(int argc, char *argv[]) {
                     uint8_t out_char[Npayloadbitsperpacket];
 
                     if (testframes == true) {
-                        Terrs += count_uncoded_errors(&ldpc, ofdm_config, &Nerrs_raw, payload_syms_de,0);
+                        Terrs += count_uncoded_errors(&ldpc, ofdm_config, payload_syms_de,0);
                         Tbits += Npayloadbitsperpacket; /* not counting errors in txt bits */
                     }
 

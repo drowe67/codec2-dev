@@ -106,8 +106,8 @@ void qpsk_modulate_frame(COMP tx_symbols[], int codeword[], int n) {
 /* Count uncoded (raw) bit errors over frame, note we don't include UW
    of txt bits as this is done after we dissassemmble the frame */
 
-int count_uncoded_errors(struct LDPC *ldpc, struct OFDM_CONFIG *config, int *Nerrs_raw, COMP codeword_symbols_de[], int crc16) {
-    int i, Nerrs, Terrs;
+int count_uncoded_errors(struct LDPC *ldpc, struct OFDM_CONFIG *config, COMP codeword_symbols_de[], int crc16) {
+    int i, Nerrs;
 
     int coded_syms_per_frame = ldpc->coded_bits_per_frame/config->bps;
     int coded_bits_per_frame = ldpc->coded_bits_per_frame;
@@ -132,8 +132,6 @@ int count_uncoded_errors(struct LDPC *ldpc, struct OFDM_CONFIG *config, int *Ner
     }
     ldpc_encode_frame(ldpc, test_codeword, tx_bits);
 
-    Terrs = 0;
-
     for (i = 0; i < coded_syms_per_frame; i++) {
         int bits[2];
         complex float s = codeword_symbols_de[i].real + I * codeword_symbols_de[i].imag;
@@ -150,10 +148,7 @@ int count_uncoded_errors(struct LDPC *ldpc, struct OFDM_CONFIG *config, int *Ner
         }
     }
 
-    *Nerrs_raw = Nerrs;
-    Terrs += Nerrs;
-
-    return Terrs;
+    return Nerrs;
 }
 
 int count_errors(uint8_t tx_bits[], uint8_t rx_bits[], int n) {
