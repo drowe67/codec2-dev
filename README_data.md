@@ -50,7 +50,7 @@ Raw modem frame API:
    ./src/freedv_data_raw_rx DATAC3 - - 2>/dev/null
    Hello World
    ```
-   Note we've padded the input frame to 30 bytes, the DATAC1 framesize. The `2>/dev/null` makes the output a little quieter by supressing some debug information.
+   Note we've padded the input frame to 30 bytes, the DATAC3 framesize. The `2>/dev/null` makes the output a little quieter by supressing some debug information.
 
 # VHF Packet Data Channel
 
@@ -167,7 +167,11 @@ A combination of the two methods may also be used. Send data when no voice is ac
 
 # Raw Data using the FreeDV API
 
-The demo programs [freedv_data_raw_tx.c](src/freedv_data_raw_tx.c) and [freedv_data_raw_rx.c](src/freedv_data_raw_rx.c) show how to use the raw data API.  The raw data API may lose frames due to channel impairments, loss of sync, or acquisition delays.  The caller must handle these situations.  The caller is also responsible for segmentation/re-assembly of the modem frames into larger blocks of data.
+The raw data API can be used to send frames of bytes over radio channels.   The frames are protected with FEC and have a 16-bit checksum to verify correct transmission.  However the raw data API may lose frames due to channel impairments, loss of sync, or acquisition delays.  The caller must handle these situations.  The caller is also responsible for segmentation/re-assembly of the modem frames into larger blocks of data.
+
+Several modes are available which support FSK and OFDM modulation. FSK is aimed at VHF And UHF applications, and the OFDM modes have been optimised for multipath HF radio channels.
+
+The demo programs [freedv_data_raw_tx.c](src/freedv_data_raw_tx.c) and [freedv_data_raw_rx.c](src/freedv_data_raw_rx.c) show how to use the raw data API.
 
 ## FSK LDPC Raw Data Mode
 
@@ -240,18 +244,20 @@ Some notes on this example:
 1. Although the `cohpsk_ch` utility is designed for 8kHz sample rate operation, it just operates on sampled signals, so it's OK to use at higher sample rates.  It does have some internal filtering so best to keep your signal well away from 0 and (sample rate)/2.  The SNR measurement is calibrated to a 3000 Hz noise bandwidth, so won't make much sense at other sample rates.  The third argument `-12` sets the noise level of the channel.
 1. The `--mask` frequency offset algorithm is used, which gives better results on noisy channels, especially for 4FSK.
 
-Also see more examples in the [ctests](CMakeLists.txt).
+Also see:
+1. Examples in the [ctests](CMakeLists.txt).
+1. [FSK_LDPC blog post](http://www.rowetel.com/?p=7467)
 
 ## OFDM Raw Data modes
 
- These modes use the OFDM modem with powerful LDPC codes and are designed for sending data over HF radio channels.  At the time of writing (Dec 2020) they are a work in progress, but usable as is.
+ These modes use an OFDM modem with powerful LDPC codes and are designed for sending data over HF radio channels with multipath fading.  At the time of writing (Dec 2020) they are a work in progress, but usable as is.
 
  See example in Quickstart section above, and the demo programs [freedv_data_raw_tx.c](src/freedv_data_raw_tx.c) and [freedv_data_raw_rx.c](src/freedv_data_raw_rx.c).  The waveforms designs are described in this [spreadsheet](doc/modem_codec_frame_design.ods).
 
-| FreeDV Mode | RF bandwidth (Hz) | Payload data rate bits/s | bytes/frame | FEC | AWGN | MPP |
+| FreeDV Mode | RF bandwidth (Hz) | Payload data rate bits/s | Payload bytes/frame | FEC | AWGN | MPP |
 | :-: | :-: | :-: | :-: | :-: | :-: | :-: |
 | DATAC1 | 1125 | 1042 | 258 | (2580,2064) | 3 | 12 |
-| DATAC1 | 563 | 521 | 258 | (2580,2064) | 1 | 7 |
+| DATAC2 | 563 | 521 | 258 | (2580,2064) | 1 | 7 |
 | DATAC3 | 563 | 212 | 32 | (768,256) | -4 | 2 |
 
 Notes:

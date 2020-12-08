@@ -80,7 +80,7 @@ void opt_help() {
     fprintf(stderr, "  --rx_freq         freq   Set modulation RX centre Frequency (1500.0 default)\n");
     fprintf(stderr, "  --verbose      [1|2|3]   Verbose output level to stderr (default off)\n");
     fprintf(stderr, "  --testframes             Receive test frames and count errors\n");
-    fprintf(stderr, "  --ldpc           [1|2]   Run LDPC decoder In (224,112) 700D or (504, 396) 2020 mode.\n");
+    fprintf(stderr, "  --ldpc                   Run LDPC decoder\n");
     fprintf(stderr, "  --databits     numBits   Number of data bits used in LDPC codeword.\n");
     fprintf(stderr, "\n");
     fprintf(stderr, "  --start_secs      secs   Number of seconds delay before we start to demod\n");
