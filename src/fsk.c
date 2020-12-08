@@ -104,7 +104,7 @@ static void fsk_generate_hann_table(struct FSK* fsk){
   AUTHOR......: Brady O'Brien
   DATE CREATED: 7 January 2016
   
-  In this version of the demod the stdanard/hbr modes have been
+  In this version of the demod the standard/hbr modes have been
   largely combined at they shared so much common code.  The
   fsk_create/fsk_create_hbr function interface has been retained to
   maximise compatability with existing applications.
@@ -117,8 +117,8 @@ struct FSK * fsk_create_core(int Fs, int Rs, int M, int P, int Nsym, int f1_tx, 
     int i;
 
     /* Check configuration validity */
-    assert(Fs > 0 );
-    assert(Rs > 0 );
+    assert(Fs > 0);
+    assert(Rs > 0);
     assert(P > 0);
     assert(Nsym > 0);
     /* Ts (Fs/Rs) must be an integer */
@@ -256,6 +256,7 @@ struct FSK * fsk_create_hbr(int Fs, int Rs, int M, int P, int Nsym, int f1_tx, i
 \*---------------------------------------------------------------------------*/
 
 void fsk_destroy(struct FSK *fsk){
+    free(fsk->Sf);
     free(fsk->f_dc);
     free(fsk->fft_cfg);
     free(fsk->stats);
@@ -269,11 +270,11 @@ void fsk_destroy(struct FSK *fsk){
   AUTHOR......: Brady O'Brien
   DATE CREATED: 11 February 2016
   
-  FSK modulator function, real valued output samples.
+  FSK modulator function, real valued output samples with amplitude 2.
 
 \*---------------------------------------------------------------------------*/
 
-void fsk_mod(struct FSK *fsk,float fsk_out[],uint8_t tx_bits[]){
+void fsk_mod(struct FSK *fsk,float fsk_out[], uint8_t tx_bits[], int nbits) {
     COMP tx_phase_c = fsk->tx_phase_c;    /* Current complex TX phase */
     int f1_tx = fsk->f1_tx;               /* '0' frequency */
     int tone_spacing = fsk->tone_spacing; /* space between frequencies */
@@ -294,7 +295,8 @@ void fsk_mod(struct FSK *fsk,float fsk_out[],uint8_t tx_bits[]){
     }
     
     bit_i = 0;
-    for( i=0; i<fsk->Nsym; i++){
+    int nsym = nbits/(M>>1);
+    for(i=0; i<nsym; i++) {
         sym = 0;
         /* Pack the symbol number from the bit stream */
         for( m=M; m>>=1; ){
@@ -327,11 +329,11 @@ void fsk_mod(struct FSK *fsk,float fsk_out[],uint8_t tx_bits[]){
   AUTHOR......: Brady O'Brien
   DATE CREATED: 11 February 2016
   
-  FSK modulator function, complex valued output samples.
+  FSK modulator function, complex valued output samples with magnitude 1.
 
 \*---------------------------------------------------------------------------*/
 
-void fsk_mod_c(struct FSK *fsk,COMP fsk_out[],uint8_t tx_bits[]){
+void fsk_mod_c(struct FSK *fsk,COMP fsk_out[], uint8_t tx_bits[], int nbits) {
     COMP tx_phase_c = fsk->tx_phase_c;    /* Current complex TX phase */
     int f1_tx = fsk->f1_tx;               /* '0' frequency */
     int tone_spacing = fsk->tone_spacing; /* space between frequencies */
@@ -353,7 +355,8 @@ void fsk_mod_c(struct FSK *fsk,COMP fsk_out[],uint8_t tx_bits[]){
     }
     
     bit_i = 0;
-    for( i=0; i<fsk->Nsym; i++){
+    int nsym = nbits/(M>>1);
+    for(i=0; i<nsym; i++) {
         sym = 0;
         /* Pack the symbol number from the bit stream */
         for( m=M; m>>=1; ){
@@ -367,7 +370,7 @@ void fsk_mod_c(struct FSK *fsk,COMP fsk_out[],uint8_t tx_bits[]){
         /* Spin the oscillator for a symbol period */
         for(j=0; j<Ts; j++){
             tx_phase_c = cmult(tx_phase_c,dph);
-            fsk_out[i*Ts+j] = fcmult(2,tx_phase_c);
+            fsk_out[i*Ts+j] = tx_phase_c;
         }
     }
     
@@ -391,7 +394,7 @@ void fsk_mod_c(struct FSK *fsk,COMP fsk_out[],uint8_t tx_bits[]){
 
 \*---------------------------------------------------------------------------*/
 
-void fsk_mod_ext_vco(struct FSK *fsk, float vco_out[], uint8_t tx_bits[]) {
+void fsk_mod_ext_vco(struct FSK *fsk, float vco_out[], uint8_t tx_bits[], int nbits) {
     int f1_tx = fsk->f1_tx;                   /* '0' frequency */
     int tone_spacing = fsk->tone_spacing;     /* space between frequencies */
     int Ts = fsk->Ts;                         /* samples-per-symbol */
@@ -403,7 +406,8 @@ void fsk_mod_ext_vco(struct FSK *fsk, float vco_out[], uint8_t tx_bits[]) {
     assert(tone_spacing > 0);
 
     bit_i = 0;
-    for(i=0; i<fsk->Nsym; i++) {
+    int nsym = nbits/(M>>1);
+    for(i=0; i<nsym; i++) {
         /* generate the symbol number from the bit stream, 
            e.g. 0,1 for 2FSK, 0,1,2,3 for 4FSK */
 

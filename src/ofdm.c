@@ -789,12 +789,6 @@ void ofdm_txframe(struct OFDM *ofdm, complex float *tx, complex float *tx_sym_li
         }
     }
 
-    /* copy in a row of complex pilots to first row */
-
-    for (i = 0; i < (ofdm->nc + 2); i++) {
-        aframe[0][i] = ofdm->pilots[i];
-    }
-
     /*
      * Place symbols in multi-carrier frame with pilots
      * This will place boundary values of complex zero around data

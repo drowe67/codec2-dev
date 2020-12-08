@@ -162,6 +162,7 @@ int ldpc_codes_find(char name[]) {
 void ldpc_codes_setup(struct LDPC *ldpc, char name[]) {
     int code_index;
     code_index = ldpc_codes_find(name);
+    assert(code_index != -1);
     memcpy(ldpc,&ldpc_codes[code_index], sizeof(struct LDPC));
     set_up_ldpc_constants(ldpc, ldpc->CodeLength, ldpc->NumberParityBits);
 }
