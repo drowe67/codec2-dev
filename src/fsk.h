@@ -85,6 +85,8 @@ struct FSK {
     float  ppm;               /* Estimated PPM clock offset */
     float  SNRest;            /* used for LLRs */
     float  v_est;             /* used for LLRs */
+    float  rx_sig_pow;
+    float  rx_nse_pow;
     
     /*  Parameters used by mod/demod and driving code */
     int nin;                /* Number of samples to feed the next demod cycle */

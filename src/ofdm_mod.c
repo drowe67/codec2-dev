@@ -53,7 +53,7 @@ void opt_help() {
     fprintf(stderr, "\nusage: %s [options]\n\n", progname);
     fprintf(stderr, "  --in      filename    Name of InputOneCharPerBitFile\n");
     fprintf(stderr, "  --out     filename    Name of OutputModemRawFile\n");
-    fprintf(stderr, "  --mode    modeName    Predefined mode 700D|2020|datac1\n");    
+    fprintf(stderr, "  --mode    modeName    Predefined mode 700D|2020|datac1\n");
     fprintf(stderr, "  --nc      [17..62]    Number of Carriers (17 default, 62 max)\n");
     fprintf(stderr, "  --ns       symbols    One pilot every ns symbols (8 default)\n");
     fprintf(stderr, "  --tcp        Nsecs    Cyclic Prefix Duration (.002 default)\n");
@@ -129,10 +129,10 @@ int main(int argc, char *argv[]) {
         {"txbpf", 'k', OPTPARSE_NONE},
         {"text", 'l', OPTPARSE_NONE},
         {"verbose", 'v', OPTPARSE_REQUIRED},
-        {"databits", 'p', OPTPARSE_REQUIRED},        
-        {"dpsk", 'q', OPTPARSE_NONE},        
-        {"mode", 'g', OPTPARSE_REQUIRED},        
-        {"help", 'h', OPTPARSE_NONE},        
+        {"databits", 'p', OPTPARSE_REQUIRED},
+        {"dpsk", 'q', OPTPARSE_NONE},
+        {"mode", 'g', OPTPARSE_REQUIRED},
+        {"help", 'h', OPTPARSE_NONE},
         {0, 0, 0}
     };
 
@@ -165,7 +165,7 @@ int main(int argc, char *argv[]) {
                 break;
             case 'e':
                 ofdm_config->ts = atof(options.optarg);
-                ofdm_config->rs = 1.0f / ofdm_config->ts; 
+                ofdm_config->rs = 1.0f / ofdm_config->ts;
                 break;
             case 'm':
                 ofdm_config->ns = atoi(options.optarg);
@@ -237,7 +237,7 @@ int main(int argc, char *argv[]) {
     ofdm_config = ofdm_get_config_param(ofdm);
 
     /* ste up some useful constants */
-    
+
     int Nbitsperpacket = ofdm_get_bits_per_packet(ofdm);
     int Npayloadbitsperpacket = Nbitsperpacket - ofdm->nuwbits - ofdm->ntxtbits;
     int Nsamperpacket = ofdm_get_samples_per_packet(ofdm);
@@ -248,17 +248,17 @@ int main(int argc, char *argv[]) {
     if (ldpc_en) {
         ldpc_codes_setup(&ldpc, ofdm->codename);
         if (verbose > 1) { fprintf(stderr, "using: %s\n", ofdm->codename); }
-      
+
         /* here is where we can change data bits per frame to a number smaller than LDPC code input data bits_per_frame */
         if (Ndatabitsperpacket) {
             set_data_bits_per_frame(&ldpc, Ndatabitsperpacket);
         }
-    
+
         Ndatabitsperpacket = ldpc.data_bits_per_frame;
- 
+
         assert(Ndatabitsperpacket <= ldpc.ldpc_data_bits_per_frame);
         assert(Npayloadbitsperpacket <= ldpc.ldpc_coded_bits_per_frame);
-        
+
         if (verbose > 1) {
             fprintf(stderr, "LDPC codeword data bits = %d\n", ldpc.ldpc_data_bits_per_frame);
             fprintf(stderr, "LDPC codeword total bits  = %d\n", ldpc.ldpc_coded_bits_per_frame);
@@ -302,7 +302,7 @@ int main(int argc, char *argv[]) {
     short   tx_scaled[Nsamperpacket];
 
     if (verbose > 1) {
-	ofdm_print_info(ofdm);
+	     ofdm_print_info(ofdm);
     }
 
     /* main loop ----------------------------------------------------------------*/
@@ -359,7 +359,7 @@ int main(int argc, char *argv[]) {
 
             /* in uncoded mode entire payload is input data bits */
             assert(Ndatabitsperpacket == Npayloadbitsperpacket);
-            
+
             if (testframes) {
                 /* build up a test frame consisting of unique word, txt bits, and psuedo-random
                    uncoded payload bits.  The psuedo-random generator is the same as Octave so
@@ -367,7 +367,7 @@ int main(int argc, char *argv[]) {
 
                 ofdm_generate_payload_data_bits(data_bits, Npayloadbitsperpacket);
             }
-            
+
             /* assemble packet of bits then modulate */
             uint8_t tx_bits_char[Nbitsperpacket];
             ofdm_assemble_qpsk_modem_packet(ofdm, tx_bits_char, data_bits, txt_bits);
@@ -401,4 +401,3 @@ int main(int argc, char *argv[]) {
 
     return 0;
 }
-

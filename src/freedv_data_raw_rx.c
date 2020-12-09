@@ -43,29 +43,24 @@ int main(int argc, char *argv[]) {
     FILE                      *fin, *fout;
     struct freedv_advanced     adv = {0,2,100,8000,1000,200, "H_256_512_4"};
     struct freedv             *freedv;
-    int                        nin, nbytes, nbytes_total = 0, npackets_total = 0, frame = 0;
+    int                        nin, nbytes, nbytes_out = 0, nframes_out = 0, buf = 0;
     int                        mode;
     int                        verbose = 0, use_testframes = 0;
     int                        mask = 0;
-    
+
     if (argc < 3) {
-        char f2020[80] = {0};
     helpmsg:
-        #ifdef __LPCNET__
-        sprintf(f2020,"|2020");
-        #endif     
-	printf("usage: %s [options] 700C|700D|800XA|FSK_LDPC%s InputModemSpeechFile BinaryDataFile\n"
+      	fprintf(stderr, "usage: %s [options] FSK_LDPC|DATAC1|DATAC2|DATAC3 InputModemSpeechFile BinaryDataFile\n"
                "  -v or --vv      verbose options\n"
                "  --testframes    count raw and coded errors in testframes sent by tx\n"
                "\n"
                "For FSK_LDPC only:\n\n"
-               "  -m      2|4     number of FSK tones\n"        
+               "  -m      2|4     number of FSK tones\n"
                "  --Fs    FreqHz  sample rate (default 8000)\n"
                "  --Rs    FreqHz  symbol rate (default 100)\n"
-               "  --mask shiftHz  Use \"mask\" freq estimator (default is \"peak\" estimator)\n"
-               , argv[0],f2020);
-	printf("e.g    %s 700D dataBytes_700d.raw dataBytes_rx.bin\n", argv[0]);
-	exit(1);
+               "  --mask shiftHz  Use \"mask\" freq estimator (default is \"peak\" estimator)\n", argv[0]);
+       	fprintf(stderr, "e.g    %s DATAC1 off_air_audio.raw received_data_bytes.bin\n", argv[0]);
+	      exit(1);
     }
 
     int o = 0;
@@ -80,9 +75,9 @@ int main(int argc, char *argv[]) {
             {"mask",       required_argument,  0, 'k'},
             {0, 0, 0, 0}
         };
-        
+
         o = getopt_long(argc,argv,"f:hm:r:tvx",long_opts,&opt_idx);
-        
+
         switch(o) {
         case 'f':
             adv.Fs = atoi(optarg);
@@ -113,19 +108,17 @@ int main(int argc, char *argv[]) {
         }
     }
     int dx = optind;
-    
+
     if( (argc - dx) < 3) {
         fprintf(stderr, "too few arguments.\n");
         goto helpmsg;
     }
 
     mode = -1;
-    if (!strcmp(argv[dx],"700C")) mode = FREEDV_MODE_700C;
-    if (!strcmp(argv[dx],"700D")) mode = FREEDV_MODE_700D;
-    #ifdef __LPCNET__
-    if (!strcmp(argv[dx],"2020")) mode = FREEDV_MODE_2020;
-    #endif
     if (!strcmp(argv[dx],"FSK_LDPC")) mode = FREEDV_MODE_FSK_LDPC;
+    if (!strcmp(argv[dx],"DATAC1")) mode = FREEDV_MODE_DATAC1;
+    if (!strcmp(argv[dx],"DATAC2")) mode = FREEDV_MODE_DATAC2;
+    if (!strcmp(argv[dx],"DATAC3")) mode = FREEDV_MODE_DATAC3;
     if (mode == -1) {
         fprintf(stderr, "Error in mode: %s\n", argv[dx]);
         exit(1);
@@ -133,16 +126,16 @@ int main(int argc, char *argv[]) {
 
     if (strcmp(argv[dx+1], "-")  == 0) fin = stdin;
     else if ( (fin = fopen(argv[dx+1],"rb")) == NULL ) {
-	fprintf(stderr, "Error opening input raw modem sample file: %s: %s.\n",
-         argv[2], strerror(errno));
-	exit(1);
+	     fprintf(stderr, "Error opening input raw modem sample file: %s: %s.\n",
+             argv[2], strerror(errno));
+	     exit(1);
     }
 
     if (strcmp(argv[dx+2], "-") == 0) fout = stdout;
     else if ( (fout = fopen(argv[dx+2],"wb")) == NULL ) {
-	fprintf(stderr, "Error opening output speech sample file: %s: %s.\n",
-         argv[3], strerror(errno));
-	exit(1);
+	     fprintf(stderr, "Error opening output speech sample file: %s: %s.\n",
+               argv[3], strerror(errno));
+	     exit(1);
     }
 
     if (mode != FREEDV_MODE_FSK_LDPC)
@@ -160,11 +153,12 @@ int main(int argc, char *argv[]) {
         struct FSK *fsk = freedv_get_fsk(freedv);
         fprintf(stderr, "Nbits: %d N: %d Ndft: %d\n", fsk->Nbits, fsk->N, fsk->Ndft);
     }
-    
+
     /* for streaming bytes it's much easier use the modes that have a multiple of 8 payload bits/frame */
     assert((freedv_get_bits_per_modem_frame(freedv) % 8) == 0);
     int bytes_per_modem_frame = freedv_get_bits_per_modem_frame(freedv)/8;
-    fprintf(stderr, "bytes_per_modem_frame: %d\n", bytes_per_modem_frame);
+    // last two bytes used for CRC
+    fprintf(stderr, "payload bytes_per_modem_frame: %d\n", bytes_per_modem_frame - 2);
     uint8_t bytes_out[bytes_per_modem_frame];
     short  demod_in[freedv_get_n_max_modem_samples(freedv)];
 
@@ -174,55 +168,50 @@ int main(int argc, char *argv[]) {
 
     nin = freedv_nin(freedv);
     while(fread(demod_in, sizeof(short), nin, fin) == nin) {
-        frame++;
-        
+        buf++;
+
         nbytes = freedv_rawdatarx(freedv, bytes_out, demod_in);
         nin = freedv_nin(freedv);
 
         if (nbytes) {
-            fwrite(bytes_out, sizeof(uint8_t), nbytes, fout);
-            nbytes_total += nbytes;
-            npackets_total++;
-        }
-        
-        if (verbose == 3) {
-            fprintf(stderr, "frame: %d nin: %d sync: %d nbytes: %d bits: %d\n",
-                    frame, nin, freedv_get_sync(freedv), nbytes, freedv_get_rx_bits(freedv));
+            // dont output CRC
+            fwrite(bytes_out, sizeof(uint8_t), nbytes-2, fout);
+            nbytes_out += nbytes-2;
+            nframes_out++;
         }
 
-	/* if using pipes we probably don't want the usual buffering */
+        if (verbose == 3) {
+            fprintf(stderr, "buf: %d nin: %d sync: %d nbytes: %d status: 0x%02x\n",
+                    buf, nin, freedv_get_sync(freedv), nbytes, freedv_get_rx_status(freedv));
+        }
+
+	      /* if using pipes we probably don't want the usual buffering */
         if (fout == stdout) fflush(stdout);
         if (fin == stdin) fflush(stdin);
     }
 
     fclose(fin);
     fclose(fout);
-    fprintf(stderr, "frames processed: %d  output bytes: %d output_packets: %d \n", frame, nbytes_total, npackets_total);
+    fprintf(stderr, "modem bufs processed: %d  output bytes: %d output_frames: %d \n", buf, nbytes_out, nframes_out);
 
     /* in testframe mode finish up with some stats */
-    
+
     if (freedv_get_test_frames(freedv)) {
         int Tbits = freedv_get_total_bits(freedv);
         int Terrs = freedv_get_total_bit_errors(freedv);
         float uncoded_ber = (float)Terrs/Tbits;
-        fprintf(stderr, "BER......: %5.4f Tbits: %5d Terrs: %5d\n", 
-		(double)uncoded_ber, Tbits, Terrs);
-        if ((mode == FREEDV_MODE_700D) || (mode == FREEDV_MODE_2020) || (mode == FREEDV_MODE_FSK_LDPC)) {
-            int Tbits_coded = freedv_get_total_bits_coded(freedv);
-            int Terrs_coded = freedv_get_total_bit_errors_coded(freedv);
-            float coded_ber = (float)Terrs_coded/Tbits_coded;
-            fprintf(stderr, "Coded BER: %5.4f Tbits: %5d Terrs: %5d\n",
-                    (double)coded_ber, Tbits_coded, Terrs_coded);
-
-            /* set return code for Ctest */
-            if ((uncoded_ber < 0.1f) && (coded_ber < 0.01f))
-                return 0;
-            else
-                return 1;
-        }
+        fprintf(stderr, "BER......: %5.4f Tbits: %5d Terrs: %5d\n", (double)uncoded_ber, Tbits, Terrs);
+        int Tbits_coded = freedv_get_total_bits_coded(freedv);
+        int Terrs_coded = freedv_get_total_bit_errors_coded(freedv);
+        float coded_ber = (float)Terrs_coded/Tbits_coded;
+        fprintf(stderr, "Coded BER: %5.4f Tbits: %5d Terrs: %5d\n", (double)coded_ber, Tbits_coded, Terrs_coded);
+        /* set return code for Ctest */
+        if ((uncoded_ber < 0.1f) && (coded_ber < 0.01f))
+            return 0;
+        else
+            return 1;
     }
 
     freedv_close(freedv);
     return 0;
 }
-

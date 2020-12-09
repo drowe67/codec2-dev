@@ -24,9 +24,9 @@ VHF packet data API:
    You can listen to the modem signal using:
    ```sh
    $ ./src/freedv_data_tx 2400A - --frames 15 | aplay -f S16_LE -r 48000
-   
+
    ```
-  
+
 2. Same for 2400B and 800XA
 
    ```sh
@@ -43,16 +43,14 @@ VHF packet data API:
 
 Raw modem frame API:
 
-1. Let's send two modem frames of 14 bytes using FreeDV 700D:
+1. Let's send some text over the modem:
    ```sh
-   $ head -c 28 </dev/urandom > binaryIn.bin
-   $ ./src/freedv_data_raw_tx 700D binaryIn.bin - |  ./src/freedv_data_raw_rx 700D - - | hexdump
-   bits_per_modem_frame: 112 bytes_per_modem_frame: 14
-   frames processed: 4  output bytes: 28
-   $ hexdump binaryIn.bin 
-   0000000 4325 0363 ce1f fb88 8102 7d76 c487 e092
-   0000010 2ded bc06 7689 eb67 5dfe 43df          
+   echo "Hello World                   " |
+   ./src/freedv_data_raw_tx DATAC3 - - 2>/dev/null |
+   ./src/freedv_data_raw_rx DATAC3 - - 2>/dev/null
+   Hello World
    ```
+   Note we've padded the input frame to 30 bytes, the DATAC3 framesize. The `2>/dev/null` makes the output a little quieter by supressing some debug information.
 
 # VHF Packet Data Channel
 
@@ -169,11 +167,15 @@ A combination of the two methods may also be used. Send data when no voice is ac
 
 # Raw Data using the FreeDV API
 
-The demo programs [freedv_data_raw_tx.c](src/freedv_data_raw_tx.c) and [freedv_data_raw_rx.c](src/freedv_data_raw_rx.c) show how to use the raw data API.  The raw data API may lose frames due to channel impairments, loss of sync, or acquisition delays.  The caller must handle these situations.  The caller is also responsible for segmentation/re-assembly of the modem frames into larger blocks of data.
+The raw data API can be used to send frames of bytes over radio channels.   The frames are protected with FEC and have a 16-bit checksum to verify correct transmission.  However the raw data API may lose frames due to channel impairments, loss of sync, or acquisition delays.  The caller must handle these situations.  The caller is also responsible for segmentation/re-assembly of the modem frames into larger blocks of data.
+
+Several modes are available which support FSK and OFDM modulation. FSK is aimed at VHF And UHF applications, and the OFDM modes have been optimised for multipath HF radio channels.
+
+The demo programs [freedv_data_raw_tx.c](src/freedv_data_raw_tx.c) and [freedv_data_raw_rx.c](src/freedv_data_raw_rx.c) show how to use the raw data API.
 
 ## FSK LDPC Raw Data Mode
 
-The FSK_LDPC mode uses 2 or 4 FSK in combination with powerful LDPC codes.  Parameters such as the number of FSK tones, sample rate, symbol rate, and LDPC code can be selected at initialisation time.  The frame format is:
+The FSK_LDPC mode uses 2 or 4 FSK in combination with powerful LDPC codes, and was designed for VHF or UHF AWGN channels. Parameters such as the number of FSK tones, sample rate, symbol rate, and LDPC code can be selected at initialisation time.  The frame format is:
 ```
 | Preamble | UW | payload data | CRC | parity | UW | payload data | CRC | parity | ........... |
            | frame 1 -------------------------| frame 2 -------------------------| ... frame n |
@@ -188,12 +190,11 @@ $ echo 'Hello World                    ' |
   ./freedv_data_raw_rx FSK_LDPC - - 2>/dev/null |
   hexdump -C
 00000000  48 65 6c 6c 6f 20 57 6f  72 6c 64 20 20 20 20 20  |Hello World     |
-00000010  20 20 20 20 20 20 20 20  20 20 20 20 20 20 11 c6  |              ..|
+00000010  20 20 20 20 20 20 20 20  20 20 20 20 20 20        |              ..|
 00000020
 ```
 Notes:
 1. The input data is padded to 30 bytes.  The (512,256) code sends 256 data bits every frame, we reserve 16 for a CRC, so there are 240 bits, or 30 bytes of payload data required for one frame.
-1. You can see the `0x11c6` CRC bytes at the end of the hexdump output.
 1. The '2>/dev/null' command redirects stderr to nowhere, removing some of the debug information the test programs usually display to make this example easier to read.
 
 When testing, it's convenient to use an internal source of test data. Here is an example where we send a single burst of 10 test frames:
@@ -203,9 +204,9 @@ $ ./freedv_data_raw_tx --testframes 10 FSK_LDPC /dev/zero - | ./freedv_data_raw_
 Nbits: 50 N: 4000 Ndft: 1024
 bits_per_modem_frame: 256 bytes_per_modem_frame: 32
 bytes_per_modem_frame: 32
-Frequency: Fs:  8.0 kHz Rs:  0.1 kHz Tone1:  1.0 kHz Shift:  0.2 kHz M: 2 
+Frequency: Fs:  8.0 kHz Rs:  0.1 kHz Tone1:  1.0 kHz Shift:  0.2 kHz M: 2
 
-frames processed: 131  output bytes: 320 output_packets: 10 
+frames processed: 131  output bytes: 320 output_packets: 10
 BER......: 0.0000 Tbits:  5440 Terrs:     0
 Coded BER: 0.0000 Tbits:  2560 Terrs:     0
 ```
@@ -219,9 +220,9 @@ $ ./freedv_data_raw_tx --testframes 1 --bursts 10 FSK_LDPC /dev/zero - |
   ./cohpsk_ch - - -5 --Fs 8000 --ssbfilt 0 |
   ./freedv_data_raw_rx --testframes -v FSK_LDPC - /dev/null
 <snip>
-frames processed: 336  output bytes: 320 output_packets: 10 
+frames processed: 336  output bytes: 320 output_packets: 10
 BER......: 0.0778 Tbits:  5440 Terrs:   423
-SNR3k(dB): -13.00 C/No: 21.8 PAPR:  7.5 
+SNR3k(dB): -13.00 C/No: 21.8 PAPR:  7.5
 Coded BER: 0.0000 Tbits:  2560 Terrs:     0
 ```
 The `cohpsk_ch` stderr reporting is mixed up with the testframes results but we can see that over a channel with a -13dB SNR, we obtained a raw bit error rate of 0.0778 (nearly 8%).  However the LDPC code cleaned that up nicely and still received all 10 packets with no errors.
@@ -232,7 +233,7 @@ $./freedv_data_raw_tx -m 4 --Fs 200000 --Rs 10000 --tone1 10000 --shift 10000 --
  ./cohpsk_ch - - -12 --Fs 8000 --ssbfilt 0 |
  ./freedv_data_raw_rx -m 4 --testframes -v --Fs 200000 --Rs 10000 FSK_LDPC --mask 10000 - /dev/null
  <snip>
- frames processed: 5568  output bytes: 30144 output_packets: 942 
+ frames processed: 5568  output bytes: 30144 output_packets: 942
 BER......: 0.0691 Tbits: 528224 Terrs: 36505
 Coded BER: 0.0022 Tbits: 248576 Terrs:   535
 ```
@@ -243,15 +244,29 @@ Some notes on this example:
 1. Although the `cohpsk_ch` utility is designed for 8kHz sample rate operation, it just operates on sampled signals, so it's OK to use at higher sample rates.  It does have some internal filtering so best to keep your signal well away from 0 and (sample rate)/2.  The SNR measurement is calibrated to a 3000 Hz noise bandwidth, so won't make much sense at other sample rates.  The third argument `-12` sets the noise level of the channel.
 1. The `--mask` frequency offset algorithm is used, which gives better results on noisy channels, especially for 4FSK.
 
-There are some more example in the [ctests](CMakeLists.txt).
+### Reading Further
 
-## HF Raw Data modes
+1. Examples in the [ctests](CMakeLists.txt).
+1. [FSK_LDPC blog post](http://www.rowetel.com/?p=7467)
 
-The following FreeDV modes are recommended for *preliminary development* using the raw data API.  These modes were originally designed for streaming voice rather than data and are not suitable for production HF data applications.  They have small payloads, and acquisition algorithms not suitable for packet data over real world HF channels.  New modes are being design for HF data at the time of writing (June 2020).
+## OFDM Raw Data modes
 
-| FreeDV Mode | RF bandwidth (Hz) | Payload data rate bits/s | bytes/frame | FEC | Min SNR (dB, AWGN) |
-| :-: | :-: | :-: | :-: | :-: | :-: |
-| 700C | 1100 | 700 | 7 | none | 2 |
-| 700D | 1100 | 700 | 14 | rate 0.8 | -2 |
-| 2020 | 1500 | 1733 | 39 | rate 0.6 | 2 |
+ These modes use an OFDM modem with powerful LDPC codes and are designed for sending data over HF radio channels with multipath fading.  At the time of writing (Dec 2020) they are a work in progress, but usable as is.
 
+ See example in Quickstart section above, and the demo programs [freedv_data_raw_tx.c](src/freedv_data_raw_tx.c) and [freedv_data_raw_rx.c](src/freedv_data_raw_rx.c).  The waveforms designs are described in this [spreadsheet](doc/modem_codec_frame_design.ods).
+
+| FreeDV Mode | RF bandwidth (Hz) | Payload data rate bits/s | Payload bytes/frame | FEC | AWGN | MPP |
+| :-: | :-: | :-: | :-: | :-: | :-: | :-: |
+| DATAC1 | 1125 | 1042 | 258 | (2580,2064) | 3 | 12 |
+| DATAC2 | 563 | 521 | 258 | (2580,2064) | 1 | 7 |
+| DATAC3 | 563 | 212 | 32 | (768,256) | -4 | 2 |
+
+Notes:
+1. 16 bits (2 bytes) per frame are reserved for a 16 bit CRC.
+1. AGWN is the SNR for 10% Packet Error Rate (PER) on an AWGN channel.
+1. MPP is the SNR for 10% Packet Error Rate (PER) on a MultiPath Poor channel.
+
+## Reading Further
+
+1. Examples in the [ctests](CMakeLists.txt).
+1. [Codec 2 HF Data Modes Part 1 blog post](http://www.rowetel.com/?p=7167)

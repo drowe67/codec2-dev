@@ -862,5 +862,5 @@ int fvhff_deframe_bits(struct freedv_vhf_deframer * def,uint8_t codec2_out[],uin
     def->on_inv_bits = on_inv_bits;
     /* return sync state and presence of extracted voice bits.
        only sync for data frames, they are already handled by callback */
-    return (extracted_frame ? RX_SYNC : 0) | (pt == FRAME_PAYLOAD_TYPE_VOICE ? RX_BITS : 0);
+    return (extracted_frame ? FREEDV_RX_SYNC : 0) | (pt == FRAME_PAYLOAD_TYPE_VOICE ? FREEDV_RX_BITS : 0);
 }

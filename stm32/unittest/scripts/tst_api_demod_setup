@@ -45,7 +45,7 @@ case "${TEST_OPT}" in
     	echo "71000010" > stm_cfg.txt
 	#
         # Copy N frames of a raw audio file to stm_in.raw. 
-        dd bs=1280 count=48 if=../../../../raw/hts1.raw of=spch_in.raw \
+        dd bs=1280 count=96 if=../../../../raw/hts1.raw of=spch_in.raw \
 		> setup.log 2>&1
 	freedv_tx 700D spch_in.raw mod_bits.raw --testframes --txbpf 0 \
 		  >> setup.log 2>&1
