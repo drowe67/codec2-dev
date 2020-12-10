@@ -46,6 +46,10 @@ function states = ofdm_init(config)
   if isfield(config,"timing_mx_thresh") timing_mx_thresh = config.timing_mx_thresh; else timing_mx_thresh = 0.35; end
   if isfield(config,"tx_uw") tx_uw = config.tx_uw; else tx_uw = zeros(1,Nuwbits); end
   if isfield(config,"bad_uw_errors") bad_uw_errors = config.bad_uw_errors; else bad_uw_errors = 3; end
+  if isfield(config,"amp_scale") amp_scale = config.amp_scale; else amp_scale = 217E3; end
+  if isfield(config,"amp_est_mode") amp_est_mode = config.amp_est_mode; else amp_est_mode = 0; end
+  if isfield(config,"EsNo_est_all_symbols")  EsNo_est_all_symbols = config.EsNo_est_all_symbols; else EsNo_est_all_symbols = 1; end
+  if isfield(config,"EsNodB") EsNodB = config.EsNodB; else EsNodB = 3; end
   
   states.Fs = 8000;
   states.bps = bps;
@@ -63,6 +67,9 @@ function states = ofdm_init(config)
     1 - j,  1 - j*3,  3 - j,  3 - j*3;
    -1 + j, -1 + j*3, -3 + j, -3 + j*3;
    -1 - j, -1 - j*3, -3 - j, -3 - j*3]/3;
+  rms = sqrt(states.qam16(:)'*states.qam16(:)/16);% set average Es to 1
+  states.qam16 /= rms;
+  states.qam16 *= exp(-j*pi/4);                   % same rotation as QPSK constellation
   states.Np = Np;                                 % number of modem frames per packet. In some modes we want
                                                   % the total packet of data to span multiple modem frames, e.g. HF data
                                                   % and/or when the FEC codeword is larger than the one
@@ -99,7 +106,8 @@ function states = ofdm_init(config)
   assert(length(states.tx_uw) == states.Nuwbits);
   tx_uw_syms = [];
   for b=1:bps:states.Nuwbits
-    tx_uw_syms = [tx_uw_syms qpsk_mod(states.tx_uw(b:b+1))];
+    if bps == 2 tx_uw_syms = [tx_uw_syms qpsk_mod(states.tx_uw(b:b+1))]; end
+    if bps == 4 tx_uw_syms = [tx_uw_syms qam16_mod(states.qam16, states.tx_uw(b:b+bps-1))]; end
   end
   states.tx_uw_syms = tx_uw_syms;
   % if the UW has this many errors it is "bad", the binomal cdf can be used to set this:
@@ -107,13 +115,16 @@ function states = ofdm_init(config)
   states.bad_uw_errors = bad_uw_errors;
   
   % use this to scale tx output to 16 bit short.  Adjusted by experiment
-  % to have same RMS power as other FreeDV waveforms  
-  states.amp_scale = 2E5*1.1491/1.06;
+  % to have same RMS value as other FreeDV waveforms (around 4400)
+  states.amp_scale = amp_scale;
 
   % this is used to scale inputs to LDPC decoder to make it amplitude indep
   states.mean_amp = 0;
 
-  % generate same pilots each time
+  % use a fxed EsNo for LDPC decoder, this seems to work OK and avoid another estimator
+  states.EsNodB = EsNodB;
+
+  % generate same BPSK pilots each time
   rand('seed',1);
   states.pilots = 1 - 2*(rand(1,Nc+2) > 0.5);
   %printf("number of pilots total: %d\n", length(states.pilots));
@@ -154,6 +165,7 @@ function states = ofdm_init(config)
   states.phase_est_en = 1;
   states.phase_est_bandwidth = "high";
   states.dpsk = 0;
+  states.amp_est_mode = amp_est_mode;
   
   states.foff_est_gain = 0.1;
   states.foff_est_hz = 0;
@@ -202,8 +214,11 @@ function states = ofdm_init(config)
 
   % Es/No (SNR) est states
   
+  states.EsNo_est_all_symbols = EsNo_est_all_symbols;
   states.noise_var = 0;
   states.sig_var = 0;
+  states.sum_sig_var = 0;
+  states.sum_noise_var = 0;
   states.clock_offset_est = 0;
 
   % automated tests
@@ -227,23 +242,33 @@ function config = ofdm_init_mode(mode="700D")
     Ts = 0.0205; Nc = 31;
   elseif strcmp(mode,"2200")
     Tframe = 0.175; Ts = Tframe/Ns; Nc = 37;
-  elseif strcmp(mode,"qam16")
+  elseif strcmp(mode,"qam16c1")
     Ns=5; config.Np=5; Tcp = 0.004; Ts = 0.016; Nc = 33;
     config.bps=4; config.Ntxtbits = 0; config.Nuwbits = 15*4; config.bad_uw_errors = 5;
-    config.ftwindow_width = 32;
+    config.ftwindow_width = 32; config.amp_scale = 135E3;
+    config.EsNo_est_all_symbols = 0; config.amp_est_mode = 1; config.EsNodB = 10;
+  elseif strcmp(mode,"qam16c2")
+    Ns=5; config.Np=31; Tcp = 0.004; Ts = 0.016; Nc = 33;
+    config.bps=4; config.Ntxtbits = 0; config.Nuwbits = 42*4; config.bad_uw_errors = 15;
+    config.ftwindow_width = 32; config.amp_scale = 135E3;
+    config.EsNo_est_all_symbols = 0; config.amp_est_mode = 1; config.EsNodB = 10;
+    config.tx_uw = zeros(1,config.Nuwbits = 42*4);
+    config.tx_uw(1:24) = [1 1 0 0  1 0 1 0  1 1 1 1  0 0 0 0  1 1 1 1  0 0 0 0];
+    config.tx_uw(end-24+1:end) = [1 1 0 0  1 0 1 0  1 1 1 1  0 0 0 0  1 1 1 1  0 0 0 0];
   elseif strcmp(mode,"datac1")
     Ns=5; config.Np=18; Tcp = 0.006; Ts = 0.016; Nc = 18;
     config.Ntxtbits = 0; config.Nuwbits = 12; config.bad_uw_errors = 2;
-    config.ftwindow_width = 32;
+    config.ftwindow_width = 32; config.amp_est_mode = 1; config.EsNodB = 10;
   elseif strcmp(mode,"datac2")
     Ns=5; config.Np=36; Tcp = 0.006; Ts = 0.016; Nc = 9;
     config.Ntxtbits = 0; config.Nuwbits = 12; config.bad_uw_errors = 1;
-    config.ftwindow_width = 32;
+    config.ftwindow_width = 32; config.amp_est_mode = 1; config.EsNodB = 10;
   elseif strcmp(mode,"datac3")
     Ns=5; config.Np=11; Tcp = 0.006; Ts = 0.016; Nc = 9;
     config.Ntxtbits = 0; config.Nuwbits = 24; config.bad_uw_errors = 5;
     config.ftwindow_width = 32; config.timing_mx_thresh = 0.30;
     config.tx_uw = [1 1 0 0  1 0 1 0  1 1 1 1  0 0 0 0  1 1 1 1  0 0 0 0];
+    config.amp_est_mode = 1; config.EsNodB = 0;
   elseif strcmp(mode,"1")
     Ns=5; config.Np=10; Tcp=0; Tframe = 0.1; Ts = Tframe/Ns; Nc = 1;
   else
@@ -262,10 +287,8 @@ end
 
 function print_config(states)
   ofdm_load_const;
-  printf("Nc=%d Ts=%4.3f Tcp=%4.3f Ns: %d Np: %d\n", Nc, 1/Rs, Tcp, Ns, Np);
-  printf("Nsymperframe: %d Nbitsperpacket: %d Nsamperframe: %d Ntxtbits: %d Nuwbits: %d Nuwframes: %d\n",
-          Ns*Nc, Nbitsperpacket, Nsamperframe, Ntxtbits, Nuwbits, Nuwframes);
-  printf("uncoded bits/s: %4.1f\n",  Nbitsperpacket*Fs/(Np*Nsamperframe));
+
+  % ASCII-art packet visualisation
   s=1; u=1; Nuwsyms=length(uw_ind_sym);
   for f=1:Np
     for r=1:Ns
@@ -284,6 +307,12 @@ function print_config(states)
       printf("\n");
     end
   end  
+
+  printf("Nc=%d Ts=%4.3f Tcp=%4.3f Ns: %d Np: %d\n", Nc, 1/Rs, Tcp, Ns, Np);
+  printf("Nsymperframe: %d Nbitsperpacket: %d Nsamperframe: %d Ntxtbits: %d Nuwbits: %d Nuwframes: %d\n",
+          Ns*Nc, Nbitsperpacket, Nsamperframe, Ntxtbits, Nuwbits, Nuwframes);
+  printf("amp_est_mode: %d\n", states.amp_est_mode);
+  printf("uncoded bits/s: %4.1f\n",  Nbitsperpacket*Fs/(Np*Nsamperframe));
 end
 
 % Gray coded QPSK modulation function
@@ -336,7 +365,7 @@ function tx = ofdm_mod(states, tx_bits)
   end  
   if bps == 4
     for s=1:Nbitsperpacket/bps
-      tx_sym_lin(s) = qam16_mod(states.qam16,tx_bits(4*(s-1)+1:4*s))*exp(-j*pi/4);
+      tx_sym_lin(s) = qam16_mod(states.qam16,tx_bits(4*(s-1)+1:4*s));
     end
   end
   
@@ -351,7 +380,7 @@ endfunction
 function tx = ofdm_txframe(states, tx_sym_lin)
   ofdm_load_const;
   assert(length(tx_sym_lin) == Nbitsperpacket/bps);
-
+  
   % place data symbols in multi-carrier frame with pilots and boundary carriers
 
   s = 1; tx_frame = zeros(Np*Ns,Nc+2);
@@ -373,7 +402,7 @@ function tx = ofdm_txframe(states, tx_sym_lin)
   assert((s-1) == length(tx_sym_lin));
 
   % OFDM upconvert symbol by symbol so we can add CP
-
+ 
   tx = [];
   for r=1:Ns*Np
     asymbol = tx_frame(r,:) * W/M;
@@ -625,7 +654,7 @@ endfunction
     rx_amp     - amplitude estimates for each symbol
 #}
 
-function [states rx_bits aphase_est_pilot_log rx_np rx_amp] = ofdm_demod(states, rxbuf_in)
+function [states rx_bits achannel_est_rect_log rx_np rx_amp] = ofdm_demod(states, rxbuf_in)
   ofdm_load_const;
 
   % insert latest input samples into rxbuf
@@ -715,6 +744,7 @@ function [states rx_bits aphase_est_pilot_log rx_np rx_amp] = ofdm_demod(states,
   % OK - now channel for each carrier and correct phase  ----------------------------------
 
   achannel_est_rect = zeros(1,Nc+2);
+  aamp_est_pilot = zeros(1,Nc+2);
   for c=2:Nc+1
 
     % estimate channel for this carrier using an average of 12 pilots
@@ -740,39 +770,49 @@ function [states rx_bits aphase_est_pilot_log rx_np rx_amp] = ofdm_demod(states,
       % present.  Useful for initial sync where freq offset est may be a bit off, and
       % for high Doppler channels.  As less pilots are averaged, low SNR performance
       % will be poorer.
-      achannel_est_rect(c) =  sum(rx_sym(2,c)*pilots(c)');      % frame    
-      achannel_est_rect(c) += sum(rx_sym(2+Ns,c)*pilots(c)');   % frame+1
+      achannel_est_rect(c) =  rx_sym(2,c)*pilots(c)';        % frame    
+      achannel_est_rect(c) += rx_sym(2+Ns,c)*pilots(c)';     % frame+1
+      aamp_est_pilot(c) = abs(rx_sym(2,c)) + abs(rx_sym(2+Ns,c));
     else
       % Average over a bunch of pilots in adjacent carriers, and past and future frames, good
       % low SNR performance, but will fall over with high Doppler of freq offset.
       cr = c-1:c+1;
-      achannel_est_rect(c) =  sum(rx_sym(2,cr)*pilots(cr)');      % frame    
-      achannel_est_rect(c) += sum(rx_sym(2+Ns,cr)*pilots(cr)');   % frame+1
+      achannel_est_rect(c) =  rx_sym(2,cr)*pilots(cr)';      % frame    
+      achannel_est_rect(c) += rx_sym(2+Ns,cr)*pilots(cr)';   % frame+1
+      aamp_est_pilot(c)  = sum(abs(rx_sym(2,cr)));
+      aamp_est_pilot(c) += sum(abs(rx_sym(2+Ns,cr)));
 
       % use next step of pilots in past and future
 
-      achannel_est_rect(c) += sum(rx_sym(1,cr)*pilots(cr)');      % frame-1
-      achannel_est_rect(c) += sum(rx_sym(2+Ns+1,cr)*pilots(cr)'); % frame+2
+      achannel_est_rect(c) += rx_sym(1,cr)*pilots(cr)';      % frame-1
+      achannel_est_rect(c) += rx_sym(2+Ns+1,cr)*pilots(cr)'; % frame+2
+      aamp_est_pilot(c) += sum(abs(rx_sym(1,cr)));
+      aamp_est_pilot(c) += sum(abs(rx_sym(2+Ns+1,cr)));
     end
   end
-  
-  if strcmp(phase_est_bandwidth, "high")
-    achannel_est_rect /= 2;
-  else
-    achannel_est_rect /= 12;
-  end
-  
+ 
   % pilots are estimated over 12 pilot symbols, so find average
 
+  if strcmp(phase_est_bandwidth, "high")
+    achannel_est_rect /= 2;
+    aamp_est_pilot /= 2;
+  else
+    achannel_est_rect /= 12;
+    aamp_est_pilot /= 12;
+  end
+  
   aphase_est_pilot = angle(achannel_est_rect);
-  aamp_est_pilot = abs(achannel_est_rect);
-
+  if states.amp_est_mode == 0
+    % legacy 700D/2020 ampl estimator for compatability with current C code
+    aamp_est_pilot = abs(achannel_est_rect);
+  end
+  achannel_est_rect = aamp_est_pilot.*exp(j*aphase_est_pilot);
+  
   % correct phase offset using phase estimate, and demodulate
   % bits, separate loop as it runs across cols (carriers) to get
   % frame bit ordering correct
 
-  aphase_est_pilot_log = [];
-  rx_bits = []; rx_np = []; rx_amp = [];
+  rx_bits = []; rx_np = []; rx_amp = []; achannel_est_rect_log = [];
   for rr=1:Ns-1
     for c=2:Nc+1
       if phase_est_en
@@ -784,20 +824,17 @@ function [states rx_bits aphase_est_pilot_log rx_np rx_amp] = ofdm_demod(states,
       else
         rx_corr = rx_sym(rr+2,c);
       end
+
       rx_np = [rx_np rx_corr];
       rx_amp = [rx_amp aamp_est_pilot(c)];
-      if bps == 1
-        abit = real(rx_corr) > 0;
-      end
-      if bps == 2
-        abit = qpsk_demod(rx_corr);
-      end
-      if bps == 4
-        abit = qam16_demod(states.qam16, rx_corr*exp(j*pi/4));
-      end
+
+      % hard decision demod
+      if bps == 1 abit = real(rx_corr) > 0; end
+      if bps == 2 abit = qpsk_demod(rx_corr); end
+      if bps == 4 abit = qam16_demod(states.qam16, rx_corr, max(1E-12,aamp_est_pilot(c))); end
       rx_bits = [rx_bits abit];
     end % c=2:Nc+1
-    aphase_est_pilot_log = [aphase_est_pilot_log; aphase_est_pilot(2:Nc+1)];
+    achannel_est_rect_log = [achannel_est_rect_log; achannel_est_rect(2:Nc+1)];
   end 
 
   % Adjust nin to take care of sample clock offset
@@ -818,20 +855,56 @@ function [states rx_bits aphase_est_pilot_log rx_np rx_amp] = ofdm_demod(states,
       sample_point += tshift;
     end
   end
-
-  % estimates of signal and noise power (see cohpsk.m for further explanation)
-  % signal power is distance from axis on complex plane
-  % we just measure noise power on imag axis, as it isn't affected by fading
-  % using all symbols in frame worked better than just pilots
   
-  sig_var = sum(abs(rx_np) .^ 2)/length(rx_np);
+  % Estimate signal and noise power to estimate EsNo.  This is used for SNR estimation and (possible) LDPC decoding
+  if states.EsNo_est_all_symbols
+    [sig_var noise_var] = est_signal_and_noise_var(rx_np);
+  else
+    % For QAM we just use this frame's pilots, as these have no amplitude modulation on them
+    [sig_var noise_var] = est_signal_and_noise_var(rx_sym(2,:).*exp(-j*aphase_est_pilot));
+  end
+  
+  states.noise_var = noise_var; 
+  states.sig_var = sig_var;
+  states.sum_noise_var += noise_var; 
+  states.sum_sig_var += sig_var;
+
+  % maintain mean amp estimate for LDPC decoder
+  states.mean_amp = 0.9*states.mean_amp + 0.1*mean(rx_amp);
+
+  states.rx_sym = rx_sym;
+  states.rxbuf = rxbuf;
+  states.nin = nin;
+  states.timing_valid = timing_valid;
+  states.timing_mx = timing_mx;
+  states.timing_est = timing_est;
+  states.sample_point = sample_point;
+  states.delta_t = delta_t;
+  states.foff_est_hz = foff_est_hz;
+  states.coarse_foff_est_hz = coarse_foff_est_hz; % just used for tofdm
+endfunction
+
+
+#{
+  ----------------------------------------------------------------------------
+  Estimates of signal and noise power (see cohpsk.m for further
+  explanation).  Signal power is distance from axis on complex
+  plane. We just measure noise power on imag axis, as it isn't
+  affected by fading.  For 700D using all symbols in frame worked
+  better than just pilots, but for QAM we need to use pilots as they
+  don't have modulation that affects estimate. 
+  ----------------------------------------------------------------------------
+#}
+  
+function [sig_var noise_var] = est_signal_and_noise_var(rx_syms)
+  sig_var = sum(abs(rx_syms) .^ 2)/length(rx_syms);
   sig_rms = sqrt(sig_var);
   
   sum_x = 0;
   sum_xx = 0;
   n = 0;
-  for i=1:length(rx_np)
-    s = rx_np(i);
+  for i=1:length(rx_syms)
+    s = rx_syms(i);
     if abs(real(s)) > sig_rms 
       % select two constellation points on real axis
       sum_x  += imag(s);
@@ -844,28 +917,10 @@ function [states rx_bits aphase_est_pilot_log rx_np rx_amp] = ofdm_demod(states,
   if n > 1
     noise_var = (n*sum_xx - sum_x*sum_x)/(n*(n-1));
   end
-
+  
   % Total noise power is twice estimate of imaginary-axis noise.  This
   % effectively gives us the an estimate of Es/No
-  
-  states.noise_var = 2*noise_var; 
-  states.sig_var = sig_var;
-
-  % maintain mean amp estimate for LDPC decoder
-
-  states.mean_amp = 0.9*states.mean_amp + 0.1*mean(rx_amp);
-
-  states.achannel_est_rect = achannel_est_rect;
-  states.rx_sym = rx_sym;
-  states.rxbuf = rxbuf;
-  states.nin = nin;
-  states.timing_valid = timing_valid;
-  states.timing_mx = timing_mx;
-  states.timing_est = timing_est;
-  states.sample_point = sample_point;
-  states.delta_t = delta_t;
-  states.foff_est_hz = foff_est_hz;
-  states.coarse_foff_est_hz = coarse_foff_est_hz; % just used for tofdm
+  noise_var = 2*noise_var;
 endfunction
 
 
@@ -933,18 +988,21 @@ endfunction
 %              during acquisition
 % -------------------------------------------------------------------------------------------------
 
-function rx_uw = extract_uw(states, rx_syms)
+function rx_uw = extract_uw(states, rx_syms, rx_amps)
   ofdm_load_const;
 
   Nsymsperframe = Nbitsperframe/bps;
   assert(length(rx_syms) == Nuwframes*Nsymsperframe);
   Nuwsyms = Nuwbits/bps;
   rx_uw_syms = zeros(1,Nuwsyms);
+  rx_uw_amps = zeros(1,Nuwsyms);
   u = 1;
  
   for s=1:Nuwframes*Nsymsperframe
     if (u <= Nuwsyms) && (s == uw_ind_sym(u))
-      rx_uw_syms(u++) = rx_syms(s);
+      rx_uw_syms(u) = rx_syms(s);
+      rx_uw_amps(u) = rx_amps(s);
+      u++;
     end
   end
   assert(u == (Nuwsyms+1));
@@ -956,7 +1014,7 @@ function rx_uw = extract_uw(states, rx_syms)
     if bps == 2
       rx_uw(bps*(s-1)+1:bps*s) = qpsk_demod(rx_uw_syms(s));
     elseif bps == 4
-      rx_uw(bps*(s-1)+1:bps*s) = qam16_demod(states.qam16,rx_uw_syms(s)*exp(j*pi/4));
+      rx_uw(bps*(s-1)+1:bps*s) = qam16_demod(states.qam16,rx_uw_syms(s), max(1E-12,rx_amps(s)));
     end
   end
 endfunction
@@ -975,12 +1033,15 @@ function [rx_uw payload_syms payload_amps txt_bits] = disassemble_modem_packet(s
   payload_syms = zeros(1,Nsymsperpacket-Nuwsyms-Ntxtsyms);
   payload_amps = zeros(1,Nsymsperpacket-Nuwsyms-Ntxtsyms);
   rx_uw_syms = zeros(1,Nuwsyms);
+  rx_uw_amps = zeros(1,Nuwsyms);
   txt_syms = zeros(1,Ntxtsyms);
   p = 1; u = 1;
  
   for s=1:Nsymsperpacket-Ntxtsyms;
     if (u <= Nuwsyms) && (s == uw_ind_sym(u))
-      rx_uw_syms(u++) = modem_frame_syms(s);
+      rx_uw_syms(u) = modem_frame_syms(s);
+      rx_uw_amps(u) = modem_frame_amps(s);
+      u++;
     else
       payload_syms(p) = modem_frame_syms(s);
       payload_amps(p++) = modem_frame_amps(s);
@@ -1002,7 +1063,7 @@ function [rx_uw payload_syms payload_amps txt_bits] = disassemble_modem_packet(s
     if bps == 2
       rx_uw(bps*(s-1)+1:bps*s) = qpsk_demod(rx_uw_syms(s));
     elseif bps == 4
-      rx_uw(bps*(s-1)+1:bps*s) = qam16_demod(states.qam16,rx_uw_syms(s)*exp(j*pi/4));
+      rx_uw(bps*(s-1)+1:bps*s) = qam16_demod(states.qam16,rx_uw_syms(s),rx_uw_amps(s));
     end
   end
   for s=1:Ntxtsyms
@@ -1207,13 +1268,16 @@ function states = sync_state_machine2(states, rx_uw)
   end
 
   states.uw_errors = sum(xor(tx_uw,rx_uw));
- 
+  %tx_uw(1:10)
+  %rx_uw(1:10)
+  
   if strcmp(states.sync_state,'trial')
     if strcmp(states.sync_state,'trial')
       if states.uw_errors < states.bad_uw_errors;
         next_state = "synced";
         states.frame_count = Nuwframes;
         states.modem_frame = Nuwframes;
+        states.sum_sig_var = states.sum_noise_var = 0;
       else
         states.sync_counter++;
         if states.sync_counter > Np
@@ -1274,7 +1338,15 @@ function [code_param Nbitspercodecframe Ncodecframespermodemframe] = codec_to_fr
     printf("Total bits per frame: %d\n", totalbitsperframe);
     assert(totalbitsperframe == Nbitsperframe);
   end
-  if strcmp(mode, "datac1") || strcmp(mode, "datac2") || strcmp(mode, "qam16")
+  if strcmp(mode, "qam16c1")
+      load H2064_516_sparse.mat
+      code_param = ldpc_init_user(HRA, modulation='QAM', mod_order=16, mapping="", reshape(states.qam16,1,16));
+  end
+  if strcmp(mode, "qam16c2")
+      framesize = 16200; rate = 0.6;
+      code_param = ldpc_init_builtin("dvbs2", rate, framesize, modulation='QAM', mod_order=16, mapping="", reshape(states.qam16,1,16));
+  end
+  if strcmp(mode, "datac1") || strcmp(mode, "datac2")
     load H2064_516_sparse.mat
     code_param = ldpc_init_user(HRA, modulation, mod_order, mapping);
   end
@@ -1283,7 +1355,7 @@ function [code_param Nbitspercodecframe Ncodecframespermodemframe] = codec_to_fr
     code_param = ldpc_init_user(H_256_768_22, modulation, mod_order, mapping);
     Nbitspercodecframe = Ncodecframespermodemframe = -1;
   end
-  if strcmp(mode, "datac1") || strcmp(mode, "datac2") || strcmp(mode, "datac3") || strcmp(mode, "qam16")
+  if strcmp(mode, "datac1") || strcmp(mode, "datac2") || strcmp(mode, "datac3") || strcmp(mode, "qam16c1") || strcmp(mode, "qam16c2")
     printf("ldpc_data_bits_per_frame = %d\n", code_param.ldpc_data_bits_per_frame);
     printf("ldpc_coded_bits_per_frame  = %d\n", code_param.ldpc_coded_bits_per_frame);
     printf("ldpc_parity_bits_per_frame  = %d\n", code_param.ldpc_parity_bits_per_frame);
@@ -1304,15 +1376,13 @@ endfunction
 function [frame_bits bits_per_frame] = fec_encode(states, code_param, mode, payload_bits, ...
                                                       Ncodecframespermodemframe, Nbitspercodecframe)
   ofdm_load_const;
-  if strcmp(mode, "700D") || strcmp(mode, "datac1") || strcmp(mode, "datac2") || strcmp(mode, "datac3") || strcmp(mode, "qam16") 
-    frame_bits = LdpcEncode(payload_bits, code_param.H_rows, code_param.P_matrix);
-  elseif strcmp(mode, "2020")
+  if strcmp(mode, "2020")
     Nunused = code_param.ldpc_data_bits_per_frame - code_param.data_bits_per_frame;
     frame_bits = LdpcEncode([payload_bits zeros(1,Nunused)], code_param.H_rows, code_param.P_matrix);
     % remove unused data bits
     frame_bits = [ frame_bits(1:code_param.data_bits_per_frame) frame_bits(code_param.ldpc_data_bits_per_frame+1:end) ];
   else
-    assert(0);
+    frame_bits = LdpcEncode(payload_bits, code_param.H_rows, code_param.P_matrix);
   end
   bits_per_frame = length(frame_bits);
     

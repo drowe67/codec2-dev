@@ -53,7 +53,6 @@ function ofdm_tx(filename, mode="700D", Nsec, SNR3kdB=100, channel='awgn', freq_
   for f=1:Npackets
     tx = [tx ofdm_mod(states, tx_bits)];
   end
-  Nsam = length(tx);
 
   % optional clipper to improve PAPR
 
@@ -68,7 +67,13 @@ function ofdm_tx(filename, mode="700D", Nsec, SNR3kdB=100, channel='awgn', freq_
   
   printf("Packets: %3d CPAPR: %4.1f SNR(3k): %3.1f dB foff: %3.1f Hz ", Npackets, cpapr, SNR3kdB, freq_offset_Hz);
   rx = channel_simulate(Fs, SNR3kdB, freq_offset_Hz, channel, tx);
-  rx *= 1E4/max(rx);;
-  printf("peak: %f\n", max(rx));
-  frx=fopen(filename,"wb"); fwrite(frx, rx, "short"); fclose(frx);
+
+  % multipath models can lead to clipping of int16 samples
+  num_clipped = length(find(abs(rx> 32767)));
+  while num_clipped/length(rx) > 0.001
+    rx /= 2;
+    num_clipped = length(find(abs(rx> 32767)));
+  end
+  
+  frx=fopen(filename,"wb"); fwrite(frx, states.amp_scale*rx, "short"); fclose(frx);
 endfunction

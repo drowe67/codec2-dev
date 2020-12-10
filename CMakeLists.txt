@@ -386,6 +386,13 @@ if(UNITTEST)
              set_tests_properties(test_OFDM_modem_octave_port_Nc_31 PROPERTIES
              PASS_REGULAR_EXPRESSION "fails: 0")
 
+
+    add_test(NAME test_OFDM_modem_octave_qam16_uncoded
+             COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/octave;
+                            echo \"ofdm_tx('test_qam16.raw','qam16c1',3,12); ofdm_rx('test_qam16.raw','qam16c1', 0.05); quit\" | 
+                            DISPLAY=\"\" octave --no-gui")
+             set_tests_properties(test_OFDM_modem_octave_qam16_uncoded PROPERTIES PASS_REGULAR_EXPRESSION "Pass")
+             
     # noise free uncoded 700D test, including reading and writing payload bits
     add_test(NAME test_OFDM_modem_700D
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;

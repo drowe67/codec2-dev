@@ -33,11 +33,24 @@ function init_cml(path_to_cml)
   end
 end
 
-% init using built in WiMax code
+% init using built in WiMax or DVSB2 code
 
-function code_param = ldpc_init_wimax(rate, framesize, modulation, mod_order, mapping)
-    [code_param.H_rows, code_param.H_cols, code_param.P_matrix] = InitializeWiMaxLDPC( rate, framesize,  0 );
-    code_param.S_matrix = CreateConstellation( modulation, mod_order, mapping );
+function code_param = ldpc_init_builtin(code, rate, framesize, modulation, mod_order, mapping, constellation)
+    if strcmp(code,'wimax')
+      [code_param.H_rows, code_param.H_cols, code_param.P_matrix] = InitializeWiMaxLDPC( rate, framesize,  0 );
+    end
+    if strcmp(code,'dvbs2')
+      [code_param.H_rows, code_param.H_cols, code_param.P_matrix] = InitializeDVBS2( rate, framesize);
+    end
+    if nargin == 7
+      code_param.S_matrix = constellation;
+    else
+      if length(mapping) == 0
+        code_param.S_matrix = CreateConstellation( modulation, mod_order);
+      else
+        code_param.S_matrix = CreateConstellation( modulation, mod_order, mapping );
+      end
+    end  
     code_param.bits_per_symbol = log2(mod_order);
 
     code_param.ldpc_data_bits_per_frame = length(code_param.H_cols) - length(code_param.P_matrix);
