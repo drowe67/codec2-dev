@@ -9,7 +9,7 @@ function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", error_pattern_filena
   gp_interleaver;
   more off;
   pkg load signal;
-  
+
   % optional DPSK testing
   dpsk = 0;
   if strcmp(mode,"700D-DPSK")
@@ -145,6 +145,8 @@ function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", error_pattern_filena
         % used fixed EsNo est, as EsNo estimator for QAM not working very well at this stage
         EsNo = 10^(states.EsNodB/10);
 
+        % TODO 2020 support for padding with known data bits
+        
         [rx_codeword paritychecks] = ldpc_dec(code_param, mx_iter=100, demod=0, dec=0, ...
                                               payload_syms_de/mean_amp, EsNo, payload_amps_de/mean_amp);
         rx_bits = rx_codeword(1:code_param.data_bits_per_frame);

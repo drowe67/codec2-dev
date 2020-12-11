@@ -41,7 +41,7 @@ function states = ofdm_init(config)
   if isfield(config,"Np") Np = config.Np; else Np = 1; end
   if isfield(config,"Ntxtbits") Ntxtbits = config.Ntxtbits ; else Ntxtbits = 4; end
   if isfield(config,"Nuwbits") Nuwbits = config.Nuwbits ; else Nuwbits = 5*bps; end
-  if isfield(config,"ftwindow_width") ftwindow_width = config.ftwindow_width; else ftwindow_width = 11; end
+  if isfield(config,"ftwindow_width") ftwindow_width = config.ftwindow_width; else ftwindow_width = 32; end
   if isfield(config,"timing_mx_thresh") timing_mx_thresh = config.timing_mx_thresh; else timing_mx_thresh = 0.35; end
   if isfield(config,"tx_uw") tx_uw = config.tx_uw; else tx_uw = zeros(1,Nuwbits); end
   if isfield(config,"bad_uw_errors") bad_uw_errors = config.bad_uw_errors; else bad_uw_errors = 3; end
@@ -50,6 +50,7 @@ function states = ofdm_init(config)
   if isfield(config,"EsNo_est_all_symbols")  EsNo_est_all_symbols = config.EsNo_est_all_symbols; else EsNo_est_all_symbols = 1; end
   if isfield(config,"EsNodB") EsNodB = config.EsNodB; else EsNodB = 3; end
   if isfield(config,"state_machine") state_machine = config.state_machine; else state_machine = "voice1"; end
+  if isfield(config,"edge_pilots") edge_pilots = config.edge_pilots; else edge_pilots = 1; end
 
   states.Fs = 8000;
   states.bps = bps;
@@ -143,6 +144,10 @@ function states = ofdm_init(config)
   rand('seed',1);
   states.pilots = 1 - 2*(rand(1,Nc+2) > 0.5);
   %printf("number of pilots total: %d\n", length(states.pilots));
+
+  % place pilots at carrier 1 and Nc+2 to support low bandwith phase est over grid
+  % of 12 pilot_samples.  Used for 700D and 2020
+  states.edge_pilots = edge_pilots;
 
   % carrier tables for up and down conversion
   fcentre = 1500;
@@ -256,7 +261,7 @@ function config = ofdm_init_mode(mode="700D")
     Ts = 0.018; Nc = 17;
   elseif strcmp(mode,"700E")
     Ts = 0.014; Tcp=0.006; Nc = 21; Ns=4;
-    config.state_machine = "voice2";
+    config.edge_pilots = 0; config.state_machine = "voice2";
     config.Nuwbits = 12; config.bad_uw_errors = 3; config.Ntxtbits = 2;
     config.amp_est_mode = 1; config.ftwindow_width = 80;
   elseif strcmp(mode,"2020")
@@ -315,9 +320,14 @@ function print_config(states)
 
   % ASCII-art packet visualisation
   s=1; u=1; Nuwsyms=length(uw_ind_sym);
+  if states.edge_pilots
+    cr = 1:Nc+2;
+  else
+    cr = 2:Nc+1;
+  end
   for f=1:Np
     for r=1:Ns
-      for c=1:Nc+2
+      for c=cr
         if r == 1
           sym="P";
         elseif c>1 && c <=(Nc+1)
@@ -413,6 +423,10 @@ function tx = ofdm_txframe(states, tx_sym_lin)
     if mod(r-1,Ns) == 0
       % row of pilots
       tx_frame(r,:) = pilots;
+      if states.edge_pilots == 0
+        tx_frame(r,1) = 0;
+        tx_frame(r,Nc+2) = 0;
+      end
     else
       % row of data symbols
       arowofsymbols = tx_sym_lin(s:s+Nc-1);
