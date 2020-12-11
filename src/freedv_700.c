@@ -523,10 +523,7 @@ int freedv_comp_short_rx_ofdm(struct freedv *f, void *demod_in_8kHz, int demod_i
     /* iterate state machine and update nin for next call */
 
     f->nin = ofdm_get_nin(ofdm);
-    if (ofdm->data_mode == 0)
-        ofdm_sync_state_machine(ofdm, rx_uw);
-    else
-        ofdm_sync_state_machine2(ofdm, rx_uw);
+    ofdm_sync_state_machine(ofdm, rx_uw);
 
     if ((f->verbose && (ofdm->last_sync_state == search)) || (f->verbose == 2)) {
         fprintf(stderr, "%3d nin: %4d st: %-6s euw: %2d %1d mf: %2d f: %5.1f phbw: %d snr: %4.1f eraw: %3d ecdd: %3d iter: %3d "

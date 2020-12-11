@@ -47,7 +47,7 @@ extern "C"
 #define TAU         (2.0f * M_PI)
 #define ROT45       (M_PI / 4.0f)
 #define MAX_UW_BITS 32
-    
+
 #define cmplx(value) (cosf(value) + sinf(value) * I)
 #define cmplxconj(value) (cosf(value) + sinf(value) * -I)
 
@@ -93,20 +93,21 @@ struct OFDM_CONFIG {
     int nuwbits;       /* number of unique word bits */
     int bad_uw_errors;
     int ftwindowwidth;
-    int data_mode;     /* non-zero if this is a data mode */
-    char *codename;    /* name of LDPC code used with this mode */
+    int edge_pilots;
+    char *state_machine;  /* name of sync state machine used for this mode */
+    char *codename;       /* name of LDPC code used with this mode */
     uint8_t tx_uw[MAX_UW_BITS]; /* user defined unique word */
 };
 
 struct OFDM {
     struct OFDM_CONFIG config;
-    
+
     /*
      * See 700D Part 4 Acquisition blog post and ofdm_dev.m routines
      * for how this was set
      */
     float timing_mx_thresh;
-    
+
     int nc;
     int ns;	/* NS-1 = data symbols between pilots  */
     int bps; 	/* Bits per symbol */
@@ -129,6 +130,8 @@ struct OFDM {
     int ntxtbits;         /* reserve bits/frame for aux text information */
     int nuwbits;          /* number of unique word bits used to achieve packet frame sync */
     int bad_uw_errors;
+    int edge_pilots;      /* insert pilots at 1 and Nc+2, to support low bandwidth phase est */
+    int data_mode;        /* true of a data mode, false for voice mode */
 
     float tx_centre; /* TX Center frequency */
     float rx_centre; /* RX Center frequency */
@@ -141,18 +144,18 @@ struct OFDM {
     float tx_nlower; /* TX lowest carrier freq */
     float rx_nlower; /* RX lowest carrier freq */
     float doc; /* division of radian circle */
-    
+
     // Pointers
 
     struct quisk_cfFilter *tx_bpf;
-    
+
     complex float *pilot_samples;
     complex float *rxbuf;
     complex float *pilots;
     complex float **rx_sym;
     complex float *rx_np;
     complex float *tx_uw_syms;
-    
+
     float *rx_amp;
     float *aphase_est_pilot_log;
 
@@ -174,7 +177,7 @@ struct OFDM {
 
     // Complex
     complex float foff_metric;
-     
+
     // Float
     float foff_est_gain;
     float foff_est_hz;
@@ -196,8 +199,7 @@ struct OFDM {
     int sync_counter;
     int frame_count;
     int modem_frame; /* increments for every modem frame in packet */
-    int data_mode;
-    
+
     // Boolean
     bool sync_start;
     bool sync_end;
@@ -208,6 +210,7 @@ struct OFDM {
     bool dpsk_en;
 
     char *codename;
+    char *state_machine;
 };
 
 /* Prototypes */

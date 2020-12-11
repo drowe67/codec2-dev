@@ -202,7 +202,8 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
         ofdm->bad_uw_errors = 3;
         ofdm->ftwindowwidth = 32;
         ofdm->timing_mx_thresh = 0.30f;
-        ofdm->data_mode = 0;
+        ofdm->state_machine = "voice1";
+        ofdm->edge_pilots = 1;
         ofdm->codename = "HRA_112_112";
         memset(ofdm->tx_uw, 0, ofdm->nuwbits);
     } else {
@@ -223,7 +224,8 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
         ofdm->bad_uw_errors = config->bad_uw_errors;
         ofdm->ftwindowwidth = config->ftwindowwidth;
         ofdm->timing_mx_thresh = config->timing_mx_thresh;
-        ofdm->data_mode = config->data_mode;
+        ofdm->state_machine = config->state_machine;
+        ofdm->edge_pilots = config->edge_pilots;
         ofdm->codename = config->codename;
         memcpy(ofdm->tx_uw, config->tx_uw, ofdm->nuwbits);
     }
@@ -235,7 +237,9 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
 
     /* basic sanity checks */
     assert((int)floorf(ofdm->fs / ofdm->rs) == ofdm->m);
-    assert((ofdm->data_mode == 0) || (ofdm->data_mode == 1));
+    assert(!strcmp(ofdm->state_machine, "voice1") ||
+           !strcmp(ofdm->state_machine, "data") ||
+           !strcmp(ofdm->state_machine, "voice2"));
     assert(ofdm->nuwbits <= MAX_UW_BITS);
 
     /* Copy constants into states */
@@ -255,7 +259,8 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     ofdm->config.txtbits = ofdm->ntxtbits;
     ofdm->config.bad_uw_errors = ofdm->bad_uw_errors;
     ofdm->config.ftwindowwidth = ofdm->ftwindowwidth;
-    ofdm->config.data_mode = ofdm->data_mode;
+    ofdm->config.state_machine = ofdm->state_machine;
+    ofdm->config.edge_pilots = ofdm->edge_pilots;
     ofdm->config.codename = ofdm->codename;
     memcpy(ofdm->config.tx_uw, ofdm->tx_uw, ofdm->nuwbits);
 
@@ -291,7 +296,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
 
     for (i = 0; i < (ofdm->ns + 3); i++) {
         ofdm->rx_sym[i] = (complex float *) MALLOC(sizeof(complex float) * (ofdm->nc + 2));
-	assert(ofdm->rx_sym[i] != NULL);
+	      assert(ofdm->rx_sym[i] != NULL);
     }
 
     /* The rest of these are 1D arrays of variable size */
@@ -365,7 +370,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     ofdm->nin = ofdm->samplesperframe;
     ofdm->mean_amp = 0.0f;
     ofdm->foff_metric = 0.0f;
-
+    ofdm->data_mode = !strcmp(ofdm->state_machine,"data");
     /*
      * Unique Word symbol placement.  Note we need to group the UW
      * bits so they fit into symbols.  The LDPC decoder works on
@@ -797,8 +802,15 @@ void ofdm_txframe(struct OFDM *ofdm, complex float *tx, complex float *tx_sym_li
 
         if ((r % ofdm->ns) == 0) {
             /* copy in a row of complex pilots to first row of each frame */
-            for (i = 0; i < (ofdm->nc + 2); i++) {
+            if (ofdm->edge_pilots) {
+              for (i = 0; i < (ofdm->nc + 2); i++) {
                 aframe[r][i] = ofdm->pilots[i];
+              }
+            }
+            else {
+              for (i = 1; i < (ofdm->nc + 1); i++) {
+                aframe[r][i] = ofdm->pilots[i];
+              }
             }
         }
         else {
@@ -1534,10 +1546,11 @@ static void ofdm_demod_core(struct OFDM *ofdm, int *rx_bits) {
     ofdm->sig_var = sig_var;
 }
 
+
 /*
  * state machine for 700D/2020
  */
-void ofdm_sync_state_machine(struct OFDM *ofdm, uint8_t *rx_uw) {
+void ofdm_sync_state_machine_voice1(struct OFDM *ofdm, uint8_t *rx_uw) {
     int i;
 
     State next_state = ofdm->sync_state;
@@ -1625,7 +1638,7 @@ void ofdm_sync_state_machine(struct OFDM *ofdm, uint8_t *rx_uw) {
 /*
  * state machine for data modes
  */
-void ofdm_sync_state_machine2(struct OFDM *ofdm, uint8_t *rx_uw) {
+void ofdm_sync_state_machine_data(struct OFDM *ofdm, uint8_t *rx_uw) {
     State next_state = ofdm->sync_state;
     int i;
 
@@ -1676,6 +1689,70 @@ void ofdm_sync_state_machine2(struct OFDM *ofdm, uint8_t *rx_uw) {
     ofdm->last_sync_state = ofdm->sync_state;
     ofdm->sync_state = next_state;
 }
+
+
+void ofdm_sync_state_machine_voice2(struct OFDM *ofdm, uint8_t *rx_uw) {
+    int i;
+
+    State next_state = ofdm->sync_state;
+
+    ofdm->sync_start = false;
+    ofdm->sync_end = false;
+
+    if (ofdm->sync_state == search) {
+        if (ofdm->timing_valid) {
+            ofdm->frame_count = 0;
+            ofdm->sync_counter = 0;
+            ofdm->sync_start = true;
+            ofdm->clock_offset_counter = 0;
+            next_state = trial;
+        }
+    }
+
+    if ((ofdm->sync_state == synced) || (ofdm->sync_state == trial)) {
+        ofdm->frame_count++;
+
+        ofdm->uw_errors = 0;
+        for (i = 0; i < ofdm->nuwbits; i++) {
+            ofdm->uw_errors += ofdm->tx_uw[i] ^ rx_uw[i];
+        }
+
+        if (ofdm->sync_state == trial) {
+            if (ofdm->uw_errors <= ofdm->bad_uw_errors)
+                next_state = synced;
+            else
+                next_state = search;
+        }
+
+        if (ofdm->sync_state == synced) {
+            if (ofdm->uw_errors > ofdm->bad_uw_errors) {
+                ofdm->sync_counter++;
+            } else {
+                ofdm->sync_counter = 0;
+            }
+
+            if (ofdm->sync_counter == 6) {
+                /* run of consecutive bad frames ... drop sync */
+                next_state = search;
+            }
+        }
+    }
+
+    ofdm->last_sync_state = ofdm->sync_state;
+    ofdm->sync_state = next_state;
+}
+
+
+/* mode based dispatcher for sync state machines */
+void ofdm_sync_state_machine(struct OFDM *ofdm, uint8_t *rx_uw) {
+    if (!strcmp(ofdm->state_machine, "voice1"))
+        ofdm_sync_state_machine_voice1(ofdm, rx_uw);
+    if (!strcmp(ofdm->state_machine, "data"))
+        ofdm_sync_state_machine_data(ofdm, rx_uw);
+    if (!strcmp(ofdm->state_machine, "voice2"))
+        ofdm_sync_state_machine_voice2(ofdm, rx_uw);
+}
+
 
 /*---------------------------------------------------------------------------* \
 

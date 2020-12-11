@@ -391,7 +391,7 @@ int main(int argc, char *argv[]) {
     int iter = 0;
     int parityCheckCount = 0;
 
-    if (ofdm->data_mode == 0)
+    if (ofdm->data_mode)
         Ndiscard = NDISCARD; /* backwards compatability with 700D/2020        */
     else
         Ndiscard = 1;        /* much longer packets, so discrd thresh smaller */
@@ -568,11 +568,7 @@ int main(int argc, char *argv[]) {
         /* per-frame modem processing */
 
         nin_frame = ofdm_get_nin(ofdm);
-
-        if (ofdm->data_mode == 0)
-            ofdm_sync_state_machine(ofdm, rx_uw);
-        else
-            ofdm_sync_state_machine2(ofdm, rx_uw);
+        ofdm_sync_state_machine(ofdm, rx_uw);
 
         /* act on any events returned by state machine */
 
