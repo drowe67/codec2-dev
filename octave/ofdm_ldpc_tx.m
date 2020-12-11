@@ -11,7 +11,7 @@ function ofdm_ldpc_tx(filename, mode="700D", Nsec, SNR3kdB=100, channel='awgn', 
   channel_lib;
   randn('seed',1);
   more off;
-  
+
   % init modem
 
   config = ofdm_init_mode(mode);
@@ -20,7 +20,7 @@ function ofdm_ldpc_tx(filename, mode="700D", Nsec, SNR3kdB=100, channel='awgn', 
   ofdm_load_const;
 
   % some constants used for assembling modem frames
-  
+
   [code_param Nbitspercodecframe Ncodecframespermodemframe] = codec_to_frame_packing(states, mode);
 
   % Generate fixed test frame of tx bits and run OFDM modulator
@@ -35,8 +35,8 @@ function ofdm_ldpc_tx(filename, mode="700D", Nsec, SNR3kdB=100, channel='awgn', 
     payload_bits = round(ofdm_rand(code_param.data_bits_per_frame)/32767);
   end
   [packet_bits bits_per_packet] = fec_encode(states, code_param, mode, payload_bits, Ncodecframespermodemframe, Nbitspercodecframe);
-   
-  % modulate to create symbols and interleave  
+
+  % modulate to create symbols and interleave
   tx_symbols = [];
   for b=1:bps:bits_per_packet
     if bps == 2 tx_symbols = [tx_symbols qpsk_mod(packet_bits(b:b+bps-1))]; end
@@ -44,7 +44,7 @@ function ofdm_ldpc_tx(filename, mode="700D", Nsec, SNR3kdB=100, channel='awgn', 
   end
   assert(gp_deinterleave(gp_interleave(tx_symbols)) == tx_symbols);
   tx_symbols = gp_interleave(tx_symbols);
-  
+
   % generate txt (non FEC protected) symbols
   txt_bits = zeros(1,Ntxtbits);
   txt_symbols = [];
@@ -53,13 +53,13 @@ function ofdm_ldpc_tx(filename, mode="700D", Nsec, SNR3kdB=100, channel='awgn', 
     if bps == 4 txt_symbols = [txt_symbols qam16_mod(states.qam16,txt_bits(b:b+bps-1))]; end
   end
 
-  % assemble interleaved modem packet that include UW and txt symbols  
+  % assemble interleaved modem packet that include UW and txt symbols
   modem_packet = assemble_modem_packet_symbols(states, tx_symbols, txt_symbols);
 
   % sanity check
   [rx_uw rx_codeword_syms payload_amps txt_bits] = disassemble_modem_packet(states, modem_packet, ones(1,length(modem_packet)));
   assert(rx_uw == states.tx_uw);
-  
+
   atx = ofdm_txframe(states, modem_packet); tx = [];
   for f=1:Npackets
     tx = [tx atx];

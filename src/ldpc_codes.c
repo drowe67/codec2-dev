@@ -11,13 +11,14 @@
 #include "assert.h"
 #include "ldpc_codes.h"
 #include "interldpc.h"
-#include "H2064_516_sparse.h"  
-#include "HRA_112_112.h"  
+#include "H2064_516_sparse.h"
+#include "HRA_112_112.h"
 #include "HRAb_396_504.h"
 #include "H_256_768_22.h"
 #include "H_256_512_4.h"
 #include "HRAa_1536_512.h"
 #include "H_128_256_5.h"
+#include "HRA_56_56.h"
 
 struct LDPC ldpc_codes[] = {
     /* short rate 1/2 code for FreeDV 700D */
@@ -34,11 +35,26 @@ struct LDPC ldpc_codes[] = {
         HRA_112_112_MAX_COL_WEIGHT,
         (uint16_t *)HRA_112_112_H_rows,
         (uint16_t *)HRA_112_112_H_cols
+    },
+    /* short rate 1/2 code for FreeDV 700E */
+    {
+        "HRA_56_56",
+        HRA_56_56_MAX_ITER,
+        0,
+        1,
+        1,
+        HRA_56_56_CODELENGTH,
+        HRA_56_56_NUMBERPARITYBITS,
+        HRA_56_56_NUMBERROWSHCOLS,
+        HRA_56_56_MAX_ROW_WEIGHT,
+        HRA_56_56_MAX_COL_WEIGHT,
+        (uint16_t *)HRA_56_56_H_rows,
+        (uint16_t *)HRA_56_56_H_cols
 #ifdef __EMBEDDED__
     }
 #else
     },
-    
+
     /* default Wenet High Alitiude Balloon rate 0.8 code */
     {
         "H2064_516_sparse",
@@ -102,7 +118,7 @@ struct LDPC ldpc_codes[] = {
         (uint16_t *)H_256_512_4_H_rows,
         (uint16_t *)H_256_512_4_H_cols
     },
-    
+
     /* used for 4FSK/LLR experiments */
     {
         "HRAa_1536_512",
@@ -166,4 +182,3 @@ void ldpc_codes_setup(struct LDPC *ldpc, char name[]) {
     memcpy(ldpc,&ldpc_codes[code_index], sizeof(struct LDPC));
     set_up_ldpc_constants(ldpc, ldpc->CodeLength, ldpc->NumberParityBits);
 }
-

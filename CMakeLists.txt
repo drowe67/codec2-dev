@@ -389,10 +389,10 @@ if(UNITTEST)
 
     add_test(NAME test_OFDM_modem_octave_qam16_uncoded
              COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/octave;
-                            echo \"ofdm_tx('test_qam16.raw','qam16c1',3,12); ofdm_rx('test_qam16.raw','qam16c1', 0.05); quit\" | 
+                            echo \"ofdm_tx('test_qam16.raw','qam16c1',3,12); ofdm_rx('test_qam16.raw','qam16c1', 0.05); quit\" |
                             DISPLAY=\"\" octave --no-gui")
              set_tests_properties(test_OFDM_modem_octave_qam16_uncoded PROPERTIES PASS_REGULAR_EXPRESSION "Pass")
-             
+
     # noise free uncoded 700D test, including reading and writing payload bits
     add_test(NAME test_OFDM_modem_700D
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
@@ -475,6 +475,13 @@ endif()
                             ./ldpc_enc /dev/zero - --sd --code HRA_112_112 --testframes 200 |
                             ./ldpc_noise - - 0.5 |
                             ./ldpc_dec - /dev/null --code HRA_112_112 --sd --testframes"
+             )
+
+    add_test(NAME test_ldpc_enc_dec_HRA_56_56
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            ./ldpc_enc /dev/zero - --sd --code HRA_56_56 --testframes 200 |
+                            ./ldpc_noise - - 0.5 |
+                            ./ldpc_dec - /dev/null --code HRA_56_56 --sd --testframes"
              )
 
     add_test(NAME test_ldpc_enc_dec_HRAb_396_504

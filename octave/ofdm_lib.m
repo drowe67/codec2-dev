@@ -241,7 +241,7 @@ function config = ofdm_init_mode(mode="700D")
     Ts = 0.018; Nc = 17;
   elseif strcmp(mode,"700E")
     Ts = 0.010; Tcp=0.006; Nc = 16; Ns=5;
-    config.amp_est_mode = 1; config.state_machine = "voice2";
+    config.state_machine = "voice2";
     config.Nuwbits = 14; config.bad_uw_errors = 4; config.Ntxtbits = 2;
   elseif strcmp(mode,"2020")
     Ts = 0.0205; Nc = 31;
@@ -1392,6 +1392,13 @@ function [code_param Nbitspercodecframe Ncodecframespermodemframe] = codec_to_fr
   if strcmp(mode, "700D")
     load HRA_112_112.txt
     code_param = ldpc_init_user(HRA_112_112, modulation, mod_order, mapping);
+    assert(Nbitsperframe == (code_param.coded_bits_per_frame + Nuwbits + Ntxtbits));
+    % unused for this mode
+    Nbitspercodecframe = Ncodecframespermodemframe = 0;
+  end
+  if strcmp(mode, "700E")
+    load HRA_56_56.txt
+    code_param = ldpc_init_user(HRA_56_56, modulation, mod_order, mapping);
     assert(Nbitsperframe == (code_param.coded_bits_per_frame + Nuwbits + Ntxtbits));
     % unused for this mode
     Nbitspercodecframe = Ncodecframespermodemframe = 0;
