@@ -387,8 +387,16 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
      * the number of carriers requested.
      */
     int nuwsyms = ofdm->nuwbits / ofdm->bps;
+    int Ndatasymsperframe = (ofdm->ns-1)*ofdm->nc;
+    int uw_step = ofdm->nc + 1;                   // default step size
+    int last_sym = floorf(nuwsyms*uw_step/ofdm->bps);
+    if (last_sym >= ofdm->np*Ndatasymsperframe)
+        uw_step = ofdm->nc - 1;                   // try a different step
+    last_sym = floorf(nuwsyms*uw_step/ofdm->bps);
+    assert(last_sym < ofdm->np*Ndatasymsperframe);// bail if we still can't fit them all
+
     for (i = 0, j = 0; i < nuwsyms; i++, j += ofdm->bps) {
-        int val = floorf((i + 1) * (ofdm->nc + 1) / ofdm->bps);
+        int val = floorf((i + 1) * uw_step / ofdm->bps);
 
         ofdm->uw_ind_sym[i] = val;             // symbol index
 

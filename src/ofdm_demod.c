@@ -695,7 +695,7 @@ int main(int argc, char *argv[]) {
 
             if (verbose != 0) {
                 fprintf(stderr, "Coded BER: %5.4f Tbits: %5d Terrs: %5d\n", coded_ber, Tbits_coded, Terrs_coded);
-                fprintf(stderr, "Coded PER: %5.4f\n", (float)Tper/packet_count);
+                fprintf(stderr, "Coded PER: %5.4f Tpkts: %5d Tpers: %5d\n", (float)Tper/packet_count, packet_count, Tper);
               }
             if ((Tbits_coded == 0) || (coded_ber >= 0.01f))
                 return 1;

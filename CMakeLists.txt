@@ -443,6 +443,13 @@ if(LPCNET)
                             PATH=$PATH:${CMAKE_CURRENT_BINARY_DIR}/src ./ofdm_time_sync.sh 2020")
 endif()
 
+    # 700E at AWGN operating point
+    add_test(NAME test_OFDM_modem_700E_AWGN
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            ./ofdm_mod --in /dev/zero --testframes 10 --ldpc --mode 700E |
+                            ./cohpsk_ch - - -20.5 --Fs 8000 |
+                            ./ofdm_demod --mode 700E --ldpc --testframes -v 2 > /dev/null")
+
     # -------------------------------------------------------------------------
     #                                OFDM Data modes
     # -------------------------------------------------------------------------

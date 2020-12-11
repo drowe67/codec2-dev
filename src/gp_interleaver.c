@@ -43,6 +43,7 @@
 */
 
 static const int b_table[] = {
+     56, 37,    /* 700E: HRA_56_56                            */
     112, 71,    /* 700D: HRA_112_112                          */
     210, 131,   /* 2020: HRAb_396_504 with 312 data bits used */
     384, 239,   /* datac3: H_256_768_22                       */
@@ -59,7 +60,7 @@ int choose_interleaver_b(int Nbits)
     }
 
     /* if we get to here it means a Nbits we don't have in our table so choke */
-    
+
     fprintf(stderr, "gp_interleaver: Nbits: %d, b not found!\n", Nbits);
     assert(0);
 }
@@ -86,7 +87,7 @@ void gp_deinterleave_comp(COMP frame[], COMP interleaved_frame[], int Nbits) {
 void gp_interleave_float(float interleaved_frame[], float frame[], int Nbits) {
   int b = choose_interleaver_b(Nbits);
   int i,j;
-   
+
   for (i=0; i<Nbits; i++) {
     j = (b*i) % Nbits;
     interleaved_frame[j] = frame[i];
@@ -96,10 +97,9 @@ void gp_interleave_float(float interleaved_frame[], float frame[], int Nbits) {
 void gp_deinterleave_float(float frame[], float interleaved_frame[], int Nbits) {
   int b = choose_interleaver_b(Nbits);
   int i,j;
-   
+
   for (i=0; i<Nbits; i++) {
     j = (b*i) % Nbits;
     frame[i] = interleaved_frame[j];
   }
 }
-
