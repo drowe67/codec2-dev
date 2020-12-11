@@ -9,17 +9,18 @@ function [spread1 spread2 path_delay_samples] = channel_multipath(channel, Fs, N
     if strcmp(channel, 'mpg')     dopplerSpreadHz = 0.1; path_delay_ms = 0.5;
     elseif strcmp(channel, 'mpm') dopplerSpreadHz = 0.5; path_delay_ms = 1.0;
     elseif strcmp(channel, 'mpp') dopplerSpreadHz = 1.0; path_delay_ms = 2.0;
-    elseif strcmp(channel, 'mpd') dopplerSpreadHz = 2.5; path_delay_ms = 4.0;
+    elseif strcmp(channel, 'mpd') dopplerSpreadHz = 2.0; path_delay_ms = 4.0;
+    elseif strcmp(channel, 'mpf') dopplerSpreadHz = 4.0; path_delay_ms = 4.0;
     elseif printf("Unknown multipath channel\n"); assert(0); end
-    
+
     path_delay_samples = path_delay_ms*Fs/1000;
     printf(" Doppler Spread: %3.2f Hz Path Delay: %3.2f ms %d samples\n", dopplerSpreadHz, path_delay_ms, path_delay_samples);
 
     % generate same fading pattern for every run
     spread1 = doppler_spread(dopplerSpreadHz, Fs, Nsam);
     spread2 = doppler_spread(dopplerSpreadHz, Fs, Nsam);
-   
-    % sometimes doppler_spread() doesn't return exactly the number of samples we need 
+
+    % sometimes doppler_spread() doesn't return exactly the number of samples we need
     if length(spread1) < Nsam
       printf("not enough doppler spreading samples %d %d\n", length(spread1), Nsam);
       assert(0);
@@ -33,7 +34,7 @@ endfunction
 function rx = channel_simulate(Fs, SNR3kdB, freq_offset_Hz, channel, tx)
   Nsam = length(tx);
   rx = tx;
-  
+
   if strcmp(channel, 'awgn') == 0
     [spread1 spread2 path_delay_samples] = channel_multipath(channel, Fs, Nsam);
     rx  = tx(1:Nsam) .* spread1(1:Nsam);

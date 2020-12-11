@@ -243,6 +243,7 @@ function config = ofdm_init_mode(mode="700D")
     Ts = 0.010; Tcp=0.006; Nc = 16; Ns=5;
     config.state_machine = "voice2";
     config.Nuwbits = 14; config.bad_uw_errors = 4; config.Ntxtbits = 2;
+    config.amp_est_mode = 1; config.ftwindow_width = 80;
   elseif strcmp(mode,"2020")
     Ts = 0.0205; Nc = 31;
   elseif strcmp(mode,"2200")
@@ -690,11 +691,11 @@ function [states rx_bits achannel_est_rect_log rx_np rx_amp] = ofdm_demod(states
     if timing_valid
       timing_est = timing_est + ft_est - ceil(ftwindow_width/2);
 
-      % Black magic to keep sample_point inside cyclic prefix.  Or something like that.
+      % Black magic to keep sample_point 4 samples (0.5ms) inside edges of cyclic prefix.  Or something like that.
 
       delta_t = ft_est - ceil(ftwindow_width/2);
-      sample_point = max(timing_est+Ncp/4, sample_point);
-      sample_point = min(timing_est+Ncp, sample_point);
+      sample_point = max(timing_est+4, sample_point);
+      sample_point = min(timing_est+Ncp-4, sample_point);
     end
 
     if verbose > 1
@@ -782,7 +783,7 @@ function [states rx_bits achannel_est_rect_log rx_np rx_amp] = ofdm_demod(states
       achannel_est_rect(c) =  rx_sym(2,c)*pilots(c)';        % frame
       achannel_est_rect(c) += rx_sym(2+Ns,c)*pilots(c)';     % frame+1
       aamp_est_pilot(c) = abs(rx_sym(2,c)) + abs(rx_sym(2+Ns,c));
-    else
+    elseif strcmp(phase_est_bandwidth, "low")
       % Average over a bunch of pilots in adjacent carriers, and past and future frames, good
       % low SNR performance, but will fall over with high Doppler or freq offset.
       cr = c-1:c+1;
@@ -805,7 +806,7 @@ function [states rx_bits achannel_est_rect_log rx_np rx_amp] = ofdm_demod(states
   if strcmp(phase_est_bandwidth, "high")
     achannel_est_rect /= 2;
     aamp_est_pilot /= 2;
-  else
+  elseif strcmp(phase_est_bandwidth, "low")
     achannel_est_rect /= 12;
     aamp_est_pilot /= 12;
   end

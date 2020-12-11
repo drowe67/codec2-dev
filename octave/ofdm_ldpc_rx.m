@@ -137,7 +137,7 @@ function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", error_pattern_filena
         if states.amp_est_mode == 0
           mean_amp = states.mean_amp;
         else
-          mean_amp = mean( payload_amps_de);
+          mean_amp = mean(payload_amps_de)+1E-12;
         end
         mean_amp_log = [mean_amp_log mean_amp];
 
