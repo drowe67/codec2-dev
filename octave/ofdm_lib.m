@@ -91,13 +91,28 @@ function states = ofdm_init(config)
   % encoded bits.
 
   states.uw_ind = states.uw_ind_sym = [];
-  for i=1:states.Nuwbits/bps
-    ind_sym = floor(i*(Nc+1)/bps+1);
+  uw_step = Nc+1;                                % default step for UW sym placement
+
+  % lets see if all UW syms will fit in frame
+  Nuwsyms = states.Nuwbits/bps;
+  Ndatasymsperframe = (Ns-1)*Nc;
+  last_sym = floor(Nuwsyms*uw_step/bps+1);
+  if last_sym > Ndatasymsperframe
+    uw_step = Nc-1;                              % try a different step
+  end
+  last_sym = floor(Nuwsyms*uw_step/bps+1);
+  assert(last_sym <= Ndatasymsperframe);         % we still can't fit them all
+
+  % Place UW symbols in frame
+  for i=1:Nuwsyms
+    ind_sym = floor(i*uw_step/bps+1);
+    % printf("%d sym: %d\n",i, ind_sym);
     states.uw_ind_sym = [states.uw_ind_sym ind_sym];   % symbol index
     for b=bps-1:-1:0
       states.uw_ind = [states.uw_ind bps*ind_sym-b];   % bit index
     end
   end
+
   % how many of the first few frames have UW symbols in them
   Nsymsperframe = states.Nbitsperframe/states.bps;
   states.Nuwframes = ceil(states.uw_ind_sym(end)/Nsymsperframe);
@@ -240,9 +255,9 @@ function config = ofdm_init_mode(mode="700D")
   if strcmp(mode,"700D")
     Ts = 0.018; Nc = 17;
   elseif strcmp(mode,"700E")
-    Ts = 0.010; Tcp=0.006; Nc = 16; Ns=5;
+    Ts = 0.014; Tcp=0.006; Nc = 21; Ns=4;
     config.state_machine = "voice2";
-    config.Nuwbits = 14; config.bad_uw_errors = 4; config.Ntxtbits = 2;
+    config.Nuwbits = 12; config.bad_uw_errors = 3; config.Ntxtbits = 2;
     config.amp_est_mode = 1; config.ftwindow_width = 80;
   elseif strcmp(mode,"2020")
     Ts = 0.0205; Nc = 31;

@@ -8,7 +8,8 @@ function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", error_pattern_filena
   ldpc;
   gp_interleaver;
   more off;
-
+  pkg load signal;
+  
   % optional DPSK testing
   dpsk = 0;
   if strcmp(mode,"700D-DPSK")
