@@ -240,9 +240,9 @@ function config = ofdm_init_mode(mode="700D")
   if strcmp(mode,"700D")
     Ts = 0.018; Nc = 17;
   elseif strcmp(mode,"700E")
-    Ts = 0.010; Tcp=0.006; Nc = 23; Ns=5;
+    Ts = 0.010; Tcp=0.006; Nc = 16; Ns=5;
     config.amp_est_mode = 1; config.state_machine = "voice2";
-    config.Nuwbits = 14; config.bad_uw_errors = 4;
+    config.Nuwbits = 14; config.bad_uw_errors = 4; config.Ntxtbits = 2;
   elseif strcmp(mode,"2020")
     Ts = 0.0205; Nc = 31;
   elseif strcmp(mode,"2200")
