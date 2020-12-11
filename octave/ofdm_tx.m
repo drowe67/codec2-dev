@@ -7,7 +7,7 @@
 
 #{
   Examples:
- 
+
   i) 10 seconds, AWGN channel at SNR3k=3dB
 
     octave:4> ofdm_tx("awgn_ebno_3dB_700d.raw", "700D", 10, 3);
@@ -15,7 +15,7 @@
   ii) 10 seconds, multipath poor channel at SNR=6dB
 
     ofdm_tx("hf_ebno_6dB_700d.raw", "700D", 10, 6, "mpp");
-    
+
   iii) 10 seconds, 2200 waveform, AWGN channel, SNR3k=100dB (noise free)
 
     ofdm_tx("hf_2020.raw", "2200", 10);
@@ -28,7 +28,8 @@ function ofdm_tx(filename, mode="700D", Nsec, SNR3kdB=100, channel='awgn', freq_
   ofdm_lib;
   channel_lib;
   randn('seed',1);
-
+  pkg load signal;
+  
   dpsk = 0;
   if strcmp(mode,"700D-DPSK")
     mode = "700D"; dpsk = 1;
@@ -36,15 +37,15 @@ function ofdm_tx(filename, mode="700D", Nsec, SNR3kdB=100, channel='awgn', freq_
   if strcmp(mode,"2020-DPSK")
     mode = "2020"; dpsk = 1;
   end
-  
+
   % init modem
-  
+
   config = ofdm_init_mode(mode);
   states = ofdm_init(config);
   print_config(states);
   ofdm_load_const;
   states.dpsk=dpsk;
-  
+
   % Generate fixed test frame of tx bits and run OFDM modulator
 
   Npackets = round(Nsec/states.Tpacket);
@@ -62,9 +63,9 @@ function ofdm_tx(filename, mode="700D", Nsec, SNR3kdB=100, channel='awgn', freq_
   end
   % note this is PAPR of complex signal, PAPR of real signal will be 3dB larger
   cpapr = 10*log10(max(abs(tx).^2)/mean(abs(tx).^2));
-  
+
   % channel simulation and save to disk
-  
+
   printf("Packets: %3d CPAPR: %4.1f SNR(3k): %3.1f dB foff: %3.1f Hz ", Npackets, cpapr, SNR3kdB, freq_offset_Hz);
   rx = channel_simulate(Fs, SNR3kdB, freq_offset_Hz, channel, tx);
 
@@ -74,6 +75,6 @@ function ofdm_tx(filename, mode="700D", Nsec, SNR3kdB=100, channel='awgn', freq_
     rx /= 2;
     num_clipped = length(find(abs(rx> 32767)));
   end
-  
+
   frx=fopen(filename,"wb"); fwrite(frx, states.amp_scale*rx, "short"); fclose(frx);
 endfunction
