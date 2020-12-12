@@ -33,9 +33,8 @@
 #ifndef __FREEDV_API__
 #define __FREEDV_API__
 
-// This declares a single-precision (float) complex number
 #include <sys/types.h>
-
+// This declares a single-precision (float) complex number
 #include "comp.h"
 
 #ifdef __cplusplus
@@ -62,15 +61,14 @@
 #define FREEDV_FS_8000          8000
 #define FREEDV_FS_16000         16000
 
+// peak sample value from Tx modulator
+#define FREEDV_PEAK             16384
+
 // Return code flags for freedv_*rx* functions
 #define FREEDV_RX_TRIAL_SYNC       0x1       // demodulator has trial sync
 #define FREEDV_RX_SYNC             0x2       // demodulator has sync
 #define FREEDV_RX_BITS             0x4       // data bits have been returned
 #define FREEDV_RX_BIT_ERRORS       0x8       // FEC may not have corrected all bit errors (not all parity checks OK)
-
-#ifndef FREEDV_MODE_EN_DEFAULT
-#define FREEDV_MODE_EN_DEFAULT 1
-#endif
 
 // These macros allow us to disable unwanted modes at compile tine, for example
 // to save memory on embedded systems or the remove need to link other
@@ -78,6 +76,10 @@
 // -DFREEDV_MODE_1600_EN=0 will enable all but FreeDV 1600.  Or the other way
 // round -DFREEDV_MODE_EN_DEFAULT=0 -DFREEDV_MODE_1600_EN=1 will enable only
 // FreeDV 1600
+
+#ifndef FREEDV_MODE_EN_DEFAULT
+#define FREEDV_MODE_EN_DEFAULT 1
+#endif
 
 #if !defined(FREEDV_MODE_1600_EN)
         #define FREEDV_MODE_1600_EN FREEDV_MODE_EN_DEFAULT
@@ -117,11 +119,6 @@
 #endif
 
 #define FDV_MODE_ACTIVE(mode_name, var)  ((mode_name##_EN) == 0 ? 0: (var) == mode_name)
-
-// optional operator control of 700D state machine
-#define FREEDV_SYNC_UNSYNC 0                 // force sync state machine to lose sync, and search for new sync
-#define FREEDV_SYNC_AUTO   1                 // falls out of sync automatically
-#define FREEDV_SYNC_MANUAL 2                 // fall out of sync only under operator control
 
 // struct that hold state information for one freedv instance
 struct freedv;
