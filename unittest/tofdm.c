@@ -198,7 +198,8 @@ int main(int argc, char *argv[])
     ofdm = ofdm_create(&ofdm_config_default);
     assert(ofdm != NULL);
     ofdm_config = ofdm_get_config_param(ofdm);
-
+    ofdm_set_tx_bpf(ofdm, false);
+    
     // make local copies for convenience
     ofdm_tx_centre = ofdm_config->tx_centre;
     ofdm_rx_centre = ofdm_config->rx_centre;
@@ -275,9 +276,9 @@ int main(int argc, char *argv[])
 
     for(f=0; f<NFRAMES; f++) {
 
-	/* --------------------------------------------------------*\
+       	/* --------------------------------------------------------*\
 	                          Mod
-	\*---------------------------------------------------------*/
+	      \*---------------------------------------------------------*/
 
         /* See CML startup code in tofdm.m */
 
