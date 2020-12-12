@@ -42,10 +42,11 @@
 
 #include "debug_alloc.h"
 
-#define BUF_N                 160
-#define FAST_FADING_DELAY_MS  2.0
-#define SLOW_FADING_DELAY_MS  0.5
-#define PAPR_TARGET           7.0
+#define BUF_N                   160
+#define FASTER_FADING_DELAY_MS  4.0
+#define FAST_FADING_DELAY_MS    2.0
+#define SLOW_FADING_DELAY_MS    0.5
+#define PAPR_TARGET             7.0
 
 /*
   Use Octave to generate the fading channel models:
@@ -139,10 +140,6 @@ int main(int argc, char *argv[])
                         " [-f FoffHz] [--slow] [--fast] [--faster] [--clip 0to1] [--ssbfilt 0|1] [--raw_dir Path] [--complexout]\n", argv[0]);
         exit(1);
     }
-    fprintf(stderr, "cohpsk_ch ----------------------------------------------------------------------------------\n");
-    fprintf(stderr, "Fs: %d NodB: %4.2f foff: %4.2f Hz fading: %d inclip: %4.2f ssbfilt: %d complexout: %d\n",
-            Fs, NodB, foff_hz, fading_en, inclip, ssbfilt_en, complex_out);
-    fprintf(stderr, "cohpsk_ch ----------------------------------------------------------------------------------\n");
 
     phase_ch.real = 1.0; phase_ch.imag = 0.0;
     noise_r = 0;
@@ -191,10 +188,10 @@ int main(int argc, char *argv[])
         }
 
         if (fading_en == 3) {
-	    sprintf(fname, "%s/%s", raw_dir, FASTER_FADING_FILE_NAME);
+	          sprintf(fname, "%s/%s", raw_dir, FASTER_FADING_FILE_NAME);
             ffading = fopen(fname, "rb");
             if (ffading == NULL) goto cant_load_fading_file;
-            nhfdelay = floor(FAST_FADING_DELAY_MS*Fs/1000);
+            nhfdelay = floor(FASTER_FADING_DELAY_MS*Fs/1000);
         }
 
         ch_fdm_delay = (COMP*)MALLOC((nhfdelay+COHPSK_NOM_SAMPLES_PER_FRAME)*sizeof(COMP));
@@ -218,12 +215,18 @@ int main(int argc, char *argv[])
         ssbfiltbuf[i].real = 0.0; ssbfiltbuf[i].imag = 0.0;
     }
 
+    fprintf(stderr, "cohpsk_ch ----------------------------------------------------------------------------------\n");
+    fprintf(stderr, "Fs: %d NodB: %4.2f foff: %4.2f Hz fading: %d nhfdelay: %d inclip: %4.2f ssbfilt: %d complexout: %d\n",
+            Fs, NodB, foff_hz, fading_en, nhfdelay, inclip, ssbfilt_en, complex_out);
+    fprintf(stderr, "cohpsk_ch ----------------------------------------------------------------------------------\n");
+
     /* --------------------------------------------------------*\
 	                          Main Loop
     \*---------------------------------------------------------*/
+
     frames = 0;
     while(fread(buf, sizeof(short), BUF_N, fin) == BUF_N) {
-	frames++;
+	      frames++;
 
         /* Hilbert Transform to produce complex signal so we can do
            single sided freq shifts.  Allows us to use real signal I/O
@@ -268,9 +271,9 @@ int main(int argc, char *argv[])
         for(i=0; i<HT_N; i++)
            htbuf[i] = htbuf[i+BUF_N];
 
-	/* --------------------------------------------------------*\
+	      /* --------------------------------------------------------*\
 	                          Channel
-	\*---------------------------------------------------------*/
+	      \*---------------------------------------------------------*/
 
         fdmdv_freq_shift_coh(ch_fdm, ch_in, foff_hz, Fs, &phase_ch, BUF_N);
 

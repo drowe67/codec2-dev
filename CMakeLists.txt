@@ -669,6 +669,12 @@ if (NOT APPLE)
                             ./freedv_data_raw_tx --testframes 10 DATAC1 /dev/zero /dev/null")
              set_tests_properties(test_memory_leak_FreeDV_DATAC1_tx PROPERTIES PASS_REGULAR_EXPRESSION "ERROR SUMMARY: 0 errors")
 
+     add_test(NAME test_memory_leak_FreeDV_700E_tx
+             COMMAND sh -c "cd  ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes \
+                            ./freedv_tx --testframes 10 700E /dev/zero /dev/null")
+             set_tests_properties(test_memory_leak_FreeDV_700E_tx PROPERTIES PASS_REGULAR_EXPRESSION "ERROR SUMMARY: 0 errors")
+
 if(LPCNET)
      add_test(NAME test_memory_leak_FreeDV_2020_tx
              COMMAND sh -c "cd  ${CMAKE_CURRENT_BINARY_DIR}/src;

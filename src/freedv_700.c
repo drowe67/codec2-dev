@@ -107,7 +107,73 @@ void freedv_700d_open(struct freedv *f) {
     f->ldpc = (struct LDPC*)MALLOC(sizeof(struct LDPC));
     assert(f->ldpc != NULL);
 
-    ldpc_codes_setup(f->ldpc, "HRA_112_112");
+    ldpc_codes_setup(f->ldpc, f->ofdm->codename);
+#ifdef __EMBEDDED__
+    f->ldpc->max_iter = 10; /* limit LDPC decoder iterations to limit CPU load */
+#endif
+    int Nsymsperpacket = ofdm_get_bits_per_packet(f->ofdm) / f->ofdm->bps;
+    f->rx_syms = (COMP*)MALLOC(sizeof(COMP) * Nsymsperpacket);
+    assert(f->rx_syms != NULL);
+    f->rx_amps = (float*)MALLOC(sizeof(float) * Nsymsperpacket);
+    assert(f->rx_amps != NULL);
+    for(int i=0; i<Nsymsperpacket; i++) {
+        f->rx_syms[i].real = f->rx_syms[i].imag = 0.0;
+        f->rx_amps[i]= 0.0;
+    }
+
+    f->nin = f->nin_prev = ofdm_get_samples_per_frame(f->ofdm);
+    f->n_nat_modem_samples = ofdm_get_samples_per_frame(f->ofdm);
+    f->n_nom_modem_samples = ofdm_get_samples_per_frame(f->ofdm);
+    f->n_max_modem_samples = ofdm_get_max_samples_per_frame(f->ofdm);
+    f->modem_sample_rate = f->ofdm->config.fs;
+    f->clip = 0;
+    f->sz_error_pattern = f->ofdm_bitsperframe;
+
+    f->tx_bits = NULL; /* not used for 700D */
+
+#ifndef __EMBEDDED__
+    /* tx BPF off on embedded platforms, as it consumes significant CPU */
+    ofdm_set_tx_bpf(f->ofdm, 1);
+#endif
+
+    f->speech_sample_rate = FREEDV_FS_8000;
+    f->codec2 = codec2_create(CODEC2_MODE_700C); assert(f->codec2 != NULL);
+    /* should be exactly an integer number of Codec 2 frames in a OFDM modem frame */
+    assert((f->ldpc->data_bits_per_frame % codec2_bits_per_frame(f->codec2)) == 0);
+
+    f->n_codec_frames = f->ldpc->data_bits_per_frame/codec2_bits_per_frame(f->codec2);
+    f->n_speech_samples = f->n_codec_frames*codec2_samples_per_frame(f->codec2);
+    f->bits_per_codec_frame = codec2_bits_per_frame(f->codec2);
+    f->bits_per_modem_frame = f->n_codec_frames*f->bits_per_codec_frame;
+
+    f->tx_payload_bits = (unsigned char*)MALLOC(f->bits_per_modem_frame);
+    assert(f->tx_payload_bits != NULL);
+    f->rx_payload_bits = (unsigned char*)MALLOC(f->bits_per_modem_frame);
+    assert(f->rx_payload_bits != NULL);
+}
+
+void freedv_700e_open(struct freedv *f) {
+    f->snr_squelch_thresh = 0.0;
+    f->squelch_en = 0;
+    struct OFDM_CONFIG *ofdm_config = (struct OFDM_CONFIG *) calloc(1, sizeof (struct OFDM_CONFIG));
+    assert(ofdm_config != NULL);
+    char mode[32] = "700E";
+    ofdm_init_mode(mode, ofdm_config);
+
+    f->ofdm = ofdm_create(ofdm_config);
+    assert(f->ofdm != NULL);
+
+    free(ofdm_config);
+    ofdm_config = ofdm_get_config_param(f->ofdm);
+    f->ofdm_bitsperpacket = ofdm_get_bits_per_packet(f->ofdm);
+    f->ofdm_bitsperframe = ofdm_get_bits_per_frame(f->ofdm);
+    f->ofdm_nuwbits = (ofdm_config->ns - 1) * ofdm_config->bps - ofdm_config->txtbits;
+    f->ofdm_ntxtbits = ofdm_config->txtbits;
+
+    f->ldpc = (struct LDPC*)MALLOC(sizeof(struct LDPC));
+    assert(f->ldpc != NULL);
+
+    ldpc_codes_setup(f->ldpc, f->ofdm->codename);
 #ifdef __EMBEDDED__
     f->ldpc->max_iter = 10; /* limit LDPC decoder iterations to limit CPU load */
 #endif

@@ -50,13 +50,13 @@
 #define FREEDV_MODE_700C        6
 #define FREEDV_MODE_700D        7
 #define FREEDV_MODE_2020        8
+#define FREEDV_MODE_700E       13
 
 // available data modes
 #define FREEDV_MODE_FSK_LDPC    9
 #define FREEDV_MODE_DATAC1     10
 #define FREEDV_MODE_DATAC2     11
 #define FREEDV_MODE_DATAC3     12
-
 
 // Sample rates used
 #define FREEDV_FS_8000          8000
@@ -87,6 +87,9 @@
 #endif
 #if !defined(FREEDV_MODE_700D_EN)
         #define FREEDV_MODE_700D_EN FREEDV_MODE_EN_DEFAULT
+#endif
+#if !defined(FREEDV_MODE_700E_EN)
+        #define FREEDV_MODE_700E_EN FREEDV_MODE_EN_DEFAULT
 #endif
 #if !defined(FREEDV_MODE_2400A_EN)
         #define FREEDV_MODE_2400A_EN FREEDV_MODE_EN_DEFAULT

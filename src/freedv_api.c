@@ -122,13 +122,14 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
     if ((FDV_MODE_ACTIVE( FREEDV_MODE_1600,   mode)   ||
          FDV_MODE_ACTIVE( FREEDV_MODE_700C,   mode)   ||
          FDV_MODE_ACTIVE( FREEDV_MODE_700D,   mode)   ||
-         FDV_MODE_ACTIVE( FREEDV_MODE_2400A,  mode)  ||
-         FDV_MODE_ACTIVE( FREEDV_MODE_2400B,  mode)  ||
-         FDV_MODE_ACTIVE( FREEDV_MODE_800XA,  mode)  ||
+         FDV_MODE_ACTIVE( FREEDV_MODE_700E,   mode)   ||
+         FDV_MODE_ACTIVE( FREEDV_MODE_2400A,  mode)   ||
+         FDV_MODE_ACTIVE( FREEDV_MODE_2400B,  mode)   ||
+         FDV_MODE_ACTIVE( FREEDV_MODE_800XA,  mode)   ||
          FDV_MODE_ACTIVE( FREEDV_MODE_2020,   mode)   ||
          FDV_MODE_ACTIVE( FREEDV_MODE_FSK_LDPC, mode) ||
-         FDV_MODE_ACTIVE( FREEDV_MODE_DATAC1, mode) ||
-         FDV_MODE_ACTIVE( FREEDV_MODE_DATAC2, mode) ||
+         FDV_MODE_ACTIVE( FREEDV_MODE_DATAC1, mode)   ||
+         FDV_MODE_ACTIVE( FREEDV_MODE_DATAC2, mode)   ||
          FDV_MODE_ACTIVE( FREEDV_MODE_DATAC3, mode))
          == false) return NULL;
 
@@ -141,6 +142,7 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
     if (FDV_MODE_ACTIVE( FREEDV_MODE_1600, mode)) freedv_1600_open(f);
     if (FDV_MODE_ACTIVE( FREEDV_MODE_700C, mode)) freedv_700c_open(f);
     if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, mode)) freedv_700d_open(f);
+    if (FDV_MODE_ACTIVE( FREEDV_MODE_700E, mode)) freedv_700e_open(f);
 #ifdef __LPCNET__
     if (FDV_MODE_ACTIVE( FREEDV_MODE_2020, mode)) freedv_2020_open(f);
 #endif
@@ -190,6 +192,13 @@ void freedv_close(struct freedv *freedv) {
     }
 
     if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, freedv->mode)) {
+        FREE(freedv->rx_syms);
+        FREE(freedv->rx_amps);
+        FREE(freedv->ldpc);
+        ofdm_destroy(freedv->ofdm);
+    }
+
+    if (FDV_MODE_ACTIVE( FREEDV_MODE_700E, freedv->mode)) {
         FREE(freedv->rx_syms);
         FREE(freedv->rx_amps);
         FREE(freedv->ldpc);
@@ -322,7 +331,8 @@ void freedv_comptx(struct freedv *f, COMP mod_out[], short speech_in[]) {
 
     assert((FDV_MODE_ACTIVE( FREEDV_MODE_1600, f->mode)) || (FDV_MODE_ACTIVE( FREEDV_MODE_700C, f->mode)) ||
            (FDV_MODE_ACTIVE( FREEDV_MODE_2400A, f->mode)) || (FDV_MODE_ACTIVE( FREEDV_MODE_2400B, f->mode)) ||
-           (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode))  || (FDV_MODE_ACTIVE( FREEDV_MODE_2020, f->mode)));
+           (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode))  || (FDV_MODE_ACTIVE( FREEDV_MODE_2020, f->mode)) ||
+           (FDV_MODE_ACTIVE( FREEDV_MODE_700E, f->mode)));
 
     if (FDV_MODE_ACTIVE( FREEDV_MODE_1600, f->mode)) {
         codec2_encode_upacked(f, f->tx_payload_bits, speech_in);
@@ -339,7 +349,7 @@ void freedv_comptx(struct freedv *f, COMP mod_out[], short speech_in[]) {
         freedv_comptx_700c(f, mod_out);
     }
 
-    if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode)) {
+    if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_700E, f->mode)) {
 
         /* buffer up bits until we get enough encoded bits for interleaver */
 
@@ -691,7 +701,7 @@ int freedv_rx(struct freedv *f, short speech_out[], short demod_in[]) {
     }
 
     /* special low memory version for 700D, to help with stm32 port */
-    if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode)) {
+    if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_700E, f->mode)) {
         float gain = 2.0f; /* keep levels the same as Octave simulations and C unit tests for real signals */
         return freedv_shortrx(f, speech_out, demod_in, gain);
     }
@@ -719,7 +729,7 @@ int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]) {
         rx_status = freedv_comprx_fsk(f, demod_in);
     }
 
-    if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode)) {
+    if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_700E, f->mode)) {
         rx_status = freedv_comp_short_rx_ofdm(f, (void*)demod_in, 0, 2.0f); // was 1.0 ??
     }
 
@@ -746,10 +756,10 @@ int freedv_shortrx(struct freedv *f, short speech_out[], short demod_in[], float
 
     // At this stage short interface only supported for 700D, to help
     // memory requirements on stm32
-    assert(f->mode == FREEDV_MODE_700D);
+    assert((f->mode == FREEDV_MODE_700D) || (f->mode == FREEDV_MODE_700E));
     assert(f->nin <= f->n_max_modem_samples);
 
-    if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode)) {
+    if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_700E, f->mode)) {
         rx_status = freedv_comp_short_rx_ofdm(f, (void*)demod_in, 1, gain);
     }
 
@@ -873,7 +883,7 @@ int freedv_bits_to_speech(struct freedv *f, short speech_out[], short demod_in[]
         } else {
             /* codec 2 decoder */
 
-            if(FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode)) {
+            if(FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_700E, f->mode)) {
                 nout = f->n_speech_samples;
                 for (int i = 0; i < f->n_codec_frames; i++) {
                     codec2_decode_upacked(f, speech_out, f->rx_payload_bits + i*f->bits_per_codec_frame);

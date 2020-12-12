@@ -56,13 +56,13 @@ int main(int argc, char *argv[]) {
     int                        use_squelch;
     float                      squelch = 0;
     int                        i;
-    
+
     if (argc < 4) {
         char f2020[80] = {0};
         #ifdef __LPCNET__
         sprintf(f2020,"|2020");
-        #endif     
-	printf("usage: %s 1600|700C|700D|2400A|2400B|800XA%s InputModemSpeechFile OutputSpeechRawFile\n"
+        #endif
+	printf("usage: %s 1600|700C|700D|700E|2400A|2400B|800XA%s InputModemSpeechFile OutputSpeechRawFile\n"
                " [--testframes] [-v] [--discard] [--usecomplex] [--dpsk] [--squelch leveldB]\n", argv[0],f2020);
 	printf("e.g    %s 1600 hts1a_fdmdv.raw hts1a_out.raw\n", argv[0]);
 	exit(1);
@@ -72,6 +72,7 @@ int main(int argc, char *argv[]) {
     if (!strcmp(argv[1],"1600")) mode = FREEDV_MODE_1600;
     if (!strcmp(argv[1],"700C")) mode = FREEDV_MODE_700C;
     if (!strcmp(argv[1],"700D")) mode = FREEDV_MODE_700D;
+    if (!strcmp(argv[1],"700E")) mode = FREEDV_MODE_700E;
     if (!strcmp(argv[1],"2400A")) mode = FREEDV_MODE_2400A;
     if (!strcmp(argv[1],"2400B")) mode = FREEDV_MODE_2400B;
     if (!strcmp(argv[1],"800XA")) mode = FREEDV_MODE_800XA;
@@ -98,7 +99,7 @@ int main(int argc, char *argv[]) {
     }
 
     use_testframes = verbose = discard = use_complex = use_dpsk = use_squelch = 0;
-    
+
     if (argc > 4) {
         for (i = 4; i < argc; i++) {
             if (strcmp(argv[i], "--testframes") == 0) use_testframes = 1;
@@ -122,7 +123,7 @@ int main(int argc, char *argv[]) {
     assert(freedv != NULL);
 
     /* set up a few options, calling these is optional -------------------------*/
-    
+
     freedv_set_test_frames(freedv, use_testframes);
     freedv_set_verbose(freedv, verbose);
 
@@ -133,7 +134,7 @@ int main(int argc, char *argv[]) {
     freedv_set_dpsk(freedv, use_dpsk);
 
     /* note use of API functions to tell us how big our buffers need to be -----*/
-    
+
     short speech_out[freedv_get_n_max_speech_samples(freedv)];
     short demod_in[freedv_get_n_max_modem_samples(freedv)];
 
@@ -145,13 +146,13 @@ int main(int argc, char *argv[]) {
     nin = freedv_nin(freedv);
     while(fread(demod_in, sizeof(short), nin, fin) == nin) {
         frame++;
-        
+
         if (use_complex) {
             /* exercise the complex version of the API (useful
                for testing 700D which has a different code path for
                short samples) */
             COMP demod_in_complex[nin];
-            
+
             for(int i=0; i<nin; i++) {
                 demod_in_complex[i].real = (float)demod_in[i];
                 demod_in_complex[i].imag = 0.0f;
@@ -181,7 +182,7 @@ int main(int argc, char *argv[]) {
 
         fwrite(speech_out, sizeof(short), nout, fout);
         nout_total += nout;
-        
+
         if (verbose == 1) {
             fprintf(stderr, "frame: %d  demod sync: %d  nin: %d demod snr: %3.2f dB  bit errors: %d clock_offset: %f\n",
                     frame, sync, nin, snr_est, total_bit_errors, clock_offset);
@@ -198,12 +199,12 @@ int main(int argc, char *argv[]) {
     fprintf(stderr, "frames decoded: %d  output speech samples: %d\n", frame, nout_total);
 
     /* finish up with some stats */
-    
+
     if (freedv_get_test_frames(freedv)) {
         int Tbits = freedv_get_total_bits(freedv);
         int Terrs = freedv_get_total_bit_errors(freedv);
         float uncoded_ber = (float)Terrs/Tbits;
-        fprintf(stderr, "BER......: %5.4f Tbits: %5d Terrs: %5d\n", 
+        fprintf(stderr, "BER......: %5.4f Tbits: %5d Terrs: %5d\n",
 		(double)uncoded_ber, Tbits, Terrs);
         if ((mode == FREEDV_MODE_700D) || (mode == FREEDV_MODE_2020)) {
             int Tbits_coded = freedv_get_total_bits_coded(freedv);
@@ -223,4 +224,3 @@ int main(int argc, char *argv[]) {
     freedv_close(freedv);
     return 0;
 }
-
