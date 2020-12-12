@@ -96,7 +96,7 @@ int main(int argc, char *argv[])
     float          hf_gain;
     COMP          *ch_fdm_delay = NULL, aspread, aspread_2ms, delayed, direct;
     float          tx_pwr, tx_pwr_fade, noise_pwr;
-    int            frames, i, j, k, Fs, ret, nclipped, noutclipped, ssbfilt_en, complex_out;
+    int            frames, i, j, k, Fs, ret, nclipped, noutclipped, ssbfilt_en, complex_out, ctest;
     float          sam, peak, clip, papr, CNo, snr3k, gain;
 
     if (argc > 3) {
@@ -115,7 +115,7 @@ int main(int argc, char *argv[])
         }
 
         NodB = atof(argv[3]);
-        Fs = COHPSK_FS; foff_hz = 0.0; fading_en = 0;
+        Fs = COHPSK_FS; foff_hz = 0.0; fading_en = 0; ctest = 0;
         clip = FREEDV_PEAK; gain = 1.0;
         ssbfilt_en = 1; complex_out = 0;
         raw_dir = strdup(DEFAULT_RAW_DIR);
@@ -130,6 +130,7 @@ int main(int argc, char *argv[])
             else if (!strcmp(argv[i], "--clip")) { clip = atof(argv[i+1]); i++; }
             else if (!strcmp(argv[i], "--ssbfilt")) { ssbfilt_en = atof(argv[i+1]); i++; }
             else if (!strcmp(argv[i], "--complexout")) complex_out = 1;
+            else if (!strcmp(argv[i], "--ctest")) ctest = 1;
             else if (!strcmp(argv[i], "--raw_dir")) {
                 FREE(raw_dir); raw_dir = strdup(argv[i+1]); i++;
             } else {
@@ -396,5 +397,9 @@ int main(int argc, char *argv[])
 
     if (ffading != NULL) fclose(ffading);
     if (ch_fdm_delay != NULL) FREE(ch_fdm_delay);
-    return 0;
+    if (ctest) {
+        /* special ctest modes, check CPAPR is around 0dB */
+        if (fabs(papr) < 0.7) return 0; else return 1;
+    }
+    else return 0;
 }

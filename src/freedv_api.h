@@ -70,6 +70,11 @@
 #define FREEDV_RX_BITS             0x4       // data bits have been returned
 #define FREEDV_RX_BIT_ERRORS       0x8       // FEC may not have corrected all bit errors (not all parity checks OK)
 
+// optional operator control of OFDM modem state machine
+#define FREEDV_SYNC_UNSYNC 0                 // force sync state machine to lose sync, and search for new sync
+#define FREEDV_SYNC_AUTO   1                 // falls out of sync automatically
+#define FREEDV_SYNC_MANUAL 2                 // fall out of sync only under operator control
+
 // These macros allow us to disable unwanted modes at compile tine, for example
 // to save memory on embedded systems or the remove need to link other
 // libraries. By default we enable all modes.  Disable during compile time e.g

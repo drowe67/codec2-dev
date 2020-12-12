@@ -338,6 +338,11 @@ if(UNITTEST)
              COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/octave; SHORT_VERSION_FOR_CTEST=1 octave --no-gui -qf ldpcut.m")
              set_tests_properties(test_CML_ldpcut PROPERTIES PASS_REGULAR_EXPRESSION "Nerr: 0")
 
+    # check channel simulator measures correct Peak to Average Power Ratio (about 0dB) with a sine wave input signal
+    add_test(NAME test_cohpsk_ch_papr
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR};
+                            ./misc/mksine - 1000 10 | ./src/cohpsk_ch - /dev/null -100 --Fs 8000 --ctest")
+
     add_test(NAME test_codec2_700c_octave_port
              COMMAND sh -c "
                cd ${CMAKE_CURRENT_BINARY_DIR}/src;
