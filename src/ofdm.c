@@ -205,6 +205,8 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
         ofdm->state_machine = "voice1";
         ofdm->edge_pilots = 1;
         ofdm->codename = "HRA_112_112";
+        ofdm->amp_est_mode = 0;
+        ofdm->tx_bpf_en = true;
         memset(ofdm->tx_uw, 0, ofdm->nuwbits);
     } else {
         /* Use the users values */
@@ -227,6 +229,8 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
         ofdm->state_machine = config->state_machine;
         ofdm->edge_pilots = config->edge_pilots;
         ofdm->codename = config->codename;
+        ofdm->amp_est_mode = config->amp_est_mode;
+        ofdm->tx_bpf_en = config->tx_bpf_en;
         memcpy(ofdm->tx_uw, config->tx_uw, ofdm->nuwbits);
     }
 
@@ -262,6 +266,8 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     ofdm->config.state_machine = ofdm->state_machine;
     ofdm->config.edge_pilots = ofdm->edge_pilots;
     ofdm->config.codename = ofdm->codename;
+    ofdm->config.amp_est_mode = ofdm->amp_est_mode;
+    ofdm->config.tx_bpf_en = ofdm->tx_bpf_en;
     memcpy(ofdm->config.tx_uw, ofdm->tx_uw, ofdm->nuwbits);
 
     /* Calculate sizes from config param */
@@ -471,7 +477,6 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     ofdm->timing_norm = ofdm->samplespersymbol * acc;
     ofdm->clock_offset_counter = 0;
     ofdm->sig_var = ofdm->noise_var = 1.0f;
-    ofdm->tx_bpf_en = false;
     ofdm->dpsk_en = false;
 
     return ofdm; /* Success */
@@ -1396,6 +1401,9 @@ static void ofdm_demod_core(struct OFDM *ofdm, int *rx_bits) {
 
             /* amplitude is estimated over 12 pilots */
             aphase_est_pilot_rect /= 12.0f;
+
+            aphase_est_pilot[i] = cargf(aphase_est_pilot_rect);
+            aamp_est_pilot[i] = cabsf(aphase_est_pilot_rect);
         } else {
             assert(ofdm->phase_est_bandwidth == high_bw);
 
@@ -1405,11 +1413,19 @@ static void ofdm_demod_core(struct OFDM *ofdm, int *rx_bits) {
              *
              * As less pilots are averaged, low SNR performance will be poorer
              */
-            aphase_est_pilot_rect = ofdm->rx_sym[1][i] * conjf(ofdm->pilots[i]);            /* "this" pilot conjugate */
+            aphase_est_pilot_rect = ofdm->rx_sym[1][i] * conjf(ofdm->pilots[i]);             /* "this" pilot conjugate */
             aphase_est_pilot_rect += ofdm->rx_sym[ofdm->ns + 1][i] * conjf(ofdm->pilots[i]); /* "next" pilot conjugate */
 
-            /* amplitude is estimated over 2 pilots */
+            /* we estimate over 2 pilots */
             aphase_est_pilot_rect /= 2.0f;
+            aphase_est_pilot[i] = cargf(aphase_est_pilot_rect);
+
+            if (ofdm->amp_est_mode == 0) {
+                // legacy 700D ampl est method
+                aamp_est_pilot[i] = cabsf(aphase_est_pilot_rect);
+            } else {
+                aamp_est_pilot[i] = cabsf(ofdm->rx_sym[1][i]) + cabsf(ofdm->rx_sym[ofdm->ns + 1][i])/2.0;
+            }
         }
 
         aphase_est_pilot[i] = cargf(aphase_est_pilot_rect);

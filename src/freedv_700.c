@@ -136,9 +136,11 @@ void freedv_ofdm_voice_open(struct freedv *f, char *mode) {
 
     f->tx_bits = NULL; /* not used for 700D */
 
-#ifndef __EMBEDDED__
     /* tx BPF off on embedded platforms, as it consumes significant CPU */
-    ofdm_set_tx_bpf(f->ofdm, 1);
+#ifdef __EMBEDDED__
+    ofdm_set_tx_bpf(f->ofdm, 0);
+#else
+    ofdm_set_tx_bpf(f->ofdm, ofdm_config->tx_bpf_en);
 #endif
 
     f->speech_sample_rate = FREEDV_FS_8000;
@@ -531,7 +533,7 @@ int freedv_comp_short_rx_ofdm(struct freedv *f, void *demod_in_8kHz, int demod_i
     ofdm_sync_state_machine(ofdm, rx_uw);
 
     if ((f->verbose && (ofdm->last_sync_state == search)) || (f->verbose == 2)) {
-        fprintf(stderr, "%3d nin: %4d st: %-6s euw: %2d %1d mf: %2d f: %5.1f phbw: %d snr: %4.1f eraw: %3d ecdd: %3d iter: %3d "
+        fprintf(stderr, "%3d nin: %4d st: %-6s euw: %2d %1d mf: %2d f: %5.1f pbw: %d snr: %4.1f eraw: %3d ecdd: %3d iter: %3d "
                 "pcc: %3d rxst: %s\n",
                 f->frames++, ofdm->nin,
                 ofdm_statemode[ofdm->last_sync_state],

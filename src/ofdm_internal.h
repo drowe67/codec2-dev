@@ -97,6 +97,8 @@ struct OFDM_CONFIG {
     char *state_machine;  /* name of sync state machine used for this mode */
     char *codename;       /* name of LDPC code used with this mode */
     uint8_t tx_uw[MAX_UW_BITS]; /* user defined unique word */
+    int amp_est_mode;
+    bool tx_bpf_en;       /* default tx BPF state */
 };
 
 struct OFDM {
@@ -132,6 +134,7 @@ struct OFDM {
     int bad_uw_errors;
     int edge_pilots;      /* insert pilots at 1 and Nc+2, to support low bandwidth phase est */
     int data_mode;        /* true of a data mode, false for voice mode */
+    int amp_est_mode;     /* amplitude estimtor algorithm */
 
     float tx_centre; /* TX Center frequency */
     float rx_centre; /* RX Center frequency */

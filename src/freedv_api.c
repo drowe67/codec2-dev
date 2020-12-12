@@ -902,7 +902,7 @@ int freedv_bits_to_speech(struct freedv *f, short speech_out[], short demod_in[]
         }
     }
 
-    if (f->verbose == 2) {
+    if (f->verbose == 3) {
         fprintf(stderr, "    sqen: %d nout: %d decsp: %d\n", f->squelch_en, nout, decode_speech);
     }
 
