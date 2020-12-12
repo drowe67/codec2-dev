@@ -116,7 +116,7 @@ int main(int argc, char *argv[])
 
         NodB = atof(argv[3]);
         Fs = COHPSK_FS; foff_hz = 0.0; fading_en = 0;
-        clip = sqrt(2*FREEDV_PEAK*FREEDV_PEAK); gain = 1.0;
+        clip = FREEDV_PEAK; gain = 1.0;
         ssbfilt_en = 1; complex_out = 0;
         raw_dir = strdup(DEFAULT_RAW_DIR);
 
