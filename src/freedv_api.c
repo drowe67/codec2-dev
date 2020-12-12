@@ -141,8 +141,8 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
 
     if (FDV_MODE_ACTIVE( FREEDV_MODE_1600, mode)) freedv_1600_open(f);
     if (FDV_MODE_ACTIVE( FREEDV_MODE_700C, mode)) freedv_700c_open(f);
-    if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, mode)) freedv_700d_open(f);
-    if (FDV_MODE_ACTIVE( FREEDV_MODE_700E, mode)) freedv_700e_open(f);
+    if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, mode)) freedv_ofdm_voice_open(f, "700D");
+    if (FDV_MODE_ACTIVE( FREEDV_MODE_700E, mode)) freedv_ofdm_voice_open(f, "700E");
 #ifdef __LPCNET__
     if (FDV_MODE_ACTIVE( FREEDV_MODE_2020, mode)) freedv_2020_open(f);
 #endif
@@ -191,14 +191,8 @@ void freedv_close(struct freedv *freedv) {
         FREE(freedv->ptFilter7500to8000);
     }
 
-    if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, freedv->mode)) {
-        FREE(freedv->rx_syms);
-        FREE(freedv->rx_amps);
-        FREE(freedv->ldpc);
-        ofdm_destroy(freedv->ofdm);
-    }
-
-    if (FDV_MODE_ACTIVE( FREEDV_MODE_700E, freedv->mode)) {
+    if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, freedv->mode) ||
+        FDV_MODE_ACTIVE( FREEDV_MODE_700E, freedv->mode)) {
         FREE(freedv->rx_syms);
         FREE(freedv->rx_amps);
         FREE(freedv->ldpc);
