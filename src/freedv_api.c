@@ -1158,6 +1158,8 @@ void freedv_set_total_bit_errors          (struct freedv *f, int val) {f->total_
 void freedv_set_total_bits                (struct freedv *f, int val) {f->total_bits = val;}
 void freedv_set_total_bit_errors_coded    (struct freedv *f, int val) {f->total_bit_errors_coded = val;}
 void freedv_set_total_bits_coded          (struct freedv *f, int val) {f->total_bits_coded = val;}
+void freedv_set_total_packet_errors       (struct freedv *f, int val) {f->total_packet_errors = val;}
+void freedv_set_total_packets             (struct freedv *f, int val) {f->total_packets = val;}
 void freedv_set_clip                      (struct freedv *f, int val) {f->clip = val;}
 void freedv_set_varicode_code_num         (struct freedv *f, int val) {varicode_set_code_num(&f->varicode_dec_states, val);}
 void freedv_set_ext_vco                   (struct freedv *f, int val) {f->ext_vco = val;}
@@ -1262,13 +1264,15 @@ int freedv_get_modem_sample_rate          (struct freedv *f) {return f->modem_sa
 int freedv_get_modem_symbol_rate          (struct freedv *f) {return f->modem_symbol_rate;}
 int freedv_get_n_max_modem_samples        (struct freedv *f) {return f->n_max_modem_samples;}
 int freedv_get_n_nom_modem_samples        (struct freedv *f) {return f->n_nom_modem_samples;}
-int freedv_get_n_tx_modem_samples        (struct freedv *f) {return f->n_nat_modem_samples;}
+int freedv_get_n_tx_modem_samples         (struct freedv *f) {return f->n_nat_modem_samples;}
 int freedv_get_total_bits                 (struct freedv *f) {return f->total_bits;}
 int freedv_get_total_bit_errors           (struct freedv *f) {return f->total_bit_errors;}
 int freedv_get_total_bits_coded           (struct freedv *f) {return f->total_bits_coded;}
 int freedv_get_total_bit_errors_coded     (struct freedv *f) {return f->total_bit_errors_coded;}
+int freedv_get_total_packets              (struct freedv *f) {return f->total_packets;}
+int freedv_get_total_packet_errors        (struct freedv *f) {return f->total_packet_errors;}
 int freedv_get_sync                       (struct freedv *f) {return f->stats.sync;}
-struct CODEC2 *freedv_get_codec2	  (struct freedv *f) {return  f->codec2;}
+struct CODEC2 *freedv_get_codec2	        (struct freedv *f) {return  f->codec2;}
 int freedv_get_bits_per_codec_frame       (struct freedv *f) {return f->bits_per_codec_frame;}
 int freedv_get_bits_per_modem_frame       (struct freedv *f) {return f->bits_per_modem_frame;}
 int freedv_get_rx_status                  (struct freedv *f) {return f->rx_status;}
