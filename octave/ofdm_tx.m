@@ -54,32 +54,8 @@ function ofdm_tx(filename, mode="700D", Nsec, SNR3kdB=100, channel='awgn', freq_
   for f=1:Npackets
     tx = [tx ofdm_mod(states, tx_bits)];
   end
-  tx *= states.amp_scale;
 
-  % optional clipper to improve PAPR
-
-  nclipped = 0;
-  if tx_clip_en
-    [tx nclipped] = ofdm_clip(states, tx*states.clip_gain, 16384);
-  end
-  % note this is PAPR of complex signal, PAPR of real signal will be 3dB-ish larger
-  peak = max(abs(tx)); RMS = sqrt(mean(abs(tx).^2));
-  cpapr = 10*log10((peak.^2)/(RMS.^2));
-
-  % channel simulation and save to disk
-
-  printf("Packets: %3d Peak: %4.2f RMS: %5.2f CPAPR: %4.1f clipped: %5.2f%%\n",
-         Npackets, peak, RMS, cpapr, nclipped*100/length(tx));
-  printf("foff: %3.1f Hz SNR(3k): %3.1f dB ", freq_offset_Hz, SNR3kdB);
-  rx = channel_simulate(Fs, SNR3kdB, freq_offset_Hz, channel, tx);
-
-  % multipath models can lead to clipping of int16 samples
-  num_clipped = length(find(abs(rx>32767)));
-  while num_clipped/length(rx) > 0.001
-    rx /= 2;
-    num_clipped = length(find(abs(rx>32767)));
-    printf("WARNING: output samples clipped, reducing level\n")
-  end
-
+  printf("Npackets: %d  ", Npackets);
+  rx = ofdm_clip_channel(states, tx, SNR3kdB, channel, freq_offset_Hz, tx_clip_en);
   frx=fopen(filename,"wb"); fwrite(frx, rx, "short"); fclose(frx);
 endfunction

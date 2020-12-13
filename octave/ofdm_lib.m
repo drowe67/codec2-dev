@@ -2,9 +2,7 @@
 % David Rowe Mar 2017
 
 #{
-  Library of functions that implement a PSK OFDM modem.  Rate Fs
-  verison of ofdm_rs.m with OFDM based up and down conversion, and all
-  those nasty real-world details like fine freq, timing.
+  Library of functions that implement a PSK OFDM modem.
 #}
 
 1;
@@ -52,6 +50,7 @@ function states = ofdm_init(config)
   if isfield(config,"state_machine") state_machine = config.state_machine; else state_machine = "voice1"; end
   if isfield(config,"edge_pilots") edge_pilots = config.edge_pilots; else edge_pilots = 1; end
   if isfield(config,"clip_gain") clip_gain = config.clip_gain; else clip_gain = 4; end
+  if isfield(config,"foff_limiter") foff_limiter = config.foff_limiter; else foff_limiter = 0; end
 
   states.Fs = 8000;
   states.bps = bps;
@@ -76,7 +75,7 @@ function states = ofdm_init(config)
                                                   % the total packet of data to span multiple modem frames, e.g. HF data
                                                   % and/or when the FEC codeword is larger than the one
                                                   % modem frame.  In other modes (e.g. 700D/2020) Np=1, ie the modem frame
-                                                  % is the same length as the packet/FEC frame.
+                                                  % is the same length as the packet/FEC codeword.
   states.Nbitsperpacket = Np*states.Nbitsperframe;
   states.Tpacket = Np*Ns*(Tcp+1/Rs);              % time for one packet in ms
 
@@ -140,7 +139,7 @@ function states = ofdm_init(config)
   % this is used to scale inputs to LDPC decoder to make it amplitude indep
   states.mean_amp = 0;
 
-  % use a fxed EsNo for LDPC decoder, this seems to work OK and avoid another estimator
+  % use a fixed EsNo for LDPC decoder, this seems to work OK and avoid another estimator
   states.EsNodB = EsNodB;
 
   % generate same BPSK pilots each time
@@ -191,6 +190,7 @@ function states = ofdm_init(config)
   states.amp_est_mode = amp_est_mode;
 
   states.foff_est_gain = 0.1;
+  states.foff_limiter = foff_limiter;
   states.foff_est_hz = 0;
   states.sample_point = states.timing_est = 1;
   states.nin = states.Nsamperframe;
@@ -268,6 +268,7 @@ function config = ofdm_init_mode(mode="700D")
     config.Nuwbits = 12; config.bad_uw_errors = 3; config.Ntxtbits = 2;
     config.amp_est_mode = 1; config.ftwindow_width = 80;
     config.amp_scale = 160E3; config.clip_gain = 1.9;
+    config.foff_limiter = 1;
   elseif strcmp(mode,"2020")
     Ts = 0.0205; Nc = 31;
   elseif strcmp(mode,"qam16c1")
@@ -778,6 +779,10 @@ function [states rx_bits achannel_est_rect_log rx_np rx_amp] = ofdm_demod(states
 
     %printf("freq_err_rect: %f %f angle: %f\n", real(freq_err_rect), imag(freq_err_rect), angle(freq_err_rect));
     freq_err_hz = angle(freq_err_rect)*Rs/(2*pi*Ns);
+    if states.foff_limiter
+      freq_err_hz = max(freq_err_hz,-1);
+      freq_err_hz = min(freq_err_hz, 1);
+    end
     foff_est_hz = foff_est_hz + foff_est_gain*freq_err_hz;
   end
 
@@ -1620,3 +1625,34 @@ function [tx nclipped] = ofdm_clip(states, tx, threshold_level, plot_en=0)
     figure(2); clf; plot(abs(tx_(1:5*M))); hold on; plot(abs(tx(1:5*M))); hold off;
   endif
 end
+
+
+function rx = ofdm_clip_channel(states, tx, SNR3kdB, channel, freq_offset_Hz, tx_clip_en)
+  tx *= states.amp_scale;
+
+  % optional clipper to improve PAPR
+
+  nclipped = 0;
+  if tx_clip_en
+    [tx nclipped] = ofdm_clip(states, tx*states.clip_gain, 16384);
+  end
+
+  % note this is PAPR of complex signal, PAPR of real signal will be 3dB-ish larger
+  peak = max(abs(tx)); RMS = sqrt(mean(abs(tx).^2));
+  cpapr = 10*log10((peak.^2)/(RMS.^2));
+
+  % channel simulation and save to disk
+
+  printf("Peak: %4.2f RMS: %5.2f CPAPR: %4.1f clipped: %5.2f%%\n",
+         peak, RMS, cpapr, nclipped*100/length(tx));
+  printf("foff: %3.1f Hz SNR(3k): %3.1f dB  ", freq_offset_Hz, SNR3kdB);
+  rx = channel_simulate(states.Fs, SNR3kdB, freq_offset_Hz, channel, tx);
+
+  % multipath models can lead to clipping of int16 samples
+  num_clipped = length(find(abs(rx>32767)));
+  while num_clipped/length(rx) > 0.001
+    rx /= 2;
+    num_clipped = length(find(abs(rx>32767)));
+    printf("WARNING: output samples clipped, reducing level\n")
+  end
+endfunction

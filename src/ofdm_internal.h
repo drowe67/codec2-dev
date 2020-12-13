@@ -99,6 +99,7 @@ struct OFDM_CONFIG {
     uint8_t tx_uw[MAX_UW_BITS]; /* user defined unique word */
     int amp_est_mode;
     bool tx_bpf_en;       /* default tx BPF state */
+    bool foff_limiter;    /* tames freq offset updates in low SNR */
 };
 
 struct OFDM {
@@ -111,15 +112,15 @@ struct OFDM {
     float timing_mx_thresh;
 
     int nc;
-    int ns;	/* NS-1 = data symbols between pilots  */
-    int bps; 	/* Bits per symbol */
-    int m; 	/* duration of each symbol in samples */
-    int ncp; 	/* duration of CP in samples */
-    int np;     /* number of modem frames per packet. In some modes we want */
-                /* the total packet of data to span multiple modem frames, e.g. HF data */
-                /* and/or when the FEC codeword is larger than the one */
-                /* modem frame.  In other modes (e.g. 700D/2020) Np=1, ie the modem frame */
-                /* is the same length as the packet/FEC frame. */
+    int ns;              	 /* NS-1 = data symbols between pilots  */
+    int bps; 	             /* Bits per symbol */
+    int m; 	               /* duration of each symbol in samples */
+    int ncp; 	             /* duration of CP in samples */
+    int np;                /* number of modem frames per packet. In some modes we want */
+                           /* the total packet of data to span multiple modem frames, e.g. HF data */
+                           /* and/or when the FEC codeword is larger than the one */
+                           /* modem frame.  In other modes (e.g. 700D/2020) Np=1, ie the modem frame */
+                           /* is the same length as the packet/FEC frame. */
     int ftwindowwidth;
     int bitsperframe;      /* total bits in all data symbols in modem frame */
     int bitsperpacket;     /* total bits in all data symbols in a packet */
@@ -136,17 +137,17 @@ struct OFDM {
     int data_mode;        /* true of a data mode, false for voice mode */
     int amp_est_mode;     /* amplitude estimtor algorithm */
 
-    float tx_centre; /* TX Center frequency */
-    float rx_centre; /* RX Center frequency */
-    float fs; /* Sample rate */
-    float ts; /* Symbol cycle time */
-    float rs; /* Symbol rate */
-    float tcp; /* Cyclic prefix duration */
-    float tpacket; /* time for one packet in ms */
-    float inv_m; /* 1/m */
-    float tx_nlower; /* TX lowest carrier freq */
-    float rx_nlower; /* RX lowest carrier freq */
-    float doc; /* division of radian circle */
+    float tx_centre;      /* TX Center frequency */
+    float rx_centre;      /* RX Center frequency */
+    float fs;             /* Sample rate */
+    float ts;             /* Symbol cycle time */
+    float rs;             /* Symbol rate */
+    float tcp;            /* Cyclic prefix duration */
+    float tpacket;        /* time for one packet in ms */
+    float inv_m;          /* 1/m */
+    float tx_nlower;      /* TX lowest carrier freq */
+    float rx_nlower;      /* RX lowest carrier freq */
+    float doc;            /* division of radian circle */
 
     // Pointers
 
@@ -183,6 +184,7 @@ struct OFDM {
 
     // Float
     float foff_est_gain;
+    bool  foff_limiter;
     float foff_est_hz;
     float timing_mx;
     float coarse_foff_est_hz;

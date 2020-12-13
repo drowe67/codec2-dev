@@ -8,6 +8,7 @@
   the Octave functions in ofdm_lib.m
 
 \*---------------------------------------------------------------------------*/
+
 /*
   Copyright (C) 2017-2020 David Rowe
 
@@ -207,6 +208,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
         ofdm->codename = "HRA_112_112";
         ofdm->amp_est_mode = 0;
         ofdm->tx_bpf_en = true;
+        ofdm->foff_limiter = false;
         memset(ofdm->tx_uw, 0, ofdm->nuwbits);
     } else {
         /* Use the users values */
@@ -231,6 +233,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
         ofdm->codename = config->codename;
         ofdm->amp_est_mode = config->amp_est_mode;
         ofdm->tx_bpf_en = config->tx_bpf_en;
+        ofdm->foff_limiter = config->foff_limiter;
         memcpy(ofdm->tx_uw, config->tx_uw, ofdm->nuwbits);
     }
 
@@ -268,6 +271,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     ofdm->config.codename = ofdm->codename;
     ofdm->config.amp_est_mode = ofdm->amp_est_mode;
     ofdm->config.tx_bpf_en = ofdm->tx_bpf_en;
+    ofdm->config.foff_limiter = ofdm->foff_limiter;
     memcpy(ofdm->config.tx_uw, ofdm->tx_uw, ofdm->nuwbits);
 
     /* Calculate sizes from config param */
@@ -1348,6 +1352,11 @@ static void ofdm_demod_core(struct OFDM *ofdm, int *rx_bits) {
         freq_err_rect += 1E-6f;
 
         float freq_err_hz = cargf(freq_err_rect) * ofdm->rs / (TAU * ofdm->ns);
+        if (ofdm->foff_limiter) {
+            /* optionally tame updates in low SNR channels */
+            if (freq_err_hz >  1.0) freq_err_hz = 1.0;
+            if (freq_err_hz < -1.0) freq_err_hz = -1.0;
+        }
         ofdm->foff_est_hz += (ofdm->foff_est_gain * freq_err_hz);
     }
 

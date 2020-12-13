@@ -4,7 +4,7 @@
 % File based ofdm tx with LDPC encoding and interleaver.  Generates a
 % file of ofdm samples, including optional channel simulation.
 
-function ofdm_ldpc_tx(filename, mode="700D", Nsec, SNR3kdB=100, channel='awgn', freq_offset_Hz=0)
+function ofdm_ldpc_tx(filename, mode="700D", Nsec, SNR3kdB=100, channel='awgn', freq_offset_Hz=0, tx_clip_en=0)
   ofdm_lib;
   ldpc;
   gp_interleaver;
@@ -65,15 +65,7 @@ function ofdm_ldpc_tx(filename, mode="700D", Nsec, SNR3kdB=100, channel='awgn', 
     tx = [tx atx];
   end
 
-  printf("Packets: %3d SNR(3k): %3.1f dB foff: %3.1f Hz ", Npackets, SNR3kdB, freq_offset_Hz);
-  rx = channel_simulate(Fs, SNR3kdB, freq_offset_Hz, channel, tx);
-  rx *= states.amp_scale;
-  % multipath models can lead to clipping of int16 samples
-  num_clipped = length(find(abs(rx>32767)));
-  while num_clipped/length(rx) > 0.001
-    rx /= 2;
-    num_clipped = length(find(abs(rx>32767)));
-    printf("WARNING: output samples clipped, reducing level\n")
-  end
+  printf("Npackets: %d  ", Npackets);
+  rx = ofdm_clip_channel(states, tx, SNR3kdB, channel, freq_offset_Hz, tx_clip_en);
   frx=fopen(filename,"wb"); fwrite(frx, rx, "short"); fclose(frx);
 endfunction
