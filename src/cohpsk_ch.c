@@ -326,7 +326,7 @@ int main(int argc, char *argv[])
         for(i=0; i<BUF_N; i++) {
             scaled_noise = fcmult(sqrt(variance), noise[noise_r]);
             ch_fdm[i] = cadd(ch_fdm[i], scaled_noise);
-            noise_pwr += pow(scaled_noise.real, 2.0);
+            noise_pwr += pow(scaled_noise.real, 2.0) + pow(scaled_noise.imag, 2.0);
             noise_r++;
             if (noise_r > noise_end) {
                 noise_r = 0;
