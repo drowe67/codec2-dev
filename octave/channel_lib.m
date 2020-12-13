@@ -31,6 +31,7 @@ function [spread1 spread2 path_delay_samples] = channel_multipath(channel, Fs, N
     end
 endfunction
 
+% returns real rx signal, input is complex tx signal
 function rx = channel_simulate(Fs, SNR3kdB, freq_offset_Hz, channel, tx)
   Nsam = length(tx);
   rx = tx;
@@ -55,7 +56,8 @@ function rx = channel_simulate(Fs, SNR3kdB, freq_offset_Hz, channel, tx)
   rx += n;
   % check our sums are OK to within 0.25 dB
   SNR4kdB_measured = 10*log10(S/(n*n')); assert (abs(SNR4kdB - SNR4kdB_measured) < 0.25);
-  printf("RPAPR: %4.1f meas SNR3k: %3.2f dB\n", rpapr, 10*log10(S/(n*n')) + 10*log10(4000) - 10*log10(3000));
+  printf("N: %3.2f dB meas SNR3k: %3.2f dB\n",
+        10*log10(n*n'), 10*log10(S/(n*n')) + 10*log10(4000) - 10*log10(3000));
 
   % add a few seconds of no signal either side
   rx = [sigma*randn(1,Fs) rx sigma*randn(1,Fs/2)];

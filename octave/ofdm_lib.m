@@ -51,6 +51,7 @@ function states = ofdm_init(config)
   if isfield(config,"EsNodB") EsNodB = config.EsNodB; else EsNodB = 3; end
   if isfield(config,"state_machine") state_machine = config.state_machine; else state_machine = "voice1"; end
   if isfield(config,"edge_pilots") edge_pilots = config.edge_pilots; else edge_pilots = 1; end
+  if isfield(config,"clip_gain") clip_gain = config.clip_gain; else clip_gain = 4; end
 
   states.Fs = 8000;
   states.bps = bps;
@@ -130,9 +131,11 @@ function states = ofdm_init(config)
   %   Nuw=12; plot(0:Nuw, binocdf(0:Nuw,Nuw,0.05)); hold on; plot(binocdf(0:Nuw,Nuw,0.5)); hold off;
   states.bad_uw_errors = bad_uw_errors;
 
-  % use this to scale tx output to 16 bit short.  Adjusted by experiment
-  % to have same RMS value as other FreeDV waveforms (around 4400)
+  % use this to scale tx output to 16 bit short to a peak value of 16384.  Adjusted by experiment
   states.amp_scale = amp_scale;
+  % when using the clipping, this is the manual gain value.  Adjusted by experiment, trade off between
+  % increased average power and BER
+  states.clip_gain = clip_gain;
 
   % this is used to scale inputs to LDPC decoder to make it amplitude indep
   states.mean_amp = 0;
@@ -264,10 +267,9 @@ function config = ofdm_init_mode(mode="700D")
     config.edge_pilots = 0; config.state_machine = "voice2";
     config.Nuwbits = 12; config.bad_uw_errors = 3; config.Ntxtbits = 2;
     config.amp_est_mode = 1; config.ftwindow_width = 80;
+    config.amp_scale = 160E3; config.clip_gain = 1.9;
   elseif strcmp(mode,"2020")
     Ts = 0.0205; Nc = 31;
-  elseif strcmp(mode,"2200")
-    Tframe = 0.175; Ts = Tframe/Ns; Nc = 37;
   elseif strcmp(mode,"qam16c1")
     Ns=5; config.Np=5; Tcp = 0.004; Ts = 0.016; Nc = 33; config.data_mode = 1;
     config.bps=4; config.Ntxtbits = 0; config.Nuwbits = 15*4; config.bad_uw_errors = 5;
@@ -346,7 +348,6 @@ function print_config(states)
   printf("Nc=%d Ts=%4.3f Tcp=%4.3f Ns: %d Np: %d\n", Nc, 1/Rs, Tcp, Ns, Np);
   printf("Nsymperframe: %d Nbitsperpacket: %d Nsamperframe: %d Ntxtbits: %d Nuwbits: %d Nuwframes: %d\n",
           Ns*Nc, Nbitsperpacket, Nsamperframe, Ntxtbits, Nuwbits, Nuwframes);
-  printf("amp_est_mode: %d\n", states.amp_est_mode);
   printf("uncoded bits/s: %4.1f\n",  Nbitsperpacket*Fs/(Np*Nsamperframe));
 end
 
@@ -1609,10 +1610,13 @@ function threshold_level = ofdm_determine_clip_threshold(tx, threshold_cdf)
 end
 
 
-function tx = ofdm_clip(states, tx, threshold_level)
+function [tx nclipped] = ofdm_clip(states, tx, threshold_level, plot_en=0)
   ofdm_load_const;
   tx_ = tx;
   ind = find(abs(tx) > threshold_level);
+  nclipped = length(ind);
   tx(ind) = threshold_level*exp(j*angle(tx(ind)));
-  figure(2); clf; plot(abs(tx_(1:5*M))); hold on; plot(abs(tx(1:5*M))); hold off;
+  if plot_en
+    figure(2); clf; plot(abs(tx_(1:5*M))); hold on; plot(abs(tx(1:5*M))); hold off;
+  endif
 end

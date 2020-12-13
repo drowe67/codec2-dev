@@ -389,8 +389,8 @@ int main(int argc, char *argv[])
     CNo = 10*log10(tx_pwr/(noise_pwr/(Fs)));
     snr3k = CNo - 10*log10(3000);
     float outclipped_percent = noutclipped*100.0/nsamples;
-    fprintf(stderr, "cohpsk_ch: SNR3k(dB): %8.2f  C/No....: %8.2f   CPAPR....: %5.1f \n", snr3k, CNo, papr);
-    fprintf(stderr, "cohpsk_ch: peak.....: %8.2f  RMS.....: %8.2f\n", peak, sqrt(tx_pwr/nsamples));
+    fprintf(stderr, "cohpsk_ch: SNR3k(dB): %8.2f  C/No....: %8.2f\n", snr3k, CNo);
+    fprintf(stderr, "cohpsk_ch: peak.....: %8.2f  RMS.....: %8.2f   CPAPR.....: %5.2f \n", peak, sqrt(tx_pwr/nsamples), papr);
     fprintf(stderr, "cohpsk_ch: Nsamples.: %8d  clipped.: %8.2f%%  OutClipped: %5.2f%%\n",
                     nsamples, nclipped*100.0/nsamples, outclipped_percent);
     if (outclipped_percent > 0.1) fprintf(stderr, "cohpsk_ch: WARNING ouput clipping\n");
