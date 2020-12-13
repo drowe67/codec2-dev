@@ -208,6 +208,8 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
         ofdm->codename = "HRA_112_112";
         ofdm->amp_est_mode = 0;
         ofdm->tx_bpf_en = true;
+        ofdm->amp_scale = 217E3;
+        ofdm->clip_gain = 4.0;
         ofdm->foff_limiter = false;
         memset(ofdm->tx_uw, 0, ofdm->nuwbits);
     } else {
@@ -234,6 +236,8 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
         ofdm->amp_est_mode = config->amp_est_mode;
         ofdm->tx_bpf_en = config->tx_bpf_en;
         ofdm->foff_limiter = config->foff_limiter;
+        ofdm->amp_scale = config->amp_scale;
+        ofdm->clip_gain = config->clip_gain;
         memcpy(ofdm->tx_uw, config->tx_uw, ofdm->nuwbits);
     }
 
@@ -272,6 +276,8 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     ofdm->config.amp_est_mode = ofdm->amp_est_mode;
     ofdm->config.tx_bpf_en = ofdm->tx_bpf_en;
     ofdm->config.foff_limiter = ofdm->foff_limiter;
+    ofdm->config.amp_scale = ofdm->amp_scale;
+    ofdm->config.clip_gain = ofdm->clip_gain;
     memcpy(ofdm->config.tx_uw, ofdm->tx_uw, ofdm->nuwbits);
 
     /* Calculate sizes from config param */

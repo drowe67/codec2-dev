@@ -100,6 +100,8 @@ struct OFDM_CONFIG {
     int amp_est_mode;
     bool tx_bpf_en;       /* default tx BPF state */
     bool foff_limiter;    /* tames freq offset updates in low SNR */
+    float amp_scale;      /* used to scale Tx waveform to approx FREEDV_PEAK */
+    float clip_gain;      /* gain we apply to Tx signal before clipping */
 };
 
 struct OFDM {
@@ -136,6 +138,8 @@ struct OFDM {
     int edge_pilots;      /* insert pilots at 1 and Nc+2, to support low bandwidth phase est */
     int data_mode;        /* true of a data mode, false for voice mode */
     int amp_est_mode;     /* amplitude estimtor algorithm */
+    float amp_scale;
+    float clip_gain;
 
     float tx_centre;      /* TX Center frequency */
     float rx_centre;      /* RX Center frequency */

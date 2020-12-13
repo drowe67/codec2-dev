@@ -36,6 +36,8 @@ void ofdm_init_mode(char mode[], struct OFDM_CONFIG *config) {
     config->edge_pilots = 1;
     config->state_machine = "voice1";
     config->codename = "HRA_112_112";
+    config->clip_gain = 4.0;
+    config->amp_scale = 217E3;
     memset(config->tx_uw, 0, MAX_UW_BITS);
 
     if (strcmp(mode,"700D") == 0) {
@@ -45,6 +47,7 @@ void ofdm_init_mode(char mode[], struct OFDM_CONFIG *config) {
          config->state_machine = "voice2"; config->amp_est_mode = 1;
          config->codename = "HRA_56_56"; config->tx_bpf_en = false;
          config->foff_limiter = true;
+         config->amp_scale = 160E3; config->clip_gain = 1.9;
     } else if (strcmp(mode,"2020") == 0) {
          config->ts = 0.0205;  config->nc = 31; config->codename = "HRAb_396_504";
     } else if (strcmp(mode,"qam16") == 0) {

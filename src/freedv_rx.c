@@ -204,14 +204,19 @@ int main(int argc, char *argv[]) {
         int Tbits = freedv_get_total_bits(freedv);
         int Terrs = freedv_get_total_bit_errors(freedv);
         float uncoded_ber = (float)Terrs/Tbits;
-        fprintf(stderr, "BER......: %5.4f Tbits: %5d Terrs: %5d\n",
+        fprintf(stderr, "BER......: %5.4f  Tbits: %8d  Terrs: %8d\n",
 		                    (double)uncoded_ber, Tbits, Terrs);
         if ((mode == FREEDV_MODE_700D) || (mode == FREEDV_MODE_700E) || (mode == FREEDV_MODE_2020)) {
             int Tbits_coded = freedv_get_total_bits_coded(freedv);
             int Terrs_coded = freedv_get_total_bit_errors_coded(freedv);
             float coded_ber = (float)Terrs_coded/Tbits_coded;
-            fprintf(stderr, "Coded BER: %5.4f Tbits: %5d Terrs: %5d\n",
+            fprintf(stderr, "Coded BER: %5.4f  Tbits: %8d  Terrs: %8d\n",
                     (double)coded_ber, Tbits_coded, Terrs_coded);
+            int Tpackets = freedv_get_total_packets(freedv);
+            int Tpacket_errors = freedv_get_total_packet_errors(freedv);
+            float per = (float)Tpacket_errors/Tpackets;
+            fprintf(stderr, "Coded PER: %5.4f  Tpkts: %8d  Tpers: %8d\n",
+                    per, Tpackets, Tpacket_errors);
 
             /* set return code for Ctest */
             if ((uncoded_ber < 0.1f) && (coded_ber < 0.01f))

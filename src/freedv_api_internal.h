@@ -115,6 +115,8 @@ struct freedv {
     int                  total_bit_errors;
     int                  total_bits_coded;
     int                  total_bit_errors_coded;
+    int                  total_packets;
+    int                  total_packet_errors;
     int                  sz_error_pattern;
 
     /* optional user defined function to pass error pattern when a test frame is received */

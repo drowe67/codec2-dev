@@ -261,14 +261,15 @@ void freedv_comptx_ofdm(struct freedv *f, COMP mod_out[]) {
 
     ofdm_ldpc_interleave_tx(f->ofdm, f->ldpc, tx_sams, f->tx_payload_bits, txt_bits);
 
+    float clip_gain = 1.0; if (f->clip) { clip_gain = f->ofdm->clip_gain;}
     for(i=0; i< f->n_nat_modem_samples; i++) {
         asam.real = crealf(tx_sams[i]);
         asam.imag = cimagf(tx_sams[i]);
-        mod_out[i] = fcmult(OFDM_AMP_SCALE * NORM_PWR_OFDM, asam);
+        mod_out[i] = fcmult(f->ofdm->amp_scale*clip_gain, asam);
     }
 
     if (f->clip) {
-        cohpsk_clip(mod_out, OFDM_CLIP, f->n_nat_modem_samples);
+        cohpsk_clip(mod_out, FREEDV_PEAK, f->n_nat_modem_samples);
     }
 }
 
@@ -504,6 +505,8 @@ int freedv_comp_short_rx_ofdm(struct freedv *f, void *demod_in_8kHz, int demod_i
                 Nerrs_coded = count_errors(payload_data_bits, f->rx_payload_bits, Ndatabitsperpacket);
                 f->total_bit_errors_coded += Nerrs_coded;
                 f->total_bits_coded += Ndatabitsperpacket;
+                if (Nerrs_coded) f->total_packet_errors++;
+                f->total_packets++;
             }
 
             /* decode txt bits (if used) */
