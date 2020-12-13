@@ -231,10 +231,10 @@ void bits_to_qpsk_symbols(COMP tx_symb[][COHPSK_NC*ND], int tx_bits[], int nbits
        symbols in the frame */
 
     assert( (NSYMROW*COHPSK_NC*2 == nbits) || (NSYMROW*COHPSK_NC*2*ND == nbits));
-    
+
     /* if we input twice as many bits we don't do diversity */
 
-    if (NSYMROW*COHPSK_NC*2 == nbits) {    
+    if (NSYMROW*COHPSK_NC*2 == nbits) {
         diversity = 1; /* diversity mode                         */
     }
     else {
@@ -701,8 +701,7 @@ void cohpsk_mod(struct COHPSK *coh, COMP tx_fdm[], int tx_bits[], int nbits)
   AUTHOR......: David Rowe
   DATE CREATED: May 2015
 
-  Hard clips a cohpsk modulator signal to improve PAPR, CLIP threshold
-  hard coded and will need to be changed if NC*ND does.
+  Hard clips a complex signal magnitude (Hilbert Clipping) to improve PAPR.
 
 \*---------------------------------------------------------------------------*/
 
@@ -1173,7 +1172,7 @@ void cohpsk_get_demod_stats(struct COHPSK *coh, struct MODEM_STATS *stats)
             stats->rx_symbols[r][c] = cmult(coh->rx_symb[r][c], pi_4);
         }
     }
-#endif    
+#endif
 }
 
 
@@ -1307,4 +1306,3 @@ void cohpsk_set_carrier_ampl(struct COHPSK *coh, int c, float ampl) {
     coh->carrier_ampl[c] = ampl;
     fprintf(stderr, "cohpsk_set_carrier_ampl: %d %f\n", c, ampl);
 }
-
