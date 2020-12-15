@@ -116,7 +116,7 @@ int main(int argc, char *argv[])
 
         NodB = atof(argv[3]);
         Fs = COHPSK_FS; foff_hz = 0.0; fading_en = 0; ctest = 0;
-        clip = FREEDV_PEAK; gain = 1.0;
+        clip =32767; gain = 1.0;
         ssbfilt_en = 1; complex_out = 0;
         raw_dir = strdup(DEFAULT_RAW_DIR);
 
@@ -221,6 +221,10 @@ int main(int argc, char *argv[])
     for(i=0; i<SSBFILT_N; i++) {
         ssbfiltbuf[i].real = 0.0; ssbfiltbuf[i].imag = 0.0;
     }
+    COMP lo_phase = {1.0,0.0};
+    COMP lo_freq;
+    lo_freq.real = cos(2.0*M_PI*SSBFILT_CENTRE/Fs);
+    lo_freq.imag = sin(2.0*M_PI*SSBFILT_CENTRE/Fs);
 
     fprintf(stderr, "cohpsk_ch: Fs: %d NodB: %4.2f foff: %4.2f Hz fading: %d nhfdelay: %d clip: %4.2f ssbfilt: %d complexout: %d\n",
             Fs, NodB, foff_hz, fading_en, nhfdelay, clip, ssbfilt_en, complex_out);
@@ -263,6 +267,7 @@ int main(int argc, char *argv[])
 
         for(i=0; i<BUF_N; i++) {
             float mag = sqrt(ch_in[i].real*ch_in[i].real + ch_in[i].imag*ch_in[i].imag);
+            //fprintf(stdout, "%f\n",mag);
             float angle = atan2(ch_in[i].imag, ch_in[i].real);
             if (mag > clip) {
               mag = clip;
@@ -334,19 +339,20 @@ int main(int argc, char *argv[])
             }
         }
 
-        /* FIR filter to simulate (a rather flat) SSB filter.  Might
-           be useful to have an option for a filter with a few dB
-           ripple too, to screw up the modem. This is mainly so analog
-           SSB sounds realistic. */
+        /* FIR filter to simulate (a rather flat) SSB filter. We
+          filter the complex signal by shifting it down to DC and
+          using real coefficients. */
 
         for(i=0, j=SSBFILT_N; i<BUF_N; i++,j++) {
-            ssbfiltbuf[j] = ch_fdm[i];
             if (ssbfilt_en) {
+                ssbfiltbuf[j] = cmult(ch_fdm[i], cconj(lo_phase));
                 ssbfiltout[i].real = 0.0; ssbfiltout[i].imag = 0.0;
                 for(k=0; k<SSBFILT_N; k++) {
                     ssbfiltout[i].real += ssbfiltbuf[j-k].real*ssbfilt_coeff[k];
                     ssbfiltout[i].imag += ssbfiltbuf[j-k].imag*ssbfilt_coeff[k];
                 }
+                ssbfiltout[i] = cmult(ssbfiltout[i], lo_phase);
+                lo_phase = cmult(lo_phase, lo_freq);
             }
             else {
                 ssbfiltout[i] = ch_fdm[i];
@@ -393,7 +399,7 @@ int main(int argc, char *argv[])
     fprintf(stderr, "cohpsk_ch: peak.....: %8.2f  RMS.....: %8.2f   CPAPR.....: %5.2f \n", peak, sqrt(tx_pwr/nsamples), papr);
     fprintf(stderr, "cohpsk_ch: Nsamples.: %8d  clipped.: %8.2f%%  OutClipped: %5.2f%%\n",
                     nsamples, nclipped*100.0/nsamples, outclipped_percent);
-    if (outclipped_percent > 0.1) fprintf(stderr, "cohpsk_ch: WARNING ouput clipping\n");
+    if (outclipped_percent > 0.1) fprintf(stderr, "cohpsk_ch: WARNING output clipping\n");
 
     if (ffading != NULL) fclose(ffading);
     if (ch_fdm_delay != NULL) FREE(ch_fdm_delay);
