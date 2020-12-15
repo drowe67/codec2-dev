@@ -43,13 +43,14 @@ function states = ofdm_init(config)
   if isfield(config,"timing_mx_thresh") timing_mx_thresh = config.timing_mx_thresh; else timing_mx_thresh = 0.35; end
   if isfield(config,"tx_uw") tx_uw = config.tx_uw; else tx_uw = zeros(1,Nuwbits); end
   if isfield(config,"bad_uw_errors") bad_uw_errors = config.bad_uw_errors; else bad_uw_errors = 3; end
-  if isfield(config,"amp_scale") amp_scale = config.amp_scale; else amp_scale = 217E3; end
+  if isfield(config,"amp_scale") amp_scale = config.amp_scale; else amp_scale = 245E3; end
   if isfield(config,"amp_est_mode") amp_est_mode = config.amp_est_mode; else amp_est_mode = 0; end
   if isfield(config,"EsNo_est_all_symbols")  EsNo_est_all_symbols = config.EsNo_est_all_symbols; else EsNo_est_all_symbols = 1; end
   if isfield(config,"EsNodB") EsNodB = config.EsNodB; else EsNodB = 3; end
   if isfield(config,"state_machine") state_machine = config.state_machine; else state_machine = "voice1"; end
   if isfield(config,"edge_pilots") edge_pilots = config.edge_pilots; else edge_pilots = 1; end
-  if isfield(config,"clip_gain") clip_gain = config.clip_gain; else clip_gain = 4; end
+  if isfield(config,"clip_gain1") clip_gain1 = config.clip_gain1; else clip_gain1 = 2; end
+  if isfield(config,"clip_gain2") clip_gain2 = config.clip_gain2; else clip_gain2 = 0.9; end
   if isfield(config,"foff_limiter") foff_limiter = config.foff_limiter; else foff_limiter = 0; end
 
   states.Fs = 8000;
@@ -134,7 +135,8 @@ function states = ofdm_init(config)
   states.amp_scale = amp_scale;
   % when using the clipping, this is the manual gain value.  Adjusted by experiment, trade off between
   % increased average power and BER
-  states.clip_gain = clip_gain;
+  states.clip_gain1 = clip_gain1;
+  states.clip_gain2 = clip_gain2;
 
   % this is used to scale inputs to LDPC decoder to make it amplitude indep
   states.mean_amp = 0;
@@ -152,7 +154,7 @@ function states = ofdm_init(config)
   states.edge_pilots = edge_pilots;
 
   % carrier tables for up and down conversion
-  fcentre = 1500;
+  states.fcentre = fcentre = 1500;
   alower = fcentre - Rs * (Nc/2);  % approx frequency of lowest carrier
   Nlower = round(alower / Rs) - 1; % round this to nearest integer multiple from 0Hz to keep DFT happy
   %printf("  fcentre: %f alower: %f alower/Rs: %f Nlower: %d\n", fcentre, alower, alower/Rs, Nlower);
@@ -267,7 +269,7 @@ function config = ofdm_init_mode(mode="700D")
     config.edge_pilots = 0; config.state_machine = "voice2";
     config.Nuwbits = 12; config.bad_uw_errors = 3; config.Ntxtbits = 2;
     config.amp_est_mode = 1; config.ftwindow_width = 80;
-    config.amp_scale = 160E3; config.clip_gain = 1.9;
+    config.amp_scale = 155E3; config.clip_gain1 = 3; config.clip_gain2 = 0.8;
     config.foff_limiter = 1;
   elseif strcmp(mode,"2020")
     Ts = 0.0205; Nc = 31;
@@ -1627,14 +1629,21 @@ function [tx nclipped] = ofdm_clip(states, tx, threshold_level, plot_en=0)
 end
 
 
-function rx = ofdm_clip_channel(states, tx, SNR3kdB, channel, freq_offset_Hz, tx_clip_en)
+function [rx_real rx] = ofdm_clip_channel(states, tx, SNR3kdB, channel, freq_offset_Hz, tx_clip_en)
   tx *= states.amp_scale;
 
   % optional clipper to improve PAPR
 
   nclipped = 0;
   if tx_clip_en
-    [tx nclipped] = ofdm_clip(states, tx*states.clip_gain, 16384);
+    printf("%f %f\n", states.clip_gain1, states.clip_gain2);
+    [tx nclipped] = ofdm_clip(states, tx*states.clip_gain1, 16384);
+    tx *= states.clip_gain2;
+    ssbfilt_n = 100;
+    ssbfilt_coeff = fir1(ssbfilt_n, 2000/(states.Fs));
+    %figure(2); freqz(ssbfilt_coeff);
+    lo = exp(j*2*pi*states.fcentre*(1:length(tx))/(states.Fs));
+    tx = lo.*filter(ssbfilt_coeff,1,tx.*conj(lo));
   end
 
   % note this is PAPR of complex signal, PAPR of real signal will be 3dB-ish larger
@@ -1646,13 +1655,13 @@ function rx = ofdm_clip_channel(states, tx, SNR3kdB, channel, freq_offset_Hz, tx
   printf("Peak: %4.2f RMS: %5.2f CPAPR: %4.1f clipped: %5.2f%%\n",
          peak, RMS, cpapr, nclipped*100/length(tx));
   printf("foff: %3.1f Hz SNR(3k): %3.1f dB  ", freq_offset_Hz, SNR3kdB);
-  rx = channel_simulate(states.Fs, SNR3kdB, freq_offset_Hz, channel, tx);
+  [rx_real rx] = channel_simulate(states.Fs, SNR3kdB, freq_offset_Hz, channel, tx);
 
   % multipath models can lead to clipping of int16 samples
-  num_clipped = length(find(abs(rx>32767)));
-  while num_clipped/length(rx) > 0.001
-    rx /= 2;
-    num_clipped = length(find(abs(rx>32767)));
+  num_clipped = length(find(abs(rx_real>32767)));
+  while num_clipped/length(rx_real) > 0.001
+    rx_real /= 2;
+    num_clipped = length(find(abs(rx_real>32767)));
     printf("WARNING: output samples clipped, reducing level\n")
   end
 endfunction

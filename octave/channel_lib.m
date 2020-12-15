@@ -31,8 +31,8 @@ function [spread1 spread2 path_delay_samples] = channel_multipath(channel, Fs, N
     end
 endfunction
 
-% returns real rx signal, input is complex tx signal
-function rx = channel_simulate(Fs, SNR3kdB, freq_offset_Hz, channel, tx)
+% returns real rx signal with noise added, input is complex tx signal
+function [rx_real rx] = channel_simulate(Fs, SNR3kdB, freq_offset_Hz, channel, tx)
   Nsam = length(tx);
   rx = tx;
 
@@ -45,20 +45,20 @@ function rx = channel_simulate(Fs, SNR3kdB, freq_offset_Hz, channel, tx)
   woffset = 2*pi*freq_offset_Hz/Fs;
   rx = rx .* exp(j*woffset*(1:Nsam));
 
-  rx = real(rx); S = rx*rx';
-  rpapr = 10*log10(max(abs(rx).^2)/mean(abs(rx).^2));
+  rx_real = real(rx); S = rx_real*rx_real';
+  rpapr = 10*log10(max(abs(rx_real).^2)/mean(abs(rx_real).^2));
 
   % SNR in a 4k bandwidth will be lower than 3k as total noise power N is higher
   SNR4kdB = SNR3kdB - 10*log10(Fs/2) + 10*log10(3000); SNR = 10^(SNR4kdB/10);
   N = S/SNR; sigma = sqrt(N/Nsam);
   n = sigma*randn(1,Nsam);
   % printf("SNR3kdB: %f SNR4kdB: %f N: %f %f\n", SNR3kdB, SNR4kdB, N, n*n');
-  rx += n;
+  rx_real += n;
   % check our sums are OK to within 0.25 dB
   SNR4kdB_measured = 10*log10(S/(n*n')); assert (abs(SNR4kdB - SNR4kdB_measured) < 0.25);
   printf("measSNR3k: %3.2f dB N: %3.2f dB\n",
          10*log10(S/(n*n')) + 10*log10(4000) - 10*log10(3000), 10*log10(n*n'));
 
   % add a few seconds of no signal either side
-  rx = [sigma*randn(1,Fs) rx sigma*randn(1,Fs/2)];
+  rx_real = [sigma*randn(1,Fs) rx_real sigma*randn(1,Fs/2)];
 endfunction
