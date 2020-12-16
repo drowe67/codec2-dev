@@ -188,6 +188,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     if (config == NULL) {
         /* Fill in default values */
 
+        strcpy(ofdm->mode, "700D");
         ofdm->nc = 17;                            /* Number of carriers */
         ofdm->np = 1;
         ofdm->ns = 8;                             /* Number of Symbols per modem frame */
@@ -209,12 +210,15 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
         ofdm->amp_est_mode = 0;
         ofdm->tx_bpf_en = true;
         ofdm->amp_scale = 217E3;
-        ofdm->clip_gain = 4.0;
+        ofdm->clip_gain1 = 2.0;
+        ofdm->clip_gain2 = 0.9;
+        ofdm->clip_en = false;
         ofdm->foff_limiter = false;
         memset(ofdm->tx_uw, 0, ofdm->nuwbits);
     } else {
         /* Use the users values */
 
+        strcpy(ofdm->mode, config->mode);
         ofdm->nc = config->nc;                    /* Number of carriers */
         ofdm->np = config->np;                    /* Number of modem Frames per Packet */
         ofdm->ns = config->ns;                    /* Number of Symbol frames */
@@ -237,7 +241,9 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
         ofdm->tx_bpf_en = config->tx_bpf_en;
         ofdm->foff_limiter = config->foff_limiter;
         ofdm->amp_scale = config->amp_scale;
-        ofdm->clip_gain = config->clip_gain;
+        ofdm->clip_gain1 = config->clip_gain1;
+        ofdm->clip_gain2 = config->clip_gain2;
+        ofdm->clip_en = config->clip_en;
         memcpy(ofdm->tx_uw, config->tx_uw, ofdm->nuwbits);
     }
 
@@ -255,6 +261,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
 
     /* Copy constants into states */
 
+    strcpy(ofdm->config.mode, ofdm->mode);
     ofdm->config.tx_centre = ofdm->tx_centre;
     ofdm->config.rx_centre = ofdm->rx_centre;
     ofdm->config.fs = ofdm->fs;
@@ -277,7 +284,9 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     ofdm->config.tx_bpf_en = ofdm->tx_bpf_en;
     ofdm->config.foff_limiter = ofdm->foff_limiter;
     ofdm->config.amp_scale = ofdm->amp_scale;
-    ofdm->config.clip_gain = ofdm->clip_gain;
+    ofdm->config.clip_gain1 = ofdm->clip_gain1;
+    ofdm->config.clip_gain2 = ofdm->clip_gain2;
+    ofdm->config.clip_en = ofdm->clip_en;
     memcpy(ofdm->config.tx_uw, ofdm->tx_uw, ofdm->nuwbits);
 
     /* Calculate sizes from config param */
@@ -328,6 +337,8 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
 
     /* Null pointers to unallocated buffers */
     ofdm->tx_bpf = NULL;
+    if (ofdm->tx_bpf_en)
+        allocate_tx_bpf(ofdm);
 
     /* store complex BPSK pilot symbols */
 
@@ -498,8 +509,15 @@ static void allocate_tx_bpf(struct OFDM *ofdm) {
 
     /* Transmit bandpass filter; complex coefficients, center frequency */
 
-    quisk_filt_cfInit(ofdm->tx_bpf, filtP550S750, sizeof (filtP550S750) / sizeof (float));
-    quisk_cfTune(ofdm->tx_bpf, ofdm->tx_centre / ofdm->fs);
+    if (!strcmp(ofdm->mode, "700D")) {
+        quisk_filt_cfInit(ofdm->tx_bpf, filtP550S750, sizeof (filtP550S750) / sizeof (float));
+        quisk_cfTune(ofdm->tx_bpf, ofdm->tx_centre / ofdm->fs);
+    }
+    else if (!strcmp(ofdm->mode, "700E")) {
+        quisk_filt_cfInit(ofdm->tx_bpf, filtP900S1100, sizeof (filtP550S750) / sizeof (float));
+        quisk_cfTune(ofdm->tx_bpf, ofdm->tx_centre / ofdm->fs);
+    }
+    else assert(0);
 }
 
 static void deallocate_tx_bpf(struct OFDM *ofdm) {
@@ -871,15 +889,29 @@ void ofdm_txframe(struct OFDM *ofdm, complex float *tx, complex float *tx_sym_li
         }
     }
 
-    /* optional Tx Band Pass Filter */
+    size_t samplesperpacket = ofdm->np*ofdm->samplesperframe;
 
-    if (ofdm->tx_bpf_en == true) {
-        assert(ofdm->tx_bpf != NULL);
-        complex float tx_filt[ofdm->samplesperframe];
+    /* vanilla Tx output waveform should be about OFDM__PEAK */
+    for(i=0; i<samplesperpacket; i++) tx[i] *= ofdm->amp_scale;
 
-        quisk_ccfFilter(tx, tx_filt, ofdm->samplesperframe, ofdm->tx_bpf);
-        memmove(tx, tx_filt, ofdm->samplesperframe * sizeof (complex float));
+    if (ofdm->clip_en) {
+        // this gain set the drive into the Hilbert Clipper and sets PAPR
+        for(i=0; i<samplesperpacket; i++) tx[i] *= ofdm->clip_gain1;
+        ofdm_clip(tx, OFDM_PEAK, samplesperpacket);
     }
+
+    if (ofdm->tx_bpf_en) {
+        assert(!strcmp(ofdm->mode, "700D") || !strcmp(ofdm->mode, "700E"));
+        assert(ofdm->tx_bpf != NULL);
+        complex float tx_filt[samplesperpacket];
+
+        quisk_ccfFilter(tx, tx_filt, samplesperpacket, ofdm->tx_bpf);
+        memmove(tx, tx_filt, samplesperpacket * sizeof (complex float));
+    }
+
+    /* BPF messes up peak levels, this gain gets back to approx OFDM_PEAK */
+    if (ofdm->tx_bpf_en && ofdm->clip_en)
+        for(i=0; i<samplesperpacket; i++) tx[i] *= ofdm->clip_gain2;
 }
 
 struct OFDM_CONFIG *ofdm_get_config_param(struct OFDM *ofdm) { return &ofdm->config; }
@@ -2110,3 +2142,19 @@ void ofdm_print_info(struct OFDM *ofdm) {
     fprintf(stderr, "ofdm->dpsk_en = %s\n", ofdm->dpsk_en ? "true" : "false");
     fprintf(stderr, "ofdm->phase_est_bandwidth_mode = %s\n", phase_est_bandwidth_mode[ofdm->phase_est_bandwidth_mode]);
 }
+
+// carbon copy of cohpsk.ch:cohpsk_clip() to avoid having to link cohpsk.[ch]
+void ofdm_clip(complex float tx[], float clip_thresh, int n) {
+    complex float sam;
+    float mag;
+    int   i;
+
+    for(i=0; i<n; i++) {
+        sam = tx[i];
+        mag = cabsf(sam);
+        if (mag > clip_thresh)  {
+            sam *= clip_thresh/mag;
+        }
+        tx[i] = sam;
+    }
+ }

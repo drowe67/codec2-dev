@@ -432,14 +432,14 @@ int main(int argc, char *argv[]) {
         /* demod */
 
         if (ofdm->sync_state == search) {
-            ofdm_sync_search_shorts(ofdm, rx_scaled, (OFDM_AMP_SCALE / 2.0f));
+            ofdm_sync_search_shorts(ofdm, rx_scaled, (ofdm->amp_scale / 2.0f));
         }
 
         if ((ofdm->sync_state == synced) || (ofdm->sync_state == trial)) {
             log_payload_syms = true;
 
             /* demod the latest modem frame */
-            ofdm_demod_shorts(ofdm, rx_bits, rx_scaled, (OFDM_AMP_SCALE / 2.0f));
+            ofdm_demod_shorts(ofdm, rx_bits, rx_scaled, (ofdm->amp_scale / 2.0f));
 
             /* accumulate a buffer of data symbols for this packet */
             for(i=0; i<Nsymsperpacket-Nsymsperframe; i++) {

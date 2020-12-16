@@ -299,7 +299,7 @@ int main(int argc, char *argv[]) {
     int varicode_bit_index = 0;
 
     complex float tx_sams[Nsamperpacket];
-    short   tx_scaled[Nsamperpacket];
+    short   tx_real[Nsamperpacket];
 
     if (verbose > 1) {
 	     ofdm_print_info(ofdm);
@@ -350,10 +350,10 @@ int main(int argc, char *argv[]) {
             ofdm_ldpc_interleave_tx(ofdm, &ldpc, tx_sams, data_bits, txt_bits);
 
             for (i = 0; i < Nsamperpacket; i++) {
-                tx_scaled[i] = OFDM_AMP_SCALE * crealf(tx_sams[i]);
+                tx_real[i] = crealf(tx_sams[i]);
             }
 
-            fwrite(tx_scaled, sizeof (short), Nsamperpacket, fout);
+            fwrite(tx_real, sizeof (short), Nsamperpacket, fout);
         } else {
             /* just modulate uncoded raw bits ------------------------------------*/
 
@@ -378,8 +378,8 @@ int main(int argc, char *argv[]) {
 
             /* scale and save to disk as shorts */
             for (i = 0; i < Nsamperpacket; i++)
-                tx_scaled[i] = tx_sams[i].real * OFDM_AMP_SCALE;
-            fwrite(tx_scaled, sizeof (short), Nsamperpacket, fout);
+                tx_real[i] = tx_sams[i].real;
+            fwrite(tx_real, sizeof (short), Nsamperpacket, fout);
         }
 
         packet++;

@@ -8,7 +8,8 @@
 function ofdm_rx(filename, mode="700D", pass_ber=0)
   ofdm_lib;
   more off;
-
+  pkg load signal;
+  
   dpsk = 0;
   if strcmp(mode,"700D-DPSK")
     mode = "700D"; dpsk = 1;

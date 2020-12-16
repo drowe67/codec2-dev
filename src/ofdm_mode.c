@@ -17,6 +17,9 @@ void ofdm_init_mode(char mode[], struct OFDM_CONFIG *config) {
     assert(mode != NULL);
     assert(config != NULL);
 
+    assert(strlen(mode) < 16);
+    strcpy(config->mode, mode);
+
     /* Fill in default values - 700D */
 
     config->nc = 17;                            /* Number of carriers */
@@ -36,8 +39,12 @@ void ofdm_init_mode(char mode[], struct OFDM_CONFIG *config) {
     config->edge_pilots = 1;
     config->state_machine = "voice1";
     config->codename = "HRA_112_112";
-    config->clip_gain = 4.0;
-    config->amp_scale = 217E3;
+    config->clip_gain1 = 2.0;
+    config->clip_gain2 = 0.75;
+    config->clip_en = false;
+    config->tx_bpf_en = true;
+    config->amp_scale = 245E3;
+    config->foff_limiter = false;
     memset(config->tx_uw, 0, MAX_UW_BITS);
 
     if (strcmp(mode,"700D") == 0) {
@@ -47,9 +54,10 @@ void ofdm_init_mode(char mode[], struct OFDM_CONFIG *config) {
          config->state_machine = "voice2"; config->amp_est_mode = 1;
          config->codename = "HRA_56_56"; config->tx_bpf_en = false;
          config->foff_limiter = true;
-         config->amp_scale = 160E3; config->clip_gain = 1.9;
+         config->amp_scale = 155E3; config->clip_gain1 = 3; config->clip_gain2 = 0.8;
     } else if (strcmp(mode,"2020") == 0) {
          config->ts = 0.0205;  config->nc = 31; config->codename = "HRAb_396_504";
+         config->tx_bpf_en = false;
     } else if (strcmp(mode,"qam16") == 0) {
         config->ns=5; config->np=5; config->tcp = 0.004; config->ts = 0.016; config->nc = 33;
         config->bps=4; config->txtbits = 0; config->nuwbits = 15*4; config->bad_uw_errors = 5;

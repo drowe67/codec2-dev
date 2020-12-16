@@ -119,6 +119,8 @@ struct freedv *freedv_open(int mode) {
 struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
     struct freedv *f;
 
+    assert(FREEDV_PEAK == OFDM_PEAK);
+
     if ((FDV_MODE_ACTIVE( FREEDV_MODE_1600,   mode)   ||
          FDV_MODE_ACTIVE( FREEDV_MODE_700C,   mode)   ||
          FDV_MODE_ACTIVE( FREEDV_MODE_700D,   mode)   ||
@@ -1160,16 +1162,26 @@ void freedv_set_total_bit_errors_coded    (struct freedv *f, int val) {f->total_
 void freedv_set_total_bits_coded          (struct freedv *f, int val) {f->total_bits_coded = val;}
 void freedv_set_total_packet_errors       (struct freedv *f, int val) {f->total_packet_errors = val;}
 void freedv_set_total_packets             (struct freedv *f, int val) {f->total_packets = val;}
-void freedv_set_clip                      (struct freedv *f, int val) {f->clip = val;}
 void freedv_set_varicode_code_num         (struct freedv *f, int val) {varicode_set_code_num(&f->varicode_dec_states, val);}
 void freedv_set_ext_vco                   (struct freedv *f, int val) {f->ext_vco = val;}
 void freedv_set_snr_squelch_thresh        (struct freedv *f, float val) {f->snr_squelch_thresh = val;}
 void freedv_set_tx_amp                    (struct freedv *f, float amp) {f->tx_amp = amp;}
 
-/* Band Pass Filter to cleanup OFDM tx waveform, only supported by FreeDV 700D */
+/* supported by 700C, 700D, 700E */
+
+void freedv_set_clip(struct freedv *f, int val) {
+    f->clip_en = val;
+    if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_700E, f->mode)) {
+      f->ofdm->clip_en = val;
+      /* really should have BPF if we clip */
+      if (val) ofdm_set_tx_bpf(f->ofdm, true);
+    }
+}
+
+/* Band Pass Filter to cleanup OFDM tx waveform, only supported by FreeDV 700D and 700E */
 
 void freedv_set_tx_bpf(struct freedv *f, int val) {
-    if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode)) {
+    if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_700E, f->mode)) {
         ofdm_set_tx_bpf(f->ofdm, val);
     }
 }

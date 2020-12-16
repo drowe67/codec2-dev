@@ -47,7 +47,7 @@ void freedv_700c_open(struct freedv *f) {
     f->n_nom_modem_samples = f->n_nat_modem_samples * FREEDV_FS_8000 / COHPSK_FS;// number of samples after native samples are interpolated to 8000 sps
     f->n_max_modem_samples = COHPSK_MAX_SAMPLES_PER_FRAME * FREEDV_FS_8000 / COHPSK_FS + 1;
     f->modem_sample_rate = FREEDV_FS_8000;                                       // note weird sample rate tamed by resampling
-    f->clip = 1;
+    f->clip_en = 1;
     f->sz_error_pattern = cohpsk_error_pattern_size();
     f->test_frames_diversity = 1;
 
@@ -84,7 +84,7 @@ void freedv_comptx_700c(struct freedv *f, COMP mod_out[]) {
 
     /* cohpsk modulator */
     cohpsk_mod(f->cohpsk, tx_fdm, tx_bits, COHPSK_BITS_PER_FRAME);
-    if (f->clip)
+    if (f->clip_en)
         cohpsk_clip(tx_fdm, COHPSK_CLIP, COHPSK_NOM_SAMPLES_PER_FRAME);
     for(i=0; i<f->n_nat_modem_samples; i++)
         mod_out[i] = fcmult(FDMDV_SCALE*NORM_PWR_COHPSK, tx_fdm[i]);
@@ -131,7 +131,7 @@ void freedv_ofdm_voice_open(struct freedv *f, char *mode) {
     f->n_nom_modem_samples = ofdm_get_samples_per_frame(f->ofdm);
     f->n_max_modem_samples = ofdm_get_max_samples_per_frame(f->ofdm);
     f->modem_sample_rate = f->ofdm->config.fs;
-    f->clip = 0;
+    f->clip_en = 0;
     f->sz_error_pattern = f->ofdm_bitsperframe;
 
     f->tx_bits = NULL; /* not used for 700D */
@@ -139,8 +139,6 @@ void freedv_ofdm_voice_open(struct freedv *f, char *mode) {
     /* tx BPF off on embedded platforms, as it consumes significant CPU */
 #ifdef __EMBEDDED__
     ofdm_set_tx_bpf(f->ofdm, 0);
-#else
-    ofdm_set_tx_bpf(f->ofdm, ofdm_config->tx_bpf_en);
 #endif
 
     f->speech_sample_rate = FREEDV_FS_8000;
@@ -220,9 +218,7 @@ void freedv_comptx_ofdm(struct freedv *f, COMP mod_out[]) {
     int    i, k;
     int    nspare;
 
-    // Generate Varicode txt bits (if used). Txt bits in OFDM frame come just
-    // after Unique Word (UW).  Txt bits aren't protected by FEC.
-
+    /* Generate Varicode txt bits (if used), waren't protected by FEC */
     nspare = f->ofdm_ntxtbits;
     uint8_t txt_bits[nspare];
 
@@ -244,7 +240,6 @@ void freedv_comptx_ofdm(struct freedv *f, COMP mod_out[]) {
     }
 
     /* optionally replace payload bits with test frames known to rx */
-
     if (f->test_frames) {
         uint8_t payload_data_bits[f->bits_per_modem_frame];
         ofdm_generate_payload_data_bits(payload_data_bits, f->bits_per_modem_frame);
@@ -255,22 +250,7 @@ void freedv_comptx_ofdm(struct freedv *f, COMP mod_out[]) {
     }
 
     /* OK now ready to LDPC encode, interleave, and OFDM modulate */
-
-    complex float tx_sams[f->n_nat_modem_samples];
-    COMP asam;
-
-    ofdm_ldpc_interleave_tx(f->ofdm, f->ldpc, tx_sams, f->tx_payload_bits, txt_bits);
-
-    float clip_gain = 1.0; if (f->clip) { clip_gain = f->ofdm->clip_gain;}
-    for(i=0; i< f->n_nat_modem_samples; i++) {
-        asam.real = crealf(tx_sams[i]);
-        asam.imag = cimagf(tx_sams[i]);
-        mod_out[i] = fcmult(f->ofdm->amp_scale*clip_gain, asam);
-    }
-
-    if (f->clip) {
-        cohpsk_clip(mod_out, FREEDV_PEAK, f->n_nat_modem_samples);
-    }
+    ofdm_ldpc_interleave_tx(f->ofdm, f->ldpc, (complex float*)mod_out, f->tx_payload_bits, txt_bits);
 }
 
 
@@ -411,7 +391,7 @@ int freedv_comp_short_rx_ofdm(struct freedv *f, void *demod_in_8kHz, int demod_i
     int    parityCheckCount = 0;
     uint8_t rx_uw[f->ofdm_nuwbits];
 
-    float new_gain = gain / OFDM_AMP_SCALE;
+    float new_gain = gain / f->ofdm->amp_scale;
 
     assert((demod_in_is_short == 0) || (demod_in_is_short == 1));
 

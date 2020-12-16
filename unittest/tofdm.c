@@ -199,7 +199,10 @@ int main(int argc, char *argv[])
     assert(ofdm != NULL);
     ofdm_config = ofdm_get_config_param(ofdm);
     ofdm_set_tx_bpf(ofdm, false);
-    
+
+    // same levels as Octave sim
+    ofdm->amp_scale = 1.0;
+
     // make local copies for convenience
     ofdm_tx_centre = ofdm_config->tx_centre;
     ofdm_rx_centre = ofdm_config->rx_centre;

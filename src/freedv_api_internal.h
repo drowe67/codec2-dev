@@ -129,7 +129,7 @@ struct freedv {
     int                 *tx_bits;                            /* FSK modem frame under construction */
     int                  tx_sync_bit;
     int                  frames;
-    int                  clip;                               /* non-zero for cohpsk modem output clipping for low PAPR */
+    int                  clip_en;                            /* non-zero for modem Tx clipping to lower PAPR */
     int                  sync;
     int                  evenframe;
     float                snr_est;
