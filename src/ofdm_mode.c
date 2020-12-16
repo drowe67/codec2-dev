@@ -39,8 +39,8 @@ void ofdm_init_mode(char mode[], struct OFDM_CONFIG *config) {
     config->edge_pilots = 1;
     config->state_machine = "voice1";
     config->codename = "HRA_112_112";
-    config->clip_gain1 = 2.0;
-    config->clip_gain2 = 0.75;
+    config->clip_gain1 = 2.5;
+    config->clip_gain2 = 0.8;
     config->clip_en = false;
     config->tx_bpf_en = true;
     config->amp_scale = 245E3;

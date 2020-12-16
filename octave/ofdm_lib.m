@@ -49,9 +49,10 @@ function states = ofdm_init(config)
   if isfield(config,"EsNodB") EsNodB = config.EsNodB; else EsNodB = 3; end
   if isfield(config,"state_machine") state_machine = config.state_machine; else state_machine = "voice1"; end
   if isfield(config,"edge_pilots") edge_pilots = config.edge_pilots; else edge_pilots = 1; end
-  if isfield(config,"clip_gain1") clip_gain1 = config.clip_gain1; else clip_gain1 = 2; end
-  if isfield(config,"clip_gain2") clip_gain2 = config.clip_gain2; else clip_gain2 = 0.9; end
+  if isfield(config,"clip_gain1") clip_gain1 = config.clip_gain1; else clip_gain1 = 2.5; end
+  if isfield(config,"clip_gain2") clip_gain2 = config.clip_gain2; else clip_gain2 = 0.8; end
   if isfield(config,"foff_limiter") foff_limiter = config.foff_limiter; else foff_limiter = 0; end
+  if isfield(config,"txbpf_width_Hz") txbpf_width_Hz = config.txbpf_width_Hz; else txbpf_width_Hz = 2000; end
 
   states.Fs = 8000;
   states.bps = bps;
@@ -137,6 +138,7 @@ function states = ofdm_init(config)
   % increased average power and BER
   states.clip_gain1 = clip_gain1;
   states.clip_gain2 = clip_gain2;
+  states.txbpf_width_Hz = txbpf_width_Hz;
 
   % this is used to scale inputs to LDPC decoder to make it amplitude indep
   states.mean_amp = 0;
@@ -263,7 +265,7 @@ function config = ofdm_init_mode(mode="700D")
 
   % some "canned" modes
   if strcmp(mode,"700D")
-    Ts = 0.018; Nc = 17;
+    Ts = 0.018; Nc = 17; config.txbpf_width_Hz = 1500;
   elseif strcmp(mode,"700E")
     Ts = 0.014; Tcp=0.006; Nc = 21; Ns=4;
     config.edge_pilots = 0; config.state_machine = "voice2";
@@ -1640,7 +1642,7 @@ function [rx_real rx] = ofdm_clip_channel(states, tx, SNR3kdB, channel, freq_off
     [tx nclipped] = ofdm_clip(states, tx*states.clip_gain1, 16384);
     tx *= states.clip_gain2;
     ssbfilt_n = 100;
-    ssbfilt_coeff = fir1(ssbfilt_n, 2000/(states.Fs));
+    ssbfilt_coeff = fir1(ssbfilt_n, states.txbpf_width_Hz/states.Fs);
     %figure(2); freqz(ssbfilt_coeff);
     lo = exp(j*2*pi*states.fcentre*(1:length(tx))/(states.Fs));
     tx = lo.*filter(ssbfilt_coeff,1,tx.*conj(lo));

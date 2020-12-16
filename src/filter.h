@@ -40,4 +40,6 @@ extern void quisk_ccfFilter(complex float *, complex float *, int, struct quisk_
 extern float quiskFilt120t480[480];
 extern float filtP550S750[160];
 extern float filtP900S1100[100];
+extern float filtP650S900[100];
+
 #endif
