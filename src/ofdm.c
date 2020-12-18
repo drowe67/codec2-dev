@@ -514,7 +514,7 @@ static void allocate_tx_bpf(struct OFDM *ofdm) {
         quisk_cfTune(ofdm->tx_bpf, ofdm->tx_centre / ofdm->fs);
     }
     else if (!strcmp(ofdm->mode, "700E")) {
-        quisk_filt_cfInit(ofdm->tx_bpf, filtP900S1100, sizeof (filtP550S750) / sizeof (float));
+        quisk_filt_cfInit(ofdm->tx_bpf, filtP900S1100, sizeof (filtP900S1100) / sizeof (float));
         quisk_cfTune(ofdm->tx_bpf, ofdm->tx_centre / ofdm->fs);
     }
     else assert(0);
@@ -900,6 +900,7 @@ void ofdm_txframe(struct OFDM *ofdm, complex float *tx, complex float *tx_sym_li
         ofdm_clip(tx, OFDM_PEAK, samplesperpacket);
     }
 
+   /* OFDM clipper (compressor) */
     if (ofdm->tx_bpf_en) {
         assert(!strcmp(ofdm->mode, "700D") || !strcmp(ofdm->mode, "700E"));
         assert(ofdm->tx_bpf != NULL);
@@ -912,6 +913,11 @@ void ofdm_txframe(struct OFDM *ofdm, complex float *tx, complex float *tx_sym_li
     /* BPF messes up peak levels, this gain gets back to approx OFDM_PEAK */
     if (ofdm->tx_bpf_en && ofdm->clip_en)
         for(i=0; i<samplesperpacket; i++) tx[i] *= ofdm->clip_gain2;
+
+    /* a very small percentage of samples may still exceed OFDM_PEAK, in
+       clipped or unclipped mode.  Lets remove them so we present consistent
+       levels to the transmitter */
+    ofdm_clip(tx, OFDM_PEAK, samplesperpacket);
 }
 
 struct OFDM_CONFIG *ofdm_get_config_param(struct OFDM *ofdm) { return &ofdm->config; }

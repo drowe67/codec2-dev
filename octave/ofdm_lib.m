@@ -132,6 +132,7 @@ function states = ofdm_init(config)
   %   Nuw=12; plot(0:Nuw, binocdf(0:Nuw,Nuw,0.05)); hold on; plot(binocdf(0:Nuw,Nuw,0.5)); hold off;
   states.bad_uw_errors = bad_uw_errors;
 
+  states.ofdm_peak = 16384;
   % use this to scale tx output to 16 bit short to a peak value of 16384.  Adjusted by experiment
   states.amp_scale = amp_scale;
   % when using the clipping, this is the manual gain value.  Adjusted by experiment, trade off between
@@ -274,12 +275,12 @@ function config = ofdm_init_mode(mode="700D")
     config.amp_scale = 155E3; config.clip_gain1 = 3; config.clip_gain2 = 0.8;
     config.foff_limiter = 1;
   elseif strcmp(mode,"2020")
-    Ts = 0.0205; Nc = 31;
+    Ts = 0.0205; Nc = 31; config.amp_scale = 167E3;
   elseif strcmp(mode,"qam16c1")
     Ns=5; config.Np=5; Tcp = 0.004; Ts = 0.016; Nc = 33; config.data_mode = 1;
     config.bps=4; config.Ntxtbits = 0; config.Nuwbits = 15*4; config.bad_uw_errors = 5;
     config.state_machine = "data";
-    config.ftwindow_width = 32; config.amp_scale = 135E3;
+    config.ftwindow_width = 32; config.amp_scale = 132E3;
     config.EsNo_est_all_symbols = 0; config.amp_est_mode = 1; config.EsNodB = 10;
   elseif strcmp(mode,"qam16c2")
     Ns=5; config.Np=31; Tcp = 0.004; Ts = 0.016; Nc = 33; config.data_mode = 1;
@@ -1634,12 +1635,12 @@ end
 function [rx_real rx] = ofdm_clip_channel(states, tx, SNR3kdB, channel, freq_offset_Hz, tx_clip_en)
   tx *= states.amp_scale;
 
-  % optional clipper to improve PAPR
+  % optional compressor to improve PAPR
 
   nclipped = 0;
   if tx_clip_en
     printf("%f %f\n", states.clip_gain1, states.clip_gain2);
-    [tx nclipped] = ofdm_clip(states, tx*states.clip_gain1, 16384);
+    [tx nclipped] = ofdm_clip(states, tx*states.clip_gain1, states.ofdm_peak);
     tx *= states.clip_gain2;
     ssbfilt_n = 100;
     ssbfilt_coeff = fir1(ssbfilt_n, states.txbpf_width_Hz/states.Fs);
@@ -1647,6 +1648,10 @@ function [rx_real rx] = ofdm_clip_channel(states, tx, SNR3kdB, channel, freq_off
     lo = exp(j*2*pi*states.fcentre*(1:length(tx))/(states.Fs));
     tx = lo.*filter(ssbfilt_coeff,1,tx.*conj(lo));
   end
+
+  % Hilbert Clipper 2 - remove any really low probability outliers after clipping/filtering
+  % or even on vanilla Tx
+  [tx tmp] = ofdm_clip(states, tx, states.ofdm_peak);
 
   % note this is PAPR of complex signal, PAPR of real signal will be 3dB-ish larger
   peak = max(abs(tx)); RMS = sqrt(mean(abs(tx).^2));
