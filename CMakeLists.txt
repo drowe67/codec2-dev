@@ -791,23 +791,23 @@ endif(NOT APPLE)
                             ./fsk_get_test_bits - 10000 | ./fsk_mod 4 8000 100 1000 100 - - |
                             ./cohpsk_ch - - -26 --Fs 8000 |
                             ./fsk_demod 4 8000 100 - - | ./fsk_put_test_bits -b 0.025 - ")
-     # shift FSK signal to -ve frequencies, note No 3dB higher as noise is single sided
+     # shift FSK signal to -ve frequencies
      add_test(NAME test_fsk_4fsk_ber_negative_freq
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
                             ./fsk_get_test_bits - 10000 | ./fsk_mod 4 8000 100 1000 200 - - |
-                            ./cohpsk_ch - - -23 --Fs 8000 --ssbfilt 0 --complexout -f -3000 |
+                            ./cohpsk_ch - - -26 --Fs 8000 --ssbfilt 0 --complexout -f -3000 |
                             ./fsk_demod -c -p 8 4 8000 100 - - |
                             ./fsk_put_test_bits -b 0.025 -q - ")
      # Low SNR 4FSK uncoded PER/BER test:
      # 4FSK modem at Eb/No = 2dB, SNR = Eb/No+10log10(Rb/B) = 6 + 10*log10(2*100/3000) = -15.7dB
-     # Theoretical BER is 0.14.  As it's single sided noise cohpsk_ch reports 3dB less (-18.7dB)
+     # Theoretical BER is 0.14.
      # Pass condition is 10% PER
      add_test(NAME test_fsk_4fsk_lockdown
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
-                            bits=512; tx_packets=20; rx_packets=18; tx_tone_sep=270; Rs=25;
+                            bits=512; tx_packets=20; rx_packets=18; tx_tone_sep=50; Rs=25;
                             ./fsk_get_test_bits - $(($bits*$tx_packets)) $bits |
                             ./fsk_mod 4 8000 $Rs 1000 $tx_tone_sep - - |
-                            ./cohpsk_ch - - -13 --Fs 8000 --ssbfilt 0 -f -3000 --complexout |
+                            ./cohpsk_ch - - -16 --Fs 8000 --ssbfilt 0 -f -3000 --complexout |
                             ./fsk_demod -c -p 8 --mask $tx_tone_sep -t1 --nsym 100 4 8000 $Rs - - 2>stats.txt |
                             ./fsk_put_test_bits -t 0.25 -b 0.20 -p $rx_packets -f $bits -q -")
 
@@ -917,12 +917,12 @@ endif(NOT APPLE)
                             ./freedv_data_raw_rx --testframes -v --Fs 100000 --Rs 10000 FSK_LDPC - /dev/null")
              set_tests_properties(test_freedv_data_raw_fsk_ldpc_10k PROPERTIES PASS_REGULAR_EXPRESSION "output_frames: 1000")
 
-     # FSK LDPC Rs=1000 bit/s (Rb=2000) 4FSK, Fs=40kHz, this needs --mask and longer preamble to work, due to lower Es/No, about 2dB over 2FSK
+     # FSK LDPC Rs=1000 bit/s (Rb=2000) 4FSK, Fs=40kHz, this needs --mask and 2Rs shift to work reliably
      add_test(NAME test_freedv_data_raw_fsk_ldpc_2k
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
-                            ./freedv_data_raw_tx -a 8192 -m 4 --Fs 40000 --Rs 1000 --tone1 1000 --shift 1000 --testframes 1 --bursts 10 FSK_LDPC /dev/zero - |
+                            ./freedv_data_raw_tx -a 8192 -m 4 --Fs 40000 --Rs 1000 --tone1 10000 --shift 2000 --testframes 1 --bursts 10 FSK_LDPC /dev/zero - |
                              ./cohpsk_ch - - -22 --Fs 8000 --ssbfilt 0 |
-                             ./freedv_data_raw_rx -m 4 --testframes -v --Fs 40000 --Rs 1000 FSK_LDPC --mask 1000 - /dev/null")
+                             ./freedv_data_raw_rx -m 4 --testframes -v --Fs 40000 --Rs 1000 FSK_LDPC --mask 2000 - /dev/null")
              set_tests_properties(test_freedv_data_raw_fsk_ldpc_2k PROPERTIES PASS_REGULAR_EXPRESSION "output_frames: 10")
 
 endif(UNITTEST)
