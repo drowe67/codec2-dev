@@ -34,7 +34,7 @@ void ofdm_init_mode(char mode[], struct OFDM_CONFIG *config) {
     config->bps = 2;                            /* Bits per Symbol */
     config->nuwbits = 5 * config->bps;          /* default is 5 symbols of Unique Word bits */
     config->bad_uw_errors = 3;
-    config->ftwindowwidth = 11;
+    config->ftwindowwidth = 32;
     config->timing_mx_thresh = 0.30f;
     config->edge_pilots = 1;
     config->state_machine = "voice1";
@@ -52,6 +52,7 @@ void ofdm_init_mode(char mode[], struct OFDM_CONFIG *config) {
          config->ts = 0.014;  config->tcp = 0.006; config->nc = 21; config->ns=4;
          config->nuwbits = 12; config->bad_uw_errors = 3; config->txtbits = 2;
          config->state_machine = "voice2"; config->amp_est_mode = 1;
+         config->ftwindowwidth = 80;
          config->codename = "HRA_56_56"; config->tx_bpf_en = false;
          config->foff_limiter = true;
          config->amp_scale = 155E3; config->clip_gain1 = 3; config->clip_gain2 = 0.8;

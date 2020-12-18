@@ -784,9 +784,9 @@ static float est_freq_offset_pilot_corr(struct OFDM *ofdm, complex float *rx, in
         complex float corr_st = 0.0f;
         complex float corr_en = 0.0f;
         float tmp = TAU * f / ofdm->fs;
-	complex float delta = cmplxconj(tmp);
-	complex float w = cmplxconj(0.0f);
-	int i;
+	      complex float delta = cmplxconj(tmp);
+	      complex float w = cmplxconj(0.0f);
+	      int i;
 
         for (i = 0; i < ofdm->samplespersymbol; i++) {
             // "mix" down (correlate) the pilot sequences from frame with 0 Hz offset pilot samples
@@ -795,15 +795,15 @@ static float est_freq_offset_pilot_corr(struct OFDM *ofdm, complex float *rx, in
 
             corr_st += rx[est                        ] * csam;
             corr_en += rx[est + ofdm->samplesperframe] * csam;
-	    w = w * delta;
-	}
+	          w = w * delta;
+	      }
 
-	float Cabs = cabsf(corr_st) + cabsf(corr_en);
+	      float Cabs = cabsf(corr_st) + cabsf(corr_en);
 
-	if (Cabs > Cabs_max) {
-	  Cabs_max = Cabs;
-	  foff_est = f;
-	}
+	      if (Cabs > Cabs_max) {
+	          Cabs_max = Cabs;
+	          foff_est = f;
+    	  }
     }
 
     ofdm->foff_metric = 0.0f; // not used in this version of freq est algorithm
@@ -1218,8 +1218,8 @@ static void ofdm_demod_core(struct OFDM *ofdm, int *rx_bits) {
 
         /* Black magic to keep sample_point inside cyclic prefix.  Or something like that. */
 
-        ofdm->sample_point = max(ofdm->timing_est + (ofdm->ncp / 4), ofdm->sample_point);
-        ofdm->sample_point = min(ofdm->timing_est + ofdm->ncp, ofdm->sample_point);
+        ofdm->sample_point = max(ofdm->timing_est + 4, ofdm->sample_point);
+        ofdm->sample_point = min(ofdm->timing_est + ofdm->ncp-4, ofdm->sample_point);
     }
 
     /*
