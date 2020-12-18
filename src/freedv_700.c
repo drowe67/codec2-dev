@@ -84,10 +84,14 @@ void freedv_comptx_700c(struct freedv *f, COMP mod_out[]) {
 
     /* cohpsk modulator */
     cohpsk_mod(f->cohpsk, tx_fdm, tx_bits, COHPSK_BITS_PER_FRAME);
-    if (f->clip_en)
+
+    float gain = 1.0;
+    if (f->clip_en) {
         cohpsk_clip(tx_fdm, COHPSK_CLIP, COHPSK_NOM_SAMPLES_PER_FRAME);
+        gain = 2.5;
+    }
     for(i=0; i<f->n_nat_modem_samples; i++)
-        mod_out[i] = fcmult(FDMDV_SCALE*NORM_PWR_COHPSK, tx_fdm[i]);
+        mod_out[i] = fcmult(gain*FDMDV_SCALE*NORM_PWR_COHPSK, tx_fdm[i]);
     i = quisk_cfInterpDecim((complex float *)mod_out, f->n_nat_modem_samples, f->ptFilter7500to8000, 16, 15);
 }
 
