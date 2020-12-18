@@ -795,7 +795,7 @@ endif(NOT APPLE)
      add_test(NAME test_fsk_4fsk_ber_negative_freq
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
                             ./fsk_get_test_bits - 10000 | ./fsk_mod 4 8000 100 1000 200 - - |
-                            ./cohpsk_ch - - -23 --Fs 8000 --ssbfilt 0 --complexout -f -4000 |
+                            ./cohpsk_ch - - -23 --Fs 8000 --ssbfilt 0 --complexout -f -3000 |
                             ./fsk_demod -c -p 8 4 8000 100 - - |
                             ./fsk_put_test_bits -b 0.025 -q - ")
      # Low SNR 4FSK uncoded PER/BER test:
