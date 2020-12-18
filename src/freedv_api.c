@@ -780,8 +780,8 @@ static void codec2_decode_upacked(struct freedv *f, short speech_out[], uint8_t 
   AUTHOR......: David Rowe
   DATE CREATED: May 2020
 
-  The *_rx functions takes off air samples, demodulate and (for some
-  modes) FEC decode, giving us a frame of bits.
+  The *_rx functions takes off air samples, demodulates and (for some
+  modes) FEC decodes, giving us a frame of bits.
 
   This function captures a lot of tricky logic that has been distilled
   through experience:
