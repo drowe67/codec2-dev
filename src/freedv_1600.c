@@ -56,8 +56,8 @@ void freedv_1600_open(struct freedv *f) {
     f->bits_per_modem_frame = fdmdv_bits_per_frame(f->fdmdv);
     f->bits_per_codec_frame = codec2_bits_per_frame(f->codec2);
     f->n_codec_frames = 1;
-    f->tx_payload_bits = MALLOC(f->bits_per_codec_frame); assert(f->tx_payload_bits != NULL);  
-    f->rx_payload_bits = MALLOC(f->bits_per_codec_frame); assert(f->rx_payload_bits != NULL);  
+    f->tx_payload_bits = MALLOC(f->bits_per_codec_frame); assert(f->tx_payload_bits != NULL);
+    f->rx_payload_bits = MALLOC(f->bits_per_codec_frame); assert(f->rx_payload_bits != NULL);
 }
 
 
@@ -146,7 +146,7 @@ int freedv_comprx_fdmdv_1600(struct freedv *f, COMP demod_in[]) {
     char                ascii_out;
     int                 reliable_sync_bit;
     int                 rx_status = 0;
-    
+
     COMP ademod_in[f->nin];
     for(i=0; i<f->nin; i++)
         ademod_in[i] = fcmult(1.0/FDMDV_SCALE, demod_in[i]);
@@ -256,4 +256,3 @@ int freedv_comprx_fdmdv_1600(struct freedv *f, COMP demod_in[]) {
 
     return rx_status;
 }
-

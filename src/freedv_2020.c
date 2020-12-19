@@ -86,16 +86,13 @@ void freedv_2020_open(struct freedv *f) {
     f->n_nom_modem_samples = ofdm_get_samples_per_frame(f->ofdm);
     f->n_max_modem_samples = ofdm_get_max_samples_per_frame(f->ofdm);
     f->modem_sample_rate = f->ofdm->config.fs;
-    f->clip = 0;
+    f->clip_en = 0;
     f->sz_error_pattern = f->ofdm_bitsperframe;
 
     /* storage for pass through audio interpolating filter.  These are
        the rate FREEDV_FS_8000 modem input samples before interpolation */
     f->passthrough_2020 = CALLOC(1, sizeof(float)*(FDMDV_OS_TAPS_16K + freedv_get_n_max_modem_samples(f)));
     assert(f->passthrough_2020 != NULL);
-
-    /* TODO: tx BPF off by default, as we need new filter coeffs for FreeDV 2020 waveform */
-    ofdm_set_tx_bpf(f->ofdm, 0);
 
     f->lpcnet = lpcnet_freedv_create(1); assert(f->lpcnet != NULL);
     f->codec2 = NULL;
@@ -157,21 +154,7 @@ void freedv_comptx_2020(struct freedv *f, COMP mod_out[]) {
     }
 
     /* OK now ready to LDPC encode, interleave, and OFDM modulate */
-
-    complex float tx_sams[f->n_nat_modem_samples];
-    COMP asam;
-
-    ofdm_ldpc_interleave_tx(f->ofdm, f->ldpc, tx_sams, tx_bits, txt_bits);
-
-    for(i=0; i< f->n_nat_modem_samples; i++) {
-        asam.real = crealf(tx_sams[i]);
-        asam.imag = cimagf(tx_sams[i]);
-        mod_out[i] = fcmult(OFDM_AMP_SCALE * NORM_PWR_OFDM, asam);
-    }
-
-    if (f->clip) {
-        cohpsk_clip(mod_out, OFDM_CLIP, f->n_nat_modem_samples);
-    }
+    ofdm_ldpc_interleave_tx(f->ofdm, f->ldpc, (complex float*)mod_out, tx_bits, txt_bits);
 }
 
 int freedv_comprx_2020(struct freedv *f, COMP demod_in[]) {

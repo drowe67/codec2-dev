@@ -2,9 +2,7 @@
 % David Rowe Mar 2017
 
 #{
-  Library of functions that implement a PSK OFDM modem.  Rate Fs
-  verison of ofdm_rs.m with OFDM based up and down conversion, and all
-  those nasty real-world details like fine freq, timing.  
+  Library of functions that implement a PSK OFDM modem.
 #}
 
 1;
@@ -20,14 +18,14 @@ qam16;
   symbols between every pilot.
 
    e.g. for Ns=4, Nc=6:
-  
+
     |-Nc-|          Time
     DDDDDD           |
    PPPPPPPP  ---     |
     DDDDDD    |      |
     DDDDDD    Ns     |
     DDDDDD    |      |
-   PPPPPPPP  ---    \|/ 
+   PPPPPPPP  ---    \|/
     DDDDDD    |      |
 
    Freq------------------>
@@ -41,21 +39,26 @@ function states = ofdm_init(config)
   if isfield(config,"Np") Np = config.Np; else Np = 1; end
   if isfield(config,"Ntxtbits") Ntxtbits = config.Ntxtbits ; else Ntxtbits = 4; end
   if isfield(config,"Nuwbits") Nuwbits = config.Nuwbits ; else Nuwbits = 5*bps; end
-  if isfield(config,"Nuwbits") Nuwbits = config.Nuwbits ; else Nuwbits = 5*bps; end
-  if isfield(config,"ftwindow_width") ftwindow_width = config.ftwindow_width; else ftwindow_width = 11; end
+  if isfield(config,"ftwindow_width") ftwindow_width = config.ftwindow_width; else ftwindow_width = 32; end
   if isfield(config,"timing_mx_thresh") timing_mx_thresh = config.timing_mx_thresh; else timing_mx_thresh = 0.35; end
   if isfield(config,"tx_uw") tx_uw = config.tx_uw; else tx_uw = zeros(1,Nuwbits); end
   if isfield(config,"bad_uw_errors") bad_uw_errors = config.bad_uw_errors; else bad_uw_errors = 3; end
-  if isfield(config,"amp_scale") amp_scale = config.amp_scale; else amp_scale = 217E3; end
+  if isfield(config,"amp_scale") amp_scale = config.amp_scale; else amp_scale = 245E3; end
   if isfield(config,"amp_est_mode") amp_est_mode = config.amp_est_mode; else amp_est_mode = 0; end
   if isfield(config,"EsNo_est_all_symbols")  EsNo_est_all_symbols = config.EsNo_est_all_symbols; else EsNo_est_all_symbols = 1; end
   if isfield(config,"EsNodB") EsNodB = config.EsNodB; else EsNodB = 3; end
-  
+  if isfield(config,"state_machine") state_machine = config.state_machine; else state_machine = "voice1"; end
+  if isfield(config,"edge_pilots") edge_pilots = config.edge_pilots; else edge_pilots = 1; end
+  if isfield(config,"clip_gain1") clip_gain1 = config.clip_gain1; else clip_gain1 = 2.5; end
+  if isfield(config,"clip_gain2") clip_gain2 = config.clip_gain2; else clip_gain2 = 0.8; end
+  if isfield(config,"foff_limiter") foff_limiter = config.foff_limiter; else foff_limiter = 0; end
+  if isfield(config,"txbpf_width_Hz") txbpf_width_Hz = config.txbpf_width_Hz; else txbpf_width_Hz = 2000; end
+
   states.Fs = 8000;
   states.bps = bps;
   states.Rs = Rs;
   states.Tcp = Tcp;
-  states.Ns = Ns;                                 % one pilot every Ns symbols, e.g. Ns=3, ...PDDDPDDDP...
+  states.Ns = Ns;                                 % one pilot every Ns symbols, e.g. Ns=4, ...PDDDPDDDP...
   states.Nc = Nc;                                 % Number of carriers
   states.M  = states.Fs/Rs;                       % oversampling rate
   states.Ncp = Tcp*states.Fs;
@@ -74,34 +77,49 @@ function states = ofdm_init(config)
                                                   % the total packet of data to span multiple modem frames, e.g. HF data
                                                   % and/or when the FEC codeword is larger than the one
                                                   % modem frame.  In other modes (e.g. 700D/2020) Np=1, ie the modem frame
-                                                  % is the same length as the packet/FEC frame.
+                                                  % is the same length as the packet/FEC codeword.
   states.Nbitsperpacket = Np*states.Nbitsperframe;
   states.Tpacket = Np*Ns*(Tcp+1/Rs);              % time for one packet in ms
 
   states.Ntxtbits = Ntxtbits;                     % reserved bits/frame for auxillary text information.  Uncoded/unprotected so may
                                                   % be of limited use going forward, consider setting to 0
-  states.Nuwbits  = Nuwbits;                      
-  
+  states.Nuwbits  = Nuwbits;
+
   % some basic sanity checks
   assert(floor(states.M) == states.M);
-  
+
   % UW symbol placement.  Use ofdm_dev.m, debug_false_sync() to test.
   % Note we need to fill each UW symbols with bits.  The LDPC decoder
   % works on symbols so we can't break up any symbols into UW/FEC
   % encoded bits.
-  
+
   states.uw_ind = states.uw_ind_sym = [];
-  for i=1:states.Nuwbits/bps
-    ind_sym = floor(i*(Nc+1)/bps+1);
+  uw_step = Nc+1;                                % default step for UW sym placement
+
+  % lets see if all UW syms will fit in frame
+  Nuwsyms = states.Nuwbits/bps;
+  Ndatasymsperframe = (Ns-1)*Nc;
+  last_sym = floor(Nuwsyms*uw_step/bps+1);
+  if last_sym > Ndatasymsperframe
+    uw_step = Nc-1;                              % try a different step
+  end
+  last_sym = floor(Nuwsyms*uw_step/bps+1);
+  assert(last_sym <= Ndatasymsperframe);         % we still can't fit them all
+
+  % Place UW symbols in frame
+  for i=1:Nuwsyms
+    ind_sym = floor(i*uw_step/bps+1);
+    % printf("%d sym: %d\n",i, ind_sym);
     states.uw_ind_sym = [states.uw_ind_sym ind_sym];   % symbol index
     for b=bps-1:-1:0
       states.uw_ind = [states.uw_ind bps*ind_sym-b];   % bit index
-    end  
+    end
   end
+
   % how many of the first few frames have UW symbols in them
   Nsymsperframe = states.Nbitsperframe/states.bps;
   states.Nuwframes = ceil(states.uw_ind_sym(end)/Nsymsperframe);
-  
+
   states.tx_uw = tx_uw;
   assert(length(states.tx_uw) == states.Nuwbits);
   tx_uw_syms = [];
@@ -113,24 +131,33 @@ function states = ofdm_init(config)
   % if the UW has this many errors it is "bad", the binomal cdf can be used to set this:
   %   Nuw=12; plot(0:Nuw, binocdf(0:Nuw,Nuw,0.05)); hold on; plot(binocdf(0:Nuw,Nuw,0.5)); hold off;
   states.bad_uw_errors = bad_uw_errors;
-  
-  % use this to scale tx output to 16 bit short.  Adjusted by experiment
-  % to have same RMS value as other FreeDV waveforms (around 4400)
+
+  states.ofdm_peak = 16384;
+  % use this to scale tx output to 16 bit short to a peak value of 16384.  Adjusted by experiment
   states.amp_scale = amp_scale;
+  % when using the clipping, this is the manual gain value.  Adjusted by experiment, trade off between
+  % increased average power and BER
+  states.clip_gain1 = clip_gain1;
+  states.clip_gain2 = clip_gain2;
+  states.txbpf_width_Hz = txbpf_width_Hz;
 
   % this is used to scale inputs to LDPC decoder to make it amplitude indep
   states.mean_amp = 0;
 
-  % use a fxed EsNo for LDPC decoder, this seems to work OK and avoid another estimator
+  % use a fixed EsNo for LDPC decoder, this seems to work OK and avoid another estimator
   states.EsNodB = EsNodB;
 
   % generate same BPSK pilots each time
   rand('seed',1);
   states.pilots = 1 - 2*(rand(1,Nc+2) > 0.5);
   %printf("number of pilots total: %d\n", length(states.pilots));
-  
+
+  % place pilots at carrier 1 and Nc+2 to support low bandwith phase est over grid
+  % of 12 pilot_samples.  Used for 700D and 2020
+  states.edge_pilots = edge_pilots;
+
   % carrier tables for up and down conversion
-  fcentre = 1500;
+  states.fcentre = fcentre = 1500;
   alower = fcentre - Rs * (Nc/2);  % approx frequency of lowest carrier
   Nlower = round(alower / Rs) - 1; % round this to nearest integer multiple from 0Hz to keep DFT happy
   %printf("  fcentre: %f alower: %f alower/Rs: %f Nlower: %d\n", fcentre, alower, alower/Rs, Nlower);
@@ -156,7 +183,7 @@ function states = ofdm_init(config)
   %                       D                 P DDD P DDD P DDD             P                    D
   states.Nrxbuf = states.Nsampersymbol + 3*states.Nsamperframe + states.Nsampersymbol + states.Nsampersymbol;
   states.rxbuf = zeros(1, states.Nrxbuf);
- 
+
   % default settings on a bunch of options and states
 
   states.verbose = 0;
@@ -166,8 +193,9 @@ function states = ofdm_init(config)
   states.phase_est_bandwidth = "high";
   states.dpsk = 0;
   states.amp_est_mode = amp_est_mode;
-  
+
   states.foff_est_gain = 0.1;
+  states.foff_limiter = foff_limiter;
   states.foff_est_hz = 0;
   states.sample_point = states.timing_est = 1;
   states.nin = states.Nsamperframe;
@@ -176,14 +204,14 @@ function states = ofdm_init(config)
   states.coarse_foff_est_hz = 0;
 
   states.foff_metric = 0;
-  
+
   % generate OFDM pilot symbol, used for timing and freq offset est
 
   rate_fs_pilot_samples = states.pilots * W/states.M;
 
   % During tuning it was found that not including the cyc prefix in
   % rate_fs_pilot_samples produced better fest results
-  
+
   %states.rate_fs_pilot_samples = [rate_fs_pilot_samples(states.M-states.Ncp+1:states.M) rate_fs_pilot_samples];
   states.rate_fs_pilot_samples = [zeros(1,states.Ncp) rate_fs_pilot_samples];
 
@@ -195,25 +223,26 @@ function states = ofdm_init(config)
 
   % sync state machine
 
-  states.sync_state = states.last_sync_state = 'search'; 
+  states.sync_state = states.last_sync_state = 'search';
   states.uw_errors = 0;
   states.sync_counter = 0;
   states.frame_count = 0;                                 % number of frames we have been in sync
   states.sync_start = 0;
   states.sync_end = 0;
   states.modem_frame = 0;                                 % keep track of how many frames received in packet
-  
+  states.state_machine = state_machine;                   % mode specific state machine
+
   % LDPC code is optionally enabled
 
   states.rate = 1.0;
   states.ldpc_en = 0;
 
   % init some output states for logging
-  
+
   states.rx_sym = zeros(1+Ns+1+1, Nc+2);
 
   % Es/No (SNR) est states
-  
+
   states.EsNo_est_all_symbols = EsNo_est_all_symbols;
   states.noise_var = 0;
   states.sig_var = 0;
@@ -237,38 +266,47 @@ function config = ofdm_init_mode(mode="700D")
 
   % some "canned" modes
   if strcmp(mode,"700D")
-    Ts = 0.018; Nc = 17;
+    Ts = 0.018; Nc = 17; config.txbpf_width_Hz = 1500;
+  elseif strcmp(mode,"700E")
+    Ts = 0.014; Tcp=0.006; Nc = 21; Ns=4;
+    config.edge_pilots = 0; config.state_machine = "voice2";
+    config.Nuwbits = 12; config.bad_uw_errors = 3; config.Ntxtbits = 2;
+    config.amp_est_mode = 1; config.ftwindow_width = 80;
+    config.amp_scale = 155E3; config.clip_gain1 = 3; config.clip_gain2 = 0.8;
+    config.foff_limiter = 1;
   elseif strcmp(mode,"2020")
-    Ts = 0.0205; Nc = 31;
-  elseif strcmp(mode,"2200")
-    Tframe = 0.175; Ts = Tframe/Ns; Nc = 37;
+    Ts = 0.0205; Nc = 31; config.amp_scale = 167E3;
   elseif strcmp(mode,"qam16c1")
-    Ns=5; config.Np=5; Tcp = 0.004; Ts = 0.016; Nc = 33;
+    Ns=5; config.Np=5; Tcp = 0.004; Ts = 0.016; Nc = 33; config.data_mode = 1;
     config.bps=4; config.Ntxtbits = 0; config.Nuwbits = 15*4; config.bad_uw_errors = 5;
-    config.ftwindow_width = 32; config.amp_scale = 135E3;
+    config.state_machine = "data";
+    config.ftwindow_width = 32; config.amp_scale = 132E3;
     config.EsNo_est_all_symbols = 0; config.amp_est_mode = 1; config.EsNodB = 10;
   elseif strcmp(mode,"qam16c2")
-    Ns=5; config.Np=31; Tcp = 0.004; Ts = 0.016; Nc = 33;
+    Ns=5; config.Np=31; Tcp = 0.004; Ts = 0.016; Nc = 33; config.data_mode = 1;
     config.bps=4; config.Ntxtbits = 0; config.Nuwbits = 42*4; config.bad_uw_errors = 15;
-    config.ftwindow_width = 32; config.amp_scale = 135E3;
+    config.ftwindow_width = 32; config.amp_scale = 135E3; config.state_machine = "data";
     config.EsNo_est_all_symbols = 0; config.amp_est_mode = 1; config.EsNodB = 10;
     config.tx_uw = zeros(1,config.Nuwbits = 42*4);
     config.tx_uw(1:24) = [1 1 0 0  1 0 1 0  1 1 1 1  0 0 0 0  1 1 1 1  0 0 0 0];
     config.tx_uw(end-24+1:end) = [1 1 0 0  1 0 1 0  1 1 1 1  0 0 0 0  1 1 1 1  0 0 0 0];
   elseif strcmp(mode,"datac1")
-    Ns=5; config.Np=18; Tcp = 0.006; Ts = 0.016; Nc = 18;
+    Ns=5; config.Np=18; Tcp = 0.006; Ts = 0.016; Nc = 18; config.data_mode = 1;
     config.Ntxtbits = 0; config.Nuwbits = 12; config.bad_uw_errors = 2;
+    config.state_machine = "data";
     config.ftwindow_width = 32; config.amp_est_mode = 1; config.EsNodB = 10;
   elseif strcmp(mode,"datac2")
-    Ns=5; config.Np=36; Tcp = 0.006; Ts = 0.016; Nc = 9;
+    Ns=5; config.Np=36; Tcp = 0.006; Ts = 0.016; Nc = 9; config.data_mode = 1;
     config.Ntxtbits = 0; config.Nuwbits = 12; config.bad_uw_errors = 1;
+    config.state_machine = "data";
     config.ftwindow_width = 32; config.amp_est_mode = 1; config.EsNodB = 10;
   elseif strcmp(mode,"datac3")
-    Ns=5; config.Np=11; Tcp = 0.006; Ts = 0.016; Nc = 9;
+    Ns=5; config.Np=11; Tcp = 0.006; Ts = 0.016; Nc = 9; config.data_mode = 1;
     config.Ntxtbits = 0; config.Nuwbits = 24; config.bad_uw_errors = 5;
     config.ftwindow_width = 32; config.timing_mx_thresh = 0.30;
     config.tx_uw = [1 1 0 0  1 0 1 0  1 1 1 1  0 0 0 0  1 1 1 1  0 0 0 0];
     config.amp_est_mode = 1; config.EsNodB = 0;
+    config.state_machine = "data";
   elseif strcmp(mode,"1")
     Ns=5; config.Np=10; Tcp=0; Tframe = 0.1; Ts = Tframe/Ns; Nc = 1;
   else
@@ -290,9 +328,14 @@ function print_config(states)
 
   % ASCII-art packet visualisation
   s=1; u=1; Nuwsyms=length(uw_ind_sym);
+  if states.edge_pilots
+    cr = 1:Nc+2;
+  else
+    cr = 2:Nc+1;
+  end
   for f=1:Np
     for r=1:Ns
-      for c=1:Nc+2
+      for c=cr
         if r == 1
           sym="P";
         elseif c>1 && c <=(Nc+1)
@@ -306,18 +349,17 @@ function print_config(states)
       end
       printf("\n");
     end
-  end  
+  end
 
   printf("Nc=%d Ts=%4.3f Tcp=%4.3f Ns: %d Np: %d\n", Nc, 1/Rs, Tcp, Ns, Np);
   printf("Nsymperframe: %d Nbitsperpacket: %d Nsamperframe: %d Ntxtbits: %d Nuwbits: %d Nuwframes: %d\n",
           Ns*Nc, Nbitsperpacket, Nsamperframe, Ntxtbits, Nuwbits, Nuwframes);
-  printf("amp_est_mode: %d\n", states.amp_est_mode);
   printf("uncoded bits/s: %4.1f\n",  Nbitsperpacket*Fs/(Np*Nsamperframe));
 end
 
 % Gray coded QPSK modulation function
 function symbol = qpsk_mod(two_bits)
-    two_bits_decimal = sum(two_bits .* [2 1]); 
+    two_bits_decimal = sum(two_bits .* [2 1]);
     switch(two_bits_decimal)
         case (0) symbol =  1;
         case (1) symbol =  j;
@@ -337,7 +379,7 @@ endfunction
 function out = freq_shift(in, foff, Fs)
   foff_rect = exp(j*2*pi*foff/Fs);
   foff_phase_rect = exp(j*0);
-  
+
   for r=1:length(in)
     foff_phase_rect *= foff_rect;
     out(r) = in(r)*foff_phase_rect;
@@ -352,7 +394,7 @@ endfunction
 function tx = ofdm_mod(states, tx_bits)
   ofdm_load_const;
   assert(length(tx_bits) == Nbitsperpacket);
- 
+
   % map to symbols in linear array
 
   if bps == 1
@@ -362,13 +404,13 @@ function tx = ofdm_mod(states, tx_bits)
     for s=1:Nbitsperpacket/bps
       tx_sym_lin(s) = qpsk_mod(tx_bits(2*(s-1)+1:2*s));
     end
-  end  
+  end
   if bps == 4
     for s=1:Nbitsperpacket/bps
       tx_sym_lin(s) = qam16_mod(states.qam16,tx_bits(4*(s-1)+1:4*s));
     end
   end
-  
+
   tx = ofdm_txframe(states, tx_sym_lin);
 endfunction
 
@@ -380,7 +422,7 @@ endfunction
 function tx = ofdm_txframe(states, tx_sym_lin)
   ofdm_load_const;
   assert(length(tx_sym_lin) == Nbitsperpacket/bps);
-  
+
   % place data symbols in multi-carrier frame with pilots and boundary carriers
 
   s = 1; tx_frame = zeros(Np*Ns,Nc+2);
@@ -388,6 +430,10 @@ function tx = ofdm_txframe(states, tx_sym_lin)
     if mod(r-1,Ns) == 0
       % row of pilots
       tx_frame(r,:) = pilots;
+      if states.edge_pilots == 0
+        tx_frame(r,1) = 0;
+        tx_frame(r,Nc+2) = 0;
+      end
     else
       % row of data symbols
       arowofsymbols = tx_sym_lin(s:s+Nc-1);
@@ -402,7 +448,7 @@ function tx = ofdm_txframe(states, tx_sym_lin)
   assert((s-1) == length(tx_sym_lin));
 
   % OFDM upconvert symbol by symbol so we can add CP
- 
+
   tx = [];
   for r=1:Ns*Np
     asymbol = tx_frame(r,:) * W/M;
@@ -429,17 +475,17 @@ endfunction
 function [t_est timing_valid timing_mx av_level] = est_timing(states, rx, rate_fs_pilot_samples, step)
     ofdm_load_const;
     Npsam = length(rate_fs_pilot_samples);
-    
+
     Ncorr = length(rx) - (Nsamperframe+Npsam);
     corr = zeros(1,Ncorr);
     %printf("Npsam: %d M+Ncp: %d Ncorr: %d Nsamperframe: %d step: %d\n", Npsam,  M+Ncp, Ncorr, Nsamperframe, step);
-    
+
     % normalise correlation so we can compare to a threshold across varying input levels
 
     av_level = 2*sqrt(states.timing_norm*(rx*rx')/length(rx)) + 1E-12;
 
     % correlate with pilots at start and end of frame to determine timing offset
-    
+
     for i=1:step:Ncorr
       rx1     = rx(i:i+Npsam-1); rx2 = rx(i+Nsamperframe:i+Nsamperframe+Npsam-1);
       corr_st = rx1 * rate_fs_pilot_samples'; corr_en = rx2 * rate_fs_pilot_samples';
@@ -449,7 +495,7 @@ function [t_est timing_valid timing_mx av_level] = est_timing(states, rx, rate_f
     [timing_mx t_est] = max(corr);
     % only declare timing valid if there are enough samples in rxbuf to demodulate a frame
     timing_valid = (abs(rx(t_est)) > 0) && (timing_mx > timing_mx_thresh);
-    
+
     if verbose > 1
       printf("  av_level: %5.4f mx: %4.3f timing_est: %4d timing_valid: %d\n", av_level, timing_mx, t_est, timing_valid);
     end
@@ -490,7 +536,7 @@ function [foff_est states] = est_freq_offset(states, rx, rate_fs_pilot_samples, 
     p2 = rx(t_est+Npsam2:t_est+Npsam-1) * rate_fs_pilot_samples(Npsam2+1:Npsam)';
     p3 = rx(t_est+Nsamperframe:t_est+Nsamperframe+Npsam2-1) * rate_fs_pilot_samples(1:Npsam2)';
     p4 = rx(t_est+Nsamperframe+Npsam2:t_est+Nsamperframe+Npsam-1) * rate_fs_pilot_samples(Npsam2+1:Npsam)';
-   
+
     Fs1 = Fs/(Npsam/2);
 
     states.foff_metric = (conj(p1)*p2 + conj(p3)*p4);
@@ -499,7 +545,7 @@ function [foff_est states] = est_freq_offset(states, rx, rate_fs_pilot_samples, 
     if states.verbose > 1
         printf("  foff_metric: %f %f foff_est: %f\n", real(states.foff_metric), imag(states.foff_metric), foff_est);
     end
- 
+
 endfunction
 
 
@@ -539,14 +585,14 @@ function foff_est = est_freq_offset_pilot_corr(states, rx, rate_fs_pilot_samples
          foff_est = f;
        end
     end
-    
+
     if states.verbose > 1
       printf("  foff_est: %f\n", foff_est);
     end
     if verbose > 2
       figure(10); clf;
       plot(st:en,C(Fs/2+st:Fs/2+en)); grid;
-    end 
+    end
 endfunction
 
 
@@ -580,9 +626,9 @@ function [timing_valid states] = ofdm_sync_search(states, rxbuf_in)
       % exp(-j*0) is just 1 when afcoarse is 0
       [act_est atiming_valid atiming_mx] = est_timing(states, states.rxbuf(st:en), states.rate_fs_pilot_samples, 2);
     end
-    
+
     %printf("afcoarse: %f atiming_mx: %f\n", afcoarse, atiming_mx);
-    
+
     if atiming_mx > timing_mx
       ct_est = act_est;
       timing_valid = atiming_valid;
@@ -590,8 +636,8 @@ function [timing_valid states] = ofdm_sync_search(states, rxbuf_in)
       fcoarse = afcoarse;
     end
   end
-  
-  % refine freq est within -/+ 20 Hz window  
+
+  % refine freq est within -/+ 20 Hz window
 
   if fcoarse != 0
     w = 2*pi*fcoarse/Fs;
@@ -602,7 +648,7 @@ function [timing_valid states] = ofdm_sync_search(states, rxbuf_in)
     % exp(-j*0) is just 1 when fcoarse is 0
     foff_est = est_freq_offset_pilot_corr(states, states.rxbuf(st:en), states.rate_fs_pilot_samples, ct_est);
   end
- 
+
   if verbose
     printf(" ct_est: %4d mx: %3.2f coarse_foff: %5.1f timing_valid: %d", ct_est, timing_mx, foff_est, timing_valid);
   end
@@ -621,7 +667,7 @@ function [timing_valid states] = ofdm_sync_search(states, rxbuf_in)
   else
     states.nin = Nsamperframe;
   end
-  
+
   states.timing_valid = timing_valid;
   states.timing_mx = timing_mx;
   states.coarse_foff_est_hz = foff_est;
@@ -632,15 +678,15 @@ endfunction
 % ofdm_demod - Demodulates one frame of bits
 % ------------------------------------------
 
-#{ 
+#{
 
   For phase estimation we need to maintain buffer of 3 frames plus
   one pilot, so we have 4 pilots total. '^' is the start of current
   frame that we are demodulating.
-           
+
   P DDD P DDD P DDD P
         ^
-    
+
   Then add one symbol either side to account for movement in
   sampling instant due to sample clock differences:
 
@@ -674,20 +720,20 @@ function [states rx_bits achannel_est_rect_log rx_np rx_amp] = ofdm_demod(states
 
     st = M+Ncp + Nsamperframe + 1 - floor(ftwindow_width/2) + (timing_est-1);
     en = st + Nsamperframe-1 + M+Ncp + ftwindow_width-1;
-          
+
     [ft_est timing_valid timing_mx] = est_timing(states, rxbuf(st:en) .* exp(-j*woff_est*(st:en)), rate_fs_pilot_samples, 1);
     % printf("  timing_est: %d ft_est: %d timing_valid: %d timing_mx: %d\n", timing_est, ft_est, timing_valid, timing_mx);
-    
+
     if timing_valid
       timing_est = timing_est + ft_est - ceil(ftwindow_width/2);
 
-      % Black magic to keep sample_point inside cyclic prefix.  Or something like that.
+      % Black magic to keep sample_point 4 samples (0.5ms) inside edges of cyclic prefix.  Or something like that.
 
       delta_t = ft_est - ceil(ftwindow_width/2);
-      sample_point = max(timing_est+Ncp/4, sample_point);
-      sample_point = min(timing_est+Ncp, sample_point);
+      sample_point = max(timing_est+4, sample_point);
+      sample_point = min(timing_est+Ncp-4, sample_point);
     end
-    
+
     if verbose > 1
       printf("  ft_est: %2d mx: %3.2f coarse_foff: %4.1f foff: %4.1f\n", ft_est, timing_mx, coarse_foff_est_hz, foff_est_hz);
     end
@@ -701,7 +747,7 @@ function [states rx_bits achannel_est_rect_log rx_np rx_amp] = ofdm_demod(states
   rx_sym = zeros(1+Ns+1+1, Nc+2);
 
   % previous pilot
-  
+
   st = M+Ncp + Nsamperframe + (-Ns)*(M+Ncp) + 1 + sample_point; en = st + M - 1;
 
   for c=1:Nc+2
@@ -711,7 +757,7 @@ function [states rx_bits achannel_est_rect_log rx_np rx_amp] = ofdm_demod(states
 
   % pilot - this frame - pilot
 
-  for rr=1:Ns+1 
+  for rr=1:Ns+1
     st = M+Ncp + Nsamperframe + (rr-1)*(M+Ncp) + 1 + sample_point; en = st + M - 1;
     for c=1:Nc+2
       acarrier = rxbuf(st:en) .* exp(-j*woff_est*(st:en)) .* conj(W(c,:));
@@ -726,18 +772,22 @@ function [states rx_bits achannel_est_rect_log rx_np rx_amp] = ofdm_demod(states
     acarrier = rxbuf(st:en) .* exp(-j*woff_est*(st:en)) .* conj(W(c,:));
     rx_sym(Ns+3,c) = sum(acarrier);
   end
-      
+
   % est freq err based on all carriers ------------------------------------
-      
+
   if foff_est_en
     freq_err_rect = sum(rx_sym(2,:))' * sum(rx_sym(2+Ns,:));
 
-    % prevent instability in atan(im/re) when real part near 0 
+    % prevent instability in atan(im/re) when real part near 0
 
     freq_err_rect += 1E-6;
 
     %printf("freq_err_rect: %f %f angle: %f\n", real(freq_err_rect), imag(freq_err_rect), angle(freq_err_rect));
     freq_err_hz = angle(freq_err_rect)*Rs/(2*pi*Ns);
+    if states.foff_limiter
+      freq_err_hz = max(freq_err_hz,-1);
+      freq_err_hz = min(freq_err_hz, 1);
+    end
     foff_est_hz = foff_est_hz + foff_est_gain*freq_err_hz;
   end
 
@@ -749,7 +799,7 @@ function [states rx_bits achannel_est_rect_log rx_np rx_amp] = ofdm_demod(states
 
     % estimate channel for this carrier using an average of 12 pilots
     % in a rect 2D window centred on this carrier
-    
+
     % PPP  <-- frame-1
     % ---
     % PPP  <-- you are here
@@ -758,26 +808,26 @@ function [states rx_bits achannel_est_rect_log rx_np rx_amp] = ofdm_demod(states
     % PPP  <-- frame+1
     % ---
     % PPP  <-- frame+2
-    
+
     if isfield(states, "phase_est_bandwidth")
       phase_est_bandwidth = states.phase_est_bandwidth;
     else
       phase_est_bandwidth = "low";
     end
-    
+
     if strcmp(phase_est_bandwidth, "high")
       % Only use pilots at start and end of this frame to track quickly changes in phase
       % present.  Useful for initial sync where freq offset est may be a bit off, and
       % for high Doppler channels.  As less pilots are averaged, low SNR performance
       % will be poorer.
-      achannel_est_rect(c) =  rx_sym(2,c)*pilots(c)';        % frame    
+      achannel_est_rect(c) =  rx_sym(2,c)*pilots(c)';        % frame
       achannel_est_rect(c) += rx_sym(2+Ns,c)*pilots(c)';     % frame+1
       aamp_est_pilot(c) = abs(rx_sym(2,c)) + abs(rx_sym(2+Ns,c));
-    else
+    elseif strcmp(phase_est_bandwidth, "low")
       % Average over a bunch of pilots in adjacent carriers, and past and future frames, good
-      % low SNR performance, but will fall over with high Doppler of freq offset.
+      % low SNR performance, but will fall over with high Doppler or freq offset.
       cr = c-1:c+1;
-      achannel_est_rect(c) =  rx_sym(2,cr)*pilots(cr)';      % frame    
+      achannel_est_rect(c) =  rx_sym(2,cr)*pilots(cr)';      % frame
       achannel_est_rect(c) += rx_sym(2+Ns,cr)*pilots(cr)';   % frame+1
       aamp_est_pilot(c)  = sum(abs(rx_sym(2,cr)));
       aamp_est_pilot(c) += sum(abs(rx_sym(2+Ns,cr)));
@@ -790,24 +840,24 @@ function [states rx_bits achannel_est_rect_log rx_np rx_amp] = ofdm_demod(states
       aamp_est_pilot(c) += sum(abs(rx_sym(2+Ns+1,cr)));
     end
   end
- 
+
   % pilots are estimated over 12 pilot symbols, so find average
 
   if strcmp(phase_est_bandwidth, "high")
     achannel_est_rect /= 2;
     aamp_est_pilot /= 2;
-  else
+  elseif strcmp(phase_est_bandwidth, "low")
     achannel_est_rect /= 12;
     aamp_est_pilot /= 12;
   end
-  
+
   aphase_est_pilot = angle(achannel_est_rect);
   if states.amp_est_mode == 0
     % legacy 700D/2020 ampl estimator for compatability with current C code
     aamp_est_pilot = abs(achannel_est_rect);
   end
   achannel_est_rect = aamp_est_pilot.*exp(j*aphase_est_pilot);
-  
+
   % correct phase offset using phase estimate, and demodulate
   % bits, separate loop as it runs across cols (carriers) to get
   % frame bit ordering correct
@@ -835,7 +885,7 @@ function [states rx_bits achannel_est_rect_log rx_np rx_amp] = ofdm_demod(states
       rx_bits = [rx_bits abit];
     end % c=2:Nc+1
     achannel_est_rect_log = [achannel_est_rect_log; achannel_est_rect(2:Nc+1)];
-  end 
+  end
 
   % Adjust nin to take care of sample clock offset
 
@@ -855,7 +905,7 @@ function [states rx_bits achannel_est_rect_log rx_np rx_amp] = ofdm_demod(states
       sample_point += tshift;
     end
   end
-  
+
   % Estimate signal and noise power to estimate EsNo.  This is used for SNR estimation and (possible) LDPC decoding
   if states.EsNo_est_all_symbols
     [sig_var noise_var] = est_signal_and_noise_var(rx_np);
@@ -863,10 +913,10 @@ function [states rx_bits achannel_est_rect_log rx_np rx_amp] = ofdm_demod(states
     % For QAM we just use this frame's pilots, as these have no amplitude modulation on them
     [sig_var noise_var] = est_signal_and_noise_var(rx_sym(2,:).*exp(-j*aphase_est_pilot));
   end
-  
-  states.noise_var = noise_var; 
+
+  states.noise_var = noise_var;
   states.sig_var = sig_var;
-  states.sum_noise_var += noise_var; 
+  states.sum_noise_var += noise_var;
   states.sum_sig_var += sig_var;
 
   % maintain mean amp estimate for LDPC decoder
@@ -892,32 +942,32 @@ endfunction
   plane. We just measure noise power on imag axis, as it isn't
   affected by fading.  For 700D using all symbols in frame worked
   better than just pilots, but for QAM we need to use pilots as they
-  don't have modulation that affects estimate. 
+  don't have modulation that affects estimate.
   ----------------------------------------------------------------------------
 #}
-  
+
 function [sig_var noise_var] = est_signal_and_noise_var(rx_syms)
   sig_var = sum(abs(rx_syms) .^ 2)/length(rx_syms);
   sig_rms = sqrt(sig_var);
-  
+
   sum_x = 0;
   sum_xx = 0;
   n = 0;
   for i=1:length(rx_syms)
     s = rx_syms(i);
-    if abs(real(s)) > sig_rms 
+    if abs(real(s)) > sig_rms
       % select two constellation points on real axis
       sum_x  += imag(s);
       sum_xx += imag(s)*imag(s);
       n++;
     end
   end
-   
+
   noise_var = 0;
   if n > 1
     noise_var = (n*sum_xx - sum_x*sum_x)/(n*(n-1));
   end
-  
+
   % Total noise power is twice estimate of imaginary-axis noise.  This
   % effectively gives us the an estimate of Es/No
   noise_var = 2*noise_var;
@@ -937,13 +987,13 @@ function modem_frame = assemble_modem_packet(states, payload_bits, txt_bits)
 
   p = 1; u = 1;
   modem_frame = zeros(1,Nbitsperpacket);
-  
+
   for b=1:Nbitsperpacket-Ntxtbits;
     if (u <= Nuwbits) && (b == uw_ind(u))
       modem_frame(b) = tx_uw(u++);
     else
       modem_frame(b) = payload_bits(p++);
-    end  
+    end
   end
   t = 1;
   for b=Nbitsperpacket-Ntxtbits+1:Nbitsperpacket
@@ -997,7 +1047,7 @@ function rx_uw = extract_uw(states, rx_syms, rx_amps)
   rx_uw_syms = zeros(1,Nuwsyms);
   rx_uw_amps = zeros(1,Nuwsyms);
   u = 1;
- 
+
   for s=1:Nuwframes*Nsymsperframe
     if (u <= Nuwsyms) && (s == uw_ind_sym(u))
       rx_uw_syms(u) = rx_syms(s);
@@ -1007,9 +1057,9 @@ function rx_uw = extract_uw(states, rx_syms, rx_amps)
   end
   assert(u == (Nuwsyms+1));
 
-  % now demodulate UW bits  
+  % now demodulate UW bits
   rx_uw = zeros(1,Nuwbits);
-  
+
   for s=1:Nuwsyms
     if bps == 2
       rx_uw(bps*(s-1)+1:bps*s) = qpsk_demod(rx_uw_syms(s));
@@ -1036,7 +1086,7 @@ function [rx_uw payload_syms payload_amps txt_bits] = disassemble_modem_packet(s
   rx_uw_amps = zeros(1,Nuwsyms);
   txt_syms = zeros(1,Ntxtsyms);
   p = 1; u = 1;
- 
+
   for s=1:Nsymsperpacket-Ntxtsyms;
     if (u <= Nuwsyms) && (s == uw_ind_sym(u))
       rx_uw_syms(u) = modem_frame_syms(s);
@@ -1055,10 +1105,10 @@ function [rx_uw payload_syms payload_amps txt_bits] = disassemble_modem_packet(s
   assert(p = (Nsymsperpacket+1));
 
   % now demodulate UW and txt bits
-  
+
   rx_uw = zeros(1,Nuwbits);
   txt_bits = zeros(1,Ntxtbits);
-  
+
   for s=1:Nuwsyms
     if bps == 2
       rx_uw(bps*(s-1)+1:bps*s) = qpsk_demod(rx_uw_syms(s));
@@ -1096,7 +1146,7 @@ function [tx_bits payload_data_bits codeword] = create_ldpc_test_frame(states, c
   ofdm_load_const;
   ldpc;
   gp_interleaver;
-  
+
   if coded_frame
     % Set up LDPC code
 
@@ -1110,9 +1160,9 @@ function [tx_bits payload_data_bits codeword] = create_ldpc_test_frame(states, c
     payload_data_bits = round(ofdm_rand(code_param.data_bits_per_frame)/32767);
     codeword = LdpcEncode(payload_data_bits, code_param.H_rows, code_param.P_matrix);
     Nsymbolsperframe = length(codeword)/bps;
-  
+
     % need all these steps to get actual raw codeword bits at demod ..
-  
+
     tx_symbols = [];
     for s=1:Nsymbolsperframe
       tx_symbols = [tx_symbols qpsk_mod( codeword(2*(s-1)+1:2*s) )];
@@ -1127,9 +1177,9 @@ function [tx_bits payload_data_bits codeword] = create_ldpc_test_frame(states, c
   else
     codeword_raw = round(ofdm_rand(Nbitsperpacket-(Nuwbits+Ntxtbits))/32767);
   end
-  
+
   % insert UW and txt bits
-  
+
   tx_bits = assemble_modem_packet(states, codeword_raw, zeros(1,Ntxtbits));
   assert(Nbitsperpacket == length(tx_bits));
 
@@ -1170,22 +1220,34 @@ function test_assemble_disassemble(states)
 endfunction
 
 %-------------------------------------------------------
-% sync_state_machine - determines sync state based on UW
-%                      700D/2020 version
+% sync_state_machine - determines mode-specific sync
+%                      state state_machine
 %-------------------------------------------------------
 
-#{
-  Due to the low pilot symbol insertion rate and acquisition issues
-  the earlier OFDM modem waveforms (700D and 2020) need a complex
-  state machine to help them avoid false sync.
-#}
-
 function states = sync_state_machine(states, rx_uw)
+  if strcmp(states.state_machine, "voice1")
+    states = sync_state_machine_voice1(states, rx_uw);
+  elseif strcmp(states.state_machine, "data")
+    states = sync_state_machine_data(states, rx_uw);
+  elseif strcmp(states.state_machine, "voice2")
+    states = sync_state_machine_voice2(states, rx_uw);
+  else
+    assert(0);
+  endif
+endfunction
+
+%--------------------------------------------------------------------
+%  Due to the low pilot symbol insertion rate and acquisition issues
+%  the earlier OFDM modem waveforms (700D and 2020) need a complex
+%  state machine to help them avoid false sync.
+%--------------------------------------------------------------------
+
+function states = sync_state_machine_voice1(states, rx_uw)
   ofdm_load_const;
   next_state = states.sync_state;
   states.sync_start = states.sync_end = 0;
-  
-  if strcmp(states.sync_state,'search') 
+
+  if strcmp(states.sync_state,'search')
 
     if states.timing_valid
       states.frame_count = 0;
@@ -1195,7 +1257,7 @@ function states = sync_state_machine(states, rx_uw)
       next_state = 'trial';
     end
   end
-        
+
   if strcmp(states.sync_state,'synced') || strcmp(states.sync_state,'trial')
 
     states.frame_count++;
@@ -1223,8 +1285,8 @@ function states = sync_state_machine(states, rx_uw)
             % change to low bandwidth, but more accurate phase estimation
             states.phase_est_bandwidth = "low";
           else
-            next_state = "search"
-          end  
+            next_state = "search";
+          end
         end
 
         if strcmp(states.sync_state,'synced')
@@ -1245,22 +1307,22 @@ function states = sync_state_machine(states, rx_uw)
       states.modem_frame++;
       if (states.modem_frame >= states.Np) states.modem_frame = 0; end
   end
-  
+
   states.last_sync_state = states.sync_state;
   states.sync_state = next_state;
 endfunction
 
 
 %-------------------------------------------------------
-% sync_state_machine_data - data waveform version
+% data waveform state machine
 %-------------------------------------------------------
 
-function states = sync_state_machine2(states, rx_uw)
+function states = sync_state_machine_data(states, rx_uw)
   ofdm_load_const;
   next_state = states.sync_state;
   states.sync_start = states.sync_end = 0;
-  
-  if strcmp(states.sync_state,'search') 
+
+  if strcmp(states.sync_state,'search')
     if states.timing_valid
       states.sync_start = 1; states.sync_counter = 0;
       next_state = 'trial';
@@ -1270,7 +1332,7 @@ function states = sync_state_machine2(states, rx_uw)
   states.uw_errors = sum(xor(tx_uw,rx_uw));
   %tx_uw(1:10)
   %rx_uw(1:10)
-  
+
   if strcmp(states.sync_state,'trial')
     if strcmp(states.sync_state,'trial')
       if states.uw_errors < states.bad_uw_errors;
@@ -1289,12 +1351,70 @@ function states = sync_state_machine2(states, rx_uw)
 
   % Note we don't every lose sync, we assume there are a known number of frames being sent,
   % or the packets contain an "end of stream" information.
-  if strcmp(states.sync_state,'synced')    
+  if strcmp(states.sync_state,'synced')
     states.frame_count++;
     states.modem_frame++;
     if (states.modem_frame >= states.Np) states.modem_frame = 0; end
   end
-  
+
+  states.last_sync_state = states.sync_state;
+  states.sync_state = next_state;
+endfunction
+
+%-------------------------------------------------------
+% fast sync voice state state_machine
+%-------------------------------------------------------
+
+function states = sync_state_machine_voice2(states, rx_uw)
+  ofdm_load_const;
+  next_state = states.sync_state;
+  states.sync_start = states.sync_end = 0;
+
+  if strcmp(states.sync_state,'search')
+
+    if states.timing_valid
+      states.frame_count = 0;
+      states.sync_counter = 0;
+      states.modem_frame = 0;
+      states.sync_start = 1;
+      next_state = 'trial';
+    end
+  end
+
+  if strcmp(states.sync_state,'synced') || strcmp(states.sync_state,'trial')
+
+    states.frame_count++;
+
+    % UW occurs at the start of a packet
+    if states.modem_frame == 0
+        states.uw_errors = sum(xor(tx_uw,rx_uw));
+
+        if strcmp(states.sync_state,'trial')
+          if states.uw_errors <= states.bad_uw_errors
+            next_state = "synced";
+          else
+            next_state = "search";
+          end
+        end
+
+        if strcmp(states.sync_state,'synced')
+          if states.uw_errors > states.bad_uw_errors
+            states.sync_counter++;
+          else
+            states.sync_counter = 0;
+          end
+
+          if states.sync_counter == 6
+            next_state = "search";
+          end
+        end
+      end
+
+      % keep track of where we are up to in packet
+      states.modem_frame++;
+      if (states.modem_frame >= states.Np) states.modem_frame = 0; end
+  end
+
   states.last_sync_state = states.sync_state;
   states.sync_state = next_state;
 endfunction
@@ -1313,6 +1433,13 @@ function [code_param Nbitspercodecframe Ncodecframespermodemframe] = codec_to_fr
   if strcmp(mode, "700D")
     load HRA_112_112.txt
     code_param = ldpc_init_user(HRA_112_112, modulation, mod_order, mapping);
+    assert(Nbitsperframe == (code_param.coded_bits_per_frame + Nuwbits + Ntxtbits));
+    % unused for this mode
+    Nbitspercodecframe = Ncodecframespermodemframe = 0;
+  end
+  if strcmp(mode, "700E")
+    load HRA_56_56.txt
+    code_param = ldpc_init_user(HRA_56_56, modulation, mod_order, mapping);
     assert(Nbitsperframe == (code_param.coded_bits_per_frame + Nuwbits + Ntxtbits));
     % unused for this mode
     Nbitspercodecframe = Ncodecframespermodemframe = 0;
@@ -1385,7 +1512,7 @@ function [frame_bits bits_per_frame] = fec_encode(states, code_param, mode, payl
     frame_bits = LdpcEncode(payload_bits, code_param.H_rows, code_param.P_matrix);
   end
   bits_per_frame = length(frame_bits);
-    
+
 endfunction
 
 
@@ -1404,7 +1531,7 @@ end
 
 
 % Save test bits frame to a text file in the form of a C array
-% 
+%
 % usage:
 %   ofdm_lib; test_bits_ofdm_file
 %
@@ -1414,7 +1541,7 @@ function test_bits_ofdm_file
   states = ofdm_init(bps, Rs, Tcp, Ns, Nc);
   [test_bits_ofdm payload_data_bits codeword] = create_ldpc_test_frame(states);
   printf("%d test bits\n", length(test_bits_ofdm));
-  
+
   f=fopen("../src/test_bits_ofdm.h","wt");
   fprintf(f,"/* Generated by test_bits_ofdm_file() Octave function */\n\n");
   fprintf(f,"const int test_bits_ofdm[]={\n");
@@ -1493,10 +1620,55 @@ function threshold_level = ofdm_determine_clip_threshold(tx, threshold_cdf)
 end
 
 
-function tx = ofdm_clip(states, tx, threshold_level)
+function [tx nclipped] = ofdm_clip(states, tx, threshold_level, plot_en=0)
   ofdm_load_const;
   tx_ = tx;
   ind = find(abs(tx) > threshold_level);
+  nclipped = length(ind);
   tx(ind) = threshold_level*exp(j*angle(tx(ind)));
-  figure(2); clf; plot(abs(tx_(1:5*M))); hold on; plot(abs(tx(1:5*M))); hold off; 
+  if plot_en
+    figure(2); clf; plot(abs(tx_(1:5*M))); hold on; plot(abs(tx(1:5*M))); hold off;
+  endif
 end
+
+
+function [rx_real rx] = ofdm_clip_channel(states, tx, SNR3kdB, channel, freq_offset_Hz, tx_clip_en)
+  tx *= states.amp_scale;
+
+  % optional compressor to improve PAPR
+
+  nclipped = 0;
+  if tx_clip_en
+    printf("%f %f\n", states.clip_gain1, states.clip_gain2);
+    [tx nclipped] = ofdm_clip(states, tx*states.clip_gain1, states.ofdm_peak);
+    tx *= states.clip_gain2;
+    ssbfilt_n = 100;
+    ssbfilt_coeff = fir1(ssbfilt_n, states.txbpf_width_Hz/states.Fs);
+    %figure(2); freqz(ssbfilt_coeff);
+    lo = exp(j*2*pi*states.fcentre*(1:length(tx))/(states.Fs));
+    tx = lo.*filter(ssbfilt_coeff,1,tx.*conj(lo));
+  end
+
+  % Hilbert Clipper 2 - remove any really low probability outliers after clipping/filtering
+  % or even on vanilla Tx
+  [tx tmp] = ofdm_clip(states, tx, states.ofdm_peak);
+
+  % note this is PAPR of complex signal, PAPR of real signal will be 3dB-ish larger
+  peak = max(abs(tx)); RMS = sqrt(mean(abs(tx).^2));
+  cpapr = 10*log10((peak.^2)/(RMS.^2));
+
+  % channel simulation and save to disk
+
+  printf("Peak: %4.2f RMS: %5.2f CPAPR: %4.1f clipped: %5.2f%%\n",
+         peak, RMS, cpapr, nclipped*100/length(tx));
+  printf("foff: %3.1f Hz SNR(3k): %3.1f dB  ", freq_offset_Hz, SNR3kdB);
+  [rx_real rx] = channel_simulate(states.Fs, SNR3kdB, freq_offset_Hz, channel, tx);
+
+  % multipath models can lead to clipping of int16 samples
+  num_clipped = length(find(abs(rx_real>32767)));
+  while num_clipped/length(rx_real) > 0.001
+    rx_real /= 2;
+    num_clipped = length(find(abs(rx_real>32767)));
+    printf("WARNING: output samples clipped, reducing level\n")
+  end
+endfunction

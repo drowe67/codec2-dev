@@ -63,8 +63,8 @@ int main(int argc, char *argv[]) {
         char f2020[80] = {0};
         #ifdef __LPCNET__
         sprintf(f2020,"|2020");
-        #endif     
-        printf("usage: %s 1600|700C|700D|2400A|2400B|800XA%s InputRawSpeechFile OutputModemRawFile\n"
+        #endif
+        printf("usage: %s 1600|700C|700D|700E|2400A|2400B|800XA%s InputRawSpeechFile OutputModemRawFile\n"
                " [--testframes] [--clip 0|1] [--txbpf 0|1] [--dpsk]\n", argv[0], f2020);
         printf("e.g    %s 1600 hts1a.raw hts1a_fdmdv.raw\n", argv[0]);
         exit(1);
@@ -74,6 +74,7 @@ int main(int argc, char *argv[]) {
     if (!strcmp(argv[1],"1600")) mode = FREEDV_MODE_1600;
     if (!strcmp(argv[1],"700C")) mode = FREEDV_MODE_700C;
     if (!strcmp(argv[1],"700D")) mode = FREEDV_MODE_700D;
+    if (!strcmp(argv[1],"700E")) mode = FREEDV_MODE_700E;
     if (!strcmp(argv[1],"2400A")) mode = FREEDV_MODE_2400A;
     if (!strcmp(argv[1],"2400B")) mode = FREEDV_MODE_2400B;
     if (!strcmp(argv[1],"800XA")) mode = FREEDV_MODE_800XA;
@@ -98,7 +99,7 @@ int main(int argc, char *argv[]) {
     }
 
     use_testframes = 0; use_clip = 0; use_txbpf = 1; use_dpsk = 0;
-    
+
     if (argc > 4) {
         for (i = 4; i < argc; i++) {
             if (strcmp(argv[i], "--testframes") == 0) use_testframes = 1;
@@ -141,16 +142,15 @@ int main(int argc, char *argv[]) {
     while(fread(speech_in, sizeof(short), n_speech_samples, fin) == n_speech_samples) {
         freedv_tx(freedv, mod_out, speech_in);
         fwrite(mod_out, sizeof(short), n_nom_modem_samples, fout);
-    
+
         /* if using pipes we don't want the usual buffering to occur */
         if (fout == stdout) fflush(stdout);
         if (fin == stdin) fflush(stdin);
     }
-    
+
     freedv_close(freedv);
     fclose(fin);
     fclose(fout);
-    
+
     return 0;
 }
-

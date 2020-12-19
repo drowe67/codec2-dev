@@ -61,7 +61,7 @@ static COMP S_matrix[] = {
     { 0.0f, -1.0f},
     {-1.0f,  0.0f}
 };
-         
+
 /* constants we use a lot and don't want to have to deference all the time  */
 
 static float ofdm_tx_centre;        /* TX Center frequency */
@@ -157,7 +157,7 @@ int main(int argc, char *argv[])
     int ldpc_enable = 1;
     struct OFDM *ofdm;
     struct OFDM_CONFIG *ofdm_config;
-   
+
     static struct option long_options[] = {
         {"nc",       required_argument, 0, 'n'},
         {"noldpc",   no_argument, 0, 'l'},
@@ -181,24 +181,28 @@ int main(int argc, char *argv[])
             exit(1);
         }
     }
-    
+
     // init once to get a copy of default config params
 
     ofdm = ofdm_create(NULL);
-    assert(ofdm != NULL);    
+    assert(ofdm != NULL);
     struct OFDM_CONFIG ofdm_config_default;
     memcpy(&ofdm_config_default, ofdm_get_config_param(ofdm), sizeof(struct OFDM_CONFIG));
     ofdm_destroy(ofdm);
 
     // now do a little customisation on default config, and re-create modem instance
-           
+
     if (opt_Nc)
        ofdm_config_default.nc = opt_Nc;
     //printf("ofdm_create() 2\n");
     ofdm = ofdm_create(&ofdm_config_default);
     assert(ofdm != NULL);
     ofdm_config = ofdm_get_config_param(ofdm);
-    
+    ofdm_set_tx_bpf(ofdm, false);
+
+    // same levels as Octave sim
+    ofdm->amp_scale = 1.0;
+
     // make local copies for convenience
     ofdm_tx_centre = ofdm_config->tx_centre;
     ofdm_rx_centre = ofdm_config->rx_centre;
@@ -227,7 +231,7 @@ int main(int argc, char *argv[])
 
     int rx_bits[ofdm_bitsperframe];    /* one frame of rx bits    */
     printf("Nc = %d ofdm_bitsperframe: %d\n", ofdm_nc, ofdm_bitsperframe);
-    
+
     /* log arrays */
 
     int tx_bits_log[ofdm_bitsperframe*NFRAMES];
@@ -247,16 +251,16 @@ int main(int argc, char *argv[])
     float coarse_foff_est_hz_log[NFRAMES];
     int sample_point_log[NFRAMES];
     float symbol_likelihood_log[ (CODED_BITSPERFRAME/ofdm_bps) * (1<<ofdm_bps) * NFRAMES];
-    float bit_likelihood_log[CODED_BITSPERFRAME * NFRAMES];        
+    float bit_likelihood_log[CODED_BITSPERFRAME * NFRAMES];
     int detected_data_log[CODED_BITSPERFRAME * NFRAMES];
-    float sig_var_log[NFRAMES], noise_var_log[NFRAMES];        
-    float mean_amp_log[NFRAMES];        
-    
+    float sig_var_log[NFRAMES], noise_var_log[NFRAMES];
+    float mean_amp_log[NFRAMES];
+
     FILE *fout;
     int f,i,j;
 
     /* set up LDPC code */
-    
+
     struct LDPC   ldpc;
 
     ldpc.max_iter = HRA_112_112_MAX_ITER;
@@ -275,9 +279,9 @@ int main(int argc, char *argv[])
 
     for(f=0; f<NFRAMES; f++) {
 
-	/* --------------------------------------------------------*\
+       	/* --------------------------------------------------------*\
 	                          Mod
-	\*---------------------------------------------------------*/
+	      \*---------------------------------------------------------*/
 
         /* See CML startup code in tofdm.m */
 
@@ -286,7 +290,7 @@ int main(int argc, char *argv[])
         }
         for(i=ofdm_nuwbits; i<ofdm_nuwbits+ofdm_ntxtbits; i++) {
             tx_bits[i] = 0;
-        }       
+        }
 
         if (ldpc_enable) {
             unsigned char ibits[HRA_112_112_NUMBERROWSHCOLS];
@@ -321,9 +325,9 @@ int main(int argc, char *argv[])
             for(i=0; i<ofdm_bitsperframe; i++)
                 tx_bits[i] = tx_bits_char[i];
         }
-        
+
         ofdm_mod(ofdm, (COMP*)tx, tx_bits);
-        
+
         /* tx vector logging */
 
 	memcpy(&tx_bits_log[ofdm_bitsperframe*f], tx_bits, sizeof(int)*ofdm_bitsperframe);
@@ -359,7 +363,7 @@ int main(int argc, char *argv[])
          ofdm->rxbuf[ofdm_nrxbuf-nin+i] = rx_log[prx].real + rx_log[prx].imag * I;
     }
 #endif
-    
+
     int nin_tot = 0;
 
     /* disable estimators for initial testing */
@@ -381,7 +385,7 @@ int main(int argc, char *argv[])
     /* start this with something sensible otherwise LDPC decode fails in tofdm.m */
 
     ofdm->mean_amp = 1.0;
-       
+
     for(f=0; f<NFRAMES; f++) {
         /* For initial testing, timing est is off, so nin is always
            fixed.  TODO: we need a constant for rxbuf_in[] size that
@@ -422,9 +426,9 @@ int main(int argc, char *argv[])
 #endif
 
         /* uncoded OFDM modem ---------------------------------------*/
-        
+
         ofdm_demod(ofdm, rx_bits, rxbuf_in);
-        
+
 #ifdef TESTING_FILE
         int Nerrs = 0;
         for(i=0; i<Nbitsperframe; i++) {
@@ -434,7 +438,7 @@ int main(int argc, char *argv[])
         }
         printf("f: %d Nerr: %d\n", f, Nerrs);
 #endif
-        
+
         float symbol_likelihood[ (CODED_BITSPERFRAME/ofdm_bps) * (1<<ofdm_bps) ];
         float bit_likelihood[CODED_BITSPERFRAME];
         uint8_t out_char[CODED_BITSPERFRAME];
@@ -443,7 +447,7 @@ int main(int argc, char *argv[])
             /* LDPC functions --------------------------------------*/
 
             float EsNo = 10;
-        
+
             /* first few symbols are used for UW and txt bits, find start of (224,112) LDPC codeword */
 
             assert((ofdm_nuwbits+ofdm_ntxtbits+CODED_BITSPERFRAME) == ofdm_bitsperframe);
@@ -456,22 +460,22 @@ int main(int argc, char *argv[])
             }
 
             float *ldpc_codeword_symbol_amps = &ofdm->rx_amp[(ofdm_nuwbits+ofdm_ntxtbits)/ofdm_bps];
-                
+
             Demod2D(symbol_likelihood, ldpc_codeword_symbols, S_matrix, EsNo, ldpc_codeword_symbol_amps, ofdm->mean_amp, CODED_BITSPERFRAME/ofdm_bps);
             Somap(bit_likelihood, symbol_likelihood, 1<<ofdm_bps, ofdm_bps, CODED_BITSPERFRAME/ofdm_bps);
 
             float  llr[CODED_BITSPERFRAME];
             int    parityCheckCount;
-        
-        
+
+
             // fprintf(stderr, "\n");
             for(i=0; i<CODED_BITSPERFRAME; i++) {
                 llr[i] = -bit_likelihood[i];
                 // fprintf(stderr, "%f ", llr[i]);
             }
-        
+
             //fprintf(stderr, "\n");
-        
+
             run_ldpc_decoder(&ldpc, out_char, llr, &parityCheckCount);
             /*
               fprintf(stderr, "iter: %d parityCheckCount: %d\n", iter, parityCheckCount);
@@ -480,7 +484,7 @@ int main(int argc, char *argv[])
               }
             */
         }
-        
+
         /* rx vector logging -----------------------------------*/
 
         assert(nin_tot < ofdm_samplesperframe*NFRAMES);
@@ -517,8 +521,8 @@ int main(int argc, char *argv[])
 
         foff_hz_log[f] = ofdm->foff_est_hz;
         timing_est_log[f] = ofdm->timing_est + 1;     /* offset by 1 to match Octave */
-        timing_valid_log[f] = ofdm->timing_valid;     
-        timing_mx_log[f] = ofdm->timing_mx;           
+        timing_valid_log[f] = ofdm->timing_valid;
+        timing_mx_log[f] = ofdm->timing_mx;
         coarse_foff_est_hz_log[f] = ofdm->coarse_foff_est_hz;
         sample_point_log[f] = ofdm->sample_point + 1; /* offset by 1 to match Octave */
         sig_var_log[f] = ofdm->sig_var;
@@ -578,4 +582,3 @@ int main(int argc, char *argv[])
 
     return 0;
 }
-

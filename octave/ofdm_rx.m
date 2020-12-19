@@ -8,7 +8,8 @@
 function ofdm_rx(filename, mode="700D", pass_ber=0)
   ofdm_lib;
   more off;
-
+  pkg load signal;
+  
   dpsk = 0;
   if strcmp(mode,"700D-DPSK")
     mode = "700D"; dpsk = 1;
@@ -16,7 +17,7 @@ function ofdm_rx(filename, mode="700D", pass_ber=0)
   if strcmp(mode,"2020-DPSK")
     mode = "2020"; dpsk = 1;
   end
-  
+
   % init modem
 
   config = ofdm_init_mode(mode);
@@ -25,7 +26,7 @@ function ofdm_rx(filename, mode="700D", pass_ber=0)
   ofdm_load_const;
   states.verbose = 0;
   states.dpsk=dpsk;
-  
+
   % load real samples from file
 
   Ascale = states.amp_scale/2; % as input is a real valued signal
@@ -36,7 +37,7 @@ function ofdm_rx(filename, mode="700D", pass_ber=0)
   % OK re-generate tx frame for BER calcs
 
   tx_bits = create_ldpc_test_frame(states, coded_frame=0);
-  
+
   % init logs and BER stats
 
   rx_np_log = []; timing_est_log = []; delta_t_log = []; foff_est_hz_log = [];
@@ -52,13 +53,13 @@ function ofdm_rx(filename, mode="700D", pass_ber=0)
   nin = Nsamperframe+2*(M+Ncp);
   %states.rxbuf(Nrxbuf-nin+1:Nrxbuf) = rx(prx:nin);
   %prx += nin;
-  
+
   states.verbose = 1;
 
   Nsymsperpacket = Nbitsperpacket/bps; Nsymsperframe = Nbitsperframe/bps;
   rx_syms = zeros(1,Nsymsperpacket); rx_amps = zeros(1,Nsymsperpacket);
   Nerrs = 0; rx_uw = zeros(1,states.Nuwbits);
-  
+
   % main loop ----------------------------------------------------------------
 
   for f=1:Nframes
@@ -74,15 +75,15 @@ function ofdm_rx(filename, mode="700D", pass_ber=0)
       rxbuf_in(1:lnew) = rx(prx:prx+lnew-1);
     end
     prx += states.nin;
- 
+
     if states.verbose
       printf("f: %3d nin: %4d st: %-6s ", f, states.nin, states.sync_state);
     end
-    
-    if strcmp(states.sync_state,'search') 
+
+    if strcmp(states.sync_state,'search')
       [timing_valid states] = ofdm_sync_search(states, rxbuf_in);
     end
-    
+
     if strcmp(states.sync_state,'synced') || strcmp(states.sync_state,'trial')
 
       % accumulate a buffer of data symbols for this packet
@@ -93,7 +94,7 @@ function ofdm_rx(filename, mode="700D", pass_ber=0)
       rx_amps(end-Nsymsperframe+1:end) = arx_amp;
 
       rx_uw = extract_uw(states, rx_syms(end-Nuwframes*Nsymsperframe+1:end), rx_amps(end-Nuwframes*Nsymsperframe+1:end));
-      
+
       % We need the full packet of symbols before disassembling and checking for bit errors
       if states.modem_frame == (states.Np-1)
         rx_bits = zeros(1,Nbitsperpacket);
@@ -112,7 +113,7 @@ function ofdm_rx(filename, mode="700D", pass_ber=0)
         Tbits += Nbitsperpacket;
         packet_count++;
       end
-      
+
       % we are in sync so log states
 
       rx_np_log = [rx_np_log arx_np];
@@ -122,15 +123,11 @@ function ofdm_rx(filename, mode="700D", pass_ber=0)
       channel_est_pilot_log = [channel_est_pilot_log; achannel_est_pilot_log];
       sig_var_log = [sig_var_log states.sig_var];
       noise_var_log = [noise_var_log states.noise_var];
-      
+
       frame_count++;
     end
-    
-    if strcmp(mode,"700D") || strcmp(mode,"2020")
-      states = sync_state_machine(states, rx_uw);
-    else
-      states = sync_state_machine2(states, rx_uw);
-    end
+
+    states = sync_state_machine(states, rx_uw);
 
     if states.verbose
       if strcmp(states.last_sync_state,'synced') || strcmp(states.last_sync_state,'trial')
@@ -142,7 +139,7 @@ function ofdm_rx(filename, mode="700D", pass_ber=0)
     end
 
     % act on any events returned by state machine
-    
+
     if states.sync_start
       Nerrs_log = [];
       Terrs = Tbits = frame_count = 0;
@@ -168,23 +165,23 @@ function ofdm_rx(filename, mode="700D", pass_ber=0)
   SNR_estdB = EsNo_estdB + 10*log10(Nc*Rs*bps/3000);
   printf("Packets: %3d Es/No est dB: % -4.1f SNR3k: %3.2f %f %f\n",
          packet_count, EsNo_estdB, SNR_estdB, mean(sig_var_log), mean(noise_var_log));
-  
+
   figure(1); clf;
   tmp = exp(j*pi/4)*rx_np_log(floor(end/4):floor(end-end/8));
   plot(tmp,'+');
   mx = 2*max(abs(tmp));
   axis([-mx mx -mx mx]);
   title('Scatter');
-  
+
   figure(2); clf;
-  plot(angle(channel_est_pilot_log(:,2:Nc)),'g+', 'markersize', 5); 
+  plot(angle(channel_est_pilot_log(:,2:Nc)),'g+', 'markersize', 5);
   title('Phase est');
-  axis([1 length(channel_est_pilot_log) -pi pi]);  
+  axis([1 length(channel_est_pilot_log) -pi pi]);
 
   figure(3); clf;
   plot(abs(channel_est_pilot_log(:,:)),'g+', 'markersize', 5);
   title('Amp est');
-  axis([1 length(channel_est_pilot_log) -3 3]);  
+  axis([1 length(channel_est_pilot_log) -3 3]);
 
   figure(4); clf;
   subplot(211)
@@ -204,7 +201,9 @@ function ofdm_rx(filename, mode="700D", pass_ber=0)
   figure(6); clf;
   stem(Nerrs_log);
   title('Errors/modem frame')
-  axis([1 length(Nerrs_log) 0 Nbitsperframe*rate/2]);
+  if length(Nerrs_log) > 1
+      axis([1 length(Nerrs_log) 0 Nbitsperframe*rate/2]);
+  endif
 
   figure(7); clf;
   plot(10*log10(sig_var_log),'b;Es;');
@@ -215,6 +214,8 @@ function ofdm_rx(filename, mode="700D", pass_ber=0)
   plot(snr_smoothed_estdB,'g;SNR3k;');
   hold off;
   title('Signal and Noise Power estimates');
+
+  figure(8); clf; plot_specgram(rx);
 
   % optional pass criteria for ctests
   if pass_ber > 0

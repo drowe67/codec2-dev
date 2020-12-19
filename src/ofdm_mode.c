@@ -16,7 +16,10 @@
 void ofdm_init_mode(char mode[], struct OFDM_CONFIG *config) {
     assert(mode != NULL);
     assert(config != NULL);
-    
+
+    assert(strlen(mode) < 16);
+    strcpy(config->mode, mode);
+
     /* Fill in default values - 700D */
 
     config->nc = 17;                            /* Number of carriers */
@@ -31,32 +34,51 @@ void ofdm_init_mode(char mode[], struct OFDM_CONFIG *config) {
     config->bps = 2;                            /* Bits per Symbol */
     config->nuwbits = 5 * config->bps;          /* default is 5 symbols of Unique Word bits */
     config->bad_uw_errors = 3;
-    config->ftwindowwidth = 11;
+    config->ftwindowwidth = 32;
     config->timing_mx_thresh = 0.30f;
-    config->data_mode = 0;
+    config->edge_pilots = 1;
+    config->state_machine = "voice1";
     config->codename = "HRA_112_112";
+    config->clip_gain1 = 2.5;
+    config->clip_gain2 = 0.8;
+    config->clip_en = false;
+    config->tx_bpf_en = true;
+    config->amp_scale = 245E3;
+    config->foff_limiter = false;
     memset(config->tx_uw, 0, MAX_UW_BITS);
-    
-    if (strcmp(mode,"700D") == 0) {   
+
+    if (strcmp(mode,"700D") == 0) {
+    } else if (strcmp(mode,"700E") == 0) {
+         config->ts = 0.014;  config->tcp = 0.006; config->nc = 21; config->ns=4;
+         config->nuwbits = 12; config->bad_uw_errors = 3; config->txtbits = 2;
+         config->state_machine = "voice2"; config->amp_est_mode = 1;
+         config->ftwindowwidth = 80;
+         config->codename = "HRA_56_56"; config->tx_bpf_en = false;
+         config->foff_limiter = true;
+         config->amp_scale = 155E3; config->clip_gain1 = 3; config->clip_gain2 = 0.8;
     } else if (strcmp(mode,"2020") == 0) {
          config->ts = 0.0205;  config->nc = 31; config->codename = "HRAb_396_504";
+         config->tx_bpf_en = false; config->amp_scale = 167E3;
     } else if (strcmp(mode,"qam16") == 0) {
         config->ns=5; config->np=5; config->tcp = 0.004; config->ts = 0.016; config->nc = 33;
         config->bps=4; config->txtbits = 0; config->nuwbits = 15*4; config->bad_uw_errors = 5;
-        config->ftwindowwidth = 32; config->data_mode = 1;
+        config->ftwindowwidth = 32; config->state_machine = "data"; config->amp_est_mode = 1;
+        config->tx_bpf_en = false;
     } else if (strcmp(mode,"datac1") == 0) {
         config->ns=5; config->np=18; config->tcp = 0.006; config->ts = 0.016; config-> nc = 18;
         config->txtbits = 0; config->nuwbits = 12; config->bad_uw_errors = 2;
-        config->ftwindowwidth = 32; config->data_mode = 1; config->codename = "H2064_516_sparse";
+        config->state_machine = "data"; config->amp_est_mode = 1; config->tx_bpf_en = false;
+        config->ftwindowwidth = 32; config->codename = "H2064_516_sparse";
     } else if (strcmp(mode,"datac2") == 0) {
         config->ns=5; config->np=36; config->tcp = 0.006; config->ts = 0.016; config->nc = 9;
         config->txtbits = 0; config->nuwbits = 12; config->bad_uw_errors = 1;
-        config->ftwindowwidth = 32; config->data_mode = 1; config->codename = "H2064_516_sparse";
+        config->state_machine = "data"; config->amp_est_mode = 1; config->tx_bpf_en = false;
+        config->ftwindowwidth = 32; config->codename = "H2064_516_sparse";
     } else if (strcmp(mode,"datac3") == 0) {
         config->ns=5; config->np=11; config->tcp = 0.006; config->ts = 0.016; config->nc = 9;
-        config->txtbits = 0; 
-        config->ftwindowwidth = 32; config->timing_mx_thresh = 0.30; config->data_mode = 1;
-        config->codename = "H_256_768_22";
+        config->txtbits = 0; config->state_machine = "data";
+        config->ftwindowwidth = 32; config->timing_mx_thresh = 0.30;
+        config->codename = "H_256_768_22"; config->amp_est_mode = 1; config->tx_bpf_en = false;
         /* custom UW - we use a longer UW with higher bad_uw_errors threshold due to high raw BER */
         config->nuwbits = 24; config->bad_uw_errors = 5;
         uint8_t uw[] = {1,1,0,0, 1,0,1,0,  1,1,1,1, 0,0,0,0, 1,1,1,1, 0,0,0,0};
@@ -68,4 +90,3 @@ void ofdm_init_mode(char mode[], struct OFDM_CONFIG *config) {
     }
     config->rs=1.0f/config->ts;
 }
-
