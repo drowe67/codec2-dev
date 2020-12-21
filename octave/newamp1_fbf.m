@@ -4,8 +4,8 @@
 % This program is distributed under the terms of the GNU General Public License
 % Version 2
 %
-% Interactive Octave script to explore frame by frame operation of new amplitude
-% modelling model.
+% Interactive Octave script to explore frame by frame operation of newamp1
+% spectral amplitude modelling.
 %
 % Usage:
 %   Make sure codec2-dev is compiled with the -DDUMP option - see README for
@@ -39,7 +39,7 @@ function newamp1_fbf(samname, f=73, varargin)
   % pre-process
   [rate_K_surface sample_freqs_kHz] = resample_const_rate_f_mel(model(1:frames,:), K);
 
-  % we need to know eq states an each frame to simulate properly
+  % we need to know eq states on each frame
   eq = zeros(frames,K);  an_eq = zeros(1,K);
   for ff=1:frames
     mean_f = mean(rate_K_surface(ff,:));
@@ -76,6 +76,7 @@ function newamp1_fbf(samname, f=73, varargin)
     if eq_en
       rate_K_vec_no_mean -= eq(f,:);
     end
+    rate_K_vec_no_mean_ = rate_K_vec_no_mean;
     if vq
       [res rate_K_vec_no_mean_ ind] = mbest(train_120_vq, rate_K_vec_no_mean, m);
       if pf
@@ -87,17 +88,22 @@ function newamp1_fbf(samname, f=73, varargin)
     % back to rate L
     model_(f,:) = resample_rate_L(model(f,:), rate_K_vec_, sample_freqs_kHz);
     Am_ = model_(f,3:(L+2)); AmdB_ = 20*log10(Am_);
-    sdL = std(abs(AmdB - AmdB_));
+    varL = var(AmdB - AmdB_);
 
     plot((1:L)*Wo*4000/pi, AmdB_,";AmdB bar;r+-");
-    l = sprintf(";error sd %3.2f dB;bk+-", sdL);
+    l = sprintf(";error var %3.2f dB;bk+-", varL);
     plot((1:L)*Wo*4000/pi, (AmdB - AmdB_), l);
     hold off;
 
     figure(3); clf;
-    plot(sample_freqs_kHz*1000, rate_K_vec_no_mean, ";rate K no mean;b+-");
+    plot(sample_freqs_kHz*1000, 40+ rate_K_vec_no_mean, ";rate K no mean;g+-");
     axis([1 4000 -20 80]); hold on;
-    plot(sample_freqs_kHz*1000, eq(f,:), ";eq;r+-");
+    plot(sample_freqs_kHz*1000, 40 + rate_K_vec_no_mean_, ";rate K no mean bar;r+-");
+    varK = var(rate_K_vec_no_mean - rate_K_vec_no_mean_);
+    l = sprintf(";error var %3.2f dB;bk+-", varK);
+    plot(sample_freqs_kHz*1000, rate_K_vec_no_mean - rate_K_vec_no_mean_, l);
+
+    plot(sample_freqs_kHz*1000, eq(f,:), ";eq;b+-");
     hold off;
 
     % interactive menu ------------------------------------------
