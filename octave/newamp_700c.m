@@ -1,11 +1,11 @@
 % newamp_700c.m
 %
 % Copyright David Rowe 2017
-% This program is distributed under the terms of the GNU General Public License 
+% This program is distributed under the terms of the GNU General Public License
 % Version 2
 %
-% Library of Octave functions to for rate K, mel spaced
-% vector quantisation of spectral magntides used in Codec 2 700C mode.
+% Library of Octave functions for rate K, mel spaced
+% vector quantisation of spectral magnitudes used in Codec 2 700C mode.
 
 1;
 melvq; % mbest VQ functions
@@ -28,16 +28,16 @@ function y = interp_para(xp, yp, x)
 
     % k is index into xp of where we start 3 points used to form parabola
 
-    while ((xp(k+1) < xi) && (k < (length(xp)-2))) 
+    while ((xp(k+1) < xi) && (k < (length(xp)-2)))
       k++;
     end
-    
+
     x1 = xp(k); y1 = yp(k); x2 = xp(k+1); y2 = yp(k+1); x3 = xp(k+2); y3 = yp(k+2);
     %printf("k: %d i: %d xi: %f x1: %f y1: %f\n", k, i, xi, x1, y1);
 
     a = ((y3-y2)/(x3-x2)-(y2-y1)/(x2-x1))/(x3-x1);
     b = ((y3-y2)/(x3-x2)*(x2-x1)+(y2-y1)/(x2-x1)*(x3-x2))/(x3-x1);
-  
+
     y(i) = a*(xi-x2)^2 + b*(xi-x2) + y2;
   end
 endfunction
@@ -144,7 +144,7 @@ function [phase Gdbfk s Aw] = determine_phase(model, f, Nfft=512, ak)
   Am = model(f,3:(L+2));
   AmdB = 20*log10(Am);
   rate_L_sample_freqs_kHz = (1:L)*Wo*4/pi;
-  
+
   Gdbfk = interp_para(rate_L_sample_freqs_kHz, AmdB, sample_freqs_kHz);
 
   % optional input of aks for testing
@@ -168,7 +168,7 @@ endfunction
 
 
 function rate_K_sample_freqs_kHz = mel_sample_freqs_kHz(K)
-  mel_start = ftomel(200); mel_end = ftomel(3700); 
+  mel_start = ftomel(200); mel_end = ftomel(3700);
   step = (mel_end-mel_start)/(K-1);
   mel = mel_start:step:mel_end;
   rate_K_sample_freqs_Hz = 700*((10 .^ (mel/2595)) - 1);
@@ -176,7 +176,7 @@ function rate_K_sample_freqs_kHz = mel_sample_freqs_kHz(K)
 endfunction
 
 
-function [rate_K_surface rate_K_sample_freqs_kHz] = resample_const_rate_f_mel(model, K) 
+function [rate_K_surface rate_K_sample_freqs_kHz] = resample_const_rate_f_mel(model, K)
   rate_K_sample_freqs_kHz = mel_sample_freqs_kHz(K);
   rate_K_surface = resample_const_rate_f(model, rate_K_sample_freqs_kHz);
 endfunction
@@ -199,18 +199,18 @@ function [rate_K_surface rate_K_sample_freqs_kHz] = resample_const_rate_f(model,
     L = min([model(f,2) max_amp-1]);
     Am = model(f,3:(L+2));
     AmdB = 20*log10(Am);
-    %pre = 10*log10((1:L)*Wo*4/(pi*0.3));    
+    %pre = 10*log10((1:L)*Wo*4/(pi*0.3));
     %AmdB += pre;
 
     % clip between peak and peak -50dB, to reduce dynamic range
 
     AmdB_peak = max(AmdB);
     AmdB(find(AmdB < (AmdB_peak-50))) = AmdB_peak-50;
-    
+
     rate_L_sample_freqs_kHz = (1:L)*Wo*4/pi;
-    
+
     %rate_K_surface(f,:) = interp1(rate_L_sample_freqs_kHz, AmdB, rate_K_sample_freqs_kHz, "spline", "extrap");
-    rate_K_surface(f,:)  = interp_para(rate_L_sample_freqs_kHz, AmdB, rate_K_sample_freqs_kHz);    
+    rate_K_surface(f,:)  = interp_para(rate_L_sample_freqs_kHz, AmdB, rate_K_sample_freqs_kHz);
 
     %printf("\r%d/%d", f, frames);
   end
@@ -229,7 +229,7 @@ function [model_ AmdB_] = resample_rate_L(model, rate_K_surface, rate_K_sample_f
     Wo = model(f,1);
     L = model(f,2);
     rate_L_sample_freqs_kHz = (1:L)*Wo*4/pi;
-    
+
     % back down to rate L
 
     % AmdB_ = interp1(rate_K_sample_freqs_kHz, rate_K_surface(f,:), rate_L_sample_freqs_kHz, "spline", 0);
@@ -250,7 +250,7 @@ endfunction
 function vec = post_filter(vec, sample_freq_kHz, pf_gain = 1.5, voicing)
     % vec is rate K vector describing spectrum of current frame
     % lets pre-emp before applying PF. 20dB/dec over 300Hz
-    
+
     pre = 20*log10(sample_freq_kHz/0.3);
     vec += pre;
 
@@ -258,7 +258,7 @@ function vec = post_filter(vec, sample_freq_kHz, pf_gain = 1.5, voicing)
     e_before = sum(levels_before_linear .^2);
 
     vec *= pf_gain;
-   
+
     levels_after_linear = 10 .^ (vec/20);
     e_after = sum(levels_after_linear .^2);
     gain = e_after/e_before;
@@ -313,7 +313,7 @@ function [Wo_ voicing_] = interp_Wo_v(Wo1, Wo2, voicing1, voicing2)
     M = 4;
     max_amp = 80;
 
-    Wo_ = zeros(1,M); 
+    Wo_ = zeros(1,M);
     voicing_ = zeros(1,M);
     if !voicing1 && !voicing2
        Wo_(1:M) = 2*pi/100;
@@ -346,7 +346,7 @@ function [Wo_ voicing_] = interp_Wo_v(Wo1, Wo2, voicing1, voicing2)
 endfunction
 
 
-% Equaliser in front of EQ, see vq_70c_eq.m for development version
+% Equaliser in front of EQ, see vq_700c_eq.m for development version
 
 function [rate_K_vec eq] = front_eq(rate_K_vec, eq)
   [tmp K] = size(rate_K_vec);
@@ -356,4 +356,3 @@ function [rate_K_vec eq] = front_eq(rate_K_vec, eq)
   eq = (1-gain)*eq + gain*update;
   eq(find(eq < 0)) = 0;
 endfunction
-
