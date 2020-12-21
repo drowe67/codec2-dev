@@ -226,7 +226,7 @@ int main(int argc, char *argv[]) {
 
     nin_frame = ofdm_get_nin(ofdm);
     int num_read;
-
+    
     while((num_read = fread(rx_scaled, sizeof(short) , nin_frame, fin)) == nin_frame) {
 
         int log_payload_syms_flag = 0;
@@ -290,7 +290,7 @@ int main(int argc, char *argv[]) {
                     uint8_t out_char[coded_bits_per_frame];
 
                         if (config_testframes) {
-                            Terrs += count_uncoded_errors(&ldpc, ofdm_config, &Nerrs_raw, codeword_symbols_de);
+                            Terrs += count_uncoded_errors(&ldpc, ofdm_config, codeword_symbols_de, 0);
                             Tbits += coded_bits_per_frame; 
                         }
 
@@ -392,7 +392,7 @@ int main(int argc, char *argv[]) {
             if (! log_payload_syms_flag) {
                 memset(payload_syms, 0, (sizeof(COMP)*coded_syms_per_frame));
                 memset(payload_amps, 0, (sizeof(float)*coded_syms_per_frame));
-                }
+            }
             fwrite(payload_syms, sizeof(COMP), coded_syms_per_frame, fdiag);
             fwrite(payload_amps, sizeof(float), coded_syms_per_frame, fdiag);
             }

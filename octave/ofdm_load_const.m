@@ -52,4 +52,4 @@ if ldpc_en
 end
 
 verbose = states.verbose;
-
+ofdm_peak = states.ofdm_peak;

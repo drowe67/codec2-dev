@@ -37,6 +37,10 @@
 #include "mpdecode_core.h"
 #include "gp_interleaver.h"
 
+void freedv_pack(unsigned char *bytes, unsigned char *bits, int nbits);
+void freedv_unpack(unsigned char *bits, unsigned char *bytes, int nbits);
+unsigned short freedv_crc16_unpacked(unsigned char *bits, int nbits);
+
 void set_up_ldpc_constants(struct LDPC *ldpc, int code_length, int parity_bits) {
     /* following provided for convenience and to match Octave variable names */
 
@@ -49,7 +53,7 @@ void set_up_ldpc_constants(struct LDPC *ldpc, int code_length, int parity_bits) 
        place known bits in the unused data bit positions, which make
        the code stronger, and allow us to mess with different speech
        codec bit allocations without designing new LDPC codes. */
-    
+
     ldpc->data_bits_per_frame = ldpc->ldpc_data_bits_per_frame;
     ldpc->coded_bits_per_frame = ldpc->ldpc_coded_bits_per_frame;
 }
@@ -58,7 +62,7 @@ void set_data_bits_per_frame(struct LDPC *ldpc, int new_data_bits_per_frame) {
     ldpc->data_bits_per_frame = new_data_bits_per_frame;
     ldpc->coded_bits_per_frame = ldpc->data_bits_per_frame + ldpc->NumberParityBits;
 }
-    
+
 void ldpc_encode_frame(struct LDPC *ldpc, int codeword[], unsigned char tx_bits_char[]) {
     unsigned char pbits[ldpc->NumberParityBits];
     int i, j;
@@ -66,15 +70,15 @@ void ldpc_encode_frame(struct LDPC *ldpc, int codeword[], unsigned char tx_bits_
     if (ldpc->data_bits_per_frame == ldpc->ldpc_data_bits_per_frame) {
         /* we have enough data bits to fill the codeword */
         encode(ldpc, tx_bits_char, pbits);
-    } else {        
+    } else {
         unsigned char tx_bits_char_padded[ldpc->ldpc_data_bits_per_frame];
-        /* some unused data bits, set these to known values to strengthen code */    
+        /* some unused data bits, set these to known values to strengthen code */
         memcpy(tx_bits_char_padded, tx_bits_char, ldpc->data_bits_per_frame);
         for (i = ldpc->data_bits_per_frame; i < ldpc->ldpc_data_bits_per_frame; i++)
             tx_bits_char_padded[i] = 1;
         encode(ldpc, tx_bits_char_padded, pbits);
     }
-          
+
     /* output codeword is concatenation of (used) data bits and parity
        bits, we don't bother sending unused (known) data bits */
     for (i = 0; i < ldpc->data_bits_per_frame; i++) {
@@ -102,8 +106,8 @@ void qpsk_modulate_frame(COMP tx_symbols[], int codeword[], int n) {
 /* Count uncoded (raw) bit errors over frame, note we don't include UW
    of txt bits as this is done after we dissassemmble the frame */
 
-int count_uncoded_errors(struct LDPC *ldpc, struct OFDM_CONFIG *config, int *Nerrs_raw, COMP codeword_symbols_de[]) {
-    int i, Nerrs, Terrs;
+int count_uncoded_errors(struct LDPC *ldpc, struct OFDM_CONFIG *config, COMP codeword_symbols_de[], int crc16) {
+    int i, Nerrs;
 
     int coded_syms_per_frame = ldpc->coded_bits_per_frame/config->bps;
     int coded_bits_per_frame = ldpc->coded_bits_per_frame;
@@ -117,14 +121,16 @@ int count_uncoded_errors(struct LDPC *ldpc, struct OFDM_CONFIG *config, int *Ner
     uint8_t tx_bits[data_bits_per_frame];
 
     ofdm_rand(r, data_bits_per_frame);
-    
+
     for (i = 0; i < data_bits_per_frame; i++) {
         tx_bits[i] = r[i] > 16384;
     }
-    
+    if (crc16) {
+      uint16_t tx_crc16 = freedv_crc16_unpacked(tx_bits, data_bits_per_frame - 16);
+      uint8_t tx_crc16_bytes[] = { tx_crc16 >> 8, tx_crc16 & 0xff };
+      freedv_unpack(tx_bits + data_bits_per_frame - 16, tx_crc16_bytes, 16);
+    }
     ldpc_encode_frame(ldpc, test_codeword, tx_bits);
-
-    Terrs = 0;
 
     for (i = 0; i < coded_syms_per_frame; i++) {
         int bits[2];
@@ -142,10 +148,7 @@ int count_uncoded_errors(struct LDPC *ldpc, struct OFDM_CONFIG *config, int *Ner
         }
     }
 
-    *Nerrs_raw = Nerrs;
-    Terrs += Nerrs;
-
-    return Terrs;
+    return Nerrs;
 }
 
 int count_errors(uint8_t tx_bits[], uint8_t rx_bits[], int n) {
@@ -157,7 +160,7 @@ int count_errors(uint8_t tx_bits[], uint8_t rx_bits[], int n) {
             Nerrs++;
         }
     }
-    
+
     return Nerrs;
 }
 
@@ -180,4 +183,3 @@ void ofdm_ldpc_interleave_tx(struct OFDM *ofdm, struct LDPC *ldpc, complex float
     ofdm_assemble_qpsk_modem_packet_symbols(ofdm, tx_symbols, payload_symbols_inter, txt_bits);
     ofdm_txframe(ofdm, tx_sams, tx_symbols);
 }
-

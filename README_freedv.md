@@ -38,6 +38,7 @@ These are designed for use with a HF SSB radio.
 | 1600 | 2012 | Codec2 1300 | DQPSK + pilot | 1125 | 1600 | Golay (23,12) | Y | 4 | poor |
 | 700C | 2017 | Codec2 700C | coherent QPSK + diversity | 1500 | 1400 | - | - | 2 | good |
 | 700D | 2018 | Codec2 700C | coherent OFDM/QPSK | 1000 | 1900 | LDPC (224,112)  | Y | -2 | fair |
+| 700E | 2020 | Codec2 700C | coherent OFDM/QPSK | 1500 | 3000 | LDPC (112,56)  | Y | 1 | good |
 | 2020 | 2019 | LPCNet 1733 | coherent OFDM/QPSK | 1600 | 3000 | LDPC (504,396)  | Y | 2 | poor |
 
 Notes:
@@ -83,7 +84,7 @@ The FSK_LDPC mode is used for data, and has user defined bit rate and a variety 
 
 See [freedv_api.h](src/freedv_api.h) and [freedv_api.c](src/freedv_api.c), and the command line demo programs [freedv_tx.c](src/freedv_tx.c) & [freedv_rx.c](src/freedv_rx.c).  Quickstart demo using FreeDV 1600:
 ```
-$ ./freedv_tx 1600 ../../raw/hts1.raw - | ./freedv_rx 1600 - - | play -t raw -r 8000 -s -2 -q -
+$ ./freedv_tx 1600 ../../raw/hts1.raw - | ./freedv_rx 1600 - - | aplay -f S16_LE
 $ cat freedv_rx_log.txt
 ```
 ## FreeDV 2400A and 2400B modes
@@ -122,7 +123,7 @@ $  ./freedv_tx 2400B ../../raw/ve9qrp_10s.raw - | sox -t raw -r 48000 -s -2 - -t
    $ cd ~
    $ git clone https://github.com/drowe67/LPCNet
    $ cd LPCNet && mkdir build_linux && cd build_linux
-   $ cmake -DCODEC2_BUILD_DIR=~/codec2/build_linux ../ 
+   $ cmake -DCODEC2_BUILD_DIR=~/codec2/build_linux ../
    $ make
    ```
 
@@ -169,6 +170,19 @@ AWGN (noise but no fading) channel, 2.8dB SNR:
 ```
 $ ./freedv_tx 2020 ~/LPCNet/wav/all.wav - | ./cohpsk_ch - - -22 --Fs 8000 | ./freedv_rx 2020 - - | aplay -f S16_LE -r 16000
 ```
+
+## Command lines for PER testing 700D/700E PER with clipper
+
+AWGN:
+```
+$ ./src/freedv_tx 700D ../raw/ve9qrp.raw - --clip 0 --testframes | ./src/cohpsk_ch - - -16 --raw_dir ../raw/ --Fs 8000 | ./src/freedv_rx 700D - /dev/null --testframes
+```
+MultiPath Poor (MPP):
+```
+$ ./src/freedv_tx 700D ../raw/ve9qrp.raw - --clip 0 --testframes | ./src/cohpsk_ch - - -24 --fast --raw_dir ../raw/ --Fs 8000 | ./src/freedv_rx 700D - /dev/null --testframes
+```
+
+Adjust `--clip [0|1]` and 3rd argument of `cohpsk_ch` to obtain a PER of just less than 0.1, and note the SNR and PAPR reported by `cohpsk_ch`.  The use of the `ve9qrp` samples makes teh test run for a few minutes, to get reasonable multipath channel results.
 
 ## Further work
 

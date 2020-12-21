@@ -27,6 +27,7 @@
 
 #include "codec2_ofdm.h"
 #include "ofdm_internal.h"
+#include "ofdm_mode.h"
 #include "mpdecode_core.h"
 #include "gp_interleaver.h"
 #include "ldpc_codes.h"
@@ -46,7 +47,7 @@ void freedv_700c_open(struct freedv *f) {
     f->n_nom_modem_samples = f->n_nat_modem_samples * FREEDV_FS_8000 / COHPSK_FS;// number of samples after native samples are interpolated to 8000 sps
     f->n_max_modem_samples = COHPSK_MAX_SAMPLES_PER_FRAME * FREEDV_FS_8000 / COHPSK_FS + 1;
     f->modem_sample_rate = FREEDV_FS_8000;                                       // note weird sample rate tamed by resampling
-    f->clip = 1;
+    f->clip_en = 1;
     f->sz_error_pattern = cohpsk_error_pattern_size();
     f->test_frames_diversity = 1;
 
@@ -75,7 +76,7 @@ void freedv_comptx_700c(struct freedv *f, COMP mod_out[]) {
 
     /* earlier modems used one bit per int for unpacked bits */
     for(i=0; i<COHPSK_BITS_PER_FRAME; i++) tx_bits[i] = f->tx_payload_bits[i];
-    
+
     /* optionally overwrite the codec bits with test frames */
     if (f->test_frames) {
         cohpsk_get_test_bits(f->cohpsk, tx_bits);
@@ -83,21 +84,31 @@ void freedv_comptx_700c(struct freedv *f, COMP mod_out[]) {
 
     /* cohpsk modulator */
     cohpsk_mod(f->cohpsk, tx_fdm, tx_bits, COHPSK_BITS_PER_FRAME);
-    if (f->clip) 
+
+    float gain = 1.0;
+    if (f->clip_en) {
         cohpsk_clip(tx_fdm, COHPSK_CLIP, COHPSK_NOM_SAMPLES_PER_FRAME);
+        gain = 2.5;
+    }
     for(i=0; i<f->n_nat_modem_samples; i++)
-        mod_out[i] = fcmult(FDMDV_SCALE*NORM_PWR_COHPSK, tx_fdm[i]);
+        mod_out[i] = fcmult(gain*FDMDV_SCALE*NORM_PWR_COHPSK, tx_fdm[i]);
     i = quisk_cfInterpDecim((complex float *)mod_out, f->n_nat_modem_samples, f->ptFilter7500to8000, 16, 15);
 }
 
-void freedv_700d_open(struct freedv *f) {
+// open function for OFDM voice modes
+void freedv_ofdm_voice_open(struct freedv *f, char *mode) {
     f->snr_squelch_thresh = 0.0;
     f->squelch_en = 0;
+    struct OFDM_CONFIG *ofdm_config = (struct OFDM_CONFIG *) calloc(1, sizeof (struct OFDM_CONFIG));
+    assert(ofdm_config != NULL);
+    ofdm_init_mode(mode, ofdm_config);
 
-    f->ofdm = ofdm_create(NULL);
+    f->ofdm = ofdm_create(ofdm_config);
     assert(f->ofdm != NULL);
-        
-    struct OFDM_CONFIG *ofdm_config = ofdm_get_config_param(f->ofdm);
+    free(ofdm_config);
+
+    ofdm_config = ofdm_get_config_param(f->ofdm);
+    f->ofdm_bitsperpacket = ofdm_get_bits_per_packet(f->ofdm);
     f->ofdm_bitsperframe = ofdm_get_bits_per_frame(f->ofdm);
     f->ofdm_nuwbits = (ofdm_config->ns - 1) * ofdm_config->bps - ofdm_config->txtbits;
     f->ofdm_ntxtbits = ofdm_config->txtbits;
@@ -105,36 +116,35 @@ void freedv_700d_open(struct freedv *f) {
     f->ldpc = (struct LDPC*)MALLOC(sizeof(struct LDPC));
     assert(f->ldpc != NULL);
 
-    ldpc_codes_setup(f->ldpc, "HRA_112_112");
+    ldpc_codes_setup(f->ldpc, f->ofdm->codename);
 #ifdef __EMBEDDED__
     f->ldpc->max_iter = 10; /* limit LDPC decoder iterations to limit CPU load */
-#endif	
-    /* Code length 224 divided by 2 bits per symbol = 112 symbols per frame */
-    int coded_syms_per_frame = f->ldpc->coded_bits_per_frame/f->ofdm->bps;
-        
-    f->modem_frame_count_tx = f->modem_frame_count_rx = 0;
-        
-    f->codeword_symbols = (COMP*)MALLOC(sizeof(COMP) * coded_syms_per_frame);
-    assert(f->codeword_symbols != NULL);
-
-    f->codeword_amps = (float*)MALLOC(sizeof(float) * coded_syms_per_frame);
-    assert(f->codeword_amps != NULL);
+#endif
+    int Nsymsperpacket = ofdm_get_bits_per_packet(f->ofdm) / f->ofdm->bps;
+    f->rx_syms = (COMP*)MALLOC(sizeof(COMP) * Nsymsperpacket);
+    assert(f->rx_syms != NULL);
+    f->rx_amps = (float*)MALLOC(sizeof(float) * Nsymsperpacket);
+    assert(f->rx_amps != NULL);
+    for(int i=0; i<Nsymsperpacket; i++) {
+        f->rx_syms[i].real = f->rx_syms[i].imag = 0.0;
+        f->rx_amps[i]= 0.0;
+    }
 
     f->nin = f->nin_prev = ofdm_get_samples_per_frame(f->ofdm);
     f->n_nat_modem_samples = ofdm_get_samples_per_frame(f->ofdm);
     f->n_nom_modem_samples = ofdm_get_samples_per_frame(f->ofdm);
     f->n_max_modem_samples = ofdm_get_max_samples_per_frame(f->ofdm);
     f->modem_sample_rate = f->ofdm->config.fs;
-    f->clip = 0;
+    f->clip_en = 0;
     f->sz_error_pattern = f->ofdm_bitsperframe;
 
     f->tx_bits = NULL; /* not used for 700D */
 
-#ifndef __EMBEDDED__
     /* tx BPF off on embedded platforms, as it consumes significant CPU */
-    ofdm_set_tx_bpf(f->ofdm, 1);
+#ifdef __EMBEDDED__
+    ofdm_set_tx_bpf(f->ofdm, 0);
 #endif
-        
+
     f->speech_sample_rate = FREEDV_FS_8000;
     f->codec2 = codec2_create(CODEC2_MODE_700C); assert(f->codec2 != NULL);
     /* should be exactly an integer number of Codec 2 frames in a OFDM modem frame */
@@ -151,37 +161,68 @@ void freedv_700d_open(struct freedv *f) {
     assert(f->rx_payload_bits != NULL);
 }
 
+// open function for OFDM data modes, TODO consider moving to a new
+// (freedv_ofdm_data.c) file
+void freedv_ofdm_data_open(struct freedv *f) {
+    struct OFDM_CONFIG ofdm_config;
+    char mode[32];
+    if (f->mode == FREEDV_MODE_DATAC1) strcpy(mode, "datac1");
+    if (f->mode == FREEDV_MODE_DATAC2) strcpy(mode, "datac2");
+    if (f->mode == FREEDV_MODE_DATAC3) strcpy(mode, "datac3");
 
-/*
-  Ok so when interleaved, we take the interleaver length of input samples,
-  and output that many modem samples, e.g. for interleaver of length 4:
+    ofdm_init_mode(mode, &ofdm_config);
+    f->ofdm = ofdm_create(&ofdm_config);
+    assert(f->ofdm != NULL);
 
-  record input speech 1234
-  freedv tx              |
-  play modem sig         1234
-  record modem sig       1234
-  freedv_rx                   |
-  play output speech          1234        
-  time axis --------->123456789012---->
+    // LDPC set up
+    f->ldpc = (struct LDPC*)MALLOC(sizeof(struct LDPC));
+    assert(f->ldpc != NULL);
+    ldpc_codes_setup(f->ldpc, f->ofdm->codename);
+#ifdef __EMBEDDED__
+    f->ldpc->max_iter = 10; /* limit LDPC decoder iterations to limit CPU load */
+#endif
 
-  So a sample of input speech at time 1 is ouput at time 9.  We assume
-  the freedv_tx and freedv_rx and propogation time over channel (from
-  when a modem signal is played at the HF tx to when it is recorded at
-  the HF rx) is zero.
+    // useful constants
+    f->ofdm_bitsperpacket = ofdm_get_bits_per_packet(f->ofdm);
+    f->ofdm_bitsperframe = ofdm_get_bits_per_frame(f->ofdm);
+    f->ofdm_nuwbits = ofdm_config.nuwbits;
+    f->ofdm_ntxtbits = ofdm_config.txtbits;
 
-  The freedv tx interface ouputs n_nom_modem_samples, which a single
-  OFDM modem frame, 112 payload bits or 4 speech codec frames.  So
-  this function must always have 1280 speech samples as input, and
-  1280 modem samples as output.
-*/
+    /* payload bits per FreeDV API "frame".  In OFDM modem nomenclature this is the number of
+       payload data bits per packet, or the number of data bits in a LDPC codeword */
+    f->bits_per_modem_frame = f->ldpc->data_bits_per_frame;
 
-void freedv_comptx_700d(struct freedv *f, COMP mod_out[]) {
+    // buffers for received symbols for one packet/LDPC codeword - may span many OFDM modem frames
+    int Nsymsperpacket = ofdm_get_bits_per_packet(f->ofdm) / f->ofdm->bps;
+    f->rx_syms = (COMP*)MALLOC(sizeof(COMP) * Nsymsperpacket);
+    assert(f->rx_syms != NULL);
+    f->rx_amps = (float*)MALLOC(sizeof(float) * Nsymsperpacket);
+    assert(f->rx_amps != NULL);
+    for(int i=0; i<Nsymsperpacket; i++) {
+        f->rx_syms[i].real = f->rx_syms[i].imag = 0.0;
+        f->rx_amps[i]= 0.0;
+    }
+
+    f->nin = f->nin_prev = ofdm_get_nin(f->ofdm);
+    f->n_nat_modem_samples = ofdm_get_samples_per_packet(f->ofdm);
+    f->n_nom_modem_samples = ofdm_get_samples_per_frame(f->ofdm);
+    f->n_max_modem_samples = ofdm_get_max_samples_per_frame(f->ofdm);
+    f->modem_sample_rate = f->ofdm->config.fs;
+    f->sz_error_pattern = f->ofdm_bitsperpacket;
+
+    // Note inconsistency: freedv API modem "frame" is a OFDM modem packet
+    f->tx_payload_bits = (unsigned char*)MALLOC(f->bits_per_modem_frame);
+    assert(f->tx_payload_bits != NULL);
+    f->rx_payload_bits = (unsigned char*)MALLOC(f->bits_per_modem_frame);
+    assert(f->rx_payload_bits != NULL);
+}
+
+/* speech or raw data, complex OFDM modulation out */
+void freedv_comptx_ofdm(struct freedv *f, COMP mod_out[]) {
     int    i, k;
     int    nspare;
- 
-    // Generate Varicode txt bits. Txt bits in OFDM frame come just
-    // after Unique Word (UW).  Txt bits aren't protected by FEC.
 
+    /* Generate Varicode txt bits (if used), waren't protected by FEC */
     nspare = f->ofdm_ntxtbits;
     uint8_t txt_bits[nspare];
 
@@ -202,8 +243,7 @@ void freedv_comptx_700d(struct freedv *f, COMP mod_out[]) {
         else txt_bits[k] = 0;
     }
 
-    /* optionally replace codec payload bits with test frames known to rx */
-
+    /* optionally replace payload bits with test frames known to rx */
     if (f->test_frames) {
         uint8_t payload_data_bits[f->bits_per_modem_frame];
         ofdm_generate_payload_data_bits(payload_data_bits, f->bits_per_modem_frame);
@@ -214,37 +254,24 @@ void freedv_comptx_700d(struct freedv *f, COMP mod_out[]) {
     }
 
     /* OK now ready to LDPC encode, interleave, and OFDM modulate */
-    
-    complex float tx_sams[f->n_nat_modem_samples];
-    COMP asam;
-    
-    ofdm_ldpc_interleave_tx(f->ofdm, f->ldpc, tx_sams, f->tx_payload_bits, txt_bits);
-
-    for(i=0; i< f->n_nat_modem_samples; i++) {
-        asam.real = crealf(tx_sams[i]);
-        asam.imag = cimagf(tx_sams[i]);
-        mod_out[i] = fcmult(OFDM_AMP_SCALE * NORM_PWR_OFDM, asam);
-    }
-
-    if (f->clip) {
-        cohpsk_clip(mod_out, OFDM_CLIP, f->n_nat_modem_samples);
-    }
+    ofdm_ldpc_interleave_tx(f->ofdm, f->ldpc, (complex float*)mod_out, f->tx_payload_bits, txt_bits);
 }
+
 
 int freedv_comprx_700c(struct freedv *f, COMP demod_in_8kHz[]) {
     int   i;
     int   sync;
 
     int rx_status = 0;
-    
+
     // quisk_cfInterpDecim() modifies input data so lets make a copy just in case there
     // is no sync and we need to echo inpout to output
 
     // freedv_nin(f): input samples at Fs=8000 Hz
     // f->nin: input samples at Fs=7500 Hz
-    
+
     COMP demod_in[freedv_nin(f)];
-    
+
     for(i=0; i<freedv_nin(f); i++)
         demod_in[i] = demod_in_8kHz[i];
 
@@ -252,23 +279,22 @@ int freedv_comprx_700c(struct freedv *f, COMP demod_in_8kHz[]) {
 
     for(i=0; i<f->nin; i++)
         demod_in[i] = fcmult(1.0/FDMDV_SCALE, demod_in[i]);
-    
+
     float rx_soft_bits[COHPSK_BITS_PER_FRAME];
-    
+
     cohpsk_demod(f->cohpsk, rx_soft_bits, &sync, demod_in, &f->nin);
-    
+
     for(i=0; i<f->bits_per_modem_frame; i++)
         f->rx_payload_bits[i] = rx_soft_bits[i] < 0.0f;
-    
+
     f->sync = sync;
     cohpsk_get_demod_stats(f->cohpsk, &f->stats);
     f->snr_est = f->stats.snr_est;
 
     if (sync) {
-        rx_status = RX_SYNC;
-        
+        rx_status = FREEDV_RX_SYNC;
         if (f->test_frames == 0) {
-            rx_status |= RX_BITS;
+            rx_status |= FREEDV_RX_BITS;
         }
         else {
 
@@ -290,7 +316,7 @@ int freedv_comprx_700c(struct freedv *f, COMP demod_in_8kHz[]) {
                         (*f->freedv_put_error_pattern)(f->error_pattern_callback_state, error_pattern, COHPSK_BITS_PER_FRAME);
                     }
                 }
-            } 
+            }
             else {
                 /* calculate error pattern on uncombined carriers - test mode to spot any carrier specific issues like
                    tx passband filtering */
@@ -334,46 +360,52 @@ int freedv_comprx_700c(struct freedv *f, COMP demod_in_8kHz[]) {
 }
 
 /*
-  700D demod function that can support complex (float) or real (short)
-  samples.  The real short samples are useful for low memory overhead,
-  such at the SM1000.
+  OFDM demod function that can support complex (float) or real (short)
+  samples.  The real short samples are useful for low memory platforms such as
+  the SM1000.
 */
 
-int freedv_comp_short_rx_700d(struct freedv *f, void *demod_in_8kHz, int demod_in_is_short, float gain) {
+int freedv_comp_short_rx_ofdm(struct freedv *f, void *demod_in_8kHz, int demod_in_is_short, float gain) {
     int   i, k;
     int   n_ascii;
     char  ascii_out;
     struct OFDM *ofdm = f->ofdm;
     struct LDPC *ldpc = f->ldpc;
-    
-    int    data_bits_per_frame = ldpc->data_bits_per_frame;
-    int    coded_bits_per_frame = ldpc->coded_bits_per_frame;
-    int    coded_syms_per_frame = ldpc->coded_bits_per_frame/ofdm->bps;
-    COMP  *codeword_symbols = f->codeword_symbols;
-    float *codeword_amps = f->codeword_amps;
-    int    rx_bits[f->ofdm_bitsperframe];
+
+    /* useful constants */
+    int Nbitsperframe = ofdm_get_bits_per_frame(ofdm);
+    int Nbitsperpacket = ofdm_get_bits_per_packet(ofdm);
+    int Nsymsperframe = Nbitsperframe / ofdm->bps;
+    int Nsymsperpacket = Nbitsperpacket / ofdm->bps;
+    int Npayloadbitsperpacket = Nbitsperpacket - ofdm->nuwbits - ofdm->ntxtbits;
+    int Npayloadsymsperpacket = Npayloadbitsperpacket/ofdm->bps;
+    int Ndatabitsperpacket = ldpc->data_bits_per_frame;
+
+    complex float *rx_syms = (complex float*)f->rx_syms;
+    float *rx_amps = f->rx_amps;
+
+    int    rx_bits[Nbitsperframe];
     short  txt_bits[f->ofdm_ntxtbits];
-    COMP   payload_syms[coded_syms_per_frame];
-    float  payload_amps[coded_syms_per_frame];
-   
+    COMP   payload_syms[Npayloadsymsperpacket];
+    float  payload_amps[Npayloadsymsperpacket];
+
     int    Nerrs_raw = 0;
     int    Nerrs_coded = 0;
     int    iter = 0;
     int    parityCheckCount = 0;
     uint8_t rx_uw[f->ofdm_nuwbits];
 
-    float new_gain = gain / OFDM_AMP_SCALE;
-    
+    float new_gain = gain / f->ofdm->amp_scale;
+
     assert((demod_in_is_short == 0) || (demod_in_is_short == 1));
 
     f->sync = f->stats.sync = 0;
     int rx_status = 0;
-    
-    /* TODO estimate this properly from signal */    
+
+    /* TODO estimate this properly from signal */
     float EsNo = 3.0;
-    
-    /* looking for modem sync */
-    
+
+    /* looking for OFDM modem sync */
     if (ofdm->sync_state == search) {
         if (demod_in_is_short)
             ofdm_sync_search_shorts(f->ofdm, (short*)demod_in_8kHz, new_gain);
@@ -381,104 +413,123 @@ int freedv_comp_short_rx_700d(struct freedv *f, void *demod_in_8kHz, int demod_i
             ofdm_sync_search(f->ofdm, (COMP*)demod_in_8kHz);
     }
 
-     /* OK modem is in sync */
-    
     if ((ofdm->sync_state == synced) || (ofdm->sync_state == trial)) {
-        rx_status |= RX_SYNC;
-        if (ofdm->sync_state == trial) rx_status |= RX_TRIAL_SYNC;
-    
+        /* OK we have OFDM modem sync */
+        rx_status |= FREEDV_RX_SYNC;
+        if (ofdm->sync_state == trial) rx_status |= FREEDV_RX_TRIAL_SYNC;
         if (demod_in_is_short)
             ofdm_demod_shorts(ofdm, rx_bits, (short*)demod_in_8kHz, new_gain);
         else
             ofdm_demod(ofdm, rx_bits, (COMP*)demod_in_8kHz);
 
-        ofdm_extract_uw(ofdm, ofdm->rx_np, ofdm->rx_amp, rx_uw);
-        ofdm_disassemble_qpsk_modem_packet(ofdm, ofdm->rx_np, ofdm->rx_amp, payload_syms, payload_amps, txt_bits);
+        /* accumulate a buffer of data symbols for this packet */
+        for(i=0; i<Nsymsperpacket-Nsymsperframe; i++) {
+            rx_syms[i] = rx_syms[i+Nsymsperframe];
+            rx_amps[i] = rx_amps[i+Nsymsperframe];
+        }
+        memcpy(&rx_syms[Nsymsperpacket-Nsymsperframe], ofdm->rx_np, sizeof(complex float)*Nsymsperframe);
+        memcpy(&rx_amps[Nsymsperpacket-Nsymsperframe], ofdm->rx_amp, sizeof(float)*Nsymsperframe);
 
+        /* look for UW as frames enter packet buffer, note UW may span several modem frames */
+        int st_uw = Nsymsperpacket - ofdm->nuwframes*Nsymsperframe;
+        ofdm_extract_uw(ofdm, &rx_syms[st_uw], &rx_amps[st_uw], rx_uw);
+
+        // update some FreeDV API level stats
         f->sync = 1;
         ofdm_get_demod_stats(f->ofdm, &f->stats);
         f->snr_est = f->stats.snr_est;
 
-        assert((f->ofdm_nuwbits+f->ofdm_ntxtbits+coded_bits_per_frame) == f->ofdm_bitsperframe);
+        if (ofdm->modem_frame == (ofdm->np-1)) {
+            /* we have received enough modem frames to complete packet and run LDPC decoder */
 
-        /* newest symbols at end of buffer (uses final i from last loop), note we 
-           change COMP formats from what modem uses internally */
-                
-        for(i=0; i< coded_syms_per_frame; i++) {
-            codeword_symbols[i] = payload_syms[i];
-            codeword_amps[i]    = payload_amps[i];
-         }
-               
-        /* run de-interleaver */
-                
-        COMP  codeword_symbols_de[coded_syms_per_frame];
-        float codeword_amps_de[coded_syms_per_frame];
-        gp_deinterleave_comp (codeword_symbols_de, codeword_symbols, coded_syms_per_frame);
-        gp_deinterleave_float(codeword_amps_de   , codeword_amps   , coded_syms_per_frame);
+            ofdm_disassemble_qpsk_modem_packet(ofdm, rx_syms, rx_amps, payload_syms, payload_amps, txt_bits);
 
-        float llr[coded_bits_per_frame];
-        uint8_t out_char[coded_bits_per_frame];
+            COMP payload_syms_de[Npayloadsymsperpacket];
+            float payload_amps_de[Npayloadsymsperpacket];
+            gp_deinterleave_comp (payload_syms_de, payload_syms, Npayloadsymsperpacket);
+            gp_deinterleave_float(payload_amps_de, payload_amps, Npayloadsymsperpacket);
 
-        if (f->test_frames) {
-            int tmp;
-            Nerrs_raw = count_uncoded_errors(ldpc, &f->ofdm->config, &tmp, codeword_symbols_de);
-            f->total_bit_errors += Nerrs_raw;
-            f->total_bits += f->ofdm_bitsperframe;
-        }
+            float llr[Npayloadbitsperpacket];
+            uint8_t decoded_codeword[Npayloadbitsperpacket];
+            symbols_to_llrs(llr, payload_syms_de, payload_amps_de,
+                            EsNo, ofdm->mean_amp, Npayloadsymsperpacket);
+            iter = run_ldpc_decoder(ldpc, decoded_codeword, llr, &parityCheckCount);
+            memcpy(f->rx_payload_bits, decoded_codeword, Ndatabitsperpacket);
 
-        f->modem_frame_count_rx = 0;
+            if (ofdm->data_mode) {
+                // we need a valid CRC to declare a data packet valid
+                if (freedv_check_crc16_unpacked(f->rx_payload_bits, Ndatabitsperpacket))
+                    rx_status |= FREEDV_RX_BITS;
+                else
+                    rx_status |= FREEDV_RX_BIT_ERRORS;
+            } else {
 
-        symbols_to_llrs(llr, codeword_symbols_de, codeword_amps_de,
-                EsNo, ofdm->mean_amp, coded_syms_per_frame);
-        iter = run_ldpc_decoder(ldpc, out_char, llr, &parityCheckCount);
+                // voice modes aren't as strict - pass everything through to the speech decoder, but flag
+                // frame with possible errors
+                rx_status |= FREEDV_RX_BITS;
+                if (parityCheckCount != ldpc->NumberParityBits)
+                   rx_status |= FREEDV_RX_BIT_ERRORS;
 
-        if (parityCheckCount != ldpc->NumberParityBits)
-            rx_status |= RX_BIT_ERRORS;
+            }
 
-        if (f->test_frames) {
-            uint8_t payload_data_bits[data_bits_per_frame];
-            ofdm_generate_payload_data_bits(payload_data_bits, data_bits_per_frame);
-            Nerrs_coded = count_errors(payload_data_bits, out_char, data_bits_per_frame);
-            f->total_bit_errors_coded += Nerrs_coded;
-            f->total_bits_coded += data_bits_per_frame;
-        } else {
-            memcpy(f->rx_payload_bits, out_char, data_bits_per_frame);
-        }
+            if (f->test_frames && (rx_status & FREEDV_RX_BITS)) {
+                /* est uncoded BER from payload bits */
+                Nerrs_raw = count_uncoded_errors(ldpc, &f->ofdm->config, payload_syms_de, ofdm->data_mode);
+                f->total_bit_errors += Nerrs_raw;
+                f->total_bits += Npayloadbitsperpacket;
 
-        rx_status |= RX_BITS;
+                /* coded errors from decoded bits */
+                uint8_t payload_data_bits[Ndatabitsperpacket];
+                ofdm_generate_payload_data_bits(payload_data_bits, Ndatabitsperpacket);
+                if (ofdm->data_mode) {
+                    uint16_t tx_crc16 = freedv_crc16_unpacked(payload_data_bits, Ndatabitsperpacket - 16);
+                    uint8_t tx_crc16_bytes[] = { tx_crc16 >> 8, tx_crc16 & 0xff };
+                    freedv_unpack(payload_data_bits + Ndatabitsperpacket - 16, tx_crc16_bytes, 16);
+                }
+                Nerrs_coded = count_errors(payload_data_bits, f->rx_payload_bits, Ndatabitsperpacket);
+                f->total_bit_errors_coded += Nerrs_coded;
+                f->total_bits_coded += Ndatabitsperpacket;
+                if (Nerrs_coded) f->total_packet_errors++;
+                f->total_packets++;
+            }
 
-        /* If modem is synced we can decode txt bits */        
-        for(k=0; k<f->ofdm_ntxtbits; k++)  { 
-            //fprintf(stderr, "txt_bits[%d] = %d\n", k, rx_bits[i]);
-            n_ascii = varicode_decode(&f->varicode_dec_states, &ascii_out, &txt_bits[k], 1, 1);
-            if (n_ascii && (f->freedv_put_next_rx_char != NULL)) {
-                (*f->freedv_put_next_rx_char)(f->callback_state, ascii_out);
+            /* decode txt bits (if used) */
+            for(k=0; k<f->ofdm_ntxtbits; k++)  {
+                //fprintf(stderr, "txt_bits[%d] = %d\n", k, rx_bits[i]);
+                n_ascii = varicode_decode(&f->varicode_dec_states, &ascii_out, &txt_bits[k], 1, 1);
+                if (n_ascii && (f->freedv_put_next_rx_char != NULL)) {
+                    (*f->freedv_put_next_rx_char)(f->callback_state, ascii_out);
+                }
             }
         }
 
-        /* estimate uncoded BER from UW */
-        for(i=0; i<f->ofdm_nuwbits; i++) {         
-            if (rx_uw[i] != ofdm->tx_uw[i]) {
-                f->total_bit_errors++;
+        if (ofdm->modem_frame == 0) {
+           /* estimate uncoded BER from UW bits, useful in non-testframe modes */
+            for(i=0; i<f->ofdm_nuwbits; i++) {
+                if (rx_uw[i] != ofdm->tx_uw[i]) {
+                    f->total_bit_errors++;
+                }
             }
+            f->total_bits += f->ofdm_nuwbits;
         }
-        
-        f->total_bits += f->ofdm_nuwbits;
     }
-    
+
     /* iterate state machine and update nin for next call */
-    
+
     f->nin = ofdm_get_nin(ofdm);
     ofdm_sync_state_machine(ofdm, rx_uw);
 
     if ((f->verbose && (ofdm->last_sync_state == search)) || (f->verbose == 2)) {
-        fprintf(stderr, "%3d nin: %4d st: %-6s euw: %2d %1d f: %5.1f phbw: %d snr: %4.1f eraw: %3d ecdd: %3d iter: %3d "
+        fprintf(stderr, "%3d nin: %4d st: %-6s euw: %2d %1d mf: %2d f: %5.1f pbw: %d snr: %4.1f eraw: %3d ecdd: %3d iter: %3d "
                 "pcc: %3d rxst: %s\n",
-                f->frames++, ofdm->nin, ofdm_statemode[ofdm->last_sync_state], ofdm->uw_errors, ofdm->sync_counter, 
-		(double)ofdm->foff_est_hz, ofdm->phase_est_bandwidth,
+                f->frames++, ofdm->nin,
+                ofdm_statemode[ofdm->last_sync_state],
+                ofdm->uw_errors,
+                ofdm->sync_counter,
+                ofdm->modem_frame,
+	 	            (double)ofdm->foff_est_hz, ofdm->phase_est_bandwidth,
                 f->snr_est, Nerrs_raw, Nerrs_coded, iter, parityCheckCount, rx_sync_flags_to_text[rx_status]);
     }
-    
+
     return rx_status;
 }
-

@@ -8,7 +8,7 @@
   embedding FreeDV in other programs.  Please see:
 
   1. README_freedv.md
-  2. Notes function use in freedv_api.c
+  2. Notes on function use in freedv_api.c
   3. The sample freedv_tx.c and freedv_rx.c programs
 
 \*---------------------------------------------------------------------------*/
@@ -33,9 +33,8 @@
 #ifndef __FREEDV_API__
 #define __FREEDV_API__
 
-// This declares a single-precision (float) complex number
 #include <sys/types.h>
-
+// This declares a single-precision (float) complex number
 #include "comp.h"
 
 #ifdef __cplusplus
@@ -50,22 +49,42 @@
 #define FREEDV_MODE_700C        6
 #define FREEDV_MODE_700D        7
 #define FREEDV_MODE_2020        8
+#define FREEDV_MODE_700E       13
 
 // available data modes
 #define FREEDV_MODE_FSK_LDPC    9
+#define FREEDV_MODE_DATAC1     10
+#define FREEDV_MODE_DATAC2     11
+#define FREEDV_MODE_DATAC3     12
 
 // Sample rates used
 #define FREEDV_FS_8000          8000
 #define FREEDV_FS_16000         16000
 
+// peak (complex) sample value from Tx modulator
+#define FREEDV_PEAK             16384
+
+// Return code flags for freedv_*rx* functions
+#define FREEDV_RX_TRIAL_SYNC       0x1       // demodulator has trial sync
+#define FREEDV_RX_SYNC             0x2       // demodulator has sync
+#define FREEDV_RX_BITS             0x4       // data bits have been returned
+#define FREEDV_RX_BIT_ERRORS       0x8       // FEC may not have corrected all bit errors (not all parity checks OK)
+
+// optional operator control of OFDM modem state machine
+#define FREEDV_SYNC_UNSYNC 0                 // force sync state machine to lose sync, and search for new sync
+#define FREEDV_SYNC_AUTO   1                 // falls out of sync automatically
+#define FREEDV_SYNC_MANUAL 2                 // fall out of sync only under operator control
+
+// These macros allow us to disable unwanted modes at compile tine, for example
+// to save memory on embedded systems or the remove need to link other
+// libraries. By default we enable all modes.  Disable during compile time e.g
+// -DFREEDV_MODE_1600_EN=0 will enable all but FreeDV 1600.  Or the other way
+// round -DFREEDV_MODE_EN_DEFAULT=0 -DFREEDV_MODE_1600_EN=1 will enable only
+// FreeDV 1600
+
 #ifndef FREEDV_MODE_EN_DEFAULT
 #define FREEDV_MODE_EN_DEFAULT 1
 #endif
-
-// By default we enable all modes.  Disable during compile time e.g
-// -DFREEDV_MODE_1600_EN=0 will enable all but FreeDV 1600.  Or the
-// other way round -DFREEDV_MODE_EN_DEFAULT=0 -DFREEDV_MODE_1600_EN=1
-// will enable only FreeDV 1600
 
 #if !defined(FREEDV_MODE_1600_EN)
         #define FREEDV_MODE_1600_EN FREEDV_MODE_EN_DEFAULT
@@ -75,6 +94,9 @@
 #endif
 #if !defined(FREEDV_MODE_700D_EN)
         #define FREEDV_MODE_700D_EN FREEDV_MODE_EN_DEFAULT
+#endif
+#if !defined(FREEDV_MODE_700E_EN)
+        #define FREEDV_MODE_700E_EN FREEDV_MODE_EN_DEFAULT
 #endif
 #if !defined(FREEDV_MODE_2400A_EN)
         #define FREEDV_MODE_2400A_EN FREEDV_MODE_EN_DEFAULT
@@ -91,13 +113,17 @@
 #if !defined(FREEDV_MODE_FSK_LDPC_EN)
         #define FREEDV_MODE_FSK_LDPC_EN FREEDV_MODE_EN_DEFAULT
 #endif
+#if !defined(FREEDV_MODE_DATAC1_EN)
+        #define FREEDV_MODE_DATAC1_EN FREEDV_MODE_EN_DEFAULT
+#endif
+#if !defined(FREEDV_MODE_DATAC2_EN)
+        #define FREEDV_MODE_DATAC2_EN FREEDV_MODE_EN_DEFAULT
+#endif
+#if !defined(FREEDV_MODE_DATAC3_EN)
+        #define FREEDV_MODE_DATAC3_EN FREEDV_MODE_EN_DEFAULT
+#endif
 
 #define FDV_MODE_ACTIVE(mode_name, var)  ((mode_name##_EN) == 0 ? 0: (var) == mode_name)
-
-// optional operator control of 700D state machine
-#define FREEDV_SYNC_UNSYNC 0                 // force sync state machine to lose sync, and search for new sync
-#define FREEDV_SYNC_AUTO   1                 // falls out of sync automatically
-#define FREEDV_SYNC_MANUAL 2                 // fall out of sync only under operator control
 
 // struct that hold state information for one freedv instance
 struct freedv;
@@ -105,7 +131,7 @@ struct freedv;
 // Some modes allow extra configuration parameters
 struct freedv_advanced {
     int interleave_frames;                   // currently ignored, was previously used to configure 700D interleaver
-    
+
     // parameters for FREEDV_MODE_FSK_LDPC
     int M;                                   // 2 or 4 FSK
     int Rs;                                  // Symbol rate Hz
@@ -136,7 +162,7 @@ typedef void (*freedv_callback_datatx)(void *, unsigned char *packet, size_t *si
 
 
 /*---------------------------------------------------------------------------*\
- 
+
                                  FreeDV API functions
 
 \*---------------------------------------------------------------------------*/
@@ -172,25 +198,29 @@ int freedv_rawdatacomprx (struct freedv *freedv, unsigned char *packed_payload_b
 
 int freedv_codec_frames_from_rawdata(struct freedv *freedv, unsigned char *codec_frames, unsigned char *rawdata);
 int freedv_rawdata_from_codec_frames(struct freedv *freedv, unsigned char *rawdata, unsigned char *codec_frames);
-unsigned short freedv_gen_crc16(unsigned char* data_p, int length);
+unsigned short freedv_gen_crc16(unsigned char* bytes, int nbytes);
 void freedv_pack(unsigned char *bytes, unsigned char *bits, int nbits);
 void freedv_unpack(unsigned char *bits, unsigned char *bytes, int nbits);
-      
+unsigned short freedv_crc16_unpacked(unsigned char *bits, int nbits);
+int freedv_check_crc16_unpacked(unsigned char *unpacked_bits, int nbits);
+
 // Set parameters ------------------------------------------------------------
 
 void freedv_set_callback_txt            (struct freedv *freedv, freedv_callback_rx rx, freedv_callback_tx tx, void *callback_state);
 void freedv_set_callback_protocol       (struct freedv *freedv, freedv_callback_protorx rx, freedv_callback_prototx tx, void *callback_state);
 void freedv_set_callback_data           (struct freedv *freedv, freedv_callback_datarx datarx, freedv_callback_datatx datatx, void *callback_state);
-void freedv_set_test_frames		(struct freedv *freedv, int test_frames);
-void freedv_set_test_frames_diversity	(struct freedv *freedv, int test_frames_diversity);
-void freedv_set_smooth_symbols		(struct freedv *freedv, int smooth_symbols);
-void freedv_set_squelch_en		(struct freedv *freedv, int squelch_en);
-void freedv_set_snr_squelch_thresh	(struct freedv *freedv, float snr_squelch_thresh);
-void freedv_set_clip	                (struct freedv *freedv, int val);
-void freedv_set_total_bit_errors    	(struct freedv *freedv, int val);
+void freedv_set_test_frames		          (struct freedv *freedv, int test_frames);
+void freedv_set_test_frames_diversity	  (struct freedv *freedv, int test_frames_diversity);
+void freedv_set_smooth_symbols		      (struct freedv *freedv, int smooth_symbols);
+void freedv_set_squelch_en		          (struct freedv *freedv, int squelch_en);
+void freedv_set_snr_squelch_thresh	    (struct freedv *freedv, float snr_squelch_thresh);
+void freedv_set_clip	                  (struct freedv *freedv, int val);
+void freedv_set_total_bit_errors    	  (struct freedv *freedv, int val);
 void freedv_set_total_bits              (struct freedv *freedv, int val);
 void freedv_set_total_bit_errors_coded  (struct freedv *freedv, int val);
 void freedv_set_total_bits_coded        (struct freedv *freedv, int val);
+void freedv_set_total_packets           (struct freedv *freedv, int val);
+void freedv_set_total_packet_errors     (struct freedv *freedv, int val);
 void freedv_set_callback_error_pattern  (struct freedv *freedv, freedv_calback_error_pattern cb, void *state);
 void freedv_set_varicode_code_num       (struct freedv *freedv, int val);
 void freedv_set_data_header             (struct freedv *freedv, unsigned char *header);
@@ -203,7 +233,7 @@ void freedv_set_dpsk                    (struct freedv *freedv, int val);
 void freedv_set_ext_vco                 (struct freedv *f, int val);
 void freedv_set_phase_est_bandwidth_mode(struct freedv *f, int val);
 void freedv_set_eq                      (struct freedv *f, int val);
-      
+
 // Get parameters -------------------------------------------------------------------------
 
 struct MODEM_STATS;
@@ -223,13 +253,18 @@ int freedv_get_modem_sample_rate    (struct freedv *freedv);
 int freedv_get_modem_symbol_rate    (struct freedv *freedv);
 int freedv_get_n_max_modem_samples  (struct freedv *freedv);
 int freedv_get_n_nom_modem_samples  (struct freedv *freedv);
+int freedv_get_n_tx_modem_samples   (struct freedv *freedv);
 
 // bit error rate stats
-int freedv_get_total_bits	    (struct freedv *freedv);
-int freedv_get_total_bit_errors	    (struct freedv *freedv);
-int freedv_get_total_bits_coded     (struct freedv *freedv);
-int freedv_get_total_bit_errors_coded(struct freedv *freedv);
-int freedv_get_rx_bits              (struct freedv *freedv);
+int freedv_get_total_bits	            (struct freedv *freedv);
+int freedv_get_total_bit_errors	      (struct freedv *freedv);
+int freedv_get_total_bits_coded       (struct freedv *freedv);
+int freedv_get_total_bit_errors_coded (struct freedv *freedv);
+int freedv_get_total_packets          (struct freedv *freedv);
+int freedv_get_total_packet_errors    (struct freedv *freedv);
+
+int freedv_get_rx_status            (struct freedv *freedv);
+void freedv_get_fsk_S_and_N         (struct freedv *freedv, float *S, float *N);
 
 int freedv_get_sync		    (struct freedv *freedv);
 int freedv_get_sync_interleaver	    (struct freedv *freedv);

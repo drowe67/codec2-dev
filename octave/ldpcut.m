@@ -33,7 +33,11 @@ function sim_out = run_simulation(sim_in)
 
   if strcmp(sim_in.code,'wimax')
     rate = 0.5; framesize = 576*4;
-    code_param = ldpc_init_wimax(rate, framesize, modulation, mod_order, mapping);
+    code_param = ldpc_init_builtin(sim_in.code, rate, framesize, modulation, mod_order, mapping);
+  elseif strcmp(sim_in.code,'dvbs2')
+    framesize = 16200; rate = 0.8;
+    code_param = ldpc_init_builtin(sim_in.code, rate, framesize, modulation, mod_order, mapping);
+    rate = code_param.ldpc_data_bits_per_frame/code_param.ldpc_coded_bits_per_frame;
   else
     tempStruct = load(sim_in.code);
     b = fieldnames(tempStruct);
@@ -42,7 +46,7 @@ function sim_out = run_simulation(sim_in)
     HRA = tempStruct.(ldpcArrayName);
     [code_param framesize rate] = ldpc_init_user(HRA, modulation, mod_order, mapping);
   end
-  
+
   % ----------------------------------
   % run simulation at each Eb/No point
   % ----------------------------------
@@ -62,22 +66,22 @@ function sim_out = run_simulation(sim_in)
     EsNodB = EbNodBvec(ne) + 10*log10(rate) + 10*log10(bps);
     EsNo = 10^(EsNodB/10);
     variance = 1/EsNo;
-    
+
     Tbits = Terrs = Ferrs = Terrs_raw = Tbits_raw = 0;
-    
+
     tx_bits = [];
-    tx_symbols = []; 
+    tx_symbols = [];
     rx_symbols = [];
 
     % Encode a bunch of frames
 
-    for nn=1:Ntrials        
+    for nn=1:Ntrials
       atx_bits = round(rand( 1, code_param.data_bits_per_frame));
       tx_bits = [tx_bits atx_bits];
       [tx_codeword atx_symbols] = ldpc_enc(atx_bits, code_param);
       tx_symbols = [tx_symbols atx_symbols];
     end
-    
+
     rx_symbols = tx_symbols;
 
     % Add AWGN noise, 0.5 factor splits power evenly between Re & Im
@@ -89,11 +93,11 @@ function sim_out = run_simulation(sim_in)
 
     rx_bits_log = [];
 
-    for nn = 1: Ntrials        
+    for nn = 1: Ntrials
       st = (nn-1)*code_param.coded_syms_per_frame + 1;
       en = (nn)*code_param.coded_syms_per_frame;
 
-      % coded 
+      % coded
 
       arx_codeword = ldpc_dec(code_param, max_iterations, demod_type, decoder_type, rx_symbols(st:en), EsNo, ones(1,code_param.coded_syms_per_frame));
       st = (nn-1)*code_param.data_bits_per_frame + 1;
@@ -101,7 +105,7 @@ function sim_out = run_simulation(sim_in)
       error_positions = xor(arx_codeword(1:code_param.data_bits_per_frame), tx_bits(st:en));
       Nerrs = sum(error_positions);
       rx_bits_log = [rx_bits_log arx_codeword(1:code_param.data_bits_per_frame)];
-        
+
       % uncoded - to est raw BER compare data symbols as code is systematic
 
       raw_rx_bits = [];
@@ -120,7 +124,7 @@ function sim_out = run_simulation(sim_in)
 
       if Nerrs > 0,  Ferrs = Ferrs + 1;  end
       Terrs     += Nerrs;
-      Tbits     += code_param.ldpc_data_bits_per_frame;        
+      Tbits     += code_param.ldpc_data_bits_per_frame;
       Terrs_raw += Nerrs_raw;
       Tbits_raw += Nbits_raw;
     end
@@ -129,7 +133,7 @@ function sim_out = run_simulation(sim_in)
       printf("\nCoded EbNodB: % 5.2f BER: %4.3f Tbits: %6d Terrs: %6d FER: %4.3f Tframes: %d Ferrs: %d\n",
              EbNodBvec(ne), Terrs/Tbits, Tbits, Terrs,  Ferrs/Ntrials, Ntrials, Ferrs);
       EbNodB_raw = EbNodBvec(ne) + 10*log10(rate);
-      printf("Raw EbNodB..: % 5.2f BER: %4.3f Tbits: %6d Terrs: %6d\n", 
+      printf("Raw EbNodB..: % 5.2f BER: %4.3f Tbits: %6d Terrs: %6d\n",
              EbNodB_raw, Terrs_raw/Tbits_raw, Tbits_raw, Terrs_raw);
     end
 
@@ -145,21 +149,28 @@ endfunction
 % 1/ Simplest possible one frame simulation
 % ---------------------------------------------------------------------------------
 
-function test1_single
+function test1_single(code="wimax")
   printf("\nTest 1:Single -----------------------------------\n");
 
-  mod_order = 4; 
+  mod_order = 4;
   modulation = 'QPSK';
   mapping = 'gray';
   demod_type = 0;
   decoder_type = 0;
   max_iterations = 100;
 
-  framesize = 576*2;       % CML library has a bunch of different framesizes available
-  rate = 1/2;
-  code_param = ldpc_init_wimax(rate, framesize, modulation, mod_order, mapping);
+  % CML library has a bunch of different framesizes available
+  if strcmp(code,'wimax') framesize = 576*2; rate = 0.5; end
+  if strcmp(code,'dvbs2') framesize = 16200; rate = 0.6; end
+  code_param = ldpc_init_builtin(code, rate, framesize, modulation, mod_order, mapping);
 
-  EsNo = 10;               % decoder needs an estimated channel EsNo (linear ratio, not dB)
+  % find out what rate we actually obtained ...
+  rate = code_param.ldpc_data_bits_per_frame/code_param.ldpc_coded_bits_per_frame;
+  printf("Ndata_bits: %d Nparity_bits: %d Ncodeword_bits: %d rate: %3.2f\n",
+         code_param.ldpc_data_bits_per_frame, code_param.ldpc_parity_bits_per_frame, code_param.ldpc_coded_bits_per_frame, rate);
+
+  % decoder needs an estimated channel EsNo (linear ratio, not dB)
+  EsNo = 10;
 
   tx_bits = round(rand(1, code_param.ldpc_data_bits_per_frame));
   [tx_codeword, qpsk_symbols] = ldpc_enc(tx_bits, code_param);
@@ -175,29 +186,29 @@ endfunction
 % 2/ Run a bunch of trials at just one EsNo point
 % ---------------------------------------------------------------------------------
 
-function test2_multiple(code)
+function test2_multiple(code, Ntrials=100)
   printf("\nTest 2: Multiple: %s ----------------------------\n", code);
 
   % these are inputs for Wimax mode, e.g. framesize defines code used
 
   sim_in.code = code;
   sim_in.verbose = 2;
-  sim_in.Ntrials = 100;
+  sim_in.Ntrials = Ntrials;
   sim_in.EbNodBvec = 3;
   run_simulation(sim_in);
 end
 
 
 % ---------------------------------------------------------------------------------
-% 3/ Lets draw some Eb/No versus BER curves 
+% 3/ Lets draw some Eb/No versus BER curves
 % ---------------------------------------------------------------------------------
 
-function test3_curves(code,fg=1)
+function test3_curves(code,fg=1,Ntrials=100)
   printf("\nTest 3: Curves: %s -------------------------------------\n", code);
 
   sim_in.code = code;
   sim_in.verbose = 2;
-  sim_in.Ntrials = 100;
+  sim_in.Ntrials = Ntrials;
   sim_in.EbNodBvec = -2:10;
   sim_out = run_simulation(sim_in);
 
@@ -213,7 +224,7 @@ function test3_curves(code,fg=1)
   xlabel('Eb/No (dB)')
   ylabel('BER')
   axis([min(EbNodB) max(EbNodB) 1E-3 1])
-  legend('boxoff'); 
+  legend('boxoff');
 end
 
 
@@ -234,14 +245,12 @@ if getenv("SHORT_VERSION_FOR_CTEST")
   test1_single
   return;
 end
-if exist("qam16")
-  test4_qam16;
-  return;
-end
 
-test1_single
-test2_multiple("wimax")
-test2_multiple("H2064_516_sparse.mat")
+%test1_single("dvbs2")
+%test3_curves("dvbs2",1,10)
+%test2_multiple("wimax")
+%test2_multiple("H2064_516_sparse.mat")
 %test3_curves("wimax",1)
 %test3_curves("H2064_516_sparse.mat",2)
-test3_curves("H_256_768_22.txt",2)
+%test3_curves("H_256_768_22.txt",2)
+%test3_curves("HRA_56_56.txt",2)

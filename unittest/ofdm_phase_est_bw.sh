@@ -26,8 +26,9 @@ fi
 
 pwd
 # BER should be < 5% for this test
-ofdm_mod --in /dev/zero --testframes 300 --mode 2020 --ldpc -p 312 --verbose 0 | cohpsk_ch - - -40 --Fs 8000 -f 10 --ssbfilt 1 --faster --raw_dir $RAW | ofdm_demod --out /dev/null --testframes --mode 2020 --verbose 1 --ldpc -p 312 --bandwidth 1 2> $results
+ofdm_mod --in /dev/zero --testframes 300 --mode 2020 --ldpc -p 312 --verbose 0 | \
+cohpsk_ch - - -40 --Fs 8000 -f 10 --ssbfilt 1 --mpp --raw_dir $RAW | \
+ofdm_demod --out /dev/null --testframes --mode 2020 --verbose 1 --ldpc -p 312 --bandwidth 1 2> $results
 cat $results
 cber=$(cat $results | sed -n "s/^Coded BER.* \([0-9..]*\) Tbits.*/\1/p")
 python -c "import sys; sys.exit(0) if $cber<=0.05 else sys.exit(1)"
-

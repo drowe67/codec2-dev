@@ -61,6 +61,11 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Debug")
 endif()
 
+# Build universal ARM64 and x86_64 binaries on Mac.
+if(BUILD_OSX_UNIVERSAL)
+set(CMAKE_OSX_ARCHITECTURES "x86_64;arm64")
+endif(BUILD_OSX_UNIVERSAL)
+
 #
 # Find the git hash if this is a working copy.
 #
@@ -154,7 +159,7 @@ if(INSTALL_EXAMPLES)
         DESTINATION ${CMAKE_INSTALL_DATADIR}/codec2)
 endif()
 
-# LPCNet needs to be bootstraped because codec2 and freedvlpcnet are 
+# LPCNet needs to be bootstraped because codec2 and freedvlpcnet are
 # cross dependent.
 option(LPCNET "Build codec2 with LPCNet support." OFF)
 set(LPCNET_BUILD_DIR FALSE CACHE PATH "Location of lpcnet build tree.")
@@ -333,6 +338,11 @@ if(UNITTEST)
              COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/octave; SHORT_VERSION_FOR_CTEST=1 octave --no-gui -qf ldpcut.m")
              set_tests_properties(test_CML_ldpcut PROPERTIES PASS_REGULAR_EXPRESSION "Nerr: 0")
 
+    # check channel simulator measures correct Peak to Average Power Ratio (about 0dB) with a sine wave input signal
+    add_test(NAME test_cohpsk_ch_papr
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR};
+                            ./misc/mksine - 1000 10 | ./src/cohpsk_ch - /dev/null -100 --Fs 8000 --ctest")
+
     add_test(NAME test_codec2_700c_octave_port
              COMMAND sh -c "
                cd ${CMAKE_CURRENT_BINARY_DIR}/src;
@@ -357,11 +367,11 @@ if(UNITTEST)
     add_test(NAME test_COHPSK_modem_AWGN_BER
              COMMAND sh -c "$<TARGET_FILE:cohpsk_get_test_bits> - 5600 | $<TARGET_FILE:cohpsk_mod> - - | $<TARGET_FILE:cohpsk_ch> - - -30  | $<TARGET_FILE:cohpsk_demod> - - | $<TARGET_FILE:cohpsk_put_test_bits> -"
              )
-           
+
     add_test(NAME test_COHPSK_modem_freq_offset
-             COMMAND sh -c "set -x; $<TARGET_FILE:cohpsk_get_test_bits> - 5600 | $<TARGET_FILE:cohpsk_mod> - - | $<TARGET_FILE:cohpsk_ch> - - -40 -f -20 | $<TARGET_FILE:cohpsk_demod> -v - - 2>log.txt | $<TARGET_FILE:cohpsk_put_test_bits> - ; ! grep 'lost sync' log.txt"
+             COMMAND sh -c "set -x; $<TARGET_FILE:cohpsk_get_test_bits> - 5600 | $<TARGET_FILE:cohpsk_mod> - - | $<TARGET_FILE:cohpsk_ch> - - -40 -f -30 | $<TARGET_FILE:cohpsk_demod> -v - - 2>log.txt | $<TARGET_FILE:cohpsk_put_test_bits> - ; ! grep 'lost sync' log.txt"
              )
-           
+
     # -------------------------------------------------------------------------
     #                                OFDM Modem
     # -------------------------------------------------------------------------
@@ -381,26 +391,33 @@ if(UNITTEST)
              set_tests_properties(test_OFDM_modem_octave_port_Nc_31 PROPERTIES
              PASS_REGULAR_EXPRESSION "fails: 0")
 
+
+    add_test(NAME test_OFDM_modem_octave_qam16_uncoded
+             COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/octave;
+                            echo \"ofdm_tx('test_qam16.raw','qam16c1',3,12); ofdm_rx('test_qam16.raw','qam16c1', 0.05); quit\" |
+                            DISPLAY=\"\" octave --no-gui")
+             set_tests_properties(test_OFDM_modem_octave_qam16_uncoded PROPERTIES PASS_REGULAR_EXPRESSION "Pass")
+
     # noise free uncoded 700D test, including reading and writing payload bits
     add_test(NAME test_OFDM_modem_700D
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
-                            ./ofdm_get_test_bits - | 
-                            ./ofdm_mod | 
+                            ./ofdm_get_test_bits - |
+                            ./ofdm_mod |
                             ./ofdm_demod  --testframes > /dev/null")
-           
+
     # noise free coded 700D test, including reading and writing payload bits
     add_test(NAME test_OFDM_modem_700D_ldpc
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
-                            ./ofdm_get_test_bits - --ldpc | 
-                            ./ofdm_mod --ldpc | 
+                            ./ofdm_get_test_bits - --length 112 |
+                            ./ofdm_mod --ldpc |
                             ./ofdm_demod --ldpc --testframes > /dev/null")
-           
+
     # noise free 2020 test, including reading and writing payload bits.  fsk_*_test_bits used as it does it's own frame sync
     add_test(NAME test_OFDM_modem_2020_ldpc
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
-                            ./fsk_get_test_bits - 5000 | 
-                            ./ofdm_mod --ldpc --mode 2020 -p 312 | 
-                            ./ofdm_demod  --ldpc --mode 2020 -p 312 | 
+                            ./fsk_get_test_bits - 5000 |
+                            ./ofdm_mod --ldpc --mode 2020 -p 312 |
+                            ./ofdm_demod  --ldpc --mode 2020 -p 312 |
                             ./fsk_put_test_bits - -q")
 
     add_test(NAME test_OFDM_modem_AWGN_BER
@@ -412,11 +429,11 @@ if(UNITTEST)
              COMMAND ${CMAKE_CURRENT_BINARY_DIR}/unittest/ofdm_fade.sh
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/unittest
              )
-           
+
     add_test(NAME test_OFDM_modem_phase_est_bw
              COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/unittest;
                             PATH=$PATH:${CMAKE_CURRENT_BINARY_DIR}/src ./ofdm_phase_est_bw.sh")
-           
+
     add_test(NAME test_OFDM_modem_fading_DPSK_BER
              COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/unittest;
                             PATH=$PATH:${CMAKE_CURRENT_BINARY_DIR}/src ./ofdm_fade_dpsk.sh")
@@ -424,12 +441,19 @@ if(UNITTEST)
     add_test(NAME test_OFDM_modem_time_sync_700D
              COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/unittest;
                             PATH=$PATH:${CMAKE_CURRENT_BINARY_DIR}/src ./ofdm_time_sync.sh 700D")
-           
+
 if(LPCNET)
     add_test(NAME test_OFDM_modem_time_sync_2020
              COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/unittest;
                             PATH=$PATH:${CMAKE_CURRENT_BINARY_DIR}/src ./ofdm_time_sync.sh 2020")
 endif()
+
+    # 700E at AWGN operating point
+    add_test(NAME test_OFDM_modem_700E_AWGN
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            ./ofdm_mod --in /dev/zero --testframes 10 --ldpc --mode 700E |
+                            ./cohpsk_ch - - -20.5 --Fs 8000 |
+                            ./ofdm_demod --mode 700E --ldpc --testframes -v 2 > /dev/null")
 
     # -------------------------------------------------------------------------
     #                                OFDM Data modes
@@ -442,17 +466,17 @@ endif()
                             cd ${CMAKE_CURRENT_SOURCE_DIR}/octave;
                             DISPLAY=\"\" octave-cli -qf --eval 'ofdm_rx(\"${CMAKE_CURRENT_BINARY_DIR}/test.raw\",\"datac1\")'")
              set_tests_properties(test_OFDM_modem_datac1_octave PROPERTIES PASS_REGULAR_EXPRESSION "BER..: 0.0000")
-    # C Tx, C Rx, uncoded       
+    # C Tx, C Rx, uncoded
     add_test(NAME test_OFDM_modem_datac1
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
                             ./ofdm_mod   --mode datac1 --in  /dev/zero --testframes 10 --verbose 1 |
                             ./ofdm_demod --mode datac1 --out /dev/null --testframes   --verbose 1")
-    # C Tx, C Rx, coded       
+    # C Tx, C Rx, coded
     add_test(NAME test_OFDM_modem_datac1_ldpc
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
-                            ./ofdm_mod   --mode datac1 --in  /dev/zero --testframes 10 --ldpc --verbose 1 | 
+                            ./ofdm_mod   --mode datac1 --in  /dev/zero --testframes 10 --ldpc --verbose 1 |
                             ./ofdm_demod --mode datac1 --out /dev/null  --testframes    --ldpc --verbose 1")
-           
+
     # -------------------------------------------------------------------------
     #                                LDPC
     # -------------------------------------------------------------------------
@@ -460,43 +484,50 @@ endif()
     # tests ldpc_enc/ldpc_noise/ldpc_dec
     add_test(NAME test_ldpc_enc_dec
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
-                            ./ldpc_enc /dev/zero - --sd --code HRA_112_112 --testframes 200 | 
-                            ./ldpc_noise - - 0.5 | 
+                            ./ldpc_enc /dev/zero - --sd --code HRA_112_112 --testframes 200 |
+                            ./ldpc_noise - - 0.5 |
                             ./ldpc_dec - /dev/null --code HRA_112_112 --sd --testframes"
+             )
+
+    add_test(NAME test_ldpc_enc_dec_HRA_56_56
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            ./ldpc_enc /dev/zero - --sd --code HRA_56_56 --testframes 200 |
+                            ./ldpc_noise - - 0.5 |
+                            ./ldpc_dec - /dev/null --code HRA_56_56 --sd --testframes"
              )
 
     add_test(NAME test_ldpc_enc_dec_HRAb_396_504
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
-                            ./ldpc_enc /dev/zero - --sd --code HRAb_396_504 --testframes 200 | 
-                            ./ldpc_noise - - -2.0 | 
+                            ./ldpc_enc /dev/zero - --sd --code HRAb_396_504 --testframes 200 |
+                            ./ldpc_noise - - -2.0 |
                             ./ldpc_dec - /dev/null --code HRAb_396_504 --sd --testframes"
              )
 
     add_test(NAME test_ldpc_enc_dec_H_256_768_22
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
-                            ./ldpc_enc /dev/zero - --sd --code H_256_768_22 --testframes 200 | 
-                            ./ldpc_noise - - 3.0 | 
+                            ./ldpc_enc /dev/zero - --sd --code H_256_768_22 --testframes 200 |
+                            ./ldpc_noise - - 3.0 |
                             ./ldpc_dec - /dev/null --code H_256_768_22 --sd --testframes"
              )
 
     add_test(NAME test_ldpc_enc_dec_H_256_512_4
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
-                            ./ldpc_enc /dev/zero - --sd --code H_256_512_4 --testframes 200 | 
-                            ./ldpc_noise - - 0.5 | 
+                            ./ldpc_enc /dev/zero - --sd --code H_256_512_4 --testframes 200 |
+                            ./ldpc_noise - - 0.5 |
                             ./ldpc_dec - /dev/null --code H_256_512_4 --sd --testframes"
              )
 
     add_test(NAME test_ldpc_enc_dec_HRAa_1536_512
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
-                            ./ldpc_enc /dev/zero - --sd --code HRAa_1536_512 --testframes 200 | 
-                            ./ldpc_noise - - -2 | 
+                            ./ldpc_enc /dev/zero - --sd --code HRAa_1536_512 --testframes 200 |
+                            ./ldpc_noise - - -2 |
                             ./ldpc_dec - /dev/null --code HRAa_1536_512 --sd --testframes"
              )
 
     add_test(NAME test_ldpc_enc_dec_H_128_256_5
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
-                            ./ldpc_enc /dev/zero - --sd --code H_128_256_5 --testframes 200 | 
-                            ./ldpc_noise - - 0.5 | 
+                            ./ldpc_enc /dev/zero - --sd --code H_128_256_5 --testframes 200 |
+                            ./ldpc_noise - - 0.5 |
                             ./ldpc_dec - /dev/null --code H_128_256_5 --sd --testframes"
              )
 
@@ -504,12 +535,12 @@ endif()
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
                             ./freedv_tx 1600 ../../raw/ve9qrp_10s.raw - | ./freedv_rx 1600 - /dev/null")
              set_tests_properties(test_freedv_api_1600 PROPERTIES PASS_REGULAR_EXPRESSION "frames decoded: 503")
-           
+
     add_test(NAME test_freedv_api_700C
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
                             ./freedv_tx 700C ../../raw/ve9qrp_10s.raw - | ./freedv_rx 700C - /dev/null")
              set_tests_properties(test_freedv_api_700C PROPERTIES PASS_REGULAR_EXPRESSION "frames decoded: 125")
-           
+
     add_test(NAME test_freedv_api_700D_backwards_compatability
              COMMAND sh -c "$<TARGET_FILE:freedv_rx> 700D ${CMAKE_CURRENT_SOURCE_DIR}/raw/testframes_700d.raw /dev/null --testframes --discard"
              )
@@ -517,11 +548,11 @@ endif()
     # no random speech output due to trial sync when listening to noise
     add_test(NAME test_freedv_api_700D_burble
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
-                            ./freedv_tx 700D ../../raw/ve9qrp.raw - | 
-                            ./cohpsk_ch - - -10 --Fs 8000 | 
+                            ./freedv_tx 700D ../../raw/ve9qrp.raw - |
+                            ./cohpsk_ch - - -8 --Fs 8000 |
                             ./freedv_rx 700D - /dev/null --squelch -2")
-             set_tests_properties(test_freedv_api_700D_burble PROPERTIES PASS_REGULAR_EXPRESSION "frames decoded: 746  output speech samples: 0")
-           
+             set_tests_properties(test_freedv_api_700D_burble PROPERTIES PASS_REGULAR_EXPRESSION "output speech samples: 0")
+
     add_test(NAME test_freedv_api_700D_AWGN_BER
              COMMAND sh -c "dd bs=2560 count=120 if=/dev/zero | $<TARGET_FILE:freedv_tx> 700D - - --testframes | $<TARGET_FILE:cohpsk_ch> - - -20 --Fs 8000 -f -10 | $<TARGET_FILE:freedv_rx> 700D - /dev/null --testframes --discard"
              )
@@ -534,25 +565,25 @@ if(LPCNET)
 
     add_test(NAME test_freedv_api_2020_to_ofdm_demod
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
-                               ./freedv_tx 2020 ../../wav/wia_16kHz.wav - --testframes | 
+                               ./freedv_tx 2020 ../../wav/wia_16kHz.wav - --testframes |
                                ./ofdm_demod --mode 2020 --verbose 1 --ldpc -p 312 --testframes > /dev/null"
              )
 
     add_test(NAME test_freedv_api_2020_from_ofdm_mod
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
-                            ./ofdm_mod --in /dev/zero --mode 2020 --verbose 1 --ldpc -p 312 --testframes 10 | 
+                            ./ofdm_mod --in /dev/zero --mode 2020 --verbose 1 --ldpc -p 312 --testframes 10 |
                             ./freedv_rx 2020 - /dev/null --testframes"
              )
 
     add_test(NAME test_freedv_api_2020_awgn
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
                             dd bs=32000 count=10 if=/dev/zero |
-                            ./freedv_tx 2020 - - --testframes | 
+                            ./freedv_tx 2020 - - --testframes |
                             ./cohpsk_ch - - -24 --Fs 8000 |
                             ./freedv_rx 2020 - /dev/null --testframes"
              )
 endif()
-           
+
      add_test(NAME test_freedv_api_2400A
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
                             ./freedv_tx 2400A ../../raw/ve9qrp_10s.raw - | ./freedv_rx 2400A - /dev/null")
@@ -586,6 +617,10 @@ if(UNIX) # Uses pthreads
              COMMAND $<TARGET_FILE:tfifo>
              )
 endif()
+
+    # -------------------------------------------------------------------------
+    #                                FreeDv API memory leaks
+    # -------------------------------------------------------------------------
 
 if (NOT APPLE)
      add_test(NAME test_memory_leak_FreeDV_1600_tx
@@ -633,6 +668,18 @@ if (NOT APPLE)
                             ./freedv_data_raw_tx --testframes 10 FSK_LDPC /dev/zero /dev/null")
              set_tests_properties(test_memory_leak_FreeDV_FSK_LDPC_tx PROPERTIES PASS_REGULAR_EXPRESSION "ERROR SUMMARY: 0 errors")
 
+     add_test(NAME test_memory_leak_FreeDV_DATAC1_tx
+             COMMAND sh -c "cd  ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes \
+                            ./freedv_data_raw_tx --testframes 10 DATAC1 /dev/zero /dev/null")
+             set_tests_properties(test_memory_leak_FreeDV_DATAC1_tx PROPERTIES PASS_REGULAR_EXPRESSION "ERROR SUMMARY: 0 errors")
+
+     add_test(NAME test_memory_leak_FreeDV_700E_tx
+             COMMAND sh -c "cd  ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes \
+                            ./freedv_tx --testframes 10 700E /dev/zero /dev/null")
+             set_tests_properties(test_memory_leak_FreeDV_700E_tx PROPERTIES PASS_REGULAR_EXPRESSION "ERROR SUMMARY: 0 errors")
+
 if(LPCNET)
      add_test(NAME test_memory_leak_FreeDV_2020_tx
              COMMAND sh -c "cd  ${CMAKE_CURRENT_BINARY_DIR}/src;
@@ -648,6 +695,10 @@ if(LPCNET)
              set_tests_properties(test_memory_leak_FreeDV_2020_rx PROPERTIES PASS_REGULAR_EXPRESSION "ERROR SUMMARY: 0 errors")
 endif(LPCNET)
 endif(NOT APPLE)
+
+    # -------------------------------------------------------------------------
+    #                                Codec 2 modes
+    # -------------------------------------------------------------------------
 
      add_test(NAME test_codec2_mode_dot_c2
              COMMAND sh -c "./c2enc 700C ${CMAKE_CURRENT_SOURCE_DIR}/raw/hts1a.raw hts1a.c2 && ./c2dec 1600 hts1a.c2 /dev/null"
@@ -706,58 +757,58 @@ endif(NOT APPLE)
              )
 
      # -------------------------------------------------------------------------
-     #                                FSK Modem      
+     #                                FSK Modem
      # -------------------------------------------------------------------------
-           
+
      # Octave FSK Modem, to make sure we don't break reference simulation
      add_test(NAME test_fsk_lib
              COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/octave; DISPLAY=\"\" octave --no-gui -qf fsk_lib_demo.m")
              set_tests_properties(test_fsk_lib PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
 
      add_test(NAME test_fsk_modem_octave_port
-             COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/octave; 
+             COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/octave;
                             PATH_TO_TFSK=${CMAKE_CURRENT_BINARY_DIR}/unittest/tfsk octave --no-gui -qf tfsk.m")
              set_tests_properties(test_fsk_modem_octave_port PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
 
      add_test(NAME test_fsk_modem_mod_demod
-             COMMAND sh -c "$<TARGET_FILE:fsk_get_test_bits> - 10000 | 
-                            $<TARGET_FILE:fsk_mod> 2 8000 100 1200 100 - - | 
-                            $<TARGET_FILE:fsk_demod> -l 2 8000 100 - - | 
+             COMMAND sh -c "$<TARGET_FILE:fsk_get_test_bits> - 10000 |
+                            $<TARGET_FILE:fsk_mod> 2 8000 100 1200 100 - - |
+                            $<TARGET_FILE:fsk_demod> -l 2 8000 100 - - |
                             $<TARGET_FILE:fsk_put_test_bits> -p 99 -q -"
              )
- 
+
      # 2FSK modem at Eb/No = 9dB, SNR = Eb/No+10log10(Rb/B) = 9 + 10*log10(100/3000) = -5.7dB
      # Ideal BER = 0.0094, set thresh 50% higher
      add_test(NAME test_fsk_2fsk_ber
-             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src; 
-                            ./fsk_get_test_bits - 10000 | ./fsk_mod 2 8000 100 1000 100 - - | 
-                            ./cohpsk_ch - - -26 --Fs 8000 | 
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            ./fsk_get_test_bits - 10000 | ./fsk_mod 2 8000 100 1000 100 - - |
+                            ./cohpsk_ch - - -26 --Fs 8000 |
                             ./fsk_demod 2 8000 100 - - | ./fsk_put_test_bits -b 0.015 -q - ")
      # 4FSK modem at Eb/No = 6dB, SNR = Eb/No+10log10(Rb/B) = 6 + 10*log10(2*100/3000) = -5.7dB
      # Ideal BER = 0.016, set thresh 50% higher
      add_test(NAME test_fsk_4fsk_ber
-             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src; 
-                            ./fsk_get_test_bits - 10000 | ./fsk_mod 4 8000 100 1000 100 - - | 
-                            ./cohpsk_ch - - -26 --Fs 8000 | 
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            ./fsk_get_test_bits - 10000 | ./fsk_mod 4 8000 100 1000 100 - - |
+                            ./cohpsk_ch - - -26 --Fs 8000 |
                             ./fsk_demod 4 8000 100 - - | ./fsk_put_test_bits -b 0.025 - ")
-     # shift FSK signal to -ve frequencies, note No 3dB higher as noise is single sided
+     # shift FSK signal to -ve frequencies
      add_test(NAME test_fsk_4fsk_ber_negative_freq
-             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src; 
-                            ./fsk_get_test_bits - 10000 | ./fsk_mod 4 8000 100 1000 200 - - | 
-                            ./cohpsk_ch - - -23 --Fs 8000 --ssbfilt 0 --complexout -f -4000 | 
-                            ./fsk_demod -c -p 8 4 8000 100 - - | 
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            ./fsk_get_test_bits - 10000 | ./fsk_mod 4 8000 100 1000 200 - - |
+                            ./cohpsk_ch - - -26 --Fs 8000 --ssbfilt 0 --complexout -f -3000 |
+                            ./fsk_demod -c -p 8 4 8000 100 - - |
                             ./fsk_put_test_bits -b 0.025 -q - ")
      # Low SNR 4FSK uncoded PER/BER test:
      # 4FSK modem at Eb/No = 2dB, SNR = Eb/No+10log10(Rb/B) = 6 + 10*log10(2*100/3000) = -15.7dB
-     # Theoretical BER is 0.14.  As it's single sided noise cohpsk_ch reports 3dB less (-18.7dB)
+     # Theoretical BER is 0.14.
      # Pass condition is 10% PER
      add_test(NAME test_fsk_4fsk_lockdown
-             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src; 
-                            bits=512; tx_packets=20; rx_packets=18; tx_tone_sep=270; Rs=25; 
-                            ./fsk_get_test_bits - $(($bits*$tx_packets)) $bits | 
-                            ./fsk_mod 4 8000 $Rs 1000 $tx_tone_sep - - | 
-                            ./cohpsk_ch - - -13 --Fs 8000 --ssbfilt 0 -f -3000 --complexout | 
-                            ./fsk_demod -c -p 8 --mask $tx_tone_sep -t1 --nsym 100 4 8000 $Rs - - 2>stats.txt | 
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            bits=512; tx_packets=20; rx_packets=18; tx_tone_sep=50; Rs=25;
+                            ./fsk_get_test_bits - $(($bits*$tx_packets)) $bits |
+                            ./fsk_mod 4 8000 $Rs 1000 $tx_tone_sep - - |
+                            ./cohpsk_ch - - -16 --Fs 8000 --ssbfilt 0 -f -3000 --complexout |
+                            ./fsk_demod -c -p 8 --mask $tx_tone_sep -t1 --nsym 100 4 8000 $Rs - - 2>stats.txt |
                             ./fsk_put_test_bits -t 0.25 -b 0.20 -p $rx_packets -f $bits -q -")
 
      # Octave 4FSK LLR reference simulation - make sure this keeps working
@@ -767,17 +818,17 @@ endif(NOT APPLE)
 
      # Command line Unique Word (UW) framer in hard decision mode
      add_test(NAME test_fsk_framer
-             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src; 
-                            ./fsk_get_test_bits - 300 | 
-                            ./framer - - 100 51 | 
-                            ./deframer - - 100 51 --hard | 
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            ./fsk_get_test_bits - 300 |
+                            ./framer - - 100 51 |
+                            ./deframer - - 100 51 --hard |
                             ./fsk_put_test_bits -")
              set_tests_properties(test_fsk_framer PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
-            
+
      # Command line Unique Word (UW) framer with LLRs and LDPC (no noise)
      add_test(NAME test_fsk_framer_ldpc
-             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src; 
-                            ./ldpc_enc /dev/zero - --code HRA_112_112 --testframes 10 | ./framer - - 224 51 | 
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            ./ldpc_enc /dev/zero - --code HRA_112_112 --testframes 10 | ./framer - - 224 51 |
                             ./tollr | ./deframer - - 224 51 | ./ldpc_dec - /dev/null --code HRA_112_112 --testframes")
 
      # mFSK soft decision rx_filter to LLR mapping
@@ -791,21 +842,21 @@ endif(NOT APPLE)
      # which is the same thing bundled up into a FreeDV "mode"
      add_test(NAME test_fsk_4fsk_ldpc
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
-                            ./ldpc_enc /dev/zero - --code HRAb_396_504 --testframes 200 | 
+                            ./ldpc_enc /dev/zero - --code HRAb_396_504 --testframes 200 |
                             ./framer - - 504 5186 |
-                            ./fsk_mod 4 8000 100 1000 100 - - | 
-                            ./cohpsk_ch - - -25 --Fs 8000  | 
-                            ./fsk_demod -s 4 8000 100 - - | 
-                            ./deframer - - 504 5186  | 
+                            ./fsk_mod 4 8000 100 1000 100 - - |
+                            ./cohpsk_ch - - -25 --Fs 8000  |
+                            ./fsk_demod -s 4 8000 100 - - |
+                            ./deframer - - 504 5186  |
                             ./ldpc_dec - /dev/null --code HRAb_396_504 --testframes")
 
      # 800XA framer test
      add_test(NAME test_fsk_vhf_framer
-             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src; 
-                            ./c2enc 700C ../../raw/ve9qrp_10s.raw - | 
-                            ./vhf_frame_c2 B - - | 
-                            ./fsk_mod -p 10 4 8000 400 400 400 - - | 
-                            ./fsk_demod -p 10 4 8000 400 - - | 
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            ./c2enc 700C ../../raw/ve9qrp_10s.raw - |
+                            ./vhf_frame_c2 B - - |
+                            ./fsk_mod -p 10 4 8000 400 400 400 - - |
+                            ./fsk_demod -p 10 4 8000 400 - - |
                             ./vhf_deframe_c2 B - /dev/null")
              set_tests_properties(test_fsk_vhf_framer PROPERTIES PASS_REGULAR_EXPRESSION "total_uw_err: 0")
 
@@ -814,18 +865,32 @@ endif(NOT APPLE)
              COMMAND sh -c "./tfreedv_data_channel"
              WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/unittest
              )
-           
+
      # ---------------------------------------------------------
      # FreeDV API raw data
      # ---------------------------------------------------------
-     
+
      # OFDM LDPC
-     add_test(NAME test_freedv_data_raw_ofdm
+     add_test(NAME test_freedv_data_raw_ofdm_datac1
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
-                            head -c 140 </dev/urandom > binaryIn.bin;
-                            ./freedv_data_raw_tx 700D binaryIn.bin - | 
-                            ./freedv_data_raw_rx 700D - - -v | 
-                            diff /dev/stdin binaryIn.bin")
+                            head -c $((256*10)) </dev/urandom > binaryIn.bin;
+                            ./freedv_data_raw_tx DATAC1 binaryIn.bin - |
+                            ./freedv_data_raw_rx DATAC1 - binaryOut.bin -v;
+                            diff binaryIn.bin binaryOut.bin")
+
+     add_test(NAME test_freedv_data_raw_ofdm_datac2
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            head -c $((256*10)) </dev/urandom > binaryIn.bin;
+                            ./freedv_data_raw_tx DATAC2 binaryIn.bin - |
+                            ./freedv_data_raw_rx DATAC2 - binaryOut.bin -v;
+                            diff binaryIn.bin binaryOut.bin")
+
+     add_test(NAME test_freedv_data_raw_ofdm_datac3
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            head -c $((30*10)) </dev/urandom > binaryIn.bin;
+                            ./freedv_data_raw_tx DATAC3 binaryIn.bin - |
+                            ./freedv_data_raw_rx DATAC3 - binaryOut.bin -v;
+                            diff binaryIn.bin binaryOut.bin")
 
      # FSK LDPC default 100 bit/s 2FSK, enough noise for several % raw BER to give
      # FEC/acquisition a work out, bursts of 1 frame as that stresses acquisition
@@ -833,8 +898,8 @@ endif(NOT APPLE)
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
                             ./freedv_data_raw_tx --testframes 1 --bursts 10 FSK_LDPC /dev/zero - |
                             ./cohpsk_ch - - -5 --Fs 8000 --ssbfilt 0 |
-                            ./freedv_data_raw_rx --testframes -v FSK_LDPC - /dev/null")           
-             set_tests_properties(test_freedv_data_raw_fsk_ldpc_100 PROPERTIES PASS_REGULAR_EXPRESSION "output_packets: 10")
+                            ./freedv_data_raw_rx --testframes -v FSK_LDPC - /dev/null")
+             set_tests_properties(test_freedv_data_raw_fsk_ldpc_100 PROPERTIES PASS_REGULAR_EXPRESSION "output_frames: 10")
 
      # FSK LDPC 1000 bit/s 2FSK, Fs=40kHz, as different configs can upset acquisition
      add_test(NAME test_freedv_data_raw_fsk_ldpc_1k
@@ -842,22 +907,22 @@ endif(NOT APPLE)
                             ./freedv_data_raw_tx --Fs 40000 --Rs 1000 --tone1 1000 --shift 1000 --testframes 1 --bursts 10 FSK_LDPC /dev/zero - |
                             ./cohpsk_ch - - -10 --Fs 8000 --ssbfilt 0 |
                             ./freedv_data_raw_rx --testframes -v --Fs 40000 --Rs 1000 FSK_LDPC - /dev/null")
-             set_tests_properties(test_freedv_data_raw_fsk_ldpc_1k PROPERTIES PASS_REGULAR_EXPRESSION "output_packets: 10")
+             set_tests_properties(test_freedv_data_raw_fsk_ldpc_1k PROPERTIES PASS_REGULAR_EXPRESSION "output_frames: 10")
 
      # FSK LDPC 10000 bit/s 2FSK, Fs=100kHz, each of the 10 bursts has 100 frames
      add_test(NAME test_freedv_data_raw_fsk_ldpc_10k
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
                             ./freedv_data_raw_tx --Fs 100000 --Rs 10000 --tone1 10000 --shift 10000 --testframes 100 --bursts 10 FSK_LDPC /dev/zero - |
-                            ./cohpsk_ch - - -15 --Fs 8000 --ssbfilt 0 | 
+                            ./cohpsk_ch - - -15 --Fs 8000 --ssbfilt 0 |
                             ./freedv_data_raw_rx --testframes -v --Fs 100000 --Rs 10000 FSK_LDPC - /dev/null")
-             set_tests_properties(test_freedv_data_raw_fsk_ldpc_10k PROPERTIES PASS_REGULAR_EXPRESSION "output_packets: 1000")
+             set_tests_properties(test_freedv_data_raw_fsk_ldpc_10k PROPERTIES PASS_REGULAR_EXPRESSION "output_frames: 1000")
 
-     # FSK LDPC Rs=1000 bit/s (Rb=2000) 4FSK, Fs=40kHz, this needs --mask and longer preamble to work, due to lower Es/No, about 2dB over 2FSK
+     # FSK LDPC Rs=1000 bit/s (Rb=2000) 4FSK, Fs=40kHz, this needs --mask and 2Rs shift to work reliably
      add_test(NAME test_freedv_data_raw_fsk_ldpc_2k
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
-                            ./freedv_data_raw_tx -a 8192 -m 4 --Fs 40000 --Rs 1000 --tone1 1000 --shift 1000 --testframes 1 --bursts 10 FSK_LDPC /dev/zero - |
-                             ./cohpsk_ch - - -22 --Fs 8000 --ssbfilt 0 | 
-                             ./freedv_data_raw_rx -m 4 --testframes -v --Fs 40000 --Rs 1000 FSK_LDPC --mask 1000 - /dev/null")
-             set_tests_properties(test_freedv_data_raw_fsk_ldpc_2k PROPERTIES PASS_REGULAR_EXPRESSION "output_packets: 10")
-             
+                            ./freedv_data_raw_tx -a 8192 -m 4 --Fs 40000 --Rs 1000 --tone1 10000 --shift 2000 --testframes 1 --bursts 10 FSK_LDPC /dev/zero - |
+                             ./cohpsk_ch - - -22 --Fs 8000 --ssbfilt 0 |
+                             ./freedv_data_raw_rx -m 4 --testframes -v --Fs 40000 --Rs 1000 FSK_LDPC --mask 2000 - /dev/null")
+             set_tests_properties(test_freedv_data_raw_fsk_ldpc_2k PROPERTIES PASS_REGULAR_EXPRESSION "output_frames: 10")
+
 endif(UNITTEST)
