@@ -142,14 +142,14 @@ for f=1:Nframes
   end
   prx += lnew;
 
-  [states rx_bits aphase_est_pilot_log arx_np arx_amp] = ofdm_demod(states, rxbuf_in);
+  [states rx_bits achannel_est_pilot_log arx_np arx_amp] = ofdm_demod(states, rxbuf_in);
   
   % log some states for comparison to C
 
   rxbuf_in_log = [rxbuf_in_log rxbuf_in];
   rxbuf_log = [rxbuf_log states.rxbuf];
   rx_sym_log = [rx_sym_log; states.rx_sym];
-  phase_est_pilot_log = [phase_est_pilot_log; aphase_est_pilot_log];
+  phase_est_pilot_log = [phase_est_pilot_log; angle(achannel_est_pilot_log)];
   rx_amp_log = [rx_amp_log arx_amp];
   foff_hz_log = [foff_hz_log; states.foff_est_hz];
   timing_est_log = [timing_est_log; states.timing_est];

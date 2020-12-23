@@ -33,9 +33,8 @@
 #ifndef __FREEDV_API__
 #define __FREEDV_API__
 
-// This declares a single-precision (float) complex number
 #include <sys/types.h>
-
+// This declares a single-precision (float) complex number
 #include "comp.h"
 
 #ifdef __cplusplus
@@ -50,6 +49,7 @@
 #define FREEDV_MODE_700C        6
 #define FREEDV_MODE_700D        7
 #define FREEDV_MODE_2020        8
+#define FREEDV_MODE_700E       13
 
 // available data modes
 #define FREEDV_MODE_FSK_LDPC    9
@@ -57,10 +57,12 @@
 #define FREEDV_MODE_DATAC2     11
 #define FREEDV_MODE_DATAC3     12
 
-
 // Sample rates used
 #define FREEDV_FS_8000          8000
 #define FREEDV_FS_16000         16000
+
+// peak (complex) sample value from Tx modulator
+#define FREEDV_PEAK             16384
 
 // Return code flags for freedv_*rx* functions
 #define FREEDV_RX_TRIAL_SYNC       0x1       // demodulator has trial sync
@@ -68,9 +70,10 @@
 #define FREEDV_RX_BITS             0x4       // data bits have been returned
 #define FREEDV_RX_BIT_ERRORS       0x8       // FEC may not have corrected all bit errors (not all parity checks OK)
 
-#ifndef FREEDV_MODE_EN_DEFAULT
-#define FREEDV_MODE_EN_DEFAULT 1
-#endif
+// optional operator control of OFDM modem state machine
+#define FREEDV_SYNC_UNSYNC 0                 // force sync state machine to lose sync, and search for new sync
+#define FREEDV_SYNC_AUTO   1                 // falls out of sync automatically
+#define FREEDV_SYNC_MANUAL 2                 // fall out of sync only under operator control
 
 // These macros allow us to disable unwanted modes at compile tine, for example
 // to save memory on embedded systems or the remove need to link other
@@ -78,6 +81,10 @@
 // -DFREEDV_MODE_1600_EN=0 will enable all but FreeDV 1600.  Or the other way
 // round -DFREEDV_MODE_EN_DEFAULT=0 -DFREEDV_MODE_1600_EN=1 will enable only
 // FreeDV 1600
+
+#ifndef FREEDV_MODE_EN_DEFAULT
+#define FREEDV_MODE_EN_DEFAULT 1
+#endif
 
 #if !defined(FREEDV_MODE_1600_EN)
         #define FREEDV_MODE_1600_EN FREEDV_MODE_EN_DEFAULT
@@ -87,6 +94,9 @@
 #endif
 #if !defined(FREEDV_MODE_700D_EN)
         #define FREEDV_MODE_700D_EN FREEDV_MODE_EN_DEFAULT
+#endif
+#if !defined(FREEDV_MODE_700E_EN)
+        #define FREEDV_MODE_700E_EN FREEDV_MODE_EN_DEFAULT
 #endif
 #if !defined(FREEDV_MODE_2400A_EN)
         #define FREEDV_MODE_2400A_EN FREEDV_MODE_EN_DEFAULT
@@ -114,11 +124,6 @@
 #endif
 
 #define FDV_MODE_ACTIVE(mode_name, var)  ((mode_name##_EN) == 0 ? 0: (var) == mode_name)
-
-// optional operator control of 700D state machine
-#define FREEDV_SYNC_UNSYNC 0                 // force sync state machine to lose sync, and search for new sync
-#define FREEDV_SYNC_AUTO   1                 // falls out of sync automatically
-#define FREEDV_SYNC_MANUAL 2                 // fall out of sync only under operator control
 
 // struct that hold state information for one freedv instance
 struct freedv;
@@ -204,16 +209,18 @@ int freedv_check_crc16_unpacked(unsigned char *unpacked_bits, int nbits);
 void freedv_set_callback_txt            (struct freedv *freedv, freedv_callback_rx rx, freedv_callback_tx tx, void *callback_state);
 void freedv_set_callback_protocol       (struct freedv *freedv, freedv_callback_protorx rx, freedv_callback_prototx tx, void *callback_state);
 void freedv_set_callback_data           (struct freedv *freedv, freedv_callback_datarx datarx, freedv_callback_datatx datatx, void *callback_state);
-void freedv_set_test_frames		(struct freedv *freedv, int test_frames);
-void freedv_set_test_frames_diversity	(struct freedv *freedv, int test_frames_diversity);
-void freedv_set_smooth_symbols		(struct freedv *freedv, int smooth_symbols);
-void freedv_set_squelch_en		(struct freedv *freedv, int squelch_en);
-void freedv_set_snr_squelch_thresh	(struct freedv *freedv, float snr_squelch_thresh);
-void freedv_set_clip	                (struct freedv *freedv, int val);
-void freedv_set_total_bit_errors    	(struct freedv *freedv, int val);
+void freedv_set_test_frames		          (struct freedv *freedv, int test_frames);
+void freedv_set_test_frames_diversity	  (struct freedv *freedv, int test_frames_diversity);
+void freedv_set_smooth_symbols		      (struct freedv *freedv, int smooth_symbols);
+void freedv_set_squelch_en		          (struct freedv *freedv, int squelch_en);
+void freedv_set_snr_squelch_thresh	    (struct freedv *freedv, float snr_squelch_thresh);
+void freedv_set_clip	                  (struct freedv *freedv, int val);
+void freedv_set_total_bit_errors    	  (struct freedv *freedv, int val);
 void freedv_set_total_bits              (struct freedv *freedv, int val);
 void freedv_set_total_bit_errors_coded  (struct freedv *freedv, int val);
 void freedv_set_total_bits_coded        (struct freedv *freedv, int val);
+void freedv_set_total_packets           (struct freedv *freedv, int val);
+void freedv_set_total_packet_errors     (struct freedv *freedv, int val);
 void freedv_set_callback_error_pattern  (struct freedv *freedv, freedv_calback_error_pattern cb, void *state);
 void freedv_set_varicode_code_num       (struct freedv *freedv, int val);
 void freedv_set_data_header             (struct freedv *freedv, unsigned char *header);
@@ -249,10 +256,12 @@ int freedv_get_n_nom_modem_samples  (struct freedv *freedv);
 int freedv_get_n_tx_modem_samples   (struct freedv *freedv);
 
 // bit error rate stats
-int freedv_get_total_bits	    (struct freedv *freedv);
-int freedv_get_total_bit_errors	    (struct freedv *freedv);
-int freedv_get_total_bits_coded     (struct freedv *freedv);
-int freedv_get_total_bit_errors_coded(struct freedv *freedv);
+int freedv_get_total_bits	            (struct freedv *freedv);
+int freedv_get_total_bit_errors	      (struct freedv *freedv);
+int freedv_get_total_bits_coded       (struct freedv *freedv);
+int freedv_get_total_bit_errors_coded (struct freedv *freedv);
+int freedv_get_total_packets          (struct freedv *freedv);
+int freedv_get_total_packet_errors    (struct freedv *freedv);
 
 int freedv_get_rx_status            (struct freedv *freedv);
 void freedv_get_fsk_S_and_N         (struct freedv *freedv, float *S, float *N);

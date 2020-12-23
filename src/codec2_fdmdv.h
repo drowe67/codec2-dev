@@ -64,7 +64,7 @@ extern "C" {
 #define FDMDV_NOM_SAMPLES_PER_FRAME  160  /* modulator output samples/frame and nominal demod samples/frame */
                                           /* at 8000 Hz sample rate                                         */
 #define FDMDV_MAX_SAMPLES_PER_FRAME  200  /* max demod samples/frame, use this to allocate storage          */
-#define FDMDV_SCALE                 1000  /* suggested scaling for 16 bit shorts                            */
+#define FDMDV_SCALE                  750   /* suggested scaling for 16 bit shorts                            */
 #define FDMDV_FCENTRE               1500  /* Centre frequency, Nc/2 carriers below this, Nc/2 carriers above (Hz) */
 
 /* 8 to 48 kHz sample rate conversion */
@@ -110,4 +110,3 @@ void fdmdv_simulate_channel(float *sig_pwr_av, COMP samples[], int nin, float ta
 #endif
 
 #endif
-

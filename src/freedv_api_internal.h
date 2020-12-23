@@ -49,7 +49,7 @@
 #endif
 
 // Experimentally derived fudge factors to normalise Tx power across modes
-#define NORM_PWR_COHPSK  1.74
+#define NORM_PWR_COHPSK  1.12
 #define NORM_PWR_FSK     0.193
 #define NORM_PWR_OFDM    1.00
 
@@ -115,6 +115,8 @@ struct freedv {
     int                  total_bit_errors;
     int                  total_bits_coded;
     int                  total_bit_errors_coded;
+    int                  total_packets;
+    int                  total_packet_errors;
     int                  sz_error_pattern;
 
     /* optional user defined function to pass error pattern when a test frame is received */
@@ -127,7 +129,7 @@ struct freedv {
     int                 *tx_bits;                            /* FSK modem frame under construction */
     int                  tx_sync_bit;
     int                  frames;
-    int                  clip;                               /* non-zero for cohpsk modem output clipping for low PAPR */
+    int                  clip_en;                            /* non-zero for modem Tx clipping to lower PAPR */
     int                  sync;
     int                  evenframe;
     float                snr_est;
@@ -191,7 +193,7 @@ struct freedv {
 
 void freedv_1600_open(struct freedv *f);
 void freedv_700c_open(struct freedv *f);
-void freedv_700d_open(struct freedv *f);
+void freedv_ofdm_voice_open(struct freedv *f, char *mode);
 void freedv_2020_open(struct freedv *f);
 void freedv_2400a_open(struct freedv *f);
 void freedv_2400b_open(struct freedv *f);

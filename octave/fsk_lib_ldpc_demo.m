@@ -18,7 +18,7 @@ function [states M] = modem_init(Rs,Fs,df)
   states.df = df;
 
   states.ber_valid_thresh = 0.1;
-  states.ber_invalid_thresh = 0.2; 
+  states.ber_invalid_thresh = 0.2;
 end
 
 % Run a complete modem (freq and timing estimators running) at a
@@ -27,17 +27,18 @@ end
 % and exclude it from the BER estimation.
 
 function [states uber cber cper] = modem_run_test(HRA, EbNodB = 10, num_frames=10, Fs=8000, Rs=100, df=0, plots=0)
+  rand('seed',1); randn('seed',1);
   [states M] = modem_init(Rs, Fs, df);
   N = states.N;
   if plots; states.verbose = 0x4; end
 
   % set up LDPC code
-  Hsize=size(HRA); 
+  Hsize=size(HRA);
   Krate = (Hsize(2)-Hsize(1))/Hsize(2); states.rate = Krate;
   code_param = ldpc_init_user(HRA, modulation='FSK', mod_order=states.M, mapping='gray');
   states.coden = code_param.coded_bits_per_frame;
   states.codek = code_param.data_bits_per_frame;
-  
+
   % set up AWGN noise
   EcNodB = EbNodB + 10*log10(Krate);
   EcNo = 10^(EcNodB/10);
@@ -76,7 +77,7 @@ function [states uber cber cper] = modem_run_test(HRA, EbNodB = 10, num_frames=1
   end
 
   % count bit errors in test frames
-  
+
   num_frames=floor(length(rx_bits)/code_param.coded_bits_per_frame);
   log_nerrs = []; num_frames_rx = 0; Tbits = Terrs = Tperr = Tpackets = 0;
   uber = cber = 0.5; cper = 1;
@@ -95,13 +96,13 @@ function [states uber cber cper] = modem_run_test(HRA, EbNodB = 10, num_frames=1
       %code_param.coded_bits_per_frame, states.bitspersymbol, st_bit,  st_symbol, en_symbol);
 
       % map FSK filter ouputs to LLRs, then LDPC decode (see also fsk_cml_sam.m)
-      symL = DemodFSK(1/states.v_est*rx_filt(:,st_symbol:en_symbol), states.SNRest, 1);     
+      symL = DemodFSK(1/states.v_est*rx_filt(:,st_symbol:en_symbol), states.SNRest, 1);
       llr = -Somap(symL);
       [x_hat, PCcnt] = MpDecode(llr, code_param.H_rows, code_param.H_cols, max_iterations=100, decoder_type=0, 1, 1);
       Niters = sum(PCcnt~=0);
       detected_data = x_hat(Niters,:);
       Nerrs = sum(xor(data_bits, detected_data(1:code_param.data_bits_per_frame)));
-      Terrs += Nerrs; 
+      Terrs += Nerrs;
       Tbits += code_param.data_bits_per_frame;
       if Nerrs Tperr++; end
       Tpackets++;
@@ -136,7 +137,7 @@ function freq_run_curve_peak_mask(HRA, num_frames=100)
 
   EbNodB = 4:10;
   m4fsk_ber_theory = [0.23 0.18 0.14 0.09772 0.06156 0.03395 0.01579 0.00591 0.00168 3.39E-4];
-  uber_log = []; cber_log = []; cper_log = []; 
+  uber_log = []; cber_log = []; cper_log = [];
   for ne = 1:length(EbNodB)
     [states uber cber cper] = modem_run_test(HRA, EbNodB(ne), num_frames);
     uber_log = [uber_log uber];  cber_log = [cber_log cber];  cper_log = [cper_log cper];

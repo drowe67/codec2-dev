@@ -196,6 +196,7 @@ set(CODEC2_SRCS
     interldpc.c
     filter.c
     HRA_112_112.c
+    HRA_56_56.c
     HRAb_396_504.c
     H_256_768_22.c
     H_256_512_4.c
