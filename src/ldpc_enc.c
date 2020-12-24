@@ -66,6 +66,7 @@ int main(int argc, char *argv[])
 
     unsigned char ibits[data_bits_per_frame];
     unsigned char pbits[parity_bits_per_frame];
+    unsigned char pbits1[parity_bits_per_frame];
     float         sdout[data_bits_per_frame+parity_bits_per_frame];
 
     if (strcmp(argv[1], "-")  == 0) fin = stdin;
@@ -102,14 +103,14 @@ int main(int argc, char *argv[])
 
     frames = 0;
     int written = 0;
-
+    fprintf(stderr, "unused_data_bits: %d ldpc->NumberParityBits: %d\n",unused_data_bits, ldpc.NumberParityBits);
     while (fread(ibits, sizeof(char), data_bits_per_frame, fin) == data_bits_per_frame) {
         if (testframes) {
             uint16_t r[data_bits_per_frame];
             ofdm_rand(r, data_bits_per_frame);
 
             for(i=0; i<data_bits_per_frame-unused_data_bits; i++) {
-                ibits[i] = r[i] > 16384;
+                ibits[i] = 1;//r[i] > 16384;
             }
             for(i=data_bits_per_frame-unused_data_bits; i<data_bits_per_frame; i++) {
                 ibits[i] = 1;
@@ -119,6 +120,8 @@ int main(int argc, char *argv[])
 
         encode(&ldpc, ibits, pbits);
         fprintf(stderr, "crc16 ibits:0x%x pbits: 0x%x\n", freedv_gen_crc16(ibits, data_bits_per_frame), freedv_gen_crc16(pbits, parity_bits_per_frame));
+        encode(&ldpc, ibits, pbits1);
+        fprintf(stderr, "crc16 ibits:0x%x pbits1: 0x%x\n", freedv_gen_crc16(ibits, data_bits_per_frame), freedv_gen_crc16(pbits1, parity_bits_per_frame));
         if (sd) {
             /* map to BPSK symbols */
             for (i=0; i<data_bits_per_frame-unused_data_bits; i++)
