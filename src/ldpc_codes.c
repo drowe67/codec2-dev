@@ -68,8 +68,8 @@ struct LDPC ldpc_codes[] = {
         NUMBERROWSHCOLS,
         MAX_ROW_WEIGHT,
         MAX_COL_WEIGHT,
-        H_rows,
-        H_cols
+        (uint16_t *)H_rows,
+        (uint16_t *)H_cols
     },
 
     /* rate 0.8 code used for FreeDV 2020 */
