@@ -1,4 +1,4 @@
-/*
+/* 
   FILE...: ldpc_enc.c
   AUTHOR.: Bill Cowley, David Rowe
   CREATED: Sep 2016
@@ -17,8 +17,6 @@
 #include "ldpc_codes.h"
 #include "ofdm_internal.h"
 
-unsigned short freedv_gen_crc16(unsigned char* bytes, int nbytes);
-
 int opt_exists(char *argv[], int argc, char opt[]) {
     int i;
     for (i=0; i<argc; i++) {
@@ -35,7 +33,7 @@ int main(int argc, char *argv[])
     int           arg, sd, i, frames, codename, testframes, Nframes, data_bits_per_frame, parity_bits_per_frame;
     struct LDPC   ldpc;
     int unused_data_bits;
-
+    
     if (argc < 2) {
         fprintf(stderr, "\n");
         fprintf(stderr, "usage: %s InputOneBytePerBit OutputFile [--sd] [--code CodeName] [--testframes Nframes] [--unused numUnusedDataBits]\n", argv[0]);
@@ -60,13 +58,12 @@ int main(int argc, char *argv[])
         code_index = ldpc_codes_find(argv[codename+1]);
     memcpy(&ldpc,&ldpc_codes[code_index],sizeof(struct LDPC));
     fprintf(stderr, "Using: %s\n", ldpc.name);
-
+    
     data_bits_per_frame = ldpc.NumberRowsHcols;
     parity_bits_per_frame = ldpc.NumberParityBits;
-
+    
     unsigned char ibits[data_bits_per_frame];
     unsigned char pbits[parity_bits_per_frame];
-    unsigned char pbits1[parity_bits_per_frame];
     float         sdout[data_bits_per_frame+parity_bits_per_frame];
 
     if (strcmp(argv[1], "-")  == 0) fin = stdin;
@@ -75,14 +72,14 @@ int main(int argc, char *argv[])
                 argv[1], strerror(errno));
         exit(1);
     }
-
+        
     if (strcmp(argv[2], "-") == 0) fout = stdout;
     else if ( (fout = fopen(argv[2],"wb")) == NULL ) {
         fprintf(stderr, "Error opening output bit file: %s: %s.\n",
                 argv[2], strerror(errno));
         exit(1);
     }
-
+    
     sd = 0;
     if (opt_exists(argv, argc, "--sd")) {
         sd = 1;
@@ -92,7 +89,7 @@ int main(int argc, char *argv[])
     if ((arg = opt_exists(argv, argc, "--unused"))) {
         unused_data_bits = atoi(argv[arg+1]);
     }
-
+    
     testframes = Nframes = 0;
 
     if ((arg = (opt_exists(argv, argc, "--testframes")))) {
@@ -103,39 +100,37 @@ int main(int argc, char *argv[])
 
     frames = 0;
     int written = 0;
-    fprintf(stderr, "unused_data_bits: %d ldpc->NumberParityBits: %d\n",unused_data_bits, ldpc.NumberParityBits);
+    
     while (fread(ibits, sizeof(char), data_bits_per_frame, fin) == data_bits_per_frame) {
         if (testframes) {
             uint16_t r[data_bits_per_frame];
             ofdm_rand(r, data_bits_per_frame);
 
             for(i=0; i<data_bits_per_frame-unused_data_bits; i++) {
-                ibits[i] = 1;//r[i] > 16384;
+                ibits[i] = r[i] > 16384;
             }
             for(i=data_bits_per_frame-unused_data_bits; i<data_bits_per_frame; i++) {
                 ibits[i] = 1;
             }
-
+           
         }
-
-        encode(&ldpc, ibits, pbits);
-        fprintf(stderr, "crc16 ibits:0x%x pbits: 0x%x\n", freedv_gen_crc16(ibits, data_bits_per_frame), freedv_gen_crc16(pbits, parity_bits_per_frame));
-        encode(&ldpc, ibits, pbits1);
-        fprintf(stderr, "crc16 ibits:0x%x pbits1: 0x%x\n", freedv_gen_crc16(ibits, data_bits_per_frame), freedv_gen_crc16(pbits1, parity_bits_per_frame));
+        
+        encode(&ldpc, ibits, pbits);  
+        
         if (sd) {
             /* map to BPSK symbols */
             for (i=0; i<data_bits_per_frame-unused_data_bits; i++)
                 sdout[i] = 1.0 - 2.0 * ibits[i];
             for (i=0; i<parity_bits_per_frame; i++)
                 sdout[i+data_bits_per_frame-unused_data_bits] = 1.0 - 2.0 * pbits[i];
-            written += fwrite(sdout, sizeof(float), data_bits_per_frame-unused_data_bits+parity_bits_per_frame, fout);
+            written += fwrite(sdout, sizeof(float), data_bits_per_frame-unused_data_bits+parity_bits_per_frame, fout); 
         }
         else {
-            written += fwrite(ibits, sizeof(char), data_bits_per_frame, fout);
-            written += fwrite(pbits, sizeof(char), parity_bits_per_frame, fout);
+            written += fwrite(ibits, sizeof(char), data_bits_per_frame, fout); 
+            written += fwrite(pbits, sizeof(char), parity_bits_per_frame, fout); 
         }
-
-        frames++;
+        
+        frames++;       
         if (testframes && (frames >= Nframes)) {
             goto finished;
         }
@@ -144,8 +139,8 @@ int main(int argc, char *argv[])
  finished:
 
     fprintf(stderr, "written: %d\n", written);
-    fclose(fin);
-    fclose(fout);
+    fclose(fin);  
+    fclose(fout); 
 
     return 1;
 }
