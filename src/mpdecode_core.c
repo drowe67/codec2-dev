@@ -79,9 +79,7 @@ void encode(struct LDPC *ldpc, unsigned char ibits[], unsigned char pbits[]) {
 
         for (i=0; i<ldpc->max_row_weight; i++) {
             ind = H_rows[p + i*ldpc->NumberParityBits];
-            if (ind<1) { fprintf(stderr, "i: %d p: %d ind: %d\n", i, p, ind); assert(0); }
-            if (ind>ldpc->NumberRowsHcols) { fprintf(stderr, "ind: %d\n", ind); assert(0); }
-            par = par + ibits[ind-1];
+            if (ind) par = par + ibits[ind-1];
         }
 
         tmp = par + prev;
