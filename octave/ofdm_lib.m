@@ -104,7 +104,7 @@ function states = ofdm_init(config)
     uw_step = Nc-1;                              % try a different step
   end
   last_sym = floor(Nuwsyms*uw_step/bps+1);
-  assert(last_sym <= Ndatasymsperframe);         % we still can't fit them all
+  assert(last_sym <= states.Np*Ndatasymsperframe);         % we still can't fit them all
 
   % Place UW symbols in frame
   for i=1:Nuwsyms
