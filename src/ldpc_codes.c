@@ -11,7 +11,7 @@
 #include "assert.h"
 #include "ldpc_codes.h"
 #include "interldpc.h"
-#include "H2064_516_sparse.h"
+#include "H_2064_516_sparse.h"
 #include "HRA_112_112.h"
 #include "HRAb_396_504.h"
 #include "H_256_768_22.h"
@@ -57,7 +57,7 @@ struct LDPC ldpc_codes[] = {
 
     /* default Wenet High Alitiude Balloon rate 0.8 code */
     {
-        "H2064_516_sparse",
+        "H_2064_516_sparse",
         MAX_ITER,
         0,
         1,
@@ -67,8 +67,8 @@ struct LDPC ldpc_codes[] = {
         NUMBERROWSHCOLS,
         MAX_ROW_WEIGHT,
         MAX_COL_WEIGHT,
-        H_rows,
-        H_cols
+        (uint16_t *)H_2064_516_sparse_H_rows,
+        (uint16_t *)H_2064_516_sparse_H_cols
     },
 
     /* rate 0.8 code used for FreeDV 2020 */
@@ -84,7 +84,7 @@ struct LDPC ldpc_codes[] = {
         HRAb_396_504_MAX_ROW_WEIGHT,
         HRAb_396_504_MAX_COL_WEIGHT,
         (uint16_t *)HRAb_396_504_H_rows,
-            (uint16_t *)HRAb_396_504_H_cols
+        (uint16_t *)HRAb_396_504_H_cols
     },
 
     /* rate 1/3 code, works at raw BER of 14% */
