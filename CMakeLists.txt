@@ -531,6 +531,13 @@ endif()
                             ./ldpc_dec - /dev/null --code H_128_256_5 --sd --testframes"
              )
 
+    add_test(NAME test_ldpc_enc_dec_H_4096_8192_3d
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            ./ldpc_enc /dev/zero - --sd --code H_4096_8192_3d --testframes 100 |
+                            ./ldpc_noise - - 0.0 |
+                            ./ldpc_dec - /dev/null --code H_4096_8192_3d --sd --testframes"
+             )
+
     add_test(NAME test_freedv_api_1600
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
                             ./freedv_tx 1600 ../../raw/ve9qrp_10s.raw - | ./freedv_rx 1600 - /dev/null")
