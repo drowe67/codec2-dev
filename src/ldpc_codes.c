@@ -85,7 +85,7 @@ struct LDPC ldpc_codes[] = {
         HRAb_396_504_MAX_ROW_WEIGHT,
         HRAb_396_504_MAX_COL_WEIGHT,
         (uint16_t *)HRAb_396_504_H_rows,
-            (uint16_t *)HRAb_396_504_H_cols
+        (uint16_t *)HRAb_396_504_H_cols
     },
 
     /* rate 1/3 code, works at raw BER of 14% */
