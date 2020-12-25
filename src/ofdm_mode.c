@@ -65,10 +65,10 @@ void ofdm_init_mode(char mode[], struct OFDM_CONFIG *config) {
         config->ftwindowwidth = 32; config->state_machine = "data"; config->amp_est_mode = 1;
         config->tx_bpf_en = false;
     } else if (strcmp(mode,"datac1") == 0) {
-        config->ns=5; config->np=18; config->tcp = 0.006; config->ts = 0.016; config-> nc = 18;
-        config->txtbits = 0; config->nuwbits = 12; config->bad_uw_errors = 2;
+        config->ns=5; config->np=38; config->tcp = 0.006; config->ts = 0.016; config->nc = 27;
+        config->txtbits = 0; config->nuwbits = 16; config->bad_uw_errors = 1;
         config->state_machine = "data"; config->amp_est_mode = 1; config->tx_bpf_en = false;
-        config->ftwindowwidth = 32; config->codename = "H2064_516_sparse";
+        config->ftwindowwidth = 80; config->codename = "H_4096_8192_3d";
     } else if (strcmp(mode,"datac2") == 0) {
         config->ns=5; config->np=36; config->tcp = 0.006; config->ts = 0.016; config->nc = 9;
         config->txtbits = 0; config->nuwbits = 12; config->bad_uw_errors = 1;
