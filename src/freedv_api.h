@@ -64,7 +64,7 @@
 // peak (complex) sample value from Tx modulator
 #define FREEDV_PEAK             16384
 
-// Return code flags for freedv_*rx* functions
+// Return code flags for freedv_get_rx_status() function
 #define FREEDV_RX_TRIAL_SYNC       0x1       // demodulator has trial sync
 #define FREEDV_RX_SYNC             0x2       // demodulator has sync
 #define FREEDV_RX_BITS             0x4       // data bits have been returned
