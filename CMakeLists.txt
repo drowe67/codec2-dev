@@ -459,23 +459,45 @@ endif()
     #                                OFDM Data modes
     # -------------------------------------------------------------------------
 
-    # C Tx, Octave Rx
+    # To integrate a new mode/waveform we prototype in Octave, get the core OFDM modem
+    # running in C, then the FreeDV API.  Here we test Octave and the C versions of the
+    # OFDM modem together
+
+    # DATAC1 C Tx, Octave Rx
     add_test(NAME test_OFDM_modem_datac1_octave
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR};
-                            ./src/ofdm_mod --mode datac1 --in /dev/zero --testframes 5 --verbose 1 > test.raw;
+                            ./src/ofdm_mod --mode datac1 --in /dev/zero --testframes 20 --verbose 1 --ldpc > test.raw;
                             cd ${CMAKE_CURRENT_SOURCE_DIR}/octave;
-                            DISPLAY=\"\" octave-cli -qf --eval 'ofdm_rx(\"${CMAKE_CURRENT_BINARY_DIR}/test.raw\",\"datac1\")'")
-             set_tests_properties(test_OFDM_modem_datac1_octave PROPERTIES PASS_REGULAR_EXPRESSION "BER..: 0.0000")
-    # C Tx, C Rx, uncoded
+                            DISPLAY=\"\" octave-cli -qf --eval 'ofdm_ldpc_rx(\"${CMAKE_CURRENT_BINARY_DIR}/test.raw\",\"datac1\")'")
+             set_tests_properties(test_OFDM_modem_datac1_octave PROPERTIES PASS_REGULAR_EXPRESSION "Coded PER: 0.0000 Pckts:     4")
+
+    # DATAC2 C Tx, Octave Rx
+    add_test(NAME test_OFDM_modem_datac2_octave
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR};
+                            ./src/ofdm_mod --mode datac2 --in /dev/zero --testframes 20 --verbose 1 --ldpc > test.raw;
+                            cd ${CMAKE_CURRENT_SOURCE_DIR}/octave;
+                            DISPLAY=\"\" octave-cli -qf --eval 'ofdm_ldpc_rx(\"${CMAKE_CURRENT_BINARY_DIR}/test.raw\",\"datac2\")'")
+             set_tests_properties(test_OFDM_modem_datac2_octave PROPERTIES PASS_REGULAR_EXPRESSION "Coded PER: 0.0000 Pckts:     4")
+
+    # DATAC3 C Tx, Octave Rx
+    add_test(NAME test_OFDM_modem_datac3_octave
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR};
+                            ./src/ofdm_mod --mode datac3 --in /dev/zero --testframes 20 --verbose 1 --ldpc > test.raw;
+                            cd ${CMAKE_CURRENT_SOURCE_DIR}/octave;
+                            DISPLAY=\"\" octave-cli -qf --eval 'ofdm_ldpc_rx(\"${CMAKE_CURRENT_BINARY_DIR}/test.raw\",\"datac3\")'")
+             set_tests_properties(test_OFDM_modem_datac3_octave PROPERTIES PASS_REGULAR_EXPRESSION "Coded PER: 0.0000 Pckts:    16")
+
+    # DATAC1 C Tx, C Rx, uncoded
     add_test(NAME test_OFDM_modem_datac1
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
                             ./ofdm_mod   --mode datac1 --in  /dev/zero --testframes 10 --verbose 1 |
                             ./ofdm_demod --mode datac1 --out /dev/null --testframes   --verbose 1")
-    # C Tx, C Rx, coded
+
+    # DATAC1 C Tx, C Rx, coded
     add_test(NAME test_OFDM_modem_datac1_ldpc
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
                             ./ofdm_mod   --mode datac1 --in  /dev/zero --testframes 10 --ldpc --verbose 1 |
-                            ./ofdm_demod --mode datac1 --out /dev/null  --testframes    --ldpc --verbose 1")
+                            ./ofdm_demod --mode datac1 --out /dev/null  --testframes --ldpc --verbose 1")
 
     # -------------------------------------------------------------------------
     #                                LDPC
@@ -538,7 +560,11 @@ endif()
                             ./ldpc_dec - /dev/null --code H_4096_8192_3d --sd --testframes"
              )
 
-    add_test(NAME test_freedv_api_1600
+     # -------------------------------------------------------------------------
+    #                                FreeDV API
+    # -------------------------------------------------------------------------
+
+   add_test(NAME test_freedv_api_1600
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
                             ./freedv_tx 1600 ../../raw/ve9qrp_10s.raw - | ./freedv_rx 1600 - /dev/null")
              set_tests_properties(test_freedv_api_1600 PROPERTIES PASS_REGULAR_EXPRESSION "frames decoded: 503")
@@ -880,7 +906,7 @@ endif(NOT APPLE)
      # OFDM LDPC
      add_test(NAME test_freedv_data_raw_ofdm_datac1
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
-                            head -c $((256*10)) </dev/urandom > binaryIn.bin;
+                            head -c $((510*10)) </dev/urandom > binaryIn.bin;
                             ./freedv_data_raw_tx DATAC1 binaryIn.bin - |
                             ./freedv_data_raw_rx DATAC1 - binaryOut.bin -v;
                             diff binaryIn.bin binaryOut.bin")
