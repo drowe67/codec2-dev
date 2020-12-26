@@ -100,7 +100,7 @@ function states = ofdm_init(config)
   Nuwsyms = states.Nuwbits/bps;
   Ndatasymsperframe = (Ns-1)*Nc;
   last_sym = floor(Nuwsyms*uw_step/bps+1);
-  if last_sym > Ndatasymsperframe
+  if last_sym > states.Np*Ndatasymsperframe
     uw_step = Nc-1;                              % try a different step
   end
   last_sym = floor(Nuwsyms*uw_step/bps+1);
@@ -296,6 +296,7 @@ function config = ofdm_init_mode(mode="700D")
     config.state_machine = "data";
     config.ftwindow_width = 80; config.amp_est_mode = 1; config.EsNodB = 3;
     config.edge_pilots = 0;
+    config.tx_uw = [1 1 0 0  1 0 1 0  1 1 1 1  0 0 0 0];
   elseif strcmp(mode,"datac2")
     Ns=5; config.Np=36; Tcp = 0.006; Ts = 0.016; Nc = 9; config.data_mode = 1;
     config.Ntxtbits = 0; config.Nuwbits = 12; config.bad_uw_errors = 1;
