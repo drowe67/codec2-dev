@@ -520,7 +520,7 @@ int freedv_comp_short_rx_ofdm(struct freedv *f, void *demod_in_8kHz, int demod_i
     ofdm_sync_state_machine(ofdm, rx_uw);
 
     if ((f->verbose && (ofdm->last_sync_state == search)) || (f->verbose == 2)) {
-        fprintf(stderr, "%3d nin: %4d st: %-6s euw: %2d %1d mf: %2d f: %5.1f pbw: %d snr: %4.1f eraw: %3d ecdd: %3d iter: %3d "
+        fprintf(stderr, "%3d nin: %4d st: %-6s euw: %2d %2d mf: %2d f: %5.1f pbw: %d snr: %4.1f eraw: %3d ecdd: %3d iter: %3d "
                 "pcc: %3d rxst: %s\n",
                 f->frames++, ofdm->nin,
                 ofdm_statemode[ofdm->last_sync_state],

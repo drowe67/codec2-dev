@@ -1248,7 +1248,7 @@ void freedv_set_carrier_ampl(struct freedv *f, int c, float ampl) {
 void freedv_set_sync(struct freedv *freedv, int sync_cmd) {
     assert (freedv != NULL);
 
-    if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, freedv->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_700E, freedv->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_2020, freedv->mode)) {
+    if (freedv->ofdm != NULL) {
         ofdm_set_sync(freedv->ofdm, sync_cmd);
     }
 }
