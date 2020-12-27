@@ -199,3 +199,33 @@ On Ubuntu 17 and above:
  wait for it to build.
  ```
 
+
+## Including Codec 2 in an Android project
+
+In an Android Studio 'NDK' project (a project that uses 'native' code)
+Codec 2 can be added to the project in the following way.
+
+1. Add the Codec 2 source tree to your app (e.g. in app/src/main/codec2)
+   (e.g. as a git sub-module).
+
+1. Add Codec 2 to the CMakeList.txt (app/src/main/cpp/CMakeLists.txt):
+
+    ```
+    # Sets lib_src_DIR to the path of the target CMake project.
+    set( codec2_src_DIR ../codec2/ )
+    # Sets lib_build_DIR to the path of the desired output directory.
+    set( codec2_build_DIR ../codec2/ )
+    file(MAKE_DIRECTORY ${codec2_build_DIR})
+
+    add_subdirectory( ${codec2_src_DIR} ${codec2_build_DIR} )
+
+    include_directories(
+	    ${codec2_src_DIR}/src
+	    ${CMAKE_CURRENT_BINARY_DIR}/../codec2
+    )
+    ```
+     
+1. Add Codec 2 to the target_link_libraries in the same file.
+
+
+
