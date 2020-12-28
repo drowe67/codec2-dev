@@ -1,11 +1,11 @@
 % Copyright David Rowe 2009
-% This program is distributed under the terms of the GNU General Public License 
+% This program is distributed under the terms of the GNU General Public License
 % Version 2
 %
 % Plot ampltiude modelling information from dump files.
 
 function plamp(samname, f, samname2)
-  
+
   % switch some stuff off to unclutter display
 
   plot_lsp = 0;
@@ -70,95 +70,52 @@ function plamp(samname, f, samname2)
 
   % optional second file, for exploring post filter
 
-  model2q_name = " ";
   if nargin == 3
-    model2q_name = strcat(samname2,"_qmodel.txt");
-    if file_in_path(".",modelq_name)
-      model2q = load(model2q_name);
-    end
+    model2_name = strcat(samname2,"_model.txt");
+    model2 = load(model2_name);
+    sn2_name = strcat(samname2,"_sn.txt");
+    Sn2 = load(sn2_name);
+
+    sw_name2 = strcat(samname2,"_sw.txt");
+    Sw2 = load(sw_name2);
   end
 
-  Ew_on = 1;
   k = ' ';
-  do 
+  do
     figure(1);
     clf;
-%    s = [ Sn(2*(f-2)-1,:) Sn(2*(f-2),:) ];
     s = [ Sn(2*f-1,:) Sn(2*f,:) ];
-    size(s);
     plot(s);
-    axis([1 length(s) -20000 20000]);
+    if (file_in_path(".",model2_name))
+      s2 = [ Sn2(2*f-1,:) Sn2(2*f,:) ];
+      hold on; plot(s2); hold off;
+    end
+    axis([1 length(s) -30000 30000]);
 
     figure(2);
     Wo = model(f,1);
     L = model(f,2);
     Am = model(f,3:(L+2));
-    plot((1:L)*Wo*4000/pi, 20*log10(Am),";Am;r");
+    plot((1:L)*Wo*4000/pi, 20*log10(Am),";Am;+-r");
     axis([1 4000 -10 80]);
     hold on;
     if plot_sw
       plot((0:255)*4000/256, Sw(f,:),";Sw;");
     end
- 
-    if (file_in_path(".",modelq_name))
-      Amq = modelq(f,3:(L+2));
-      plot((1:L)*Wo*4000/pi, 20*log10(Amq),";Amq;g" );
-      if (file_in_path(".",pw_name) && plot_pw)
-        plot((0:255)*4000/256, 10*log10(Pw(f,:)),";Pw;c");
-      endif	
-      signal = Am * Am';
-      noise = (Am-Amq) * (Am-Amq)'; 
-      snr1 = 10*log10(signal/noise);
-      Am_err_label = sprintf(";Am error SNR %4.2f dB;m",snr1);
-      plot((1:L)*Wo*4000/pi, 20*log10(Amq) - 20*log10(Am), Am_err_label);
-    endif
 
-    if file_in_path(".",model2q_name)
-      Amq2 = model2q(f,3:(L+2));
-      plot((1:L)*Wo*4000/pi, 20*log10(Amq2),";Amq2;m" );
-    end
-
-    if (file_in_path(".",snr_name) && plot_vsnr)
-      snr_label = sprintf(";Voicing SNR %4.2f dB;",snr(f));
-      plot(1,1,snr_label);
-    endif
-
-    % phase model - determine SNR and error spectrum for phase model 1
-
-    if (file_in_path(".",phase_name_))
-      orig  = Am.*exp(j*phase(f,1:L));
-      synth = Am.*exp(j*phase_(f,1:L));
-      signal = orig * orig';
-      noise = (orig-synth) * (orig-synth)';
-      snr_phase = 10*log10(signal/noise);
-
-      %phase_err_label = sprintf(";phase_err SNR %4.2f dB;",snr_phase);
-      %plot((1:L)*Wo*4000/pi, 20*log10(orig-synth), phase_err_label);
-    endif
-
-    if (file_in_path(".",lsp_name) && plot_lsp)
-      for l=1:10
-        plot([lsp(f,l)*4000/pi lsp(f,l)*4000/pi], [60 80], 'r');
-      endfor
+    if (file_in_path(".",model2_name))
+      Wo2 = model2(f,1);
+      L2 = model2(f,2);
+      Am2 = model2(f,3:(L2+2));
+      plot((1:L2)*Wo2*4000/pi, 20*log10(Am2),";Am2;+-g" );
+      plot((0:255)*4000/256, Sw2(f,:),";Sw2;");
     endif
 
     hold off;
 
-    %if (file_in_path(".",phase_name))
-      %figure(3);
-      %plot((1:L)*Wo*4000/pi, phase(f,1:L), ";phase;");
-      %axis;
-      %if (file_in_path(".",phase_name_))
-        %hold on;
-        %plot((1:L)*Wo*4000/pi, phase_(f,1:L), ";phase_;");
-	%hold off;
-      %endif
-      %figure(2);
-    %endif
-
     % interactive menu
 
-    printf("\rframe: %d  menu: n-next  b-back  p-png  q-quit e-toggle Ew", f);
+    printf("\rframe: %d  menu: n-next  b-back  p-png  q-quit", f);
     fflush(stdout);
     k = kbhit();
     if (k == 'n')
@@ -166,13 +123,6 @@ function plamp(samname, f, samname2)
     endif
     if (k == 'b')
       f = f - 1;
-    endif
-    if (k == 'e')
-	if (Ew_on == 1)
-	    Ew_on = 0;
-        else
-	    Ew_on = 1;
-        endif
     endif
 
     % optional print to PNG
