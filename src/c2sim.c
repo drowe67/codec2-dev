@@ -111,7 +111,9 @@ int main(int argc, char *argv[])
     FILE  *frateKWov = NULL;
     int   ten_ms_centre = 0;
     FILE  *fphasenn = NULL;
-    FILE  *frateK = NULL; int rateKout;
+    FILE  *frateK = NULL;
+    FILE  *frateKin = NULL;
+    int   rateKout, rateKin;
     FILE *fbands = NULL;
     int   bands_resample = 0;
     
@@ -123,6 +125,7 @@ int main(int argc, char *argv[])
         { "newamp1vq", no_argument, &newamp1vq, 1 },
         { "rateKdec", required_argument, &rate_K_dec, 1 },
         { "rateKout", required_argument, &rateKout, 1 },
+        { "rateKin", required_argument, &rateKin, 1 },
         { "bands",required_argument, &bands, 1 },
         { "bands_lower",required_argument, &bands_lower_en, 1 },
         { "bands_resample", no_argument, &bands_resample, 1 },
@@ -208,7 +211,15 @@ int main(int argc, char *argv[])
 	    } else if(strcmp(long_options[option_index].name, "rateKout") == 0) {
                 /* read model records from file or stdin */
                 if ((frateK = fopen(optarg,"wb")) == NULL) {
-	            fprintf(stderr, "Error opening rateK file: %s: %s\n",
+	            fprintf(stderr, "Error opening output rateK file: %s: %s\n",
+		        optarg, strerror(errno));
+                    exit(1);
+                }
+                fprintf(stderr, "each record is %d bytes\n", (int)(K*sizeof(float)));
+	    } else if(strcmp(long_options[option_index].name, "rateKin") == 0) {
+                /* read model records from file or stdin */
+                if ((frateKin = fopen(optarg,"rb")) == NULL) {
+	            fprintf(stderr, "Error opening input rateK file: %s: %s\n",
 		        optarg, strerror(errno));
                     exit(1);
                 }
@@ -791,11 +802,8 @@ int main(int argc, char *argv[])
 	    bands_mean /= nbands;
 	    //fprintf(stderr, "bands_mean: %f bands_lower %f\n", bands_mean,  bands_lower);
 	    if (bands_mean > bands_lower)
-		assert(fwrite(bandE, sizeof(float), nbands, fbands) == nbands);
-	    for(int i=0; i<nbands; i++) {
-                bandE[i] *= 10.0;
-            }
-            // optionall reconstrict [Am} by linear interpolation of band energies,
+ 		assert(fwrite(bandE, sizeof(float), nbands, fbands) == nbands);
+            // optionally reconstruct [Am} by linear interpolation of band energies,
             // this doesn't sound very Good
             if (bands_resample)
                 resample_rate_L(&c2const, &model, &bandE[1], &freqkHz[1], nbands-2);
@@ -813,6 +821,8 @@ int main(int argc, char *argv[])
 
 	    if (frateK != NULL)
 		assert(fwrite(rate_K_vec, sizeof(float), K, frateK) == K);
+	    if (frateKin != NULL)
+		assert(fread(rate_K_vec, sizeof(float), K, frateKin) == K);
 
             float rate_K_vec_[K];
             if (newamp1vq) {
@@ -1068,6 +1078,7 @@ int main(int argc, char *argv[])
     if (flspEWov != NULL) fclose(flspEWov);
     if (fphasenn != NULL) fclose(fphasenn);
     if (frateK != NULL) fclose(frateK);
+    if (frateKin != NULL) fclose(frateKin);
     if (ften_ms_centre != NULL) fclose(ften_ms_centre);
     if (fmodelout != NULL) fclose(fmodelout);
     if (fbands != NULL) fclose(fbands);
