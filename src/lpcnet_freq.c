@@ -85,7 +85,7 @@ int lpcnet_compute_band_energy(float *bandE, float *bandCentrekHz, COMP *X, floa
     sum[nb_bands-1] *= 2;
     for (int i=0;i<nb_bands;i++) {
         bandCentrekHz[i] = eband5ms[i]*Fs/40.0/1000.0;
-	bandE[i] = log10(sum[i]);
+	bandE[i] = 10.0*log10(sum[i]);
     }
 
     return nb_bands;
