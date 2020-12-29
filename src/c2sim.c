@@ -821,9 +821,22 @@ int main(int argc, char *argv[])
 
 	    if (frateK != NULL)
 		assert(fwrite(rate_K_vec, sizeof(float), K, frateK) == K);
-	    if (frateKin != NULL)
+	    
+	    if (frateKin != NULL) {
 		assert(fread(rate_K_vec, sizeof(float), K, frateKin) == K);
-
+		/* apply newamp1 postfilter - this helped male samples with VQVAE work */
+                float sum = 0.0;
+                for(int k=0; k<K; k++)
+                    sum += rate_K_vec[k];
+                float mean = sum/K;
+                float rate_K_vec_no_mean[K];
+                for(int k=0; k<K; k++)
+                    rate_K_vec_no_mean[k] = rate_K_vec[k] - mean;
+		post_filter_newamp1(rate_K_vec_no_mean,  rate_K_sample_freqs_kHz, K, 1.5);
+                for(int k=0; k<K; k++)
+                    rate_K_vec[k] = rate_K_vec_no_mean[k] +  mean;
+	    }
+	    
             float rate_K_vec_[K];
             if (newamp1vq) {
                 /* remove mean */
@@ -934,6 +947,7 @@ int main(int argc, char *argv[])
                 for(int k=0; k<K; k++)
                     rate_K_vec_[k] = rate_K_vec_delay_[0][k];
             }
+	    
             resample_rate_L(&c2const, &model, rate_K_vec_, rate_K_sample_freqs_kHz, K);
         }
 
