@@ -120,6 +120,7 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
     struct freedv *f;
 
     assert(FREEDV_PEAK == OFDM_PEAK);
+    assert(FREEDV_VARICODE_MAX_BITS == VARICODE_MAX_BITS);
 
     if ((FDV_MODE_ACTIVE( FREEDV_MODE_1600,   mode)   ||
          FDV_MODE_ACTIVE( FREEDV_MODE_700C,   mode)   ||

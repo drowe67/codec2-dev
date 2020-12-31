@@ -75,6 +75,8 @@
 #define FREEDV_SYNC_AUTO   1                 // falls out of sync automatically
 #define FREEDV_SYNC_MANUAL 2                 // fall out of sync only under operator control
 
+#define FREEDV_VARICODE_MAX_BITS  12         // max bits for each ASCII character
+
 // These macros allow us to disable unwanted modes at compile tine, for example
 // to save memory on embedded systems or the remove need to link other
 // libraries. By default we enable all modes.  Disable during compile time e.g
