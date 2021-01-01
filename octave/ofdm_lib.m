@@ -303,13 +303,14 @@ function config = ofdm_init_mode(mode="700D")
     config.state_machine = "data";
     config.ftwindow_width = 32; config.amp_est_mode = 1; config.EsNodB = 10;
   elseif strcmp(mode,"datac3")
-    Ns=5; config.Np=11; Tcp = 0.006; Ts = 0.016; Nc = 28; config.data_mode = 1;
-    config.Ntxtbits = 0; config.Nuwbits = 48; config.bad_uw_errors = 10;
-    config.ftwindow_width = 32; config.timing_mx_thresh = 0.30;
+    Ns=5; config.Np=37; Tcp = 0.006; Ts = 0.016; Nc = 8; config.data_mode = 1;
+    config.Ntxtbits = 0; config.Nuwbits = 64; config.bad_uw_errors = 15;
+    config.ftwindow_width = 80; config.timing_mx_thresh = 0.30;
     config.tx_uw = zeros(1,config.Nuwbits);
     config.tx_uw(1:24) = [1 1 0 0  1 0 1 0  1 1 1 1  0 0 0 0  1 1 1 1  0 0 0 0];
-    config.amp_est_mode = 1; config.EsNodB = 0;
-    config.state_machine = "data";
+    config.tx_uw(config.Nuwbits) = 1;
+    config.amp_est_mode = 1; config.EsNodB = 3;
+    config.state_machine = "data"; config.amp_scale = 400E3;
   elseif strcmp(mode,"1")
     Ns=5; config.Np=10; Tcp=0; Tframe = 0.1; Ts = Tframe/Ns; Nc = 1;
   else
@@ -1333,9 +1334,10 @@ function states = sync_state_machine_data(states, rx_uw)
   end
 
   states.uw_errors = sum(xor(tx_uw,rx_uw));
-  %tx_uw(1:10)
-  %rx_uw(1:10)
-
+  if states.uw_errors == 0
+    printf("\n  tx_uw: "); printf("%d",tx_uw); printf("\n");
+    printf("  rx_uw: "); printf("%d",rx_uw); printf("\n");
+  end
   if strcmp(states.sync_state,'trial')
     if strcmp(states.sync_state,'trial')
       if states.uw_errors < states.bad_uw_errors;
@@ -1485,9 +1487,7 @@ function [code_param Nbitspercodecframe Ncodecframespermodemframe] = codec_to_fr
     code_param = ldpc_init_user(HRA, modulation, mod_order, mapping);
   end
   if strcmp(mode, "datac3")
-    load H_256_768_22.txt
-    code_param = ldpc_init_user(H_256_768_22, modulation, mod_order, mapping);
-    Nbitspercodecframe = Ncodecframespermodemframe = -1;
+    code_param = ldpc_init_builtin('wimax', 0.5, 576*4, modulation, mod_order, mapping);
   end
   if strcmp(mode, "datac1") || strcmp(mode, "datac2") || strcmp(mode, "datac3") || strcmp(mode, "qam16c1") || strcmp(mode, "qam16c2")
     printf("ldpc_data_bits_per_frame = %d\n", code_param.ldpc_data_bits_per_frame);
