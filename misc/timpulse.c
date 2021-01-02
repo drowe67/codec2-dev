@@ -2,8 +2,8 @@
   timpulse.c
   David Rowe Dec 2019
 
-  Generate an impulse train from a sum of sinusoids.  Test program for
-  phaseNN project.
+  Generate a synthetic speech signal from a sum of sinusoids.  Generates a known test
+  signals for phaseNN and ampNN projects.
 */
 
 #include <assert.h>
@@ -21,6 +21,7 @@ int main(int argc, char *argv[]) {
     int   Nsecs = 1;
     int   randf0 = 0;
     int   filter = 0;
+    int   rande = 0;
     
     int o = 0;
     int opt_idx = 0;
@@ -31,6 +32,7 @@ int main(int argc, char *argv[]) {
             {"f0",     required_argument, 0, 'f'},
             {"secs",   required_argument, 0, 's'},
             {"randf0", no_argument, 0, 'r'},
+            {"rande",  required_argument, 0, 'e'},
             {"filter", no_argument, 0, 'i'},
             {0, 0, 0, 0}
         };
@@ -53,16 +55,26 @@ int main(int argc, char *argv[]) {
         case 'i':
             filter = 1;
 	    break;
+        case 'e':
+            rande = atoi(optarg);
+	    break;
         case '?':
         case 'h':
-	    fprintf(stderr, "usage: %s [--f0 f0Hz] [--n0 samples] [--secs Nsecs]\n"
-	                    "[--randf0]  choose a random F0 every second\n\n", argv[0]);
+	    fprintf(stderr,
+		    "usage: %s\n"
+		    "[--f0 f0Hz]          fixed F0\n" 
+                    "[--n0 samples]       time offset\n" 
+                    "[--secs Nsecs]       number of seconds to generate\n"
+	            "[--randf0]           choose a random F0 every second\n"
+	            "[--rande Ndiscrete]  choose a random frame energy every second, Ndiscrete values\n"
+		    "\n", argv[0]);
 	    exit(1);      
 	break;
         }
     }
 
     int t = 0;
+    float A = 100.0;
     
     /* optionally filter with 2nd order system */
     float alpha = 0.25*M_PI, gamma=0.99;
@@ -70,19 +82,36 @@ int main(int argc, char *argv[]) {
     float mem[2] = {0};
     
     for (int j=0; j<Nsecs; j++) {
+	if (rande) {
+	    float AdB_min = 20.0*log10(100.0);
+	    float AdB_step = 6.0;
+	    float num_values = rande;
+
+	    // discrete RV between 0..1
+	    float r = (float)rand()/RAND_MAX;
+	    r = floor(r*num_values);
+	    
+	    float AdB = AdB_min + r*AdB_step;
+	    A = pow(10.0,AdB/20.0);
+	    fprintf(stderr, "r: %f AdB: %f A: %f\n", r, AdB, A);
+	}
 	if (randf0) {
-	    float pitch_period = FS/400.0 + (FS/50.0 - FS/400.0)*rand()/RAND_MAX;
+	    float pitch_period = FS/400.0 + (FS/80.0 - FS/400.0)*rand()/RAND_MAX;
 	    f0 = (float)FS/pitch_period;
-	    fprintf(stderr, "P: %f f0: %f\n", pitch_period, f0);
+	    //fprintf(stderr, "P: %f f0: %f\n", pitch_period, f0);
 	}
 	float Wo = 2.0*M_PI*f0/FS;
 	int L = M_PI/Wo;
+	float e = 0.0;
 	for(int i=0; i<FS; i++) {
 	    buf[i] = 0;
+	    // 1/sqrt(L) term makes power constant across Wo
 	    for(int m=1; m<L; m++)
-		buf[i] += (1000.0/L)*cos(m*Wo*(t + n0));
+		buf[i] += (A/sqrt(L))*cos(m*Wo*(t + n0));
+	    e += pow(buf[i], 2.0);
 	    t++;
 	}
+	//fprintf(stderr, "e (dB): %f\n", 10*log10(e));
 	if (filter) {
 	    for(int i=0; i<FS; i++) {
 		float x = (float)buf[i];
