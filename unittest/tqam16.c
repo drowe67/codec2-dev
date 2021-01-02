@@ -9,6 +9,7 @@
 \*---------------------------------------------------------------------------*/
 
 #include <stdio.h>
+#include <string.h>
 #include "ofdm_internal.h"
 
 int main(void) {
