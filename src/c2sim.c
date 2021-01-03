@@ -1007,8 +1007,7 @@ int main(int argc, char *argv[])
                     int nrec;
                     nrec = fread(&model_dec[i],sizeof(MODEL),1,fmodelin);
                     if (nrec != 1) {
-			fprintf(stderr, "Error reading model in record in frame %d - do you have enough records in file?\n", frames);
-			exit(1);
+			fprintf(stderr, "Warning - error reading model in record in frame %d - do you have enough records in file?\n", frames);
 		    }
                 }
 
