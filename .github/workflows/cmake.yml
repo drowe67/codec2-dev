@@ -39,7 +39,7 @@ jobs:
 
     - name: Setup CML Support
       shell: bash
-      run: $GITHUB_WORKSPACE/script/build_cml.sh
+      run: cd $HOME && $GITHUB_WORKSPACE/script/build_cml.sh
       
     - name: Build
       working-directory: ${{github.workspace}}/build_linux
