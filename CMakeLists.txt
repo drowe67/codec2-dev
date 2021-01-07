@@ -560,7 +560,14 @@ endif()
                             ./ldpc_dec - /dev/null --code H_4096_8192_3d --sd --testframes"
              )
 
-     # -------------------------------------------------------------------------
+    add_test(NAME test_ldpc_enc_dec_H_16200_9720
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            ./ldpc_enc /dev/zero - --sd --code H_16200_9720 --testframes 10 |
+                            ./ldpc_noise - - 0.5 |
+                            ./ldpc_dec - /dev/null --code H_16200_9720 --sd --testframes"
+             )
+
+    # -------------------------------------------------------------------------
     #                                FreeDV API
     # -------------------------------------------------------------------------
 
