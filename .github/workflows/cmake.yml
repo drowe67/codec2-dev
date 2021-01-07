@@ -36,7 +36,7 @@ jobs:
       # The CMake binaries on the Github Actions machines are (as of this writing) 3.12
       run: cmake $GITHUB_WORKSPACE
 
-    - name Setup CML Support
+    - name: Setup CML Support
       shell: bash
       run: $GITHUB_WORKSPACE/scripts/build_cml.sh
       
