@@ -19,8 +19,7 @@ jobs:
 
     - name: Install packages
       shell: bash
-      run: sudo apt install octave octave-common octave-signal liboctave-dev gnuplot \
-           sox p7zip-full python3-numpy valgrind 
+      run: sudo apt install octave octave-common octave-signal liboctave-dev gnuplot sox p7zip-full python3-numpy valgrind 
 
     - name: Create Build Directory
       shell: bash
