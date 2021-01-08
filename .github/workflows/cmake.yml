@@ -46,20 +46,19 @@ jobs:
       shell: bash
       run: |
            cd $HOME
-	   git clone https://github.com/drowe67/LPCNet.git 
-           cd LPCNet
-	   mkdir -p build_linux
-	   cmake -DCODEC2_BUILD_DIR=$GITHUB_WORKSPACE/build_linux ..
-	   make
-	   cd src && sox ../../wav/wia.wav -t raw -r 16000 - | ./lpcnet_enc -s | ./lpcnet_dec -s > /dev/null
-	   
+           git clone https://github.com/drowe67/LPCNet.git 
+           cd LPCNet && mkdir -p build_linux && cd build_linux 
+           cmake -DCODEC2_BUILD_DIR=$GITHUB_WORKSPACE/build_linux ..
+           make
+           cd src && sox ../../wav/wia.wav -t raw -r 16000 - | ./lpcnet_enc -s | ./lpcnet_dec -s > /dev/null
+
     - name: Rebuild codec2 with LPCNet
       working-directory: ${{github.workspace}}/build_linux
       shell: bash
-      # First pass build of codec2 without LPCNet 
+      # Second pass build of codec2 with LPCNet 
       run: |
-           cmake -DLPCNET_BUILD_DIR=$HOME/LPCNet/build_linux
-	   make -j4
+           cmake -DLPCNET_BUILD_DIR=$HOME/LPCNet/build_linux $GITHUB_WORKSPACE
+           make -j4
       
     - name: Run ctests
       working-directory: ${{github.workspace}}/build_linux
