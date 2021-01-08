@@ -55,9 +55,9 @@ jobs:
     - name: Rebuild codec2 with LPCNet
       working-directory: ${{github.workspace}}/build_linux
       shell: bash
-      # First pass build of codec2 without LPCNet 
+      # Second pass build of codec2 with LPCNet 
       run: |
-           cmake -DLPCNET_BUILD_DIR=$HOME/LPCNet/build_linux
+           cmake -DLPCNET_BUILD_DIR=$HOME/LPCNet/build_linux $GITHUB_WORKSPACE
            make -j4
       
     - name: Run ctests
