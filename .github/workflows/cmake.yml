@@ -47,7 +47,8 @@ jobs:
       run: |
            cd $HOME
            git clone https://github.com/drowe67/LPCNet.git 
-           cd LPCNet && mkdir -p build_linux && cmake -DCODEC2_BUILD_DIR=$GITHUB_WORKSPACE/build_linux ..
+           cd LPCNet && mkdir -p build_linux && cd build_linux 
+           cmake -DCODEC2_BUILD_DIR=$GITHUB_WORKSPACE/build_linux ..
            make
            cd src && sox ../../wav/wia.wav -t raw -r 16000 - | ./lpcnet_enc -s | ./lpcnet_dec -s > /dev/null
 
