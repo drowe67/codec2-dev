@@ -1,4 +1,4 @@
-!/bin/bash
+#!/bin/bash
 wget http://www.iterativesolutions.com/user/image/cml.1.10.zip
 unzip cml.1.10.zip
 ls ${GITHUB_WORKSPACE}/octave/cml.patch
