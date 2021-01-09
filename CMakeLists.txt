@@ -480,12 +480,12 @@ endif()
              set_tests_properties(test_OFDM_modem_datac2_octave PROPERTIES PASS_REGULAR_EXPRESSION "Coded PER: 0.0000 Pckts:     4")
 
     # DATAC3 C Tx, Octave Rx
-    add_test(NAME test_OFDM_modem_datac3_octave
-             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR};
-                            ./src/ofdm_mod --mode datac3 --in /dev/zero --testframes 20 --verbose 1 --ldpc > test.raw;
-                            cd ${CMAKE_CURRENT_SOURCE_DIR}/octave;
-                            DISPLAY=\"\" octave-cli -qf --eval 'ofdm_ldpc_rx(\"${CMAKE_CURRENT_BINARY_DIR}/test.raw\",\"datac3\")'")
-             set_tests_properties(test_OFDM_modem_datac3_octave PROPERTIES PASS_REGULAR_EXPRESSION "Coded PER: 0.0000 Pckts:    16")
+    #add_test(NAME test_OFDM_modem_datac3_octave
+    #         COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR};
+    #                        ./src/ofdm_mod --mode datac3 --in /dev/zero --testframes 20 --verbose 1 --ldpc > test.raw;
+    #                        cd ${CMAKE_CURRENT_SOURCE_DIR}/octave;
+    #                        DISPLAY=\"\" octave-cli -qf --eval 'ofdm_ldpc_rx(\"${CMAKE_CURRENT_BINARY_DIR}/test.raw\",\"datac3\")'")
+    #         set_tests_properties(test_OFDM_modem_datac3_octave PROPERTIES PASS_REGULAR_EXPRESSION "Coded PER: 0.0000 Pckts:    16")
 
     # DATAC1 C Tx, C Rx, uncoded
     add_test(NAME test_OFDM_modem_datac1
