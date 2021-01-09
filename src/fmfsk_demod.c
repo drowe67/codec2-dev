@@ -28,6 +28,7 @@
 */
 
 #include <stdio.h>
+#include <string.h>
 #include "fmfsk.h"
 #include "modem_stats.h"
 #define MODEMPROBE_ENABLE

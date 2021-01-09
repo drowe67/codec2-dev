@@ -9,6 +9,7 @@
 \*---------------------------------------------------------------------------*/
 
 #include <assert.h>
+#include <string.h>
 #include "comp.h"
 #include "ofdm_internal.h"
 #include "ofdm_mode.h"

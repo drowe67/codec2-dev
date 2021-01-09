@@ -64,7 +64,7 @@
 // peak (complex) sample value from Tx modulator
 #define FREEDV_PEAK             16384
 
-// Return code flags for freedv_*rx* functions
+// Return code flags for freedv_get_rx_status() function
 #define FREEDV_RX_TRIAL_SYNC       0x1       // demodulator has trial sync
 #define FREEDV_RX_SYNC             0x2       // demodulator has sync
 #define FREEDV_RX_BITS             0x4       // data bits have been returned
@@ -74,6 +74,8 @@
 #define FREEDV_SYNC_UNSYNC 0                 // force sync state machine to lose sync, and search for new sync
 #define FREEDV_SYNC_AUTO   1                 // falls out of sync automatically
 #define FREEDV_SYNC_MANUAL 2                 // fall out of sync only under operator control
+
+#define FREEDV_VARICODE_MAX_BITS  12         // max bits for each ASCII character
 
 // These macros allow us to disable unwanted modes at compile tine, for example
 // to save memory on embedded systems or the remove need to link other

@@ -47,12 +47,14 @@ int main(int argc, char *argv[]) {
     int                        mode;
     int                        verbose = 0, use_testframes = 0;
     int                        mask = 0;
+    int                        resetsync = 0;
 
     if (argc < 3) {
     helpmsg:
       	fprintf(stderr, "usage: %s [options] FSK_LDPC|DATAC1|DATAC2|DATAC3 InputModemSpeechFile BinaryDataFile\n"
-               "  -v or --vv      verbose options\n"
-               "  --testframes    count raw and coded errors in testframes sent by tx\n"
+               "  -v or --vv              verbose options\n"
+               "  --testframes            count raw and coded errors in testframes sent by tx\n"
+               "  --resetsync  Nframes    reset sync after Nframes received\n"
                "\n"
                "For FSK_LDPC only:\n\n"
                "  -m      2|4     number of FSK tones\n"
@@ -73,6 +75,7 @@ int main(int argc, char *argv[]) {
             {"Rs",         required_argument,  0, 'r'},
             {"vv",         no_argument,        0, 'x'},
             {"mask",       required_argument,  0, 'k'},
+            {"resetsync",  required_argument,  0, 's'},
             {0, 0, 0, 0}
         };
 
@@ -91,6 +94,9 @@ int main(int argc, char *argv[]) {
             break;
         case 'r':
             adv.Rs = atoi(optarg);
+            break;
+        case 's':
+            resetsync = atoi(optarg);
             break;
         case 't':
             use_testframes = 1;
@@ -178,6 +184,8 @@ int main(int argc, char *argv[]) {
             fwrite(bytes_out, sizeof(uint8_t), nbytes-2, fout);
             nbytes_out += nbytes-2;
             nframes_out++;
+            if (resetsync && (nframes_out >= resetsync))
+                freedv_set_sync(freedv, FREEDV_SYNC_UNSYNC);
         }
 
         if (verbose == 3) {
