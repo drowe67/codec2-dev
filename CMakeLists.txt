@@ -309,9 +309,14 @@ elseif(UNIX AND NOT APPLE)
     # Linux packaging
     SET(CPACK_GENERATOR "DEB")
     SET(CPACK_DEBIAN_PACKAGE_MAINTAINER "Mooneer Salem <mooneer@gmail.com>") #required
-    SET(CPACK_DEBIAN_PACKAGE_DEPENDS "LPCNet (>= 0.2.0)")
     SET(CPACK_DEB_COMPONENT_INSTALL ON)
+    SET(CPACK_DEBIAN_FILE_NAME DEB-DEFAULT)
+    SET(CPACK_DEBIAN_ENABLE_COMPONENT_DEPENDS ON)
+    SET(CPACK_DEBIAN_LIB_PACKAGE_NAME "codec2")
+    SET(CPACK_DEBIAN_PACKAGE_DEPENDS "LPCNet (>= 0.2.0)")
     include(CPack)
+    cpack_add_component(lib REQUIRED)
+    cpack_add_component(dev DEPENDS lib)
 endif(WIN32)
 
 ########################################################################
