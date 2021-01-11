@@ -273,14 +273,24 @@ else()
 endif()
 message(STATUS "Libraries linked: " ${CMAKE_REQUIRED_LIBRARIES})
 
-#
-# Cpack NSIS installer configuration for Windows.
-# See: http://nsis.sourceforge.net/Download
-#
-# *nix systems should use "make install" and/or appropriate
-# distribution packaging tools.
-#
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Next-Generation Digital Voice for Two-Way Radio")
+set(CPACK_PACKAGE_VENDOR "CMake")
+set(CPACK_PACKAGE_DESCRIPTION_FILE "${CMAKE_CURRENT_SOURCE_DIR}/README.md")
+set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/COPYING")
+set(CPACK_PACKAGE_VERSION_MAJOR ${CODEC2_VERSION_MAJOR})
+set(CPACK_PACKAGE_VERSION_MINOR ${CODEC2_VERSION_MINOR})
+if(CODEC2_VERSION_PATCH)
+    set(CPACK_PACKAGE_VERSION_PATCH ${CODEC2_VERSION_PATCH})
+else()
+    set(CPACK_PACKAGE_VERSION_PATCH 0)
+endif()
+
 if(WIN32)
+    #
+    # Cpack NSIS installer configuration for Windows.
+    # See: http://nsis.sourceforge.net/Download
+    #
+
     # Detect if we're doing a 32-bit or 64-bit windows build.
     if(${CMAKE_SIZEOF_VOID_P} EQUAL 8)
         set(CMAKE_CL_64 TRUE)
@@ -289,23 +299,24 @@ if(WIN32)
         @ONLY
     )
     install(SCRIPT ${CMAKE_BINARY_DIR}/cmake/GetDependencies.cmake)
-    set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Next-Generation Digital Voice for Two-Way Radio")
-    set(CPACK_PACKAGE_VENDOR "CMake")
-    set(CPACK_PACKAGE_DESCRIPTION_FILE "${CMAKE_CURRENT_SOURCE_DIR}/README.md")
-    set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/COPYING")
-    set(CPACK_PACKAGE_VERSION_MAJOR ${CODEC2_VERSION_MAJOR})
-    set(CPACK_PACKAGE_VERSION_MINOR ${CODEC2_VERSION_MINOR})
-    if(CODEC2_VERSION_PATCH)
-        set(CPACK_PACKAGE_VERSION_PATCH ${CODEC2_VERSION_PATCH})
-    else()
-        set(CPACK_PACKAGE_VERSION_PATCH 0)
-    endif()
     set(CPACK_PACKAGE_INSTALL_DIRECTORY "Codec2")
     set(CPACK_CREATE_DESKTOP_LINKS "")
     set(CPACK_NSIS_DISPLAY_NAME "${CPACK_PACKAGE_INSTALL_DIRECTORY}")
     set(CPACK_NSIS_URL_INFO_ABOUT "http://rowetel.com/codec2.html")
     set(CPACK_NSIS_MODIFY_PATH ON)
     include(CPack)
+elseif(UNIX AND NOT APPLE)
+    # Linux packaging
+    SET(CPACK_GENERATOR "DEB")
+    SET(CPACK_DEBIAN_PACKAGE_MAINTAINER "Mooneer Salem <mooneer@gmail.com>") #required
+    SET(CPACK_DEB_COMPONENT_INSTALL ON)
+    SET(CPACK_DEBIAN_FILE_NAME DEB-DEFAULT)
+    SET(CPACK_DEBIAN_ENABLE_COMPONENT_DEPENDS ON)
+    SET(CPACK_DEBIAN_LIB_PACKAGE_NAME "codec2")
+    SET(CPACK_DEBIAN_PACKAGE_DEPENDS "LPCNet (>= 0.2.0)")
+    include(CPack)
+    cpack_add_component(lib REQUIRED)
+    cpack_add_component(dev DEPENDS lib)
 endif(WIN32)
 
 ########################################################################

@@ -227,5 +227,11 @@ Codec 2 can be added to the project in the following way.
      
 1. Add Codec 2 to the target_link_libraries in the same file.
 
+## Building Debian packages
 
+To build Debian packages, simply run the "cpack" command after running "make". This will generate the following packages:
 
++ codec2: Contains the .so and .a files for linking/executing applications dependent on Codec2.
+* codec2-dev: Contains the header files for development using Codec2.
+
+Once generated, they can be installed with "dpkg -i" (once LPCNet is installed). If LPCNet is not desired, CMakeLists.txt can be modified to remove that dependency.
