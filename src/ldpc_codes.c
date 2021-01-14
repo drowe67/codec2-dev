@@ -21,6 +21,7 @@
 #include "HRA_56_56.h"
 #include "H_4096_8192_3d.h"
 #include "H_16200_9720.h"
+#include "H_1024_2048_4f.h"
 
 struct LDPC ldpc_codes[] = {
     /* short rate 1/2 code for FreeDV 700D */
@@ -183,6 +184,22 @@ struct LDPC ldpc_codes[] = {
         H_16200_9720_MAX_COL_WEIGHT,
         (uint16_t *)H_16200_9720_H_rows,
         (uint16_t *)H_16200_9720_H_cols
+    },
+     
+    /* Another fine code from Bill VK5DSK - also useful for HF data */ 
+    {
+        "H_1024_2048_4f",
+        H_1024_2048_4f_MAX_ITER,
+        0,
+        1,
+        1,
+        H_1024_2048_4f_CODELENGTH,
+        H_1024_2048_4f_NUMBERPARITYBITS,
+        H_1024_2048_4f_NUMBERROWSHCOLS,
+        H_1024_2048_4f_MAX_ROW_WEIGHT,
+        H_1024_2048_4f_MAX_COL_WEIGHT,
+        (uint16_t *)H_1024_2048_4f_H_rows,
+        (uint16_t *)H_1024_2048_4f_H_cols
     }
 #endif
 };
