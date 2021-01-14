@@ -777,7 +777,7 @@ void fsk_demod_core(struct FSK *fsk, uint8_t rx_bits[], float rx_filt[], COMP fs
         /* resample at ideal sampling instant */
         int st = (i+1)*P;
         for( m=0; m<M; m++) {
-            t[m] =           fcmult(1-fract,f_int[m][st+ low_sample]);
+            t[m] =           fcmult(1-fract,f_int[m][st+low_sample]);
             t[m] = cadd(t[m],fcmult(  fract,f_int[m][st+high_sample]));
             /* Figure mag^2 of each resampled fx_int */
             tmax[m] = (t[m].real*t[m].real) + (t[m].imag*t[m].imag);
@@ -899,8 +899,9 @@ void fsk_demod_core(struct FSK *fsk, uint8_t rx_bits[], float rx_filt[], COMP fs
                   j*neweyesamp_dec: For 2*P>MODEM_STATS_EYE_IND_MAX advance through integrated 
                                     samples newamp_dec at a time so we dont overflow rx_eye[][]
                */
-               ind = 2*P*i + neyeoffset + j*neyesamp_dec;
+               ind = 2*P*(i+1) + neyeoffset + j*neyesamp_dec;
                assert((i*M+m) < MODEM_STATS_ET_MAX);
+               assert(ind >= 0);
                assert(ind < (nsym+1)*P);
                fsk->stats->rx_eye[i*M+m][j] = cabsolute(f_int[m][ind]);
             }
