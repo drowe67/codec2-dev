@@ -301,14 +301,13 @@ function config = ofdm_init_mode(mode="700D")
     Ns=5; config.Np=36; Tcp = 0.006; Ts = 0.016; Nc = 9; config.data_mode = 1;
     config.Ntxtbits = 0; config.Nuwbits = 12; config.bad_uw_errors = 1;
     config.state_machine = "data";
-    config.ftwindow_width = 32; config.amp_est_mode = 1; config.EsNodB = 10;
+    config.ftwindow_width = 80; config.amp_est_mode = 1; config.EsNodB = 10;
   elseif strcmp(mode,"datac3")
-    Ns=5; config.Np=37; Tcp = 0.006; Ts = 0.016; Nc = 8; config.data_mode = 1;
+    Ns=5; config.Np=33; Tcp = 0.006; Ts = 0.016; Nc = 8; config.data_mode = 1;
     config.Ntxtbits = 0; config.Nuwbits = 64; config.bad_uw_errors = 15;
     config.ftwindow_width = 80; config.timing_mx_thresh = 0.30;
     config.tx_uw = zeros(1,config.Nuwbits);
     config.tx_uw(1:24) = [1 1 0 0  1 0 1 0  1 1 1 1  0 0 0 0  1 1 1 1  0 0 0 0];
-    config.tx_uw(config.Nuwbits) = 1;
     config.amp_est_mode = 1; config.EsNodB = 3;
     config.state_machine = "data"; config.amp_scale = 400E3;
   elseif strcmp(mode,"1")
@@ -1487,7 +1486,8 @@ function [code_param Nbitspercodecframe Ncodecframespermodemframe] = codec_to_fr
     code_param = ldpc_init_user(HRA, modulation, mod_order, mapping);
   end
   if strcmp(mode, "datac3")
-    code_param = ldpc_init_builtin('wimax', 0.5, 576*4, modulation, mod_order, mapping);
+    load H_1024_2048_4f.mat
+    code_param = ldpc_init_user(H, modulation, mod_order, mapping);
   end
   if strcmp(mode, "datac1") || strcmp(mode, "datac2") || strcmp(mode, "datac3") || strcmp(mode, "qam16c1") || strcmp(mode, "qam16c2")
     printf("ldpc_data_bits_per_frame = %d\n", code_param.ldpc_data_bits_per_frame);
