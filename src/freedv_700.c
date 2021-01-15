@@ -472,7 +472,7 @@ int freedv_comp_short_rx_ofdm(struct freedv *f, void *demod_in_8kHz, int demod_i
 
             }
 
-            if (f->test_frames && (rx_status & FREEDV_RX_BITS)) {
+            if (f->test_frames) {
                 /* est uncoded BER from payload bits */
                 Nerrs_raw = count_uncoded_errors(ldpc, &f->ofdm->config, payload_syms_de, ofdm->data_mode);
                 f->total_bit_errors += Nerrs_raw;

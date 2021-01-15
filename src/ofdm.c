@@ -435,7 +435,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     // work out how many frames UW is spread over
     int symsperframe = ofdm->bitsperframe / ofdm->bps;
     ofdm->nuwframes = (int) ceilf((float)ofdm->uw_ind_sym[nuwsyms-1]/symsperframe);
-
+     
     ofdm->tx_uw_syms = MALLOC(sizeof (complex float) * (ofdm->nuwbits / ofdm->bps));
     assert(ofdm->tx_uw_syms != NULL);
 
@@ -1729,8 +1729,7 @@ void ofdm_sync_state_machine_data(struct OFDM *ofdm, uint8_t *rx_uw) {
         }
     }
 
-    ofdm->uw_errors = 0;
-
+    ofdm->uw_errors = 0;        
     for (i = 0; i < ofdm->nuwbits; i++) {
         ofdm->uw_errors += ofdm->tx_uw[i] ^ rx_uw[i];
     }

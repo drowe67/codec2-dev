@@ -213,6 +213,9 @@ int main(int argc, char *argv[]) {
         int Terrs_coded = freedv_get_total_bit_errors_coded(freedv);
         float coded_ber = (float)Terrs_coded/Tbits_coded;
         fprintf(stderr, "Coded BER: %5.4f Tbits: %5d Terrs: %5d\n", (double)coded_ber, Tbits_coded, Terrs_coded);
+        int Tpackets = freedv_get_total_packets(freedv);
+        int Tpacket_errors = freedv_get_total_packet_errors(freedv);
+        fprintf(stderr, "Coded PER: %5.4f Tpkts: %5d Tpers: %5d\n", (float)Tpacket_errors/Tpackets, Tpackets, Tpacket_errors);
         /* set return code for Ctest */
         if ((uncoded_ber < 0.1f) && (coded_ber < 0.01f))
             return 0;

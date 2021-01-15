@@ -934,7 +934,7 @@ endif(NOT APPLE)
 
      add_test(NAME test_freedv_data_raw_ofdm_datac3
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
-                            head -c $((30*10)) </dev/urandom > binaryIn.bin;
+                            head -c $((126*10)) </dev/urandom > binaryIn.bin;
                             ./freedv_data_raw_tx DATAC3 binaryIn.bin - |
                             ./freedv_data_raw_rx DATAC3 - binaryOut.bin -v;
                             diff binaryIn.bin binaryOut.bin")
