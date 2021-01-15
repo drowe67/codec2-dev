@@ -63,16 +63,20 @@ set(CODEBOOKSNEWAMP2_ENERGY
 
 # when crosscompiling we need a native executable
 if(CMAKE_CROSSCOMPILING)
+    set(CMAKE_DISABLE_SOURCE_CHANGES OFF)
     include(ExternalProject)
     ExternalProject_Add(codec2_native
-       SOURCE_DIR ${CMAKE_SOURCE_DIR}
-       BUILD_COMMAND $(MAKE) generate_codebook
-       INSTALL_COMMAND ${CMAKE_COMMAND} -E copy src/generate_codebook ${CMAKE_CURRENT_BINARY_DIR}
+       SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/..
+       BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR}/codec2_native
+       BUILD_COMMAND ${CMAKE_COMMAND} --build . --target generate_codebook
+       INSTALL_COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/codec2_native/src/generate_codebook ${CMAKE_CURRENT_BINARY_DIR}
+       BUILD_BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/generate_codebook
     )
     add_executable(generate_codebook IMPORTED)
     set_target_properties(generate_codebook PROPERTIES
         IMPORTED_LOCATION ${CMAKE_CURRENT_BINARY_DIR}/generate_codebook)
     add_dependencies(generate_codebook codec2_native)
+    set(CMAKE_DISABLE_SOURCE_CHANGES ON)
 else(CMAKE_CROSSCOMPILING)
 # Build code generator binaries. These do not get installed.
     # generate_codebook
@@ -203,6 +207,9 @@ set(CODEC2_SRCS
     HRAa_1536_512.c
     H_128_256_5.c
     H_2064_516_sparse.c
+    H_4096_8192_3d.c
+    H_16200_9720.c
+    H_1024_2048_4f.c
     ldpc_codes.c
     lpcnet_freq.c
 )
@@ -388,8 +395,8 @@ add_executable(ldpc_dec ldpc_dec.c)
 target_link_libraries(ldpc_dec ${CMAKE_REQUIRED_LIBRARIES} codec2)
 
 install(TARGETS codec2 EXPORT codec2-config
-    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT lib
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT lib
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-    PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/codec2
+    PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/codec2 COMPONENT dev
 )

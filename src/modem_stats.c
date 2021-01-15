@@ -29,6 +29,7 @@
 #include <math.h>
 #include "modem_stats.h"
 #include "codec2_fdmdv.h"
+#include "kiss_fft.h"
 
 void modem_stats_open(struct MODEM_STATS *f)
 {
@@ -39,11 +40,11 @@ void modem_stats_open(struct MODEM_STATS *f)
     memset(f, 0, sizeof(struct MODEM_STATS));
 
     /* init the FFT */
-    
+
 #ifndef __EMBEDDED__
     for(i=0; i<2*MODEM_STATS_NSPEC; i++)
 	f->fft_buf[i] = 0.0;
-    f->fft_cfg = kiss_fft_alloc (2*MODEM_STATS_NSPEC, 0, NULL, NULL);
+    f->fft_cfg = (void*)kiss_fft_alloc (2*MODEM_STATS_NSPEC, 0, NULL, NULL);
     assert(f->fft_cfg != NULL);
 #endif
 }
@@ -107,7 +108,7 @@ void modem_stats_get_rx_spectrum(struct MODEM_STATS *f, float mag_spec_dB[], COM
 	fft_in[i].imag = 0.0;
     }
 
-    kiss_fft(f->fft_cfg, (kiss_fft_cpx *)fft_in, (kiss_fft_cpx *)fft_out);
+    kiss_fft((kiss_fft_cfg)f->fft_cfg, (kiss_fft_cpx *)fft_in, (kiss_fft_cpx *)fft_out);
 
     /* FFT scales up a signal of level 1 FDMDV_NSPEC */
 

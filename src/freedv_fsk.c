@@ -581,6 +581,7 @@ int freedv_comprx_fsk(struct freedv *f, COMP demod_in[]) {
             demod_in_float[i] = demod_in[i].real;
         }
         fmfsk_demod(f->fmfsk,(uint8_t*)f->tx_bits,demod_in_float);
+        f->snr_est = f->fmfsk->snr_mean;
         f->nin = fmfsk_nin(f->fmfsk);
     }
 

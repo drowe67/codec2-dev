@@ -273,14 +273,24 @@ else()
 endif()
 message(STATUS "Libraries linked: " ${CMAKE_REQUIRED_LIBRARIES})
 
-#
-# Cpack NSIS installer configuration for Windows.
-# See: http://nsis.sourceforge.net/Download
-#
-# *nix systems should use "make install" and/or appropriate
-# distribution packaging tools.
-#
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Next-Generation Digital Voice for Two-Way Radio")
+set(CPACK_PACKAGE_VENDOR "CMake")
+set(CPACK_PACKAGE_DESCRIPTION_FILE "${CMAKE_CURRENT_SOURCE_DIR}/README.md")
+set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/COPYING")
+set(CPACK_PACKAGE_VERSION_MAJOR ${CODEC2_VERSION_MAJOR})
+set(CPACK_PACKAGE_VERSION_MINOR ${CODEC2_VERSION_MINOR})
+if(CODEC2_VERSION_PATCH)
+    set(CPACK_PACKAGE_VERSION_PATCH ${CODEC2_VERSION_PATCH})
+else()
+    set(CPACK_PACKAGE_VERSION_PATCH 0)
+endif()
+
 if(WIN32)
+    #
+    # Cpack NSIS installer configuration for Windows.
+    # See: http://nsis.sourceforge.net/Download
+    #
+
     # Detect if we're doing a 32-bit or 64-bit windows build.
     if(${CMAKE_SIZEOF_VOID_P} EQUAL 8)
         set(CMAKE_CL_64 TRUE)
@@ -289,23 +299,24 @@ if(WIN32)
         @ONLY
     )
     install(SCRIPT ${CMAKE_BINARY_DIR}/cmake/GetDependencies.cmake)
-    set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Next-Generation Digital Voice for Two-Way Radio")
-    set(CPACK_PACKAGE_VENDOR "CMake")
-    set(CPACK_PACKAGE_DESCRIPTION_FILE "${CMAKE_CURRENT_SOURCE_DIR}/README.md")
-    set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/COPYING")
-    set(CPACK_PACKAGE_VERSION_MAJOR ${CODEC2_VERSION_MAJOR})
-    set(CPACK_PACKAGE_VERSION_MINOR ${CODEC2_VERSION_MINOR})
-    if(CODEC2_VERSION_PATCH)
-        set(CPACK_PACKAGE_VERSION_PATCH ${CODEC2_VERSION_PATCH})
-    else()
-        set(CPACK_PACKAGE_VERSION_PATCH 0)
-    endif()
     set(CPACK_PACKAGE_INSTALL_DIRECTORY "Codec2")
     set(CPACK_CREATE_DESKTOP_LINKS "")
     set(CPACK_NSIS_DISPLAY_NAME "${CPACK_PACKAGE_INSTALL_DIRECTORY}")
     set(CPACK_NSIS_URL_INFO_ABOUT "http://rowetel.com/codec2.html")
     set(CPACK_NSIS_MODIFY_PATH ON)
     include(CPack)
+elseif(UNIX AND NOT APPLE)
+    # Linux packaging
+    SET(CPACK_GENERATOR "DEB")
+    SET(CPACK_DEBIAN_PACKAGE_MAINTAINER "Mooneer Salem <mooneer@gmail.com>") #required
+    SET(CPACK_DEB_COMPONENT_INSTALL ON)
+    SET(CPACK_DEBIAN_FILE_NAME DEB-DEFAULT)
+    SET(CPACK_DEBIAN_ENABLE_COMPONENT_DEPENDS ON)
+    SET(CPACK_DEBIAN_LIB_PACKAGE_NAME "codec2")
+    SET(CPACK_DEBIAN_PACKAGE_DEPENDS "LPCNet (>= 0.2.0)")
+    include(CPack)
+    cpack_add_component(lib REQUIRED)
+    cpack_add_component(dev DEPENDS lib)
 endif(WIN32)
 
 ########################################################################
@@ -459,23 +470,45 @@ endif()
     #                                OFDM Data modes
     # -------------------------------------------------------------------------
 
-    # C Tx, Octave Rx
+    # To integrate a new mode/waveform we prototype in Octave, get the core OFDM modem
+    # running in C, then the FreeDV API.  Here we test Octave and the C versions of the
+    # OFDM modem together
+
+    # DATAC1 C Tx, Octave Rx
     add_test(NAME test_OFDM_modem_datac1_octave
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR};
-                            ./src/ofdm_mod --mode datac1 --in /dev/zero --testframes 5 --verbose 1 > test.raw;
+                            ./src/ofdm_mod --mode datac1 --in /dev/zero --testframes 20 --verbose 1 --ldpc > test.raw;
                             cd ${CMAKE_CURRENT_SOURCE_DIR}/octave;
-                            DISPLAY=\"\" octave-cli -qf --eval 'ofdm_rx(\"${CMAKE_CURRENT_BINARY_DIR}/test.raw\",\"datac1\")'")
-             set_tests_properties(test_OFDM_modem_datac1_octave PROPERTIES PASS_REGULAR_EXPRESSION "BER..: 0.0000")
-    # C Tx, C Rx, uncoded
+                            DISPLAY=\"\" octave-cli -qf --eval 'ofdm_ldpc_rx(\"${CMAKE_CURRENT_BINARY_DIR}/test.raw\",\"datac1\")'")
+             set_tests_properties(test_OFDM_modem_datac1_octave PROPERTIES PASS_REGULAR_EXPRESSION "Coded PER: 0.0000 Pckts:     4")
+
+    # DATAC2 C Tx, Octave Rx
+    add_test(NAME test_OFDM_modem_datac2_octave
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR};
+                            ./src/ofdm_mod --mode datac2 --in /dev/zero --testframes 20 --verbose 1 --ldpc > test.raw;
+                            cd ${CMAKE_CURRENT_SOURCE_DIR}/octave;
+                            DISPLAY=\"\" octave-cli -qf --eval 'ofdm_ldpc_rx(\"${CMAKE_CURRENT_BINARY_DIR}/test.raw\",\"datac2\")'")
+             set_tests_properties(test_OFDM_modem_datac2_octave PROPERTIES PASS_REGULAR_EXPRESSION "Coded PER: 0.0000 Pckts:     4")
+
+    # DATAC3 C Tx, Octave Rx
+    add_test(NAME test_OFDM_modem_datac3_octave
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR};
+                            ./src/ofdm_mod --mode datac3 --in /dev/zero --testframes 20 --verbose 1 --ldpc > test.raw;
+                            cd ${CMAKE_CURRENT_SOURCE_DIR}/octave;
+                            DISPLAY=\"\" octave-cli -qf --eval 'ofdm_ldpc_rx(\"${CMAKE_CURRENT_BINARY_DIR}/test.raw\",\"datac3\")'")
+             set_tests_properties(test_OFDM_modem_datac3_octave PROPERTIES PASS_REGULAR_EXPRESSION "Coded PER: 0.0000 Pckts:     5")
+
+    # DATAC1 C Tx, C Rx, uncoded
     add_test(NAME test_OFDM_modem_datac1
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
                             ./ofdm_mod   --mode datac1 --in  /dev/zero --testframes 10 --verbose 1 |
                             ./ofdm_demod --mode datac1 --out /dev/null --testframes   --verbose 1")
-    # C Tx, C Rx, coded
+
+    # DATAC1 C Tx, C Rx, coded
     add_test(NAME test_OFDM_modem_datac1_ldpc
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
                             ./ofdm_mod   --mode datac1 --in  /dev/zero --testframes 10 --ldpc --verbose 1 |
-                            ./ofdm_demod --mode datac1 --out /dev/null  --testframes    --ldpc --verbose 1")
+                            ./ofdm_demod --mode datac1 --out /dev/null  --testframes --ldpc --verbose 1")
 
     # -------------------------------------------------------------------------
     #                                LDPC
@@ -531,7 +564,32 @@ endif()
                             ./ldpc_dec - /dev/null --code H_128_256_5 --sd --testframes"
              )
 
-    add_test(NAME test_freedv_api_1600
+    add_test(NAME test_ldpc_enc_dec_H_4096_8192_3d
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            ./ldpc_enc /dev/zero - --sd --code H_4096_8192_3d --testframes 100 |
+                            ./ldpc_noise - - 0.0 |
+                            ./ldpc_dec - /dev/null --code H_4096_8192_3d --sd --testframes"
+             )
+
+    add_test(NAME test_ldpc_enc_dec_H_16200_9720
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            ./ldpc_enc /dev/zero - --sd --code H_16200_9720 --testframes 10 |
+                            ./ldpc_noise - - 0.5 |
+                            ./ldpc_dec - /dev/null --code H_16200_9720 --sd --testframes"
+             )
+
+    add_test(NAME test_ldpc_enc_dec_H_1024_2048_4f
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            ./ldpc_enc /dev/zero - --sd --code H_1024_2048_4f --testframes 100 |
+                            ./ldpc_noise - - 0.0 |
+                            ./ldpc_dec - /dev/null --code H_1024_2048_4f --sd --testframes"
+             )
+
+    # -------------------------------------------------------------------------
+    #                                FreeDV API
+    # -------------------------------------------------------------------------
+
+   add_test(NAME test_freedv_api_1600
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
                             ./freedv_tx 1600 ../../raw/ve9qrp_10s.raw - | ./freedv_rx 1600 - /dev/null")
              set_tests_properties(test_freedv_api_1600 PROPERTIES PASS_REGULAR_EXPRESSION "frames decoded: 503")
@@ -873,7 +931,7 @@ endif(NOT APPLE)
      # OFDM LDPC
      add_test(NAME test_freedv_data_raw_ofdm_datac1
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
-                            head -c $((256*10)) </dev/urandom > binaryIn.bin;
+                            head -c $((510*10)) </dev/urandom > binaryIn.bin;
                             ./freedv_data_raw_tx DATAC1 binaryIn.bin - |
                             ./freedv_data_raw_rx DATAC1 - binaryOut.bin -v;
                             diff binaryIn.bin binaryOut.bin")
@@ -887,7 +945,7 @@ endif(NOT APPLE)
 
      add_test(NAME test_freedv_data_raw_ofdm_datac3
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
-                            head -c $((30*10)) </dev/urandom > binaryIn.bin;
+                            head -c $((126*10)) </dev/urandom > binaryIn.bin;
                             ./freedv_data_raw_tx DATAC3 binaryIn.bin - |
                             ./freedv_data_raw_rx DATAC3 - binaryOut.bin -v;
                             diff binaryIn.bin binaryOut.bin")

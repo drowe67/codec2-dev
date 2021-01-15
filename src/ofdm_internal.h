@@ -46,7 +46,7 @@ extern "C"
 
 #define TAU         (2.0f * M_PI)
 #define ROT45       (M_PI / 4.0f)
-#define MAX_UW_BITS 32
+#define MAX_UW_BITS 64
 
 #define cmplx(value) (cosf(value) + sinf(value) * I)
 #define cmplxconj(value) (cosf(value) + sinf(value) * -I)

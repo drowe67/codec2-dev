@@ -120,6 +120,7 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
     struct freedv *f;
 
     assert(FREEDV_PEAK == OFDM_PEAK);
+    assert(FREEDV_VARICODE_MAX_BITS == VARICODE_MAX_BITS);
 
     if ((FDV_MODE_ACTIVE( FREEDV_MODE_1600,   mode)   ||
          FDV_MODE_ACTIVE( FREEDV_MODE_700C,   mode)   ||
@@ -854,7 +855,7 @@ int freedv_bits_to_speech(struct freedv *f, short speech_out[], short demod_in[]
            }
            else {
                /* sync is solid - decode even through fades as there is still some speech info there */
-               if (f->stats.snr_est > f->snr_squelch_thresh)
+               if (f->snr_est > f->snr_squelch_thresh)
                    decode_speech = 1;
            }
        }
@@ -1248,7 +1249,7 @@ void freedv_set_carrier_ampl(struct freedv *f, int c, float ampl) {
 void freedv_set_sync(struct freedv *freedv, int sync_cmd) {
     assert (freedv != NULL);
 
-    if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, freedv->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_700E, freedv->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_2020, freedv->mode)) {
+    if (freedv->ofdm != NULL) {
         ofdm_set_sync(freedv->ofdm, sync_cmd);
     }
 }

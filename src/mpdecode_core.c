@@ -79,7 +79,7 @@ void encode(struct LDPC *ldpc, unsigned char ibits[], unsigned char pbits[]) {
 
         for (i=0; i<ldpc->max_row_weight; i++) {
             ind = H_rows[p + i*ldpc->NumberParityBits];
-            par = par + ibits[ind-1];
+            if (ind) par = par + ibits[ind-1];
         }
 
         tmp = par + prev;
@@ -545,8 +545,8 @@ int run_ldpc_decoder(struct LDPC *ldpc, uint8_t out_char[], float input[], int *
     for(i=0; i<CodeLength; i++) DecodedBits[i] = 0;
 
     /* Call function to do the actual decoding */
-    int iter = SumProduct( parityCheckCount, DecodedBits, c_nodes, v_nodes, 
-                           CodeLength, NumberParityBits, max_iter, 
+    int iter = SumProduct( parityCheckCount, DecodedBits, c_nodes, v_nodes,
+                           CodeLength, NumberParityBits, max_iter,
                            r_scale_factor, q_scale_factor, data_int );
 
     for (i=0; i<CodeLength; i++) out_char[i] = DecodedBits[i];
@@ -693,7 +693,7 @@ void symbols_to_llrs(float llr[], COMP rx_qpsk_symbols[], float rx_amps[], float
 }
 
 /*
-   Description: Transforms M-dimensional FSK symbols into ML symbol log-likelihoods 
+   Description: Transforms M-dimensional FSK symbols into ML symbol log-likelihoods
 
    The calling syntax is:
       [output] = FskDemod( input, EsNo, [csi_flag], [fade_coef] )
@@ -712,18 +712,18 @@ void symbols_to_llrs(float llr[], COMP rx_qpsk_symbols[], float rx_amps[], float
 
    Last updated on May 6, 2006
 
-   Function DemodFSK is part of the Iterative Solutions 
-   Coded Modulation Library. The Iterative Solutions Coded Modulation 
-   Library is free software; you can redistribute it and/or modify it 
-   under the terms of the GNU Lesser General Public License as published 
-   by the Free Software Foundation; either version 2.1 of the License, 
+   Function DemodFSK is part of the Iterative Solutions
+   Coded Modulation Library. The Iterative Solutions Coded Modulation
+   Library is free software; you can redistribute it and/or modify it
+   under the terms of the GNU Lesser General Public License as published
+   by the Free Software Foundation; either version 2.1 of the License,
    or (at your option) any later version.
 
    This library is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
    Lesser General Public License for more details.
-  
+
    You should have received a copy of the GNU Lesser General Public
    License along with this library; if not, write to the Free Software
    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
@@ -732,8 +732,8 @@ void symbols_to_llrs(float llr[], COMP rx_qpsk_symbols[], float rx_amps[], float
 
 /* the logI_0 function */
 static float logbesseli0(float x)
-{	
-    if (x < 1) 
+{
+    if (x < 1)
         return( 0.226*x*x+0.0125*x-0.0012 );
     else if (x < 2)
         return( 0.1245*x*x+0.2177*x-0.108 );
@@ -749,12 +749,12 @@ static float logbesseli0(float x)
 
 static void FskDemod(float out[], float yr[], float v_est, float SNR, int M, int number_symbols)
 {
-    int i, j;	
+    int i, j;
     float y_envelope, scale_factor;
-	
+
     scale_factor = 2*SNR;
-    for (i=0;i<number_symbols;i++) { 
-        for (j=0;j<M;j++) { 
+    for (i=0;i<number_symbols;i++) {
+        for (j=0;j<M;j++) {
             y_envelope = sqrt( yr[j*number_symbols+i]*yr[j*number_symbols+i]/(v_est*v_est));
             out[i*M+j] = logbesseli0( scale_factor*y_envelope );
         }
@@ -787,4 +787,3 @@ void ldpc_print_info(struct LDPC *ldpc) {
     fprintf(stderr, "ldpc->data_bits_per_frame = %d\n", ldpc->data_bits_per_frame);
     fprintf(stderr, "ldpc->coded_bits_per_frame = %d\n", ldpc->coded_bits_per_frame);
 }
-

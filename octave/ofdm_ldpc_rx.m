@@ -116,7 +116,7 @@ function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", error_pattern_filena
         packet_count++;
 
         % unpack, de-interleave PSK symbols and symbol amplitudes
-        [rx_uw payload_syms payload_amps txt_bits] = disassemble_modem_packet(states, rx_syms, rx_amps);
+        [rx_uw_unused payload_syms payload_amps txt_bits] = disassemble_modem_packet(states, rx_syms, rx_amps);
         payload_syms_de = gp_deinterleave(payload_syms);
         payload_amps_de = gp_deinterleave(payload_amps);
 
