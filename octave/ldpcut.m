@@ -246,6 +246,7 @@ if getenv("SHORT_VERSION_FOR_CTEST")
   return;
 end
 
+%test3_curves("H_1024_2048_4f.mat",1)
 %test1_single("dvbs2")
 %test3_curves("dvbs2",1,10)
 %test2_multiple("wimax")
@@ -253,4 +254,4 @@ end
 %test3_curves("wimax",1)
 %test3_curves("H2064_516_sparse.mat",2)
 %test3_curves("H_256_768_22.txt",2)
-%test3_curves("HRA_56_56.txt",2)
+%test3_curves("H_4096_8192_3d.mat")

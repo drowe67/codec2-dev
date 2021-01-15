@@ -274,9 +274,11 @@ int main(int argc, char *argv[]) {
 
         /* some silence at the end to allow demod to complete processing */
 
-        for(int i=0; i<shorts_per_sample*n_mod_out; i++) mod_out_short[i] = 0;
-        fwrite(mod_out_short, sizeof(short), shorts_per_sample*n_mod_out, fout);
-        fwrite(mod_out_short, sizeof(short), shorts_per_sample*n_mod_out, fout);
+        int n_demod_in = freedv_get_n_nom_modem_samples(freedv);
+        short sil_short[shorts_per_sample*n_demod_in];
+        for(int i=0; i<shorts_per_sample*n_demod_in; i++) sil_short[i] = 0;
+        fwrite(sil_short, sizeof(short), shorts_per_sample*n_demod_in, fout);
+        fwrite(sil_short, sizeof(short), shorts_per_sample*n_demod_in, fout);
     }
 
     freedv_close(freedv);

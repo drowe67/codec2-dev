@@ -100,11 +100,11 @@ function states = ofdm_init(config)
   Nuwsyms = states.Nuwbits/bps;
   Ndatasymsperframe = (Ns-1)*Nc;
   last_sym = floor(Nuwsyms*uw_step/bps+1);
-  if last_sym > Ndatasymsperframe
+  if last_sym > states.Np*Ndatasymsperframe
     uw_step = Nc-1;                              % try a different step
   end
   last_sym = floor(Nuwsyms*uw_step/bps+1);
-  assert(last_sym <= Ndatasymsperframe);         % we still can't fit them all
+  assert(last_sym <= states.Np*Ndatasymsperframe);         % we still can't fit them all
 
   % Place UW symbols in frame
   for i=1:Nuwsyms
@@ -285,28 +285,32 @@ function config = ofdm_init_mode(mode="700D")
   elseif strcmp(mode,"qam16c2")
     Ns=5; config.Np=31; Tcp = 0.004; Ts = 0.016; Nc = 33; config.data_mode = 1;
     config.bps=4; config.Ntxtbits = 0; config.Nuwbits = 42*4; config.bad_uw_errors = 15;
-    config.ftwindow_width = 32; config.amp_scale = 135E3; config.state_machine = "data";
+    config.ftwindow_width = 80; config.amp_scale = 135E3; config.state_machine = "data";
     config.EsNo_est_all_symbols = 0; config.amp_est_mode = 1; config.EsNodB = 10;
     config.tx_uw = zeros(1,config.Nuwbits = 42*4);
     config.tx_uw(1:24) = [1 1 0 0  1 0 1 0  1 1 1 1  0 0 0 0  1 1 1 1  0 0 0 0];
     config.tx_uw(end-24+1:end) = [1 1 0 0  1 0 1 0  1 1 1 1  0 0 0 0  1 1 1 1  0 0 0 0];
   elseif strcmp(mode,"datac1")
-    Ns=5; config.Np=18; Tcp = 0.006; Ts = 0.016; Nc = 18; config.data_mode = 1;
-    config.Ntxtbits = 0; config.Nuwbits = 12; config.bad_uw_errors = 2;
+    Ns=5; config.Np=38; Tcp = 0.006; Ts = 0.016; Nc = 27; config.data_mode = 1;
+    config.Ntxtbits = 0; config.Nuwbits = 16; config.bad_uw_errors = 2;
     config.state_machine = "data";
-    config.ftwindow_width = 32; config.amp_est_mode = 1; config.EsNodB = 10;
+    config.ftwindow_width = 80; config.amp_est_mode = 1; config.EsNodB = 3;
+    config.edge_pilots = 0;
+    config.tx_uw = [1 1 0 0  1 0 1 0  1 1 1 1  0 0 0 0];
   elseif strcmp(mode,"datac2")
     Ns=5; config.Np=36; Tcp = 0.006; Ts = 0.016; Nc = 9; config.data_mode = 1;
     config.Ntxtbits = 0; config.Nuwbits = 12; config.bad_uw_errors = 1;
     config.state_machine = "data";
-    config.ftwindow_width = 32; config.amp_est_mode = 1; config.EsNodB = 10;
+    config.ftwindow_width = 80; config.amp_est_mode = 1; config.EsNodB = 10;
   elseif strcmp(mode,"datac3")
-    Ns=5; config.Np=11; Tcp = 0.006; Ts = 0.016; Nc = 9; config.data_mode = 1;
-    config.Ntxtbits = 0; config.Nuwbits = 24; config.bad_uw_errors = 5;
-    config.ftwindow_width = 32; config.timing_mx_thresh = 0.30;
-    config.tx_uw = [1 1 0 0  1 0 1 0  1 1 1 1  0 0 0 0  1 1 1 1  0 0 0 0];
-    config.amp_est_mode = 1; config.EsNodB = 0;
-    config.state_machine = "data";
+    Ns=5; config.Np=33; Tcp = 0.006; Ts = 0.016; Nc = 8; config.data_mode = 1;
+    config.Ntxtbits = 0; config.Nuwbits = 64; config.bad_uw_errors = 15;
+    config.ftwindow_width = 80; config.timing_mx_thresh = 0.30;
+    config.tx_uw = zeros(1,config.Nuwbits);
+    config.tx_uw(1:24) = [1 1 0 0  1 0 1 0  1 1 1 1  0 0 0 0  1 1 1 1  0 0 0 0];
+    config.tx_uw(end-24+1:end) = [1 1 0 0  1 0 1 0  1 1 1 1  0 0 0 0  1 1 1 1  0 0 0 0];
+    config.amp_est_mode = 1; config.EsNodB = 3;
+    config.state_machine = "data"; config.amp_scale = 400E3;
   elseif strcmp(mode,"1")
     Ns=5; config.Np=10; Tcp=0; Tframe = 0.1; Ts = Tframe/Ns; Nc = 1;
   else
@@ -1330,8 +1334,6 @@ function states = sync_state_machine_data(states, rx_uw)
   end
 
   states.uw_errors = sum(xor(tx_uw,rx_uw));
-  %tx_uw(1:10)
-  %rx_uw(1:10)
 
   if strcmp(states.sync_state,'trial')
     if strcmp(states.sync_state,'trial')
@@ -1473,14 +1475,17 @@ function [code_param Nbitspercodecframe Ncodecframespermodemframe] = codec_to_fr
       framesize = 16200; rate = 0.6;
       code_param = ldpc_init_builtin("dvbs2", rate, framesize, modulation='QAM', mod_order=16, mapping="", reshape(states.qam16,1,16));
   end
-  if strcmp(mode, "datac1") || strcmp(mode, "datac2")
+  if strcmp(mode, "datac1")
+    load H_4096_8192_3d.mat
+    code_param = ldpc_init_user(HRA, modulation, mod_order, mapping);
+  end
+  if strcmp(mode, "datac2")
     load H2064_516_sparse.mat
     code_param = ldpc_init_user(HRA, modulation, mod_order, mapping);
   end
   if strcmp(mode, "datac3")
-    load H_256_768_22.txt
-    code_param = ldpc_init_user(H_256_768_22, modulation, mod_order, mapping);
-    Nbitspercodecframe = Ncodecframespermodemframe = -1;
+    load H_1024_2048_4f.mat
+    code_param = ldpc_init_user(H, modulation, mod_order, mapping);
   end
   if strcmp(mode, "datac1") || strcmp(mode, "datac2") || strcmp(mode, "datac3") || strcmp(mode, "qam16c1") || strcmp(mode, "qam16c2")
     printf("ldpc_data_bits_per_frame = %d\n", code_param.ldpc_data_bits_per_frame);
