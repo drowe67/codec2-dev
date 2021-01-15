@@ -308,6 +308,7 @@ function config = ofdm_init_mode(mode="700D")
     config.ftwindow_width = 80; config.timing_mx_thresh = 0.30;
     config.tx_uw = zeros(1,config.Nuwbits);
     config.tx_uw(1:24) = [1 1 0 0  1 0 1 0  1 1 1 1  0 0 0 0  1 1 1 1  0 0 0 0];
+    config.tx_uw(end-24+1:end) = [1 1 0 0  1 0 1 0  1 1 1 1  0 0 0 0  1 1 1 1  0 0 0 0];
     config.amp_est_mode = 1; config.EsNodB = 3;
     config.state_machine = "data"; config.amp_scale = 400E3;
   elseif strcmp(mode,"1")
@@ -1333,10 +1334,7 @@ function states = sync_state_machine_data(states, rx_uw)
   end
 
   states.uw_errors = sum(xor(tx_uw,rx_uw));
-  if states.uw_errors == 0
-    printf("\n  tx_uw: "); printf("%d",tx_uw); printf("\n");
-    printf("  rx_uw: "); printf("%d",rx_uw); printf("\n");
-  end
+
   if strcmp(states.sync_state,'trial')
     if strcmp(states.sync_state,'trial')
       if states.uw_errors < states.bad_uw_errors;

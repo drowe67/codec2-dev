@@ -88,7 +88,8 @@ void ofdm_init_mode(char mode[], struct OFDM_CONFIG *config) {
         uint8_t uw[] = {1,1,0,0, 1,0,1,0,  1,1,1,1, 0,0,0,0, 1,1,1,1, 0,0,0,0};
         assert(sizeof(uw) <= MAX_UW_BITS);
         memcpy(config->tx_uw, uw, sizeof(uw));
-    }
+        memcpy(&config->tx_uw[MAX_UW_BITS-sizeof(uw)], uw, sizeof(uw));
+     }
     else {
         assert(0);
     }
