@@ -251,15 +251,15 @@ Some notes on this example:
 
 ## OFDM Raw Data modes
 
- These modes use an OFDM modem with powerful LDPC codes and are designed for sending data over HF radio channels with multipath fading.  At the time of writing (Dec 2020) they are a work in progress, but usable as is.
+ These modes use an OFDM modem with powerful LDPC codes and are designed for sending data over HF radio channels with multipath fading.  At the time of writing (Jan 2021) they are a work in progress, but usable as is.
 
  See example in Quickstart section above, and the demo programs [freedv_data_raw_tx.c](src/freedv_data_raw_tx.c) and [freedv_data_raw_rx.c](src/freedv_data_raw_rx.c).  The waveforms designs are described in this [spreadsheet](doc/modem_codec_frame_design.ods).
 
 | FreeDV Mode | RF bandwidth (Hz) | Payload data rate bits/s | Payload bytes/frame | FEC | AWGN | MPP |
 | :-: | :-: | :-: | :-: | :-: | :-: | :-: |
-| DATAC1 | 1125 | 1042 | 258 | (2580,2064) | 3 | 12 |
+| DATAC1 | 1700 | 980 | 512 | (8192,4096) | 1 | 5 |
 | DATAC2 | 563 | 521 | 258 | (2580,2064) | 1 | 7 |
-| DATAC3 | 563 | 212 | 32 | (768,256) | -4 | 2 |
+| DATAC3 | 500 | 282 | 128 | (2048,1024) | -4 | 0 |
 
 Notes:
 1. 16 bits (2 bytes) per frame are reserved for a 16 bit CRC.
