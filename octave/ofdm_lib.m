@@ -292,7 +292,7 @@ function config = ofdm_init_mode(mode="700D")
     config.tx_uw(end-24+1:end) = [1 1 0 0  1 0 1 0  1 1 1 1  0 0 0 0  1 1 1 1  0 0 0 0];
   elseif strcmp(mode,"datac1")
     Ns=5; config.Np=38; Tcp = 0.006; Ts = 0.016; Nc = 27; config.data_mode = 1;
-    config.Ntxtbits = 0; config.Nuwbits = 16; config.bad_uw_errors = 2;
+    config.Ntxtbits = 0; config.Nuwbits = 16; config.bad_uw_errors = 3;
     config.state_machine = "data";
     config.ftwindow_width = 80; config.amp_est_mode = 1; config.EsNodB = 3;
     config.edge_pilots = 0;

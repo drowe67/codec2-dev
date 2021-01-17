@@ -67,13 +67,13 @@ void ofdm_init_mode(char mode[], struct OFDM_CONFIG *config) {
         config->tx_bpf_en = false;
     } else if (strcmp(mode,"datac1") == 0) {
         config->ns=5; config->np=38; config->tcp = 0.006; config->ts = 0.016; config->nc = 27;
-        config->txtbits = 0; config->nuwbits = 16; config->bad_uw_errors = 2;
+        config->txtbits = 0; config->nuwbits = 16; config->bad_uw_errors = 3;
         config->state_machine = "data"; config->amp_est_mode = 1; config->tx_bpf_en = false;
         config->ftwindowwidth = 80; config->codename = "H_4096_8192_3d";
         uint8_t uw[] = {1,1,0,0, 1,0,1,0,  1,1,1,1, 0,0,0,0};
         assert(sizeof(uw) == config->nuwbits);
         memcpy(config->tx_uw, uw, config->nuwbits);
-        config->timing_mx_thresh = 0.60f;    
+        config->timing_mx_thresh = 0.50f;    
     } else if (strcmp(mode,"datac2") == 0) {
         config->ns=5; config->np=36; config->tcp = 0.006; config->ts = 0.016; config->nc = 9;
         config->txtbits = 0; config->nuwbits = 12; config->bad_uw_errors = 1;
@@ -82,7 +82,7 @@ void ofdm_init_mode(char mode[], struct OFDM_CONFIG *config) {
     } else if (strcmp(mode,"datac3") == 0) {
         config->ns=5; config->np=33; config->tcp = 0.006; config->ts = 0.016; config->nc = 8;
         config->txtbits = 0; config->state_machine = "data";
-        config->ftwindowwidth = 80; config->timing_mx_thresh = 0.45;
+        config->ftwindowwidth = 80; config->timing_mx_thresh = 0.50;
         config->codename = "H_1024_2048_4f"; config->amp_est_mode = 1; config->tx_bpf_en = false;
         /* custom UW - we use a longer UW with higher bad_uw_errors threshold due to high raw BER */
         config->nuwbits = 64; config->bad_uw_errors = 15;

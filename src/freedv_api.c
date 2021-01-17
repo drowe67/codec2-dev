@@ -494,7 +494,7 @@ int freedv_rawdatapreamblecomptx(struct freedv *f, COMP mod_out[]) {
         // need to modify bits per packet to set up pre-amble of a few modem frames in length
         struct OFDM ofdm_preamble;
         memcpy(&ofdm_preamble, f->ofdm, sizeof(struct OFDM));
-        ofdm_preamble.np = 2;
+        ofdm_preamble.np = 4;
         ofdm_preamble.bitsperpacket = ofdm_preamble.np * ofdm_preamble.bitsperframe;
         int preamble_bits[ofdm_preamble.bitsperpacket];
         for(int i=0; i<ofdm_preamble.bitsperpacket; i++) preamble_bits[i] = 1;

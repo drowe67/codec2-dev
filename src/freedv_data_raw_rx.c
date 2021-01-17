@@ -188,6 +188,11 @@ int main(int argc, char *argv[]) {
             fwrite(bytes_out, sizeof(uint8_t), nbytes-2, fout);
             nbytes_out += nbytes-2;
             nframes_out++;
+        }
+        
+        int rx_status = freedv_get_rx_status(freedv);
+        if ((rx_status & FREEDV_RX_BITS) || (rx_status & FREEDV_RX_BIT_ERRORS)) {
+            // end of burst even if we get bit errors
             nframes_this_burst++;
             if (resetsync && (nframes_this_burst >= resetsync)) {
                 freedv_set_sync(freedv, FREEDV_SYNC_UNSYNC);
@@ -195,7 +200,7 @@ int main(int argc, char *argv[]) {
             }
         }
 
-	/* if using pipes we probably don't want the usual buffering */
+	    /* if using pipes we probably don't want the usual buffering */
         if (fout == stdout) fflush(stdout);
         if (fin == stdin) fflush(stdin);
     }
