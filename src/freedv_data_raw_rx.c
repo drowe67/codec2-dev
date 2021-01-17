@@ -47,7 +47,7 @@ int main(int argc, char *argv[]) {
     int                        mode;
     int                        verbose = 0, use_testframes = 0;
     int                        mask = 0;
-    int                        resetsync = 0;
+    int                        resetsync = 0, nframes_this_burst = 0;
 
     if (argc < 3) {
     helpmsg:
@@ -74,6 +74,7 @@ int main(int argc, char *argv[]) {
             {"Fs",         required_argument,  0, 'f'},
             {"Rs",         required_argument,  0, 'r'},
             {"vv",         no_argument,        0, 'x'},
+            {"vvv",        no_argument,        0, 'y'},
             {"mask",       required_argument,  0, 'k'},
             {"resetsync",  required_argument,  0, 's'},
             {0, 0, 0, 0}
@@ -106,6 +107,9 @@ int main(int argc, char *argv[]) {
             break;
         case 'x':
             verbose = 2;
+            break;
+        case 'y':
+            verbose = 3;
             break;
         case 'h':
         case '?':
@@ -184,16 +188,14 @@ int main(int argc, char *argv[]) {
             fwrite(bytes_out, sizeof(uint8_t), nbytes-2, fout);
             nbytes_out += nbytes-2;
             nframes_out++;
-            if (resetsync && (nframes_out >= resetsync))
+            nframes_this_burst++;
+            if (resetsync && (nframes_this_burst >= resetsync)) {
                 freedv_set_sync(freedv, FREEDV_SYNC_UNSYNC);
+                nframes_this_burst = 0;
+            }
         }
 
-        if (verbose == 3) {
-            fprintf(stderr, "buf: %d nin: %d sync: %d nbytes: %d status: 0x%02x\n",
-                    buf, nin, freedv_get_sync(freedv), nbytes, freedv_get_rx_status(freedv));
-        }
-
-	      /* if using pipes we probably don't want the usual buffering */
+	/* if using pipes we probably don't want the usual buffering */
         if (fout == stdout) fflush(stdout);
         if (fin == stdin) fflush(stdin);
     }
