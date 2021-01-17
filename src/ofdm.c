@@ -1099,13 +1099,14 @@ static int ofdm_sync_search_core(struct OFDM *ofdm) {
 
     PROFILE_SAMPLE_AND_LOG2(freq_start, "  freq");
 
-    if (ofdm->verbose != 0) {
+    if (ofdm->verbose > 1) {
         fprintf(stderr, "    ct_est: %4d foff_est: %4.1f timing_valid: %d timing_mx: %5.4f\n",
                 ct_est, (double) ofdm->coarse_foff_est_hz, timing_valid,
                 (double)timing_mx);
     }
 
-    if (timing_valid != 0) {
+    ofdm->timing_valid = timing_valid;
+    if (ofdm->timing_valid != 0) {
         /* potential candidate found .... */
 
         /* calculate number of samples we need on next buffer to get into sync */
@@ -1116,7 +1117,6 @@ static int ofdm_sync_search_core(struct OFDM *ofdm) {
 
         ofdm->sample_point = ofdm->timing_est = 0;
         ofdm->foff_est_hz = ofdm->coarse_foff_est_hz;
-        ofdm->timing_valid = timing_valid;
         ofdm->timing_mx = timing_mx;
     } else {
         ofdm->nin = ofdm->samplesperframe;
@@ -1836,13 +1836,7 @@ void ofdm_sync_state_machine(struct OFDM *ofdm, uint8_t *rx_uw) {
   AUTHOR......: David Rowe
   DATE CREATED: May 2018
 
-  Operator control of sync state machine.  This mode is required to
-  acquire sync up at very low SNRS.  This is difficult to implement,
-  for example we may get a false sync, or the state machine may fall
-  out of sync by mistake during a long fade.
-
-  So with this API call we allow some operator assistance.
-
+  External control of sync state machine.
   Ensure this is called in the same thread as ofdm_sync_state_machine().
 
 \*---------------------------------------------------------------------------*/
@@ -1852,15 +1846,15 @@ void ofdm_set_sync(struct OFDM *ofdm, int sync_cmd) {
 
     switch (sync_cmd) {
         case UN_SYNC:
-            /*
-             * force manual unsync, in case operator detects false sync,
-             * which will cause sync state machine to have another go at sync
-             */
+            /* force manual unsync, which will cause sync state machine to 
+               have re-attempt sync */
             ofdm->sync_state = search;
+            /* clear rxbuf so we don't try to sync on any existing OFDM signals
+               in buffer */
+            for (int i = 0; i < ofdm->nrxbuf; i++) ofdm->rxbuf[i] = 0.0f;
             break;
         case AUTO_SYNC:
             /* normal operating mode - sync state machine decides when to unsync */
-
             ofdm->sync_mode = autosync;
             break;
         case MANUAL_SYNC:
