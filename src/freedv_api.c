@@ -255,7 +255,14 @@ static void codec2_encode_upacked(struct freedv *f, uint8_t unpacked_bits[], sho
     freedv_unpack(unpacked_bits, packed_codec_bits, f->bits_per_codec_frame);
 }
 
-
+static int is_ofdm_mode(struct freedv *f) {
+        return FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode)   ||
+               FDV_MODE_ACTIVE( FREEDV_MODE_700E, f->mode)   ||
+               FDV_MODE_ACTIVE( FREEDV_MODE_DATAC1, f->mode) ||
+               FDV_MODE_ACTIVE( FREEDV_MODE_DATAC2, f->mode) ||
+               FDV_MODE_ACTIVE( FREEDV_MODE_DATAC3, f->mode);
+}
+       
 /*---------------------------------------------------------------------------*\
 
   FUNCTION....: freedv_tx
@@ -1212,8 +1219,8 @@ void freedv_set_verbose(struct freedv *f, int verbosity) {
     if (FDV_MODE_ACTIVE( FREEDV_MODE_700C, f->mode)) {
         cohpsk_set_verbose(f->cohpsk, f->verbose);
     }
-    if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode)) {
-        ofdm_set_verbose(f->ofdm, f->verbose);
+    if (is_ofdm_mode(f)) {
+        ofdm_set_verbose(f->ofdm, f->verbose-1);
     }
 }
 
@@ -1235,13 +1242,8 @@ void freedv_set_carrier_ampl(struct freedv *f, int c, float ampl) {
   AUTHOR......: David Rowe
   DATE CREATED: May 2018
 
-  Extended control of sync state machines, especially for FreeDV 700D.
-  This mode is required to acquire sync up at very low SNRS.  This is
-  difficult to implement, for example we may get a false sync, or the
-  state machine may fall out of sync by mistake during a long fade.
-
-  So with this API call we allow some operator assistance.
-
+  Extended control of sync state machines for OFDM modes.
+ 
   Ensure this is called in the same thread as freedv_rx().
 
 \*---------------------------------------------------------------------------*/
