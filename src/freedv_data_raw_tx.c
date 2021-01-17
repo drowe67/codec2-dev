@@ -55,13 +55,15 @@ int main(int argc, char *argv[]) {
     float                     amp = FSK_SCALE;
     int                       shorts_per_sample = 1;
     int                       Nbursts = 1, sequence_numbers = 0;
-
+    int                       inter_burst_delay_ms = 0;
+    
     if (argc < 4) {
     helpmsg:
         fprintf(stderr, "usage: %s [options] FSK_LDPC|DATAC1|DATAC2|DATAC3 InputBinaryDataFile OutputModemRawFile\n"
                "\n"
                "  --testframes N  send N test frames per burst\n"
                "  --bursts     B  send B bursts on N testframes (default 1)\n"
+               "  --delay      ms testframe inter-burst delay in ms (default min rqd for demod)\n"
                "  -a amp          maximum amplitude of FSK signal\n"
                "  -c              complex signed 16 bit output format (default real)\n"
                "  --clip  0|1     clipping for reduced PAPR\n"
@@ -95,6 +97,7 @@ int main(int argc, char *argv[]) {
             {"tone1",      required_argument,  0, '1'},
             {"shift",      required_argument,  0, 's'},
             {"bursts",     required_argument,  0, 'e'},
+            {"delay",      required_argument,  0, 'j'},
             {"seq",        no_argument,        0, 'q'},
             {0, 0, 0, 0}
         };
@@ -114,6 +117,9 @@ int main(int argc, char *argv[]) {
             break;
         case 'e':
             Nbursts = atoi(optarg);
+            break;
+        case 'j':
+            inter_burst_delay_ms = atoi(optarg);
             break;
         case 't':
             testframes = 1;
@@ -271,14 +277,19 @@ int main(int argc, char *argv[]) {
             frames++;
             if (testframes && (frames >= Nframes)) break;
         }
-
-        /* some silence at the end to allow demod to complete processing */
-
-        int n_demod_in = freedv_get_n_nom_modem_samples(freedv);
-        short sil_short[shorts_per_sample*n_demod_in];
-        for(int i=0; i<shorts_per_sample*n_demod_in; i++) sil_short[i] = 0;
-        fwrite(sil_short, sizeof(short), shorts_per_sample*n_demod_in, fout);
-        fwrite(sil_short, sizeof(short), shorts_per_sample*n_demod_in, fout);
+        
+        int samples_delay = 0;
+        if (inter_burst_delay_ms) {
+            /* user define inter-burst delay */
+            samples_delay = FREEDV_FS_8000*inter_burst_delay_ms/1000;
+        }
+        else {                
+            /* just enough silence at the end to allow demod to complete processing */
+            samples_delay = 2*freedv_get_n_nom_modem_samples(freedv);
+        }
+        short sil_short[shorts_per_sample*samples_delay];
+        for(int i=0; i<shorts_per_sample*samples_delay; i++) sil_short[i] = 0;
+        fwrite(sil_short, sizeof(short), shorts_per_sample*samples_delay, fout);
     }
 
     freedv_close(freedv);
