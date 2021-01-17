@@ -477,26 +477,40 @@ void freedv_rawdatatx(struct freedv *f, short mod_out[], unsigned char *packed_p
 
 int freedv_rawdatapreamblecomptx(struct freedv *f, COMP mod_out[]) {
     assert(f != NULL);
-    assert(f->mode == FREEDV_MODE_FSK_LDPC);
-    struct FSK *fsk = f->fsk;
+    int npreamble_samples = 0;
+    
+    if (f->mode == FREEDV_MODE_FSK_LDPC) {
+        struct FSK *fsk = f->fsk;
 
-    int npreamble_symbols = 50*(fsk->mode>>1);
-    int npreamble_bits = npreamble_symbols*(fsk->mode>>1);
-    int npreamble_samples = fsk->Ts*npreamble_symbols;
-    //fprintf(stderr, "npreamble_symbols: %d npreamble_bits: %d npreamble_samples: %d Nbits: %d N: %d\n",
-    //npreamble_symbols, npreamble_bits, npreamble_samples, fsk->Nbits, fsk->N);
+        int npreamble_symbols = 50*(fsk->mode>>1);
+        int npreamble_bits = npreamble_symbols*(fsk->mode>>1);
+        npreamble_samples = fsk->Ts*npreamble_symbols;
+        //fprintf(stderr, "npreamble_symbols: %d npreamble_bits: %d npreamble_samples: %d Nbits: %d N: %d\n",
+        //npreamble_symbols, npreamble_bits, npreamble_samples, fsk->Nbits, fsk->N);
 
-    assert(npreamble_samples < f->n_nom_modem_samples); /* caller probably using an array of this size */
-    freedv_tx_fsk_ldpc_data_preamble(f, mod_out, npreamble_bits, npreamble_samples);
+        assert(npreamble_samples < f->n_nom_modem_samples); /* caller probably using an array of this size */
+        freedv_tx_fsk_ldpc_data_preamble(f, mod_out, npreamble_bits, npreamble_samples);
+    } else if (is_ofdm_mode(f)) {
+        // need to modify bits per packet to set up pre-amble of a few modem frames in length
+        struct OFDM ofdm_preamble;
+        memcpy(&ofdm_preamble, f->ofdm, sizeof(struct OFDM));
+        ofdm_preamble.np = 2;
+        ofdm_preamble.bitsperpacket = ofdm_preamble.np * ofdm_preamble.bitsperframe;
+        int preamble_bits[ofdm_preamble.bitsperpacket];
+        for(int i=0; i<ofdm_preamble.bitsperpacket; i++) preamble_bits[i] = 1;
+        ofdm_mod(&ofdm_preamble, mod_out, preamble_bits);
+        npreamble_samples = ofdm_preamble.np * ofdm_preamble.samplesperframe;
+    }
 
     return npreamble_samples;
 }
 
 int freedv_rawdatapreambletx(struct freedv *f, short mod_out[]) {
     assert(f != NULL);
-    COMP mod_out_comp[f->n_nom_modem_samples];
+    COMP mod_out_comp[f->n_nat_modem_samples];
 
     int npreamble_samples = freedv_rawdatapreamblecomptx(f, mod_out_comp);
+    assert(npreamble_samples <= f->n_nat_modem_samples);
 
     /* convert complex to real */
     for(int i=0; i<npreamble_samples; i++)

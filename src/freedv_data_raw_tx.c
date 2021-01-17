@@ -236,15 +236,14 @@ int main(int argc, char *argv[]) {
 
         /* send preamble to help estimators lock up at start of burst */
         int n_preamble = 0;
-        if (mode == FREEDV_MODE_FSK_LDPC) {
-            if (use_complex == 0) {
-                n_preamble = freedv_rawdatapreambletx(freedv, mod_out_short);
-            } else {
-                n_preamble = freedv_rawdatapreamblecomptx(freedv, mod_out_comp);
-                comp_to_short(mod_out_short, mod_out_comp, n_preamble);
-            }
-            fwrite(mod_out_short, sizeof(short), shorts_per_sample*n_preamble, fout);
+        if (use_complex == 0) {
+            n_preamble = freedv_rawdatapreambletx(freedv, mod_out_short);
+        } else {
+            n_preamble = freedv_rawdatapreamblecomptx(freedv, mod_out_comp);
+            comp_to_short(mod_out_short, mod_out_comp, n_preamble);
         }
+        assert(n_preamble <= n_mod_out);
+        fwrite(mod_out_short, sizeof(short), shorts_per_sample*n_preamble, fout);
 
         /* OK main loop  --------------------------------------- */
 
