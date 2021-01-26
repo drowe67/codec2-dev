@@ -35,9 +35,18 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <getopt.h>
+#include  <signal.h>
 
 #include "freedv_api.h"
 #include "fsk.h"
+
+/* other processes can end this program using signals */
+
+static volatile int finish = 0;
+void  INThandler(int sig) {
+    fprintf(stderr,"signal received: %d\n", sig);
+    finish = 1;
+}
 
 int main(int argc, char *argv[]) {
     FILE                      *fin, *fout;
@@ -172,12 +181,15 @@ int main(int argc, char *argv[]) {
     uint8_t bytes_out[bytes_per_modem_frame];
     short  demod_in[freedv_get_n_max_modem_samples(freedv)];
 
+    signal(SIGINT, INThandler);
+    signal(SIGTERM, INThandler);
+
     /* We need to work out how many samples the demod needs on each
        call (nin).  This is used to adjust for differences in the tx
        and rx sample clock frequencies */
 
     nin = freedv_nin(freedv);
-    while(fread(demod_in, sizeof(short), nin, fin) == nin) {
+    while((fread(demod_in, sizeof(short), nin, fin) == nin) && !finish) {
         buf++;
 
         nbytes = freedv_rawdatarx(freedv, bytes_out, demod_in);

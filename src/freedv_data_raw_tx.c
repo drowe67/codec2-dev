@@ -56,6 +56,7 @@ int main(int argc, char *argv[]) {
     int                       shorts_per_sample = 1;
     int                       Nbursts = 1, sequence_numbers = 0;
     int                       inter_burst_delay_ms = 0;
+    int                       postdelay_ms = 0;
     
     if (argc < 4) {
     helpmsg:
@@ -64,6 +65,7 @@ int main(int argc, char *argv[]) {
                "  --testframes N  send N test frames per burst\n"
                "  --bursts     B  send B bursts on N testframes (default 1)\n"
                "  --delay      ms testframe inter-burst delay in ms (default min rqd for demod)\n"
+               "  --postdelay  ms additional delay at end of testframe sequence (default) 0)\n"
                "  -a amp          maximum amplitude of FSK signal\n"
                "  -c              complex signed 16 bit output format (default real)\n"
                "  --clip  0|1     clipping for reduced PAPR\n"
@@ -98,6 +100,7 @@ int main(int argc, char *argv[]) {
             {"shift",      required_argument,  0, 's'},
             {"bursts",     required_argument,  0, 'e'},
             {"delay",      required_argument,  0, 'j'},
+            {"postdelay",  required_argument,  0, 'k'},
             {"seq",        no_argument,        0, 'q'},
             {0, 0, 0, 0}
         };
@@ -120,6 +123,9 @@ int main(int argc, char *argv[]) {
             break;
         case 'j':
             inter_burst_delay_ms = atoi(optarg);
+            break;
+        case 'k':
+            postdelay_ms = atoi(optarg);
             break;
         case 't':
             testframes = 1;
@@ -291,6 +297,14 @@ int main(int argc, char *argv[]) {
         fwrite(sil_short, sizeof(short), shorts_per_sample*samples_delay, fout);
     }
 
+    if (postdelay_ms) {
+        int samples_delay = FREEDV_FS_8000*postdelay_ms/1000;
+        fprintf(stderr, "postdelay: %d %d\n", postdelay_ms, samples_delay);
+        short sil_short[shorts_per_sample*samples_delay];
+        for(int i=0; i<shorts_per_sample*samples_delay; i++) sil_short[i] = 0;
+        fwrite(sil_short, sizeof(short), shorts_per_sample*samples_delay, fout);
+    }
+    
     freedv_close(freedv);
     fclose(fin);
     fclose(fout);
