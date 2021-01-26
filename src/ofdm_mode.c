@@ -65,6 +65,14 @@ void ofdm_init_mode(char mode[], struct OFDM_CONFIG *config) {
         config->bps=4; config->txtbits = 0; config->nuwbits = 15*4; config->bad_uw_errors = 5;
         config->ftwindowwidth = 32; config->state_machine = "data"; config->amp_est_mode = 1;
         config->tx_bpf_en = false;
+    } else if (strcmp(mode,"datac0") == 0) {
+        config->ns=5; config->np=4; config->tcp = 0.006; config->ts = 0.016; config->nc = 9;
+        config->txtbits = 0; config->nuwbits = 32; config->bad_uw_errors = 9;
+        config->state_machine = "data"; config->amp_est_mode = 1; config->tx_bpf_en = false;
+        config->ftwindowwidth = 80; config->codename = "H_128_256_5";
+        uint8_t uw[] = {1,1,0,0, 1,0,1,0,  1,1,1,1, 0,0,0,0};
+        memcpy(config->tx_uw, uw, sizeof(uw));
+        config->timing_mx_thresh = 0.50f;    
     } else if (strcmp(mode,"datac1") == 0) {
         config->ns=5; config->np=38; config->tcp = 0.006; config->ts = 0.016; config->nc = 27;
         config->txtbits = 0; config->nuwbits = 16; config->bad_uw_errors = 3;

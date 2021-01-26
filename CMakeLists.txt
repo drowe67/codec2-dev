@@ -733,6 +733,12 @@ if (NOT APPLE)
                             ./freedv_data_raw_tx --testframes 10 FSK_LDPC /dev/zero /dev/null")
              set_tests_properties(test_memory_leak_FreeDV_FSK_LDPC_tx PROPERTIES PASS_REGULAR_EXPRESSION "ERROR SUMMARY: 0 errors")
 
+     add_test(NAME test_memory_leak_FreeDV_DATAC0_tx
+             COMMAND sh -c "cd  ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes \
+                            ./freedv_data_raw_tx --testframes 10 DATAC0 /dev/zero /dev/null")
+             set_tests_properties(test_memory_leak_FreeDV_DATAC0_tx PROPERTIES PASS_REGULAR_EXPRESSION "ERROR SUMMARY: 0 errors")
+
      add_test(NAME test_memory_leak_FreeDV_DATAC1_tx
              COMMAND sh -c "cd  ${CMAKE_CURRENT_BINARY_DIR}/src;
                             valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes \
@@ -936,6 +942,13 @@ endif(NOT APPLE)
      # ---------------------------------------------------------
 
      # OFDM LDPC
+     add_test(NAME test_freedv_data_raw_ofdm_datac0
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            head -c $((14*10)) </dev/urandom > binaryIn.bin;
+                            ./freedv_data_raw_tx DATAC0 binaryIn.bin - |
+                            ./freedv_data_raw_rx DATAC0 - binaryOut.bin -v;
+                            diff binaryIn.bin binaryOut.bin")
+
      add_test(NAME test_freedv_data_raw_ofdm_datac1
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
                             head -c $((510*10)) </dev/urandom > binaryIn.bin;

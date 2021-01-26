@@ -166,6 +166,7 @@ void freedv_ofdm_voice_open(struct freedv *f, char *mode) {
 void freedv_ofdm_data_open(struct freedv *f) {
     struct OFDM_CONFIG ofdm_config;
     char mode[32];
+    if (f->mode == FREEDV_MODE_DATAC0) strcpy(mode, "datac0");
     if (f->mode == FREEDV_MODE_DATAC1) strcpy(mode, "datac1");
     if (f->mode == FREEDV_MODE_DATAC2) strcpy(mode, "datac2");
     if (f->mode == FREEDV_MODE_DATAC3) strcpy(mode, "datac3");

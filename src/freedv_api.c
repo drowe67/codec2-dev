@@ -131,6 +131,7 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
          FDV_MODE_ACTIVE( FREEDV_MODE_800XA,  mode)   ||
          FDV_MODE_ACTIVE( FREEDV_MODE_2020,   mode)   ||
          FDV_MODE_ACTIVE( FREEDV_MODE_FSK_LDPC, mode) ||
+         FDV_MODE_ACTIVE( FREEDV_MODE_DATAC0, mode)   ||
          FDV_MODE_ACTIVE( FREEDV_MODE_DATAC1, mode)   ||
          FDV_MODE_ACTIVE( FREEDV_MODE_DATAC2, mode)   ||
          FDV_MODE_ACTIVE( FREEDV_MODE_DATAC3, mode))
@@ -153,6 +154,7 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
     if (FDV_MODE_ACTIVE( FREEDV_MODE_2400B, mode)) freedv_2400b_open(f);
     if (FDV_MODE_ACTIVE( FREEDV_MODE_800XA, mode)) freedv_800xa_open(f);
     if (FDV_MODE_ACTIVE( FREEDV_MODE_FSK_LDPC, mode)) freedv_fsk_ldpc_open(f, adv);
+    if (FDV_MODE_ACTIVE( FREEDV_MODE_DATAC0, mode)) freedv_ofdm_data_open(f);
     if (FDV_MODE_ACTIVE( FREEDV_MODE_DATAC1, mode)) freedv_ofdm_data_open(f);
     if (FDV_MODE_ACTIVE( FREEDV_MODE_DATAC2, mode)) freedv_ofdm_data_open(f);
     if (FDV_MODE_ACTIVE( FREEDV_MODE_DATAC3, mode)) freedv_ofdm_data_open(f);
@@ -231,7 +233,8 @@ void freedv_close(struct freedv *freedv) {
         FREE(freedv->twoframes_hard);
     }
 
-    if (FDV_MODE_ACTIVE( FREEDV_MODE_DATAC1, freedv->mode) ||
+    if (FDV_MODE_ACTIVE( FREEDV_MODE_DATAC0, freedv->mode) ||
+        FDV_MODE_ACTIVE( FREEDV_MODE_DATAC1, freedv->mode) ||
         FDV_MODE_ACTIVE( FREEDV_MODE_DATAC2, freedv->mode) ||
         FDV_MODE_ACTIVE( FREEDV_MODE_DATAC3, freedv->mode))
     {
@@ -258,6 +261,7 @@ static void codec2_encode_upacked(struct freedv *f, uint8_t unpacked_bits[], sho
 static int is_ofdm_mode(struct freedv *f) {
         return FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode)   ||
                FDV_MODE_ACTIVE( FREEDV_MODE_700E, f->mode)   ||
+               FDV_MODE_ACTIVE( FREEDV_MODE_DATAC0, f->mode) ||
                FDV_MODE_ACTIVE( FREEDV_MODE_DATAC1, f->mode) ||
                FDV_MODE_ACTIVE( FREEDV_MODE_DATAC2, f->mode) ||
                FDV_MODE_ACTIVE( FREEDV_MODE_DATAC3, f->mode);
@@ -445,6 +449,7 @@ void freedv_rawdatacomptx(struct freedv *f, COMP mod_out[], unsigned char *packe
     if (FDV_MODE_ACTIVE( FREEDV_MODE_1600, f->mode)) freedv_comptx_fdmdv_1600(f, mod_out);
     if (FDV_MODE_ACTIVE( FREEDV_MODE_700C, f->mode)) freedv_comptx_700c(f, mod_out);
     if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode)   ||
+        FDV_MODE_ACTIVE( FREEDV_MODE_DATAC0, f->mode) ||
         FDV_MODE_ACTIVE( FREEDV_MODE_DATAC1, f->mode) ||
         FDV_MODE_ACTIVE( FREEDV_MODE_DATAC2, f->mode) ||
         FDV_MODE_ACTIVE( FREEDV_MODE_DATAC3, f->mode)) freedv_comptx_ofdm(f, mod_out);
@@ -973,6 +978,7 @@ int freedv_rawdatacomprx(struct freedv *f, unsigned char *packed_payload_bits, C
     if (FDV_MODE_ACTIVE( FREEDV_MODE_1600, f->mode)) rx_status = freedv_comprx_fdmdv_1600(f, demod_in);
     if (FDV_MODE_ACTIVE( FREEDV_MODE_700C, f->mode)) rx_status = freedv_comprx_700c(f, demod_in);
     if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode)   ||
+        FDV_MODE_ACTIVE( FREEDV_MODE_DATAC0, f->mode) ||
         FDV_MODE_ACTIVE( FREEDV_MODE_DATAC1, f->mode) ||
         FDV_MODE_ACTIVE( FREEDV_MODE_DATAC2, f->mode) ||
         FDV_MODE_ACTIVE( FREEDV_MODE_DATAC3, f->mode)) rx_status = freedv_comp_short_rx_ofdm(f, (void*)demod_in, 0, 1.0f);

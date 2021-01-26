@@ -56,6 +56,7 @@
 #define FREEDV_MODE_DATAC1     10
 #define FREEDV_MODE_DATAC2     11
 #define FREEDV_MODE_DATAC3     12
+#define FREEDV_MODE_DATAC0     14
 
 // Sample rates used
 #define FREEDV_FS_8000          8000
@@ -114,6 +115,9 @@
 #endif
 #if !defined(FREEDV_MODE_FSK_LDPC_EN)
         #define FREEDV_MODE_FSK_LDPC_EN FREEDV_MODE_EN_DEFAULT
+#endif
+#if !defined(FREEDV_MODE_DATAC0_EN)
+        #define FREEDV_MODE_DATAC0_EN FREEDV_MODE_EN_DEFAULT
 #endif
 #if !defined(FREEDV_MODE_DATAC1_EN)
         #define FREEDV_MODE_DATAC1_EN FREEDV_MODE_EN_DEFAULT

@@ -60,7 +60,7 @@ int main(int argc, char *argv[]) {
 
     if (argc < 3) {
     helpmsg:
-      	fprintf(stderr, "usage: %s [options] FSK_LDPC|DATAC1|DATAC2|DATAC3 InputModemSpeechFile BinaryDataFile\n"
+      	fprintf(stderr, "usage: %s [options] FSK_LDPC|DATAC0|DATAC1|DATAC2|DATAC3 InputModemSpeechFile BinaryDataFile\n"
                "  -v or --vv              verbose options\n"
                "  --testframes            count raw and coded errors in testframes sent by tx\n"
                "  --resetsync  Nframes    reset sync after Nframes received\n"
@@ -135,6 +135,7 @@ int main(int argc, char *argv[]) {
 
     mode = -1;
     if (!strcmp(argv[dx],"FSK_LDPC")) mode = FREEDV_MODE_FSK_LDPC;
+    if (!strcmp(argv[dx],"DATAC0")) mode = FREEDV_MODE_DATAC0;
     if (!strcmp(argv[dx],"DATAC1")) mode = FREEDV_MODE_DATAC1;
     if (!strcmp(argv[dx],"DATAC2")) mode = FREEDV_MODE_DATAC2;
     if (!strcmp(argv[dx],"DATAC3")) mode = FREEDV_MODE_DATAC3;
