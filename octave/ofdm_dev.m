@@ -153,10 +153,18 @@ function [sim_out rx states] = run_sim(sim_in)
     spread1 = doppler_spread(dopplerSpreadHz, Fs, Nrp*(M+Ncp)*1.1);
     spread2 = doppler_spread(dopplerSpreadHz, Fs, Nrp*(M+Ncp)*1.1);
 
+<<<<<<< Updated upstream
     % sometimes doppler_spread() doesn't return exactly the number of samples we need
  
     assert(length(spread1) >= Nrp*(M+Ncp), "not enough doppler spreading samples");
     assert(length(spread2) >= Nrp*(M+Ncp), "not enough doppler spreading samples");
+=======
+  Npackets = sim_in.Npackets+2;
+  tx_bits = create_ldpc_test_frame(states, coded_frame=0);
+  tx = [];
+  for f=1:Npackets
+    tx = [tx ofdm_mod(states, tx_bits)];
+>>>>>>> Stashed changes
   end
  
   % ------------------------------------------------------------------
@@ -435,6 +443,7 @@ function [sim_out rx states] = run_sim(sim_in)
 
       if ldpc_en || diversity_en
 
+<<<<<<< Updated upstream
         st = (f-1)*Nbitsperframe*rate + 1;
         en = st + Nbitsperframe*rate - 1;
         errors = xor(tx_data_bits(st:en), rx_codeword(1:Nbitsperframe*rate));
@@ -572,6 +581,13 @@ function [sim_out rx states] = run_sim(sim_in)
     end
 
   end
+=======
+  printf("Npackets: %d  ", Npackets);
+  rx = ofdm_clip_channel(states, tx, sim_in.SNR3kdB, sim_in.channel, sim_in.foff_Hz, 0);
+  % strip off noise-only sections channel simulator normally adds
+  rx = rx(states.Fs+1:end-states.Fs/2);
+  printf("%d %d %d\n",Npackets,states.Nsamperframe, length(rx));
+>>>>>>> Stashed changes
 endfunction
 
 
@@ -1010,16 +1026,24 @@ function [delta_ct delta_foff timing_mx_log] = acquisition_test(mode="700D", Nte
     % a bunch of trials, this allows averaging of freq est
     % metric over time as we receive more and more frames
 
+<<<<<<< Updated upstream
     st = 0.5*Nsamperframe; 
     en = 2.5*Nsamperframe - 1;    % note this gives Nsamperframe possibilities for coarse timing
 
     % actual known position of correct coarse timing
 
     ct_target = mod(sim_in.initial_noise_sams + Nsamperframe/2, Nsamperframe);
+=======
+  st = 0; 
+  en = 2*Nsamperframe - 1;
+
+  % actual known position of correct coarse timing
+  ct_target = 1;
+>>>>>>> Stashed changes
 
   i = 1;
   states.foff_metric = 0;
-  for w=1:Nsamperframe:length(rx)-4*Nsamperframe
+  for w=1:Nsamperframe:length(rx)-2*Nsamperframe
     [ct_est timing_valid timing_mx] = est_timing(states, real(rx(w+st:w+en)), rate_fs_pilot_samples, 1);
     foff_est = est_freq_offset_pilot_corr(states, real(rx(w+st:w+en)), rate_fs_pilot_samples, ct_est);
     if states.verbose
@@ -1028,12 +1052,21 @@ function [delta_ct delta_foff timing_mx_log] = acquisition_test(mode="700D", Nte
 
       % valid coarse timing ests are modulo Nsamperframe
 
+<<<<<<< Updated upstream
       delta_ct = [delta_ct ct_est-ct_target];
       delta_foff = [delta_foff (foff_est-foff_hz)];
       timing_mx_log = [timing_mx_log; timing_mx];
       foff_metric_log = [foff_metric_log states.foff_metric];
     end
 
+=======
+    delta_ct = [delta_ct ct_est-ct_target];
+    delta_foff = [delta_foff (foff_est-foff_Hz)];
+    timing_mx_log = [timing_mx_log; timing_mx];
+    foff_metric_log = [foff_metric_log states.foff_metric];
+  end
+  delta_ct
+>>>>>>> Stashed changes
   if states.verbose > 1
     %printf("mean: %f std: %f\n", mean(delta_foff), std(delta_foff));
     figure(1); clf; plot(timing_mx_log,'+-');
@@ -1047,14 +1080,12 @@ endfunction
 
 
 #{
-
    Generates aquisistion statistics for AWGN and HF channels for
    continuous signals. Probability of acquistion is what matters,
    e.g. if it's 50% we can expect sync within 2 frames.
-
 #}
 
-function res = acquisition_histograms(mode="700D", fine_en = 0, foff, EbNoAWGN=-1, EbNoHF=3, verbose=1)
+function res = acquisition_histograms(mode="700D", foff, SNR_AWGN=1, SNR_HF=5, verbose=1)
   Fs = 8000;
   Ntests = 100;
 
@@ -1065,60 +1096,37 @@ function res = acquisition_histograms(mode="700D", fine_en = 0, foff, EbNoAWGN=-
 
   % AWGN channel at uncoded Eb/No operating point
 
-  [dct dfoff] = acquisition_test(mode, Ntests, EbNoAWGN, foff, 0, fine_en);
-
-  % Probability of acquistion is what matters, e.g. if it's 50% we can
-  % expect sync within 2 frames
+  [dct dfoff] = acquisition_test(mode, Ntests, SNR_AWGN, foff, "awgn", verbose);
 
   PtAWGN = length(find (abs(dct) < ttol_samples))/length(dct);
   printf("AWGN P(time offset acq) = %3.2f\n", PtAWGN);
-  if fine_en == 0
-    PfAWGN = length(find (abs(dfoff) < ftol_hz))/length(dfoff);
-    printf("AWGN P(freq offset acq) = %3.2f\n", PfAWGN);
-  end
 
   if verbose
     figure(1); clf;
     hist(dct(find (abs(dct) < ttol_samples)))
-    t = sprintf("Coarse Timing Error AWGN EbNo = %3.2f foff = %3.1f", EbNoAWGN, foff);
+    t = sprintf("Coarse Timing Error AWGN SNR = %3.2f foff = %3.1f", SNR_AWGN, foff);
     title(t)
-    if fine_en == 0
-      figure(2)
-      hist(dfoff(find(abs(dfoff) < 2*ftol_hz)))
-      t = sprintf("Coarse Freq Error AWGN EbNo = %3.2f foff = %3.1f", EbNoAWGN, foff);
-      title(t);
-    end
  end
 
   % HF channel at uncoded operating point
 
-  [dct dfoff] = acquisition_test(mode, Ntests, EbNoHF, foff, 1, fine_en);
+  [dct dfoff] = acquisition_test(mode, Ntests, SNR_HF, foff, "mpp", verbose);
 
   PtHF = length(find (abs(dct) < ttol_samples))/length(dct);
   printf("HF P(time offset acq) = %3.2f\n", PtHF);
-  if fine_en == 0
-    PfHF = length(find (abs(dfoff) < ftol_hz))/length(dfoff)
-    printf("HF P(freq offset acq) = %3.2f\n", PfHF);
-  end
-
+ 
   if verbose
     figure(3); clf;
     hist(dct(find (abs(dct) < ttol_samples)))
-    t = sprintf("Coarse Timing Error HF EbNo = %3.2f foff = %3.1f", EbNoHF, foff);
+    t = sprintf("Coarse Timing Error HF SNR = %3.2f foff = %3.1f", SNR_HF, foff);
     title(t)
-    if fine_en == 0
-      figure(4)
-      hist(dfoff(find(abs(dfoff) < 2*ftol_hz)))
-      t = sprintf("Coarse Freq Error HF EbNo = %3.2f foff = %3.1f", EbNoHF, foff);
-      title(t);
-    end
   end
   
   res = [PtAWGN PfAWGN PtHF PfHF];
 endfunction
 
 
-% plot some curves of Acquisition probability against EbNo and freq offset
+% plot some curves of Acquisition probability against SNR and freq offset
 
 function acquistion_curves(mode="700D")
 
@@ -1127,10 +1135,10 @@ function acquistion_curves(mode="700D")
   foff = [-15 -5 0 5 15];
   cc = ['b' 'g' 'k' 'c' 'm'];
   
-  figure(1); clf; hold on; title('P(timing) AWGN'); xlabel('Eb/No dB'); legend('location', 'southeast');
-  figure(2); clf; hold on; title('P(freq) AWGN'); xlabel('Eb/No dB'); legend('location', 'southeast');
-  figure(3); clf; hold on; title('P(timing) HF'); xlabel('Eb/No dB'); legend('location', 'southeast');
-  figure(4); clf; hold on; title('P(freq) HF'); xlabel('Eb/No dB'); legend('location', 'southeast');
+  figure(1); clf; hold on; title('P(timing) AWGN'); xlabel('SNR dB'); legend('location', 'southeast');
+  figure(2); clf; hold on; title('P(freq) AWGN'); xlabel('SNR dB'); legend('location', 'southeast');
+  figure(3); clf; hold on; title('P(timing) HF'); xlabel('SNR dB'); legend('location', 'southeast');
+  figure(4); clf; hold on; title('P(freq) HF'); xlabel('SNR dB'); legend('location', 'southeast');
 
   for f=1:4
     ylim([0 1]);
@@ -1139,22 +1147,22 @@ function acquistion_curves(mode="700D")
   for f = 1:length(foff)
     afoff = foff(f);
     res_log = [];
-    for e = 1:length(EbNo)
-      aEbNo = EbNo(e);
+    for e = 1:length(SNR)
+      aSNR = SNR(e);
       res = zeros(1,4);
-      res = acquisition_histograms(mode, fine_en = 0, afoff, aEbNo, aEbNo+4, verbose = 0);
+      res = acquisition_histograms(mode, fine_en = 0, afoff, aSNR, aSNR+4, verbose = 0);
       res_log = [res_log; res];
     end
-    figure(1); l = sprintf('%c+-;%3.1f Hz;', cc(f), afoff); plot(EbNo, res_log(:,1), l);
-    figure(2); l = sprintf('%c+-;%3.1f Hz;', cc(f), afoff); plot(EbNo, res_log(:,3), l);
-    figure(3); l = sprintf('%c+-;%3.1f Hz;', cc(f), afoff); plot(EbNo+4, res_log(:,2), l);
-    figure(4); l = sprintf('%c+-;%3.1f Hz;', cc(f), afoff); plot(EbNo+4, res_log(:,4), l);
+    figure(1); l = sprintf('%c+-;%3.1f Hz;', cc(f), afoff); plot(SNR, res_log(:,1), l);
+    figure(2); l = sprintf('%c+-;%3.1f Hz;', cc(f), afoff); plot(SNR, res_log(:,3), l);
+    figure(3); l = sprintf('%c+-;%3.1f Hz;', cc(f), afoff); plot(SNR+4, res_log(:,2), l);
+    figure(4); l = sprintf('%c+-;%3.1f Hz;', cc(f), afoff); plot(SNR+4, res_log(:,4), l);
   end
   
-  figure(1); print('-deps', '-color', sprintf("ofdm_dev_acq_curves_time_awgn_%s.eps", mode))
-  figure(2); print('-deps', '-color', sprintf("ofdm_dev_acq_curves_freq_awgn_%s.eps", mode))
-  figure(3); print('-deps', '-color', sprintf("ofdm_dev_acq_curves_time_hf_%s.eps", mode))
-  figure(4); print('-deps', '-color', sprintf("ofdm_dev_acq_curves_freq_hf_%s.eps", mode))
+  figure(1); print('-dpng', '-color', sprintf("ofdm_dev_acq_curves_time_awgn_%s.png", mode))
+  figure(2); print('-dpng', '-color', sprintf("ofdm_dev_acq_curves_freq_awgn_%s.png", mode))
+  figure(3); print('-dpng', '-color', sprintf("ofdm_dev_acq_curves_time_hf_%s.png", mode))
+  figure(4); print('-dpng', '-color', sprintf("ofdm_dev_acq_curves_freq_hf_%s.png", mode))
 endfunction
 
 
@@ -1353,7 +1361,9 @@ endfunction
 
 format;
 more off;
+pkg load signal;
 
+<<<<<<< Updated upstream
 path_to_cml = '~/cml';
 addpath(strcat(path_to_cml, "/mex"), strcat(path_to_cml, "/mat"));
 if exist("Somap") == 0
@@ -1368,6 +1378,10 @@ end
 %run_curves_estimators
 %acquisition_histograms("700D", fin_en=0, foff_hz=-15, EbNoAWGN=-1, EbNoHF=3)
 %acquisition_test("700D", Ntests=10, EbNodB=-1, foff_hz=0, hf_en=0, verbose=1);
+=======
+acquisition_test("700D", Ntests=10, SNR3kdB=0, foff_hz=0, 'awgn', verbose=1);
+%acquisition_histograms("700D", foff_hz=-15, SNR_AWGN=0, SNR_HF=5)
+>>>>>>> Stashed changes
 %sync_metrics('freq')
 %run_curves_snr
 %acquisition_dev(Ntests=10, EbNodB=100, foff_hz=0)
