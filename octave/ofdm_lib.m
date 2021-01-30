@@ -1614,8 +1614,8 @@ function [tx nclipped] = ofdm_clip(states, tx, threshold_level, plot_en=0)
   endif
 end
 
-
-function [rx_real rx] = ofdm_clip_channel(states, tx, SNR3kdB, channel, freq_offset_Hz, tx_clip_en)
+% two stage Hilbert clipper to improve PAPR 
+function tx = ofdm_hilbert_clipper(states, tx, tx_clip_en)
   tx *= states.amp_scale;
 
   % optional compressor to improve PAPR
@@ -1642,14 +1642,20 @@ function [rx_real rx] = ofdm_clip_channel(states, tx, SNR3kdB, channel, freq_off
   peak = max(abs(tx)); RMS = sqrt(mean(abs(tx).^2));
   cpapr = 10*log10((peak.^2)/(RMS.^2));
 
-  % channel simulation and save to disk
-
   if states.verbose
     printf("Peak: %4.2f RMS: %5.2f CPAPR: %4.1f clipped: %5.2f%%\n",
            peak, RMS, cpapr, nclipped*100/length(tx));
     printf("foff: %3.1f Hz SNR(3k): %3.1f dB  ", freq_offset_Hz, SNR3kdB);
   end
-  [rx_real rx] = channel_simulate(states.Fs, SNR3kdB, freq_offset_Hz, channel, tx);
+endfunction
+
+
+%  helper function that adds channel simulation and ensures we don't clip int output samples  
+function [rx_real rx] = ofdm_channel(states, tx, SNR3kdB, channel, freq_offset_Hz)
+  [rx_real rx sigma] = channel_simulate(states.Fs, SNR3kdB, freq_offset_Hz, channel, tx);
+    
+  % add a few seconds of no signal either side
+  rx_real = [sigma*randn(1,states.Fs) rx_real sigma*randn(1,states.Fs/2)];
   
   % multipath models can lead to clipping of int16 samples
   num_clipped = length(find(abs(rx_real>32767)));

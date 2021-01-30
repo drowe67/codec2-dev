@@ -67,8 +67,9 @@ function ofdm_ldpc_tx(filename, mode="700D", Nsec, SNR3kdB=100, channel='awgn', 
   end
 
   printf("Npackets: %d  ", Npackets);
-  [rx_real rx] = ofdm_clip_channel(states, tx, SNR3kdB, channel, freq_offset_Hz, tx_clip_en);
-  frx=fopen(filename,"wb"); fwrite(frx, rx_real, "short"); fclose(frx);
+  tx = ofdm_hilbert_clipper(states, tx, tx_clip_en);
+  [rx_real rx] = ofdm_channel(states, tx, SNR3kdB, channel, freq_offset_Hz);
+  frx = fopen(filename,"wb"); fwrite(frx, rx_real, "short"); fclose(frx);
   if length(rx) >= states.Fs
     figure(1); clf; plot(20*log10(abs(fft(rx(1:states.Fs)/16384))));
     axis([1 states.Fs -20 60])

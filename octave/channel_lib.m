@@ -32,7 +32,7 @@ function [spread1 spread2 path_delay_samples] = channel_multipath(channel, Fs, N
 endfunction
 
 % returns real rx signal with noise added, input is complex tx signal
-function [rx_real rx] = channel_simulate(Fs, SNR3kdB, freq_offset_Hz, channel, tx, verbose=0)
+function [rx_real rx sigma] = channel_simulate(Fs, SNR3kdB, freq_offset_Hz, channel, tx, verbose=0)
   Nsam = length(tx);
   rx = tx;
 
@@ -61,7 +61,4 @@ function [rx_real rx] = channel_simulate(Fs, SNR3kdB, freq_offset_Hz, channel, t
     printf("measSNR3k: %3.2f dB N: %3.2f dB\n",
            10*log10(S/(n*n')) + 10*log10(4000) - 10*log10(3000), 10*log10(n*n'));
   end
-  
-  % add a few seconds of no signal either side
-  rx_real = [sigma*randn(1,Fs) rx_real sigma*randn(1,Fs/2)];
 endfunction
