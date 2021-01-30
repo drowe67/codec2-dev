@@ -475,18 +475,19 @@ endfunction
 % -----------------------------------------------------------
 
 #{
-  Correlates the OFDM pilot symbol samples with a window of received
-  samples to determine the most likely timing offset.  Combines two
-  frames pilots so we need at least Nsamperframe+M+Ncp samples in rx.
+  Correlates known samples (for example pilots or a preamble) with a window of received
+  samples to determine the most likely timing offset.  Optionally combines
+  known samples from two frames (e.g. pilots at start of this and next frame)
+  so we need at least Nsamperframe+M+Ncp samples in rx.
 
   Can be used for acquisition (coarse timing), and fine timing.  Tends
   to break down when freq offset approaches +/- symbol rate (e.g +/-
   25 Hz for 700D).
 #}
 
-function [t_est timing_valid timing_mx av_level] = est_timing(states, rx, rate_fs_pilot_samples, step)
+function [t_est timing_valid timing_mx av_level] = est_timing(states, rx, known_samples, step, dual=1)
     ofdm_load_const;
-    Npsam = length(rate_fs_pilot_samples);
+    Npsam = length(known_samples);
 
     Ncorr = length(rx) - (Nsamperframe+Npsam);
     corr = zeros(1,Ncorr);
@@ -496,11 +497,17 @@ function [t_est timing_valid timing_mx av_level] = est_timing(states, rx, rate_f
 
     av_level = 2*sqrt(states.timing_norm*(rx*rx')/length(rx)) + 1E-12;
 
-    % correlate with pilots at start and end of frame to determine timing offset
+    % correlate with pilots at start and (optionally) end of frame to determine timing offset
 
     for i=1:step:Ncorr
-      rx1     = rx(i:i+Npsam-1); rx2 = rx(i+Nsamperframe:i+Nsamperframe+Npsam-1);
-      corr_st = rx1 * rate_fs_pilot_samples'; corr_en = rx2 * rate_fs_pilot_samples';
+      rx1 = rx(i:i+Npsam-1); 
+      corr_st = rx1 * known_samples'; 
+      corr_en = 0;
+      if dual
+        % for the streaming voice modes we also correlate with pilot samples at start of next frame 
+        rx2 = rx(i+Nsamperframe:i+Nsamperframe+Npsam-1);
+        corr_en = rx2 * known_samples';
+      end
       corr(i) = (abs(corr_st) + abs(corr_en))/av_level;
     end
 
@@ -512,85 +519,47 @@ function [t_est timing_valid timing_mx av_level] = est_timing(states, rx, rate_f
       printf("  av_level: %5.4f mx: %4.3f timing_est: %4d timing_valid: %d\n", av_level, timing_mx, t_est, timing_valid);
     end
     if verbose > 2
-      figure(3); clf;
+      figure(10); clf;
       subplot(211); plot(rx)
       subplot(212); plot(corr)
-      figure(4); clf; plot(real(rate_fs_pilot_samples));
+      figure(11); clf; plot(real(known_samples));
     end
 
 endfunction
 
 
 % -----------------------------------------------------------
-% est_freq_offset
+% est_freq_offset_known_corr
 % -----------------------------------------------------------
 
 #{
   Determines frequency offset at current timing estimate, used for
   coarse freq offset estimation during acquisition.
-
-  This estimator works well for AWGN channels but has problems with
-  fading channels.  With stationary/slow fading channels (say a notch
-  in the spectrum), ot exhibits bias which can delay sync for 10's of
-  seconds.
 #}
 
-function [foff_est states] = est_freq_offset(states, rx, rate_fs_pilot_samples, t_est)
+function foff_est = est_freq_offset_known_corr(states, rx, known_samples, t_est, dual=1)
     ofdm_load_const;
-    Npsam = length(rate_fs_pilot_samples);
-
-    % Freq offset can be considered as change in phase over two halves
-    % of pilot symbols.  We average this statistic over this and next
-    % frames pilots.
-
-    Npsam2 = floor(Npsam/2);
-    p1 = rx(t_est:t_est+Npsam2-1) * rate_fs_pilot_samples(1:Npsam2)';
-    p2 = rx(t_est+Npsam2:t_est+Npsam-1) * rate_fs_pilot_samples(Npsam2+1:Npsam)';
-    p3 = rx(t_est+Nsamperframe:t_est+Nsamperframe+Npsam2-1) * rate_fs_pilot_samples(1:Npsam2)';
-    p4 = rx(t_est+Nsamperframe+Npsam2:t_est+Nsamperframe+Npsam-1) * rate_fs_pilot_samples(Npsam2+1:Npsam)';
-
-    Fs1 = Fs/(Npsam/2);
-
-    states.foff_metric = (conj(p1)*p2 + conj(p3)*p4);
-    foff_est = Fs1*angle(states.foff_metric)/(2*pi);
-
-    if states.verbose > 1
-        printf("  foff_metric: %f %f foff_est: %f\n", real(states.foff_metric), imag(states.foff_metric), foff_est);
-    end
-
-endfunction
-
-
-% -----------------------------------------------------------
-% est_freq_offset_pilot_corr
-% -----------------------------------------------------------
-
-#{
-  Determines frequency offset at current timing estimate, used for
-  coarse freq offset estimation during acquisition.
-
-  This is an alternative algorithm to est_freq_offset() above that is less noisey
-  and performs better on HF channels using the acquistion tests in ofdm_dev.m
-#}
-
-function foff_est = est_freq_offset_pilot_corr(states, rx, rate_fs_pilot_samples, t_est)
-    ofdm_load_const;
-    Npsam = length(rate_fs_pilot_samples);
+    Npsam = length(known_samples);
 
     % extract pilot samples from either end of frame
     rx1  = rx(t_est:t_est+Npsam-1); rx2 = rx(t_est+Nsamperframe:t_est+Nsamperframe+Npsam-1);
 
     % "mix" these down (correlate) with 0 Hz offset pilot samples
-    corr_st = rx1 .* conj(rate_fs_pilot_samples);
-    corr_en = rx2 .* conj(rate_fs_pilot_samples);
-
+    corr_st = rx1 .* conj(known_samples);
+    if dual 
+      corr_en = rx2 .* conj(known_samples);
+    end
+    
     % sample sum of DFT magnitude of correlated signals at each freq offset and look for peak
     st = -20; en = 20; foff_est = 0; Cabs_max = 0;
 
     for f=st:en
        w = 2*pi*f/Fs;
        C_st = corr_st * exp(j*w*(0:Npsam-1))';
-       C_en = corr_en * exp(j*w*(0:Npsam-1))';
+       C_en = 0;
+       if dual
+          C_en = corr_en * exp(j*w*(0:Npsam-1))';
+       end
        Cabs = abs(C_st) + abs(C_en);
        if Cabs > Cabs_max
          Cabs_max = Cabs;
@@ -601,10 +570,7 @@ function foff_est = est_freq_offset_pilot_corr(states, rx, rate_fs_pilot_samples
     if states.verbose > 1
       printf("  foff_est: %f\n", foff_est);
     end
-    if verbose > 2
-      figure(10); clf;
-      plot(st:en,C(Fs/2+st:Fs/2+en)); grid;
-    end
+
 endfunction
 
 
@@ -654,11 +620,11 @@ function [timing_valid states] = ofdm_sync_search(states, rxbuf_in)
   if fcoarse != 0
     w = 2*pi*fcoarse/Fs;
     wvec = exp(-j*w*(0:2*Nsamperframe+M+Ncp-1));
-    foff_est = est_freq_offset_pilot_corr(states, wvec .* states.rxbuf(st:en), states.rate_fs_pilot_samples, ct_est);
+    foff_est = est_freq_offset_known_corr(states, wvec .* states.rxbuf(st:en), states.rate_fs_pilot_samples, ct_est);
     foff_est += fcoarse;
   else
     % exp(-j*0) is just 1 when fcoarse is 0
-    foff_est = est_freq_offset_pilot_corr(states, states.rxbuf(st:en), states.rate_fs_pilot_samples, ct_est);
+    foff_est = est_freq_offset_known_corr(states, states.rxbuf(st:en), states.rate_fs_pilot_samples, ct_est);
   end
 
   if verbose
@@ -1656,7 +1622,9 @@ function [rx_real rx] = ofdm_clip_channel(states, tx, SNR3kdB, channel, freq_off
 
   nclipped = 0;
   if tx_clip_en
-    printf("%f %f\n", states.clip_gain1, states.clip_gain2);
+    if states.verbose
+      printf("%f %f\n", states.clip_gain1, states.clip_gain2);
+    end
     [tx nclipped] = ofdm_clip(states, tx*states.clip_gain1, states.ofdm_peak);
     tx *= states.clip_gain2;
     ssbfilt_n = 100;
@@ -1676,11 +1644,13 @@ function [rx_real rx] = ofdm_clip_channel(states, tx, SNR3kdB, channel, freq_off
 
   % channel simulation and save to disk
 
-  printf("Peak: %4.2f RMS: %5.2f CPAPR: %4.1f clipped: %5.2f%%\n",
-         peak, RMS, cpapr, nclipped*100/length(tx));
-  printf("foff: %3.1f Hz SNR(3k): %3.1f dB  ", freq_offset_Hz, SNR3kdB);
+  if states.verbose
+    printf("Peak: %4.2f RMS: %5.2f CPAPR: %4.1f clipped: %5.2f%%\n",
+           peak, RMS, cpapr, nclipped*100/length(tx));
+    printf("foff: %3.1f Hz SNR(3k): %3.1f dB  ", freq_offset_Hz, SNR3kdB);
+  end
   [rx_real rx] = channel_simulate(states.Fs, SNR3kdB, freq_offset_Hz, channel, tx);
-
+  
   % multipath models can lead to clipping of int16 samples
   num_clipped = length(find(abs(rx_real>32767)));
   while num_clipped/length(rx_real) > 0.001
