@@ -21,23 +21,24 @@ DELAY="${DELAY:-500}"
 MAX_RUN_TIME=3600
 # in this version we use single frame bursts, so BURSTS==FRAMES
 BURSTS=$2
+MODE=DATAC0
 
 function tx1 {
-    freedv_data_raw_tx DATAC1 /dev/zero - --testframes 1 --bursts ${BURSTS} --delay ${DELAY} | aplay --device="plughw:CARD=CHAT2,DEV=1" -f S16_LE
+    freedv_data_raw_tx ${MODE} /dev/zero - --testframes 1 --bursts ${BURSTS} --delay ${DELAY} | aplay --device="plughw:CARD=CHAT2,DEV=1" -f S16_LE
 }
 
 function rx2_background {
     # re-transmit any frames we receive
     ( arecord --device="plughw:CARD=CHAT2,DEV=0" -f S16_LE -d $MAX_RUN_TIME | \
-    freedv_data_raw_rx DATAC1 - - --resetsync 1 --vv --testframes | \
-    freedv_data_raw_tx DATAC1 - - --delay ${DELAY} | \
+    freedv_data_raw_rx ${MODE} - - --resetsync 1 --vv --testframes | \
+    freedv_data_raw_tx ${MODE} - - --delay ${DELAY} | \
     aplay --device="plughw:CARD=CHAT1,DEV=1" -f S16_LE ) 2>${LOGFILE2} & 
     # killing arecord kills the entire pipeline
     echo $(pidof arecord)>${PIDFILE_RX2}
 }
 
 function rx1_background {
-    arecord --device="plughw:CARD=CHAT1,DEV=0" -f S16_LE -d $MAX_RUN_TIME | freedv_data_raw_rx DATAC1 - /dev/null --resetsync 1 --vv --testframes &
+    arecord --device="plughw:CARD=CHAT1,DEV=0" -f S16_LE -d $MAX_RUN_TIME | freedv_data_raw_rx ${MODE} - /dev/null --resetsync 1 --vv --testframes &
     echo $!>${PIDFILE_RX1}
 }
 
