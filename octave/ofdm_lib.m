@@ -511,10 +511,10 @@ function [t_est timing_valid timing_mx av_level] = est_timing(states, rx, known_
       corr(i) = (abs(corr_st) + abs(corr_en))/av_level;
     end
 
-    [timing_mx t_est] = max(corr);
+    [timing_mx t_est] = max(abs(corr));
     % only declare timing valid if there are enough samples in rxbuf to demodulate a frame
     timing_valid = (abs(rx(t_est)) > 0) && (timing_mx > timing_mx_thresh);
-
+    
     if verbose > 1
       printf("  av_level: %5.4f mx: %4.3f timing_est: %4d timing_valid: %d\n", av_level, timing_mx, t_est, timing_valid);
     end
@@ -561,6 +561,7 @@ function foff_est = est_freq_offset_known_corr(states, rx, known_samples, t_est,
           C_en = corr_en * exp(j*w*(0:Npsam-1))';
        end
        Cabs = abs(C_st) + abs(C_en);
+       %printf("f: %4.1f Cabs: %f Cmax: %f\n", f, Cabs, Cabs_max);
        if Cabs > Cabs_max
          Cabs_max = Cabs;
          foff_est = f;
@@ -569,6 +570,62 @@ function foff_est = est_freq_offset_known_corr(states, rx, known_samples, t_est,
 
     if states.verbose > 1
       printf("  foff_est: %f\n", foff_est);
+    end
+
+endfunction
+
+
+% Joint estimation used for data mode acquistion
+
+function [t_est foff_est timing_mx] = est_timing_and_freq(states, rx, known_samples, step)
+    ofdm_load_const;
+    Npsam = length(known_samples);
+
+    Ncorr = length(rx) - (Nsamperframe+Npsam);
+    corr = zeros(1,Ncorr);
+
+    % set up matrix of freq shifted known samples for correlation with received signal.  Each row
+    % is the known samples shifted by a different freq offset
+
+    M = [];
+    for afcoarse=-50:5:50
+       w = 2*pi*afcoarse/Fs;
+       wvec = exp(j*w*(0:Npsam-1));
+       M = [M; known_samples .* wvec];
+    end
+    
+    % At each timing position, correlate with known samples at all possible freq offsets.  Result
+    % is a column vector for each timing offset.  Each matrix cell is s freq,timing coordinate
+    
+    corr = [];
+    for i=1:step:Ncorr
+      rx1 = rx(i:i+Npsam-1); 
+      col = M * rx1';
+      corr = [corr, col];
+    end
+
+    % best timing offset is the col with the global max of the corr matrix
+    max_col = max(abs(corr));
+    [mx mx_col] = max(max_col);
+    t_est = (mx_col-1)*step;
+    
+    % obtain normalised real number for timing max
+    mag1 = known_samples*known_samples';
+    mag2 = rx(t_est:t_est+Npsam-1)*rx(t_est:t_est+Npsam-1)';
+    timing_mx = mx*mx'/(mag1*mag2);
+    
+    % determine frequency offset for row where max occuurred
+    [tmp freq_row] = max(corr(:,mx_col));
+    foff_est = -50 + 5*(freq_row-1);
+       
+    if verbose > 1
+      printf("  t_est: %d timing:mx: %f foff_est: %f\n", t_est, timing_mx, foff_est);
+    end
+    if verbose > 2
+      figure(10); clf;
+      subplot(211); plot(rx)
+      subplot(212); plot(corr)
+      figure(11); clf; plot(real(known_samples));
     end
 
 endfunction

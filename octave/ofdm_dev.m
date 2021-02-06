@@ -15,7 +15,7 @@ function tx_preamble = generate_preamble(states)
 endfunction
 
 % build a vector of Tx bursts in noise
-function [rx tx_preamble states] = generate_bursts(sim_in)
+function [rx tx_preamble burst_len states] = generate_bursts(sim_in)
   config = ofdm_init_mode(sim_in.mode);
   states = ofdm_init(config);
   ofdm_load_const;
@@ -23,13 +23,19 @@ function [rx tx_preamble states] = generate_bursts(sim_in)
   tx_preamble = generate_preamble(states);
   Nbursts = sim_in.Nbursts;
   tx_bits = create_ldpc_test_frame(states, coded_frame=0);
-  tx = [tx_preamble ofdm_mod(states, tx_bits)];
-
-  rx = [];
+  tx_burst = [tx_preamble ofdm_mod(states, tx_bits)];
+  tx_burst = ofdm_hilbert_clipper(states, tx_burst, tx_clip_en=0);
+  on_len = length(tx_burst);
+  tx_burst = [zeros(1,Fs) tx_burst zeros(1,Fs)];
+  burst_len = length(tx_burst);
+  
+  tx = [];
   for f=1:Nbursts
-    arx = ofdm_clip_channel(states, tx, sim_in.SNR3kdB, sim_in.channel, sim_in.foff_Hz, 0);
-    rx = [rx arx];
+    tx = [tx tx_burst];
   end
+  % adjust channel simulator SNR setpoint given (burst on length)/(sample length) ratio
+  SNRdB_setpoint = sim_in.SNR3kdB + 10*log10(on_len/burst_len);
+  [rx_real rx] = channel_simulate(Fs, SNRdB_setpoint, sim_in.foff_Hz, sim_in.channel, tx, verbose);
 endfunction
 
 % Run an acquisition test, returning vectors of estimation errors
@@ -40,22 +46,18 @@ function [delta_ct delta_foff timing_mx_log] = acquisition_test(mode="700D", Nte
   sim_in.foff_Hz = foff_Hz;  
   sim_in.mode = mode;
   sim_in.Nbursts = Ntests;
-  [rx tx_preamble states] = generate_bursts(sim_in);
+  [rx tx_preamble Nsamperburst states] = generate_bursts(sim_in);
   states.verbose = bitand(verbose_top,3);
   ofdm_load_const;
   
   delta_ct = []; delta_foff = []; ct_log = []; timing_mx_log = []; 
-  
-  Nsamperburst = Fs + Nsamperframe*(Np+1) + Fs/2; 
-  printf("Nsamperburst: %d length: %d %d\n", Nsamperburst, length(rx), length(tx_preamble));
- 
+   
   i = 1;
   states.foff_metric = 0;
   for w=1:Nsamperburst:length(rx)
-    [ct_est timing_valid timing_mx] = est_timing(states, rx(w:w+Nsamperburst-1), tx_preamble, 1, dual=0);
-    foff_est = est_freq_offset_known_corr(states, rx(w:w+Nsamperburst-1), tx_preamble, ct_est, dual=0);
+    [ct_est foff_est timing_mx] = est_timing_and_freq(states, rx(w:w+Nsamperburst-1), tx_preamble, 8);
     if states.verbose
-      printf("i: %2d w: %8d ct_est: %4d foff_est: %5.1f timing_mx: %3.2f timing_vld: %d\n", i++, w, ct_est, foff_est, timing_mx, timing_valid);
+      printf("i: %2d w: %8d ct_est: %6d foff_est: %5.1f timing_mx: %3.2f\n", i++, w, ct_est, foff_est, timing_mx);
     end
 
     % valid coarse timing ests are modulo Nsamperframe
@@ -275,9 +277,10 @@ endfunction
 format;
 more off;
 pkg load signal;
+graphics_toolkit ("gnuplot");
 randn('seed',1);
 
-acquisition_test("datac1", Ntests=10, SNR3kdB=10, foff_hz=0, 'mpp', verbose=1+8);
+acquisition_test("datac0", Ntests=10, SNR3kdB=100, foff_hz=-0, 'awgn', verbose=1+8);
 %acquisition_histograms("700D", fin_en=0, foff_hz=-15, EbNoAWGN=-1, EbNoHF=3)
 %sync_metrics('freq')
 %acquisition_dev(Ntests=10, EbNodB=100, foff_hz=0)
