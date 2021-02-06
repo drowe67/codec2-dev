@@ -55,7 +55,12 @@ function [delta_ct delta_foff timing_mx_log] = acquisition_test(mode="700D", Nte
   i = 1;
   states.foff_metric = 0;
   for w=1:Nsamperburst:length(rx)
-    [ct_est foff_est timing_mx] = est_timing_and_freq(states, rx(w:w+Nsamperburst-1), tx_preamble, 8);
+    [ct_est foff_est timing_mx] = est_timing_and_freq(states, rx(w:w+Nsamperburst-1), tx_preamble, 
+                                  tstep =8, fmin = -50, fmax = 50, fstep = 5);
+    fmin = foff_est-3; fmax = foff_est+3;
+    st = w+ct_est; en = st + length(tx_preamble)-1; rx1 = rx(st:en);
+    [tmp foff_est timing_mx] = est_timing_and_freq(states, rx1, tx_preamble, 
+                                  tstep = 1, fmin, fmax, fstep = 1);
     if states.verbose
       printf("i: %2d w: %8d ct_est: %6d foff_est: %5.1f timing_mx: %3.2f\n", i++, w, ct_est, foff_est, timing_mx);
     end
@@ -280,7 +285,7 @@ pkg load signal;
 graphics_toolkit ("gnuplot");
 randn('seed',1);
 
-acquisition_test("datac0", Ntests=10, SNR3kdB=100, foff_hz=-0, 'awgn', verbose=1+8);
+acquisition_test("datac0", Ntests=10, SNR3kdB=100, foff_hz=-38, 'awgn', verbose=1+8);
 %acquisition_histograms("700D", fin_en=0, foff_hz=-15, EbNoAWGN=-1, EbNoHF=3)
 %sync_metrics('freq')
 %acquisition_dev(Ntests=10, EbNodB=100, foff_hz=0)
