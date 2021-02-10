@@ -15,7 +15,7 @@ function tx_preamble = generate_preamble(states)
 endfunction
 
 % build a vector of Tx bursts in noise
-function [rx tx_preamble burst_len states] = generate_bursts(sim_in)
+function [rx tx_preamble burst_len padded_burst_len states] = generate_bursts(sim_in)
   config = ofdm_init_mode(sim_in.mode);
   states = ofdm_init(config);
   ofdm_load_const;
@@ -23,19 +23,20 @@ function [rx tx_preamble burst_len states] = generate_bursts(sim_in)
   tx_preamble = generate_preamble(states);
   Nbursts = sim_in.Nbursts;
   tx_bits = create_ldpc_test_frame(states, coded_frame=0);
-  tx_burst = [tx_preamble ofdm_mod(states, tx_bits)];
+  tx_burst = [tx_preamble ofdm_mod(states, tx_bits) tx_preamble];
+  burst_len = length(tx_burst);
   tx_burst = ofdm_hilbert_clipper(states, tx_burst, tx_clip_en=0);
   on_len = length(tx_burst);
-  tx_burst = [zeros(1,Fs) tx_burst zeros(1,Fs)];
-  burst_len = length(tx_burst);
+  tx_burst_padded = [zeros(1,Fs) tx_burst zeros(1,Fs)];
+  padded_burst_len = length(tx_burst_padded);
   
   tx = [];
   for f=1:Nbursts
-    tx = [tx tx_burst];
+    tx = [tx tx_burst_padded];
   end
   % adjust channel simulator SNR setpoint given (burst on length)/(sample length) ratio
   SNRdB_setpoint = sim_in.SNR3kdB + 10*log10(on_len/burst_len);
-  [rx_real rx] = channel_simulate(Fs, SNRdB_setpoint, sim_in.foff_Hz, sim_in.channel, tx, verbose);
+  rx = channel_simulate(Fs, SNRdB_setpoint, sim_in.foff_Hz, sim_in.channel, tx, verbose);
 endfunction
 
 % Run an acquisition test, returning vectors of estimation errors
@@ -46,7 +47,7 @@ function [delta_ct delta_foff timing_mx_log] = acquisition_test(mode="700D", Nte
   sim_in.foff_Hz = foff_Hz;  
   sim_in.mode = mode;
   sim_in.Nbursts = Ntests;
-  [rx tx_preamble Nsamperburst states] = generate_bursts(sim_in);
+  [rx tx_preamble Nsamperburst Nsamperburstpadded states] = generate_bursts(sim_in);
   states.verbose = bitand(verbose_top,3);
   ofdm_load_const;
   
@@ -54,31 +55,39 @@ function [delta_ct delta_foff timing_mx_log] = acquisition_test(mode="700D", Nte
    
   i = 1;
   states.foff_metric = 0;
-  for w=1:Nsamperburst:length(rx)
-    [ct_est foff_est timing_mx] = est_timing_and_freq(states, rx(w:w+Nsamperburst-1), tx_preamble, 
+  for w=1:Nsamperburstpadded:length(rx)
+    [ct_est foff_est timing_mx] = est_timing_and_freq(states, rx(w:w+Nsamperburstpadded-1), tx_preamble, 
                                   tstep =8, fmin = -50, fmax = 50, fstep = 5);
     fmin = foff_est-3; fmax = foff_est+3;
     st = w+ct_est; en = st + length(tx_preamble)-1; rx1 = rx(st:en);
     [tmp foff_est timing_mx] = est_timing_and_freq(states, rx1, tx_preamble, 
                                   tstep = 1, fmin, fmax, fstep = 1);
-    if states.verbose
-      printf("i: %2d w: %8d ct_est: %6d foff_est: %5.1f timing_mx: %3.2f\n", i++, w, ct_est, foff_est, timing_mx);
-    end
 
-    % valid coarse timing ests are modulo Nsamperframe
-
-    ct_target = Fs+1;
-    delta_ct = [delta_ct ct_est-ct_target];
+    % valid coarse timing could be pre-amble or post-amble
+    ct_target1 = Fs;
+    ct_target2 = Fs+Nsamperburst-length(tx_preamble);
+    ct_delta1 = ct_est-ct_target1;
+    ct_delta2 = ct_est-ct_target2;
+    adelta_ct = min([abs(ct_delta1) abs(ct_delta2)]);
+    
+    % log results
+    delta_ct = [delta_ct adelta_ct];
     delta_foff = [delta_foff (foff_est-foff_Hz)];
     ct_log = [ct_log w+ct_est];
     timing_mx_log = [timing_mx_log; timing_mx];
+    
+    if states.verbose
+      printf("i: %2d w: %8d ct_est: %6d delta_ct: %6d foff_est: %5.1f timing_mx: %3.2f\n",
+              i++, w, ct_est, adelta_ct, foff_est, timing_mx);
+    end
+
   end
   
   if bitand(verbose_top,8)
     figure(1); clf; plot(timing_mx_log,'+-'); title('mx log');
     figure(2); clf; plot(delta_ct,'+-'); title('delta ct');
     figure(3); clf; plot(delta_foff,'+-'); title('delta freq off');
-    figure(5); clf; plot(rx); hold on; plot(ct_log,zeros(1,length(ct_log)),'r+','markersize', 25, 'linewidth', 2); hold off;
+    figure(5); clf; plot(real(rx)); hold on; plot(ct_log,zeros(1,length(ct_log)),'r+','markersize', 25, 'linewidth', 2); hold off;
   end
   
 endfunction
@@ -285,7 +294,7 @@ pkg load signal;
 graphics_toolkit ("gnuplot");
 randn('seed',1);
 
-acquisition_test("datac0", Ntests=10, SNR3kdB=100, foff_hz=-38, 'awgn', verbose=1+8);
+acquisition_test("datac1", Ntests=10, SNR3kdB=5, foff_hz=-38, 'awgn', verbose=1+8);
 %acquisition_histograms("700D", fin_en=0, foff_hz=-15, EbNoAWGN=-1, EbNoHF=3)
 %sync_metrics('freq')
 %acquisition_dev(Ntests=10, EbNodB=100, foff_hz=0)

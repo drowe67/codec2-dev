@@ -586,7 +586,7 @@ function [t_est foff_est timing_mx] = est_timing_and_freq(states, rx, known_samp
     
     % set up matrix of freq shifted known samples for correlation with received signal.  Each row
     % is the known samples shifted by a different freq offset
-
+    
     M = [];
     for afcoarse=fmin:fstep:fmax
        w = 2*pi*afcoarse/Fs;
