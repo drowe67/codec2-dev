@@ -14,7 +14,7 @@ function [spread1 spread2 path_delay_samples] = channel_multipath(channel, Fs, N
     elseif printf("Unknown multipath channel\n"); assert(0); end
 
     path_delay_samples = path_delay_ms*Fs/1000;
-    printf(" Doppler Spread: %3.2f Hz Path Delay: %3.2f ms %d samples\n", dopplerSpreadHz, path_delay_ms, path_delay_samples);
+    %printf(" Doppler Spread: %3.2f Hz Path Delay: %3.2f ms %d samples\n", dopplerSpreadHz, path_delay_ms, path_delay_samples);
 
     % generate same fading pattern for every run
     spread1 = doppler_spread(dopplerSpreadHz, Fs, Nsam);

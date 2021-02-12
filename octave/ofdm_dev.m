@@ -39,8 +39,9 @@ function [rx tx_preamble burst_len padded_burst_len states] = generate_bursts(si
   rx = channel_simulate(Fs, SNRdB_setpoint, sim_in.foff_Hz, sim_in.channel, tx, verbose);
 endfunction
 
+
 % Run an acquisition test, returning vectors of estimation errors
-function [delta_ct delta_foff timing_mx_log] = acquisition_test(mode="700D", Ntests=10, SNR3kdB=100, foff_Hz=0, channel, verbose_top=0)
+function [delta_ct delta_foff timing_mx_log] = acquisition_test(mode="700D", Ntests=10, channel, SNR3kdB=100, foff_Hz=0, verbose_top=0)
   
   sim_in.SNR3kdB = SNR3kdB;
   sim_in.channel = channel;
@@ -94,71 +95,52 @@ endfunction
 
 
 #{
-
-   Generates aquisistion statistics for AWGN and HF channels for
-   continuous signals. Probability of acquistion is what matters,
-   e.g. if it's 50% we can expect sync within 2 frames.
-
+   Meausures aquisistion statistics for AWGN and HF channels
 #}
 
-function res = acquisition_histograms(mode="700D", fine_en = 0, foff, EbNoAWGN=-1, EbNoHF=3, verbose=1)
+function res = acquisition_histograms(mode="datac0", Ntests=10, SNR3kdB=100, foff=0, verbose=1)
   Fs = 8000;
-  Ntests = 100;
-
+  
   % allowable tolerance for acquistion
 
-  ftol_hz = 1.5;            % we can sync up on this
-  ttol_samples = 0.002*Fs;  % 2ms, ie CP length
+  ftol_hz = 2;              % we can sync up on this (todo: make mode selectable)
+  ttol_samples = 0.006*Fs;  % CP length (todo: make mode selectable)
 
-  % AWGN channel at uncoded Eb/No operating point
-
-  [dct dfoff] = acquisition_test(mode, Ntests, EbNoAWGN, foff, 0, fine_en);
-
-  % Probability of acquistion is what matters, e.g. if it's 50% we can
-  % expect sync within 2 frames
-
+ % AWGN channel
+ 
+  [dct dfoff] = acquisition_test(mode, Ntests, 'awgn', SNR3kdB, foff, verbose); 
   PtAWGN = length(find (abs(dct) < ttol_samples))/length(dct);
-  printf("AWGN P(time offset acq) = %3.2f\n", PtAWGN);
-  if fine_en == 0
-    PfAWGN = length(find (abs(dfoff) < ftol_hz))/length(dfoff);
-    printf("AWGN P(freq offset acq) = %3.2f\n", PfAWGN);
-  end
+  PfAWGN = length(find (abs(dfoff) < ftol_hz))/length(dfoff);
+  printf("AWGN P(time) = %3.2f  P(freq) = %3.2f\n", PtAWGN, PfAWGN);
 
-  if verbose
+  if bitand(verbose,16)
     figure(1); clf;
     hist(dct(find (abs(dct) < ttol_samples)))
-    t = sprintf("Coarse Timing Error AWGN EbNo = %3.2f foff = %3.1f", EbNoAWGN, foff);
+    t = sprintf("Coarse Timing Error AWGN SNR = %3.2f foff = %3.1f", SNR3kdB, foff);
     title(t)
-    if fine_en == 0
-      figure(2)
-      hist(dfoff(find(abs(dfoff) < 2*ftol_hz)))
-      t = sprintf("Coarse Freq Error AWGN EbNo = %3.2f foff = %3.1f", EbNoAWGN, foff);
-      title(t);
-    end
- end
-
-  % HF channel at uncoded operating point
-
-  [dct dfoff] = acquisition_test(mode, Ntests, EbNoHF, foff, 1, fine_en);
-
-  PtHF = length(find (abs(dct) < ttol_samples))/length(dct);
-  printf("HF P(time offset acq) = %3.2f\n", PtHF);
-  if fine_en == 0
-    PfHF = length(find (abs(dfoff) < ftol_hz))/length(dfoff)
-    printf("HF P(freq offset acq) = %3.2f\n", PfHF);
+    figure(2); clf;
+    hist(dfoff(find(abs(dfoff) < 2*ftol_hz)))
+    t = sprintf("Coarse Freq Error AWGN SNR = %3.2f foff = %3.1f", SNR3kdB, foff);
+    title(t);
   end
 
-  if verbose
+  % HF channel
+
+  [dct dfoff] = acquisition_test(mode, Ntests, 'mpp', SNR3kdB, foff, verbose); 
+
+  PtHF = length(find (abs(dct) < ttol_samples))/length(dct);
+  PfHF = length(find (abs(dfoff) < ftol_hz))/length(dfoff);
+  printf("HF   P(time) = %3.2f  P(freq) = %3.2f\n", PtHF, PfHF);
+
+  if bitand(verbose,16)
     figure(3); clf;
     hist(dct(find (abs(dct) < ttol_samples)))
-    t = sprintf("Coarse Timing Error HF EbNo = %3.2f foff = %3.1f", EbNoHF, foff);
+    t = sprintf("Coarse Timing Error HF SNR = %3.2f foff = %3.1f", SNR3kdB, foff);
     title(t)
-    if fine_en == 0
-      figure(4)
-      hist(dfoff(find(abs(dfoff) < 2*ftol_hz)))
-      t = sprintf("Coarse Freq Error HF EbNo = %3.2f foff = %3.1f", EbNoHF, foff);
-      title(t);
-    end
+    figure(4)
+    hist(dfoff(find(abs(dfoff) < 2*ftol_hz)))
+    t = sprintf("Coarse Freq Error HF SNR = %3.2f foff = %3.1f", SNR3kdB, foff);
+    title(t);
   end
   
   res = [PtAWGN PfAWGN PtHF PfHF];
@@ -294,8 +276,8 @@ pkg load signal;
 graphics_toolkit ("gnuplot");
 randn('seed',1);
 
-acquisition_test("datac1", Ntests=10, SNR3kdB=5, foff_hz=-38, 'awgn', verbose=1+8);
-%acquisition_histograms("700D", fin_en=0, foff_hz=-15, EbNoAWGN=-1, EbNoHF=3)
+% acquisition_test("datac1", Ntests=10, 'awgn', SNR3kdB=5, foff_hz=-38, verbose=1+8);
+%acquisition_histograms(mode="datac0", Ntests=10, SNR3kdB=5, foff=-10, verbose=16);
+acquisition_histograms("datac0", SNR3kdB=5, foff_hz=-15)
 %sync_metrics('freq')
-%acquisition_dev(Ntests=10, EbNodB=100, foff_hz=0)
 %acquistion_curves
