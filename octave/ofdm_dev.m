@@ -15,7 +15,7 @@ function tx_preamble = generate_preamble(states)
 endfunction
 
 % build a vector of Tx bursts in noise
-function [rx tx_preamble burst_len padded_burst_len states] = generate_bursts(sim_in)
+function [rx tx_preamble burst_len padded_burst_len ct_targets states] = generate_bursts(sim_in)
   config = ofdm_init_mode(sim_in.mode);
   states = ofdm_init(config);
   ofdm_load_const;
@@ -27,11 +27,14 @@ function [rx tx_preamble burst_len padded_burst_len states] = generate_bursts(si
   burst_len = length(tx_burst);
   tx_burst = ofdm_hilbert_clipper(states, tx_burst, tx_clip_en=0);
   on_len = length(tx_burst);
-  tx_burst_padded = [zeros(1,Fs) tx_burst zeros(1,Fs)];
-  padded_burst_len = length(tx_burst_padded);
+  padded_burst_len = Fs+burst_len+Fs;
   
-  tx = [];
+  tx = []; ct_targets = [];
   for f=1:Nbursts
+    % 100ms of jitter in the burst start point
+    jitter = floor(rand(1,1)*0.1*Fs);
+    tx_burst_padded = [zeros(1,Fs+jitter) tx_burst zeros(1,Fs-jitter)];
+    ct_targets = [ct_targets Fs+jitter];
     tx = [tx tx_burst_padded];
   end
   % adjust channel simulator SNR setpoint given (burst on length)/(sample length) ratio
@@ -48,7 +51,7 @@ function [delta_ct delta_foff timing_mx_log] = acquisition_test(mode="700D", Nte
   sim_in.foff_Hz = foff_Hz;  
   sim_in.mode = mode;
   sim_in.Nbursts = Ntests;
-  [rx tx_preamble Nsamperburst Nsamperburstpadded states] = generate_bursts(sim_in);
+  [rx tx_preamble Nsamperburst Nsamperburstpadded ct_targets states] = generate_bursts(sim_in);
   states.verbose = bitand(verbose_top,3);
   ofdm_load_const;
   
@@ -58,15 +61,16 @@ function [delta_ct delta_foff timing_mx_log] = acquisition_test(mode="700D", Nte
   states.foff_metric = 0;
   for w=1:Nsamperburstpadded:length(rx)
     [ct_est foff_est timing_mx] = est_timing_and_freq(states, rx(w:w+Nsamperburstpadded-1), tx_preamble, 
-                                  tstep =8, fmin = -50, fmax = 50, fstep = 5);
+                                  tstep = 4, fmin = -50, fmax = 50, fstep = 5);
     fmin = foff_est-3; fmax = foff_est+3;
     st = w+ct_est; en = st + length(tx_preamble)-1; rx1 = rx(st:en);
     [tmp foff_est timing_mx] = est_timing_and_freq(states, rx1, tx_preamble, 
                                   tstep = 1, fmin, fmax, fstep = 1);
 
     % valid coarse timing could be pre-amble or post-amble
-    ct_target1 = Fs;
-    ct_target2 = Fs+Nsamperburst-length(tx_preamble);
+    ct_target1 = ct_targets(i);
+    ct_target2 = ct_targets(i)+Nsamperburst-length(tx_preamble);
+    %printf("  ct_target1: %d ct_target2: %d ct_est: %d\n", ct_target1, ct_target2, ct_est);
     ct_delta1 = ct_est-ct_target1;
     ct_delta2 = ct_est-ct_target2;
     adelta_ct = min([abs(ct_delta1) abs(ct_delta2)]);
@@ -98,7 +102,7 @@ endfunction
    Meausures aquisistion statistics for AWGN and HF channels
 #}
 
-function res = acquisition_histograms(mode="datac0", Ntests=10, SNR3kdB=100, foff=0, verbose=1)
+function res = acquisition_histograms(mode="datac0", Ntests=10, SNR3kdB=100, foff=0, verbose=0)
   Fs = 8000;
   
   % allowable tolerance for acquistion
@@ -111,7 +115,7 @@ function res = acquisition_histograms(mode="datac0", Ntests=10, SNR3kdB=100, fof
   [dct dfoff] = acquisition_test(mode, Ntests, 'awgn', SNR3kdB, foff, verbose); 
   PtAWGN = length(find (abs(dct) < ttol_samples))/length(dct);
   PfAWGN = length(find (abs(dfoff) < ftol_hz))/length(dfoff);
-  printf("AWGN P(time) = %3.2f  P(freq) = %3.2f\n", PtAWGN, PfAWGN);
+  printf("SNR: %3.1f AWGN P(time) = %3.2f  P(freq) = %3.2f\n", SNR3kdB, PtAWGN, PfAWGN);
 
   if bitand(verbose,16)
     figure(1); clf;
@@ -130,14 +134,14 @@ function res = acquisition_histograms(mode="datac0", Ntests=10, SNR3kdB=100, fof
 
   PtHF = length(find (abs(dct) < ttol_samples))/length(dct);
   PfHF = length(find (abs(dfoff) < ftol_hz))/length(dfoff);
-  printf("HF   P(time) = %3.2f  P(freq) = %3.2f\n", PtHF, PfHF);
+  printf("SNR: %3.1f HF   P(time) = %3.2f  P(freq) = %3.2f\n", SNR3kdB, PtHF, PfHF);
 
   if bitand(verbose,16)
     figure(3); clf;
     hist(dct(find (abs(dct) < ttol_samples)))
     t = sprintf("Coarse Timing Error HF SNR = %3.2f foff = %3.1f", SNR3kdB, foff);
     title(t)
-    figure(4)
+    figure(4); clf;
     hist(dfoff(find(abs(dfoff) < 2*ftol_hz)))
     t = sprintf("Coarse Freq Error HF SNR = %3.2f foff = %3.1f", SNR3kdB, foff);
     title(t);
@@ -149,41 +153,36 @@ endfunction
 
 % plot some curves of Acquisition probability against EbNo and freq offset
 
-function acquistion_curves(mode="700D")
+function acquistion_curves(mode="datac1", Ntests=10)
 
-  EbNo = [-1 2 5 8 20];
-  %foff = [-20 -15 -10 -5 0 5 10 15 20];
-  foff = [-15 -5 0 5 15];
+  SNR = [ -5 0 5 15 ];
+  foff = [-40 -10 0 10 -40];
   cc = ['b' 'g' 'k' 'c' 'm'];
   
-  figure(1); clf; hold on; title('P(timing) AWGN'); xlabel('Eb/No dB'); legend('location', 'southeast');
-  figure(2); clf; hold on; title('P(freq) AWGN'); xlabel('Eb/No dB'); legend('location', 'southeast');
-  figure(3); clf; hold on; title('P(timing) HF'); xlabel('Eb/No dB'); legend('location', 'southeast');
-  figure(4); clf; hold on; title('P(freq) HF'); xlabel('Eb/No dB'); legend('location', 'southeast');
+  figure(1); clf; hold on; title('P(timing) AWGN'); xlabel('SNR3k dB'); legend('location', 'southeast');
+  figure(2); clf; hold on; title('P(freq) AWGN'); xlabel('SNR3k dB'); legend('location', 'southeast');
+  figure(3); clf; hold on; title('P(timing) HF'); xlabel('SNR3k dB'); legend('location', 'southeast');
+  figure(4); clf; hold on; title('P(freq) HF'); xlabel('SNR3k dB'); legend('location', 'southeast');
 
-  for f=1:4
-    ylim([0 1]);
-  end
-  
   for f = 1:length(foff)
     afoff = foff(f);
     res_log = [];
-    for e = 1:length(EbNo)
-      aEbNo = EbNo(e);
+    for e = 1:length(SNR)
+      aSNR = SNR(e);
       res = zeros(1,4);
-      res = acquisition_histograms(mode, fine_en = 0, afoff, aEbNo, aEbNo+4, verbose = 0);
+      res = acquisition_histograms(mode, Ntests, aSNR, afoff, verbose=1);
       res_log = [res_log; res];
     end
-    figure(1); l = sprintf('%c+-;%3.1f Hz;', cc(f), afoff); plot(EbNo, res_log(:,1), l);
-    figure(2); l = sprintf('%c+-;%3.1f Hz;', cc(f), afoff); plot(EbNo, res_log(:,3), l);
-    figure(3); l = sprintf('%c+-;%3.1f Hz;', cc(f), afoff); plot(EbNo+4, res_log(:,2), l);
-    figure(4); l = sprintf('%c+-;%3.1f Hz;', cc(f), afoff); plot(EbNo+4, res_log(:,4), l);
+    figure(1); l = sprintf('%c+-;%3.1f Hz;', cc(f), afoff); plot(SNR, res_log(:,1), l);
+    figure(2); l = sprintf('%c+-;%3.1f Hz;', cc(f), afoff); plot(SNR, res_log(:,3), l);
+    figure(3); l = sprintf('%c+-;%3.1f Hz;', cc(f), afoff); plot(SNR, res_log(:,2), l);
+    figure(4); l = sprintf('%c+-;%3.1f Hz;', cc(f), afoff); plot(SNR, res_log(:,4), l);
   end
   
-  figure(1); print('-deps', '-color', sprintf("ofdm_dev_acq_curves_time_awgn_%s.eps", mode))
-  figure(2); print('-deps', '-color', sprintf("ofdm_dev_acq_curves_freq_awgn_%s.eps", mode))
-  figure(3); print('-deps', '-color', sprintf("ofdm_dev_acq_curves_time_hf_%s.eps", mode))
-  figure(4); print('-deps', '-color', sprintf("ofdm_dev_acq_curves_freq_hf_%s.eps", mode))
+  figure(1); print('-dpng', sprintf("ofdm_dev_acq_curves_time_awgn_%s.png", mode))
+  figure(2); print('-dpng', sprintf("ofdm_dev_acq_curves_freq_awgn_%s.png", mode))
+  figure(3); print('-dpng', sprintf("ofdm_dev_acq_curves_time_hf_%s.png", mode))
+  figure(4); print('-dpng', sprintf("ofdm_dev_acq_curves_freq_hf_%s.png", mode))
 endfunction
 
 
@@ -276,8 +275,7 @@ pkg load signal;
 graphics_toolkit ("gnuplot");
 randn('seed',1);
 
-% acquisition_test("datac1", Ntests=10, 'awgn', SNR3kdB=5, foff_hz=-38, verbose=1+8);
-%acquisition_histograms(mode="datac0", Ntests=10, SNR3kdB=5, foff=-10, verbose=16);
-acquisition_histograms("datac0", SNR3kdB=5, foff_hz=-15)
+%acquisition_test("datac1", Ntests=10, 'mpp', SNR3kdB=0, foff_hz=-38, verbose=1+8);
+%acquisition_histograms(mode="datac1", Ntests=10, SNR3kdB=0, foff=37, verbose=1+16);
 %sync_metrics('freq')
-%acquistion_curves
+acquistion_curves("datac0")
