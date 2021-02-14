@@ -98,6 +98,19 @@ function [delta_ct delta_foff timing_mx_log] = acquisition_test(mode="700D", Nte
 endfunction
 
 
+% Helper function to count number of tests where both time and freq are OK
+function P = both_ok(dct, ttol_samples, dfoff, ftol_hz)
+  Ntests = length(dct);
+  ok = 0;
+  for i = 1:Ntests
+    if ((abs(dct(i)) < ttol_samples) && (abs(dfoff(i)) < ftol_hz))
+      ok+=1;
+    end
+  end
+  P = ok/Ntests;
+endfunction
+  
+
 #{
    Meausures aquisistion statistics for AWGN and HF channels
 #}
@@ -115,7 +128,8 @@ function res = acquisition_histograms(mode="datac0", Ntests=10, SNR3kdB=100, fof
   [dct dfoff] = acquisition_test(mode, Ntests, 'awgn', SNR3kdB, foff, verbose); 
   PtAWGN = length(find (abs(dct) < ttol_samples))/length(dct);
   PfAWGN = length(find (abs(dfoff) < ftol_hz))/length(dfoff);
-  printf("SNR: %3.1f foff: %3.1f AWGN P(time) = %3.2f  P(freq) = %3.2f\n", SNR3kdB, foff, PtAWGN, PfAWGN);
+  PAWGN = both_ok(dct, ttol_samples, dfoff, ftol_hz)
+  printf("SNR: %3.1f foff: %3.1f AWGN P(time) = %3.2f  P(freq) = %3.2f PAWGN = %3.2f\n", SNR3kdB, foff, PtAWGN, PfAWGN, PAWGN);
 
   if bitand(verbose,16)
     figure(1); clf;
@@ -134,7 +148,8 @@ function res = acquisition_histograms(mode="datac0", Ntests=10, SNR3kdB=100, fof
 
   PtHF = length(find (abs(dct) < ttol_samples))/length(dct);
   PfHF = length(find (abs(dfoff) < ftol_hz))/length(dfoff);
-  printf("SNR: %3.1f foff: %3.1f HF   P(time) = %3.2f  P(freq) = %3.2f\n", SNR3kdB, foff, PtHF, PfHF);
+  PHF = both_ok(dct, ttol_samples, dfoff, ftol_hz);
+  printf("SNR: %3.1f foff: %3.1f HF   P(time) = %3.2f  P(freq) = %3.2f PHF = %3.2f\n", SNR3kdB, foff, PtHF, PfHF, PHF);
 
   if bitand(verbose,16)
     figure(3); clf;
@@ -147,7 +162,7 @@ function res = acquisition_histograms(mode="datac0", Ntests=10, SNR3kdB=100, fof
     title(t);
   end
   
-  res = [PtAWGN PfAWGN PtHF PfHF PtAWGN*PfAWGN PtHF*PfHF];
+  res = [PtAWGN PfAWGN PtHF PfHF PAWGN PHF];
 endfunction
 
 
@@ -155,8 +170,8 @@ endfunction
 
 function res_log = acquistion_curves(mode="datac1", Ntests=10)
 
-  SNR = [ -5 -5  0 5 10 ];
-  foff = [-42 -7  +7 + 42 ];
+  SNR = [ -10 -5 0 5 10 ];
+  foff = [-42 -7  0 49 ];
   % SNR = [-5 5];f off = [ -2 2];
   cc = ['b' 'g' 'k' 'c' 'm' 'r'];
   pt = ['+' '*' 'x' 'o' '+' '*'];
@@ -164,7 +179,7 @@ function res_log = acquistion_curves(mode="datac1", Ntests=10)
   png_suffixes={'awgn_time', 'awgn_freq', 'hf_time', 'hf_freq', 'awgn', 'hf'};
   
   for i=1:length(titles)
-    figure(i); clf; hold on; sprintf("%s %s",mode,title(titles{i}));
+    figure(i); clf; hold on; title(sprintf("%s %s",mode,titles{i}));
   end
 
   res_log = []; % keep record of all results, one row per test, length(SNR) rows per freq step
@@ -279,8 +294,7 @@ pkg load signal;
 graphics_toolkit ("gnuplot");
 randn('seed',1);
 
-%acquisition_test("datac1", Ntests=10, 'mpp', SNR3kdB=0, foff_hz=-38, verbose=1+8);
-%acquisition_histograms(mode="datac1", Ntests=10, SNR3kdB=-5, foff=37, verbose=1+16);
+%acquisition_test("datac1", Ntests=25, 'mpp', SNR3kdB=0, foff_hz=-38, verbose=1+8);
+acquisition_histograms(mode="datac1", Ntests=10, SNR3kdB=-5, foff=37, verbose=1+16)
 %sync_metrics('freq')
-acquistion_curves("datac0")
-acquistion_curves("datac1")
+%acquistion_curves("datac1")
