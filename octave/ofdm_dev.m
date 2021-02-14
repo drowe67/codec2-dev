@@ -115,7 +115,7 @@ function res = acquisition_histograms(mode="datac0", Ntests=10, SNR3kdB=100, fof
   [dct dfoff] = acquisition_test(mode, Ntests, 'awgn', SNR3kdB, foff, verbose); 
   PtAWGN = length(find (abs(dct) < ttol_samples))/length(dct);
   PfAWGN = length(find (abs(dfoff) < ftol_hz))/length(dfoff);
-  printf("SNR: %3.1f AWGN P(time) = %3.2f  P(freq) = %3.2f\n", SNR3kdB, PtAWGN, PfAWGN);
+  printf("SNR: %3.1f foff: %3.1f AWGN P(time) = %3.2f  P(freq) = %3.2f\n", SNR3kdB, foff, PtAWGN, PfAWGN);
 
   if bitand(verbose,16)
     figure(1); clf;
@@ -134,7 +134,7 @@ function res = acquisition_histograms(mode="datac0", Ntests=10, SNR3kdB=100, fof
 
   PtHF = length(find (abs(dct) < ttol_samples))/length(dct);
   PfHF = length(find (abs(dfoff) < ftol_hz))/length(dfoff);
-  printf("SNR: %3.1f HF   P(time) = %3.2f  P(freq) = %3.2f\n", SNR3kdB, PtHF, PfHF);
+  printf("SNR: %3.1f foff: %3.1f HF   P(time) = %3.2f  P(freq) = %3.2f\n", SNR3kdB, foff, PtHF, PfHF);
 
   if bitand(verbose,16)
     figure(3); clf;
@@ -147,43 +147,47 @@ function res = acquisition_histograms(mode="datac0", Ntests=10, SNR3kdB=100, fof
     title(t);
   end
   
-  res = [PtAWGN PfAWGN PtHF PfHF];
+  res = [PtAWGN PfAWGN PtHF PfHF PtAWGN*PfAWGN PtHF*PfHF];
 endfunction
 
 
 % plot some curves of Acquisition probability against EbNo and freq offset
 
-function acquistion_curves(mode="datac1", Ntests=10)
+function res_log = acquistion_curves(mode="datac1", Ntests=10)
 
-  SNR = [ -5 0 5 15 ];
-  foff = [-40 -10 0 10 -40];
-  cc = ['b' 'g' 'k' 'c' 'm'];
+  SNR = [ -5 -5  0 5 10 ];
+  foff = [-42 -7  +7 + 42 ];
+  % SNR = [-5 5];f off = [ -2 2];
+  cc = ['b' 'g' 'k' 'c' 'm' 'r'];
+  pt = ['+' '*' 'x' 'o' '+' '*'];
+  titles={'P(timing) AWGN', 'P(freq) AWGN', 'P(timing) HF', 'P(freq) HF', 'P(acq) AWGN', 'P(acq) HF'};
+  png_suffixes={'awgn_time', 'awgn_freq', 'hf_time', 'hf_freq', 'awgn', 'hf'};
   
-  figure(1); clf; hold on; title('P(timing) AWGN'); xlabel('SNR3k dB'); legend('location', 'southeast');
-  figure(2); clf; hold on; title('P(freq) AWGN'); xlabel('SNR3k dB'); legend('location', 'southeast');
-  figure(3); clf; hold on; title('P(timing) HF'); xlabel('SNR3k dB'); legend('location', 'southeast');
-  figure(4); clf; hold on; title('P(freq) HF'); xlabel('SNR3k dB'); legend('location', 'southeast');
+  for i=1:length(titles)
+    figure(i); clf; hold on; sprintf("%s %s",mode,title(titles{i}));
+  end
 
+  res_log = []; % keep record of all results, one row per test, length(SNR) rows per freq step
   for f = 1:length(foff)
     afoff = foff(f);
-    res_log = [];
     for e = 1:length(SNR)
       aSNR = SNR(e);
-      res = zeros(1,4);
       res = acquisition_histograms(mode, Ntests, aSNR, afoff, verbose=1);
       res_log = [res_log; res];
     end
-    figure(1); l = sprintf('%c+-;%3.1f Hz;', cc(f), afoff); plot(SNR, res_log(:,1), l);
-    figure(2); l = sprintf('%c+-;%3.1f Hz;', cc(f), afoff); plot(SNR, res_log(:,3), l);
-    figure(3); l = sprintf('%c+-;%3.1f Hz;', cc(f), afoff); plot(SNR, res_log(:,2), l);
-    figure(4); l = sprintf('%c+-;%3.1f Hz;', cc(f), afoff); plot(SNR, res_log(:,4), l);
+    st = (f-1)*length(SNR)+1; en = st + length(SNR) - 1;
+    for i=1:length(titles)
+      figure(i); l = sprintf('%c%c-;%3.1f Hz;', cc(f), pt(f), afoff); plot(SNR, res_log(st:en,i), l, 'markersize', 10);
+    end
   end
   
-  figure(1); print('-dpng', sprintf("ofdm_dev_acq_curves_time_awgn_%s.png", mode))
-  figure(2); print('-dpng', sprintf("ofdm_dev_acq_curves_freq_awgn_%s.png", mode))
-  figure(3); print('-dpng', sprintf("ofdm_dev_acq_curves_time_hf_%s.png", mode))
-  figure(4); print('-dpng', sprintf("ofdm_dev_acq_curves_freq_hf_%s.png", mode))
-endfunction
+  for i=1:length(titles)
+    figure(i); grid;
+    xlabel('SNR3k dB'); legend('location', 'southeast'); 
+    xlim([min(SNR)-2 max(SNR)+2]); ylim([0 1.1]);
+    print('-dpng', sprintf("ofdm_dev_acq_curves_%s_%s.png", mode, png_suffixes{i}))
+  end 
+ endfunction
 
 
 % Used to develop sync state machine - in particular a metric to show
@@ -276,6 +280,7 @@ graphics_toolkit ("gnuplot");
 randn('seed',1);
 
 %acquisition_test("datac1", Ntests=10, 'mpp', SNR3kdB=0, foff_hz=-38, verbose=1+8);
-%acquisition_histograms(mode="datac1", Ntests=10, SNR3kdB=0, foff=37, verbose=1+16);
+%acquisition_histograms(mode="datac1", Ntests=10, SNR3kdB=-5, foff=37, verbose=1+16);
 %sync_metrics('freq')
 acquistion_curves("datac0")
+acquistion_curves("datac1")
