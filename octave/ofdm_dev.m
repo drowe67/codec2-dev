@@ -152,9 +152,9 @@ endfunction
 % plot some curves of Acquisition probability against EbNo and freq offset
 
 function res_log = acquistion_curves(mode="datac1", channel='awgn', Ntests=10)
-  %SNR = [ -10 -5 0 5 10 ];
-  %foff = [-42 -7  0 49 ];
-  SNR = [-5 5]; foff = [ -2 2];
+  SNR = [ -10 -5 0 5 10 15];
+  foff = [-42 -7  0 49 ];
+  %SNR = [-5 5]; foff = [ -2 2];
   cc = ['b' 'g' 'k' 'c' 'm' 'r'];
   pt = ['+' '*' 'x' 'o' '+' '*'];
   titles={'P(timing)', 'P(freq)', 'P(acq)'};
