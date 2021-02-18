@@ -2,6 +2,10 @@
 % David Rowe Jan 2021
 %
 % Simulations used for development of HF data modem acquisition
+%
+% To run headless on a server:
+%
+%   DISPLAY=\"\" octave-cli --no-gui -qf ofdm_dev.m > 210218.txt &
 
 ofdm_lib;
 channel_lib;
@@ -180,7 +184,22 @@ function res_log = acquistion_curves(mode="datac1", channel='awgn', Ntests=10)
     xlim([min(SNR)-2 max(SNR)+2]); ylim([0 1.1]);
     print('-dpng', sprintf("ofdm_dev_acq_curves_%s_%s_%s.png", mode, channel, png_suffixes{i}))
   end 
- endfunction
+endfunction
+
+
+% many acquisition curves across modes and channels
+
+function res_log = acquistion_curves_modes_channels(Ntests=5)
+  modes={'datac0', 'datac1', 'datac3'};
+  channels={'awgn', 'mpm', 'mpp', 'notch'};
+  res_log = [];
+  for m=1:length(modes)
+    for c=1:length(channels)
+      res = acquistion_curves(modes{m}, channels{c}, Ntests);
+      res_log = [res_log; res];
+    end
+  end
+endfunction
 
 
 % Used to develop sync state machine - in particular a metric to show
@@ -262,17 +281,18 @@ function sync_metrics(mode = "700D", x_axis = 'EbNo')
 endfunction
 
 
-% ---------------------------------------------------------
-% choose simulation to run here 
-% ---------------------------------------------------------
-
 format;
 more off;
 pkg load signal;
 graphics_toolkit ("gnuplot");
 randn('seed',1);
 
-acquisition_test("datac1", Ntests=5, 'notch', SNR3kdB=0, foff_hz=-38, verbose=1+8);
+% ---------------------------------------------------------
+% choose simulation to run here 
+% ---------------------------------------------------------
+
+%acquisition_test("datac1", Ntests=5, 'notch', SNR3kdB=0, foff_hz=-38, verbose=1+8);
 %acquisition_histograms(mode="datac2", Ntests=3, channel='mpm', SNR3kdB=-5, foff=37, verbose=1+16)
 %sync_metrics('freq')
-%acquistion_curves("datac0", "notch", Ntests=3)
+%acquistion_curves("datac0", "awgn", Ntests=3)
+acquistion_curves_modes_channels(Ntests=25)
