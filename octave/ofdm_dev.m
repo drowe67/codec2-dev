@@ -92,7 +92,8 @@ function [delta_ct delta_foff timing_mx_log] = acquisition_test(mode="700D", Nte
     figure(1); clf; plot(timing_mx_log,'+-'); title('mx log');
     figure(2); clf; plot(delta_ct,'+-'); title('delta ct');
     figure(3); clf; plot(delta_foff,'+-'); title('delta freq off');
-    figure(5); clf; plot(real(rx)); hold on; plot(ct_log,zeros(1,length(ct_log)),'r+','markersize', 25, 'linewidth', 2); hold off;
+    figure(4); clf; plot(real(rx)); hold on; plot(ct_log,zeros(1,length(ct_log)),'r+','markersize', 25, 'linewidth', 2); hold off;
+    figure(5); clf; plot_specgram(rx);
   end
   
 endfunction
@@ -115,7 +116,7 @@ endfunction
    Meausures aquisistion statistics for AWGN and HF channels
 #}
 
-function res = acquisition_histograms(mode="datac0", Ntests=10, SNR3kdB=100, foff=0, verbose=0)
+function res = acquisition_histograms(mode="datac0", Ntests=10, channel = "awgn", SNR3kdB=100, foff=0, verbose=0)
   Fs = 8000;
   
   % allowable tolerance for acquistion
@@ -123,63 +124,40 @@ function res = acquisition_histograms(mode="datac0", Ntests=10, SNR3kdB=100, fof
   ftol_hz = 2;              % we can sync up on this (todo: make mode selectable)
   ttol_samples = 0.006*Fs;  % CP length (todo: make mode selectable)
 
- % AWGN channel
- 
-  [dct dfoff] = acquisition_test(mode, Ntests, 'awgn', SNR3kdB, foff, verbose); 
-  PtAWGN = length(find (abs(dct) < ttol_samples))/length(dct);
-  PfAWGN = length(find (abs(dfoff) < ftol_hz))/length(dfoff);
-  PAWGN = both_ok(dct, ttol_samples, dfoff, ftol_hz)
-  printf("SNR: %3.1f foff: %3.1f AWGN P(time) = %3.2f  P(freq) = %3.2f PAWGN = %3.2f\n", SNR3kdB, foff, PtAWGN, PfAWGN, PAWGN);
+  [dct dfoff] = acquisition_test(mode, Ntests, channel, SNR3kdB, foff, verbose); 
+  Pt = length(find (abs(dct) < ttol_samples))/length(dct);
+  Pf = length(find (abs(dfoff) < ftol_hz))/length(dfoff);
+  Pa = both_ok(dct, ttol_samples, dfoff, ftol_hz)
+  printf("%s %s SNR: %3.1f foff: %3.1f P(time) = %3.2f  P(freq) = %3.2f P(acq) = %3.2f\n", mode, channel, SNR3kdB, foff, Pt, Pf, Pa);
 
   if bitand(verbose,16)
     figure(1); clf;
     hist(dct(find (abs(dct) < ttol_samples)))
-    t = sprintf("Coarse Timing Error AWGN SNR = %3.2f foff = %3.1f", SNR3kdB, foff);
+    t = sprintf("Coarse Timing Error %s %s SNR = %3.2f foff = %3.1f", mode, channel, SNR3kdB, foff);
     title(t)
     figure(2); clf;
     hist(dfoff(find(abs(dfoff) < 2*ftol_hz)))
-    t = sprintf("Coarse Freq Error AWGN SNR = %3.2f foff = %3.1f", SNR3kdB, foff);
+    t = sprintf("Coarse Freq Error %s %s SNR = %3.2f foff = %3.1f", mode, channel, SNR3kdB, foff);
     title(t);
   end
 
-  % HF channel
-
-  [dct dfoff] = acquisition_test(mode, Ntests, 'mpp', SNR3kdB, foff, verbose); 
-
-  PtHF = length(find (abs(dct) < ttol_samples))/length(dct);
-  PfHF = length(find (abs(dfoff) < ftol_hz))/length(dfoff);
-  PHF = both_ok(dct, ttol_samples, dfoff, ftol_hz);
-  printf("SNR: %3.1f foff: %3.1f HF   P(time) = %3.2f  P(freq) = %3.2f PHF = %3.2f\n", SNR3kdB, foff, PtHF, PfHF, PHF);
-
-  if bitand(verbose,16)
-    figure(3); clf;
-    hist(dct(find (abs(dct) < ttol_samples)))
-    t = sprintf("Coarse Timing Error HF SNR = %3.2f foff = %3.1f", SNR3kdB, foff);
-    title(t)
-    figure(4); clf;
-    hist(dfoff(find(abs(dfoff) < 2*ftol_hz)))
-    t = sprintf("Coarse Freq Error HF SNR = %3.2f foff = %3.1f", SNR3kdB, foff);
-    title(t);
-  end
-  
-  res = [PtAWGN PfAWGN PtHF PfHF PAWGN PHF];
+   res = [Pt Pf Pa];
 endfunction
 
 
 % plot some curves of Acquisition probability against EbNo and freq offset
 
-function res_log = acquistion_curves(mode="datac1", Ntests=10)
-
-  SNR = [ -10 -5 0 5 10 ];
-  foff = [-42 -7  0 49 ];
-  % SNR = [-5 5];f off = [ -2 2];
+function res_log = acquistion_curves(mode="datac1", channel='awgn', Ntests=10)
+  %SNR = [ -10 -5 0 5 10 ];
+  %foff = [-42 -7  0 49 ];
+  SNR = [-5 5]; foff = [ -2 2];
   cc = ['b' 'g' 'k' 'c' 'm' 'r'];
   pt = ['+' '*' 'x' 'o' '+' '*'];
-  titles={'P(timing) AWGN', 'P(freq) AWGN', 'P(timing) HF', 'P(freq) HF', 'P(acq) AWGN', 'P(acq) HF'};
-  png_suffixes={'awgn_time', 'awgn_freq', 'hf_time', 'hf_freq', 'awgn', 'hf'};
+  titles={'P(timing)', 'P(freq)', 'P(acq)'};
+  png_suffixes={'time', 'freq', 'acq'};
   
   for i=1:length(titles)
-    figure(i); clf; hold on; title(sprintf("%s %s",mode,titles{i}));
+    figure(i); clf; hold on; title(sprintf("%s %s %s",mode,channel,titles{i}));
   end
 
   res_log = []; % keep record of all results, one row per test, length(SNR) rows per freq step
@@ -187,7 +165,7 @@ function res_log = acquistion_curves(mode="datac1", Ntests=10)
     afoff = foff(f);
     for e = 1:length(SNR)
       aSNR = SNR(e);
-      res = acquisition_histograms(mode, Ntests, aSNR, afoff, verbose=1);
+      res = acquisition_histograms(mode, Ntests, channel, aSNR, afoff, verbose=1);
       res_log = [res_log; res];
     end
     st = (f-1)*length(SNR)+1; en = st + length(SNR) - 1;
@@ -200,7 +178,7 @@ function res_log = acquistion_curves(mode="datac1", Ntests=10)
     figure(i); grid;
     xlabel('SNR3k dB'); legend('location', 'southeast'); 
     xlim([min(SNR)-2 max(SNR)+2]); ylim([0 1.1]);
-    print('-dpng', sprintf("ofdm_dev_acq_curves_%s_%s.png", mode, png_suffixes{i}))
+    print('-dpng', sprintf("ofdm_dev_acq_curves_%s_%s_%s.png", mode, channel, png_suffixes{i}))
   end 
  endfunction
 
@@ -294,7 +272,7 @@ pkg load signal;
 graphics_toolkit ("gnuplot");
 randn('seed',1);
 
-%acquisition_test("datac1", Ntests=25, 'mpp', SNR3kdB=0, foff_hz=-38, verbose=1+8);
-acquisition_histograms(mode="datac1", Ntests=10, SNR3kdB=-5, foff=37, verbose=1+16)
+acquisition_test("datac1", Ntests=5, 'notch', SNR3kdB=0, foff_hz=-38, verbose=1+8);
+%acquisition_histograms(mode="datac2", Ntests=3, channel='mpm', SNR3kdB=-5, foff=37, verbose=1+16)
 %sync_metrics('freq')
-%acquistion_curves("datac1")
+%acquistion_curves("datac0", "notch", Ntests=3)
