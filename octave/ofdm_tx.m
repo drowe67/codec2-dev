@@ -56,6 +56,7 @@ function ofdm_tx(filename, mode="700D", Nsec, SNR3kdB=100, channel='awgn', freq_
   end
 
   printf("Npackets: %d  ", Npackets);
+  states.verbose=1;
   tx = ofdm_hilbert_clipper(states, tx, tx_clip_en);
   rx_real = ofdm_channel(states, tx, SNR3kdB, channel, freq_offset_Hz);
   frx = fopen(filename,"wb"); fwrite(frx, rx_real, "short"); fclose(frx);

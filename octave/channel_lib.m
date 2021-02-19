@@ -65,6 +65,7 @@ function [rx_real rx sigma] = channel_simulate(Fs, SNR3kdB, freq_offset_Hz, chan
   SNR4kdB_measured = 10*log10(S/(n*n')); 
   assert (abs(SNR4kdB - SNR4kdB_measured) < 0.5);
   if verbose
+    printf("foff: %3.1f Hz SNR(3k): %3.1f dB  ", freq_offset_Hz, SNR3kdB);
     printf("measSNR3k: %3.2f dB N: %3.2f dB\n",
            10*log10(S/(n*n')) + 10*log10(4000) - 10*log10(3000), 10*log10(n*n'));
   end
