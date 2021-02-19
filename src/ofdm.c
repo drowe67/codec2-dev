@@ -349,7 +349,9 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     for (i = 0; i < (ofdm->nc + 2); i++) {
         ofdm->pilots[i] = ((float) pilotvalues[i]) + 0.0f * I;
     }
-
+    if (ofdm->edge_pilots == 0) {
+        ofdm->pilots[0] = ofdm->pilots[ofdm->nc + 1] = 0.0f;
+    }
     /* carrier tables for up and down conversion */
 
     ofdm->doc = (TAU / (ofdm->fs / ofdm->rs));
@@ -843,15 +845,8 @@ void ofdm_txframe(struct OFDM *ofdm, complex float *tx, complex float *tx_sym_li
 
         if ((r % ofdm->ns) == 0) {
             /* copy in a row of complex pilots to first row of each frame */
-            if (ofdm->edge_pilots) {
-              for (i = 0; i < (ofdm->nc + 2); i++) {
-                aframe[r][i] = ofdm->pilots[i];
-              }
-            }
-            else {
-              for (i = 1; i < (ofdm->nc + 1); i++) {
-                aframe[r][i] = ofdm->pilots[i];
-              }
+            for (i = 0; i < (ofdm->nc + 2); i++) {
+              aframe[r][i] = ofdm->pilots[i];
             }
         }
         else {

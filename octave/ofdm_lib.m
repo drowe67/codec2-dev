@@ -152,10 +152,14 @@ function states = ofdm_init(config)
   states.pilots = 1 - 2*(rand(1,Nc+2) > 0.5);
   %printf("number of pilots total: %d\n", length(states.pilots));
 
-  % place pilots at carrier 1 and Nc+2 to support low bandwith phase est over grid
+  % If set, place pilots at carrier 1 and Nc+2 to support low bandwith phase est over grid
   % of 12 pilot_samples.  Used for 700D and 2020
   states.edge_pilots = edge_pilots;
-
+  if states.edge_pilots == 0
+     states.pilots(1) = 0;
+     states.pilots(Nc+2) = 0;
+  end
+  
   % carrier tables for up and down conversion
   states.fcentre = fcentre = 1500;
   alower = fcentre - Rs * (Nc/2);  % approx frequency of lowest carrier
@@ -317,7 +321,7 @@ function config = ofdm_init_mode(mode="700D")
     config.tx_uw = zeros(1,config.Nuwbits);
     config.tx_uw(1:24) = [1 1 0 0  1 0 1 0  1 1 1 1  0 0 0 0  1 1 1 1  0 0 0 0];
     config.tx_uw(end-24+1:end) = [1 1 0 0  1 0 1 0  1 1 1 1  0 0 0 0  1 1 1 1  0 0 0 0];
-    config.amp_est_mode = 1; config.EsNodB = 3;
+    config.amp_est_mode = 1; config.EsNodB = 3; config.edge_pilots = 0;
     config.state_machine = "data"; %config.amp_scale = 400E3;
   elseif strcmp(mode,"1")
     Ns=5; config.Np=10; Tcp=0; Tframe = 0.1; Ts = Tframe/Ns; Nc = 1;
@@ -340,11 +344,7 @@ function print_config(states)
 
   % ASCII-art packet visualisation
   s=1; u=1; Nuwsyms=length(uw_ind_sym);
-  if states.edge_pilots
-    cr = 1:Nc+2;
-  else
-    cr = 2:Nc+1;
-  end
+  cr = 1:Nc+2;
   for f=1:Np
     for r=1:Ns
       for c=cr
@@ -442,10 +442,6 @@ function tx = ofdm_txframe(states, tx_sym_lin)
     if mod(r-1,Ns) == 0
       % row of pilots
       tx_frame(r,:) = pilots;
-      if states.edge_pilots == 0
-        tx_frame(r,1) = 0;
-        tx_frame(r,Nc+2) = 0;
-      end
     else
       % row of data symbols
       arowofsymbols = tx_sym_lin(s:s+Nc-1);

@@ -51,6 +51,7 @@ void ofdm_init_mode(char mode[], struct OFDM_CONFIG *config) {
     if (strcmp(mode,"700D") == 0) {
     } else if (strcmp(mode,"700E") == 0) {
          config->ts = 0.014;  config->tcp = 0.006; config->nc = 21; config->ns=4;
+         config->edge_pilots = 0;
          config->nuwbits = 12; config->bad_uw_errors = 3; config->txtbits = 2;
          config->state_machine = "voice2"; config->amp_est_mode = 1;
          config->ftwindowwidth = 80;
@@ -67,6 +68,7 @@ void ofdm_init_mode(char mode[], struct OFDM_CONFIG *config) {
         config->tx_bpf_en = false;
     } else if (strcmp(mode,"datac0") == 0) {
         config->ns=5; config->np=4; config->tcp = 0.006; config->ts = 0.016; config->nc = 9;
+        config->edge_pilots = 0;
         config->txtbits = 0; config->nuwbits = 32; config->bad_uw_errors = 9;
         config->state_machine = "data"; config->amp_est_mode = 1; config->tx_bpf_en = false;
         config->ftwindowwidth = 80; config->codename = "H_128_256_5";
@@ -75,6 +77,7 @@ void ofdm_init_mode(char mode[], struct OFDM_CONFIG *config) {
         config->timing_mx_thresh = 0.50f;    
     } else if (strcmp(mode,"datac1") == 0) {
         config->ns=5; config->np=38; config->tcp = 0.006; config->ts = 0.016; config->nc = 27;
+        config->edge_pilots = 0;
         config->txtbits = 0; config->nuwbits = 16; config->bad_uw_errors = 3;
         config->state_machine = "data"; config->amp_est_mode = 1; config->tx_bpf_en = false;
         config->ftwindowwidth = 80; config->codename = "H_4096_8192_3d";
@@ -89,6 +92,7 @@ void ofdm_init_mode(char mode[], struct OFDM_CONFIG *config) {
         config->ftwindowwidth = 80; config->codename = "H_2064_516_sparse";
     } else if (strcmp(mode,"datac3") == 0) {
         config->ns=5; config->np=33; config->tcp = 0.006; config->ts = 0.016; config->nc = 8;
+        config->edge_pilots = 0;
         config->txtbits = 0; config->state_machine = "data";
         config->ftwindowwidth = 80; config->timing_mx_thresh = 0.50;
         config->codename = "H_1024_2048_4f"; config->amp_est_mode = 1; config->tx_bpf_en = false;
