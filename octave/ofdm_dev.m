@@ -291,8 +291,8 @@ randn('seed',1);
 % choose simulation to run here 
 % ---------------------------------------------------------
 
-acquisition_test("datac3", Ntests=25, 'mpp', SNR3kdB=15, foff_hz=0, verbose=1+8);
+%acquisition_test("datac3", Ntests=25, 'mpp', SNR3kdB=15, foff_hz=0, verbose=1+8);
 %acquisition_histograms(mode="datac2", Ntests=3, channel='mpm', SNR3kdB=-5, foff=37, verbose=1+16)
 %sync_metrics('freq')
-%acquistion_curves("datac0", "awgn", Ntests=3)
+acquistion_curves("datac3", "mpp", Ntests=10)
 %acquistion_curves_modes_channels(Ntests=25)

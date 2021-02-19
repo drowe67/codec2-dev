@@ -316,13 +316,14 @@ function config = ofdm_init_mode(mode="700D")
     config.ftwindow_width = 80; config.amp_est_mode = 1; config.EsNodB = 10;
   elseif strcmp(mode,"datac3")
     Ns=5; config.Np=29; Tcp = 0.006; Ts = 0.016; Nc = 9; config.data_mode = 1;
+    config.edge_pilots = 0;
     config.Ntxtbits = 0; config.Nuwbits = 40; config.bad_uw_errors = 10;
     config.ftwindow_width = 80; config.timing_mx_thresh = 0.50;
     config.tx_uw = zeros(1,config.Nuwbits);
     config.tx_uw(1:24) = [1 1 0 0  1 0 1 0  1 1 1 1  0 0 0 0  1 1 1 1  0 0 0 0];
     config.tx_uw(end-24+1:end) = [1 1 0 0  1 0 1 0  1 1 1 1  0 0 0 0  1 1 1 1  0 0 0 0];
-    config.amp_est_mode = 1; config.EsNodB = 3; config.edge_pilots = 0;
-    config.state_machine = "data"; %config.amp_scale = 400E3;
+    config.amp_est_mode = 1; config.EsNodB = 3;
+    config.state_machine = "data"; 
   elseif strcmp(mode,"1")
     Ns=5; config.Np=10; Tcp=0; Tframe = 0.1; Ts = Tframe/Ns; Nc = 1;
   else

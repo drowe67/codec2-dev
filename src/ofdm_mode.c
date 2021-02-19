@@ -91,17 +91,17 @@ void ofdm_init_mode(char mode[], struct OFDM_CONFIG *config) {
         config->state_machine = "data"; config->amp_est_mode = 1; config->tx_bpf_en = false;
         config->ftwindowwidth = 80; config->codename = "H_2064_516_sparse";
     } else if (strcmp(mode,"datac3") == 0) {
-        config->ns=5; config->np=33; config->tcp = 0.006; config->ts = 0.016; config->nc = 8;
+        config->ns=5; config->np=29; config->tcp = 0.006; config->ts = 0.016; config->nc = 9;
         config->edge_pilots = 0;
         config->txtbits = 0; config->state_machine = "data";
         config->ftwindowwidth = 80; config->timing_mx_thresh = 0.50;
         config->codename = "H_1024_2048_4f"; config->amp_est_mode = 1; config->tx_bpf_en = false;
         /* custom UW - we use a longer UW with higher bad_uw_errors threshold due to high raw BER */
-        config->nuwbits = 64; config->bad_uw_errors = 15;
+        config->nuwbits = 40; config->bad_uw_errors = 10;
         uint8_t uw[] = {1,1,0,0, 1,0,1,0,  1,1,1,1, 0,0,0,0, 1,1,1,1, 0,0,0,0};
         assert(sizeof(uw) <= MAX_UW_BITS);
         memcpy(config->tx_uw, uw, sizeof(uw));
-        memcpy(&config->tx_uw[MAX_UW_BITS-sizeof(uw)], uw, sizeof(uw));
+        memcpy(&config->tx_uw[config->nuwbits-sizeof(uw)], uw, sizeof(uw));
      }
     else {
         assert(0);
