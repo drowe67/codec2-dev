@@ -10,21 +10,13 @@
 ofdm_lib;
 channel_lib;
 
-% build a single modem frame preamble vector
-function tx_preamble = generate_preamble(states)
-  % tweak local copy of states so we can generate a 1 modem-frame packet
-  states.Np = 1; states.Nbitsperpacket = states.Nbitsperframe;
-  preamble_bits = rand(1,states.Nbitsperframe) > 0.5;
-  tx_preamble = ofdm_mod(states, preamble_bits);
-endfunction
-
 % build a vector of Tx bursts in noise
 function [rx tx_preamble burst_len padded_burst_len ct_targets states] = generate_bursts(sim_in)
   config = ofdm_init_mode(sim_in.mode);
   states = ofdm_init(config);
   ofdm_load_const;
 
-  tx_preamble = generate_preamble(states);
+  tx_preamble = states.tx_preamble;
   Nbursts = sim_in.Nbursts;
   tx_bits = create_ldpc_test_frame(states, coded_frame=0);
   tx_burst = [tx_preamble ofdm_mod(states, tx_bits) tx_preamble];
@@ -291,8 +283,8 @@ randn('seed',1);
 % choose simulation to run here 
 % ---------------------------------------------------------
 
-%acquisition_test("datac3", Ntests=25, 'mpp', SNR3kdB=15, foff_hz=0, verbose=1+8);
+acquisition_test("datac3", Ntests=5, 'mpp', SNR3kdB=0, foff_hz=0, verbose=1+8);
 %acquisition_histograms(mode="datac2", Ntests=3, channel='mpm', SNR3kdB=-5, foff=37, verbose=1+16)
 %sync_metrics('freq')
-acquistion_curves("datac3", "mpp", Ntests=10)
+%acquistion_curves("datac3", "mpp", Ntests=10)
 %acquistion_curves_modes_channels(Ntests=25)

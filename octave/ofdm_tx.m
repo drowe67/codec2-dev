@@ -10,19 +10,12 @@
 
   i) 10 seconds, AWGN channel at SNR3k=3dB
 
-    octave:4> ofdm_tx("awgn_ebno_3dB_700d.raw", "700D", 10, 3);
+    octave:4> ofdm_tx("awgn_snr_3dB_700d.raw", "700D", 10, 3);
 
   ii) 10 seconds, multipath poor channel at SNR=6dB
 
-    ofdm_tx("hf_ebno_6dB_700d.raw", "700D", 10, 6, "mpp");
-
-  iii) 10 seconds, 2200 waveform, AWGN channel, SNR3k=100dB (noise free)
-
-    ofdm_tx("hf_2020.raw", "2200", 10);
+    octave:5> ofdm_tx("hf_snr_6dB_700d.raw", "700D", 10, 6, "mpp");
 #}
-
-% Note EbNodB is for payload data bits, so will be 10log10(rate) higher than
-% raw EbNodB used in ofdm_tx() at uncoded bit rate
 
 function ofdm_tx(filename, mode="700D", Nsec, SNR3kdB=100, channel='awgn', freq_offset_Hz=0, tx_clip_en=0)
   ofdm_lib;
@@ -50,9 +43,13 @@ function ofdm_tx(filename, mode="700D", Nsec, SNR3kdB=100, channel='awgn', freq_
 
   Npackets = round(Nsec/states.Tpacket);
   tx_bits = create_ldpc_test_frame(states, coded_frame=0);
+  atx = ofdm_mod(states, tx_bits);
   tx = [];
   for f=1:Npackets
-    tx = [tx ofdm_mod(states, tx_bits)];
+    tx = [tx atx];
+  end
+  if states.data_mode
+    tx = [states.tx_preamble tx];
   end
 
   printf("Npackets: %d  ", Npackets);

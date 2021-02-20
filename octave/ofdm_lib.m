@@ -53,6 +53,7 @@ function states = ofdm_init(config)
   if isfield(config,"clip_gain2") clip_gain2 = config.clip_gain2; else clip_gain2 = 0.8; end
   if isfield(config,"foff_limiter") foff_limiter = config.foff_limiter; else foff_limiter = 0; end
   if isfield(config,"txbpf_width_Hz") txbpf_width_Hz = config.txbpf_width_Hz; else txbpf_width_Hz = 2000; end
+  if isfield(config,"data_mode") data_mode = config.data_mode; else data_mode = 0; end
 
   states.Fs = 8000;
   states.bps = bps;
@@ -101,10 +102,10 @@ function states = ofdm_init(config)
   Ndatasymsperframe = (Ns-1)*Nc;
   last_sym = floor(Nuwsyms*uw_step/bps+1);
   if last_sym > states.Np*Ndatasymsperframe
-    uw_step = Nc-1;                              % try a different step
+    uw_step = Nc-1;                                 % try a different step
   end
   last_sym = floor(Nuwsyms*uw_step/bps+1);
-  assert(last_sym <= states.Np*Ndatasymsperframe);         % we still can't fit them all
+  assert(last_sym <= states.Np*Ndatasymsperframe);  % we still can't fit them all
 
   % Place UW symbols in frame
   for i=1:Nuwsyms
@@ -254,6 +255,12 @@ function states = ofdm_init(config)
   states.sum_noise_var = 0;
   states.clock_offset_est = 0;
 
+  % pre-amble for data modes
+  states.data_mode = data_mode;
+  if states.data_mode
+    states.tx_preamble = ofdm_generate_preamble(states);
+  end
+  
   % automated tests
   test_qam16_mod_demod(states.qam16);
   test_assemble_disassemble(states);
@@ -318,7 +325,7 @@ function config = ofdm_init_mode(mode="700D")
     Ns=5; config.Np=29; Tcp = 0.006; Ts = 0.016; Nc = 9; config.data_mode = 1;
     config.edge_pilots = 0;
     config.Ntxtbits = 0; config.Nuwbits = 40; config.bad_uw_errors = 10;
-    config.ftwindow_width = 80; config.timing_mx_thresh = 0.50;
+    config.ftwindow_width = 80; config.timing_mx_thresh = 0.30;
     config.tx_uw = zeros(1,config.Nuwbits);
     config.tx_uw(1:24) = [1 1 0 0  1 0 1 0  1 1 1 1  0 0 0 0  1 1 1 1  0 0 0 0];
     config.tx_uw(end-24+1:end) = [1 1 0 0  1 0 1 0  1 1 1 1  0 0 0 0  1 1 1 1  0 0 0 0];
@@ -1161,12 +1168,22 @@ endfunction
 %             int between 0 and 32767
 %-----------------------------------------------------------------------
 
-function r = ofdm_rand(n)
-  r = zeros(1,n); seed = 1;
+function r = ofdm_rand(n, seed=1)
+  r = zeros(1,n);
   for i=1:n
     seed = mod(1103515245 * seed + 12345, 32768);
     r(i) = seed;
   end
+endfunction
+
+
+% build a single modem frame preamble vector for reliable single frame acquisition
+% on data modes
+function tx_preamble = ofdm_generate_preamble(states)
+  % tweak local copy of states so we can generate a 1 modem-frame packet
+  states.Np = 1; states.Nbitsperpacket = states.Nbitsperframe;
+  preamble_bits = ofdm_rand(states.Nbitsperframe, 2) > 0.5;
+  tx_preamble = ofdm_mod(states, preamble_bits);
 endfunction
 
 
@@ -1689,7 +1706,7 @@ function tx = ofdm_hilbert_clipper(states, tx, tx_clip_en)
   end
 
   % Hilbert Clipper 2 - remove any really low probability outliers after clipping/filtering
-  % or even on vanilla Tx
+  % even on vanilla Tx
   [tx tmp] = ofdm_clip(states, tx, states.ofdm_peak);
 
   % note this is PAPR of complex signal, PAPR of real signal will be 3dB-ish larger
