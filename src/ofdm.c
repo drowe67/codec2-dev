@@ -388,7 +388,8 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     ofdm->phase_est_en = true;
     ofdm->phase_est_bandwidth = high_bw;
     ofdm->phase_est_bandwidth_mode = AUTO_PHASE_EST;
-
+    ofdm->framesperburst = 0;  // default: never lose syn in raw data mode
+    
     ofdm->coarse_foff_est_hz = 0.0f;
     ofdm->foff_est_gain = 0.1f;
     ofdm->foff_est_hz = 0.0f;
@@ -972,6 +973,10 @@ void ofdm_set_tx_bpf(struct OFDM *ofdm, bool val) {
 
 void ofdm_set_dpsk(struct OFDM *ofdm, bool val) {
     ofdm->dpsk_en = val;
+}
+
+void ofdm_set_frames_per_burst(struct OFDM *ofdm, int framesperburst) {
+    ofdm->framesperburst = framesperburst;
 }
 
 /*
@@ -1733,7 +1738,7 @@ void ofdm_sync_state_machine_data(struct OFDM *ofdm, uint8_t *rx_uw) {
         if (ofdm->sync_state == trial) {
             if (ofdm->uw_errors < ofdm->bad_uw_errors) {
                 next_state = synced;
-                ofdm->frame_count = ofdm->nuwframes;
+                ofdm->frame_count = 0;
                 ofdm->modem_frame = ofdm->nuwframes;
             } else {
                 ofdm->sync_counter++;
@@ -1745,16 +1750,22 @@ void ofdm_sync_state_machine_data(struct OFDM *ofdm, uint8_t *rx_uw) {
         }
     }
 
-    // Note we don't ever lose sync, we assume there are a known number of frames being sent,
-    // or the packets contain an "end of stream" information.
+    // Note if frameperburst==0 we don't ever lose sync, which is useful for 
+    // stream based testing or external control of state machine
 
     if (ofdm->sync_state == synced) {
-        ofdm->frame_count++;
         ofdm->modem_frame++;
 
         if (ofdm->modem_frame >= ofdm->np) {
             ofdm->modem_frame = 0;
+            ofdm->frame_count++;
+            //fprintf(stderr, "frame_count: %d  framesperburst:%d\n", ofdm->frame_count, ofdm->framesperburst);
+            if (ofdm->framesperburst) {
+                if (ofdm->frame_count == ofdm->framesperburst)
+                    next_state = search;
+            }
         }
+        
     }
 
     ofdm->last_sync_state = ofdm->sync_state;

@@ -1276,6 +1276,13 @@ void freedv_set_sync(struct freedv *freedv, int sync_cmd) {
     }
 }
 
+void freedv_set_frames_per_burst(struct freedv *freedv, int framesperburst) {
+    assert (freedv != NULL);
+    if (freedv->ofdm != NULL) {
+        ofdm_set_frames_per_burst(freedv->ofdm, framesperburst);
+    }
+}
+
 struct FSK * freedv_get_fsk(struct freedv *f){
 	return f->fsk;
 }

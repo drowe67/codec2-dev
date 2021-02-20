@@ -141,6 +141,7 @@ struct OFDM {
     int bad_uw_errors;
     int edge_pilots;      /* insert pilots at 1 and Nc+2, to support low bandwidth phase est */
     int data_mode;        /* true of a data mode, false for voice mode */
+    int framesperburst;   /* for OFDM data modes, how many frames before we reset state machine */
     int amp_est_mode;     /* amplitude estimtor algorithm */
     float amp_scale;
     float clip_gain1;

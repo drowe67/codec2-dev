@@ -30,7 +30,7 @@ function tx1 {
 function rx2_background {
     # re-transmit any frames we receive
     ( arecord --device="plughw:CARD=CHAT2,DEV=0" -f S16_LE -d $MAX_RUN_TIME | \
-    freedv_data_raw_rx ${MODE} - - --resetsync 1 --vv --testframes | \
+    freedv_data_raw_rx ${MODE} - - --framesperburst 1 --vv --testframes | \
     freedv_data_raw_tx ${MODE} - - --delay ${DELAY} | \
     aplay --device="plughw:CARD=CHAT1,DEV=1" -f S16_LE ) 2>${LOGFILE2} & 
     # killing arecord kills the entire pipeline
@@ -38,7 +38,7 @@ function rx2_background {
 }
 
 function rx1_background {
-    arecord --device="plughw:CARD=CHAT1,DEV=0" -f S16_LE -d $MAX_RUN_TIME | freedv_data_raw_rx ${MODE} - /dev/null --resetsync 1 --vv --testframes &
+    arecord --device="plughw:CARD=CHAT1,DEV=0" -f S16_LE -d $MAX_RUN_TIME | freedv_data_raw_rx ${MODE} - /dev/null --framesperburst 1 --vv --testframes &
     echo $!>${PIDFILE_RX1}
 }
 

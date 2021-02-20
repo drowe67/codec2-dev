@@ -23,7 +23,7 @@ function run_tx {
 }
 
 function start_rx_background {
-    arecord --device="plughw:CARD=CHAT2,DEV=0" -f S16_LE -d $MAX_RUN_TIME | freedv_data_raw_rx DATAC1 - /dev/null --resetsync 1 --vv --testframes &
+    arecord --device="plughw:CARD=CHAT2,DEV=0" -f S16_LE -d $MAX_RUN_TIME | freedv_data_raw_rx DATAC1 - /dev/null --framesperburst 1 --vv --testframes &
     echo $!>${PIDFILE_RX}
 }
 

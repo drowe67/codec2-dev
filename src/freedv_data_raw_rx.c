@@ -56,14 +56,14 @@ int main(int argc, char *argv[]) {
     int                        mode;
     int                        verbose = 0, use_testframes = 0;
     int                        mask = 0;
-    int                        resetsync = 0, nframes_this_burst = 0;
+    int                        framesperburst = 0;
 
     if (argc < 3) {
     helpmsg:
       	fprintf(stderr, "usage: %s [options] FSK_LDPC|DATAC0|DATAC1|DATAC2|DATAC3 InputModemSpeechFile BinaryDataFile\n"
-               "  -v or --vv              verbose options\n"
-               "  --testframes            count raw and coded errors in testframes sent by tx\n"
-               "  --resetsync  Nframes    reset sync after Nframes received\n"
+               "  -v or --vv                  verbose options\n"
+               "  --testframes                count raw and coded errors in testframes sent by tx\n"
+               "  --framesperburst  Nframes   state machine resets after Nframes received\n"
                "\n"
                "For FSK_LDPC only:\n\n"
                "  -m      2|4     number of FSK tones\n"
@@ -78,14 +78,14 @@ int main(int argc, char *argv[]) {
     int opt_idx = 0;
     while( o != -1 ){
         static struct option long_opts[] = {
-            {"testframes", no_argument,        0, 't'},
-            {"help",       no_argument,        0, 'h'},
-            {"Fs",         required_argument,  0, 'f'},
-            {"Rs",         required_argument,  0, 'r'},
-            {"vv",         no_argument,        0, 'x'},
-            {"vvv",        no_argument,        0, 'y'},
-            {"mask",       required_argument,  0, 'k'},
-            {"resetsync",  required_argument,  0, 's'},
+            {"testframes",      no_argument,        0, 't'},
+            {"help",            no_argument,        0, 'h'},
+            {"Fs",              required_argument,  0, 'f'},
+            {"Rs",              required_argument,  0, 'r'},
+            {"vv",              no_argument,        0, 'x'},
+            {"vvv",             no_argument,        0, 'y'},
+            {"mask",            required_argument,  0, 'k'},
+            {"framesperburst",  required_argument,  0, 's'},
             {0, 0, 0, 0}
         };
 
@@ -106,7 +106,7 @@ int main(int argc, char *argv[]) {
             adv.Rs = atoi(optarg);
             break;
         case 's':
-            resetsync = atoi(optarg);
+            framesperburst = atoi(optarg);
             break;
         case 't':
             use_testframes = 1;
@@ -169,6 +169,8 @@ int main(int argc, char *argv[]) {
     assert(freedv != NULL);
     freedv_set_verbose(freedv, verbose);
     freedv_set_test_frames(freedv, use_testframes);
+    freedv_set_frames_per_burst(freedv, framesperburst);
+    
     if (mode == FREEDV_MODE_FSK_LDPC) {
         struct FSK *fsk = freedv_get_fsk(freedv);
         fprintf(stderr, "Nbits: %d N: %d Ndft: %d\n", fsk->Nbits, fsk->N, fsk->Ndft);
@@ -203,16 +205,6 @@ int main(int argc, char *argv[]) {
             nframes_out++;
         }
         
-        int rx_status = freedv_get_rx_status(freedv);
-        if ((rx_status & FREEDV_RX_BITS) || (rx_status & FREEDV_RX_BIT_ERRORS)) {
-            // end of burst even if we get bit errors
-            nframes_this_burst++;
-            if (resetsync && (nframes_this_burst >= resetsync)) {
-                freedv_set_sync(freedv, FREEDV_SYNC_UNSYNC);
-                nframes_this_burst = 0;
-            }
-        }
-
 	    /* if using pipes we probably don't want the usual buffering */
         if (fout == stdout) fflush(stdout);
         if (fin == stdin) fflush(stdin);

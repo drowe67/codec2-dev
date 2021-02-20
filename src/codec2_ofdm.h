@@ -96,6 +96,7 @@ void ofdm_set_off_est_hz(struct OFDM *, float);
 void ofdm_set_sync(struct OFDM *, int);
 void ofdm_set_tx_bpf(struct OFDM *, bool);
 void ofdm_set_dpsk(struct OFDM *ofdm, bool val);
+void ofdm_set_frames_per_burst(struct OFDM *ofdm, int framesperburst);
 
 void ofdm_print_info(struct OFDM *);
 
