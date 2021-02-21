@@ -258,6 +258,7 @@ function states = ofdm_init(config)
   % pre-amble for data modes
   states.data_mode = data_mode;
   if states.data_mode
+    printf("creating preamble....\n")
     states.tx_preamble = ofdm_generate_preamble(states);
   end
   
@@ -325,7 +326,7 @@ function config = ofdm_init_mode(mode="700D")
     Ns=5; config.Np=29; Tcp = 0.006; Ts = 0.016; Nc = 9; config.data_mode = 1;
     config.edge_pilots = 0;
     config.Ntxtbits = 0; config.Nuwbits = 40; config.bad_uw_errors = 10;
-    config.ftwindow_width = 80; config.timing_mx_thresh = 0.30;
+    config.ftwindow_width = 80; config.timing_mx_thresh = 0.08;
     config.tx_uw = zeros(1,config.Nuwbits);
     config.tx_uw(1:24) = [1 1 0 0  1 0 1 0  1 1 1 1  0 0 0 0  1 1 1 1  0 0 0 0];
     config.tx_uw(end-24+1:end) = [1 1 0 0  1 0 1 0  1 1 1 1  0 0 0 0  1 1 1 1  0 0 0 0];
@@ -616,7 +617,7 @@ function [t_est foff_est timing_mx] = est_timing_and_freq(states, rx, known_samp
     % obtain normalised real number for timing max
     mag1 = known_samples*known_samples';
     mag2 = rx(t_est+1:t_est+Npsam)*rx(t_est+1:t_est+Npsam)';
-    timing_mx = mx*mx'/(mag1*mag2);
+    timing_mx = mx*mx'/(mag1*mag2+1E-12);
     
     % determine frequency offset for row where max occuurred
     [tmp freq_row] = max(corr(:,mx_col));
@@ -635,6 +636,58 @@ function [t_est foff_est timing_mx] = est_timing_and_freq(states, rx, known_samp
 endfunction
 
 
+% streaming mode acquistion, used mainly for voice modes
+
+function [ct_est foff_est timing_mx timing_valid] = ofdm_sync_search_stream(states, rx_buf)
+    ofdm_load_const;
+    
+    % Attempt coarse timing estimate (i.e. detect start of frame) at a range of frequency offsets
+
+    st = M+Ncp + Nsamperframe + 1; en = st + 2*Nsamperframe +  M+Ncp - 1;
+    timing_mx = 0; fcoarse = 0; timing_valid = 0; ct_est = 1;
+    for afcoarse=-40:40:40
+      % vector of local oscillator samples to shift input vector
+      % these could be computed on the fly to save memory, or pre-computed in flash at tables as they are static
+
+      if afcoarse != 0
+        w = 2*pi*afcoarse/Fs;
+        wvec = exp(-j*w*(0:2*Nsamperframe+M+Ncp-1));
+
+        % choose best timing offset metric at this freq offset
+        [act_est atiming_valid atiming_mx] = est_timing(states, wvec .* states.rxbuf(st:en), states.rate_fs_pilot_samples, 2);
+      else
+        % exp(-j*0) is just 1 when afcoarse is 0
+        [act_est atiming_valid atiming_mx] = est_timing(states, states.rxbuf(st:en), states.rate_fs_pilot_samples, 2);
+      end
+
+      %printf("afcoarse: %f atiming_mx: %f\n", afcoarse, atiming_mx);
+
+      if atiming_mx > timing_mx
+        ct_est = act_est;
+        timing_valid = atiming_valid;
+        timing_mx = atiming_mx;
+        fcoarse = afcoarse;
+      end
+    end
+
+    % refine freq est within -/+ 20 Hz window
+
+    if fcoarse != 0
+      w = 2*pi*fcoarse/Fs;
+      wvec = exp(-j*w*(0:2*Nsamperframe+M+Ncp-1));
+      foff_est = est_freq_offset_known_corr(states, wvec .* states.rxbuf(st:en), states.rate_fs_pilot_samples, ct_est);
+      foff_est += fcoarse;
+    else
+      % exp(-j*0) is just 1 when fcoarse is 0
+      foff_est = est_freq_offset_known_corr(states, states.rxbuf(st:en), states.rate_fs_pilot_samples, ct_est);
+    end
+
+    if verbose
+      printf(" ct_est: %4d mx: %3.2f coarse_foff: %5.1f timing_valid: %d", ct_est, timing_mx, foff_est, timing_valid);
+    end
+
+endfunction
+ 
 % ----------------------------------------------------------------------------------
 % ofdm_sync_search - attempts to find coarse sync parameters for modem initial sync
 % ----------------------------------------------------------------------------------
@@ -647,60 +700,27 @@ function [timing_valid states] = ofdm_sync_search(states, rxbuf_in)
   states.rxbuf(1:Nrxbuf-states.nin) = states.rxbuf(states.nin+1:Nrxbuf);
   states.rxbuf(Nrxbuf-states.nin+1:Nrxbuf) = rxbuf_in;
 
-  % Attempt coarse timing estimate (i.e. detect start of frame) at a range of frequency offsets
-
-  st = M+Ncp + Nsamperframe + 1; en = st + 2*Nsamperframe +  M+Ncp - 1;
-  timing_mx = 0; fcoarse = 0; timing_valid = 0; ct_est = 1;
-  for afcoarse=-40:40:40
-    % vector of local oscillator samples to shift input vector
-    % these could be computed on the fly to save memory, or pre-computed in flash at tables as they are static
-
-    if afcoarse != 0
-      w = 2*pi*afcoarse/Fs;
-      wvec = exp(-j*w*(0:2*Nsamperframe+M+Ncp-1));
-
-      % choose best timing offset metric at this freq offset
-      [act_est atiming_valid atiming_mx] = est_timing(states, wvec .* states.rxbuf(st:en), states.rate_fs_pilot_samples, 2);
-    else
-      % exp(-j*0) is just 1 when afcoarse is 0
-      [act_est atiming_valid atiming_mx] = est_timing(states, states.rxbuf(st:en), states.rate_fs_pilot_samples, 2);
+  if states.data_mode
+    st = M+Ncp + Nsamperframe + 1; en = st + 2*Nsamperframe +  M+Ncp - 1;    
+    [ct_est foff_est timing_mx] = est_timing_and_freq(states, states.rxbuf(st:en), states.tx_preamble, tstep = 4, fmin = -50, fmax = 50, fstep = 5);    
+    fmin = foff_est-3; fmax = foff_est+3;
+    st1 = st + ct_est; en1 = st1 + length(states.tx_preamble)-1; rx1 = states.rxbuf(st1:en1);
+    [tmp foff_est timing_mx] = est_timing_and_freq(states, rx1, states.tx_preamble, tstep = 1, fmin, fmax, fstep = 1);
+    timing_valid = timing_mx > timing_mx_thresh;
+    if verbose
+      printf(" ct_est: %4d mx: %3.2f coarse_foff: %5.1f timing_valid: %d", ct_est, timing_mx, foff_est, timing_valid);
     end
-
-    %printf("afcoarse: %f atiming_mx: %f\n", afcoarse, atiming_mx);
-
-    if atiming_mx > timing_mx
-      ct_est = act_est;
-      timing_valid = atiming_valid;
-      timing_mx = atiming_mx;
-      fcoarse = afcoarse;
-    end
-  end
-
-  % refine freq est within -/+ 20 Hz window
-
-  if fcoarse != 0
-    w = 2*pi*fcoarse/Fs;
-    wvec = exp(-j*w*(0:2*Nsamperframe+M+Ncp-1));
-    foff_est = est_freq_offset_known_corr(states, wvec .* states.rxbuf(st:en), states.rate_fs_pilot_samples, ct_est);
-    foff_est += fcoarse;
   else
-    % exp(-j*0) is just 1 when fcoarse is 0
-    foff_est = est_freq_offset_known_corr(states, states.rxbuf(st:en), states.rate_fs_pilot_samples, ct_est);
+    [ct_est foff_est timing_mx timing_valid] = ofdm_sync_search_stream(states, states.rxbuf);
   end
-
-  if verbose
-    printf(" ct_est: %4d mx: %3.2f coarse_foff: %5.1f timing_valid: %d", ct_est, timing_mx, foff_est, timing_valid);
-  end
-
+  
   if timing_valid
     % potential candidate found ....
 
     % calculate number of samples we need on next buffer to get into sync
-
     states.nin = ct_est - 1;
 
     % reset modem states
-
     states.sample_point = states.timing_est = 1;
     states.foff_est_hz = foff_est;
   else
