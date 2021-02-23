@@ -17,31 +17,40 @@
     octave:5> ofdm_tx("hf_snr_6dB_700d.raw", "700D", 10, 6, "mpp");
 #}
 
-function ofdm_tx(filename, mode="700D", Nsec, SNR3kdB=100, channel='awgn', freq_offset_Hz=0, tx_clip_en=0)
+function ofdm_tx(filename, mode="700D", N, SNR3kdB=100, channel='awgn', varargin)
   ofdm_lib;
   channel_lib;
   randn('seed',1);
   pkg load signal;
 
-  dpsk = 0;
-  if strcmp(mode,"700D-DPSK")
-    mode = "700D"; dpsk = 1;
-  end
-  if strcmp(mode,"2020-DPSK")
-    mode = "2020"; dpsk = 1;
-  end
-
+  tx_clip_en = 0; freq_offset_Hz = 0.0; burst_mode = 0; Nbursts = 1;
+  for i = 1:length (varargin)
+    if strcmp(varargin{i},"txclip") 
+      txclip_en = 1;
+    end
+    if strcmp(varargin{i},"bursts") 
+      burst_mode = 1;
+      Nbursts = varargin{i+1};
+    end  
+  endfor
+  
   % init modem
 
   config = ofdm_init_mode(mode);
   states = ofdm_init(config);
   print_config(states);
   ofdm_load_const;
-  states.dpsk=dpsk;
 
-  % Generate fixed test frame of tx bits and run OFDM modulator
+  if burst_mode
+    % burst mode: treat N as Npackets
+    Npackets = N; 
+  else
+    % streaming mode: treat N as Nseconds
+    Npackets = round(N/states.Tpacket);
+  end
 
-  Npackets = round(Nsec/states.Tpacket);
+  % Generate fixed test frame of tx bits and concatentate packets
+
   tx_bits = create_ldpc_test_frame(states, coded_frame=0);
   atx = ofdm_mod(states, tx_bits);
   tx = [];
@@ -51,8 +60,16 @@ function ofdm_tx(filename, mode="700D", Nsec, SNR3kdB=100, channel='awgn', freq_
   if states.data_mode
     tx = [states.tx_preamble tx];
   end
-
-  printf("Npackets: %d  ", Npackets);
+  
+  % if burst mode concatenate multiple bursts with spaces
+  if burst_mode
+    atx = tx; tx = [];
+    for b=1:Nbursts
+      tx = [tx atx zeros(1,states.Fs)];
+    end
+  end
+  
+  printf("Npackets: %d  Nbursts: %d  ", Npackets, Nbursts);
   states.verbose=1;
   tx = ofdm_hilbert_clipper(states, tx, tx_clip_en);
   rx_real = ofdm_channel(states, tx, SNR3kdB, channel, freq_offset_Hz);
