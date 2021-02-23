@@ -236,7 +236,8 @@ function states = ofdm_init(config)
   states.sync_end = 0;
   states.modem_frame = 0;                                 % keep track of how many frames received in packet
   states.state_machine = state_machine;                   % mode specific state machine
-
+  states.framesperburst = 0;                              % for OFDM data modes, how many frames before we reset state machine
+  
   % LDPC code is optionally enabled
 
   states.rate = 1.0;
@@ -307,7 +308,7 @@ function config = ofdm_init_mode(mode="700D")
     config.Ntxtbits = 0; config.Nuwbits = 32; config.bad_uw_errors = 9;
     config.state_machine = "data";
     config.ftwindow_width = 80; config.amp_est_mode = 1; config.EsNodB = 3;
-    config.edge_pilots = 0;
+    config.edge_pilots = 0; config.timing_mx_thresh = 0.10;
     config.tx_uw = zeros(1,config.Nuwbits);
     config.tx_uw(1:16) = [1 1 0 0  1 0 1 0  1 1 1 1  0 0 0 0];
   elseif strcmp(mode,"datac1")
@@ -315,7 +316,7 @@ function config = ofdm_init_mode(mode="700D")
     config.Ntxtbits = 0; config.Nuwbits = 16; config.bad_uw_errors = 3;
     config.state_machine = "data";
     config.ftwindow_width = 80; config.amp_est_mode = 1; config.EsNodB = 3;
-    config.edge_pilots = 0;
+    config.edge_pilots = 0; config.timing_mx_thresh = 0.10;
     config.tx_uw = [1 1 0 0  1 0 1 0  1 1 1 1  0 0 0 0];
   elseif strcmp(mode,"datac2")
     Ns=5; config.Np=36; Tcp = 0.006; Ts = 0.016; Nc = 9; config.data_mode = 1;
@@ -326,7 +327,7 @@ function config = ofdm_init_mode(mode="700D")
     Ns=5; config.Np=29; Tcp = 0.006; Ts = 0.016; Nc = 9; config.data_mode = 1;
     config.edge_pilots = 0;
     config.Ntxtbits = 0; config.Nuwbits = 40; config.bad_uw_errors = 10;
-    config.ftwindow_width = 80; config.timing_mx_thresh = 0.08;
+    config.ftwindow_width = 80; config.timing_mx_thresh = 0.15;
     config.tx_uw = zeros(1,config.Nuwbits);
     config.tx_uw(1:24) = [1 1 0 0  1 0 1 0  1 1 1 1  0 0 0 0  1 1 1 1  0 0 0 0];
     config.tx_uw(end-24+1:end) = [1 1 0 0  1 0 1 0  1 1 1 1  0 0 0 0  1 1 1 1  0 0 0 0];
@@ -643,7 +644,7 @@ function [ct_est foff_est timing_mx timing_valid] = ofdm_sync_search_stream(stat
     
     % Attempt coarse timing estimate (i.e. detect start of frame) at a range of frequency offsets
 
-    st = M+Ncp + Nsamperframe + 1; en = st + 2*Nsamperframe +  M+Ncp - 1;
+    st = M+Ncp + Nsamperframe + 1; en = st + 2*Nsamperframe + M+Ncp - 1;
     timing_mx = 0; fcoarse = 0; timing_valid = 0; ct_est = 1;
     for afcoarse=-40:40:40
       % vector of local oscillator samples to shift input vector
@@ -701,7 +702,7 @@ function [timing_valid states] = ofdm_sync_search(states, rxbuf_in)
   states.rxbuf(Nrxbuf-states.nin+1:Nrxbuf) = rxbuf_in;
 
   if states.data_mode
-    st = M+Ncp + Nsamperframe + 1; en = st + 2*Nsamperframe +  M+Ncp - 1;    
+    st = M+Ncp + Nsamperframe + 1; en = st + 2*Nsamperframe + M+Ncp - 1;    
     [ct_est foff_est timing_mx] = est_timing_and_freq(states, states.rxbuf(st:en), states.tx_preamble, tstep = 4, fmin = -50, fmax = 50, fstep = 5);    
     fmin = foff_est-3; fmax = foff_est+3;
     st1 = st + ct_est; en1 = st1 + length(states.tx_preamble)-1; rx1 = states.rxbuf(st1:en1);
@@ -1202,7 +1203,7 @@ endfunction
 function tx_preamble = ofdm_generate_preamble(states)
   % tweak local copy of states so we can generate a 1 modem-frame packet
   states.Np = 1; states.Nbitsperpacket = states.Nbitsperframe;
-  preamble_bits = ofdm_rand(states.Nbitsperframe, 2) > 0.5;
+  preamble_bits = ofdm_rand(states.Nbitsperframe, 3) > 0.5;
   tx_preamble = ofdm_mod(states, preamble_bits);
 endfunction
 
@@ -1401,27 +1402,33 @@ function states = sync_state_machine_data(states, rx_uw)
   states.uw_errors = sum(xor(tx_uw,rx_uw));
 
   if strcmp(states.sync_state,'trial')
-    if strcmp(states.sync_state,'trial')
-      if states.uw_errors < states.bad_uw_errors;
-        next_state = "synced";
-        states.frame_count = Nuwframes;
-        states.modem_frame = Nuwframes;
-        states.sum_sig_var = states.sum_noise_var = 0;
-      else
-        states.sync_counter++;
-        if states.sync_counter > Np
+     if states.uw_errors < states.bad_uw_errors;
+       next_state = "synced";
+       states.frame_count = 0;
+       states.modem_frame = Nuwframes;
+       states.sum_sig_var = states.sum_noise_var = 0;
+    else
+       states.sync_counter++;
+       if states.sync_counter > Np
+         next_state = "search";
+       end
+    end
+ end
+
+  % Note frameperburst==0 we don't ever lose sync, which is useful for 
+  % stream based testing or external control of state machine
+  
+  if strcmp(states.sync_state,'synced')
+    states.modem_frame++;
+    if (states.modem_frame >= states.Np) 
+      states.modem_frame = 0; 
+      states.frame_count++;
+      if (states.framesperburst)
+        if (states.frame_count >= states.framesperburst)
           next_state = "search";
         end
       end
     end
-  end
-
-  % Note we don't every lose sync, we assume there are a known number of frames being sent,
-  % or the packets contain an "end of stream" information.
-  if strcmp(states.sync_state,'synced')
-    states.frame_count++;
-    states.modem_frame++;
-    if (states.modem_frame >= states.Np) states.modem_frame = 0; end
   end
 
   states.last_sync_state = states.sync_state;

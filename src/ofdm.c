@@ -1761,7 +1761,7 @@ void ofdm_sync_state_machine_data(struct OFDM *ofdm, uint8_t *rx_uw) {
             ofdm->frame_count++;
             //fprintf(stderr, "frame_count: %d  framesperburst:%d\n", ofdm->frame_count, ofdm->framesperburst);
             if (ofdm->framesperburst) {
-                if (ofdm->frame_count == ofdm->framesperburst)
+                if (ofdm->frame_count >= ofdm->framesperburst)
                     next_state = search;
             }
         }
