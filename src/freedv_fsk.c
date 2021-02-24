@@ -532,6 +532,9 @@ int freedv_rx_fsk_ldpc_data(struct freedv *f, COMP demod_in[]) {
                 Nerrs_coded = count_errors(tx_frame + sizeof(fsk_ldpc_uw), f->rx_payload_bits, f->bits_per_modem_frame);
                 f->total_bit_errors_coded += Nerrs_coded;
                 f->total_bits_coded += f->bits_per_modem_frame;
+                if (Nerrs_coded) f->total_packet_errors++;
+                f->total_packets++;
+
             }
 
             /* extract packet sequnce numbers optionally placed in byte[0] */

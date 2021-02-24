@@ -261,6 +261,7 @@ int freedv_get_modem_symbol_rate    (struct freedv *freedv);
 int freedv_get_n_max_modem_samples  (struct freedv *freedv);
 int freedv_get_n_nom_modem_samples  (struct freedv *freedv);
 int freedv_get_n_tx_modem_samples   (struct freedv *freedv);
+int freedv_get_n_tx_preamble_modem_samples(struct freedv *freedv);
 
 // bit error rate stats
 int freedv_get_total_bits	            (struct freedv *freedv);

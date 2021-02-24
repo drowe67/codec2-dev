@@ -249,6 +249,7 @@ int main(int argc, char *argv[]) {
             n_preamble = freedv_rawdatapreamblecomptx(freedv, mod_out_comp);
             comp_to_short(mod_out_short, mod_out_comp, n_preamble);
         }
+        assert(n_preamble == freedv_get_n_tx_preamble_modem_samples(freedv));
         assert(n_preamble <= n_mod_out);
         fwrite(mod_out_short, sizeof(short), shorts_per_sample*n_preamble, fout);
 

@@ -1372,6 +1372,20 @@ void freedv_get_modem_extended_stats(struct freedv *f, struct MODEM_STATS *stats
     }
 }
 
+int freedv_get_n_tx_preamble_modem_samples(struct freedv *f) {
+    // make sure this stays in sync with freedv_rawdatapreamblecomptx(), TODO clean this up
+    // when preamble stabilises
+    if (f->mode == FREEDV_MODE_FSK_LDPC) {
+        struct FSK *fsk = f->fsk;
+        int npreamble_symbols = 50*(fsk->mode>>1);
+        return fsk->Ts*npreamble_symbols;
+    } else if (is_ofdm_mode(f)) {
+        return 4*f->ofdm->samplesperframe;
+    }
+    
+    return 0; 
+}
+
 // from http://stackoverflow.com/questions/10564491/function-to-calculate-a-crc16-checksum
 
 unsigned short freedv_gen_crc16(unsigned char* data_p, int length) {
