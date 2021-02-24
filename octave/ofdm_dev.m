@@ -200,7 +200,7 @@ endfunction
 
 % test frame by frame acquisition algorithm
 
-function frame_by_frame_acquisition_test(mode="datac1", Ntests=10, channel="awgn", SNR3kdB=100, foff_Hz=0, verbose_top=0)
+function Pa = frame_by_frame_acquisition_test(mode="datac1", Ntests=10, channel="awgn", SNR3kdB=100, foff_Hz=0, verbose_top=0)
   
   sim_in.SNR3kdB = SNR3kdB;
   sim_in.channel = channel;
@@ -226,7 +226,7 @@ function frame_by_frame_acquisition_test(mode="datac1", Ntests=10, channel="awgn
                                   tstep, fmin = -50, fmax = 50, fstep);
     % refine estimate over finer grid                             
     fmin = foff_est - ceil(fstep/2); fmax = foff_est + ceil(fstep/2); 
-    st = n + ct_est - tstep/2; en = st + Nsamperframe + tstep - 1;
+    st = max(1, n + ct_est - tstep/2); en = st + Nsamperframe + tstep - 1;
     [ct_est foff_est timing_mx] = est_timing_and_freq(states, rx(st:en), tx_preamble, 1, fmin, fmax, 1);
     timing_mx_log = [timing_mx_log timing_mx];
     ct_est += st;
@@ -296,6 +296,43 @@ function frame_by_frame_acquisition_test(mode="datac1", Ntests=10, channel="awgn
 endfunction
 
 
+% test frame by frame across modes, channels, and SNR (don't worry about sweeping freq)
+
+function acquistion_curves_frame_by_frame_modes_channels_snr(Ntests=5)
+  modes={'datac0', 'datac1', 'datac3'};
+  channels={'awgn', 'mpm', 'mpp', 'notch'};
+  SNR = [ -10 -5 0 5 10 15];
+  %channels={'awgn','mpp'}; SNR = [0 5];
+  
+  cc = ['b' 'g' 'k' 'c' 'm' 'r'];
+  pt = ['+' '*' 'x' 'o' '+' '*'];
+ 
+  for i=1:length(modes)
+    figure(i); clf; hold on; title(sprintf("%s P(acquisition)", modes{i}));
+  end
+  
+  for m=1:length(modes)
+    figure(m);
+    for c=1:length(channels)
+      Pa_log = [];
+      for s=1:length(SNR)
+        Pa = frame_by_frame_acquisition_test(modes{m}, Ntests, channels{c}, SNR(s), foff_hz=0, verbose=1);
+        Pa_log = [Pa_log Pa];
+      end
+      l = sprintf('%c%c-;%s;', cc(c), pt(c), channels{c}); 
+      plot(SNR, Pa_log, l, 'markersize', 10);
+    end
+  end
+  
+  for i=1:length(modes)
+    figure(i); grid;
+    xlabel('SNR3k dB'); legend('location', 'southeast'); 
+    xlim([min(SNR)-2 max(SNR)+2]); ylim([0 1.1]);
+    print('-dpng', sprintf("ofdm_dev_acq_curves_fbf_%s.png", modes{i}));
+  end 
+endfunction
+
+
 format;
 more off;
 pkg load signal;
@@ -311,4 +348,5 @@ randn('seed',1);
 %sync_metrics('freq')
 %acquistion_curves("datac3", "mpp", Ntests=10)
 %acquistion_curves_modes_channels(Ntests=25)
-frame_by_frame_acquisition_test("datac3", Ntests=25, 'mpp', SNR3kdB=0, foff_hz=0, verbose=1+8);
+%frame_by_frame_acquisition_test("datac3", Ntests=25, 'mpp', SNR3kdB=0, foff_hz=-42, verbose=1+8);
+acquistion_curves_frame_by_frame_modes_channels_snr(Ntests=5)
