@@ -17,7 +17,6 @@ function ofdm_rx(filename, mode="700D", pass_ber=0)
   print_config(states);
   ofdm_load_const;
   states.verbose = 0;
-  states.framesperburst = 1;
   
   % load real samples from file
 

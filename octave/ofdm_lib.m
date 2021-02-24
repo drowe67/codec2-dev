@@ -700,7 +700,7 @@ function [timing_valid states] = ofdm_sync_search(states, rxbuf_in)
   states.rxbuf(1:Nrxbuf-states.nin) = states.rxbuf(states.nin+1:Nrxbuf);
   states.rxbuf(Nrxbuf-states.nin+1:Nrxbuf) = rxbuf_in;
 
-  if states.data_mode
+  if states.data_mode == 2
     st = M+Ncp + Nsamperframe + 1; en = st + 2*Nsamperframe + M+Ncp - 1;    
     [ct_est foff_est timing_mx] = est_timing_and_freq(states, states.rxbuf(st:en), states.tx_preamble, tstep = 4, fmin = -50, fmax = 50, fstep = 5);    
     fmin = foff_est-3; fmax = foff_est+3;
