@@ -10,7 +10,8 @@
 ofdm_lib;
 channel_lib;
 
-% build a vector of Tx bursts in noise
+% Build a vector of Tx bursts in noise, one burst occurs every padded_burst_len samples
+
 function [rx tx_preamble burst_len padded_burst_len ct_targets states] = generate_bursts(sim_in)
   config = ofdm_init_mode(sim_in.mode);
   states = ofdm_init(config);
@@ -39,7 +40,11 @@ function [rx tx_preamble burst_len padded_burst_len ct_targets states] = generat
 endfunction
 
 
-% Run an acquisition test, returning vectors of estimation errors
+% Run an acquisition test, returning vectors of estimation errors.  Each tests runs on a segment of
+% simulated signal that is known to contain a single burst.  We look for the peak of the acquisition
+% metric in that segment.  This tests the core metric but is not (quite) a complete acquisition system as it
+% doesn't operate frame by frame and operates on the assumption that the samples do contain a burst.
+ 
 function [delta_ct delta_foff timing_mx_log] = acquisition_test(mode="700D", Ntests=10, channel, SNR3kdB=100, foff_Hz=0, verbose_top=0)
   
   sim_in.SNR3kdB = SNR3kdB;
@@ -96,7 +101,7 @@ endfunction
 
 
 % Helper function to count number of tests where both time and freq are OK
-function P = both_ok(dct, ttol_samples, dfoff, ftol_hz)
+function ok = both_ok(dct, ttol_samples, dfoff, ftol_hz)
   Ntests = length(dct);
   ok = 0;
   for i = 1:Ntests
@@ -104,7 +109,6 @@ function P = both_ok(dct, ttol_samples, dfoff, ftol_hz)
       ok+=1;
     end
   end
-  P = ok/Ntests;
 endfunction
   
 
@@ -123,7 +127,7 @@ function res = acquisition_histograms(mode="datac0", Ntests=10, channel = "awgn"
   [dct dfoff] = acquisition_test(mode, Ntests, channel, SNR3kdB, foff, verbose); 
   Pt = length(find (abs(dct) < ttol_samples))/length(dct);
   Pf = length(find (abs(dfoff) < ftol_hz))/length(dfoff);
-  Pa = both_ok(dct, ttol_samples, dfoff, ftol_hz)
+  Pa = both_ok(dct, ttol_samples, dfoff, ftol_hz)/Ntests;
   printf("%s %s SNR: %3.1f foff: %3.1f P(time) = %3.2f  P(freq) = %3.2f P(acq) = %3.2f\n", mode, channel, SNR3kdB, foff, Pt, Pf, Pa);
 
   if bitand(verbose,16)
@@ -137,7 +141,7 @@ function res = acquisition_histograms(mode="datac0", Ntests=10, channel = "awgn"
     title(t);
   end
 
-   res = [Pt Pf Pa];
+  res = [Pt Pf Pa];
 endfunction
 
 
@@ -194,82 +198,101 @@ function res_log = acquistion_curves_modes_channels(Ntests=5)
 endfunction
 
 
-% Used to develop sync state machine - in particular a metric to show
-% we are out of sync, or have sync with a bad freq offset est, or have
-% lost modem signal
+% test frame by frame acquisition algorithm
 
-function sync_metrics(mode = "700D", x_axis = 'EbNo')
-  Fs      = 8000;
-  Ntests  = 4;
-  f_offHz = [-25:25];
-  EbNodB  = [-10 0 3 6 10 20];
-  %f_offHz = [-5:5:5];
-  %EbNodB  = [-10 0 10];
-  cc = ['b' 'g' 'k' 'c' 'm' 'b'];
-  pt = ['+' '+' '+' '+' '+' 'o'];
+function frame_by_frame_acquisition_test(mode="datac1", Ntests=10, channel="awgn", SNR3kdB=100, foff_Hz=0, verbose_top=0)
+  
+  sim_in.SNR3kdB = SNR3kdB;
+  sim_in.channel = channel;
+  sim_in.foff_Hz = foff_Hz;  
+  sim_in.mode = mode;
+  sim_in.Nbursts = Ntests;
+  [rx tx_preamble Nsamperburst Nsamperburstpadded ct_targets states] = generate_bursts(sim_in);
+  states.verbose = bitand(verbose_top,3);
+  ofdm_load_const;
+  state = "idle";
+  
+  timing_mx_log = []; ct_log = []; delta_ct = []; delta_foff = [];
+
+  % allowable tolerance for acquistion
+  ftol_hz = 2;              % we can sync up on this (todo: make mode selectable)
+  ttol_samples = 0.006*Fs;  % CP length (todo: make mode selectable)
+  target_acq = zeros(1,Ntests);
+  
+  for n=1:Nsamperframe:length(rx)-2*Nsamperframe
+    % initial search over coarse grid
+    tstep = 4; fstep = 5;
+    [ct_est foff_est timing_mx] = est_timing_and_freq(states, rx(n:n+2*Nsamperframe-1), tx_preamble, 
+                                  tstep, fmin = -50, fmax = 50, fstep);
+    % refine estimate over finer grid                             
+    fmin = foff_est - ceil(fstep/2); fmax = foff_est + ceil(fstep/2); 
+    st = n + ct_est - tstep/2; en = st + Nsamperframe + tstep - 1;
+    [ct_est foff_est timing_mx] = est_timing_and_freq(states, rx(st:en), tx_preamble, 1, fmin, fmax, 1);
+    timing_mx_log = [timing_mx_log timing_mx];
+    ct_est += st;
+     
+    % state machine to track peaks
+    next_state = state;
+    if strcmp(state,"idle")
+      if timing_mx > states.timing_mx_thresh
+        next_state = "track_peak";
+        best_timing_mx = timing_mx;
+        best_ct_est = ct_est;
+        best_foff_est = foff_est;
+      end
+    end
+    if strcmp(state,"track_peak")
+      if timing_mx > best_timing_mx
+        best_timing_mx = timing_mx;
+        best_ct_est = ct_est;
+        best_foff_est = foff_est;
+      end
+      if timing_mx < states.timing_mx_thresh
+        next_state = "idle";
+        % OK we have located peak
     
-  mean_mx1_log = mean_dfoff_log = [];
-  for f = 1:length(f_offHz)
-    af_offHz = f_offHz(f);
-    mean_mx1_row = mean_dfoff_row = [];
-    for e = 1:length(EbNodB)
-      aEbNodB = EbNodB(e);
-      [dct dfoff timing_mx_log] = acquisition_test(mode, Ntests, aEbNodB, af_offHz);
-      mean_mx1 = mean(timing_mx_log(:,1));
-      printf("f_offHz: %5.2f EbNodB: % 6.2f mx1: %3.2f\n", af_offHz, aEbNodB, mean_mx1);
-      mean_mx1_row = [mean_mx1_row mean_mx1];
-      mean_dfoff_row = [mean_dfoff_row mean(dfoff)];
-    end
-    mean_mx1_log = [mean_mx1_log; mean_mx1_row];
-    mean_dfoff_log = [mean_dfoff_log; mean_dfoff_row];
-  end
+        % re-base ct_est to be wrt start of current burst reference frame
+        i = ceil(n/Nsamperburstpadded);
+        w = (i-1)*Nsamperburstpadded;
+        best_ct_est -= (i-1)*Nsamperburstpadded;
+        
+        % valid coarse timing could be pre-amble or post-amble
+        ct_target1 = ct_targets(i);
+        ct_target2 = ct_targets(i)+Nsamperburst-length(tx_preamble);
+        ct_delta1 = best_ct_est-ct_target1;
+        ct_delta2 = best_ct_est-ct_target2;
+        adelta_ct = min([abs(ct_delta1) abs(ct_delta2)]);
 
-  figure(1); clf; hold on; grid;
-  if strcmp(x_axis,'EbNo')
-    for f = 1:length(f_offHz)
-      if f == 2, hold on, end;
-      leg1 = sprintf("b+-;mx1 %4.1f Hz;", f_offHz(f));
-      plot(EbNodB, mean_mx1_log(f,:), leg1)
-    end
-    hold off;
-    xlabel('Eb/No (dB)');
-    ylabel('Coefficient')
-    title('Pilot Correlation Metric against Eb/No for different Freq Offsets');
-    legend("location", "northwest"); legend("boxoff");
-    axis([min(EbNodB) max(EbNodB) 0 1.2])
-    print('-deps', '-color', "ofdm_dev_pilot_correlation_ebno.eps")
-  end
-
-  if strcmp(x_axis,'freq')
-    % x axis is freq
-
-    for e = length(EbNodB):-1:1
-      leg1 = sprintf("%c%c-;mx1 %3.0f dB;", cc(e), pt(e), EbNodB(e));
-      plot(f_offHz, mean_mx1_log(:,e), leg1)
-    end
-    hold off;
-    xlabel('freq offset (Hz)');
-    ylabel('Coefficient')
-    title('Pilot Correlation Metric against Freq Offset for different Eb/No dB');
-    legend("location", "northwest"); legend("boxoff");
-    axis([min(f_offHz) max(f_offHz) 0 1])
-    print('-deps', '-color', "ofdm_dev_pilot_correlation_freq.eps")
-
-    mean_dfoff_log
- 
-    figure(2); clf;
-    for e = 1:length(EbNodB)
-      if e == 2, hold on, end;
-      leg1 = sprintf("+-;mx1 %3.0f dB;", EbNodB(e));
-      plot(f_offHz, mean_dfoff_log(:,e), leg1)
-    end
-    hold off;
-    xlabel('freq offset (Hz)');
-    ylabel('Mean Freq Est Error')
-    title('Freq Est Error against Freq Offset for different Eb/No dB');
-    axis([min(f_offHz) max(f_offHz) -5 5])
+        % log results
+        delta_ct = [delta_ct adelta_ct];
+        adelta_foff = best_foff_est-foff_Hz;
+        delta_foff = [delta_foff adelta_foff];
+        ct_log = [ct_log w+best_ct_est];
+        
+        target_acq(i) = (abs(adelta_ct) < ttol_samples) && (abs(adelta_foff) < ftol_hz);
+        
+        if states.verbose
+          printf("i: %2d ct_est: %6d adelta_ct: %6d foff_est: %5.1f timing_mx: %3.2f Acq: %d\n",
+                 i, best_ct_est, adelta_ct, best_foff_est, best_timing_mx, target_acq(i));
+        end
+      end      
+    end            
+    state = next_state;    
   end
   
+  if bitand(verbose_top,8)
+    figure(1); clf; plot(timing_mx_log,'+-'); title('mx log'); axis([0 length(timing_mx_log) 0 0.5]); grid;
+    figure(4); clf; plot(real(rx)); axis([0 length(rx) -2E4 2E4]);
+               hold on;
+               plot(ct_log,zeros(1,length(ct_log)),'r+','markersize', 25, 'linewidth', 2);
+               hold off; 
+    figure(5); clf; plot_specgram(rx);
+  end
+  
+
+  Pa = sum(target_acq)/Ntests;
+  printf("%s %s SNR: %3.1f foff: %3.1f P(acq) = %3.2f\n", mode, channel, SNR3kdB, foff_Hz, Pa);
+
 endfunction
 
 
@@ -283,8 +306,9 @@ randn('seed',1);
 % choose simulation to run here 
 % ---------------------------------------------------------
 
-acquisition_test("datac3", Ntests=5, 'mpp', SNR3kdB=0, foff_hz=0, verbose=1+8);
+%acquisition_test("datac3", Ntests=10, 'mpp', SNR3kdB=0, foff_hz=0, verbose=1+8);
 %acquisition_histograms(mode="datac2", Ntests=3, channel='mpm', SNR3kdB=-5, foff=37, verbose=1+16)
 %sync_metrics('freq')
 %acquistion_curves("datac3", "mpp", Ntests=10)
 %acquistion_curves_modes_channels(Ntests=25)
+frame_by_frame_acquisition_test("datac3", Ntests=25, 'mpp', SNR3kdB=0, foff_hz=0, verbose=1+8);

@@ -259,7 +259,6 @@ function states = ofdm_init(config)
   % pre-amble for data modes
   states.data_mode = data_mode;
   if states.data_mode
-    printf("creating preamble....\n")
     states.tx_preamble = ofdm_generate_preamble(states);
   end
   
@@ -308,7 +307,7 @@ function config = ofdm_init_mode(mode="700D")
     config.Ntxtbits = 0; config.Nuwbits = 32; config.bad_uw_errors = 9;
     config.state_machine = "data";
     config.ftwindow_width = 80; config.amp_est_mode = 1; config.EsNodB = 3;
-    config.edge_pilots = 0; config.timing_mx_thresh = 0.10;
+    config.edge_pilots = 0; config.timing_mx_thresh = 0.15;
     config.tx_uw = zeros(1,config.Nuwbits);
     config.tx_uw(1:16) = [1 1 0 0  1 0 1 0  1 1 1 1  0 0 0 0];
   elseif strcmp(mode,"datac1")
@@ -327,7 +326,7 @@ function config = ofdm_init_mode(mode="700D")
     Ns=5; config.Np=29; Tcp = 0.006; Ts = 0.016; Nc = 9; config.data_mode = 1;
     config.edge_pilots = 0;
     config.Ntxtbits = 0; config.Nuwbits = 40; config.bad_uw_errors = 10;
-    config.ftwindow_width = 80; config.timing_mx_thresh = 0.15;
+    config.ftwindow_width = 80; config.timing_mx_thresh = 0.10;
     config.tx_uw = zeros(1,config.Nuwbits);
     config.tx_uw(1:24) = [1 1 0 0  1 0 1 0  1 1 1 1  0 0 0 0  1 1 1 1  0 0 0 0];
     config.tx_uw(end-24+1:end) = [1 1 0 0  1 0 1 0  1 1 1 1  0 0 0 0  1 1 1 1  0 0 0 0];
