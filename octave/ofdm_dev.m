@@ -23,7 +23,6 @@ function [rx tx_preamble burst_len padded_burst_len ct_targets states] = generat
   tx_burst = [tx_preamble ofdm_mod(states, tx_bits) tx_preamble];
   burst_len = length(tx_burst);
   tx_burst = ofdm_hilbert_clipper(states, tx_burst, tx_clip_en=0);
-  on_len = length(tx_burst);
   padded_burst_len = Fs+burst_len+Fs;
   
   tx = []; ct_targets = [];
@@ -34,9 +33,12 @@ function [rx tx_preamble burst_len padded_burst_len ct_targets states] = generat
     ct_targets = [ct_targets Fs+jitter];
     tx = [tx tx_burst_padded];
   end
+  
   % adjust channel simulator SNR setpoint given (burst on length)/(sample length) ratio
-  SNRdB_setpoint = sim_in.SNR3kdB + 10*log10(on_len/burst_len);
-  rx = channel_simulate(Fs, SNRdB_setpoint, sim_in.foff_Hz, sim_in.channel, tx, verbose);
+  mark_space_SNR_offset = 10*log10(burst_len/padded_burst_len);
+  SNRdB_setpoint = sim_in.SNR3kdB + mark_space_SNR_offset;
+  printf("SNR3kdB: %f Burst offset: %f\n", sim_in.SNR3kdB, mark_space_SNR_offset)
+  rx = channel_simulate(Fs, SNRdB_setpoint, sim_in.foff_Hz, sim_in.channel, tx);
 endfunction
 
 
@@ -348,5 +350,5 @@ randn('seed',1);
 %sync_metrics('freq')
 %acquistion_curves("datac3", "mpp", Ntests=10)
 %acquistion_curves_modes_channels(Ntests=25)
-%frame_by_frame_acquisition_test("datac3", Ntests=25, 'mpp', SNR3kdB=0, foff_hz=-42, verbose=1+8);
-acquistion_curves_frame_by_frame_modes_channels_snr(Ntests=5)
+frame_by_frame_acquisition_test("datac0", Ntests=10, 'mpp', SNR3kdB=100, foff_hz=0, verbose=1+8);
+%acquistion_curves_frame_by_frame_modes_channels_snr(Ntests=5)

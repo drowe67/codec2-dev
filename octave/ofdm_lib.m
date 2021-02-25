@@ -307,7 +307,7 @@ function config = ofdm_init_mode(mode="700D")
     config.Ntxtbits = 0; config.Nuwbits = 32; config.bad_uw_errors = 9;
     config.state_machine = "data";
     config.ftwindow_width = 80; config.amp_est_mode = 1; config.EsNodB = 3;
-    config.edge_pilots = 0; config.timing_mx_thresh = 0.15;
+    config.edge_pilots = 0; config.timing_mx_thresh = 0.08;
     config.tx_uw = zeros(1,config.Nuwbits);
     config.tx_uw(1:16) = [1 1 0 0  1 0 1 0  1 1 1 1  0 0 0 0];
   elseif strcmp(mode,"datac1")

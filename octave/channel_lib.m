@@ -18,9 +18,9 @@ function [spread1 spread2 path_delay_samples] = channel_multipath(channel, Fs, N
     %printf(" Doppler Spread: %3.2f Hz Path Delay: %3.2f ms %d samples\n", dopplerSpreadHz, path_delay_ms, path_delay_samples);
 
     if strcmp(channel, "notch")
-      % simple notch filter (not time varying)
+      % simple notch filter (not time varying), hand tweaked to be 10dB down at about 1300 Hz (Fc-200Hz)
       spread1 = 0.5*ones(1,Nsam);
-      spread2 = 0.5*ones(1,Nsam);
+      spread2 = j*0.2*ones(1,Nsam);
     else
       % generate same fading pattern for every run
       spread1 = doppler_spread(dopplerSpreadHz, Fs, Nsam);
