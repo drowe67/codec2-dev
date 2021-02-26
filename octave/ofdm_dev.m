@@ -20,7 +20,7 @@ function [rx tx_preamble burst_len padded_burst_len ct_targets states] = generat
   tx_preamble = states.tx_preamble;
   Nbursts = sim_in.Nbursts;
   tx_bits = create_ldpc_test_frame(states, coded_frame=0);
-  tx_burst = [tx_preamble ofdm_mod(states, tx_bits) tx_preamble];
+  tx_burst = [tx_preamble ofdm_mod(states, tx_bits)];
   burst_len = length(tx_burst);
   tx_burst = ofdm_hilbert_clipper(states, tx_burst, tx_clip_en=0);
   padded_burst_len = Fs+burst_len+Fs;
@@ -37,7 +37,7 @@ function [rx tx_preamble burst_len padded_burst_len ct_targets states] = generat
   % adjust channel simulator SNR setpoint given (burst on length)/(sample length) ratio
   mark_space_SNR_offset = 10*log10(burst_len/padded_burst_len);
   SNRdB_setpoint = sim_in.SNR3kdB + mark_space_SNR_offset;
-  printf("SNR3kdB: %f Burst offset: %f\n", sim_in.SNR3kdB, mark_space_SNR_offset)
+  %printf("SNR3kdB: %f Burst offset: %f\n", sim_in.SNR3kdB, mark_space_SNR_offset)
   rx = channel_simulate(Fs, SNRdB_setpoint, sim_in.foff_Hz, sim_in.channel, tx);
 endfunction
 
@@ -213,6 +213,7 @@ function Pa = frame_by_frame_acquisition_test(mode="datac1", Ntests=10, channel=
   states.verbose = bitand(verbose_top,3);
   ofdm_load_const;
   state = "idle";
+  postamble = 0; % set to non-zero if there is a postamble
   
   timing_mx_log = []; ct_log = []; delta_ct = []; delta_foff = [];
 
@@ -249,7 +250,7 @@ function Pa = frame_by_frame_acquisition_test(mode="datac1", Ntests=10, channel=
         best_ct_est = ct_est;
         best_foff_est = foff_est;
       end
-      if timing_mx < states.timing_mx_thresh
+      if timing_mx < states.timing_mx_thresh/2
         next_state = "idle";
         % OK we have located peak
     
@@ -259,12 +260,17 @@ function Pa = frame_by_frame_acquisition_test(mode="datac1", Ntests=10, channel=
         best_ct_est -= (i-1)*Nsamperburstpadded;
         
         % valid coarse timing could be pre-amble or post-amble
-        ct_target1 = ct_targets(i);
-        ct_target2 = ct_targets(i)+Nsamperburst-length(tx_preamble);
-        ct_delta1 = best_ct_est-ct_target1;
-        ct_delta2 = best_ct_est-ct_target2;
-        adelta_ct = min([abs(ct_delta1) abs(ct_delta2)]);
-
+        if postamble
+	  ct_target1 = ct_targets(i);
+          ct_target2 = ct_targets(i)+Nsamperburst-length(tx_preamble);
+          ct_delta1 = best_ct_est-ct_target1;
+          ct_delta2 = best_ct_est-ct_target2;
+          adelta_ct = min([abs(ct_delta1) abs(ct_delta2)]);
+        else
+	  ct_target = ct_targets(i);
+          adelta_ct = abs(best_ct_est-ct_target);
+	end
+	
         % log results
         delta_ct = [delta_ct adelta_ct];
         adelta_foff = best_foff_est-foff_Hz;
@@ -300,11 +306,15 @@ endfunction
 
 % test frame by frame across modes, channels, and SNR (don't worry about sweeping freq)
 
-function acquistion_curves_frame_by_frame_modes_channels_snr(Ntests=5)
+function acquistion_curves_frame_by_frame_modes_channels_snr(Ntests=5, quick_test=0)
   modes={'datac0', 'datac1', 'datac3'};
-  channels={'awgn', 'mpm', 'mpp', 'notch'};
-  SNR = [ -10 -5 0 5 10 15];
-  %channels={'awgn','mpp'}; SNR = [0 5];
+  if quick_test
+    Ntests = 5;
+    channels={'awgn','mpp'}; SNR = [0 5];
+  else
+    channels={'awgn', 'mpm', 'mpp', 'notch'};
+    SNR = [ -10 -5 -3.5 -1.5 0 1.5 3.5 5 7.5 10 15];
+  end
   
   cc = ['b' 'g' 'k' 'c' 'm' 'r'];
   pt = ['+' '*' 'x' 'o' '+' '*'];
@@ -330,7 +340,7 @@ function acquistion_curves_frame_by_frame_modes_channels_snr(Ntests=5)
     figure(i); grid;
     xlabel('SNR3k dB'); legend('location', 'southeast'); 
     xlim([min(SNR)-2 max(SNR)+2]); ylim([0 1.1]);
-    print('-dpng', sprintf("ofdm_dev_acq_curves_fbf_%s.png", modes{i}));
+    print('-dpng', sprintf("%s_ofdm_dev_acq_curves_fbf_%s.png", datestr(clock(),"yyyy-mm-dd"), modes{i}));
   end 
 endfunction
 
@@ -350,5 +360,5 @@ randn('seed',1);
 %sync_metrics('freq')
 %acquistion_curves("datac3", "mpp", Ntests=10)
 %acquistion_curves_modes_channels(Ntests=25)
-frame_by_frame_acquisition_test("datac0", Ntests=10, 'mpp', SNR3kdB=100, foff_hz=0, verbose=1+8);
-%acquistion_curves_frame_by_frame_modes_channels_snr(Ntests=5)
+%frame_by_frame_acquisition_test("datac3", Ntests=10, 'mpp', SNR3kdB=0, foff_hz=0, verbose=1+8);
+acquistion_curves_frame_by_frame_modes_channels_snr(Ntests=50, quick_test=0)
