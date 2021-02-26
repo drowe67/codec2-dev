@@ -259,7 +259,8 @@ function states = ofdm_init(config)
   % pre-amble for data modes
   states.data_mode = data_mode;
   if states.data_mode
-    states.tx_preamble = ofdm_generate_preamble(states);
+    states.tx_preamble = ofdm_generate_preamble(states, 2);
+    states.tx_postamble = ofdm_generate_preamble(states, 3);
   end
   
   % automated tests
@@ -1199,10 +1200,10 @@ endfunction
 
 % build a single modem frame preamble vector for reliable single frame acquisition
 % on data modes
-function tx_preamble = ofdm_generate_preamble(states)
+function tx_preamble = ofdm_generate_preamble(states, seed=2)
   % tweak local copy of states so we can generate a 1 modem-frame packet
   states.Np = 1; states.Nbitsperpacket = states.Nbitsperframe;
-  preamble_bits = ofdm_rand(states.Nbitsperframe, 3) > 0.5;
+  preamble_bits = round(ofdm_rand(states.Nbitsperframe, seed)/32767);
   tx_preamble = ofdm_mod(states, preamble_bits);
 endfunction
 

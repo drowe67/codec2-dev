@@ -12,15 +12,16 @@ channel_lib;
 
 % Build a vector of Tx bursts in noise, one burst occurs every padded_burst_len samples
 
-function [rx tx_preamble burst_len padded_burst_len ct_targets states] = generate_bursts(sim_in)
+function [rx tx_preamble tx_postamble burst_len padded_burst_len ct_targets states] = generate_bursts(sim_in)
   config = ofdm_init_mode(sim_in.mode);
   states = ofdm_init(config);
   ofdm_load_const;
 
-  tx_preamble = states.tx_preamble;
+  tx_preamble = states.tx_preamble; tx_postamble = states.tx_postamble;
+   
   Nbursts = sim_in.Nbursts;
   tx_bits = create_ldpc_test_frame(states, coded_frame=0);
-  tx_burst = [tx_preamble ofdm_mod(states, tx_bits)];
+  tx_burst = [tx_preamble ofdm_mod(states, tx_bits) tx_postamble];
   burst_len = length(tx_burst);
   tx_burst = ofdm_hilbert_clipper(states, tx_burst, tx_clip_en=0);
   padded_burst_len = Fs+burst_len+Fs;
@@ -200,42 +201,26 @@ function res_log = acquistion_curves_modes_channels(Ntests=5)
 endfunction
 
 
-% test frame by frame acquisition algorithm
-
-function Pa = frame_by_frame_acquisition_test(mode="datac1", Ntests=10, channel="awgn", SNR3kdB=100, foff_Hz=0, verbose_top=0)
-  
-  sim_in.SNR3kdB = SNR3kdB;
-  sim_in.channel = channel;
-  sim_in.foff_Hz = foff_Hz;  
-  sim_in.mode = mode;
-  sim_in.Nbursts = Ntests;
-  [rx tx_preamble Nsamperburst Nsamperburstpadded ct_targets states] = generate_bursts(sim_in);
-  states.verbose = bitand(verbose_top,3);
-  ofdm_load_const;
-  state = "idle";
-  postamble = 0; % set to non-zero if there is a postamble
-  
-  timing_mx_log = []; ct_log = []; delta_ct = []; delta_foff = [];
-
-  % allowable tolerance for acquistion
-  ftol_hz = 2;              % we can sync up on this (todo: make mode selectable)
-  ttol_samples = 0.006*Fs;  % CP length (todo: make mode selectable)
-  target_acq = zeros(1,Ntests);
-  
-  for n=1:Nsamperframe:length(rx)-2*Nsamperframe
+function results = two_stage_acquisition_search(states, rx, n, known_sequence)
+    ofdm_load_const;
+    
     % initial search over coarse grid
     tstep = 4; fstep = 5;
-    [ct_est foff_est timing_mx] = est_timing_and_freq(states, rx(n:n+2*Nsamperframe-1), tx_preamble, 
+    [ct_est foff_est timing_mx] = est_timing_and_freq(states, rx(n:n+2*Nsamperframe-1), known_sequence, 
                                   tstep, fmin = -50, fmax = 50, fstep);
     % refine estimate over finer grid                             
     fmin = foff_est - ceil(fstep/2); fmax = foff_est + ceil(fstep/2); 
     st = max(1, n + ct_est - tstep/2); en = st + Nsamperframe + tstep - 1;
-    [ct_est foff_est timing_mx] = est_timing_and_freq(states, rx(st:en), tx_preamble, 1, fmin, fmax, 1);
-    timing_mx_log = [timing_mx_log timing_mx];
+    [ct_est foff_est timing_mx] = est_timing_and_freq(states, rx(st:en), known_sequence, 1, fmin, fmax, 1);
     ct_est += st;
-     
-    % state machine to track peaks
-    next_state = state;
+    results.ct_est = ct_est; results.foff_est = foff_est; results.timing_mx = timing_mx;
+end
+
+#{
+% state machine to trak timing_mx peaks and make a call on valid detection
+
+function [states output_en] = acquisition_state_machine(states, timing_mx_thresh, timing_mx)
+    next_state = states.state;
     if strcmp(state,"idle")
       if timing_mx > states.timing_mx_thresh
         next_state = "track_peak";
@@ -286,10 +271,71 @@ function Pa = frame_by_frame_acquisition_test(mode="datac1", Ntests=10, channel=
       end      
     end            
     state = next_state;    
+endfunction
+#}
+    
+% test frame by frame acquisition algorithm
+
+function Pa = frame_by_frame_acquisition_test(mode="datac1", Ntests=10, channel="awgn", SNR3kdB=100, foff_Hz=0, verbose_top=0) 
+  sim_in.SNR3kdB = SNR3kdB;
+  sim_in.channel = channel;
+  sim_in.foff_Hz = foff_Hz;  
+  sim_in.mode = mode;
+  sim_in.Nbursts = Ntests;
+  [rx tx_preamble tx_postamble Nsamperburst Nsamperburstpadded ct_targets states] = generate_bursts(sim_in);
+  states.verbose = bitand(verbose_top,3);
+  ofdm_load_const;
+  state = "idle";
+  
+  timing_mx_log = []; ct_log = []; delta_ct_log = []; delta_foff_log = [];
+
+  % allowable tolerance for acquistion
+  ftol_hz = 2;              % we can sync up on this (todo: make mode selectable)
+  ttol_samples = 0.006*Fs;  % CP length (todo: make mode selectable)
+  target_acq = zeros(1,Ntests);
+  
+  for n=1:Nsamperframe:length(rx)-2*Nsamperframe
+     pre = two_stage_acquisition_search(states, rx, n, tx_preamble);
+     post = two_stage_acquisition_search(states, rx, n, tx_postamble);
+     timing_mx_log = [timing_mx_log [pre.timing_mx; post.timing_mx]];
+     
+     if pre.timing_mx > states.timing_mx_thresh
+        % OK we have located a candidate peak
+    
+        % re-base ct_est to be wrt start of current burst reference frame
+        i = ceil(n/Nsamperburstpadded);
+        w = (i-1)*Nsamperburstpadded;
+        ct_est = pre.ct_est - (i-1)*Nsamperburstpadded;
+        
+        % target for preamble
+  	    ct_target = ct_targets(i);
+        delta_ct = abs(ct_est-ct_target);
+	
+        % log results
+        delta_ct_log = [delta_ct_log delta_ct];
+        delta_foff = pre.foff_est-foff_Hz;
+        delta_foff_log = [delta_foff_log delta_foff];
+        ct_log = [ct_log w + ct_est];
+        
+        acq_ok = (abs(delta_ct) < ttol_samples) && (abs(delta_foff) < ftol_hz);
+        if acq_ok == 0
+          target_acq(i) = -1; % flag a bad acquisition for this burst
+        end
+        if acq_ok && (target_acq(i) == 0)
+          target_acq(i) = 1;  % flag a sucessful acquisition
+        end
+          
+        if states.verbose
+          printf("i: %2d ct_est: %6d delta_ct: %6d foff_est: %5.1f timing_mx: %3.2f Acq: %d\n",
+                 i, ct_est, delta_ct, pre.foff_est, pre.timing_mx, target_acq(i));
+        end
+    end
   end
   
   if bitand(verbose_top,8)
-    figure(1); clf; plot(timing_mx_log,'+-'); title('mx log'); axis([0 length(timing_mx_log) 0 0.5]); grid;
+    figure(1); clf; plot(timing_mx_log(1,:),'+-;preamble;'); 
+               hold on; plot(timing_mx_log(2,:),'o-;postamble;'); hold off;
+               title('mx log'); axis([0 length(timing_mx_log) 0 0.5]); grid;
     figure(4); clf; plot(real(rx)); axis([0 length(rx) -2E4 2E4]);
                hold on;
                plot(ct_log,zeros(1,length(ct_log)),'r+','markersize', 25, 'linewidth', 2);
@@ -297,10 +343,8 @@ function Pa = frame_by_frame_acquisition_test(mode="datac1", Ntests=10, channel=
     figure(5); clf; plot_specgram(rx);
   end
   
-
-  Pa = sum(target_acq)/Ntests;
+  Pa = length(find(target_acq == 1))/Ntests;
   printf("%s %s SNR: %3.1f foff: %3.1f P(acq) = %3.2f\n", mode, channel, SNR3kdB, foff_Hz, Pa);
-
 endfunction
 
 
@@ -360,5 +404,5 @@ randn('seed',1);
 %sync_metrics('freq')
 %acquistion_curves("datac3", "mpp", Ntests=10)
 %acquistion_curves_modes_channels(Ntests=25)
-%frame_by_frame_acquisition_test("datac3", Ntests=10, 'mpp', SNR3kdB=0, foff_hz=0, verbose=1+8);
-acquistion_curves_frame_by_frame_modes_channels_snr(Ntests=50, quick_test=0)
+frame_by_frame_acquisition_test("datac1", Ntests=5, 'mpp', SNR3kdB=0, foff_hz=0, verbose=1+8);
+%acquistion_curves_frame_by_frame_modes_channels_snr(Ntests=50, quick_test=0)
