@@ -4,12 +4,21 @@
 % OFDM file based uncoded rx to unit test core OFDM modem.  See also
 % ofdm_ldpc_rx which includes LDPC and interleaving, and ofdm_demod.c
 
-function ofdm_rx(filename, mode="700D", pass_ber=0)
+#{
+    1. Streaming mode operation:
+  
+       ofdm_rx("test_datac0.raw","datac0")
+    
+    2. Burst mode, tell state machine there is one frame in each burst:
+    
+       ofdm_rx("test_datac0.raw","datac0",0,"framesperburst",1)
+#}
+
+function ofdm_rx(filename, mode="700D", pass_ber=0, varargin)
   ofdm_lib;
   more off;
   pkg load signal;
   
- 
   % init modem
 
   config = ofdm_init_mode(mode);
@@ -17,6 +26,13 @@ function ofdm_rx(filename, mode="700D", pass_ber=0)
   print_config(states);
   ofdm_load_const;
   states.verbose = 0;
+  
+  for i = 1:length (varargin)
+    if strcmp(varargin{i},"framesperburst")
+      states.data_mode = 2; % use preamble based sync
+      states.framesperburst = varargin{i+1};
+    end  
+  endfor
   
   % load real samples from file
 

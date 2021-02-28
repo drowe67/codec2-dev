@@ -15,6 +15,11 @@
   ii) 10 seconds, multipath poor channel at SNR=6dB
 
     octave:5> ofdm_tx("hf_snr_6dB_700d.raw", "700D", 10, 6, "mpp");
+    
+  iii) Data mode example, three bursts of one frame each, SNR=100dB:
+  
+    octave:6> ofdm_tx("test_datac0.raw","datac0",1,100,"awgn","bursts",3)
+
 #}
 
 function ofdm_tx(filename, mode="700D", N, SNR3kdB=100, channel='awgn', varargin)

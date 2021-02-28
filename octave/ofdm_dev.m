@@ -43,22 +43,6 @@ function [rx tx_preamble tx_postamble burst_len padded_burst_len ct_targets stat
 endfunction
 
 
-function results = acquisition_detector(states, rx, n, known_sequence)
-  ofdm_load_const;
-    
-  % initial search over coarse grid
-  tstep = 4; fstep = 5;
-  [ct_est foff_est timing_mx] = est_timing_and_freq(states, rx(n:n+2*Nsamperframe-1), known_sequence, 
-                                                    tstep, fmin = -50, fmax = 50, fstep);
-  % refine estimate over finer grid                             
-  fmin = foff_est - ceil(fstep/2); fmax = foff_est + ceil(fstep/2); 
-  st = max(1, n + ct_est - tstep/2); en = st + Nsamperframe + tstep - 1;
-  [ct_est foff_est timing_mx] = est_timing_and_freq(states, rx(st:en), known_sequence, 1, fmin, fmax, 1);
-  ct_est += st;
-  results.ct_est = ct_est; results.foff_est = foff_est; results.timing_mx = timing_mx;
-end
-
-
 function results = evaluate_candidate(states, det, i, Nsamperburstpadded, ct_target, foff_Hz, ttol_samples, ftol_hz)
   results.candidate = 0;
   if det.timing_mx > states.timing_mx_thresh

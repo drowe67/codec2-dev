@@ -540,7 +540,7 @@ endfunction
 
 #{
   Determines frequency offset at current timing estimate, used for
-  coarse freq offset estimation during acquisition.
+  coarse freq offset estimation during streaming mode acquisition.
 #}
 
 function foff_est = est_freq_offset_known_corr(states, rx, known_samples, t_est, dual=1)
@@ -581,7 +581,7 @@ function foff_est = est_freq_offset_known_corr(states, rx, known_samples, t_est,
 endfunction
 
 
-% Joint estimation used for data mode acquistion
+% Joint estimation used for data mode burst acquistion
 
 function [t_est foff_est timing_mx] = est_timing_and_freq(states, rx, known_samples, tstep, fmin, fmax, fstep)
     ofdm_load_const;
@@ -689,6 +689,25 @@ function [ct_est foff_est timing_mx timing_valid] = ofdm_sync_search_stream(stat
 
 endfunction
  
+
+% two stage acquisition detector for burst mode
+
+function results = acquisition_detector(states, rx, n, known_sequence)
+  ofdm_load_const;
+    
+  % initial search over coarse grid
+  tstep = 4; fstep = 5;
+  [ct_est foff_est timing_mx] = est_timing_and_freq(states, rx(n:n+2*Nsamperframe-1), known_sequence, 
+                                                    tstep, fmin = -50, fmax = 50, fstep);
+  % refine estimate over finer grid                             
+  fmin = foff_est - ceil(fstep/2); fmax = foff_est + ceil(fstep/2); 
+  st = max(1, n + ct_est - tstep/2); en = st + Nsamperframe + tstep - 1;
+  [ct_est foff_est timing_mx] = est_timing_and_freq(states, rx(st:en), known_sequence, 1, fmin, fmax, 1);
+  ct_est += st;
+  results.ct_est = ct_est; results.foff_est = foff_est; results.timing_mx = timing_mx;
+end
+
+
 % ----------------------------------------------------------------------------------
 % ofdm_sync_search - attempts to find coarse sync parameters for modem initial sync
 % ----------------------------------------------------------------------------------
@@ -702,11 +721,9 @@ function [timing_valid states] = ofdm_sync_search(states, rxbuf_in)
   states.rxbuf(Nrxbuf-states.nin+1:Nrxbuf) = rxbuf_in;
 
   if states.data_mode == 2
-    st = M+Ncp + Nsamperframe + 1; en = st + 2*Nsamperframe + M+Ncp - 1;    
-    [ct_est foff_est timing_mx] = est_timing_and_freq(states, states.rxbuf(st:en), states.tx_preamble, tstep = 4, fmin = -50, fmax = 50, fstep = 5);    
-    fmin = foff_est-3; fmax = foff_est+3;
-    st1 = st + ct_est; en1 = st1 + length(states.tx_preamble)-1; rx1 = states.rxbuf(st1:en1);
-    [tmp foff_est timing_mx] = est_timing_and_freq(states, rx1, states.tx_preamble, tstep = 1, fmin, fmax, fstep = 1);
+    st = M+Ncp + Nsamperframe + 1; en = st + 2*Nsamperframe - 1;    
+    pre = acquisition_detector(states, states.rxbuf, st, states.tx_preamble);
+    timing_mx = pre.timing_mx; ct_est = pre.ct_est - st; foff_est = pre.foff_est;
     timing_valid = timing_mx > timing_mx_thresh;
     if verbose
       printf(" ct_est: %4d mx: %3.2f coarse_foff: %5.1f timing_valid: %d", ct_est, timing_mx, foff_est, timing_valid);
