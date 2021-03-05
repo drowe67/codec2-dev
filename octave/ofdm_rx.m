@@ -48,6 +48,7 @@ function ofdm_rx(filename, mode="700D", pass_ber=0, varargin)
   % init logs and BER stats
 
   rx_np_log = []; timing_est_log = []; delta_t_log = []; foff_est_hz_log = [];
+  sample_point_log = [];
   channel_est_pilot_log = []; sig_var_log = []; noise_var_log = [];
   Terrs = Tbits = Terrs_coded = Tbits_coded = Tpackets = Tpacketerrs = 0;
   packet_count = frame_count = 0;
@@ -125,6 +126,7 @@ function ofdm_rx(filename, mode="700D", pass_ber=0, varargin)
 
       rx_np_log = [rx_np_log arx_np];
       timing_est_log = [timing_est_log states.timing_est];
+      sample_point_log = [sample_point_log states.sample_point];
       delta_t_log = [delta_t_log states.delta_t];
       foff_est_hz_log = [foff_est_hz_log states.foff_est_hz];
       channel_est_pilot_log = [channel_est_pilot_log; achannel_est_pilot_log];
@@ -195,8 +197,8 @@ function ofdm_rx(filename, mode="700D", pass_ber=0, varargin)
   stem(delta_t_log)
   title('delta t');
   subplot(212)
-  plot(timing_est_log);
-  title('timing est');
+  plot(timing_est_log,';timing est;');
+  hold on; plot(sample_point_log,';sample point;'); hold off;
 
   figure(5); clf;
   plot(foff_est_hz_log)

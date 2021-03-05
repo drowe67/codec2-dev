@@ -795,20 +795,31 @@ function [states rx_bits achannel_est_rect_log rx_np rx_amp] = ofdm_demod(states
   if timing_en
     % update timing at start of every frame
 
+    % search for timing in a window centered on timing_est, the window will typically be around 2Ncp wide as we could
+    % get a shift of +Ncp or -Ncp if we swing from one delay extreme to another
     st = M+Ncp + Nsamperframe + 1 - floor(ftwindow_width/2) + (timing_est-1);
     en = st + Nsamperframe-1 + M+Ncp + ftwindow_width-1;
 
     [ft_est timing_valid timing_mx] = est_timing(states, rxbuf(st:en) .* exp(-j*woff_est*(st:en)), rate_fs_pilot_samples, 1);
     % printf("  timing_est: %d ft_est: %d timing_valid: %d timing_mx: %d\n", timing_est, ft_est, timing_valid, timing_mx);
 
+    % if we are in a deep fade timing_valid will not be asserted as ft_est will be garbage, so we don't
+    % adjust timing est, just freewheel for now
     if timing_valid
+        
+      % adjust timing_est based on ft_est    
       timing_est = timing_est + ft_est - ceil(ftwindow_width/2);
 
-      % Black magic to keep sample_point 4 samples (0.5ms) inside edges of cyclic prefix.  Or something like that.
-
-      delta_t = ft_est - ceil(ftwindow_width/2);
-      sample_point = max(timing_est+4, sample_point);
-      sample_point = min(timing_est+Ncp-4, sample_point);
+      % Track the ideal sampling point, which is Ncp for a multipath signal whose delay varies between 0 and Ncp.  The
+      % timing est will be bouncing back and forth due to multipath so we may need to use the upper or lower limit of
+      % the timing est to track the ideal sample_point. A good way to explore this algorithm is to disable the feedback
+      % loop for nin adjustment below, and look at the plots from ofdm_rx with +ve and -ve sample clock offsets 
+      % (sox can be used to resample).  The "4" constants are small guard bands so we don't stumble outside of the CP 
+      % due to noise.
+      
+      delta_t = ft_est - ceil(ftwindow_width/2);           % just used for plotting
+      sample_point = max(timing_est+4, sample_point);      % we are at max timing est, so sample point just above
+      sample_point = min(timing_est+Ncp-4, sample_point);  % we are at min timing_est, so sample point Ncp above
     end
 
     if verbose > 1
@@ -819,9 +830,7 @@ function [states rx_bits achannel_est_rect_log rx_np rx_amp] = ofdm_demod(states
 
   % down convert at current timing instant----------------------------------
 
-  % todo: this cld be more efficent, as pilot r becomes r-Ns on next frame
-
-  rx_sym = zeros(1+Ns+1+1, Nc+2);
+   rx_sym = zeros(1+Ns+1+1, Nc+2);
 
   % previous pilot
 
@@ -964,7 +973,8 @@ function [states rx_bits achannel_est_rect_log rx_np rx_amp] = ofdm_demod(states
     achannel_est_rect_log = [achannel_est_rect_log; achannel_est_rect(2:Nc+1)];
   end
 
-  % Adjust nin to take care of sample clock offset
+  % Adjust nin to take care of sample clock offset.  When debugong or exploring how timing loop works
+  % it's a good idea to comment out ths code to "open the loop".
 
   nin = Nsamperframe;
   if timing_en && timing_valid
