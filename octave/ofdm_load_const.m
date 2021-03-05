@@ -31,6 +31,7 @@ ftwindow_width = states.ftwindow_width;
 
 Nrxbuf = states.Nrxbuf;
 rxbuf = states.rxbuf;
+rxbufst = states.rxbufst;
 
 pilots = states.pilots;
 rate_fs_pilot_samples = states.rate_fs_pilot_samples;

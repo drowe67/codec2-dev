@@ -133,6 +133,8 @@ struct OFDM {
     int rowsperframe;
     int samplespersymbol;
     int samplesperframe;
+    int nrxbufhistory;    /* extra storage at start of rxbuf to allow us to step back in time */
+    int rxbufst;          /* start of rxbuf window used for demod of current rx frame */
     int max_samplesperframe;
     int nuwframes;
     int nrxbuf;

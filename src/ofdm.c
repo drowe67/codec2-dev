@@ -298,7 +298,9 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     ofdm->samplespersymbol = (ofdm->m + ofdm->ncp);
     ofdm->samplesperframe = ofdm->ns * ofdm->samplespersymbol;
     ofdm->max_samplesperframe = ofdm->samplesperframe + (ofdm->samplespersymbol / 4);
-    ofdm->nrxbuf = (3 * ofdm->samplesperframe) + (3 * ofdm->samplespersymbol);
+    ofdm->nrxbufhistory = 1000;
+    ofdm->rxbufst = ofdm->nrxbufhistory;
+    ofdm->nrxbuf = ofdm->nrxbufhistory + (3 * ofdm->samplesperframe) + (3 * ofdm->samplespersymbol);
 
     ofdm->pilot_samples = (complex float *) MALLOC(sizeof (complex float) * ofdm->samplespersymbol);
     assert(ofdm->pilot_samples != NULL);
@@ -1065,7 +1067,7 @@ static int ofdm_sync_search_core(struct OFDM *ofdm) {
 
     /* Attempt coarse timing estimate (i.e. detect start of frame) at a range of frequency offsets */
 
-    int st = ofdm->samplesperframe + ofdm->samplespersymbol;
+    int st = ofdm->rxbufst + ofdm->samplesperframe + ofdm->samplespersymbol;
     int en = st + 2 * ofdm->samplesperframe + ofdm->samplespersymbol;
 
     int fcoarse = 0;
@@ -1194,7 +1196,7 @@ static void ofdm_demod_core(struct OFDM *ofdm, int *rx_bits) {
     if (ofdm->timing_en == true) {
         /* update timing at start of every frame */
 
-        st = (ofdm->samplespersymbol + ofdm->samplesperframe) - floorf(ofdm->ftwindowwidth / 2) + ofdm->timing_est;
+        st = ofdm->rxbufst + ofdm->samplespersymbol + ofdm->samplesperframe - floorf(ofdm->ftwindowwidth / 2) + ofdm->timing_est;
         en = st + ofdm->samplesperframe - 1 + ofdm->samplespersymbol + ofdm->ftwindowwidth;
 
         complex float work[(en - st)];
@@ -1269,7 +1271,7 @@ static void ofdm_demod_core(struct OFDM *ofdm, int *rx_bits) {
     /*
      * "Previous" pilot symbol is one modem frame above.
      */
-    st = ofdm->samplespersymbol + 1 + ofdm->sample_point;
+    st = ofdm->rxbufst + ofdm->samplespersymbol + 1 + ofdm->sample_point;
     en = st + ofdm->m;
 
     complex float work[ofdm->m];
@@ -1307,7 +1309,7 @@ static void ofdm_demod_core(struct OFDM *ofdm, int *rx_bits) {
      * In this routine we also process the current data symbols.
      */
     for (rr = 0; rr < (ofdm->ns + 1); rr++) {
-        st = ofdm->samplespersymbol + ofdm->samplesperframe + (rr * ofdm->samplespersymbol) + 1 + ofdm->sample_point;
+        st = ofdm->rxbufst + ofdm->samplespersymbol + ofdm->samplesperframe + (rr * ofdm->samplespersymbol) + 1 + ofdm->sample_point;
         en = st + ofdm->m;
 
         /* down-convert at current timing instant---------------------------------- */
@@ -1352,7 +1354,7 @@ static void ofdm_demod_core(struct OFDM *ofdm, int *rx_bits) {
      * We are ignoring the data symbols between the "next" pilot and "future" pilot.
      * We only want the "future" pilot symbol, to perform the averaging of all pilots.
      */
-    st = ofdm->samplespersymbol + (3 * ofdm->samplesperframe) + 1 + ofdm->sample_point;
+    st = ofdm->rxbufst + ofdm->samplespersymbol + (3 * ofdm->samplesperframe) + 1 + ofdm->sample_point;
     en = st + ofdm->m;
 
     /* down-convert at current timing instant------------------------------- */

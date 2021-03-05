@@ -185,7 +185,7 @@ function states = ofdm_init(config)
   %                                   ^
   %                                   nominal start of current modem frame
   
-  Nrxbufhistory = 0;            % extra storage at start of rxbuf to allow us to step back in time 
+  Nrxbufhistory = 1000;            % extra storage at start of rxbuf to allow us to step back in time 
   states.rxbufst = Nrxbufhistory;  % start of rxbuf window used for demod of current rx frame
  
   
@@ -718,13 +718,13 @@ end
 function [timing_valid states] = ofdm_sync_search(states, rxbuf_in)
   ofdm_load_const;
 
-  % insert latest input samples into rxbuf so it is primed for when we have to call ofdm_demod()
+  % update rxbuf so it is primed for when we have to call ofdm_demod()
 
   states.rxbuf(1:Nrxbuf-states.nin) = states.rxbuf(states.nin+1:Nrxbuf);
   states.rxbuf(Nrxbuf-states.nin+1:Nrxbuf) = rxbuf_in;
 
   if states.data_mode == 2
-    st = M+Ncp + Nsamperframe + 1; en = st + 2*Nsamperframe - 1;    
+    st = rxbufst + M+Ncp + Nsamperframe + 1; en = st + 2*Nsamperframe - 1;
     pre = acquisition_detector(states, states.rxbuf, st, states.tx_preamble);
     timing_mx = pre.timing_mx; ct_est = pre.ct_est - st; foff_est = pre.foff_est;
     timing_valid = timing_mx > timing_mx_thresh;
@@ -732,7 +732,7 @@ function [timing_valid states] = ofdm_sync_search(states, rxbuf_in)
       printf(" ct_est: %4d mx: %3.2f coarse_foff: %5.1f timing_valid: %d", ct_est, timing_mx, foff_est, timing_valid);
     end
   else
-    st = M+Ncp + Nsamperframe + 1; en = st + 2*Nsamperframe + M+Ncp - 1;
+    st = rxbufst + M+Ncp + Nsamperframe + 1; en = st + 2*Nsamperframe + M+Ncp - 1;
     [ct_est foff_est timing_mx timing_valid] = ofdm_sync_search_stream(states, states.rxbuf(st:en));
   end
   
@@ -801,7 +801,7 @@ function [states rx_bits achannel_est_rect_log rx_np rx_amp] = ofdm_demod(states
 
     % search for timing in a window centered on timing_est, the window will typically be around 2Ncp wide as we could
     % get a shift of +Ncp or -Ncp if we swing from one delay extreme to another
-    st = M+Ncp + Nsamperframe + 1 - floor(ftwindow_width/2) + (timing_est-1);
+    st = rxbufst + M+Ncp + Nsamperframe + 1 - floor(ftwindow_width/2) + (timing_est-1);
     en = st + Nsamperframe-1 + M+Ncp + ftwindow_width-1;
 
     [ft_est timing_valid timing_mx] = est_timing(states, rxbuf(st:en) .* exp(-j*woff_est*(st:en)), rate_fs_pilot_samples, 1);
@@ -838,7 +838,7 @@ function [states rx_bits achannel_est_rect_log rx_np rx_amp] = ofdm_demod(states
 
   % previous pilot
 
-  st = M+Ncp + Nsamperframe + (-Ns)*(M+Ncp) + 1 + sample_point; en = st + M - 1;
+  st = rxbufst + M+Ncp + Nsamperframe + (-Ns)*(M+Ncp) + 1 + sample_point; en = st + M - 1;
 
   for c=1:Nc+2
     acarrier = rxbuf(st:en) .* exp(-j*woff_est*(st:en)) .* conj(W(c,:));
@@ -848,7 +848,7 @@ function [states rx_bits achannel_est_rect_log rx_np rx_amp] = ofdm_demod(states
   % pilot - this frame - pilot
 
   for rr=1:Ns+1
-    st = M+Ncp + Nsamperframe + (rr-1)*(M+Ncp) + 1 + sample_point; en = st + M - 1;
+    st = rxbufst + M+Ncp + Nsamperframe + (rr-1)*(M+Ncp) + 1 + sample_point; en = st + M - 1;
     for c=1:Nc+2
       acarrier = rxbuf(st:en) .* exp(-j*woff_est*(st:en)) .* conj(W(c,:));
       rx_sym(rr+1,c) = sum(acarrier);
@@ -857,7 +857,7 @@ function [states rx_bits achannel_est_rect_log rx_np rx_amp] = ofdm_demod(states
 
   % next pilot
 
-  st = M+Ncp + Nsamperframe + (2*Ns)*(M+Ncp) + 1 + sample_point; en = st + M - 1;
+  st = rxbufst + M+Ncp + Nsamperframe + (2*Ns)*(M+Ncp) + 1 + sample_point; en = st + M - 1;
   for c=1:Nc+2
     acarrier = rxbuf(st:en) .* exp(-j*woff_est*(st:en)) .* conj(W(c,:));
     rx_sym(Ns+3,c) = sum(acarrier);
