@@ -38,8 +38,7 @@ function ofdm_rx(filename, mode="700D", pass_ber=0, varargin)
 
   Ascale = states.amp_scale/2; % as input is a real valued signal
   frx=fopen(filename,"rb"); rx = fread(frx, Inf, "short")/Ascale; fclose(frx);
-  Nsam = length(rx); Nframes = floor(Nsam/Nsamperframe);
-  prx = 1;
+  Nsam = length(rx);  prx = 1;
 
   % OK re-generate tx frame for BER calcs
 
@@ -55,8 +54,6 @@ function ofdm_rx(filename, mode="700D", pass_ber=0, varargin)
   Nerrs_coded_log = Nerrs_log = [];
   error_positions = [];
 
-  % 'prime' rx buf to get correct coarse timing (for now)
-
   prx = 1;
   nin = Nsamperframe+2*(M+Ncp);
   %states.rxbuf(Nrxbuf-nin+1:Nrxbuf) = rx(prx:nin);
@@ -69,9 +66,10 @@ function ofdm_rx(filename, mode="700D", pass_ber=0, varargin)
   Nerrs = 0; rx_uw = zeros(1,states.Nuwbits);
 
   % main loop ----------------------------------------------------------------
-
-  for f=1:Nframes
-
+  
+  f = 1;
+  while(prx < Nsam)
+    
     % insert samples at end of buffer, set to zero if no samples
     % available to disable phase estimation on future pilots on last
     % frame of simulation
@@ -92,7 +90,7 @@ function ofdm_rx(filename, mode="700D", pass_ber=0, varargin)
       [timing_valid states] = ofdm_sync_search(states, rxbuf_in);
     end
 
-    if strcmp(states.sync_state,'synced') || strcmp(states.sync_state,'trial')
+    if strcmp(states.sync_state,'synced') || strcmp(states.sync_state,'trial')  || strcmp(states.sync_state,'post')
 
       % accumulate a buffer of data symbols for this packet
       rx_syms(1:end-Nsymsperframe) = rx_syms(Nsymsperframe+1:end);
@@ -135,7 +133,7 @@ function ofdm_rx(filename, mode="700D", pass_ber=0, varargin)
 
       frame_count++;
     end
-
+    
     states = sync_state_machine(states, rx_uw);
 
     if states.verbose
@@ -155,7 +153,10 @@ function ofdm_rx(filename, mode="700D", pass_ber=0, varargin)
       rx_np_log = [];
       sig_var_log = []; noise_var_log = [];
     end
+    
+    f++;
   end
+  Nframes = f;
 
   ber = Terrs/(Tbits+1E-12);
   printf("\nBER..: %5.4f Tbits: %5d Terrs: %5d\n", ber, Tbits, Terrs);

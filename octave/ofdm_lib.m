@@ -185,8 +185,12 @@ function states = ofdm_init(config)
   %                                   ^
   %                                   nominal start of current modem frame
   
-  Nrxbufhistory = 0;     % extra storage at start of rxbuf to allow us to step back in time 
-  states.rxbufst = Nrxbufhistory;  % start of rxbuf window used for demod of current rx frame
+  if data_mode
+    Nrxbufhistory = (states.Np+2)*states.Nsamperframe;     % extra storage at start of rxbuf to allow us to step back in time 
+  else
+    Nrxbufhistory = 0;
+  end
+  states.rxbufst = Nrxbufhistory;                    % start of rxbuf window used for demod of current rx frame
  
   
   %                       D                    P DDD P DDD P DDD             P                    D
@@ -313,7 +317,7 @@ function config = ofdm_init_mode(mode="700D")
     config.Ntxtbits = 0; config.Nuwbits = 32; config.bad_uw_errors = 9;
     config.state_machine = "data";
     config.ftwindow_width = 80; config.amp_est_mode = 1; config.EsNodB = 3;
-    config.edge_pilots = 0; config.timing_mx_thresh = 0.08;
+    config.edge_pilots = 0; config.timing_mx_thresh = 0.15;
     config.tx_uw = zeros(1,config.Nuwbits);
     config.tx_uw(1:16) = [1 1 0 0  1 0 1 0  1 1 1 1  0 0 0 0];
   elseif strcmp(mode,"datac1")
@@ -724,13 +728,22 @@ function [timing_valid states] = ofdm_sync_search(states, rxbuf_in)
   states.rxbuf(1:Nrxbuf-states.nin) = states.rxbuf(states.nin+1:Nrxbuf);
   states.rxbuf(Nrxbuf-states.nin+1:Nrxbuf) = rxbuf_in;
   
+  pre_post = "";
   if states.data_mode == 2
     st = rxbufst + M+Ncp + Nsamperframe + 1; en = st + 2*Nsamperframe - 1;
     pre = acquisition_detector(states, states.rxbuf, st, states.tx_preamble);
-    timing_mx = pre.timing_mx; ct_est = pre.ct_est - st; foff_est = pre.foff_est;
+    pre.timing_mx = 0;
+    post = acquisition_detector(states, states.rxbuf, st, states.tx_postamble);
+    if pre.timing_mx > post.timing_mx
+      timing_mx = pre.timing_mx; ct_est = pre.ct_est - st; foff_est = pre.foff_est;
+      pre_post = "pre";
+    else
+      timing_mx = post.timing_mx; ct_est = post.ct_est - st; foff_est = post.foff_est;
+      pre_post = "post";
+    end
     timing_valid = timing_mx > timing_mx_thresh;
     if verbose
-      printf(" ct_est: %4d mx: %3.2f coarse_foff: %5.1f timing_valid: %d", ct_est, timing_mx, foff_est, timing_valid);
+      printf(" ct_est: %4d mx: %3.2f coarse_foff: %5.1f timing_valid: %d %s", ct_est, timing_mx, foff_est, timing_valid, pre_post);
     end
   else
     st = rxbufst + M+Ncp + Nsamperframe + 1; en = st + 2*Nsamperframe + M+Ncp - 1;
@@ -741,8 +754,16 @@ function [timing_valid states] = ofdm_sync_search(states, rxbuf_in)
     % potential candidate found ....
 
     % calculate number of samples we need on next buffer to get into sync
-    states.nin = ct_est - 1;
-
+    if (states.data_mode == 2) && strcmp(pre_post, "post")
+      states.nin = 0;
+      printf("\n  rxbufst: %d ", states.rxbufst);
+      states.rxbufst -= states.Np*states.Nsamperframe; % backup to first modem frame in packet
+      states.rxbufst += ct_est - 1;
+      printf("%d\n", states.rxbufst);
+    else
+      states.nin = ct_est - 1;
+    end
+    
     % reset modem states
     states.sample_point = states.timing_est = 1;
     states.foff_est_hz = foff_est;
@@ -1003,7 +1024,9 @@ function [states rx_bits achannel_est_rect_log rx_np rx_amp] = ofdm_demod(states
   %printf("\nrxbufst: %d rxbufst_next: %d nin: %d Nrxbufmin: %d rqd: %d Nrxbuf: %d\n", 
   %     rxbufst, rxbufst_next, nin, Nrxbufmin, rxbufst_next + Nrxbufmin, Nrxbuf);
   if rxbufst_next + Nrxbufmin <= Nrxbuf
-     printf("Can maybe use rxbufst!\n");
+     % printf("Can maybe use rxbufst!\n");
+     rxbufst = rxbufst_next;
+     nin = 0;
   end
       
   % Estimate signal and noise power to estimate EsNo.  This is used for SNR estimation and (possible) LDPC decoding
@@ -1448,12 +1471,12 @@ function states = sync_state_machine_data(states, rx_uw)
 
   % streaming mode
   if states.data_mode == 1
-     if strcmp(states.sync_state,'trial')
-       if states.uw_errors < states.bad_uw_errors;
-         next_state = "synced";
-         states.packet_count = 0;
-         states.modem_frame = Nuwframes;
-         states.sum_sig_var = states.sum_noise_var = 0;
+    if strcmp(states.sync_state,'trial')
+      if states.uw_errors < states.bad_uw_errors;
+        next_state = "synced";
+        states.packet_count = 0;
+        states.modem_frame = Nuwframes;
+        states.sum_sig_var = states.sum_noise_var = 0;
       else
         states.sync_counter++;
         if states.sync_counter > Np
@@ -1465,11 +1488,11 @@ function states = sync_state_machine_data(states, rx_uw)
  
   % burst mode
   if states.data_mode == 2
-    % pre or post amble tells us this is the start of the packet.  Check
-    % is it valid by checking the UW after the modem frames containing the UW have been received 
+    % pre or post amble tells us this is the start of the packet.  Confirm we 
+    % hav a valid frame by checking the UW after the modem frames containing the UW have been received 
     if strcmp(states.sync_state,'trial')
       states.sync_counter++;
-      if states.sync_counter > Nuwframes
+      if states.sync_counter == Nuwframes
         if states.uw_errors < states.bad_uw_errors;
            next_state = "synced";
            states.packet_count = 0;                          % number of packets in this burst
@@ -1492,12 +1515,21 @@ function states = sync_state_machine_data(states, rx_uw)
       states.packet_count++;
       if (states.packetsperburst)
         if (states.packet_count >= states.packetsperburst)
-          next_state = "search";
+          next_state = "post";
+          states.post_counter = 0;
         end
       end
     end
   end
-
+  
+  % avoid detecting the postamble again
+  if strcmp(states.sync_state,'post')
+    states.post_counter++;
+    if (states.post_counter > 0)
+      next_state = "search";
+    end
+  end
+  
   states.last_sync_state = states.sync_state;
   states.sync_state = next_state;
 endfunction
