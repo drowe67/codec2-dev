@@ -9,9 +9,9 @@
   
        ofdm_rx("test_datac0.raw","datac0")
     
-    2. Burst mode, tell state machine there is one frame in each burst:
+    2. Burst mode, tell state machine there is one packet in each burst:
     
-       ofdm_rx("test_datac0.raw","datac0",0,"framesperburst",1)
+       ofdm_rx("test_datac0.raw","datac0",0,"packetsperburst",1)
 #}
 
 function ofdm_rx(filename, mode="700D", pass_ber=0, varargin)
@@ -28,9 +28,9 @@ function ofdm_rx(filename, mode="700D", pass_ber=0, varargin)
   states.verbose = 0;
   
   for i = 1:length (varargin)
-    if strcmp(varargin{i},"framesperburst")
-      states.data_mode = 2; % use preamble based sync
-      states.framesperburst = varargin{i+1};
+    if strcmp(varargin{i},"packetsperburst")
+      states.data_mode = 2; % use pre/post amble based sync
+      states.packetsperburst = varargin{i+1};
     end  
   endfor
   
@@ -140,7 +140,7 @@ function ofdm_rx(filename, mode="700D", pass_ber=0, varargin)
 
     if states.verbose
       if strcmp(states.last_sync_state,'synced') || strcmp(states.last_sync_state,'trial')
-        printf("euw: %3d %d mf: %2d pbw: %s eraw: %3d foff: %4.1f",
+        printf(" euw: %3d %d mf: %2d pbw: %s eraw: %3d foff: %4.1f",
                 states.uw_errors, states.sync_counter, states.modem_frame, states.phase_est_bandwidth(1),
                 Nerrs, states.foff_est_hz);
       end

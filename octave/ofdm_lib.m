@@ -185,12 +185,13 @@ function states = ofdm_init(config)
   %                                   ^
   %                                   nominal start of current modem frame
   
-  Nrxbufhistory = 1000;            % extra storage at start of rxbuf to allow us to step back in time 
+  Nrxbufhistory = 0;     % extra storage at start of rxbuf to allow us to step back in time 
   states.rxbufst = Nrxbufhistory;  % start of rxbuf window used for demod of current rx frame
  
   
-  %                       D                 P DDD P DDD P DDD             P                    D
-  states.Nrxbuf = Nrxbufhistory + states.Nsampersymbol + 3*states.Nsamperframe + states.Nsampersymbol + states.Nsampersymbol;
+  %                       D                    P DDD P DDD P DDD             P                    D
+  states.Nrxbufmin = states.Nsampersymbol + 3*states.Nsamperframe + states.Nsampersymbol + states.Nsampersymbol;
+  states.Nrxbuf = Nrxbufhistory + states.Nrxbufmin;
   states.rxbuf = zeros(1, states.Nrxbuf);
 
   % default settings on a bunch of options and states
@@ -240,7 +241,7 @@ function states = ofdm_init(config)
   states.sync_end = 0;
   states.modem_frame = 0;                                 % keep track of how many frames received in packet
   states.state_machine = state_machine;                   % mode specific state machine
-  states.framesperburst = 0;                              % for OFDM data modes, how many frames before we reset state machine
+  states.packetsperburst = 0;                             % for OFDM data modes, how many packets before we reset state machine
   
   % LDPC code is optionally enabled
 
@@ -722,7 +723,7 @@ function [timing_valid states] = ofdm_sync_search(states, rxbuf_in)
 
   states.rxbuf(1:Nrxbuf-states.nin) = states.rxbuf(states.nin+1:Nrxbuf);
   states.rxbuf(Nrxbuf-states.nin+1:Nrxbuf) = rxbuf_in;
-
+  
   if states.data_mode == 2
     st = rxbufst + M+Ncp + Nsamperframe + 1; en = st + 2*Nsamperframe - 1;
     pre = acquisition_detector(states, states.rxbuf, st, states.tx_preamble);
@@ -997,6 +998,14 @@ function [states rx_bits achannel_est_rect_log rx_np rx_amp] = ofdm_demod(states
     end
   end
 
+  % use internal rxbuf samples if they are available
+  rxbufst_next = rxbufst + nin;
+  %printf("\nrxbufst: %d rxbufst_next: %d nin: %d Nrxbufmin: %d rqd: %d Nrxbuf: %d\n", 
+  %     rxbufst, rxbufst_next, nin, Nrxbufmin, rxbufst_next + Nrxbufmin, Nrxbuf);
+  if rxbufst_next + Nrxbufmin <= Nrxbuf
+     printf("Can maybe use rxbufst!\n");
+  end
+      
   % Estimate signal and noise power to estimate EsNo.  This is used for SNR estimation and (possible) LDPC decoding
   if states.EsNo_est_all_symbols
     [sig_var noise_var] = est_signal_and_noise_var(rx_np);
@@ -1016,6 +1025,7 @@ function [states rx_bits achannel_est_rect_log rx_np rx_amp] = ofdm_demod(states
   states.rx_sym = rx_sym;
   states.rxbuf = rxbuf;
   states.nin = nin;
+  states.rxbufst = rxbufst;
   states.timing_valid = timing_valid;
   states.timing_mx = timing_mx;
   states.timing_est = timing_est;
@@ -1420,6 +1430,8 @@ endfunction
 % data waveform state machine
 %-------------------------------------------------------
 
+% TODO: consider refactoring into separate streaming and burst data state machines
+
 function states = sync_state_machine_data(states, rx_uw)
   ofdm_load_const;
   next_state = states.sync_state;
@@ -1434,30 +1446,52 @@ function states = sync_state_machine_data(states, rx_uw)
 
   states.uw_errors = sum(xor(tx_uw,rx_uw));
 
-  if strcmp(states.sync_state,'trial')
-     if states.uw_errors < states.bad_uw_errors;
-       next_state = "synced";
-       states.frame_count = 0;
-       states.modem_frame = Nuwframes;
-       states.sum_sig_var = states.sum_noise_var = 0;
-    else
-       states.sync_counter++;
-       if states.sync_counter > Np
-         next_state = "search";
-       end
+  % streaming mode
+  if states.data_mode == 1
+     if strcmp(states.sync_state,'trial')
+       if states.uw_errors < states.bad_uw_errors;
+         next_state = "synced";
+         states.packet_count = 0;
+         states.modem_frame = Nuwframes;
+         states.sum_sig_var = states.sum_noise_var = 0;
+      else
+        states.sync_counter++;
+        if states.sync_counter > Np
+          next_state = "search";
+        end
+      end
     end
- end
-
-  % Note frameperburst==0 we don't ever lose sync, which is useful for 
+  end
+ 
+  % burst mode
+  if states.data_mode == 2
+    % pre or post amble tells us this is the start of the packet.  Check
+    % is it valid by checking the UW after the modem frames containing the UW have been received 
+    if strcmp(states.sync_state,'trial')
+      states.sync_counter++;
+      if states.sync_counter > Nuwframes
+        if states.uw_errors < states.bad_uw_errors;
+           next_state = "synced";
+           states.packet_count = 0;                          % number of packets in this burst
+           states.modem_frame = Nuwframes;                   % which modem frame we are up to in packet
+           states.sum_sig_var = states.sum_noise_var = 0;
+         else
+           next_state = "search";
+         end
+      end
+    end
+  end
+  
+  % Note packetsperburst==0 we don't ever lose sync, which is useful for 
   % stream based testing or external control of state machine
   
   if strcmp(states.sync_state,'synced')
     states.modem_frame++;
     if (states.modem_frame >= states.Np) 
       states.modem_frame = 0; 
-      states.frame_count++;
-      if (states.framesperburst)
-        if (states.frame_count >= states.framesperburst)
+      states.packet_count++;
+      if (states.packetsperburst)
+        if (states.packet_count >= states.packetsperburst)
           next_state = "search";
         end
       end

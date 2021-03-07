@@ -298,7 +298,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     ofdm->samplespersymbol = (ofdm->m + ofdm->ncp);
     ofdm->samplesperframe = ofdm->ns * ofdm->samplespersymbol;
     ofdm->max_samplesperframe = ofdm->samplesperframe + (ofdm->samplespersymbol / 4);
-    ofdm->nrxbufhistory = 1000;
+    ofdm->nrxbufhistory = 0;
     ofdm->rxbufst = ofdm->nrxbufhistory;
     ofdm->nrxbuf = ofdm->nrxbufhistory + (3 * ofdm->samplesperframe) + (3 * ofdm->samplespersymbol);
 

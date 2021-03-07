@@ -16,7 +16,7 @@
 
     octave:5> ofdm_tx("hf_snr_6dB_700d.raw", "700D", 10, 6, "mpp");
     
-  iii) Data mode example, three bursts of one frame each, SNR=100dB:
+  iii) Data mode example, three bursts of one packet each, SNR=100dB:
   
     octave:6> ofdm_tx("test_datac0.raw","datac0",1,100,"awgn","bursts",3)
 
@@ -43,6 +43,7 @@ function ofdm_tx(filename, mode="700D", N, SNR3kdB=100, channel='awgn', varargin
 
   config = ofdm_init_mode(mode);
   states = ofdm_init(config);
+  
   print_config(states);
   ofdm_load_const;
 
@@ -63,7 +64,7 @@ function ofdm_tx(filename, mode="700D", N, SNR3kdB=100, channel='awgn', varargin
     tx = [tx atx];
   end
   if states.data_mode
-    tx = [states.tx_preamble tx];
+    tx = [states.tx_preamble tx states.tx_postamble];
   end
   
   % if burst mode concatenate multiple bursts with spaces
