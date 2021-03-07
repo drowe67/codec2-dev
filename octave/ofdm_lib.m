@@ -191,7 +191,7 @@ function states = ofdm_init(config)
     Nrxbufhistory = 0;
   end
   states.rxbufst = Nrxbufhistory;                    % start of rxbuf window used for demod of current rx frame
- 
+  states.Nrxbufhistory = Nrxbufhistory;
   
   %                       D                    P DDD P DDD P DDD             P                    D
   states.Nrxbufmin = states.Nsampersymbol + 3*states.Nsamperframe + states.Nsampersymbol + states.Nsampersymbol;
@@ -1515,18 +1515,11 @@ function states = sync_state_machine_data(states, rx_uw)
       states.packet_count++;
       if (states.packetsperburst)
         if (states.packet_count >= states.packetsperburst)
-          next_state = "post";
-          states.post_counter = 0;
+          next_state = "search";
+          % get back to end of rxbuf to avoid any detecting-postamable-again loops 
+          states.rxbufst = states.Nrxbufhistory;
         end
       end
-    end
-  end
-  
-  % avoid detecting the postamble again
-  if strcmp(states.sync_state,'post')
-    states.post_counter++;
-    if (states.post_counter > 0)
-      next_state = "search";
     end
   end
   

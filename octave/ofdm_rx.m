@@ -86,12 +86,9 @@ function ofdm_rx(filename, mode="700D", pass_ber=0, varargin)
       printf("f: %3d nin: %4d st: %-6s ", f, states.nin, states.sync_state);
     end
 
-    if strcmp(states.sync_state,'search')
+    if strcmp(states.sync_state,'search') || strcmp(states.sync_state,'post')
       [timing_valid states] = ofdm_sync_search(states, rxbuf_in);
-    end
-
-    if strcmp(states.sync_state,'synced') || strcmp(states.sync_state,'trial')  || strcmp(states.sync_state,'post')
-
+    else
       % accumulate a buffer of data symbols for this packet
       rx_syms(1:end-Nsymsperframe) = rx_syms(Nsymsperframe+1:end);
       rx_amps(1:end-Nsymsperframe) = rx_amps(Nsymsperframe+1:end);
