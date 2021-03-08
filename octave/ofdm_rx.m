@@ -11,10 +11,14 @@
     
     2. Burst mode, tell state machine there is one packet in each burst:
     
-       ofdm_rx("test_datac0.raw","datac0",0,"packetsperburst",1)
+       ofdm_rx("test_datac0.raw","datac0","packetsperburst",1)
+       
+    3. Burst mode, enable only postamble detecion:
+    
+       ofdm_rx("test_datac0.raw","datac0","packetsperburst",1, "postambletest")
 #}
 
-function ofdm_rx(filename, mode="700D", pass_ber=0, varargin)
+function ofdm_rx(filename, mode="700D", varargin)
   ofdm_lib;
   more off;
   pkg load signal;
@@ -26,11 +30,22 @@ function ofdm_rx(filename, mode="700D", pass_ber=0, varargin)
   print_config(states);
   ofdm_load_const;
   states.verbose = 0;
+  pass_ber = 0;
   
   for i = 1:length (varargin)
     if strcmp(varargin{i},"packetsperburst")
       states.data_mode = 2; % use pre/post amble based sync
       states.packetsperburst = varargin{i+1};
+    end
+    
+    % flags used to support ctests  
+    if strcmp(varargin{i},"passber")
+      pass_ber = varargin{i+1};
+    end  
+    if strcmp(varargin{i},"postambletest")
+      states.postambletest = 1;
+      % at high SNR avoid firing on data frames just before postamble
+      state.timing_mx_thresh = 0.15;
     end  
   endfor
   
@@ -86,7 +101,7 @@ function ofdm_rx(filename, mode="700D", pass_ber=0, varargin)
       printf("f: %3d nin: %4d st: %-6s ", f, states.nin, states.sync_state);
     end
 
-    if strcmp(states.sync_state,'search') || strcmp(states.sync_state,'post')
+    if strcmp(states.sync_state,'search')
       [timing_valid states] = ofdm_sync_search(states, rxbuf_in);
     else
       % accumulate a buffer of data symbols for this packet
@@ -142,9 +157,8 @@ function ofdm_rx(filename, mode="700D", pass_ber=0, varargin)
       printf("\n");
     end
 
-    % act on any events returned by state machine
-
-    if states.sync_start
+    % reset stats if in streaming mode, don't reset if in burst mode
+    if (states.data_mode == 1) && states.sync_start
       Nerrs_log = [];
       Terrs = Tbits = frame_count = 0;
       rx_np_log = [];
@@ -226,6 +240,6 @@ function ofdm_rx(filename, mode="700D", pass_ber=0, varargin)
 
   % optional pass criteria for ctests
   if pass_ber > 0
-    if ber < pass_ber printf("Pass!\n"); else printf("Fail!\n"); end;
+    if packet_count && (ber < pass_ber) printf("Pass!\n"); else printf("Fail!\n"); end;
   end
 endfunction

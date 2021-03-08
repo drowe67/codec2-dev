@@ -246,6 +246,8 @@ function states = ofdm_init(config)
   states.modem_frame = 0;                                 % keep track of how many frames received in packet
   states.state_machine = state_machine;                   % mode specific state machine
   states.packetsperburst = 0;                             % for OFDM data modes, how many packets before we reset state machine
+  states.postambledectoren = 1;
+  states.ostambledetectorcounter = 0;
   
   % LDPC code is optionally enabled
 
@@ -317,7 +319,7 @@ function config = ofdm_init_mode(mode="700D")
     config.Ntxtbits = 0; config.Nuwbits = 32; config.bad_uw_errors = 9;
     config.state_machine = "data";
     config.ftwindow_width = 80; config.amp_est_mode = 1; config.EsNodB = 3;
-    config.edge_pilots = 0; config.timing_mx_thresh = 0.15;
+    config.edge_pilots = 0; config.timing_mx_thresh = 0.08;
     config.tx_uw = zeros(1,config.Nuwbits);
     config.tx_uw(1:16) = [1 1 0 0  1 0 1 0  1 1 1 1  0 0 0 0];
   elseif strcmp(mode,"datac1")
@@ -728,13 +730,19 @@ function [timing_valid states] = ofdm_sync_search(states, rxbuf_in)
   states.rxbuf(1:Nrxbuf-states.nin) = states.rxbuf(states.nin+1:Nrxbuf);
   states.rxbuf(Nrxbuf-states.nin+1:Nrxbuf) = rxbuf_in;
   
+  if states.postambledectoren == 0
+    states.postambledetectorcounter -= states.nin;
+  end
+  
   pre_post = "";
   if states.data_mode == 2
     st = rxbufst + M+Ncp + Nsamperframe + 1; en = st + 2*Nsamperframe - 1;
     pre = acquisition_detector(states, states.rxbuf, st, states.tx_preamble);
-    pre.timing_mx = 0;
     post = acquisition_detector(states, states.rxbuf, st, states.tx_postamble);
-    if pre.timing_mx > post.timing_mx
+    
+    if isfield(states,"postambletest") pre.timing_mx = 0; end % force ignore preamble to test postamble
+
+    if (states.postambledectoren == 0) || (pre.timing_mx > post.timing_mx)
       timing_mx = pre.timing_mx; ct_est = pre.ct_est - st; foff_est = pre.foff_est;
       pre_post = "pre";
     else
@@ -756,12 +764,16 @@ function [timing_valid states] = ofdm_sync_search(states, rxbuf_in)
     % calculate number of samples we need on next buffer to get into sync
     if (states.data_mode == 2) && strcmp(pre_post, "post")
       states.nin = 0;
-      printf("\n  rxbufst: %d ", states.rxbufst);
+      % printf("\n  rxbufst: %d ", states.rxbufst);
       states.rxbufst -= states.Np*states.Nsamperframe; % backup to first modem frame in packet
       states.rxbufst += ct_est - 1;
-      printf("%d\n", states.rxbufst);
+      % printf("%d\n", states.rxbufst);
     else
-      states.nin = ct_est - 1;
+      if states.data_mode == 2
+        states.nin = Nsamperframe +  ct_est - 1;
+      else
+        states.nin = ct_est - 1;
+      end
     end
     
     % reset modem states
@@ -1465,6 +1477,13 @@ function states = sync_state_machine_data(states, rx_uw)
       states.sync_start = 1; states.sync_counter = 0;
       next_state = 'trial';
     end
+    % re-enable postamble detector after enough samples have passed to avoid a loop
+    if states.postambledectoren == 0
+      if states.postambledetectorcounter < 0
+        states.postambledectoren = 1;
+        printf("\npostamble detector on!");
+      end
+    end
   end
 
   states.uw_errors = sum(xor(tx_uw,rx_uw));
@@ -1500,6 +1519,9 @@ function states = sync_state_machine_data(states, rx_uw)
            states.sum_sig_var = states.sum_noise_var = 0;
          else
            next_state = "search";
+           % make sure we only ever loop once through same samples to avoid infinte loop
+           states.postambledectoren = 0;
+           states.postambledetectorcounter = Np*Nsamperframe;
          end
       end
     end
@@ -1516,8 +1538,9 @@ function states = sync_state_machine_data(states, rx_uw)
       if (states.packetsperburst)
         if (states.packet_count >= states.packetsperburst)
           next_state = "search";
-          % get back to end of rxbuf to avoid any detecting-postamable-again loops 
-          states.rxbufst = states.Nrxbufhistory;
+          % make sure we only ever loop once through same samples to avoid infinte loop
+          states.postambledectoren = 0;
+          states.postambledetectorcounter = Np*Nsamperframe;
         end
       end
     end
