@@ -700,11 +700,7 @@ function [timing_valid states] = ofdm_sync_search_stream(states)
     end
     
   if timing_valid
-    % potential candidate found .... set up states for demod
-
     states.nin = ct_est - 1;
-    states.sample_point = states.timing_est = 1;
-    states.foff_est_hz = foff_est;
   else
     states.nin = Nsamperframe;
   end
@@ -712,12 +708,13 @@ function [timing_valid states] = ofdm_sync_search_stream(states)
   states.timing_valid = timing_valid;
   states.timing_mx = timing_mx;
   states.coarse_foff_est_hz = foff_est;
+  states.sample_point = states.timing_est = 1;
 endfunction
  
 
 % two stage acquisition detector for burst mode
 
-function results = acquisition_detector(states, rx, n, known_sequence)
+function results = burst_acquisition_detector(states, rx, n, known_sequence)
   ofdm_load_const;
     
   % initial search over coarse grid
@@ -733,30 +730,6 @@ function results = acquisition_detector(states, rx, n, known_sequence)
 end
 
 
-% Streaming mode acquisition ------------------------------------------
-
-function [timing_valid states] = ofdm_sync_search_streaming(states)
-  ofdm_load_const;
-
-  st = rxbufst + M+Ncp + Nsamperframe + 1; en = st + 2*Nsamperframe + M+Ncp - 1;
-  [ct_est foff_est timing_mx timing_valid] = ofdm_sync_search_stream(states, states.rxbuf(st:en));
-  
-  if timing_valid
-    % potential candidate found .... set up states for demod
-
-    states.nin = ct_est - 1;
-    states.sample_point = states.timing_est = 1;
-    states.foff_est_hz = foff_est;
-  else
-    states.nin = Nsamperframe;
-  end
-
-  states.timing_valid = timing_valid;
-  states.timing_mx = timing_mx;
-  states.coarse_foff_est_hz = foff_est;
-endfunction
-
-
 % Burst mode acquisition ------------------------------------------
 
 function [timing_valid states] = ofdm_sync_search_burst(states)
@@ -768,8 +741,8 @@ function [timing_valid states] = ofdm_sync_search_burst(states)
   
   pre_post = "";
   st = rxbufst + M+Ncp + Nsamperframe + 1; en = st + 2*Nsamperframe - 1;
-  pre = acquisition_detector(states, states.rxbuf, st, states.tx_preamble);
-  post = acquisition_detector(states, states.rxbuf, st, states.tx_postamble);
+  pre = burst_acquisition_detector(states, states.rxbuf, st, states.tx_preamble);
+  post = burst_acquisition_detector(states, states.rxbuf, st, states.tx_postamble);
     
   if isfield(states,"postambletest") pre.timing_mx = 0; end % force ignore preamble to test postamble
 
@@ -798,17 +771,14 @@ function [timing_valid states] = ofdm_sync_search_burst(states)
     else
       states.nin = Nsamperframe +  ct_est - 1;
     end
-    
-    % set up states for demod
-    states.sample_point = states.timing_est = 1;
-    states.foff_est_hz = foff_est;
   else
     states.nin = Nsamperframe;
   end
 
   states.timing_valid = timing_valid;
   states.timing_mx = timing_mx;
-  states.coarse_foff_est_hz = foff_est;
+  states.sample_point = states.timing_est = 1;
+  states.foff_est_hz = foff_est;
 endfunction
 
 
