@@ -236,7 +236,7 @@ function ofdm_rx(filename, mode="700D", varargin)
   hold off;
   title('Signal and Noise Power estimates');
 
-  figure(8); clf; plot_specgram(rx);
+  figure(8); clf; plot_specgram(rx, 8000, 500, 2500);
 
   % optional pass criteria for ctests
   if pass_ber > 0

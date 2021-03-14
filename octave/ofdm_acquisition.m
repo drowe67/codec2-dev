@@ -162,7 +162,7 @@ function Pa = frame_by_frame_acquisition_test(mode="datac1", Ntests=10, channel=
                hold on;
                plot(ct_log,zeros(1,length(ct_log)),'r+','markersize', 25, 'linewidth', 2);
                hold off; 
-    figure(5); clf; plot_specgram(rx);
+    figure(5); clf; plot_specgram(rx, Fs, 500, 2500);
   end
   
   Pa = length(find(target_acq == 1))/Ntests;
