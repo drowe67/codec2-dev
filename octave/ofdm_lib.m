@@ -718,6 +718,85 @@ function results = acquisition_detector(states, rx, n, known_sequence)
 end
 
 
+% Streaming mode acquisition ------------------------------------------
+
+function [timing_valid states] = ofdm_sync_search_streaming(states)
+  ofdm_load_const;
+
+  st = rxbufst + M+Ncp + Nsamperframe + 1; en = st + 2*Nsamperframe + M+Ncp - 1;
+  [ct_est foff_est timing_mx timing_valid] = ofdm_sync_search_stream(states, states.rxbuf(st:en));
+  
+  if timing_valid
+    % potential candidate found .... set up states for demod
+
+    states.nin = ct_est - 1;
+    states.sample_point = states.timing_est = 1;
+    states.foff_est_hz = foff_est;
+  else
+    states.nin = Nsamperframe;
+  end
+
+  states.timing_valid = timing_valid;
+  states.timing_mx = timing_mx;
+  states.coarse_foff_est_hz = foff_est;
+endfunction
+
+
+% Burst mode acquisition ------------------------------------------
+
+function [timing_valid states] = ofdm_sync_search_burst(states)
+  ofdm_load_const;
+
+  if states.postambledectoren == 0
+    states.postambledetectorcounter -= states.nin;
+  end
+  
+  pre_post = "";
+  st = rxbufst + M+Ncp + Nsamperframe + 1; en = st + 2*Nsamperframe - 1;
+  pre = acquisition_detector(states, states.rxbuf, st, states.tx_preamble);
+  post = acquisition_detector(states, states.rxbuf, st, states.tx_postamble);
+    
+  if isfield(states,"postambletest") pre.timing_mx = 0; end % force ignore preamble to test postamble
+
+  if (states.postambledectoren == 0) || (pre.timing_mx > post.timing_mx)
+    timing_mx = pre.timing_mx; ct_est = pre.ct_est - st; foff_est = pre.foff_est;
+    pre_post = "pre";
+  else
+    timing_mx = post.timing_mx; ct_est = post.ct_est - st; foff_est = post.foff_est;
+    pre_post = "post";
+  end
+  timing_valid = timing_mx > timing_mx_thresh;
+  if verbose
+    printf(" ct_est: %4d mx: %3.2f coarse_foff: %5.1f timing_valid: %d %s", ct_est, timing_mx, foff_est, timing_valid, pre_post);
+  end
+  
+  if timing_valid
+    % potential candidate found ....
+
+    % calculate number of samples we need on next buffer to get into sync
+    if strcmp(pre_post, "post")
+      states.nin = 0;
+      % printf("\n  rxbufst: %d ", states.rxbufst);
+      states.rxbufst -= states.Np*states.Nsamperframe; % backup to first modem frame in packet
+      states.rxbufst += ct_est - 1;
+      % printf("%d\n", states.rxbufst);
+    else
+      states.nin = Nsamperframe +  ct_est - 1;
+    end
+    
+    % set up states for demod
+    states.sample_point = states.timing_est = 1;
+    states.foff_est_hz = foff_est;
+  else
+    states.nin = Nsamperframe;
+  end
+
+  states.timing_valid = timing_valid;
+  states.timing_mx = timing_mx;
+  states.coarse_foff_est_hz = foff_est;
+endfunction
+
+
 % ----------------------------------------------------------------------------------
 % ofdm_sync_search - attempts to find coarse sync parameters for modem initial sync
 % ----------------------------------------------------------------------------------
@@ -730,62 +809,11 @@ function [timing_valid states] = ofdm_sync_search(states, rxbuf_in)
   states.rxbuf(1:Nrxbuf-states.nin) = states.rxbuf(states.nin+1:Nrxbuf);
   states.rxbuf(Nrxbuf-states.nin+1:Nrxbuf) = rxbuf_in;
   
-  if states.postambledectoren == 0
-    states.postambledetectorcounter -= states.nin;
-  end
-  
-  pre_post = "";
   if states.data_mode == 2
-    st = rxbufst + M+Ncp + Nsamperframe + 1; en = st + 2*Nsamperframe - 1;
-    pre = acquisition_detector(states, states.rxbuf, st, states.tx_preamble);
-    post = acquisition_detector(states, states.rxbuf, st, states.tx_postamble);
-    
-    if isfield(states,"postambletest") pre.timing_mx = 0; end % force ignore preamble to test postamble
-
-    if (states.postambledectoren == 0) || (pre.timing_mx > post.timing_mx)
-      timing_mx = pre.timing_mx; ct_est = pre.ct_est - st; foff_est = pre.foff_est;
-      pre_post = "pre";
-    else
-      timing_mx = post.timing_mx; ct_est = post.ct_est - st; foff_est = post.foff_est;
-      pre_post = "post";
-    end
-    timing_valid = timing_mx > timing_mx_thresh;
-    if verbose
-      printf(" ct_est: %4d mx: %3.2f coarse_foff: %5.1f timing_valid: %d %s", ct_est, timing_mx, foff_est, timing_valid, pre_post);
-    end
+    [timing_valid states] = ofdm_sync_search_burst(states);
   else
-    st = rxbufst + M+Ncp + Nsamperframe + 1; en = st + 2*Nsamperframe + M+Ncp - 1;
-    [ct_est foff_est timing_mx timing_valid] = ofdm_sync_search_stream(states, states.rxbuf(st:en));
+    [timing_valid states] = ofdm_sync_search_stream(states);
   end
-  
-  if timing_valid
-    % potential candidate found ....
-
-    % calculate number of samples we need on next buffer to get into sync
-    if (states.data_mode == 2) && strcmp(pre_post, "post")
-      states.nin = 0;
-      % printf("\n  rxbufst: %d ", states.rxbufst);
-      states.rxbufst -= states.Np*states.Nsamperframe; % backup to first modem frame in packet
-      states.rxbufst += ct_est - 1;
-      % printf("%d\n", states.rxbufst);
-    else
-      if states.data_mode == 2
-        states.nin = Nsamperframe +  ct_est - 1;
-      else
-        states.nin = ct_est - 1;
-      end
-    end
-    
-    % reset modem states
-    states.sample_point = states.timing_est = 1;
-    states.foff_est_hz = foff_est;
-  else
-    states.nin = Nsamperframe;
-  end
-
-  states.timing_valid = timing_valid;
-  states.timing_mx = timing_mx;
-  states.coarse_foff_est_hz = foff_est;
 endfunction
 
 
