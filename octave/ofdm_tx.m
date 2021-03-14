@@ -42,15 +42,14 @@ function ofdm_tx(filename, mode="700D", N, SNR3kdB=100, channel='awgn', varargin
   % init modem
 
   config = ofdm_init_mode(mode);
-  states = ofdm_init(config);
-  
+  states = ofdm_init(config);  
   print_config(states);
   ofdm_load_const;
 
   if burst_mode
     % burst mode: treat N as Npackets
     Npackets = N; 
-  else
+ else
     % streaming mode: treat N as Nseconds
     Npackets = round(N/states.Tpacket);
   end
@@ -73,11 +72,18 @@ function ofdm_tx(filename, mode="700D", N, SNR3kdB=100, channel='awgn', varargin
     for b=1:Nbursts
       tx = [tx atx zeros(1,states.Fs)];
     end
+    % adjust channel simulator SNR setpoint given (burst on length)/(total length including silence) ratio
+    burst_len = length(atx); padded_burst_len = burst_len + states.Fs;
+    mark_space_SNR_offset = 10*log10(burst_len/padded_burst_len);
+    SNRdB_setpoint = SNR3kdB + mark_space_SNR_offset;
+    printf("SNR3kdB: %4.2f Burst offset: %4.2f SNRdB_setpoint: %4.2f\n", SNR3kdB, mark_space_SNR_offset, SNRdB_setpoint)
+  else
+    SNRdB_setpoint = SNR3kdB; % no adjustment to SNR in streaming mode
   end
   
   printf("Npackets: %d  Nbursts: %d  ", Npackets, Nbursts);
   states.verbose=1;
   tx = ofdm_hilbert_clipper(states, tx, tx_clip_en);
-  rx_real = ofdm_channel(states, tx, SNR3kdB, channel, freq_offset_Hz);
+  rx_real = ofdm_channel(states, tx, SNRdB_setpoint, channel, freq_offset_Hz);
   frx = fopen(filename,"wb"); fwrite(frx, rx_real, "short"); fclose(frx);
 endfunction
