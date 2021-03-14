@@ -188,12 +188,12 @@ function states = ofdm_init(config)
   %                                   ^
   %                                   nominal start of current modem frame
   
-  if data_mode
+  if length(data_mode)
     Nrxbufhistory = (states.Np+2)*states.Nsamperframe;     % extra storage at start of rxbuf to allow us to step back in time 
   else
     Nrxbufhistory = 0;
   end
-  states.rxbufst = Nrxbufhistory;                    % start of rxbuf window used for demod of current rx frame
+  states.rxbufst = Nrxbufhistory;                          % start of rxbuf window used for demod of current rx frame
   states.Nrxbufhistory = Nrxbufhistory;
   
   %                       D                    P DDD P DDD P DDD             P                    D
@@ -272,7 +272,7 @@ function states = ofdm_init(config)
 
   % pre-amble for data modes
   states.data_mode = data_mode;
-  if states.data_mode
+  if length(states.data_mode)
     states.tx_preamble = ofdm_generate_preamble(states, 2);
     states.tx_postamble = ofdm_generate_preamble(states, 3);
   end
@@ -313,7 +313,7 @@ function config = ofdm_init_mode(mode="700D")
   config.clip_gain2 = 0.8;
   config.foff_limiter = 0;
   config.txbpf_width_Hz = 2000;
-  config.data_mode = 0;
+  config.data_mode = "";
 
   if strcmp(mode,"700D") ||  strcmp(mode,"700d")
     % defaults above
@@ -327,13 +327,13 @@ function config = ofdm_init_mode(mode="700D")
   elseif strcmp(mode,"2020")
     Ts = 0.0205; Nc = 31; config.amp_scale = 167E3;
   elseif strcmp(mode,"qam16c1")
-    Ns=5; config.Np=5; Tcp = 0.004; Ts = 0.016; Nc = 33; config.data_mode = 1;
+    Ns=5; config.Np=5; Tcp = 0.004; Ts = 0.016; Nc = 33; config.data_mode = "streaming";
     config.bps=4; config.Ntxtbits = 0; config.Nuwbits = 15*4; config.bad_uw_errors = 5;
     config.state_machine = "data";
     config.ftwindow_width = 32; config.amp_scale = 132E3;
     config.EsNo_est_all_symbols = 0; config.amp_est_mode = 1; config.EsNodB = 10;
   elseif strcmp(mode,"qam16c2")
-    Ns=5; config.Np=31; Tcp = 0.004; Ts = 0.016; Nc = 33; config.data_mode = 1;
+    Ns=5; config.Np=31; Tcp = 0.004; Ts = 0.016; Nc = 33; config.data_mode = "streaming";
     config.bps=4; config.Ntxtbits = 0; config.Nuwbits = 42*4; config.bad_uw_errors = 15;
     config.ftwindow_width = 80; config.amp_scale = 135E3; config.state_machine = "data";
     config.EsNo_est_all_symbols = 0; config.amp_est_mode = 1; config.EsNodB = 10;
@@ -341,7 +341,7 @@ function config = ofdm_init_mode(mode="700D")
     config.tx_uw(1:24) = [1 1 0 0  1 0 1 0  1 1 1 1  0 0 0 0  1 1 1 1  0 0 0 0];
     config.tx_uw(end-24+1:end) = [1 1 0 0  1 0 1 0  1 1 1 1  0 0 0 0  1 1 1 1  0 0 0 0];
   elseif strcmp(mode,"datac0")
-    Ns=5; config.Np=4; Tcp = 0.006; Ts = 0.016; Nc = 9; config.data_mode = 1;
+    Ns=5; config.Np=4; Tcp = 0.006; Ts = 0.016; Nc = 9; config.data_mode = "streaming";
     config.Ntxtbits = 0; config.Nuwbits = 32; config.bad_uw_errors = 9;
     config.state_machine = "data";
     config.ftwindow_width = 80; config.amp_est_mode = 1; config.EsNodB = 3;
@@ -349,19 +349,19 @@ function config = ofdm_init_mode(mode="700D")
     config.tx_uw = zeros(1,config.Nuwbits);
     config.tx_uw(1:16) = [1 1 0 0  1 0 1 0  1 1 1 1  0 0 0 0];
   elseif strcmp(mode,"datac1")
-    Ns=5; config.Np=38; Tcp = 0.006; Ts = 0.016; Nc = 27; config.data_mode = 1;
+    Ns=5; config.Np=38; Tcp = 0.006; Ts = 0.016; Nc = 27; config.data_mode = "streaming";
     config.Ntxtbits = 0; config.Nuwbits = 16; config.bad_uw_errors = 3;
     config.state_machine = "data";
     config.ftwindow_width = 80; config.amp_est_mode = 1; config.EsNodB = 3;
     config.edge_pilots = 0; config.timing_mx_thresh = 0.10;
     config.tx_uw = [1 1 0 0  1 0 1 0  1 1 1 1  0 0 0 0];
   elseif strcmp(mode,"datac2")
-    Ns=5; config.Np=36; Tcp = 0.006; Ts = 0.016; Nc = 9; config.data_mode = 1;
+    Ns=5; config.Np=36; Tcp = 0.006; Ts = 0.016; Nc = 9; config.data_mode = "streaming";
     config.Ntxtbits = 0; config.Nuwbits = 12; config.bad_uw_errors = 1;
     config.state_machine = "data";
     config.ftwindow_width = 80; config.amp_est_mode = 1; config.EsNodB = 10;
   elseif strcmp(mode,"datac3")
-    Ns=5; config.Np=29; Tcp = 0.006; Ts = 0.016; Nc = 9; config.data_mode = 1;
+    Ns=5; config.Np=29; Tcp = 0.006; Ts = 0.016; Nc = 9; config.data_mode = "streaming";
     config.edge_pilots = 0;
     config.Ntxtbits = 0; config.Nuwbits = 40; config.bad_uw_errors = 10;
     config.ftwindow_width = 80; config.timing_mx_thresh = 0.10;
@@ -823,7 +823,7 @@ function [timing_valid states] = ofdm_sync_search(states, rxbuf_in)
   states.rxbuf(1:Nrxbuf-states.nin) = states.rxbuf(states.nin+1:Nrxbuf);
   states.rxbuf(Nrxbuf-states.nin+1:Nrxbuf) = rxbuf_in;
   
-  if states.data_mode == 2
+  if strcmp(states.data_mode, "burst")
     [timing_valid states] = ofdm_sync_search_burst(states);
   else
     [timing_valid states] = ofdm_sync_search_stream(states);
@@ -1531,7 +1531,7 @@ function states = sync_state_machine_data(states, rx_uw)
   states.uw_errors = sum(xor(tx_uw,rx_uw));
 
   % streaming mode
-  if states.data_mode == 1
+  if strcmp(states.data_mode,"streaming")
     if strcmp(states.sync_state,'trial')
       if states.uw_errors < states.bad_uw_errors;
         next_state = "synced";
@@ -1548,7 +1548,7 @@ function states = sync_state_machine_data(states, rx_uw)
   end
  
   % burst mode
-  if states.data_mode == 2
+  if strcmp(states.data_mode, "burst")
     % pre or post amble tells us this is the start of the packet.  Confirm we 
     % hav a valid frame by checking the UW after the modem frames containing the UW have been received 
     if strcmp(states.sync_state,'trial')

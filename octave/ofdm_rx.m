@@ -34,7 +34,7 @@ function ofdm_rx(filename, mode="700D", varargin)
   
   for i = 1:length (varargin)
     if strcmp(varargin{i},"packetsperburst")
-      states.data_mode = 2; % use pre/post amble based sync
+      states.data_mode = "burst"; % use pre/post amble based sync
       states.packetsperburst = varargin{i+1};
     end
     
@@ -158,7 +158,7 @@ function ofdm_rx(filename, mode="700D", varargin)
     end
 
     % reset stats if in streaming mode, don't reset if in burst mode
-    if (states.data_mode == 1) && states.sync_start
+    if strcmp(states.data_mode, "streaming") && states.sync_start
       Nerrs_log = [];
       Terrs = Tbits = frame_count = 0;
       rx_np_log = [];

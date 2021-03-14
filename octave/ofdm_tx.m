@@ -63,7 +63,7 @@ function ofdm_tx(filename, mode="700D", N, SNR3kdB=100, channel='awgn', varargin
   for f=1:Npackets
     tx = [tx atx];
   end
-  if states.data_mode
+  if length(states.data_mode)
     tx = [states.tx_preamble tx states.tx_postamble];
   end
   
