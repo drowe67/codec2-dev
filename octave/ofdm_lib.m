@@ -1409,16 +1409,19 @@ function test_assemble_disassemble(states)
   assert(codeword_syms == rx_codeword_syms);
 endfunction
 
-%-------------------------------------------------------
-% sync_state_machine - determines mode-specific sync
-%                      state state_machine
-%-------------------------------------------------------
+%-------------------------------------------------------------------
+% sync_state_machine - calls mode-specific sync state state_machine
+%-------------------------------------------------------------------
 
 function states = sync_state_machine(states, rx_uw)
   if strcmp(states.state_machine, "voice1")
     states = sync_state_machine_voice1(states, rx_uw);
   elseif strcmp(states.state_machine, "data")
-    states = sync_state_machine_data(states, rx_uw);
+    if strcmp(states.data_mode, "streaming")
+      states = sync_state_machine_data_streaming(states, rx_uw);
+    else
+      states = sync_state_machine_data_burst(states, rx_uw);
+    end
   elseif strcmp(states.state_machine, "voice2")
     states = sync_state_machine_voice2(states, rx_uw);
   else
@@ -1504,12 +1507,10 @@ endfunction
 
 
 %-------------------------------------------------------
-% data waveform state machine
+% data (streaming mode) state machine
 %-------------------------------------------------------
 
-% TODO: consider refactoring into separate streaming and burst data state machines
-
-function states = sync_state_machine_data(states, rx_uw)
+function states = sync_state_machine_data_streaming(states, rx_uw)
   ofdm_load_const;
   next_state = states.sync_state;
   states.sync_start = states.sync_end = 0;
@@ -1519,56 +1520,24 @@ function states = sync_state_machine_data(states, rx_uw)
       states.sync_start = 1; states.sync_counter = 0;
       next_state = 'trial';
     end
-    % re-enable postamble detector after enough samples have passed to avoid a loop
-    if states.postambledectoren == 0
-      if states.postambledetectorcounter < 0
-        states.postambledectoren = 1;
-        printf("\npostamble detector on!");
-      end
-    end
   end
 
   states.uw_errors = sum(xor(tx_uw,rx_uw));
 
-  % streaming mode
-  if strcmp(states.data_mode,"streaming")
-    if strcmp(states.sync_state,'trial')
-      if states.uw_errors < states.bad_uw_errors;
-        next_state = "synced";
-        states.packet_count = 0;
-        states.modem_frame = Nuwframes;
-        states.sum_sig_var = states.sum_noise_var = 0;
-      else
-        states.sync_counter++;
-        if states.sync_counter > Np
-          next_state = "search";
-        end
+  if strcmp(states.sync_state,'trial')
+    if states.uw_errors < states.bad_uw_errors;
+      next_state = "synced";
+      states.packet_count = 0;
+      states.modem_frame = Nuwframes;
+      states.sum_sig_var = states.sum_noise_var = 0;
+    else
+      states.sync_counter++;
+      if states.sync_counter > Np
+        next_state = "search";
       end
     end
   end
  
-  % burst mode
-  if strcmp(states.data_mode, "burst")
-    % pre or post amble tells us this is the start of the packet.  Confirm we 
-    % hav a valid frame by checking the UW after the modem frames containing the UW have been received 
-    if strcmp(states.sync_state,'trial')
-      states.sync_counter++;
-      if states.sync_counter == Nuwframes
-        if states.uw_errors < states.bad_uw_errors;
-           next_state = "synced";
-           states.packet_count = 0;                          % number of packets in this burst
-           states.modem_frame = Nuwframes;                   % which modem frame we are up to in packet
-           states.sum_sig_var = states.sum_noise_var = 0;
-         else
-           next_state = "search";
-           % make sure we only ever loop once through same samples to avoid infinte loop
-           states.postambledectoren = 0;
-           states.postambledetectorcounter = Np*Nsamperframe;
-         end
-      end
-    end
-  end
-  
   % Note packetsperburst==0 we don't ever lose sync, which is useful for 
   % stream based testing or external control of state machine
   
@@ -1580,6 +1549,68 @@ function states = sync_state_machine_data(states, rx_uw)
       if (states.packetsperburst)
         if (states.packet_count >= states.packetsperburst)
           next_state = "search";
+        end
+      end
+    end
+  end
+  
+  states.last_sync_state = states.sync_state;
+  states.sync_state = next_state;
+endfunction
+
+%-------------------------------------------------------
+% data (burst mode) state machine
+%-------------------------------------------------------
+
+function states = sync_state_machine_data_burst(states, rx_uw)
+  ofdm_load_const;
+  next_state = states.sync_state;
+  states.sync_start = states.sync_end = 0;
+
+  if strcmp(states.sync_state,'search')
+    if states.timing_valid
+      states.sync_start = 1; states.sync_counter = 0;
+      next_state = 'trial';
+    end
+    % re-enable postamble detector after enough samples have passed to avoid a loop
+    if states.postambledectoren == 0
+       if states.postambledetectorcounter < 0
+         states.postambledectoren = 1;
+         printf("\npostamble detector on!");
+       end
+    end
+  end
+
+  states.uw_errors = sum(xor(tx_uw,rx_uw));
+
+  % pre or post-amble has told us this is the start of the packet.  Confirm we 
+  % have a valid frame by checking the UW after the modem frames containing
+  % the UW have been received 
+  if strcmp(states.sync_state,'trial')
+    states.sync_counter++;
+    if states.sync_counter == Nuwframes
+      if states.uw_errors < states.bad_uw_errors;
+        next_state = "synced";
+        states.packet_count = 0;                          % number of packets in this burst
+        states.modem_frame = Nuwframes;                   % which modem frame we are up to in packet
+        states.sum_sig_var = states.sum_noise_var = 0;
+      else
+        next_state = "search";
+        % make sure we only ever loop once through same samples to avoid infinte loop
+        states.postambledectoren = 0;
+        states.postambledetectorcounter = Np*Nsamperframe;
+      end
+    end
+  end
+  
+  if strcmp(states.sync_state,'synced')
+    states.modem_frame++;
+    if (states.modem_frame >= states.Np) 
+      states.modem_frame = 0;                           % start of new packet
+      states.packet_count++;
+      if (states.packetsperburst)
+        if (states.packet_count >= states.packetsperburst)
+          next_state = "search";                        % we've finished this burst
           % make sure we only ever loop once through same samples to avoid infinte loop
           states.postambledectoren = 0;
           states.postambledetectorcounter = Np*Nsamperframe;
