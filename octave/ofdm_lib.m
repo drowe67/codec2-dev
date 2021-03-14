@@ -650,9 +650,11 @@ endfunction
 
 % streaming mode acquistion, used mainly for voice modes
 
-function [ct_est foff_est timing_mx timing_valid] = ofdm_sync_search_stream(states, rx_buf)
+function [timing_valid states] = ofdm_sync_search_stream(states)
     ofdm_load_const;
     
+    st = rxbufst + M+Ncp + Nsamperframe + 1; en = st + 2*Nsamperframe + M+Ncp - 1;
+  
     % Attempt coarse timing estimate (i.e. detect start of frame) at a range of frequency offsets
 
     timing_mx = 0; fcoarse = 0; timing_valid = 0; ct_est = 1;
@@ -665,10 +667,10 @@ function [ct_est foff_est timing_mx timing_valid] = ofdm_sync_search_stream(stat
         wvec = exp(-j*w*(0:2*Nsamperframe+M+Ncp-1));
 
         % choose best timing offset metric at this freq offset
-        [act_est atiming_valid atiming_mx] = est_timing(states, wvec .* rx_buf, states.rate_fs_pilot_samples, 2);
+        [act_est atiming_valid atiming_mx] = est_timing(states, wvec .* states.rxbuf(st:en), states.rate_fs_pilot_samples, 2);
       else
         % exp(-j*0) is just 1 when afcoarse is 0
-        [act_est atiming_valid atiming_mx] = est_timing(states, rx_buf, states.rate_fs_pilot_samples, 2);
+        [act_est atiming_valid atiming_mx] = est_timing(states, states.rxbuf(st:en), states.rate_fs_pilot_samples, 2);
       end
 
       %printf("afcoarse: %f atiming_mx: %f\n", afcoarse, atiming_mx);
@@ -686,17 +688,30 @@ function [ct_est foff_est timing_mx timing_valid] = ofdm_sync_search_stream(stat
     if fcoarse != 0
       w = 2*pi*fcoarse/Fs;
       wvec = exp(-j*w*(0:2*Nsamperframe+M+Ncp-1));
-      foff_est = est_freq_offset_known_corr(states, wvec .* rx_buf, states.rate_fs_pilot_samples, ct_est);
+      foff_est = est_freq_offset_known_corr(states, wvec .* states.rxbuf(st:en), states.rate_fs_pilot_samples, ct_est);
       foff_est += fcoarse;
     else
       % exp(-j*0) is just 1 when fcoarse is 0
-      foff_est = est_freq_offset_known_corr(states, rx_buf, states.rate_fs_pilot_samples, ct_est);
+      foff_est = est_freq_offset_known_corr(states, states.rxbuf(st:en), states.rate_fs_pilot_samples, ct_est);
     end
 
     if verbose
       printf(" ct_est: %4d mx: %3.2f coarse_foff: %5.1f timing_valid: %d", ct_est, timing_mx, foff_est, timing_valid);
     end
+    
+  if timing_valid
+    % potential candidate found .... set up states for demod
 
+    states.nin = ct_est - 1;
+    states.sample_point = states.timing_est = 1;
+    states.foff_est_hz = foff_est;
+  else
+    states.nin = Nsamperframe;
+  end
+
+  states.timing_valid = timing_valid;
+  states.timing_mx = timing_mx;
+  states.coarse_foff_est_hz = foff_est;
 endfunction
  
 

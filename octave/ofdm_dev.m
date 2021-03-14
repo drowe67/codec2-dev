@@ -83,8 +83,8 @@ function Pa = frame_by_frame_acquisition_test(mode="datac1", Ntests=10, channel=
   state = 'acquisition';
   
   for n=1:Nsamperframe:length(rx)-2*Nsamperframe
-     pre = acquisition_detector(states, rx, n, tx_preamble);
-     post = acquisition_detector(states, rx, n, tx_postamble);
+     pre = burst_acquisition_detector(states, rx, n, tx_preamble);
+     post = burst_acquisition_detector(states, rx, n, tx_postamble);
      timing_mx_log = [timing_mx_log [pre.timing_mx; post.timing_mx]];
      
      % state machine to simulate acquisition/demod processing
