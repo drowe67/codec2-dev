@@ -34,27 +34,30 @@ qam16;
 #}
 
 function states = ofdm_init(config)
-  if isfield(config,"bps") bps = config.bps; else bps=2; end
-  Rs = config.Rs; Tcp = config.Tcp; Ns = config.Ns; Nc = config.Nc;
-  if isfield(config,"Np") Np = config.Np; else Np = 1; end
-  if isfield(config,"Ntxtbits") Ntxtbits = config.Ntxtbits ; else Ntxtbits = 4; end
-  if isfield(config,"Nuwbits") Nuwbits = config.Nuwbits ; else Nuwbits = 5*bps; end
-  if isfield(config,"ftwindow_width") ftwindow_width = config.ftwindow_width; else ftwindow_width = 32; end
-  if isfield(config,"timing_mx_thresh") timing_mx_thresh = config.timing_mx_thresh; else timing_mx_thresh = 0.35; end
-  if isfield(config,"tx_uw") tx_uw = config.tx_uw; else tx_uw = zeros(1,Nuwbits); end
-  if isfield(config,"bad_uw_errors") bad_uw_errors = config.bad_uw_errors; else bad_uw_errors = 3; end
-  if isfield(config,"amp_scale") amp_scale = config.amp_scale; else amp_scale = 245E3; end
-  if isfield(config,"amp_est_mode") amp_est_mode = config.amp_est_mode; else amp_est_mode = 0; end
-  if isfield(config,"EsNo_est_all_symbols")  EsNo_est_all_symbols = config.EsNo_est_all_symbols; else EsNo_est_all_symbols = 1; end
-  if isfield(config,"EsNodB") EsNodB = config.EsNodB; else EsNodB = 3; end
-  if isfield(config,"state_machine") state_machine = config.state_machine; else state_machine = "voice1"; end
-  if isfield(config,"edge_pilots") edge_pilots = config.edge_pilots; else edge_pilots = 1; end
-  if isfield(config,"clip_gain1") clip_gain1 = config.clip_gain1; else clip_gain1 = 2.5; end
-  if isfield(config,"clip_gain2") clip_gain2 = config.clip_gain2; else clip_gain2 = 0.8; end
-  if isfield(config,"foff_limiter") foff_limiter = config.foff_limiter; else foff_limiter = 0; end
-  if isfield(config,"txbpf_width_Hz") txbpf_width_Hz = config.txbpf_width_Hz; else txbpf_width_Hz = 2000; end
-  if isfield(config,"data_mode") data_mode = config.data_mode; else data_mode = 0; end
-
+  Rs = config.Rs; 
+  Tcp = config.Tcp; 
+  Ns = config.Ns; 
+  Nc = config.Nc;
+  bps = config.bps;
+  Np = config.Np;
+  Ntxtbits = config.Ntxtbits;
+  Nuwbits = config.Nuwbits;
+  ftwindow_width = config.ftwindow_width;
+  timing_mx_thresh = config.timing_mx_thresh;
+  tx_uw = config.tx_uw;
+  bad_uw_errors = config.bad_uw_errors;
+  amp_scale = config.amp_scale;
+  amp_est_mode = config.amp_est_mode;
+  EsNo_est_all_symbols = config.EsNo_est_all_symbols;
+  EsNodB = config.EsNodB; 
+  state_machine = config.state_machine; 
+  edge_pilots = config.edge_pilots;
+  clip_gain1 = config.clip_gain1;
+  clip_gain2 = config.clip_gain2;
+  foff_limiter = config.foff_limiter; 
+  txbpf_width_Hz = config.txbpf_width_Hz;
+  data_mode = config.data_mode;
+       
   states.Fs = 8000;
   states.bps = bps;
   states.Rs = Rs;
@@ -286,12 +289,35 @@ endfunction
 %------------------------------------------------------------------------------
 
 function config = ofdm_init_mode(mode="700D")
-  Tcp = 0.002; Ns=8;
+  % defaults for 700D
+  
+  Tcp = 0.002; 
+  Ns = 8;
+  Ts = 0.018; 
+  Nc = 17;
+  config.bps = 2; 
+  config.txbpf_width_Hz = 1500;
+  config.Np = 1;
+  config.Ntxtbits = 4;
+  config.Nuwbits = 5*config.bps;
+  config.ftwindow_width = 32;
+  config.timing_mx_thresh  = 0.35;
+  config.bad_uw_errors = 3;
+  config.amp_scale = 245E3;
+  config.amp_est_mode = 0;
+  config.EsNo_est_all_symbols = 1;
+  config.EsNodB = 3;
+  config.state_machine = "voice1";
+  config.edge_pilots = 1;
+  config.clip_gain1 = 2.5;
+  config.clip_gain2 = 0.8;
+  config.foff_limiter = 0;
+  config.txbpf_width_Hz = 2000;
+  config.data_mode = 0;
 
-  % some "canned" modes
-  if strcmp(mode,"700D")
-    Ts = 0.018; Nc = 17; config.txbpf_width_Hz = 1500;
-  elseif strcmp(mode,"700E")
+  if strcmp(mode,"700D") ||  strcmp(mode,"700d")
+    % defaults above
+  elseif strcmp(mode,"700E") ||  strcmp(mode,"700e")
     Ts = 0.014; Tcp=0.006; Nc = 21; Ns=4;
     config.edge_pilots = 0; config.state_machine = "voice2";
     config.Nuwbits = 12; config.bad_uw_errors = 3; config.Ntxtbits = 2;
@@ -353,6 +379,9 @@ function config = ofdm_init_mode(mode="700D")
   end
   Rs=1/Ts;
   config.Rs = Rs; config.Tcp = Tcp; config.Ns = Ns; config.Nc = Nc;
+  if !isfield(config,"tx_uw") 
+    config.tx_uw = zeros(1,config.Nuwbits); 
+  end  
 end
 
 
