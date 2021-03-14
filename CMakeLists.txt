@@ -409,6 +409,11 @@ if(UNITTEST)
                             DISPLAY=\"\" octave --no-gui")
              set_tests_properties(test_OFDM_modem_octave_qam16_uncoded PROPERTIES PASS_REGULAR_EXPRESSION "Pass")
 
+    add_test(NAME test_OFDM_modem_octave_acquisition
+             COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/octave;
+                            echo \"ofdm_acquisition; quit\" | DISPLAY=\"\" octave --no-gui")
+             set_tests_properties(test_OFDM_modem_octave_acquisition PROPERTIES PASS_REGULAR_EXPRESSION "P.acq. = 1.00")
+
     add_test(NAME test_OFDM_modem_octave_datac0_postamble
              COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/octave;
                             echo \"ofdm_tx('test_datac0.raw','datac0',1,100,'awgn','bursts',3); ofdm_rx('test_datac0.raw','datac0','packetsperburst',1,'postambletest','passber', 1E-6); quit\" |

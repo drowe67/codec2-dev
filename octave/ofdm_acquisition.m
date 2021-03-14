@@ -1,7 +1,7 @@
-% ofdm_dev.m
+% ofdm_acquisition.m
 % David Rowe Jan 2021
 %
-% Simulations used for development of HF data modem acquisition
+% Simulations used for development of HF data modem burst mode acquisition
 %
 % To run headless on a server:
 %
@@ -222,10 +222,5 @@ randn('seed',1);
 % choose simulation to run here 
 % ---------------------------------------------------------
 
-%acquisition_test("datac3", Ntests=10, 'mpp', SNR3kdB=0, foff_hz=0, verbose=1+8);
-%acquisition_histograms(mode="datac2", Ntests=3, channel='mpm', SNR3kdB=-5, foff=37, verbose=1+16)
-%sync_metrics('freq')
-%acquistion_curves("datac3", "mpp", Ntests=10)
-%acquistion_curves_modes_channels(Ntests=25)
-frame_by_frame_acquisition_test("datac0", Ntests=20, 'mpp', SNR3kdB=100, foff_hz=0, verbose=1+8);
+frame_by_frame_acquisition_test("datac0", Ntests=5, 'mpp', SNR3kdB=5, foff_hz=0, verbose=1+8);
 %acquistion_curves_frame_by_frame_modes_channels_snr(Ntests=50, quick_test=0)
