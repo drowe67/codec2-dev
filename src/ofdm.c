@@ -2104,13 +2104,11 @@ void ofdm_extract_uw(struct OFDM *ofdm, complex float rx_syms[], float rx_amps[]
  * and 32767.  Used for generating test frames of various lengths.
  */
 void ofdm_rand(uint16_t r[], int n) {
-    ofdm_rand_seed(r, in, 1);
+    ofdm_rand_seed(r, n, 1);
 }
 
 void ofdm_rand_seed(uint16_t r[], int n, uint64_t seed) {
-    int i;
-
-    for (i = 0; i < n; i++) {
+    for (int i = 0; i < n; i++) {
         seed = (1103515245l * seed + 12345) % 32768;
         r[i] = seed;
     }

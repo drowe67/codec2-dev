@@ -1322,7 +1322,7 @@ function tx_preamble = ofdm_generate_preamble(states, seed=2)
   tmp_states = states;
   % tweak local copy of states so we can generate a 1 modem-frame packet
   tmp_states.Np = 1; tmp_states.Nbitsperpacket = tmp_states.Nbitsperframe;
-  preamble_bits = round(ofdm_rand(tmp_states.Nbitsperframe, seed)/32767);
+  preamble_bits = ofdm_rand(tmp_states.Nbitsperframe, seed) > 16384;
   tmp_states.pilots = ones(1,tmp_states.Nc+2);
   tx_preamble = ofdm_mod(tmp_states, preamble_bits);
 endfunction

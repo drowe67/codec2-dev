@@ -259,12 +259,19 @@ static void codec2_encode_upacked(struct freedv *f, uint8_t unpacked_bits[], sho
 }
 
 static int is_ofdm_mode(struct freedv *f) {
-        return FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode)   ||
-               FDV_MODE_ACTIVE( FREEDV_MODE_700E, f->mode)   ||
-               FDV_MODE_ACTIVE( FREEDV_MODE_DATAC0, f->mode) ||
-               FDV_MODE_ACTIVE( FREEDV_MODE_DATAC1, f->mode) ||
-               FDV_MODE_ACTIVE( FREEDV_MODE_DATAC2, f->mode) ||
-               FDV_MODE_ACTIVE( FREEDV_MODE_DATAC3, f->mode);
+    return FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode)   ||
+           FDV_MODE_ACTIVE( FREEDV_MODE_700E, f->mode)   ||
+           FDV_MODE_ACTIVE( FREEDV_MODE_DATAC0, f->mode) ||
+           FDV_MODE_ACTIVE( FREEDV_MODE_DATAC1, f->mode) ||
+           FDV_MODE_ACTIVE( FREEDV_MODE_DATAC2, f->mode) ||
+           FDV_MODE_ACTIVE( FREEDV_MODE_DATAC3, f->mode);
+}
+       
+static int is_ofdm_data_mode(struct freedv *f) {
+    return FDV_MODE_ACTIVE( FREEDV_MODE_DATAC0, f->mode) ||
+           FDV_MODE_ACTIVE( FREEDV_MODE_DATAC1, f->mode) ||
+           FDV_MODE_ACTIVE( FREEDV_MODE_DATAC2, f->mode) ||
+           FDV_MODE_ACTIVE( FREEDV_MODE_DATAC3, f->mode);
 }
        
 /*---------------------------------------------------------------------------*\
@@ -496,8 +503,8 @@ int freedv_rawdatapreamblecomptx(struct freedv *f, COMP mod_out[]) {
         assert(npreamble_samples < f->n_nom_modem_samples); /* caller probably using an array of this size */
         freedv_tx_fsk_ldpc_data_preamble(f, mod_out, npreamble_bits, npreamble_samples);
     } else if (is_ofdm_data_mode(f)) {
-        memcpy(mod_out, f->ofdm->tx_preamble, sizeof(COMP)*ofdm->nsamperframe);
-        npreamble_samples = ofdm->nsamperframe;
+        memcpy(mod_out, f->ofdm->tx_preamble, sizeof(COMP)*f->ofdm->samplesperframe);
+        npreamble_samples = f->ofdm->samplesperframe;
     }
 
     return npreamble_samples;
