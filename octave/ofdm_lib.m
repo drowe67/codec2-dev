@@ -644,8 +644,8 @@ function [t_est foff_est timing_mx] = est_timing_and_freq(states, rx, known_samp
     % is a column vector for each timing offset.  Each matrix cell is s freq,timing coordinate
     
     corr = [];
-    for i=1:tstep:Ncorr
-      rx1 = rx(i:i+Npsam-1); 
+    for t=1:tstep:Ncorr
+      rx1 = rx(t:t+Npsam-1); 
       col = M * rx1';
       corr = [corr, col];
     end
@@ -655,12 +655,12 @@ function [t_est foff_est timing_mx] = est_timing_and_freq(states, rx, known_samp
     [mx mx_col] = max(max_col);
     t_est = (mx_col-1)*tstep;
     
-    % obtain normalised real number for timing max
+    % obtain normalised real number for timing mx
     mag1 = known_samples*known_samples';
     mag2 = rx(t_est+1:t_est+Npsam)*rx(t_est+1:t_est+Npsam)';
     timing_mx = mx*mx'/(mag1*mag2+1E-12);
     
-    % determine frequency offset for row where max occuurred
+    % determine frequency offset for row where max is located
     [tmp freq_row] = max(corr(:,mx_col));
     foff_est = fmin + fstep*(freq_row-1);
        

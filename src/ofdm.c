@@ -770,15 +770,15 @@ static float est_freq_offset_pilot_corr(struct OFDM *ofdm, complex float *rx, in
     switch(fcoarse) {
     case -40:
       for (j = 0; j < ofdm->samplespersymbol; j++)
-	wvec_pilot[j] = conjf(ofdm_wval[j]*ofdm->pilot_samples[j]);
+        wvec_pilot[j] = conjf(ofdm_wval[j]*ofdm->pilot_samples[j]);
       break;
     case 0:
       for (j = 0; j < ofdm->samplespersymbol; j++)
-	wvec_pilot[j] = conjf(ofdm->pilot_samples[j]);
+        wvec_pilot[j] = conjf(ofdm->pilot_samples[j]);
       break;
     case 40:
       for (j = 0; j < ofdm->samplespersymbol; j++)
-	wvec_pilot[j] = ofdm_wval[j]*conjf(ofdm->pilot_samples[j]);
+        wvec_pilot[j] = ofdm_wval[j]*conjf(ofdm->pilot_samples[j]);
       break;
     default:
       assert(0);
@@ -819,6 +819,48 @@ static float est_freq_offset_pilot_corr(struct OFDM *ofdm, complex float *rx, in
 
     return foff_est;
 }
+
+/* Joint estimation of timing and freq used for burst data acquisition */
+
+static float est_timing_and_freq(struct OFDM *ofdm, 
+                                 int *t_est, float *foff_est,
+                                 complex float *rx, int Nrx, 
+                                 complex float *known_samples, int Npsam,
+                                 int tstep, float fmin, float fmax, float fstep) {
+    int Ncorr = Nrx - Npsam + 1;
+    float max_corr = 0;
+    for (float afcoarse=fmin; afcoarse<=fmax; afcoarse += fstep) {
+        float w = TAU * afcoarse / ofdm->fs;
+        complex float mvec[Npsam];
+        for(int i=0; i<Npsam; i++) 
+            mvec[i] = known_samples[i]*cmplx(w*i);
+        for(int t=0; t<Ncorr; t+=tstep) {
+            complex float corr = 0;
+            for(int i=0; i<Npsam; i++)
+                corr += rx[i+t]*cmplxconj(mvec[i]);
+            if (cabsf(corr) > max_corr) {
+                max_corr = cabsf(corr);
+                *t_est = t;
+                *foff_est = afcoarse;
+            }
+        }
+    }   
+        
+    /* obtain normalised real number for timing_mx */
+    complex float mag1=0, mag2=0;
+    for(int i=0; i<Npsam; i++) {
+        mag1 += known_samples[i]*cmplxconj(known_samples[i]);
+        mag2 += rx[i+*t_est]*cmplxconj(rx[i+*t_est]);
+    }
+    float timing_mx = max_corr*max_corr/(mag1*mag2+1E-12);
+                                      
+    if (ofdm->verbose >= 2) {
+        fprintf(stderr, "  t_est: %d timing:mx: %f foff_est: %f\n", *t_est, timing_mx, *foff_est);
+    }
+    
+    return timing_mx;
+}
+
 
 /*
  * ----------------------------------------------
@@ -2074,8 +2116,6 @@ void ofdm_rand(uint16_t r[], int n) {
 void ofdm_generate_payload_data_bits(uint8_t payload_data_bits[], int n) {
     uint16_t r[n];
     int i;
-
-    /* construct payload data bits */
 
     ofdm_rand(r, n);
 
