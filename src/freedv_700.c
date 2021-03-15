@@ -4,7 +4,8 @@
   AUTHOR......: David Rowe
   DATE CREATED: May 2020
 
-  Functions that implement the various FreeDV 700 modes.
+  Functions that implement the various FreeDV 700 modes, and more generally 
+  OFDM data modes.
 
 \*---------------------------------------------------------------------------*/
 

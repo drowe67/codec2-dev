@@ -243,7 +243,8 @@ void ofdm_assemble_qpsk_modem_packet_symbols(struct OFDM *, complex float [], CO
 void ofdm_disassemble_qpsk_modem_packet(struct OFDM *, complex float rx_syms[], float rx_amps[], COMP [], float [], short []);
 void ofdm_extract_uw(struct OFDM *ofdm, complex float rx_syms[], float rx_amps[], uint8_t rx_uw[]);
 void ofdm_rand(uint16_t [], int);
-void ofdm_generate_payload_data_bits(uint8_t [], int);
+void ofdm_rand_seed(uint16_t r[], int n, uint64_t seed);
+void ofdm_generate_payload_data_bits(uint8_t data_bits[], int n, uint64_t seed);
 int ofdm_get_phase_est_bandwidth_mode(struct OFDM *);
 void ofdm_set_phase_est_bandwidth_mode(struct OFDM *, int);
 void ofdm_clip(complex float tx[], float clip_thresh, int n);

@@ -2104,7 +2104,10 @@ void ofdm_extract_uw(struct OFDM *ofdm, complex float rx_syms[], float rx_amps[]
  * and 32767.  Used for generating test frames of various lengths.
  */
 void ofdm_rand(uint16_t r[], int n) {
-    uint64_t seed = 1;
+    ofdm_rand_seed(r, in, 1);
+}
+
+void ofdm_rand_seed(uint16_t r[], int n, uint64_t seed) {
     int i;
 
     for (i = 0; i < n; i++) {
@@ -2122,6 +2125,21 @@ void ofdm_generate_payload_data_bits(uint8_t payload_data_bits[], int n) {
     for (i = 0; i < n; i++) {
         payload_data_bits[i] = r[i] > 16384;
     }
+}
+
+void ofdm_generate_preamble(struct OFDM *ofdm, COMP *tx_preamble, int seed) {
+  // need to modify bits per packet to set up pre-amble of a few modem frames in length
+  struct OFDM ofdm_preamble;
+  memcpy(&ofdm_preamble, ofdm, sizeof(struct OFDM));
+  ofdm_preamble.np = 1;
+  ofdm_preamble.bitsperpacket = ofdm_preamble.bitsperframe;
+  uint16_t r[ofdm_preamble.bitsperpacket];
+  ofdm_rand_seed(r, ofdm_preamble.bitsperpacket, seed);
+  int preamble_bits[ofdm_preamble.bitsperpacket];
+  for(int i=0; i<ofdm_preamble.bitsperpacket; i++) 
+      preamble_bits[i] = r[i] > 16384;
+  for(int i=0; i<ofdm->nc+2; i++) ofdm_preamble.pilots[i] = 1.0;
+  ofdm_mod(&ofdm_preamble, tx_preamble, preamble_bits);
 }
 
 void ofdm_print_info(struct OFDM *ofdm) {
