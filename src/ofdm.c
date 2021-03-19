@@ -214,6 +214,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
         ofdm->clip_gain2 = 0.9;
         ofdm->clip_en = false;
         ofdm->foff_limiter = false;
+        ofdm->data_mode = "";
         memset(ofdm->tx_uw, 0, ofdm->nuwbits);
     } else {
         /* Use the users values */
@@ -245,6 +246,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
         ofdm->clip_gain2 = config->clip_gain2;
         ofdm->clip_en = config->clip_en;
         memcpy(ofdm->tx_uw, config->tx_uw, ofdm->nuwbits);
+        ofdm->data_mode = config->data_mode;
     }
 
     ofdm->rs = (1.0f / ofdm->ts);                 /* Modulation Symbol Rate */
@@ -288,6 +290,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     ofdm->config.clip_gain2 = ofdm->clip_gain2;
     ofdm->config.clip_en = ofdm->clip_en;
     memcpy(ofdm->config.tx_uw, ofdm->tx_uw, ofdm->nuwbits);
+    ofdm->config.data_mode = ofdm->data_mode;
 
     /* Calculate sizes from config param */
 
@@ -402,7 +405,6 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     ofdm->nin = ofdm->samplesperframe;
     ofdm->mean_amp = 0.0f;
     ofdm->foff_metric = 0.0f;
-    ofdm->data_mode = !strcmp(ofdm->state_machine,"data");
     /*
      * Unique Word symbol placement.  Note we need to group the UW
      * bits so they fit into symbols.  The LDPC decoder works on
@@ -490,12 +492,10 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
         ofdm->pilot_samples[i] = temp[j];
     }
 
-    FREE(temp);    /* finished with temp */
+    FREE(temp);
 
     /* calculate constant used to normalise timing correlation maximum */
-
     float acc = 0.0f;
-
     for (i = 0; i < ofdm->samplespersymbol; i++) {
         acc += cnormf(ofdm->pilot_samples[i]);
     }
@@ -505,6 +505,11 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     ofdm->sig_var = ofdm->noise_var = 1.0f;
     ofdm->dpsk_en = false;
 
+    if (strlen(ofdm->data_mode)) {
+        ofdm->tx_preamble = (COMP*)malloc(sizeof(COMP)*ofdm->samplesperframe);
+        assert(ofdm->tx_preamble != NULL);
+        ofdm_generate_preamble(ofdm, ofdm->tx_preamble, 2);
+    }
     return ofdm; /* Success */
 }
 
@@ -535,6 +540,9 @@ static void deallocate_tx_bpf(struct OFDM *ofdm) {
 void ofdm_destroy(struct OFDM *ofdm) {
     int i;
 
+    if (strlen(ofdm->data_mode)) {
+        free(ofdm->tx_preamble);
+    }
     if (ofdm->tx_bpf) {
         deallocate_tx_bpf(ofdm);
     }
