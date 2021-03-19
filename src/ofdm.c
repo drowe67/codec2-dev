@@ -1089,7 +1089,7 @@ int ofdm_sync_search(struct OFDM *ofdm, COMP *rxbuf_in) {
 }
 
 /*
- * This is a wrapper with a new interface to reduce memory allocated.
+ * This is a wrapper to reduce memory allocated.
  * This works with ofdm_demod and freedv_api. Gain is not used here.
  */
 int ofdm_sync_search_shorts(struct OFDM *ofdm, short *rxbuf_in, float gain) {
@@ -1109,10 +1109,60 @@ int ofdm_sync_search_shorts(struct OFDM *ofdm, short *rxbuf_in, float gain) {
     return ofdm_sync_search_core(ofdm);
 }
 
+/* Two stage burst mode acquisition  */
+
+static void burst_acquisition_detector(struct OFDM *ofdm, 
+                                       complex float *rx, int n, 
+                                       complex float *known_sequence,
+                                       int *ct_est, float *foff_est, float *timing_mx)
+{
+    
+    float fmin, fmax, fstep;
+    int tstep;
+    
+    // initial search over coarse grid
+    tstep = 4; fstep = 5; fmin = -50.0; fmax = 50.0;
+    *timing_mx = est_timing_and_freq(ofdm, ct_est, foff_est,
+                                 &rx[n], 2 * ofdm->samplesperframe, 
+                                 known_sequence, ofdm->samplesperframe,
+                                 tstep, fmin, fmax, fstep);
+                
+    // refine estimate over finer grid
+    fmin = *foff_est - ceilf(fstep/2.0); fmax = *foff_est + ceilf(fstep/2.0); 
+    int st = n + *ct_est - tstep/2.0;
+    *timing_mx = est_timing_and_freq(ofdm, ct_est, foff_est,
+                                 &rx[st], ofdm->samplesperframe + tstep, 
+                                 known_sequence, ofdm->samplesperframe,
+                                 1, fmin, fmax, 1.0);                
+    *ct_est += st;
+}
+    
+static int ofdm_sync_search_burst(struct OFDM *ofdm) {
+    
+    int st = ofdm->rxbufst + ofdm->m + ofdm->ncp + ofdm->samplesperframe;
+    int ct_est;
+    float foff_est, timing_mx;
+    
+    burst_acquisition_detector(ofdm, ofdm->rxbuf, st, (complex float*)ofdm->tx_preamble, &ct_est, &foff_est, &timing_mx);
+    
+    int timing_valid = timing_mx > ofdm->timing_mx_thresh;
+    ofdm->nin = ct_est - st;
+    ofdm->foff_est_hz = foff_est;
+    ofdm->timing_mx = timing_mx;
+    ofdm->timing_valid = timing_valid;
+
+    if (ofdm->verbose > 1) {
+        fprintf(stderr, "    ct_est: %4d foff_est: %4.1f timing_valid: %d timing_mx: %5.4f\n",
+                ct_est, foff_est, timing_valid, timing_mx);
+    }
+
+    return ofdm->timing_valid;
+}
+
 /*
- * Attempts to find coarse sync parameters for modem initial sync
+ * Attempts to find coarse sync parameters for modem initial sync (streaming mode)
  */
-static int ofdm_sync_search_core(struct OFDM *ofdm) {
+static int ofdm_sync_search_stream(struct OFDM *ofdm) {
     int act_est, afcoarse;
 
     /* Attempt coarse timing estimate (i.e. detect start of frame) at a range of frequency offsets */
@@ -1177,6 +1227,13 @@ static int ofdm_sync_search_core(struct OFDM *ofdm) {
     ofdm->timing_mx = timing_mx;
 
     return ofdm->timing_valid;
+}
+
+static int ofdm_sync_search_core(struct OFDM *ofdm) {
+    if (!strcmp(ofdm->data_mode, "burst"))
+        return ofdm_sync_search_burst(ofdm);
+    else
+        return ofdm_sync_search_stream(ofdm);
 }
 
 /*
