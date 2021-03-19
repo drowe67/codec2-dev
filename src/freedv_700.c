@@ -475,14 +475,14 @@ int freedv_comp_short_rx_ofdm(struct freedv *f, void *demod_in_8kHz, int demod_i
 
             if (f->test_frames) {
                 /* est uncoded BER from payload bits */
-                Nerrs_raw = count_uncoded_errors(ldpc, &f->ofdm->config, payload_syms_de, strcmp(ofdm->data_mode,""));
+                Nerrs_raw = count_uncoded_errors(ldpc, &f->ofdm->config, payload_syms_de, strlen(ofdm->data_mode));
                 f->total_bit_errors += Nerrs_raw;
                 f->total_bits += Npayloadbitsperpacket;
 
                 /* coded errors from decoded bits */
                 uint8_t payload_data_bits[Ndatabitsperpacket];
                 ofdm_generate_payload_data_bits(payload_data_bits, Ndatabitsperpacket);
-                if (ofdm->data_mode) {
+                if (strlen(ofdm->data_mode)) {
                     uint16_t tx_crc16 = freedv_crc16_unpacked(payload_data_bits, Ndatabitsperpacket - 16);
                     uint8_t tx_crc16_bytes[] = { tx_crc16 >> 8, tx_crc16 & 0xff };
                     freedv_unpack(payload_data_bits + Ndatabitsperpacket - 16, tx_crc16_bytes, 16);
