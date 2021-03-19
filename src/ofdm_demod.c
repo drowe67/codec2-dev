@@ -41,7 +41,6 @@
 
 #include "codec2_ofdm.h"
 #include "ofdm_internal.h"
-#include "ofdm_mode.h"
 #include "octave.h"
 #include "mpdecode_core.h"
 #include "ldpc_codes.h"

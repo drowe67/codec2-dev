@@ -62,6 +62,7 @@ struct OFDM;
 
 struct OFDM *ofdm_create(const struct OFDM_CONFIG * config);
 void ofdm_destroy(struct OFDM *);
+void ofdm_init_mode(char mode[], struct OFDM_CONFIG *config);
 
 /* signal processing */
 

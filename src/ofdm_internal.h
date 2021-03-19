@@ -104,7 +104,8 @@ struct OFDM_CONFIG {
     float clip_gain1;     /* gain we apply to Tx signal before clipping to control PAPR*/
     float clip_gain2;     /* gain we apply to Tx signal after clipping and BBF to control peak level */
     bool  clip_en;
-    char mode[16];        /* OFDM mode isn string form */
+    char mode[16];        /* OFDM mode in string form */
+    char *data_mode;
 };
 
 struct OFDM {
@@ -142,7 +143,7 @@ struct OFDM {
     int nuwbits;          /* number of unique word bits used to achieve packet frame sync */
     int bad_uw_errors;
     int edge_pilots;      /* insert pilots at 1 and Nc+2, to support low bandwidth phase est */
-    int data_mode;        /* true of a data mode, false for voice mode */
+    char *data_mode;      /* "", "streaming", "burst"  */
     int framesperburst;   /* for OFDM data modes, how many frames before we reset state machine */
     int amp_est_mode;     /* amplitude estimtor algorithm */
     float amp_scale;
@@ -246,6 +247,7 @@ void ofdm_extract_uw(struct OFDM *ofdm, complex float rx_syms[], float rx_amps[]
 void ofdm_rand(uint16_t [], int);
 void ofdm_rand_seed(uint16_t r[], int n, uint64_t seed) ;
 void ofdm_generate_payload_data_bits(uint8_t data_bits[], int n);
+void ofdm_generate_preamble(struct OFDM *ofdm, COMP *tx_preamble, int seed);
 int ofdm_get_phase_est_bandwidth_mode(struct OFDM *);
 void ofdm_set_phase_est_bandwidth_mode(struct OFDM *, int);
 void ofdm_clip(complex float tx[], float clip_thresh, int n);

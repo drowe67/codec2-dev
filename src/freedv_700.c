@@ -28,7 +28,6 @@
 
 #include "codec2_ofdm.h"
 #include "ofdm_internal.h"
-#include "ofdm_mode.h"
 #include "mpdecode_core.h"
 #include "gp_interleaver.h"
 #include "ldpc_codes.h"
@@ -476,7 +475,7 @@ int freedv_comp_short_rx_ofdm(struct freedv *f, void *demod_in_8kHz, int demod_i
 
             if (f->test_frames) {
                 /* est uncoded BER from payload bits */
-                Nerrs_raw = count_uncoded_errors(ldpc, &f->ofdm->config, payload_syms_de, ofdm->data_mode);
+                Nerrs_raw = count_uncoded_errors(ldpc, &f->ofdm->config, payload_syms_de, strcmp(ofdm->data_mode,""));
                 f->total_bit_errors += Nerrs_raw;
                 f->total_bits += Npayloadbitsperpacket;
 
