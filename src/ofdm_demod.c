@@ -390,10 +390,10 @@ int main(int argc, char *argv[]) {
     int iter = 0;
     int parityCheckCount = 0;
 
-    if (ofdm->data_mode)
+    if (strlen(ofdm->data_mode) == 0)
         Ndiscard = NDISCARD; /* backwards compatability with 700D/2020        */
     else
-        Ndiscard = 1;        /* much longer packets, so discrd thresh smaller */
+        Ndiscard = 1;        /* much longer packets, so discard thresh smaller */
 
     float EsNo = 3.0f;
     float snr_est_smoothed_dB = 0.0f;
