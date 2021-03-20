@@ -2201,7 +2201,12 @@ void ofdm_generate_preamble(struct OFDM *ofdm, COMP *tx_preamble, int seed) {
   int preamble_bits[ofdm_preamble.bitsperpacket];
   for(int i=0; i<ofdm_preamble.bitsperpacket; i++) 
       preamble_bits[i] = r[i] > 16384;
-  for(int i=0; i<ofdm->nc+2; i++) ofdm_preamble.pilots[i] = 1.0;
+  /* make pilots different to regular modem frames */
+  complex float pilots[ofdm->nc+2];
+  for(int i=0; i<ofdm->nc+2; i++) {
+      pilots[i] = 1.0;
+  }
+  ofdm_preamble.pilots = pilots;
   ofdm_mod(&ofdm_preamble, tx_preamble, preamble_bits);
 }
 

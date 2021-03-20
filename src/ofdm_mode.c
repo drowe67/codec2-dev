@@ -87,13 +87,13 @@ void ofdm_init_mode(char mode[], struct OFDM_CONFIG *config) {
         assert(sizeof(uw) == config->nuwbits);
         memcpy(config->tx_uw, uw, config->nuwbits);
         config->timing_mx_thresh = 0.50f;    
-        config->data_mode = "";
+        config->data_mode = "streaming";
     } else if (strcmp(mode,"datac2") == 0) {
         config->ns=5; config->np=36; config->tcp = 0.006; config->ts = 0.016; config->nc = 9;
         config->txtbits = 0; config->nuwbits = 12; config->bad_uw_errors = 1;
         config->state_machine = "data"; config->amp_est_mode = 1; config->tx_bpf_en = false;
         config->ftwindowwidth = 80; config->codename = "H_2064_516_sparse";
-        config->data_mode = "";
+        config->data_mode = "streaming";
     } else if (strcmp(mode,"datac3") == 0) {
         config->ns=5; config->np=29; config->tcp = 0.006; config->ts = 0.016; config->nc = 9;
         config->edge_pilots = 0;
@@ -106,7 +106,7 @@ void ofdm_init_mode(char mode[], struct OFDM_CONFIG *config) {
         assert(sizeof(uw) <= MAX_UW_BITS);
         memcpy(config->tx_uw, uw, sizeof(uw));
         memcpy(&config->tx_uw[config->nuwbits-sizeof(uw)], uw, sizeof(uw));
-        config->data_mode = "";
+        config->data_mode = "streaming";
      }
     else {
         assert(0);
