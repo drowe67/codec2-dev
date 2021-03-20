@@ -828,57 +828,6 @@ static float est_freq_offset_pilot_corr(struct OFDM *ofdm, complex float *rx, in
     return foff_est;
 }
 
-/* Joint estimation of timing and freq used for burst data acquisition */
-
-static float est_timing_and_freq(struct OFDM *ofdm, 
-                                 int *t_est, float *foff_est,
-                                 complex float *rx, int Nrx, 
-                                 complex float *known_samples, int Npsam,
-                                 int tstep, float fmin, float fmax, float fstep) {
-    int Ncorr = Nrx - Npsam + 1;
-    //fprintf(stderr, "    Nrx: %d Npsam: %d Ncorr: %d\n",  Nrx,  Npsam, Ncorr);
-    float max_corr = 0;
-    *t_est = 0; *foff_est = 0.0;
-    for (float afcoarse=fmin; afcoarse<=fmax; afcoarse += fstep) {
-        float w = TAU * afcoarse / ofdm->fs;
-        complex float mvec[Npsam];
-        //fprintf(stderr, "    mvec: w = %f\n", w);
-        for(int i=0; i<Npsam; i++) {
-            complex float ph = cmplx(w*i);
-            mvec[i] = known_samples[i]*ph;
-            //fprintf(stderr, "ph: %f %f mvec: %f %f ", crealf(ph), cimagf(ph), crealf(mvec[i]), cimagf(mvec[i]));
-        }
-        //fprintf(stderr, "\n----------------\n");
-        for(int t=0; t<Ncorr; t+=tstep) {
-            complex float corr = 0;
-            for(int i=0; i<Npsam; i++) {
-                corr += rx[i+t]*cmplxconj(mvec[i]);
-                //corr += mvec[i]*cmplxconj(mvec[i]);
-            }
-            //fprintf(stderr, "f: %f t: %d cabs(corr): %f\n", afcoarse, t, cabs(corr));
-            if (cabsf(corr) > max_corr) {
-                max_corr = cabsf(corr);
-                *t_est = t;
-                *foff_est = afcoarse;
-            }
-        }
-    }   
-        
-    /* obtain normalised real number for timing_mx */
-    float mag1=0, mag2=0;
-    for(int i=0; i<Npsam; i++) {
-        mag1 += cabsf(known_samples[i]*cmplxconj(known_samples[i]));
-        mag2 += cabsf(rx[i+*t_est]*cmplxconj(rx[i+*t_est]));
-    }
-    float timing_mx = max_corr*max_corr/(mag1*mag2+1E-12);
-    fprintf(stderr, "max_corr: %f mag1: %f mag2: %f", max_corr, mag1, mag2);                             
-    if (ofdm->verbose >= 2) {
-        fprintf(stderr, "  t_est: %4d timing:mx: %f foff_est: %f\n", *t_est, timing_mx, *foff_est);
-    }
-    
-    return timing_mx;
-}
-
 
 /*
  * ----------------------------------------------
@@ -1119,6 +1068,49 @@ int ofdm_sync_search_shorts(struct OFDM *ofdm, short *rxbuf_in, float gain) {
     return ofdm_sync_search_core(ofdm);
 }
 
+/* Joint estimation of timing and freq used for burst data acquisition */
+
+static float est_timing_and_freq(struct OFDM *ofdm, 
+                                 int *t_est, float *foff_est,
+                                 complex float *rx, int Nrx, 
+                                 complex float *known_samples, int Npsam,
+                                 int tstep, float fmin, float fmax, float fstep) {
+    int Ncorr = Nrx - Npsam + 1;
+    float max_corr = 0;
+    *t_est = 0; *foff_est = 0.0;
+    for (float afcoarse=fmin; afcoarse<=fmax; afcoarse += fstep) {
+        float w = TAU * afcoarse / ofdm->fs;
+        complex float mvec[Npsam];
+        for(int i=0; i<Npsam; i++) {
+            complex float ph = cmplx(w*i);
+            mvec[i] = known_samples[i]*ph;
+        }
+        for(int t=0; t<Ncorr; t+=tstep) {
+            complex float corr = 0;
+            for(int i=0; i<Npsam; i++)
+                corr += rx[i+t]*conj(mvec[i]);
+            if (cabsf(corr) > max_corr) {
+                max_corr = cabsf(corr);
+                *t_est = t;
+                *foff_est = afcoarse;
+            }
+        }
+    }   
+        
+    /* obtain normalised real number for timing_mx */
+    float mag1=0, mag2=0;
+    for(int i=0; i<Npsam; i++) {
+        mag1 += cabsf(known_samples[i]*conj(known_samples[i]));
+        mag2 += cabsf(rx[i+*t_est]*conj(rx[i+*t_est]));
+    }
+    float timing_mx = max_corr*max_corr/(mag1*mag2+1E-12);
+    if (ofdm->verbose > 2) {
+        fprintf(stderr, "  t_est: %4d timing:mx: %f foff_est: %f\n", *t_est, timing_mx, *foff_est);
+    }
+    
+    return timing_mx;
+}
+
 /* Two stage burst mode acquisition  */
 
 static void burst_acquisition_detector(struct OFDM *ofdm, 
@@ -1131,12 +1123,12 @@ static void burst_acquisition_detector(struct OFDM *ofdm,
     int tstep;
     
     // initial search over coarse grid
-    tstep = 4; fstep = 5; fmin = 0.0; fmax = 0.0;
+    tstep = 4; fstep = 5; fmin = -50.0; fmax = 50.0;
     *timing_mx = est_timing_and_freq(ofdm, ct_est, foff_est,
                                  &rx[n], 2*ofdm->samplesperframe, 
                                  known_sequence, ofdm->samplesperframe,
                                  tstep, fmin, fmax, fstep);
-    #ifdef SECOND                
+
     // refine estimate over finer grid
     fmin = *foff_est - ceilf(fstep/2.0); fmax = *foff_est + ceilf(fstep/2.0); 
     int st = n + *ct_est - tstep/2.0;
@@ -1146,8 +1138,6 @@ static void burst_acquisition_detector(struct OFDM *ofdm,
                                  1, fmin, fmax, 1.0);                
                                  
     *ct_est += st;
-    #endif
-    *ct_est = n;
 }
     
 static int ofdm_sync_search_burst(struct OFDM *ofdm) {
@@ -1155,20 +1145,18 @@ static int ofdm_sync_search_burst(struct OFDM *ofdm) {
     int st = ofdm->rxbufst + ofdm->m + ofdm->ncp + ofdm->samplesperframe;
     int ct_est;
     float foff_est, timing_mx;
-    
-    //fprintf(stderr, "    ofdm_sync_search_burst: nrxbuf: %d st: %d rxbuf[st]: %f %f\n", ofdm->nrxbuf, st, crealf(ofdm->rxbuf[st]), cimagf(ofdm->rxbuf[st]));
-    
+        
     burst_acquisition_detector(ofdm, ofdm->rxbuf, st, (complex float*)ofdm->tx_preamble, &ct_est, &foff_est, &timing_mx);
     
     int timing_valid = timing_mx > ofdm->timing_mx_thresh;
-    //ofdm->nin = ct_est - st;
+    ofdm->nin = ct_est - st;
     ofdm->foff_est_hz = foff_est;
     ofdm->timing_mx = timing_mx;
     ofdm->timing_valid = timing_valid;
 
     if (ofdm->verbose > 1) {
-        //fprintf(stderr, "    ct_est: %4d foff_est: %4.1f timing_valid: %d timing_mx: %5.4f\n",
-        //        ct_est -st, foff_est, timing_valid, timing_mx);
+        fprintf(stderr, "  ct_est: %4d mx: %3.2f off_est: % 5.1f timing_valid: %d\n",
+                ct_est -st, timing_mx, foff_est, timing_valid);
     }
 
     return ofdm->timing_valid;

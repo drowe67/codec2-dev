@@ -39,11 +39,10 @@ int main(int argc, char *argv[])
     int f = 0;
     
     while (fread(rx_scaled, sizeof (short), nin_frame, fin) == nin_frame) {
-        fprintf(stderr, "%3d  nin_frame: %d  ", f++, nin_frame);
+        fprintf(stderr, "%3d ", f++);
         ofdm_sync_search_shorts(ofdm, rx_scaled, ofdm->amp_scale / 2.0f);
-        nin_frame = ofdm_get_nin(ofdm);
-        //fprintf(stderr, "\n----------------\n");
-
+        // this is modified when a valid pre-amble is found. Force fixed nin to stay in acq state
+        ofdm->nin = nin_frame; 
     }
     fclose(fin);
        

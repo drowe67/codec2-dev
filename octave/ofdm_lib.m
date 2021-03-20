@@ -249,7 +249,7 @@ function states = ofdm_init(config)
   states.modem_frame = 0;                                 % keep track of how many frames received in packet
   states.state_machine = state_machine;                   % mode specific state machine
   states.packetsperburst = 0;                             % for OFDM data modes, how many packets before we reset state machine
-  states.postambledectoren = 1;
+  states.postambledectoren = strcmp(data_mode,"burst");
   states.postambledetectorcounter = 0;
   
   % LDPC code is optionally enabled
@@ -771,8 +771,10 @@ function [timing_valid states] = ofdm_sync_search_burst(states)
   pre_post = "";
   st = rxbufst + M+Ncp + Nsamperframe + 1; en = st + 2*Nsamperframe - 1;
   pre = burst_acquisition_detector(states, states.rxbuf, st, states.tx_preamble);
-  post = burst_acquisition_detector(states, states.rxbuf, st, states.tx_postamble);
-    
+  if states.postambledectoren
+    post = burst_acquisition_detector(states, states.rxbuf, st, states.tx_postamble);
+  end
+  
   if isfield(states,"postambletest") pre.timing_mx = 0; end % force ignore preamble to test postamble
 
   if (states.postambledectoren == 0) || (pre.timing_mx > post.timing_mx)
@@ -784,7 +786,7 @@ function [timing_valid states] = ofdm_sync_search_burst(states)
   end
   timing_valid = timing_mx > timing_mx_thresh;
   if verbose
-    printf(" ct_est: %4d mx: %3.2f coarse_foff: %5.1f timing_valid: %d %4s", ct_est, timing_mx, foff_est, timing_valid, pre_post);
+    printf("  ct_est: %4d mx: %3.2f foff_est: %5.1f timing_valid: %d %4s", ct_est, timing_mx, foff_est, timing_valid, pre_post);
   end
   
   if timing_valid

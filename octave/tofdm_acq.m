@@ -8,7 +8,7 @@ pkg load signal;
 
 % generate a file of transmit samples
 filename = "test_datac0.raw";
-ofdm_tx(filename,"datac0",1,100,"awgn","bursts",1);
+ofdm_tx(filename,"datac0",1,10,"awgn","bursts",1);
 
 printf("\nRunning Octave version....\n");
 config = ofdm_init_mode("datac0");
@@ -24,7 +24,7 @@ while(length(rx) == nin)
   [timing_valid states] = ofdm_sync_search(states, rx);
   states.nin = nin;
   rx = fread(frx, nin, "short")/(states.amp_scale/2);
-  printf(" nin: %d\n", states.nin);
+  printf("\n");
 end   
 fclose(frx);
 
