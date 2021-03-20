@@ -806,6 +806,7 @@ function [timing_valid states] = ofdm_sync_search_burst(states)
     states.nin = Nsamperframe;
   end
 
+  states.ct_est = ct_est;
   states.timing_valid = timing_valid;
   states.timing_mx = timing_mx;
   states.sample_point = states.timing_est = 1;

@@ -1149,6 +1149,7 @@ static int ofdm_sync_search_burst(struct OFDM *ofdm) {
     burst_acquisition_detector(ofdm, ofdm->rxbuf, st, (complex float*)ofdm->tx_preamble, &ct_est, &foff_est, &timing_mx);
     
     int timing_valid = timing_mx > ofdm->timing_mx_thresh;
+    ofdm->ct_est = ct_est - st;
     ofdm->nin = ct_est - st;
     ofdm->foff_est_hz = foff_est;
     ofdm->timing_mx = timing_mx;
@@ -1156,7 +1157,7 @@ static int ofdm_sync_search_burst(struct OFDM *ofdm) {
 
     if (ofdm->verbose > 1) {
         fprintf(stderr, "  ct_est: %4d mx: %3.2f off_est: % 5.1f timing_valid: %d\n",
-                ct_est -st, timing_mx, foff_est, timing_valid);
+                ct_est - st, timing_mx, foff_est, timing_valid);
     }
 
     return ofdm->timing_valid;

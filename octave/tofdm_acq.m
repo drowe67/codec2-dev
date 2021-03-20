@@ -5,6 +5,7 @@ ofdm_lib;
 autotest;
 randn('seed',1);
 pkg load signal;
+more off;
 
 % generate a file of transmit samples
 filename = "test_datac0.raw";
@@ -19,10 +20,15 @@ frx=fopen(filename,"rb");
 nin = states.nin;
 rx = fread(frx, nin, "short")/(states.amp_scale/2);
 f = 0;
+timing_mx_log = []; ct_est_log = []; foff_est_log = []; timing_valid_log = [];
 while(length(rx) == nin)
   printf(" %2d ",f++);
   [timing_valid states] = ofdm_sync_search(states, rx);
   states.nin = nin;
+  timing_mx_log = [timing_mx_log states.timing_mx];
+  ct_est_log = [ct_est_log states.ct_est];
+  foff_est_log = [foff_est_log states.foff_est_hz];
+  timing_valid_log = [timing_valid_log states.timing_valid];
   rx = fread(frx, nin, "short")/(states.amp_scale/2);
   printf("\n");
 end   
@@ -37,14 +43,26 @@ end
 system(sprintf("%s/tofdm_acq %s", path_to_unittest, filename));
 load tofdm_acq_out.txt;
 
-fg = 1;
+fg = 1; p = 0;
 
-% due to the order of processing we need to massage the Octave version a little before
-% comparing
-%tx_preamble = ofdm_clip(states, states.tx_preamble*states.amp_scale, states.ofdm_peak);
-tx_preamble = ofdm_clip(states, states.tx_preamble, states.ofdm_peak);
+tx_preamble = states.tx_preamble;
 stem_sig_and_error(fg, 211, real(tx_preamble_c), real(tx_preamble_c - tx_preamble), 'tx preamble re')
 stem_sig_and_error(fg++, 212, imag(tx_preamble_c), imag(tx_preamble_c - tx_preamble), 'tx preamble im')
-check(tx_preamble, tx_preamble_c, 'tx preamble', 0.1);
+p += check(tx_preamble, tx_preamble_c, 'tx preamble', 0.1);
+
+stem_sig_and_error(fg, 211, real(timing_mx_log_c), real(timing_mx_log_c - timing_mx_log), 'timing mx')
+p += check(timing_mx_log, timing_mx_log_c, 'timing_mx');
+stem_sig_and_error(fg++, 212, real(ct_est_log_c), real(ct_est_log_c - ct_est_log), 'ct est')
+p += check(ct_est_log, ct_est_log_c, 'ct_est_mx');
+
+stem_sig_and_error(fg, 211, real(foff_est_log_c), real(foff_est_log_c - foff_est_log), 'foff est')
+p += check(foff_est_log, foff_est_log_c, 'foff_est');
+stem_sig_and_error(fg++, 212, real(timing_valid_log_c), real(timing_valid_log_c - timing_valid_log), 'timing valid')
+p += check(timing_valid_log, timing_valid_log_c, 'timing_valid');
+
+if p == 5 printf("PASS\n"); else printf("FAIL\n"); end
+
+  
+
 
 

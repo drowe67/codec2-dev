@@ -214,6 +214,7 @@ struct OFDM {
     int sample_point;
     int timing_est;
     int timing_valid;
+    int ct_est;
     int nin;
     int uw_errors;
     int sync_counter;
