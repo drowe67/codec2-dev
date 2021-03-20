@@ -29,8 +29,24 @@ int main(int argc, char *argv[])
 
     ofdm_init_mode("datac0", &ofdm_config);
     ofdm = ofdm_create(&ofdm_config);
+    ofdm->data_mode = "burst";
+    ofdm->verbose = 2;
     assert(ofdm != NULL);
     
+    int nin_frame = ofdm_get_nin(ofdm);
+    FILE *fin = fopen(argv[1],"rb"); assert(fin != NULL);
+    short rx_scaled[ofdm_get_max_samples_per_frame(ofdm)];
+    int f = 0;
+    
+    while (fread(rx_scaled, sizeof (short), nin_frame, fin) == nin_frame) {
+        fprintf(stderr, "%3d  nin_frame: %d  ", f++, nin_frame);
+        ofdm_sync_search_shorts(ofdm, rx_scaled, ofdm->amp_scale / 2.0f);
+        nin_frame = ofdm_get_nin(ofdm);
+        //fprintf(stderr, "\n----------------\n");
+
+    }
+    fclose(fin);
+       
     /*---------------------------------------------------------*\
                Dump logs to Octave file for evaluation
                       by tofdm_acq.m Octave script

@@ -250,7 +250,7 @@ function states = ofdm_init(config)
   states.state_machine = state_machine;                   % mode specific state machine
   states.packetsperburst = 0;                             % for OFDM data modes, how many packets before we reset state machine
   states.postambledectoren = 1;
-  states.ostambledetectorcounter = 0;
+  states.postambledetectorcounter = 0;
   
   % LDPC code is optionally enabled
 
@@ -784,7 +784,7 @@ function [timing_valid states] = ofdm_sync_search_burst(states)
   end
   timing_valid = timing_mx > timing_mx_thresh;
   if verbose
-    printf(" ct_est: %4d mx: %3.2f coarse_foff: %5.1f timing_valid: %d %s", ct_est, timing_mx, foff_est, timing_valid, pre_post);
+    printf(" ct_est: %4d mx: %3.2f coarse_foff: %5.1f timing_valid: %d %4s", ct_est, timing_mx, foff_est, timing_valid, pre_post);
   end
   
   if timing_valid
