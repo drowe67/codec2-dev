@@ -31,6 +31,7 @@ function ofdm_rx(filename, mode="700D", varargin)
   ofdm_load_const;
   states.verbose = 0;
   pass_ber = 0;
+  pass_packet_count = 0;
   
   for i = 1:length (varargin)
     if strcmp(varargin{i},"packetsperburst")
@@ -41,6 +42,9 @@ function ofdm_rx(filename, mode="700D", varargin)
     % flags used to support ctests  
     if strcmp(varargin{i},"passber")
       pass_ber = varargin{i+1};
+    end  
+    if strcmp(varargin{i},"passpacketcount")
+      pass_packet_count = varargin{i+1};
     end  
     if strcmp(varargin{i},"postambletest")
       states.postambletest = 1;
@@ -241,5 +245,8 @@ function ofdm_rx(filename, mode="700D", varargin)
   % optional pass criteria for ctests
   if pass_ber > 0
     if packet_count && (ber < pass_ber) printf("Pass!\n"); else printf("Fail!\n"); end;
+  end
+  if pass_packet_count > 0
+    if packet_count >= pass_packet_count printf("Pass!\n"); else printf("Fail!\n"); end;
   end
 endfunction

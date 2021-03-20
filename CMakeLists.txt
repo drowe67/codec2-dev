@@ -421,10 +421,20 @@ if(UNITTEST)
                             DISPLAY=\"\" octave --no-gui")
              set_tests_properties(test_OFDM_modem_octave_datac0_postamble PROPERTIES PASS_REGULAR_EXPRESSION "Pass")
 
+    # Check C port of burst acquisition
     add_test(NAME test_OFDM_modem_burst_acq_port
              COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/octave;
                             echo \"tofdm_acq; quit\" | DISPLAY=\"\" octave --no-gui")
              set_tests_properties(test_OFDM_modem_burst_acq_port PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
+
+    # Give uncoded modem a workout on a poor channel (0dB SNR MPP)
+    add_test(NAME test_OFDM_modem_octave_datac0_mpp
+             COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/octave;
+                            echo \"ofdm_tx('test_datac0.raw','datac0',1,0,'mpp','bursts',10); \
+                                   ofdm_rx('test_datac0.raw','datac0','packetsperburst',1,'passpacketcount',9);\
+                                   quit\" |
+                            DISPLAY=\"\" octave --no-gui")
+             set_tests_properties(test_OFDM_modem_octave_datac0_mpp PROPERTIES PASS_REGULAR_EXPRESSION "Pass")
 
     #  ---------------------------------- ofdm_mod/demod level C modem tests ----------------------------------
     
