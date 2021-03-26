@@ -393,7 +393,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     ofdm->phase_est_en = true;
     ofdm->phase_est_bandwidth = high_bw;
     ofdm->phase_est_bandwidth_mode = AUTO_PHASE_EST;
-    ofdm->framesperburst = 0;  // default: never lose syn in raw data mode
+    ofdm->packetsperburst = 0;  // default: never lose syn in raw data mode
     
     ofdm->coarse_foff_est_hz = 0.0f;
     ofdm->foff_est_gain = 0.1f;
@@ -986,8 +986,8 @@ void ofdm_set_dpsk(struct OFDM *ofdm, bool val) {
     ofdm->dpsk_en = val;
 }
 
-void ofdm_set_frames_per_burst(struct OFDM *ofdm, int framesperburst) {
-    ofdm->framesperburst = framesperburst;
+void ofdm_set_packets_per_burst(struct OFDM *ofdm, int packetsperburst) {
+    ofdm->packetsperburst = packetsperburst;
 }
 
 /*
@@ -1828,7 +1828,7 @@ void ofdm_sync_state_machine_voice1(struct OFDM *ofdm, uint8_t *rx_uw) {
 /*
  * state machine for data modes
  */
-void ofdm_sync_state_machine_data(struct OFDM *ofdm, uint8_t *rx_uw) {
+void ofdm_sync_state_machine_data_streaming(struct OFDM *ofdm, uint8_t *rx_uw) {
     State next_state = ofdm->sync_state;
     int i;
 
@@ -1851,7 +1851,7 @@ void ofdm_sync_state_machine_data(struct OFDM *ofdm, uint8_t *rx_uw) {
         if (ofdm->sync_state == trial) {
             if (ofdm->uw_errors < ofdm->bad_uw_errors) {
                 next_state = synced;
-                ofdm->frame_count = 0;
+                ofdm->packet_count = 0;
                 ofdm->modem_frame = ofdm->nuwframes;
             } else {
                 ofdm->sync_counter++;
@@ -1871,10 +1871,9 @@ void ofdm_sync_state_machine_data(struct OFDM *ofdm, uint8_t *rx_uw) {
 
         if (ofdm->modem_frame >= ofdm->np) {
             ofdm->modem_frame = 0;
-            ofdm->frame_count++;
-            //fprintf(stderr, "frame_count: %d  framesperburst:%d\n", ofdm->frame_count, ofdm->framesperburst);
-            if (ofdm->framesperburst) {
-                if (ofdm->frame_count >= ofdm->framesperburst)
+            ofdm->packet_count++;
+            if (ofdm->packetsperburst) {
+                if (ofdm->packet_count >= ofdm->packetsperburst)
                     next_state = search;
             }
         }
@@ -1943,7 +1942,7 @@ void ofdm_sync_state_machine(struct OFDM *ofdm, uint8_t *rx_uw) {
     if (!strcmp(ofdm->state_machine, "voice1"))
         ofdm_sync_state_machine_voice1(ofdm, rx_uw);
     if (!strcmp(ofdm->state_machine, "data"))
-        ofdm_sync_state_machine_data(ofdm, rx_uw);
+        ofdm_sync_state_machine_data_streaming(ofdm, rx_uw);
     if (!strcmp(ofdm->state_machine, "voice2"))
         ofdm_sync_state_machine_voice2(ofdm, rx_uw);
 }

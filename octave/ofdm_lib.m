@@ -1522,7 +1522,8 @@ function states = sync_state_machine_data_streaming(states, rx_uw)
 
   if strcmp(states.sync_state,'search')
     if states.timing_valid
-      states.sync_start = 1; states.sync_counter = 0;
+      states.sync_start = 1; 
+      states.sync_counter = 0;
       next_state = 'trial';
     end
   end

@@ -144,7 +144,7 @@ struct OFDM {
     int bad_uw_errors;
     int edge_pilots;      /* insert pilots at 1 and Nc+2, to support low bandwidth phase est */
     char *data_mode;      /* "", "streaming", "burst"  */
-    int framesperburst;   /* for OFDM data modes, how many frames before we reset state machine */
+    int packetsperburst;  /* for OFDM data modes, how many packets before we reset state machine */
     int amp_est_mode;     /* amplitude estimtor algorithm */
     float amp_scale;
     float clip_gain1;
@@ -218,8 +218,9 @@ struct OFDM {
     int nin;
     int uw_errors;
     int sync_counter;
-    int frame_count;
-    int modem_frame; /* increments for every modem frame in packet */
+    int frame_count;  /* general purpose counter of modem frames */
+    int packet_count; /* data mode: number of packets received so far */ 
+    int modem_frame;  /* increments for every modem frame in packet */
 
     // Boolean
     bool sync_start;
