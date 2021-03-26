@@ -10,11 +10,11 @@
 
   i) 10 seconds, AWGN channel at SNR3k=3dB
 
-    octave:4> ofdm_tx("awgn_snr_3dB_700d.raw", "700D", 10, 3);
+    octave:4> ofdm_tx("awgn_snr_3dB_700d.raw", "700D", 10, 3)
 
   ii) 10 seconds, multipath poor channel at SNR=6dB
 
-    octave:5> ofdm_tx("hf_snr_6dB_700d.raw", "700D", 10, 6, "mpp");
+    octave:5> ofdm_tx("hf_snr_6dB_700d.raw", "700D", 10, 6, "mpp")
     
   iii) Data mode example, three bursts of one packet each, SNR=100dB:
   
@@ -29,15 +29,19 @@ function ofdm_tx(filename, mode="700D", N, SNR3kdB=100, channel='awgn', varargin
   pkg load signal;
 
   tx_clip_en = 0; freq_offset_Hz = 0.0; burst_mode = 0; Nbursts = 1;
-  for i = 1:length (varargin)
+  i = 1;
+  while i<length(varargin)
     if strcmp(varargin{i},"txclip") 
       txclip_en = 1;
-    end
-    if strcmp(varargin{i},"bursts") 
+    elseif strcmp(varargin{i},"bursts") 
       burst_mode = 1;
-      Nbursts = varargin{i+1};
-    end  
-  endfor
+      Nbursts = varargin{i+1}; i++;
+    else
+      printf("\nERROR unknown argument: [%d] %s \n", i ,varargin{i});
+      return;
+    end
+    i++;
+  end
   
   % init modem
 
@@ -63,6 +67,7 @@ function ofdm_tx(filename, mode="700D", N, SNR3kdB=100, channel='awgn', varargin
     tx = [tx atx];
   end
   if length(states.data_mode)
+    % note postamble provides a "column" of pilots at the end of the burst
     tx = [states.tx_preamble tx states.tx_postamble];
   end
   

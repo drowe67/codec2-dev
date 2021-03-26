@@ -32,26 +32,26 @@ function ofdm_rx(filename, mode="700D", varargin)
   states.verbose = 0;
   pass_ber = 0;
   pass_packet_count = 0;
-  
-  for i = 1:length (varargin)
+   
+  i = 1;
+  while i < length(varargin)
     if strcmp(varargin{i},"packetsperburst")
       states.data_mode = "burst"; % use pre/post amble based sync
-      states.packetsperburst = varargin{i+1};
-    end
-    
-    % flags used to support ctests  
-    if strcmp(varargin{i},"passber")
-      pass_ber = varargin{i+1};
-    end  
-    if strcmp(varargin{i},"passpacketcount")
-      pass_packet_count = varargin{i+1};
-    end  
-    if strcmp(varargin{i},"postambletest")
+      states.packetsperburst = varargin{i+1}; i++;
+    elseif strcmp(varargin{i},"passber")
+      pass_ber = varargin{i+1}; i++;
+    elseif strcmp(varargin{i},"passpacketcount")
+      pass_packet_count = varargin{i+1}; i++;
+    elseif strcmp(varargin{i},"postambletest")
       states.postambletest = 1;
       % at high SNR avoid firing on data frames just before postamble
-      state.timing_mx_thresh = 0.15;
-    end  
-  endfor
+      states.timing_mx_thresh = 0.15;
+    else
+      printf("\nERROR unknown argument: %s\n", varargin{i});
+      return;
+    end
+    i++; 
+  end
   
   % load real samples from file
 
@@ -75,11 +75,7 @@ function ofdm_rx(filename, mode="700D", varargin)
 
   prx = 1;
   nin = Nsamperframe+2*(M+Ncp);
-  %states.rxbuf(Nrxbuf-nin+1:Nrxbuf) = rx(prx:nin);
-  %prx += nin;
-
   states.verbose = 1;
-
   Nsymsperpacket = Nbitsperpacket/bps; Nsymsperframe = Nbitsperframe/bps;
   rx_syms = zeros(1,Nsymsperpacket); rx_amps = zeros(1,Nsymsperpacket);
   Nerrs = 0; rx_uw = zeros(1,states.Nuwbits);
@@ -118,7 +114,7 @@ function ofdm_rx(filename, mode="700D", varargin)
       rx_uw = extract_uw(states, rx_syms(end-Nuwframes*Nsymsperframe+1:end), rx_amps(end-Nuwframes*Nsymsperframe+1:end));
 
       % We need the full packet of symbols before disassembling and checking for bit errors
-      if states.modem_frame == (states.Np-1)
+      if states.modem_frame == (states.Np-1);
         rx_bits = zeros(1,Nbitsperpacket);
         for s=1:Nsymsperpacket
           if bps == 2

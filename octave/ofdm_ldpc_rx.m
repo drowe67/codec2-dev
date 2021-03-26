@@ -27,14 +27,22 @@ function ofdm_ldpc_rx(filename, mode="700D", varargin)
   states = ofdm_init(config);
   ofdm_load_const;
   states.verbose = 1;
+  pass_packet_count = 0;
  
-  for i = 1:length (varargin)
+  i=1;
+  while i < length(varargin)
+    printf("%d %s\n", i, varargin{i})
     if strcmp(varargin{i},"packetsperburst")
       states.data_mode = "burst"; % use pre/post amble based sync
-      states.packetsperburst = varargin{i+1};
-      printf("BURST mode!\n");
-    end
-  endfor
+      states.packetsperburst = varargin{i+1}; i++;
+    elseif strcmp(varargin{i},"passpacketcount")
+      pass_packet_count = varargin{i+1}; i++;
+    else
+      printf("\nERROR unknown argument: [%d] %s \n", i ,varargin{i});
+      return;
+    end  
+    i++;
+  end
 
   % some constants used for assembling modem frames
 
@@ -265,5 +273,8 @@ function ofdm_ldpc_rx(filename, mode="700D", varargin)
   ylabel('SNR (dB)')
 
   figure(9); clf; plot_specgram(rx);
-  
+
+  if pass_packet_count > 0
+    if packet_count >= pass_packet_count printf("Pass!\n"); else printf("Fail!\n"); end;
+  end
 endfunction

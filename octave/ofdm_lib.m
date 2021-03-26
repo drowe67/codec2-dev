@@ -92,7 +92,7 @@ function states = ofdm_init(config)
   % some basic sanity checks
   assert(floor(states.M) == states.M);
 
-  % UW symbol placement.  Use ofdm_dev.m, debug_false_sync() to test.
+  % UW symbol placement. 
   % Note we need to fill each UW symbols with bits.  The LDPC decoder
   % works on symbols so we can't break up any symbols into UW/FEC
   % encoded bits.
@@ -1326,7 +1326,6 @@ function tx_preamble = ofdm_generate_preamble(states, seed=2)
   % tweak local copy of states so we can generate a 1 modem-frame packet
   tmp_states.Np = 1; tmp_states.Nbitsperpacket = tmp_states.Nbitsperframe;
   preamble_bits = ofdm_rand(tmp_states.Nbitsperframe, seed) > 16384;
-  tmp_states.pilots = ones(1,tmp_states.Nc+2);
   tx_preamble = ofdm_mod(tmp_states, preamble_bits);
 endfunction
 
