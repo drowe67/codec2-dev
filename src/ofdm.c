@@ -510,6 +510,9 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
         assert(ofdm->tx_preamble != NULL);
         ofdm_generate_preamble(ofdm, ofdm->tx_preamble, 2);
     }
+    ofdm->postambledetectoren = !strcmp(ofdm->data_mode,"burst");
+    ofdm->postambledetectorcounter = 0;
+    
     return ofdm; /* Success */
 }
 
@@ -1826,7 +1829,7 @@ void ofdm_sync_state_machine_voice1(struct OFDM *ofdm, uint8_t *rx_uw) {
 }
 
 /*
- * state machine for data modes
+ *  data (streaming mode) state machine
  */
 void ofdm_sync_state_machine_data_streaming(struct OFDM *ofdm, uint8_t *rx_uw) {
     State next_state = ofdm->sync_state;
@@ -1878,6 +1881,73 @@ void ofdm_sync_state_machine_data_streaming(struct OFDM *ofdm, uint8_t *rx_uw) {
             }
         }
         
+    }
+
+    ofdm->last_sync_state = ofdm->sync_state;
+    ofdm->sync_state = next_state;
+}
+
+/*
+ *  data (burst mode) state machine
+ */
+void ofdm_sync_state_machine_data_burst(struct OFDM *ofdm, uint8_t *rx_uw) {
+    State next_state = ofdm->sync_state;
+    int i;
+
+    ofdm->sync_start = ofdm->sync_end = 0;
+
+    if (ofdm->sync_state == search) {
+        if (ofdm->timing_valid != 0) {
+            ofdm->sync_start = true;
+            ofdm->sync_counter = 0;
+            next_state = trial;
+        }
+        // re-enable postamble detector after enough samples have passed to avoid a loop
+       if (ofdm->postambledetectoren == 0) {
+           if (ofdm->postambledetectorcounter < 0) {
+               ofdm->postambledetectoren = true;
+               fprintf(stderr, "\npostamble detector on!");
+           }
+       }
+    }
+
+    ofdm->uw_errors = 0;
+    for (i = 0; i < ofdm->nuwbits; i++) {
+        ofdm->uw_errors += ofdm->tx_uw[i] ^ rx_uw[i];
+    }
+
+    /* pre or post-amble has told us this is the start of the packet.  Confirm we 
+      have a valid frame by checking the UW after the modem frames containing
+      the UW have been received */
+    if (ofdm->sync_state == trial) {
+        ofdm->sync_counter++;
+        if (ofdm->sync_counter > ofdm->nuwframes) {
+            if (ofdm->uw_errors < ofdm->bad_uw_errors) {
+                next_state = synced;
+                ofdm->packet_count = 0;
+                ofdm->modem_frame = ofdm->nuwframes;    
+            } else {
+               // make sure we only ever loop once through same samples to avoid infinte loop
+               ofdm->postambledetectoren = false;
+               ofdm->postambledetectorcounter = ofdm->np * ofdm->samplesperframe;
+           }
+       }
+   }
+       
+    if (ofdm->sync_state == synced) {
+        ofdm->modem_frame++;
+        if (ofdm->modem_frame >= ofdm->np) {
+            ofdm->modem_frame = 0;
+            ofdm->packet_count++;
+            if (ofdm->packetsperburst) {
+                if (ofdm->packet_count >= ofdm->packetsperburst) {
+                    next_state = search;
+                    // make sure we only ever loop once through same samples to avoid infinte loop
+                    ofdm->postambledetectoren = false;
+                    ofdm->postambledetectorcounter = ofdm->np * ofdm->samplesperframe;
+                }
+            }
+        }    
     }
 
     ofdm->last_sync_state = ofdm->sync_state;
@@ -1941,8 +2011,12 @@ void ofdm_sync_state_machine_voice2(struct OFDM *ofdm, uint8_t *rx_uw) {
 void ofdm_sync_state_machine(struct OFDM *ofdm, uint8_t *rx_uw) {
     if (!strcmp(ofdm->state_machine, "voice1"))
         ofdm_sync_state_machine_voice1(ofdm, rx_uw);
-    if (!strcmp(ofdm->state_machine, "data"))
-        ofdm_sync_state_machine_data_streaming(ofdm, rx_uw);
+    if (!strcmp(ofdm->state_machine, "data")) {
+        if (strcmp(ofdm->data_mode,"streaming") == 0)
+            ofdm_sync_state_machine_data_streaming(ofdm, rx_uw);
+        else
+            ofdm_sync_state_machine_data_burst(ofdm, rx_uw);
+    }
     if (!strcmp(ofdm->state_machine, "voice2"))
         ofdm_sync_state_machine_voice2(ofdm, rx_uw);
 }

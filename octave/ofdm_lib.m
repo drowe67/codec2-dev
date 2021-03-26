@@ -249,7 +249,7 @@ function states = ofdm_init(config)
   states.modem_frame = 0;                                 % keep track of how many frames received in packet
   states.state_machine = state_machine;                   % mode specific state machine
   states.packetsperburst = 0;                             % for OFDM data modes, how many packets before we reset state machine
-  states.postambledectoren = strcmp(data_mode,"burst");
+  states.postambledetectoren = strcmp(data_mode,"burst");
   states.postambledetectorcounter = 0;
   states.npre = states.npost = 0;                         % counters for logging
   
@@ -765,20 +765,20 @@ end
 function [timing_valid states] = ofdm_sync_search_burst(states)
   ofdm_load_const;
 
-  if states.postambledectoren == 0
+  if states.postambledetectoren == 0
     states.postambledetectorcounter -= states.nin;
   end
   
   pre_post = "";
   st = rxbufst + M+Ncp + Nsamperframe + 1; en = st + 2*Nsamperframe - 1;
   pre = burst_acquisition_detector(states, states.rxbuf, st, states.tx_preamble);
-  if states.postambledectoren
+  if states.postambledetectoren
     post = burst_acquisition_detector(states, states.rxbuf, st, states.tx_postamble);
   end
   
   if isfield(states,"postambletest") pre.timing_mx = 0; end % force ignore preamble to test postamble
 
-  if (states.postambledectoren == 0) || (pre.timing_mx > post.timing_mx)
+  if (states.postambledetectoren == 0) || (pre.timing_mx > post.timing_mx)
     timing_mx = pre.timing_mx; ct_est = pre.ct_est - st; foff_est = pre.foff_est;
     pre_post = "pre";
   else
@@ -1575,13 +1575,14 @@ function states = sync_state_machine_data_burst(states, rx_uw)
 
   if strcmp(states.sync_state,'search')
     if states.timing_valid
-      states.sync_start = 1; states.sync_counter = 0;
+      states.sync_start = 1; 
+      states.sync_counter = 0;
       next_state = 'trial';
     end
     % re-enable postamble detector after enough samples have passed to avoid a loop
-    if states.postambledectoren == 0
+    if states.postambledetectoren == 0
        if states.postambledetectorcounter < 0
-         states.postambledectoren = 1;
+         states.postambledetectoren = 1;
          printf("\npostamble detector on!");
        end
     end
@@ -1603,7 +1604,7 @@ function states = sync_state_machine_data_burst(states, rx_uw)
       else
         next_state = "search";
         % make sure we only ever loop once through same samples to avoid infinte loop
-        states.postambledectoren = 0;
+        states.postambledetectoren = 0;
         states.postambledetectorcounter = Np*Nsamperframe;
       end
     end
@@ -1618,7 +1619,7 @@ function states = sync_state_machine_data_burst(states, rx_uw)
         if (states.packet_count >= states.packetsperburst)
           next_state = "search";                        % we've finished this burst
           % make sure we only ever loop once through same samples to avoid infinte loop
-          states.postambledectoren = 0;
+          states.postambledetectoren = 0;
           states.postambledetectorcounter = Np*Nsamperframe;
         end
       end

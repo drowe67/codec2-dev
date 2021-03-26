@@ -221,7 +221,8 @@ struct OFDM {
     int frame_count;  /* general purpose counter of modem frames */
     int packet_count; /* data mode: number of packets received so far */ 
     int modem_frame;  /* increments for every modem frame in packet */
-
+    int postambledetectorcounter;
+    
     // Boolean
     bool sync_start;
     bool sync_end;
@@ -230,7 +231,8 @@ struct OFDM {
     bool phase_est_en;
     bool tx_bpf_en;
     bool dpsk_en;
-
+    bool postambledetectoren; /* allows us to optionally disable the postamble detector */
+    
     char *codename;
     char *state_machine;
 };
