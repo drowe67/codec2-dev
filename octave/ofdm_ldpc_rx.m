@@ -211,7 +211,8 @@ function ofdm_ldpc_rx(filename, mode="700D", varargin)
   
   printf("Raw BER..: %5.4f Tbits: %5d Terrs: %5d\n", Terrs/(Tbits+1E-12), Tbits, Terrs);
   printf("Coded BER: %5.4f Tbits: %5d Terrs: %5d\n", Terrs_coded/(Tbits_coded+1E-12), Tbits_coded, Terrs_coded);
-  printf("Coded PER: %5.4f Pckts: %5d Perrs: %5d\n", Perrs_coded/(packet_count+1E-12), packet_count, Perrs_coded);
+  printf("Coded PER: %5.4f Pckts: %5d Perrs: %5d Npre: %d Npost: %d\n", 
+         Perrs_coded/(packet_count+1E-12), packet_count, Perrs_coded,  states.npre, states.npost);
 
   if length(rx_np_log)
       figure(1); clf;

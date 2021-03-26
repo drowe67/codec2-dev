@@ -251,6 +251,7 @@ function states = ofdm_init(config)
   states.packetsperburst = 0;                             % for OFDM data modes, how many packets before we reset state machine
   states.postambledectoren = strcmp(data_mode,"burst");
   states.postambledetectorcounter = 0;
+  states.npre = states.npost = 0;                         % counters for logging
   
   % LDPC code is optionally enabled
 
@@ -798,9 +799,11 @@ function [timing_valid states] = ofdm_sync_search_burst(states)
       % printf("\n  rxbufst: %d ", states.rxbufst);
       states.rxbufst -= states.Np*states.Nsamperframe; % backup to first modem frame in packet
       states.rxbufst += ct_est - 1;
+      states.npost++;
       % printf("%d\n", states.rxbufst);
     else
       states.nin = Nsamperframe +  ct_est - 1;
+      states.npre++;
     end
   else
     states.nin = Nsamperframe;

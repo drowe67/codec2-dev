@@ -408,7 +408,7 @@ if(UNITTEST)
                             DISPLAY=\"\" octave --no-gui")
              set_tests_properties(test_OFDM_modem_octave_qam16_uncoded PROPERTIES PASS_REGULAR_EXPRESSION "Pass")
 
-    #  ---------------------------------- Data Mode burst acquiistion tests ----------------------------------
+    #  ---------------------------------- Data Mode burst acquisition tests ----------------------------------
     
     add_test(NAME test_OFDM_modem_octave_burst_acq
              COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/octave;

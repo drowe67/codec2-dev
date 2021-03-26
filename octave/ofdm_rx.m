@@ -184,8 +184,8 @@ function ofdm_rx(filename, mode="700D", varargin)
   EsNo_est = mean(sig_var_log)/mean(noise_var_log);
   EsNo_estdB = 10*log10(EsNo_est);
   SNR_estdB = EsNo_estdB + 10*log10(Nc*Rs*bps/3000);
-  printf("Packets: %3d Es/No est dB: % -4.1f SNR3k: %3.2f %f %f\n",
-         packet_count, EsNo_estdB, SNR_estdB, mean(sig_var_log), mean(noise_var_log));
+  printf("Packets: %3d Npre: %d Npost: %d Es/No est dB: % -4.1f SNR3k: %3.2f\n",
+         packet_count, states.npre, states.npost, EsNo_estdB, SNR_estdB);
 
   figure(1); clf;
   tmp = exp(j*pi/4)*rx_np_log(floor(end/4):floor(end-end/8));
