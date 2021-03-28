@@ -206,6 +206,7 @@ function ofdm_ldpc_rx(filename, mode="700D", varargin)
       Terrs_coded = Tbits_coded = 0;
       error_positions = Nerrs_coded_log = [];
     end
+    f++;
   end
   Nframes = f;
   

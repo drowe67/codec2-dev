@@ -160,6 +160,7 @@ int main(int argc, char *argv[]) {
         {"skip_secs", 'z', OPTPARSE_REQUIRED},
         {"dpsk", 'q', OPTPARSE_NONE},
         {"mode", 'r', OPTPARSE_REQUIRED},
+        {"burst", 'e', OPTPARSE_NONE},
         {0, 0, 0}
     };
 
@@ -184,6 +185,10 @@ int main(int argc, char *argv[]) {
                 break;
             case 'd':
                 testframes = true;
+                break;
+            case 'e':
+                ofdm_config->data_mode = "burst";
+                fprintf(stderr, "burst data mode!\n");
                 break;
             case 'i':
                 ldpc_en = 1;
@@ -282,7 +287,12 @@ int main(int argc, char *argv[]) {
 
     ofdm_set_phase_est_bandwidth_mode(ofdm, phase_est_bandwidth_mode);
     ofdm_set_dpsk(ofdm, dpsk);
-
+    // default to one packet per burst for burst mode
+    if (strcmp(ofdm->data_mode, "burst") == 0) {
+        ofdm_set_packets_per_burst(ofdm, 1);
+        fprintf(stderr, "one packet per burst ...\n");
+    }
+    
     /* Get a copy of the actual modem config (ofdm_create() fills in more parameters) */
     ofdm_config = ofdm_get_config_param(ofdm);
 
@@ -425,6 +435,8 @@ int main(int argc, char *argv[]) {
 
     while ((fread(rx_scaled, sizeof (short), nin_frame, fin) == nin_frame) && !finish) {
 
+        if (verbose >= 2)
+            fprintf(stderr, "%3d nin: %4d st: %-6s ", f, nin_frame,statemode[ofdm->last_sync_state]);
         bool log_payload_syms = false;
         Nerrs_raw = Nerrs_coded = 0;
 
@@ -513,6 +525,8 @@ int main(int argc, char *argv[]) {
                         Nerrs_coded = count_errors(payload_data_bits, out_char, Ndatabitsperpacket);
                         Terrs_coded += Nerrs_coded;
                         Tbits_coded += Ndatabitsperpacket;
+                        fprintf(stderr,"Nerrs_coded: %d\n", Nerrs_coded);
+
                         if (Nerrs_coded) Tper++;
                     }
 
@@ -571,16 +585,15 @@ int main(int argc, char *argv[]) {
 
         /* act on any events returned by state machine */
 
-        if (ofdm->sync_start == true) {
+        if (!strcmp(ofdm->data_mode, "streaming") && ofdm->sync_start ) {
             Terrs = Tbits = Terrs2 = Tbits2 = Terrs_coded = Tbits_coded = frame_count = packet_count = 0;
             Nerrs_raw = 0;
             Nerrs_coded = 0;
         }
 
         if (verbose >= 2) {
-           fprintf(stderr, "%3d nin: %4d st: %-6s euw: %2d %1d mf: %2d f: %5.1f pbw: %d eraw: %3d ecdd: %3d iter: %3d pcc: %3d\n",
-                    f, nin_frame,
-                    statemode[ofdm->last_sync_state],
+           if (ofdm->last_sync_state != search)
+                fprintf(stderr, "euw: %2d %1d mf: %2d f: %5.1f pbw: %d eraw: %3d ecdd: %3d iter: %3d pcc: %3d\n",
                     ofdm->uw_errors,
                     ofdm->sync_counter,
                     ofdm->modem_frame,
