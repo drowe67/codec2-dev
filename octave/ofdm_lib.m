@@ -753,9 +753,10 @@ function results = burst_acquisition_detector(states, rx, n, known_sequence)
                                                     tstep, fmin = -50, fmax = 50, fstep);
   % refine estimate over finer grid                             
   fmin = foff_est - ceil(fstep/2); fmax = foff_est + ceil(fstep/2); 
-  st = max(1, n + ct_est - tstep/2); en = st + Nsamperframe + tstep - 1;
-  [ct_est foff_est timing_mx] = est_timing_and_freq(states, rx(st:en), known_sequence, 1, fmin, fmax, 1);
-  ct_est += st;
+  fine_st = max(1, n + ct_est - tstep/2); fine_en = fine_st + Nsamperframe + tstep - 1;
+  [ct_est foff_est timing_mx] = est_timing_and_freq(states, rx(fine_st:fine_en), known_sequence, 1, fmin, fmax, 1);
+  % refer ct_est to nominal start of frame rx_buf(n)
+  ct_est += fine_st - n;
   results.ct_est = ct_est; results.foff_est = foff_est; results.timing_mx = timing_mx;
 end
 
@@ -779,10 +780,10 @@ function [timing_valid states] = ofdm_sync_search_burst(states)
   if isfield(states,"postambletest") pre.timing_mx = 0; end % force ignore preamble to test postamble
 
   if (states.postambledetectoren == 0) || (pre.timing_mx > post.timing_mx)
-    timing_mx = pre.timing_mx; ct_est = pre.ct_est - st; foff_est = pre.foff_est;
+    timing_mx = pre.timing_mx; ct_est = pre.ct_est; foff_est = pre.foff_est;
     pre_post = "pre";
   else
-    timing_mx = post.timing_mx; ct_est = post.ct_est - st; foff_est = post.foff_est;
+    timing_mx = post.timing_mx; ct_est = post.ct_est; foff_est = post.foff_est;
     pre_post = "post";
   end
   timing_valid = timing_mx > timing_mx_thresh;

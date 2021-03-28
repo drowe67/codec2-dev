@@ -83,8 +83,13 @@ function Pa = frame_by_frame_acquisition_test(mode="datac1", Ntests=10, channel=
   state = 'acquisition';
   
   for n=1:Nsamperframe:length(rx)-2*Nsamperframe
-     pre = burst_acquisition_detector(states, rx, n, tx_preamble);
+     pre = burst_acquisition_detector(states, rx, n, tx_preamble);   
      post = burst_acquisition_detector(states, rx, n, tx_postamble);
+     
+     % adjust time reference for this simulation
+     pre.ct_est += n;
+     post.ct_est += n;
+
      timing_mx_log = [timing_mx_log [pre.timing_mx; post.timing_mx]];
      
      % state machine to simulate acquisition/demod processing
@@ -125,7 +130,7 @@ function Pa = frame_by_frame_acquisition_test(mode="datac1", Ntests=10, channel=
            target_acq(i) = -1; % flag bad candidate
          end
          if post_eval.ok && (target_acq(i) == 0)
-           target_acq(i) = 1;  % flag a sucessful acquisition 
+           target_acq(i) = 1;  % flag a successful acquisition 
            next_state = "demod";
            modem_frame = Np-2;                               
          end

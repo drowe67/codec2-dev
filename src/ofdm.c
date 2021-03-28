@@ -1134,13 +1134,14 @@ static void burst_acquisition_detector(struct OFDM *ofdm,
 
     // refine estimate over finer grid
     fmin = *foff_est - ceilf(fstep/2.0); fmax = *foff_est + ceilf(fstep/2.0); 
-    int st = n + *ct_est - tstep/2.0;
+    int fine_st = n + *ct_est - tstep/2.0;
     *timing_mx = est_timing_and_freq(ofdm, ct_est, foff_est,
-                                 &rx[st], ofdm->samplesperframe + tstep, 
+                                 &rx[fine_st], ofdm->samplesperframe + tstep, 
                                  known_sequence, ofdm->samplesperframe,
                                  1, fmin, fmax, 1.0);                
                                  
-    *ct_est += st;
+    // refer ct_est to nominal start of frame rx[n]
+    *ct_est += fine_st - n;
 }
     
 static int ofdm_sync_search_burst(struct OFDM *ofdm) {
@@ -1152,8 +1153,8 @@ static int ofdm_sync_search_burst(struct OFDM *ofdm) {
     burst_acquisition_detector(ofdm, ofdm->rxbuf, st, (complex float*)ofdm->tx_preamble, &ct_est, &foff_est, &timing_mx);
     
     int timing_valid = timing_mx > ofdm->timing_mx_thresh;
-    ofdm->ct_est = ct_est - st;
-    ofdm->nin = ct_est - st;
+    ofdm->ct_est = ct_est;
+    ofdm->nin = ct_est;
     ofdm->foff_est_hz = foff_est;
     ofdm->timing_mx = timing_mx;
     ofdm->timing_valid = timing_valid;
