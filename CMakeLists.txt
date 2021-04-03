@@ -510,7 +510,15 @@ endif()
 
     # To integrate a new mode/waveform we prototype in Octave, get the core OFDM modem
     # running in C, then the FreeDV API.  Here we test Octave and the C versions of the
-    # OFDM modem together
+    # OFDM modem working together, to help prevent any bit rot between them
+
+    # DATAC0 burst mode Octave Tx, C Rx
+    add_test(NAME test_OFDM_modem_datac0_octave_burst
+             COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/octave;
+                            DISPLAY=\"\" octave-cli -qf --eval \"ofdm_ldpc_tx('${CMAKE_CURRENT_BINARY_DIR}/test.raw','datac0',1,100,'awgn','bursts',3)\";
+                            cd ${CMAKE_CURRENT_BINARY_DIR};
+                            cat test.raw | ./src/ofdm_demod --mode datac0 --out /dev/null  --testframes --ldpc --verbose 1 --burst")
+             set_tests_properties(test_OFDM_modem_datac0_octave_burst PROPERTIES PASS_REGULAR_EXPRESSION "Coded PER: 0.0000 Tpkts:     3")
 
     # DATAC1 C Tx, Octave Rx
     add_test(NAME test_OFDM_modem_datac1_octave
