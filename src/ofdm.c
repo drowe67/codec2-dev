@@ -901,37 +901,44 @@ void ofdm_txframe(struct OFDM *ofdm, complex float *tx, complex float *tx_sym_li
             tx[m + j] = asymbol_cp[j];
         }
     }
-
+    
     size_t samplesperpacket = ofdm->np*ofdm->samplesperframe;
+    ofdm_hilbert_clipper(ofdm, tx, samplesperpacket);
+}
 
-    /* vanilla Tx output waveform should be about OFDM__PEAK */
-    for(i=0; i<samplesperpacket; i++) tx[i] *= ofdm->amp_scale;
+
+/* Scale Tx signal and optionally apply two stage Hilbert clipper to improve PAPR */
+void ofdm_hilbert_clipper(struct OFDM *ofdm, complex float *tx, size_t n) {
+    
+    /* vanilla Tx output waveform should be about OFDM_PEAK */
+    for(int i=0; i<n; i++) tx[i] *= ofdm->amp_scale;
 
     if (ofdm->clip_en) {
         // this gain set the drive into the Hilbert Clipper and sets PAPR
-        for(i=0; i<samplesperpacket; i++) tx[i] *= ofdm->clip_gain1;
-        ofdm_clip(tx, OFDM_PEAK, samplesperpacket);
+        for(int i=0; i<n; i++) tx[i] *= ofdm->clip_gain1;
+        ofdm_clip(tx, OFDM_PEAK, n);
     }
 
-   /* OFDM clipper (compressor) */
+   /* BPF to remove out of band energy clipper introduces */
     if (ofdm->tx_bpf_en) {
         assert(!strcmp(ofdm->mode, "700D") || !strcmp(ofdm->mode, "700E"));
         assert(ofdm->tx_bpf != NULL);
-        complex float tx_filt[samplesperpacket];
+        complex float tx_filt[n];
 
-        quisk_ccfFilter(tx, tx_filt, samplesperpacket, ofdm->tx_bpf);
-        memmove(tx, tx_filt, samplesperpacket * sizeof (complex float));
+        quisk_ccfFilter(tx, tx_filt, n, ofdm->tx_bpf);
+        memmove(tx, tx_filt, n * sizeof (complex float));
     }
 
     /* BPF messes up peak levels, this gain gets back to approx OFDM_PEAK */
     if (ofdm->tx_bpf_en && ofdm->clip_en)
-        for(i=0; i<samplesperpacket; i++) tx[i] *= ofdm->clip_gain2;
+        for(int i=0; i<n; i++) tx[i] *= ofdm->clip_gain2;
 
     /* a very small percentage of samples may still exceed OFDM_PEAK, in
        clipped or unclipped mode.  Lets remove them so we present consistent
        levels to the transmitter */
-    ofdm_clip(tx, OFDM_PEAK, samplesperpacket);
+    ofdm_clip(tx, OFDM_PEAK, n);
 }
+
 
 struct OFDM_CONFIG *ofdm_get_config_param(struct OFDM *ofdm) { return &ofdm->config; }
 int ofdm_get_nin(struct OFDM *ofdm) {return ofdm->nin;}
@@ -1003,7 +1010,7 @@ void ofdm_set_packets_per_burst(struct OFDM *ofdm, int packetsperburst) {
  */
 void ofdm_mod(struct OFDM *ofdm, COMP *result, const int *tx_bits) {
     int length = ofdm->bitsperpacket / ofdm->bps;
-    complex float *tx = (complex float *) &result[0]; // complex has same memory layout
+    complex float *tx = (complex float *) result; // complex has same memory layout
     complex float tx_sym_lin[length];
     int dibit[2];
     int s, i;
@@ -2286,7 +2293,8 @@ void ofdm_generate_preamble(struct OFDM *ofdm, COMP *tx_preamble, int seed) {
   int preamble_bits[ofdm_preamble.bitsperpacket];
   for(int i=0; i<ofdm_preamble.bitsperpacket; i++) 
       preamble_bits[i] = r[i] > 16384;
-  ofdm_preamble.amp_scale = 1.0;
+  // ensures the signal passes through hilbert clipper unchanged
+  ofdm_preamble.amp_scale = 1.0; ofdm_preamble.tx_bpf_en = false;
   ofdm_mod(&ofdm_preamble, tx_preamble, preamble_bits);
 }
 
