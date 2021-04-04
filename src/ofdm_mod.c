@@ -104,7 +104,8 @@ int main(int argc, char *argv[]) {
 
     int Npackets = 0;
     int Nsec = 0;
-
+    int bursts = 0;
+    
     /* set up the default modem config */
     struct OFDM_CONFIG *ofdm_config = (struct OFDM_CONFIG *) calloc(1, sizeof (struct OFDM_CONFIG));
     assert(ofdm_config != NULL);
@@ -132,6 +133,7 @@ int main(int argc, char *argv[]) {
         {"dpsk", 'q', OPTPARSE_NONE},
         {"mode", 'g', OPTPARSE_REQUIRED},
         {"help", 'h', OPTPARSE_NONE},
+        {"bursts", 'o', OPTPARSE_REQUIRED},
         {0, 0, 0}
     };
 
@@ -179,6 +181,10 @@ int main(int argc, char *argv[]) {
                 break;
             case 'n':
                 ofdm_config->tx_centre = atof(options.optarg);
+                break;
+            case 'o':
+                bursts = atoi(options.optarg);
+                fprintf(stderr, "bursts: %d\n", bursts);
                 break;
             case 'i':
                 ofdm_config->rx_centre = atof(options.optarg);
@@ -347,12 +353,7 @@ int main(int argc, char *argv[]) {
             }
 
             ofdm_ldpc_interleave_tx(ofdm, &ldpc, tx_sams, data_bits, txt_bits);
-
-            for (i = 0; i < Nsamperpacket; i++) {
-                tx_real[i] = crealf(tx_sams[i]);
-            }
-
-            fwrite(tx_real, sizeof (short), Nsamperpacket, fout);
+            for (i = 0; i < Nsamperpacket; i++) tx_real[i] = crealf(tx_sams[i]);
         } else {
             /* just modulate uncoded raw bits ------------------------------------*/
 
@@ -374,13 +375,10 @@ int main(int argc, char *argv[]) {
             for (i = 0; i < Nbitsperpacket; i++) tx_bits[i] = tx_bits_char[i];
             COMP tx_sams[Nsamperpacket];
             ofdm_mod(ofdm, tx_sams, tx_bits);
-
-            /* scale and save to disk as shorts */
-            for (i = 0; i < Nsamperpacket; i++)
-                tx_real[i] = tx_sams[i].real;
-            fwrite(tx_real, sizeof (short), Nsamperpacket, fout);
+            for (i = 0; i < Nsamperpacket; i++) tx_real[i] = tx_sams[i].real;
         }
 
+        fwrite(tx_real, sizeof (short), Nsamperpacket, fout);
         packet++;
 
         if (testframes && (packet >= Npackets))

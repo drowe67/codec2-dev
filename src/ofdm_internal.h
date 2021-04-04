@@ -256,6 +256,7 @@ void ofdm_generate_preamble(struct OFDM *ofdm, COMP *tx_preamble, int seed);
 int ofdm_get_phase_est_bandwidth_mode(struct OFDM *);
 void ofdm_set_phase_est_bandwidth_mode(struct OFDM *, int);
 void ofdm_clip(complex float tx[], float clip_thresh, int n);
+void ofdm_hilbert_clipper(struct OFDM *ofdm, complex float *tx);
 
 #ifdef __cplusplus
 }
