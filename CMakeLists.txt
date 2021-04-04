@@ -357,7 +357,7 @@ if(UNITTEST)
     add_test(NAME test_fdmdv_16to8_short
              COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/octave;
                             ${CMAKE_CURRENT_BINARY_DIR}/unittest/t16_8_short;
-                            DISPLAY=\"\" echo \"diff_fft_mag('in8.raw','out8.raw'); quit;\" | octave --no-gui -qf
+                            DISPLAY=\"\" echo \"diff_fft_mag('in8_short.raw','out8_short.raw'); quit;\" | octave --no-gui -qf
                             ")
              set_tests_properties(test_fdmdv_16to8_short PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
 

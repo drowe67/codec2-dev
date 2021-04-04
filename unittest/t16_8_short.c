@@ -44,9 +44,9 @@ int main() {
 
     f16 = fopen("out16_short.raw", "wb");
     assert(f16 != NULL);
-    f8 = fopen("out8.raw", "wb");
+    f8 = fopen("out8_short.raw", "wb");
     assert(f8 != NULL);
-    f8in = fopen("in8.raw", "wb");
+    f8in = fopen("in8_short.raw", "wb");
     assert(f8in != NULL);
 
     /* clear filter memories */
