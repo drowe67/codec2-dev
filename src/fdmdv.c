@@ -1759,21 +1759,16 @@ void fdmdv_get_demod_stats(struct FDMDV *fdmdv, struct MODEM_STATS *stats)
 
 \*---------------------------------------------------------------------------*/
 
-void fdmdv_8_to_16(float out16k[], float in8k[], int n)
+void fdmdv_8_to_16(float out16k[], float in8k[], int n8k)
 {
     int i,k,l;
     float acc;
-
-    /* make sure n is an integer multiple of the oversampling rate, ow
-       this function breaks */
-
-    assert((n % FDMDV_OS) == 0);
 
     /* this version unrolled for specific FDMDV_OS */
 
     assert(FDMDV_OS == 2);
 
-    for(i=0; i<n; i++) {
+    for(i=0; i<n8k; i++) {
         acc = 0.0;
         for(k=0,l=0; k<FDMDV_OS_TAPS_16K; k+=FDMDV_OS,l++)
             acc += fdmdv_os_filter[k]*in8k[i-l];
@@ -1788,25 +1783,20 @@ void fdmdv_8_to_16(float out16k[], float in8k[], int n)
     /* update filter memory */
 
     for(i=-(FDMDV_OS_TAPS_8K); i<0; i++)
-	in8k[i] = in8k[i + n];
+	in8k[i] = in8k[i + n8k];
 
 }
 
-void fdmdv_8_to_16_short(short out16k[], short in8k[], int n)
+void fdmdv_8_to_16_short(short out16k[], short in8k[], int n8k)
 {
     int i,k,l;
     float acc;
-
-    /* make sure n is an integer multiple of the oversampling rate, ow
-       this function breaks */
-
-    assert((n % FDMDV_OS) == 0);
 
     /* this version unrolled for specific FDMDV_OS */
 
     assert(FDMDV_OS == 2);
 
-    for(i=0; i<n; i++) {
+    for(i=0; i<n8k; i++) {
         acc = 0.0;
         for(k=0,l=0; k<FDMDV_OS_TAPS_16K; k+=FDMDV_OS,l++)
             acc += fdmdv_os_filter[k]*(float)in8k[i-l];
@@ -1821,7 +1811,7 @@ void fdmdv_8_to_16_short(short out16k[], short in8k[], int n)
     /* update filter memory */
 
     for(i=-(FDMDV_OS_TAPS_8K); i<0; i++)
-	in8k[i] = in8k[i + n];
+	in8k[i] = in8k[i + n8k];
 
 }
 
