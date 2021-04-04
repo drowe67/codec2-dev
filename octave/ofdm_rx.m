@@ -34,7 +34,7 @@ function ofdm_rx(filename, mode="700D", varargin)
   pass_packet_count = 0;
    
   i = 1;
-  while i < length(varargin)
+  while i <= length(varargin)
     if strcmp(varargin{i},"packetsperburst")
       states.data_mode = "burst"; % use pre/post amble based sync
       states.packetsperburst = varargin{i+1}; i++;
@@ -43,6 +43,7 @@ function ofdm_rx(filename, mode="700D", varargin)
     elseif strcmp(varargin{i},"passpacketcount")
       pass_packet_count = varargin{i+1}; i++;
     elseif strcmp(varargin{i},"postambletest")
+      printf("postamble test!\n");
       states.postambletest = 1;
       % at high SNR avoid firing on data frames just before postamble
       states.timing_mx_thresh = 0.15;

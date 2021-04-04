@@ -30,8 +30,7 @@ function ofdm_ldpc_rx(filename, mode="700D", varargin)
   pass_packet_count = 0;
  
   i=1;
-  while i < length(varargin)
-    printf("%d %s\n", i, varargin{i})
+  while i <= length(varargin)
     if strcmp(varargin{i},"packetsperburst")
       states.data_mode = "burst"; % use pre/post amble based sync
       states.packetsperburst = varargin{i+1}; i++;

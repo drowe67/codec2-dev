@@ -30,7 +30,7 @@ function ofdm_ldpc_tx(filename, mode="700D", N, SNR3kdB=100, channel='awgn', var
 
   tx_clip_en = 0; freq_offset_Hz = 0.0; burst_mode = 0; Nbursts = 1;
   i = 1;
-  while i<length(varargin)
+  while i<=length(varargin)
     if strcmp(varargin{i},"txclip") 
       txclip_en = 1;
     elseif strcmp(varargin{i},"bursts") 
