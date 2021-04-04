@@ -72,6 +72,7 @@ int main(int argc, char *argv[])
     assert(fout != NULL);
     fprintf(fout, "# Created by tofdm_acq.c\n");
     octave_save_complex(fout, "tx_preamble_c", (COMP*)ofdm->tx_preamble, 1, ofdm->samplesperframe, ofdm->samplesperframe);
+    octave_save_complex(fout, "tx_postamble_c", (COMP*)ofdm->tx_postamble, 1, ofdm->samplesperframe, ofdm->samplesperframe);
     octave_save_float(fout, "timing_mx_log_c", timing_mx_log, 1, f, f);
     octave_save_float(fout, "foff_est_log_c", foff_est_log, 1, f, f);
     octave_save_int(fout, "ct_est_log_c", ct_est_log, 1, f);

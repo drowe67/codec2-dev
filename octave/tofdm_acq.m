@@ -43,24 +43,28 @@ end
 system(sprintf("%s/tofdm_acq %s", path_to_unittest, filename));
 load tofdm_acq_out.txt;
 
-fg = 1; p = 0;
+fg = 1; passes = 0; ntests = 0;
 
 tx_preamble = states.tx_preamble;
 stem_sig_and_error(fg, 211, real(tx_preamble_c), real(tx_preamble_c - tx_preamble), 'tx preamble re')
 stem_sig_and_error(fg++, 212, imag(tx_preamble_c), imag(tx_preamble_c - tx_preamble), 'tx preamble im')
-p += check(tx_preamble, tx_preamble_c, 'tx preamble', 0.1);
+passes += check(tx_preamble, tx_preamble_c, 'tx preamble', 0.1); ntests++;
+tx_postamble = states.tx_postamble;
+stem_sig_and_error(fg, 211, real(tx_postamble_c), real(tx_postamble_c - tx_postamble), 'tx postamble re')
+stem_sig_and_error(fg++, 212, imag(tx_postamble_c), imag(tx_postamble_c - tx_postamble), 'tx postamble im')
+passes += check(tx_postamble, tx_postamble_c, 'tx postamble', 0.1); ntests++;
 
 stem_sig_and_error(fg, 211, real(timing_mx_log_c), real(timing_mx_log_c - timing_mx_log), 'timing mx')
-p += check(timing_mx_log, timing_mx_log_c, 'timing_mx');
+passes += check(timing_mx_log, timing_mx_log_c, 'timing_mx'); ntests++;
 stem_sig_and_error(fg++, 212, real(ct_est_log_c), real(ct_est_log_c - ct_est_log), 'ct est')
-p += check(ct_est_log, ct_est_log_c, 'ct_est_mx');
+passes += check(ct_est_log, ct_est_log_c, 'ct_est_mx'); ntests++;
 
 stem_sig_and_error(fg, 211, real(foff_est_log_c), real(foff_est_log_c - foff_est_log), 'foff est')
-p += check(foff_est_log, foff_est_log_c, 'foff_est');
+passes += check(foff_est_log, foff_est_log_c, 'foff_est'); ntests++;
 stem_sig_and_error(fg++, 212, real(timing_valid_log_c), real(timing_valid_log_c - timing_valid_log), 'timing valid')
-p += check(timing_valid_log, timing_valid_log_c, 'timing_valid');
+passes += check(timing_valid_log, timing_valid_log_c, 'timing_valid'); ntests++;
 
-if p == 5 printf("PASS\n"); else printf("FAIL\n"); end
+if passes == ntests printf("PASS\n"); else printf("FAIL\n"); end
 
   
 

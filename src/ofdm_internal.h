@@ -174,6 +174,7 @@ struct OFDM {
     complex float *rx_np;
     complex float *tx_uw_syms;
     COMP          *tx_preamble;
+    COMP          *tx_postamble;
 
     float *rx_amp;
     float *aphase_est_pilot_log;

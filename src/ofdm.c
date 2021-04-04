@@ -509,6 +509,9 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
         ofdm->tx_preamble = (COMP*)malloc(sizeof(COMP)*ofdm->samplesperframe);
         assert(ofdm->tx_preamble != NULL);
         ofdm_generate_preamble(ofdm, ofdm->tx_preamble, 2);
+        ofdm->tx_postamble = (COMP*)malloc(sizeof(COMP)*ofdm->samplesperframe);
+        assert(ofdm->tx_postamble != NULL);
+        ofdm_generate_preamble(ofdm, ofdm->tx_postamble, 3);
     }
     ofdm->postambledetectoren = !strcmp(ofdm->data_mode,"burst");
     ofdm->postambledetectorcounter = 0;

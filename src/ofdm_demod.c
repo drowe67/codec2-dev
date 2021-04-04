@@ -369,14 +369,6 @@ int main(int argc, char *argv[]) {
 
     if (verbose != 0) {
         ofdm_set_verbose(ofdm, verbose);
-
-        fprintf(stderr, "Phase Estimate Switching: ");
-
-        switch (phase_est_bandwidth_mode) {
-        case 0: fprintf(stderr, "Auto\n");
-                break;
-        case 1: fprintf(stderr, "Locked\n");
-        }
     }
 
     complex float rx_syms[Nsymsperpacket]; float rx_amps[Nsymsperpacket];
@@ -525,7 +517,6 @@ int main(int argc, char *argv[]) {
                         Nerrs_coded = count_errors(payload_data_bits, out_char, Ndatabitsperpacket);
                         Terrs_coded += Nerrs_coded;
                         Tbits_coded += Ndatabitsperpacket;
-                        fprintf(stderr,"Nerrs_coded: %d\n", Nerrs_coded);
 
                         if (Nerrs_coded) Tper++;
                     }
