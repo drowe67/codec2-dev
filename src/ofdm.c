@@ -548,6 +548,7 @@ void ofdm_destroy(struct OFDM *ofdm) {
 
     if (strlen(ofdm->data_mode)) {
         free(ofdm->tx_preamble);
+        free(ofdm->tx_postamble);
     }
     if (ofdm->tx_bpf) {
         deallocate_tx_bpf(ofdm);
