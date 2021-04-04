@@ -63,7 +63,7 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "usage: %s [options] FSK_LDPC|DATAC0|DATAC1|DATAC2|DATAC3 InputBinaryDataFile OutputModemRawFile\n"
                "\n"
                "  --testframes N  send N test frames per burst\n"
-               "  --bursts     B  send B bursts on N testframes (default 1)\n"
+               "  --bursts     B  send B bursts of N testframes (default 1)\n"
                "  --delay      ms testframe inter-burst delay in ms (default min rqd for demod)\n"
                "  --postdelay  ms additional delay at end of testframe sequence (default) 0)\n"
                "  -a amp          maximum amplitude of FSK signal\n"
@@ -287,7 +287,7 @@ int main(int argc, char *argv[]) {
         
         int samples_delay = 0;
         if (inter_burst_delay_ms) {
-            /* user define inter-burst delay */
+            /* user defined inter-burst delay */
             samples_delay = FREEDV_FS_8000*inter_burst_delay_ms/1000;
         }
         else {                
