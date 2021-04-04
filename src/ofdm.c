@@ -130,8 +130,8 @@ complex float qpsk_mod(int *bits) {
 void qpsk_demod(complex float symbol, int *bits) {
     complex float rotate = symbol * cmplx(ROT45);
 
-    bits[0] = crealf(rotate) < 0.0f;
-    bits[1] = cimagf(rotate) < 0.0f;
+    bits[0] = crealf(rotate) <= 0.0f;
+    bits[1] = cimagf(rotate) <= 0.0f;
 }
 
 complex float qam16_mod(int *bits) {
