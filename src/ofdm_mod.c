@@ -52,12 +52,12 @@ void opt_help() {
     fprintf(stderr, "\nusage: %s [options]\n\n", progname);
     fprintf(stderr, "  --in      filename    Name of InputOneCharPerBitFile\n");
     fprintf(stderr, "  --out     filename    Name of OutputModemRawFile\n");
-    fprintf(stderr, "  --mode    modeName    Predefined mode 700D|2020|datac1\n");
+    fprintf(stderr, "  --mode    modeName    Predefined mode 700D|700E|2020|datac0|datac1|datac3\n");
     fprintf(stderr, "  --nc      [17..62]    Number of Carriers (17 default, 62 max)\n");
     fprintf(stderr, "  --ns       symbols    One pilot every ns symbols (8 default)\n");
     fprintf(stderr, "  --tcp        Nsecs    Cyclic Prefix Duration (.002 default)\n");
     fprintf(stderr, "  --ts         Nsecs    Symbol Duration (.018 default)\n");
-    fprintf(stderr, "  --testframes Nsecs    Transmit test frames (adjusts test frames for raw and LDPC modes)\n");
+    fprintf(stderr, "  --testframes Nsecs    Transmit test frames for Nsec (--testframes NpacketsPerBurst in burst mode)\n");
     fprintf(stderr, "  --tx_freq     freq    Set an optional modulation TX centre frequency (1500.0 default)\n");
     fprintf(stderr, "  --rx_freq     freq    Set an optional modulation RX centre frequency (1500.0 default)\n\n");
     fprintf(stderr, "  --verbose  [1|2|3]    Verbose output level to stderr (default off)\n");
@@ -67,6 +67,7 @@ void opt_help() {
                     "                        In testframe mode raw and coded errors will be counted.\n");
     fprintf(stderr, "  -p --databits numBits Number of data bits used in LDPC codeword.\n");
     fprintf(stderr, "  --dpsk                Differential PSK.\n");
+    fprintf(stderr, "  --bursts   nBursts    Burst mode: Send nBursts of testframes each\n");
     fprintf(stderr, "\n");
     exit(-1);
 }
@@ -282,7 +283,10 @@ int main(int argc, char *argv[]) {
     }
 
     if (testframes) {
-        Npackets = round(Nsec/ofdm->tpacket);
+        if (bursts)
+            Npackets = Nsec;                      // burst mode: treat Nsecs as Npackets
+        else
+            Npackets = round(Nsec/ofdm->tpacket); // streaming mode
         if (verbose)
             fprintf(stderr, "Npackets: %d\n", Npackets);
     }
@@ -310,6 +314,15 @@ int main(int argc, char *argv[]) {
 	     ofdm_print_info(ofdm);
     }
 
+    if (bursts) {
+        fprintf(stderr, "Tx preamble\n");
+        complex float tx_preamble[ofdm->samplesperframe];
+        memcpy(tx_preamble, ofdm->tx_preamble, sizeof(COMP)*ofdm->samplesperframe);
+        ofdm_hilbert_clipper(ofdm, tx_preamble, ofdm->samplesperframe);
+        for (i = 0; i < ofdm->samplesperframe; i++) tx_real[i] = crealf(tx_preamble[i]);
+        fwrite(tx_real, sizeof (short), ofdm->samplesperframe, fout);
+    }
+    
     /* main loop ----------------------------------------------------------------*/
 
     int packet = 0;
@@ -385,6 +398,21 @@ int main(int argc, char *argv[]) {
             break;
     }
 
+    if (bursts) {
+        // Post-amble 
+        fprintf(stderr, "Tx postamble\n");
+        complex float tx_postamble[ofdm->samplesperframe];
+        memcpy(tx_postamble, ofdm->tx_postamble, sizeof(COMP)*ofdm->samplesperframe);
+        ofdm_hilbert_clipper(ofdm, tx_postamble, ofdm->samplesperframe);
+        for (i = 0; i < ofdm->samplesperframe; i++) tx_real[i] = crealf(tx_postamble[i]);
+        fwrite(tx_real, sizeof (short), ofdm->samplesperframe, fout);
+        // Interburst silence
+        int samples_delay = ofdm->fs;
+        short sil_short[samples_delay];
+        for(int i=0; i<samples_delay; i++) sil_short[i] = 0;
+        fwrite(sil_short, sizeof(short), samples_delay, fout);
+    }
+    
     if (input_specified)
         fclose(fin);
 
