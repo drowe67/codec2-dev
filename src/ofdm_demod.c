@@ -86,6 +86,7 @@ void opt_help() {
     fprintf(stderr, "  --len_secs        secs   Number of seconds to run demod\n");
     fprintf(stderr, "  --skip_secs   timeSecs   At timeSecs introduce a large timing error by skipping half a frame of samples\n");
     fprintf(stderr, "  --dpsk                   Differential PSK.\n");
+    fprintf(stderr, "  --packetsperburst p      use burst mode; number of packets we expect per burst\n");
     fprintf(stderr, "\n");
 
     exit(-1);
@@ -119,7 +120,8 @@ int main(int argc, char *argv[]) {
     int phase_est_bandwidth_mode = AUTO_PHASE_EST;
     int ldpc_en = 0;
     int Ndatabitsperpacket = 0;
-
+    int packetsperburst = 0;
+    
     bool testframes = false;
     bool input_specified = false;
     bool output_specified = false;
@@ -160,7 +162,7 @@ int main(int argc, char *argv[]) {
         {"skip_secs", 'z', OPTPARSE_REQUIRED},
         {"dpsk", 'q', OPTPARSE_NONE},
         {"mode", 'r', OPTPARSE_REQUIRED},
-        {"burst", 'e', OPTPARSE_NONE},
+        {"packetsperburst", 'e', OPTPARSE_REQUIRED},
         {0, 0, 0}
     };
 
@@ -188,6 +190,7 @@ int main(int argc, char *argv[]) {
                 break;
             case 'e':
                 ofdm_config->data_mode = "burst";
+                packetsperburst = atoi(options.optarg);
                 fprintf(stderr, "burst data mode!\n");
                 break;
             case 'i':
@@ -289,7 +292,7 @@ int main(int argc, char *argv[]) {
     ofdm_set_dpsk(ofdm, dpsk);
     // default to one packet per burst for burst mode
     if (strcmp(ofdm->data_mode, "burst") == 0) {
-        ofdm_set_packets_per_burst(ofdm, 1);
+        ofdm_set_packets_per_burst(ofdm, packetsperburst);
         fprintf(stderr, "one packet per burst ...\n");
     }
     

@@ -105,7 +105,8 @@ int main(int argc, char *argv[]) {
 
     int Npackets = 0;
     int Nsec = 0;
-    int bursts = 0;
+    int burst_mode = 0;
+    int Nbursts = 1;
     
     /* set up the default modem config */
     struct OFDM_CONFIG *ofdm_config = (struct OFDM_CONFIG *) calloc(1, sizeof (struct OFDM_CONFIG));
@@ -184,8 +185,9 @@ int main(int argc, char *argv[]) {
                 ofdm_config->tx_centre = atof(options.optarg);
                 break;
             case 'o':
-                bursts = atoi(options.optarg);
-                fprintf(stderr, "bursts: %d\n", bursts);
+                burst_mode = 1;
+                Nbursts = atoi(options.optarg);
+                fprintf(stderr, "bursts: %d\n", Nbursts);
                 break;
             case 'i':
                 ofdm_config->rx_centre = atof(options.optarg);
@@ -283,8 +285,8 @@ int main(int argc, char *argv[]) {
     }
 
     if (testframes) {
-        if (bursts)
-            Npackets = Nsec;                      // burst mode: treat Nsecs as Npackets
+        if (burst_mode)
+            Npackets = Nsec;                      // burst mode: treat Nsecs as Npackets/burst
         else
             Npackets = round(Nsec/ofdm->tpacket); // streaming mode
         if (verbose)
@@ -310,117 +312,114 @@ int main(int argc, char *argv[]) {
     complex float tx_sams[Nsamperpacket];
     short   tx_real[Nsamperpacket];
 
-    if (verbose > 1) {
-	     ofdm_print_info(ofdm);
-    }
+    if (verbose > 1) ofdm_print_info(ofdm);
 
-    if (bursts) {
-        fprintf(stderr, "Tx preamble\n");
-        complex float tx_preamble[ofdm->samplesperframe];
-        memcpy(tx_preamble, ofdm->tx_preamble, sizeof(COMP)*ofdm->samplesperframe);
-        ofdm_hilbert_clipper(ofdm, tx_preamble, ofdm->samplesperframe);
-        for (i = 0; i < ofdm->samplesperframe; i++) tx_real[i] = crealf(tx_preamble[i]);
-        fwrite(tx_real, sizeof (short), ofdm->samplesperframe, fout);
-    }
+    for (int b=0; b<Nbursts; b++) {
+        if (burst_mode) {
+            fprintf(stderr, "Tx preamble\n");
+            complex float tx_preamble[ofdm->samplesperframe];
+            memcpy(tx_preamble, ofdm->tx_preamble, sizeof(COMP)*ofdm->samplesperframe);
+            ofdm_hilbert_clipper(ofdm, tx_preamble, ofdm->samplesperframe);
+            for (i = 0; i < ofdm->samplesperframe; i++) tx_real[i] = crealf(tx_preamble[i]);
+            fwrite(tx_real, sizeof (short), ofdm->samplesperframe, fout);
+        }
     
-    /* main loop ----------------------------------------------------------------*/
+        /* main loop ----------------------------------------------------------------*/
 
-    int packet = 0;
-    uint8_t data_bits[Ndatabitsperpacket];
-    while (fread(data_bits, sizeof (uint8_t), Ndatabitsperpacket, fin) == Ndatabitsperpacket) {
+        int packet = 0;
+        uint8_t data_bits[Ndatabitsperpacket];
+        while (fread(data_bits, sizeof (uint8_t), Ndatabitsperpacket, fin) == Ndatabitsperpacket) {
 
-        if (ldpc_en) {
-            /* fancy LDPC encoded frames ----------------------------*/
+            if (ldpc_en) {
+                /* fancy LDPC encoded frames ----------------------------*/
 
-            /* optionally overwrite input data with test frame of
-               payload data bits known to demodulator */
+                /* optionally overwrite input data with test frame of
+                   payload data bits known to demodulator */
 
-            if (testframes) {
+                if (testframes) {
 
-                if (use_text) {
-                    // Get text bits
-                    int nspare = ofdm->ntxtbits;
-                    int k;
+                    if (use_text) {
+                        // Get text bits
+                        int nspare = ofdm->ntxtbits;
+                        int k;
 
-                    for (k = 0; k < nspare; k++) {
-                        if (nvaricode_bits) {
-                            txt_bits[k] = tx_varicode_bits[varicode_bit_index++];
-                            nvaricode_bits--;
-                        }
+                        for (k = 0; k < nspare; k++) {
+                            if (nvaricode_bits) {
+                                txt_bits[k] = tx_varicode_bits[varicode_bit_index++];
+                                nvaricode_bits--;
+                            }
 
-                        if (nvaricode_bits == 0) {
-                            /* get new char and encode */
-                            char s[2];
-                            s[0] = *ptr_text++;
+                            if (nvaricode_bits == 0) {
+                                /* get new char and encode */
+                                char s[2];
+                                s[0] = *ptr_text++;
 
-                            if (*ptr_text == 0)
-                                ptr_text = &text_str[0];
+                                if (*ptr_text == 0)
+                                    ptr_text = &text_str[0];
 
-                            nvaricode_bits = varicode_encode(tx_varicode_bits, s, VARICODE_MAX_BITS, 1, 1);
-                            varicode_bit_index = 0;
+                                nvaricode_bits = varicode_encode(tx_varicode_bits, s, VARICODE_MAX_BITS, 1, 1);
+                                varicode_bit_index = 0;
+                            }
                         }
                     }
+
+                    ofdm_generate_payload_data_bits(data_bits, Ndatabitsperpacket);
                 }
 
-                ofdm_generate_payload_data_bits(data_bits, Ndatabitsperpacket);
+                ofdm_ldpc_interleave_tx(ofdm, &ldpc, tx_sams, data_bits, txt_bits);
+                for (i = 0; i < Nsamperpacket; i++) tx_real[i] = crealf(tx_sams[i]);
+            } else {
+                /* just modulate uncoded raw bits ------------------------------------*/
+
+                /* in uncoded mode entire payload is input data bits */
+                assert(Ndatabitsperpacket == Npayloadbitsperpacket);
+
+                if (testframes) {
+                    /* build up a test frame consisting of unique word, txt bits, and psuedo-random
+                       uncoded payload bits.  The psuedo-random generator is the same as Octave so
+                       it can interoperate with ofdm_tx.m/ofdm_rx.m */
+
+                    ofdm_generate_payload_data_bits(data_bits, Npayloadbitsperpacket);
+                }
+
+                /* assemble packet of bits then modulate */
+                uint8_t tx_bits_char[Nbitsperpacket];
+                ofdm_assemble_qpsk_modem_packet(ofdm, tx_bits_char, data_bits, txt_bits);
+                int tx_bits[Nbitsperpacket];
+                for (i = 0; i < Nbitsperpacket; i++) tx_bits[i] = tx_bits_char[i];
+                COMP tx_sams[Nsamperpacket];
+                ofdm_mod(ofdm, tx_sams, tx_bits);
+                for (i = 0; i < Nsamperpacket; i++) tx_real[i] = tx_sams[i].real;
             }
 
-            ofdm_ldpc_interleave_tx(ofdm, &ldpc, tx_sams, data_bits, txt_bits);
-            for (i = 0; i < Nsamperpacket; i++) tx_real[i] = crealf(tx_sams[i]);
-        } else {
-            /* just modulate uncoded raw bits ------------------------------------*/
+            fwrite(tx_real, sizeof (short), Nsamperpacket, fout);
+            packet++;
 
-            /* in uncoded mode entire payload is input data bits */
-            assert(Ndatabitsperpacket == Npayloadbitsperpacket);
-
-            if (testframes) {
-                /* build up a test frame consisting of unique word, txt bits, and psuedo-random
-                   uncoded payload bits.  The psuedo-random generator is the same as Octave so
-                   it can interoperate with ofdm_tx.m/ofdm_rx.m */
-
-                ofdm_generate_payload_data_bits(data_bits, Npayloadbitsperpacket);
-            }
-
-            /* assemble packet of bits then modulate */
-            uint8_t tx_bits_char[Nbitsperpacket];
-            ofdm_assemble_qpsk_modem_packet(ofdm, tx_bits_char, data_bits, txt_bits);
-            int tx_bits[Nbitsperpacket];
-            for (i = 0; i < Nbitsperpacket; i++) tx_bits[i] = tx_bits_char[i];
-            COMP tx_sams[Nsamperpacket];
-            ofdm_mod(ofdm, tx_sams, tx_bits);
-            for (i = 0; i < Nsamperpacket; i++) tx_real[i] = tx_sams[i].real;
+            if (testframes && (packet >= Npackets))
+                break;
         }
 
-        fwrite(tx_real, sizeof (short), Nsamperpacket, fout);
-        packet++;
-
-        if (testframes && (packet >= Npackets))
-            break;
+        if (burst_mode) {
+            // Post-amble 
+            fprintf(stderr, "Tx postamble\n");
+            complex float tx_postamble[ofdm->samplesperframe];
+            memcpy(tx_postamble, ofdm->tx_postamble, sizeof(COMP)*ofdm->samplesperframe);
+            ofdm_hilbert_clipper(ofdm, tx_postamble, ofdm->samplesperframe);
+            for (i = 0; i < ofdm->samplesperframe; i++) tx_real[i] = crealf(tx_postamble[i]);
+            fwrite(tx_real, sizeof (short), ofdm->samplesperframe, fout);
+            // Interburst silence
+            int samples_delay = ofdm->fs;
+            short sil_short[samples_delay];
+            for(int i=0; i<samples_delay; i++) sil_short[i] = 0;
+            fwrite(sil_short, sizeof(short), samples_delay, fout);
+        }
     }
 
-    if (bursts) {
-        // Post-amble 
-        fprintf(stderr, "Tx postamble\n");
-        complex float tx_postamble[ofdm->samplesperframe];
-        memcpy(tx_postamble, ofdm->tx_postamble, sizeof(COMP)*ofdm->samplesperframe);
-        ofdm_hilbert_clipper(ofdm, tx_postamble, ofdm->samplesperframe);
-        for (i = 0; i < ofdm->samplesperframe; i++) tx_real[i] = crealf(tx_postamble[i]);
-        fwrite(tx_real, sizeof (short), ofdm->samplesperframe, fout);
-        // Interburst silence
-        int samples_delay = ofdm->fs;
-        short sil_short[samples_delay];
-        for(int i=0; i<samples_delay; i++) sil_short[i] = 0;
-        fwrite(sil_short, sizeof(short), samples_delay, fout);
-    }
-    
     if (input_specified)
         fclose(fin);
 
     if (output_specified)
         fclose(fout);
-
-    if (verbose)
-        fprintf(stderr, "%d packets processed\n", packet);
 
     ofdm_destroy(ofdm);
 

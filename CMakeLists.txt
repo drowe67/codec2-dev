@@ -517,7 +517,7 @@ endif()
              COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/octave;
                             DISPLAY=\"\" octave-cli -qf --eval \"ofdm_ldpc_tx('${CMAKE_CURRENT_BINARY_DIR}/test.raw','datac0',1,100,'awgn','bursts',3)\";
                             cd ${CMAKE_CURRENT_BINARY_DIR};
-                            cat test.raw | ./src/ofdm_demod --mode datac0 --out /dev/null  --testframes --ldpc --verbose 1 --burst")
+                            cat test.raw | ./src/ofdm_demod --mode datac0 --out /dev/null  --testframes --ldpc --verbose 1 --packetsperburst 1")
              set_tests_properties(test_OFDM_modem_datac0_octave_burst PROPERTIES PASS_REGULAR_EXPRESSION "Coded PER: 0.0000 Tpkts:     3")
 
     # DATAC1 C Tx, Octave Rx
@@ -555,6 +555,13 @@ endif()
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
                             ./ofdm_mod   --mode datac1 --in  /dev/zero --testframes 10 --ldpc --verbose 1 |
                             ./ofdm_demod --mode datac1 --out /dev/null  --testframes --ldpc --verbose 1")
+
+    # DATAC0 C Tx, C Rx, coded, burst mode
+    add_test(NAME test_OFDM_modem_datac0_ldpc_burst
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            ./ofdm_mod --mode datac0 --in /dev/zero --testframes 1 --verbose 1 --ldpc --bursts 3 |
+                            ./cohpsk_ch - - -17 --Fs 8000 |
+                            ./ofdm_demod --mode datac0 --out /dev/null --testframes --ldpc --verbose 2 --packetsperburst 1")
 
     # -------------------------------------------------------------------------
     #                                LDPC

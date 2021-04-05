@@ -75,7 +75,7 @@ void ofdm_init_mode(char mode[], struct OFDM_CONFIG *config) {
         config->ftwindowwidth = 80; config->codename = "H_128_256_5";
         uint8_t uw[] = {1,1,0,0, 1,0,1,0,  1,1,1,1, 0,0,0,0};
         memcpy(config->tx_uw, uw, sizeof(uw));
-        config->timing_mx_thresh = 0.50f;    
+        config->timing_mx_thresh = 0.08f;    
         config->data_mode = "streaming";
     } else if (strcmp(mode,"datac1") == 0) {
         config->ns=5; config->np=38; config->tcp = 0.006; config->ts = 0.016; config->nc = 27;
