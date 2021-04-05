@@ -86,7 +86,7 @@ void ofdm_init_mode(char mode[], struct OFDM_CONFIG *config) {
         uint8_t uw[] = {1,1,0,0, 1,0,1,0,  1,1,1,1, 0,0,0,0};
         assert(sizeof(uw) == config->nuwbits);
         memcpy(config->tx_uw, uw, config->nuwbits);
-        config->timing_mx_thresh = 0.50f;    
+        config->timing_mx_thresh = 0.10f;    
         config->data_mode = "streaming";
     } else if (strcmp(mode,"datac2") == 0) {
         config->ns=5; config->np=36; config->tcp = 0.006; config->ts = 0.016; config->nc = 9;
@@ -98,7 +98,7 @@ void ofdm_init_mode(char mode[], struct OFDM_CONFIG *config) {
         config->ns=5; config->np=29; config->tcp = 0.006; config->ts = 0.016; config->nc = 9;
         config->edge_pilots = 0;
         config->txtbits = 0; config->state_machine = "data";
-        config->ftwindowwidth = 80; config->timing_mx_thresh = 0.50;
+        config->ftwindowwidth = 80; config->timing_mx_thresh = 0.10;
         config->codename = "H_1024_2048_4f"; config->amp_est_mode = 1; config->tx_bpf_en = false;
         /* custom UW - we use a longer UW with higher bad_uw_errors threshold due to high raw BER */
         config->nuwbits = 40; config->bad_uw_errors = 10;

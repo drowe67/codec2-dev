@@ -994,7 +994,14 @@ endif(NOT APPLE)
      # FreeDV API raw data
      # ---------------------------------------------------------
 
-     # OFDM LDPC
+     # Burst mode: 3 bursts, each burst is two frams long
+     add_test(NAME test_freedv_data_raw_ofdm_datac0_burst
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            ./freedv_data_raw_tx --testframes 2 --bursts 3 DATAC0 /dev/zero - |
+                            ./freedv_data_raw_rx --framesperburst 2 --testframes DATAC0 - /dev/null --vv")
+             set_tests_properties(test_freedv_data_raw_ofdm_datac0_burst PROPERTIES PASS_REGULAR_EXPRESSION "Coded PER: 0.0000 Tpkts:     6 Tpers:     0")
+
+     # Streaming mode tests
      add_test(NAME test_freedv_data_raw_ofdm_datac0
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
                             head -c $((14*10)) </dev/urandom > binaryIn.bin;
