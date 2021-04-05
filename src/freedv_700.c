@@ -504,8 +504,9 @@ int freedv_comp_short_rx_ofdm(struct freedv *f, void *demod_in_8kHz, int demod_i
             }
         }
 
-        if (ofdm->modem_frame == 0) {
-           /* estimate uncoded BER from UW bits, useful in non-testframe modes */
+        if ((ofdm->np == 1) && (ofdm->modem_frame == 0)) {
+           /* add in UW bit errors, useful in non-testframe, 
+              single modem frame per packet modes */
             for(i=0; i<f->ofdm_nuwbits; i++) {
                 if (rx_uw[i] != ofdm->tx_uw[i]) {
                     f->total_bit_errors++;
