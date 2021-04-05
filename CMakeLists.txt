@@ -349,7 +349,7 @@ if(UNITTEST)
     add_test(NAME test_fdmdv_16to8
              COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/octave;
                             ${CMAKE_CURRENT_BINARY_DIR}/unittest/t16_8;
-                            DISPLAY=\"\" echo \"diff_fft_mag('in8.raw','out8.raw'); quit;\" | octave --no-gui -qf
+                            DISPLAY=\"\" echo \"diff_fft_mag('in8.raw','out8.raw'); quit;\" | octave-cli -qf
                             ")
              set_tests_properties(test_fdmdv_16to8 PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
 
@@ -357,12 +357,12 @@ if(UNITTEST)
     add_test(NAME test_fdmdv_16to8_short
              COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/octave;
                             ${CMAKE_CURRENT_BINARY_DIR}/unittest/t16_8_short;
-                            DISPLAY=\"\" echo \"diff_fft_mag('in8_short.raw','out8_short.raw'); quit;\" | octave --no-gui -qf
+                            DISPLAY=\"\" echo \"diff_fft_mag('in8_short.raw','out8_short.raw'); quit;\" | octave-cli -qf
                             ")
              set_tests_properties(test_fdmdv_16to8_short PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
 
     add_test(NAME test_CML_ldpcut
-             COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/octave; SHORT_VERSION_FOR_CTEST=1 octave --no-gui -qf ldpcut.m")
+             COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/octave; SHORT_VERSION_FOR_CTEST=1 octave-cli -qf ldpcut.m")
              set_tests_properties(test_CML_ldpcut PROPERTIES PASS_REGULAR_EXPRESSION "Nerr: 0")
 
     # check channel simulator measures correct Peak to Average Power Ratio (about 0dB) with a sine wave input signal
@@ -422,7 +422,7 @@ if(UNITTEST)
     add_test(NAME test_OFDM_modem_octave_qam16_uncoded
              COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/octave;
                             echo \"ofdm_tx('test_qam16.raw','qam16c1',3,12); ofdm_rx('test_qam16.raw','qam16c1', 0.05); quit\" |
-                            DISPLAY=\"\" octave --no-gui")
+                            DISPLAY=\"\" octave-cli")
              set_tests_properties(test_OFDM_modem_octave_qam16_uncoded PROPERTIES PASS_REGULAR_EXPRESSION "Pass")
 
     # noise free uncoded 700D test, including reading and writing payload bits
@@ -631,7 +631,7 @@ endif()
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
                             ./freedv_tx 700D ../../raw/ve9qrp.raw - |
                             ./cohpsk_ch - - -8 --Fs 8000 |
-                            ./freedv_rx 700D - /dev/null --squelch -2")
+                            ./freedv_rx 700D - /dev/null --squelch -2 -vv")
              set_tests_properties(test_freedv_api_700D_burble PROPERTIES PASS_REGULAR_EXPRESSION "output speech samples: 0")
 
     add_test(NAME test_freedv_api_700D_AWGN_BER
@@ -843,12 +843,12 @@ endif(NOT APPLE)
 
      # Octave FSK Modem, to make sure we don't break reference simulation
      add_test(NAME test_fsk_lib
-             COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/octave; DISPLAY=\"\" octave --no-gui -qf fsk_lib_demo.m")
+             COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/octave; DISPLAY=\"\" octave-cli -qf fsk_lib_demo.m")
              set_tests_properties(test_fsk_lib PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
 
      add_test(NAME test_fsk_modem_octave_port
              COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/octave;
-                            PATH_TO_TFSK=${CMAKE_CURRENT_BINARY_DIR}/unittest/tfsk octave --no-gui -qf tfsk.m")
+                            PATH_TO_TFSK=${CMAKE_CURRENT_BINARY_DIR}/unittest/tfsk octave-cli -qf tfsk.m")
              set_tests_properties(test_fsk_modem_octave_port PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
 
      add_test(NAME test_fsk_modem_mod_demod
@@ -894,7 +894,7 @@ endif(NOT APPLE)
 
      # Octave 4FSK LLR reference simulation - make sure this keeps working
      add_test(NAME test_fsk_lib_4fsk_ldpc
-             COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/octave; DISPLAY=\"\" octave --no-gui -qf fsk_lib_ldpc_demo.m")
+             COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/octave; DISPLAY=\"\" octave-cli -qf fsk_lib_ldpc_demo.m")
              set_tests_properties(test_fsk_lib_4fsk_ldpc PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
 
      # Command line Unique Word (UW) framer in hard decision mode
