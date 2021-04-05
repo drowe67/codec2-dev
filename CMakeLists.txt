@@ -346,7 +346,7 @@ if(UNITTEST)
              COMMAND sh -c "${CMAKE_CURRENT_BINARY_DIR}/unittest/thash")
 
     add_test(NAME test_CML_ldpcut
-             COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/octave; SHORT_VERSION_FOR_CTEST=1 octave --no-gui -qf ldpcut.m")
+             COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/octave; SHORT_VERSION_FOR_CTEST=1 octave-cli -qf ldpcut.m")
              set_tests_properties(test_CML_ldpcut PROPERTIES PASS_REGULAR_EXPRESSION "Nerr: 0")
 
     # check channel simulator measures correct Peak to Average Power Ratio (about 0dB) with a sine wave input signal
@@ -405,26 +405,26 @@ if(UNITTEST)
     add_test(NAME test_OFDM_modem_octave_qam16_uncoded
              COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/octave;
                             echo \"ofdm_tx('test_qam16.raw','qam16c1',3,12,'awgn','bursts',3); ofdm_rx('test_qam16.raw','qam16c1', 'passber', 0.05, 'packetsperburst', 1); quit\" |
-                            DISPLAY=\"\" octave --no-gui")
+                            DISPLAY=\"\" octave-cli")
              set_tests_properties(test_OFDM_modem_octave_qam16_uncoded PROPERTIES PASS_REGULAR_EXPRESSION "Pass")
 
     #  ---------------------------------- Data Mode burst acquisition tests ----------------------------------
     
     add_test(NAME test_OFDM_modem_octave_burst_acq
              COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/octave;
-                            echo \"ofdm_acquisition; quit\" | DISPLAY=\"\" octave --no-gui")
+                            echo \"ofdm_acquisition; quit\" | DISPLAY=\"\" octave-cli")
              set_tests_properties(test_OFDM_modem_octave_burst_acq PROPERTIES PASS_REGULAR_EXPRESSION "P.acq. = 1.00")
 
     add_test(NAME test_OFDM_modem_octave_datac0_postamble
              COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/octave;
                             echo \"ofdm_tx('test_datac0.raw','datac0',1,100,'awgn','bursts',3); ofdm_rx('test_datac0.raw','datac0','packetsperburst',1,'postambletest','passber', 1E-6); quit\" |
-                            DISPLAY=\"\" octave --no-gui")
+                            DISPLAY=\"\" octave-cli")
              set_tests_properties(test_OFDM_modem_octave_datac0_postamble PROPERTIES PASS_REGULAR_EXPRESSION "Pass")
 
     # Check C port of burst acquisition
     add_test(NAME test_OFDM_modem_burst_acq_port
              COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/octave;
-                            echo \"tofdm_acq; quit\" | DISPLAY=\"\" octave --no-gui")
+                            echo \"tofdm_acq; quit\" | DISPLAY=\"\" octave-cli")
              set_tests_properties(test_OFDM_modem_burst_acq_port PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
 
     # Give uncoded Octave burst data modem a workout on a poor channel (0dB SNR MPP)
@@ -433,7 +433,7 @@ if(UNITTEST)
                             echo \"ofdm_tx('test_datac0.raw','datac0',1,0,'mpp','bursts',10); \
                                    ofdm_rx('test_datac0.raw','datac0','packetsperburst',1,'passpacketcount',9);\
                                    quit\" |
-                            DISPLAY=\"\" octave --no-gui")
+                            DISPLAY=\"\" octave-cli")
              set_tests_properties(test_OFDM_modem_octave_datac0_mpp PROPERTIES PASS_REGULAR_EXPRESSION "Pass")
 
     # Same for coded Octave burst data modem - look out for bit rot as simulations evolve ....
@@ -442,7 +442,7 @@ if(UNITTEST)
                             echo \"ofdm_ldpc_tx('test_datac0.raw','datac0',1,0,'mpp','bursts',10); \
                                    ofdm_ldpc_rx('test_datac0.raw','datac0','packetsperburst',1,'passpacketcount',9);\
                                    quit\" |
-                            DISPLAY=\"\" octave --no-gui")
+                            DISPLAY=\"\" octave-cli")
              set_tests_properties(test_OFDM_modem_octave_datac0_mpp_coded PROPERTIES PASS_REGULAR_EXPRESSION "Pass")
 
     #  ---------------------------------- ofdm_mod/demod level C modem tests ----------------------------------
@@ -886,12 +886,12 @@ endif(NOT APPLE)
 
      # Octave FSK Modem, to make sure we don't break reference simulation
      add_test(NAME test_fsk_lib
-             COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/octave; DISPLAY=\"\" octave --no-gui -qf fsk_lib_demo.m")
+             COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/octave; DISPLAY=\"\" octave-cli -qf fsk_lib_demo.m")
              set_tests_properties(test_fsk_lib PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
 
      add_test(NAME test_fsk_modem_octave_port
              COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/octave;
-                            PATH_TO_TFSK=${CMAKE_CURRENT_BINARY_DIR}/unittest/tfsk octave --no-gui -qf tfsk.m")
+                            PATH_TO_TFSK=${CMAKE_CURRENT_BINARY_DIR}/unittest/tfsk octave-cli -qf tfsk.m")
              set_tests_properties(test_fsk_modem_octave_port PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
 
      add_test(NAME test_fsk_modem_mod_demod
@@ -937,7 +937,7 @@ endif(NOT APPLE)
 
      # Octave 4FSK LLR reference simulation - make sure this keeps working
      add_test(NAME test_fsk_lib_4fsk_ldpc
-             COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/octave; DISPLAY=\"\" octave --no-gui -qf fsk_lib_ldpc_demo.m")
+             COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/octave; DISPLAY=\"\" octave-cli -qf fsk_lib_ldpc_demo.m")
              set_tests_properties(test_fsk_lib_4fsk_ldpc PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
 
      # Command line Unique Word (UW) framer in hard decision mode
