@@ -503,8 +503,11 @@ int freedv_rawdatapreamblecomptx(struct freedv *f, COMP mod_out[]) {
         assert(npreamble_samples < f->n_nom_modem_samples); /* caller probably using an array of this size */
         freedv_tx_fsk_ldpc_data_preamble(f, mod_out, npreamble_bits, npreamble_samples);
     } else if (is_ofdm_data_mode(f)) {
-        memcpy(mod_out, f->ofdm->tx_preamble, sizeof(COMP)*f->ofdm->samplesperframe);
-        npreamble_samples = f->ofdm->samplesperframe;
+        struct OFDM *ofdm = f->ofdm;
+        complex float *tx_preamble = (complex float*)mod_out;
+        memcpy(tx_preamble, ofdm->tx_preamble, sizeof(COMP)*ofdm->samplesperframe);
+        ofdm_hilbert_clipper(ofdm, tx_preamble, ofdm->samplesperframe);
+        npreamble_samples = ofdm->samplesperframe;
     }
 
     return npreamble_samples;
@@ -522,6 +525,35 @@ int freedv_rawdatapreambletx(struct freedv *f, short mod_out[]) {
         mod_out[i] = mod_out_comp[i].real;
 
     return npreamble_samples;
+}
+
+int freedv_rawdatapostamblecomptx(struct freedv *f, COMP mod_out[]) {
+    assert(f != NULL);
+    int npostamble_samples = 0;
+    
+    if (is_ofdm_data_mode(f)) {
+        struct OFDM *ofdm = f->ofdm;
+        complex float *tx_postamble = (complex float*)mod_out;
+        memcpy(tx_postamble, ofdm->tx_postamble, sizeof(COMP)*ofdm->samplesperframe);
+        ofdm_hilbert_clipper(ofdm, tx_postamble, ofdm->samplesperframe);
+        npostamble_samples = ofdm->samplesperframe;
+    }
+
+    return npostamble_samples;
+}
+
+int freedv_rawdatapostambletx(struct freedv *f, short mod_out[]) {
+    assert(f != NULL);
+    COMP mod_out_comp[f->n_nat_modem_samples];
+
+    int npostamble_samples = freedv_rawdatapostamblecomptx(f, mod_out_comp);
+    assert(npostamble_samples <= f->n_nat_modem_samples);
+
+    /* convert complex to real */
+    for(int i=0; i<npostamble_samples; i++)
+        mod_out[i] = mod_out_comp[i].real;
+
+    return npostamble_samples;
 }
 
 /* VHF packet data tx function */
@@ -1276,6 +1308,7 @@ void freedv_set_sync(struct freedv *freedv, int sync_cmd) {
     }
 }
 
+// this also selects burst mode
 void freedv_set_frames_per_burst(struct freedv *freedv, int framesperburst) {
     assert (freedv != NULL);
     if (freedv->ofdm != NULL) {
@@ -1380,6 +1413,14 @@ int freedv_get_n_tx_preamble_modem_samples(struct freedv *f) {
         int npreamble_symbols = 50*(fsk->mode>>1);
         return fsk->Ts*npreamble_symbols;
     } else if (is_ofdm_data_mode(f)) {
+        return f->ofdm->samplesperframe;
+    }
+    
+    return 0; 
+}
+
+int freedv_get_n_tx_postamble_modem_samples(struct freedv *f) {
+    if (is_ofdm_data_mode(f)) {
         return f->ofdm->samplesperframe;
     }
     

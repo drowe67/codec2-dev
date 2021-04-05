@@ -1000,7 +1000,9 @@ void ofdm_set_dpsk(struct OFDM *ofdm, bool val) {
     ofdm->dpsk_en = val;
 }
 
+// select burst mode, and set packets per burst
 void ofdm_set_packets_per_burst(struct OFDM *ofdm, int packetsperburst) {
+    ofdm->data_mode = "burst";
     ofdm->packetsperburst = packetsperburst;
 }
 

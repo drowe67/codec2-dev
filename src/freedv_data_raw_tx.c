@@ -241,7 +241,7 @@ int main(int argc, char *argv[]) {
 
     for(int b=0; b<Nbursts; b++) {
 
-        /* send preamble to help estimators lock up at start of burst */
+        /* send preamble */
         int n_preamble = 0;
         if (use_complex == 0) {
             n_preamble = freedv_rawdatapreambletx(freedv, mod_out_short);
@@ -285,6 +285,18 @@ int main(int argc, char *argv[]) {
             if (testframes && (frames >= Nframes)) break;
         }
         
+        /* send postamble */
+        int n_postamble = 0;
+        if (use_complex == 0) {
+            n_postamble = freedv_rawdatapostambletx(freedv, mod_out_short);
+        } else {
+            n_postamble = freedv_rawdatapostamblecomptx(freedv, mod_out_comp);
+            comp_to_short(mod_out_short, mod_out_comp, n_preamble);
+        }
+        assert(n_postamble == freedv_get_n_tx_postamble_modem_samples(freedv));
+        assert(n_postamble <= n_mod_out);
+        fwrite(mod_out_short, sizeof(short), shorts_per_sample*n_postamble, fout);
+
         int samples_delay = 0;
         if (inter_burst_delay_ms) {
             /* user defined inter-burst delay */

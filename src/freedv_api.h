@@ -189,6 +189,8 @@ void freedv_rawdatatx      (struct freedv *f, short mod_out[], unsigned char *pa
 void freedv_rawdatacomptx  (struct freedv *f, COMP mod_out[], unsigned char *packed_payload_bits);
 int  freedv_rawdatapreambletx      (struct freedv *f, short mod_out[]);
 int  freedv_rawdatapreamblecomptx  (struct freedv *f, COMP mod_out[]);
+int  freedv_rawdatapostambletx      (struct freedv *f, short mod_out[]);
+int  freedv_rawdatapostamblecomptx  (struct freedv *f, COMP mod_out[]);
 
 // Receive -------------------------------------------------------------------
 
@@ -262,6 +264,7 @@ int freedv_get_n_max_modem_samples  (struct freedv *freedv);
 int freedv_get_n_nom_modem_samples  (struct freedv *freedv);
 int freedv_get_n_tx_modem_samples   (struct freedv *freedv);
 int freedv_get_n_tx_preamble_modem_samples(struct freedv *freedv);
+int freedv_get_n_tx_postamble_modem_samples(struct freedv *freedv);
 
 // bit error rate stats
 int freedv_get_total_bits	            (struct freedv *freedv);

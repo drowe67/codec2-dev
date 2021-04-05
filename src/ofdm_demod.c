@@ -189,7 +189,6 @@ int main(int argc, char *argv[]) {
                 testframes = true;
                 break;
             case 'e':
-                ofdm_config->data_mode = "burst";
                 packetsperburst = atoi(options.optarg);
                 fprintf(stderr, "burst data mode!\n");
                 break;
@@ -291,9 +290,8 @@ int main(int argc, char *argv[]) {
     ofdm_set_phase_est_bandwidth_mode(ofdm, phase_est_bandwidth_mode);
     ofdm_set_dpsk(ofdm, dpsk);
     // default to one packet per burst for burst mode
-    if (strcmp(ofdm->data_mode, "burst") == 0) {
+    if (packetsperburst) {
         ofdm_set_packets_per_burst(ofdm, packetsperburst);
-        fprintf(stderr, "one packet per burst ...\n");
     }
     
     /* Get a copy of the actual modem config (ofdm_create() fills in more parameters) */
