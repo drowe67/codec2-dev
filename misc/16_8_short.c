@@ -4,7 +4,6 @@
    October 2018
 
    Utilty for resampling raw files from 16 to 8 kHz.
-
 */
 
 #include <assert.h>

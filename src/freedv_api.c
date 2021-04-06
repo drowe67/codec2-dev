@@ -1358,11 +1358,18 @@ void freedv_get_fsk_S_and_N               (struct freedv *f, float *S, float *N)
 int freedv_get_n_max_speech_samples(struct freedv *f) {
     /* When "passing through" demod samples to the speech output
        (e.g. no sync and squelch off) f->nin bounces around with
-       timing variations.  So is is possible we may return
+       timing variations.  So we may return
        freedv_get_n_max_modem_samples() via the speech_output[]
        array */
-    if (freedv_get_n_max_modem_samples(f) > f->n_speech_samples)
-        return freedv_get_n_max_modem_samples(f);
+    int max_output_passthrough_samples;
+    if (FDV_MODE_ACTIVE(FREEDV_MODE_2020, f->mode))
+       // In 2020 we oversample the input modem samples from 8->16 kHz
+       max_output_passthrough_samples = 2*freedv_get_n_max_modem_samples(f);
+    else
+       max_output_passthrough_samples = freedv_get_n_max_modem_samples(f);
+    
+    if (max_output_passthrough_samples > f->n_speech_samples)
+        return max_output_passthrough_samples;
     else
         return f->n_speech_samples;
 }

@@ -72,7 +72,7 @@ void freedv_comptx_fdmdv_1600(struct freedv *f, COMP mod_out[]) {
     data_flag_index = codec2_get_spare_bit_index(f->codec2);
 
     if (f->nvaricode_bits) {
-        f->fdmdv_tx_bits[data_flag_index] = f->tx_varicode_bits[f->varicode_bit_index++];
+        f->tx_payload_bits[data_flag_index] = f->tx_varicode_bits[f->varicode_bit_index++];
         f->nvaricode_bits--;
     }
 
@@ -88,7 +88,7 @@ void freedv_comptx_fdmdv_1600(struct freedv *f, COMP mod_out[]) {
 
     /* Protect first 12 out of first 16 excitation bits with (23,12) Golay Code:
 
-       0,1,2,3: v[0]..v[1]
+       0,1,2,3: v[0]..v[3]
        4,5,6,7: MSB of pitch
        11,12,13,14: MSB of energy
 

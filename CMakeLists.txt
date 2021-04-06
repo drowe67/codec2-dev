@@ -345,6 +345,22 @@ if(UNITTEST)
     add_test(NAME test_freedv_get_hash
              COMMAND sh -c "${CMAKE_CURRENT_BINARY_DIR}/unittest/thash")
 
+    # 16<->8 kHz float resamplers
+    add_test(NAME test_fdmdv_16to8
+             COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/octave;
+                            ${CMAKE_CURRENT_BINARY_DIR}/unittest/t16_8;
+                            DISPLAY=\"\" echo \"diff_fft_mag('in8.raw','out8.raw'); quit;\" | octave-cli -qf
+                            ")
+             set_tests_properties(test_fdmdv_16to8 PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
+
+    # 16<->8 kHz short (int16) resamplers
+    add_test(NAME test_fdmdv_16to8_short
+             COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/octave;
+                            ${CMAKE_CURRENT_BINARY_DIR}/unittest/t16_8_short;
+                            DISPLAY=\"\" echo \"diff_fft_mag('in8_short.raw','out8_short.raw'); quit;\" | octave-cli -qf
+                            ")
+             set_tests_properties(test_fdmdv_16to8_short PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
+
     add_test(NAME test_CML_ldpcut
              COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/octave; SHORT_VERSION_FOR_CTEST=1 octave-cli -qf ldpcut.m")
              set_tests_properties(test_CML_ldpcut PROPERTIES PASS_REGULAR_EXPRESSION "Nerr: 0")
@@ -649,10 +665,12 @@ endif()
     #                                FreeDV API
     # -------------------------------------------------------------------------
 
-   add_test(NAME test_freedv_api_1600
+    # Test 1600 using number of frames decoded and correct rx txt channel output
+    add_test(NAME test_freedv_api_1600
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
-                            ./freedv_tx 1600 ../../raw/ve9qrp_10s.raw - | ./freedv_rx 1600 - /dev/null")
-             set_tests_properties(test_freedv_api_1600 PROPERTIES PASS_REGULAR_EXPRESSION "frames decoded: 503")
+                            ./freedv_tx 1600 ../../raw/ve9qrp_10s.raw - | ./freedv_rx 1600 - /dev/null --txtrx 1600.txt;
+                            cat 1600.txt")
+             set_tests_properties(test_freedv_api_1600 PROPERTIES PASS_REGULAR_EXPRESSION "frames decoded: 503 .*cq cq hello")
 
     add_test(NAME test_freedv_api_700C
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
@@ -668,7 +686,7 @@ endif()
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
                             ./freedv_tx 700D ../../raw/ve9qrp.raw - |
                             ./cohpsk_ch - - -8 --Fs 8000 |
-                            ./freedv_rx 700D - /dev/null --squelch -2")
+                            ./freedv_rx 700D - /dev/null --squelch -2 -vv")
              set_tests_properties(test_freedv_api_700D_burble PROPERTIES PASS_REGULAR_EXPRESSION "output speech samples: 0")
 
     add_test(NAME test_freedv_api_700D_AWGN_BER

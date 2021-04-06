@@ -42,9 +42,6 @@ struct my_callback_state {
 char my_get_next_tx_char(void *callback_state) {
     struct my_callback_state* pstate = (struct my_callback_state*)callback_state;
     char  c = *pstate->ptx_str++;
-
-    //fprintf(stderr, "my_get_next_tx_char: %c\n", c);
-
     if (*pstate->ptx_str == 0) {
         pstate->ptx_str = pstate->tx_str;
     }
