@@ -300,10 +300,19 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     ofdm->rowsperframe = ofdm->bitsperframe / (ofdm->nc * ofdm->bps);
     ofdm->samplespersymbol = (ofdm->m + ofdm->ncp);
     ofdm->samplesperframe = ofdm->ns * ofdm->samplespersymbol;
-    ofdm->max_samplesperframe = ofdm->samplesperframe + (ofdm->samplespersymbol / 4);
-    ofdm->nrxbufhistory = 0;
+    if (ofdm->data_mode)
+        // in burst data modes we skip ahead one frame to jump over preamble
+        ofdm->max_samplesperframe = 2*ofdm->samplesperframe;
+    else
+        ofdm->max_samplesperframe = ofdm->samplesperframe + (ofdm->samplespersymbol / 4);
+    /* extra storage at start of rxbuf to allow us to step back in time */
+    if (strlen(ofdm->data_mode))
+        ofdm->nrxbufhistory = (ofdm->np+2)*ofdm->samplesperframe; 
+    else
+        ofdm->nrxbufhistory = 0;
     ofdm->rxbufst = ofdm->nrxbufhistory;
-    ofdm->nrxbuf = ofdm->nrxbufhistory + (3 * ofdm->samplesperframe) + (3 * ofdm->samplespersymbol);
+    ofdm->nrxbufmin = 3*ofdm->samplesperframe + 3*ofdm->samplespersymbol;
+    ofdm->nrxbuf = ofdm->nrxbufhistory + ofdm->nrxbufmin;
 
     ofdm->pilot_samples = (complex float *) MALLOC(sizeof (complex float) * ofdm->samplespersymbol);
     assert(ofdm->pilot_samples != NULL);
@@ -1160,15 +1169,42 @@ static void burst_acquisition_detector(struct OFDM *ofdm,
 static int ofdm_sync_search_burst(struct OFDM *ofdm) {
     
     int st = ofdm->rxbufst + ofdm->m + ofdm->ncp + ofdm->samplesperframe;
-    int ct_est;
-    float foff_est, timing_mx;
+    char *pre_post = "";
+    
+    ofdm->postambledetectoren = 0;  // tmp disable while debugging
+    if (!ofdm->postambledetectoren)
+        ofdm->postambledetectorcounter -= ofdm->nin;
         
-    burst_acquisition_detector(ofdm, ofdm->rxbuf, st, (complex float*)ofdm->tx_preamble, &ct_est, &foff_est, &timing_mx);
+    int pre_ct_est; float pre_foff_est, pre_timing_mx;        
+    burst_acquisition_detector(ofdm, ofdm->rxbuf, st, (complex float*)ofdm->tx_preamble, 
+                               &pre_ct_est, &pre_foff_est, &pre_timing_mx);
+
+    int post_ct_est; float post_foff_est, post_timing_mx;        
+    if (ofdm->postambledetectoren)
+        burst_acquisition_detector(ofdm, ofdm->rxbuf, st, (complex float*)ofdm->tx_postamble, 
+                                   &post_ct_est, &post_foff_est, &post_timing_mx);
+    
+    int ct_est; float foff_est, timing_mx;        
+    if (!ofdm->postambledetectoren || (pre_timing_mx > post_timing_mx)) {
+        timing_mx = pre_timing_mx; ct_est = pre_ct_est; foff_est = pre_foff_est;
+        pre_post = "pre";
+    } else {
+        timing_mx = post_timing_mx; ct_est = post_ct_est; foff_est = post_foff_est;
+        pre_post = "post";
+    }
     
     int timing_valid = timing_mx > ofdm->timing_mx_thresh;
-    if (timing_valid)
-        ofdm->nin = ct_est;
-    else
+    if (timing_valid) {
+        if (!strcmp(pre_post, "post")) {
+            // we won't be need any new samples for a while ....
+            ofdm->nin = 0;
+            // backup to first modem frame in packet
+            ofdm->rxbufst -= ofdm->np*ofdm->samplesperframe; 
+            ofdm->rxbufst += ct_est;
+        } else
+            // ct_est is start of preamble, so advance past that to start of first modem frame
+            ofdm->nin = ofdm->samplesperframe + ct_est - 1;
+    } else 
         ofdm->nin = ofdm->samplesperframe;
     
     ofdm->ct_est = ct_est;
@@ -1177,8 +1213,8 @@ static int ofdm_sync_search_burst(struct OFDM *ofdm) {
     ofdm->timing_valid = timing_valid;
 
     if (ofdm->verbose > 1) {
-        fprintf(stderr, "  ct_est: %4d mx: %3.2f foff_est: % 5.1f timing_valid: %d\n",
-                ct_est, timing_mx, foff_est, timing_valid);
+        fprintf(stderr, "  ct_est: %4d nin: %4d mx: %3.2f foff_est: % 5.1f timing_valid: %d %4s\n",
+                ct_est, ofdm->nin, timing_mx, foff_est, timing_valid, pre_post);
     }
 
     return ofdm->timing_valid;
@@ -1708,6 +1744,13 @@ static void ofdm_demod_core(struct OFDM *ofdm, int *rx_bits) {
         }
     }
 
+    // use internal rxbuf samples if they are available
+    int rxbufst_next = ofdm->rxbufst + ofdm->nin;
+    if (rxbufst_next + ofdm->nrxbufmin <= ofdm->nrxbuf) {
+        ofdm->rxbufst = rxbufst_next;
+        ofdm->nin = 0;
+    }
+     
     /*
      * estimate signal and noise power, see ofdm_lib.m,
      * cohpsk.m for more info
@@ -1924,7 +1967,7 @@ void ofdm_sync_state_machine_data_burst(struct OFDM *ofdm, uint8_t *rx_uw) {
        if (ofdm->postambledetectoren == 0) {
            if (ofdm->postambledetectorcounter < 0) {
                ofdm->postambledetectoren = true;
-               fprintf(stderr, "\npostamble detector on!");
+               fprintf(stderr, "\npostamble detector on!\n");
            }
        }
     }
@@ -1939,12 +1982,13 @@ void ofdm_sync_state_machine_data_burst(struct OFDM *ofdm, uint8_t *rx_uw) {
       the UW have been received */
     if (ofdm->sync_state == trial) {
         ofdm->sync_counter++;
-        if (ofdm->sync_counter > ofdm->nuwframes) {
+        if (ofdm->sync_counter == ofdm->nuwframes) {
             if (ofdm->uw_errors < ofdm->bad_uw_errors) {
                 next_state = synced;
                 ofdm->packet_count = 0;
                 ofdm->modem_frame = ofdm->nuwframes;    
             } else {
+               next_state = search;
                // make sure we only ever loop once through same samples to avoid infinte loop
                ofdm->postambledetectoren = false;
                ofdm->postambledetectorcounter = ofdm->np * ofdm->samplesperframe;

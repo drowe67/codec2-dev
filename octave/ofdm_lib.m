@@ -787,9 +787,6 @@ function [timing_valid states] = ofdm_sync_search_burst(states)
     pre_post = "post";
   end
   timing_valid = timing_mx > timing_mx_thresh;
-  if verbose
-    printf("  ct_est: %4d mx: %3.2f foff_est: %5.1f timing_valid: %d %4s", ct_est, timing_mx, foff_est, timing_valid, pre_post);
-  end
   
   if timing_valid
     % potential candidate found ....
@@ -803,7 +800,8 @@ function [timing_valid states] = ofdm_sync_search_burst(states)
       states.npost++;
       % printf("%d\n", states.rxbufst);
     else
-      states.nin = Nsamperframe +  ct_est - 1;
+      % ct_est is start of preamble, so advance past that to start of first modem frame
+      states.nin = Nsamperframe + ct_est - 1;
       states.npre++;
     end
   else
@@ -815,6 +813,11 @@ function [timing_valid states] = ofdm_sync_search_burst(states)
   states.timing_mx = timing_mx;
   states.sample_point = states.timing_est = 1;
   states.foff_est_hz = foff_est;
+
+  if verbose
+    printf("  ct_est: %4d nin: %4d mx: %3.2f foff_est: %5.1f timing_valid: %d %4s", 
+           ct_est, states.nin, timing_mx, foff_est, timing_valid, pre_post);
+  end
 endfunction
 
 

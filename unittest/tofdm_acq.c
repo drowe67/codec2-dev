@@ -34,6 +34,7 @@ int main(int argc, char *argv[])
     ofdm->data_mode = "burst";
     ofdm->verbose = 2;
     ofdm->timing_mx_thresh = 0.08;
+    ofdm->postambledetectoren = 0;
     assert(ofdm != NULL);
     
     int nin_frame = ofdm_get_nin(ofdm);
@@ -45,21 +46,23 @@ int main(int argc, char *argv[])
     int ct_est_log[MAX_FRAMES];
     float foff_est_log[MAX_FRAMES];
     int timing_valid_log[MAX_FRAMES];
+    int nin_log[MAX_FRAMES];
     
     while (fread(rx_scaled, sizeof (short), nin_frame, fin) == nin_frame) {
         fprintf(stderr, "%3d ", f);
         ofdm_sync_search_shorts(ofdm, rx_scaled, ofdm->amp_scale / 2.0f);
-
-        // this is modified when a valid pre-amble is found. Force fixed nin to stay in acq state
-        ofdm->nin = nin_frame;
 
         if (f < MAX_FRAMES) {
             timing_mx_log[f] = ofdm->timing_mx;
             ct_est_log[f] = ofdm->ct_est;
             foff_est_log[f] = ofdm->foff_est_hz;
             timing_valid_log[f] = ofdm->timing_valid;
+            nin_log[f] = ofdm->nin;
         }
         f++;
+        
+        // this is modified when a valid pre-amble is found. Force fixed nin while we run this test
+        ofdm->nin = nin_frame;
     }
     fclose(fin);
        
@@ -77,6 +80,7 @@ int main(int argc, char *argv[])
     octave_save_float(fout, "foff_est_log_c", foff_est_log, 1, f, f);
     octave_save_int(fout, "ct_est_log_c", ct_est_log, 1, f);
     octave_save_int(fout, "timing_valid_log_c", timing_valid_log, 1, f);
+    octave_save_int(fout, "nin_log_c", nin_log, 1, f);
     fclose(fout);
 
     ofdm_destroy(ofdm);

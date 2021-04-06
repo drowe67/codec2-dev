@@ -20,15 +20,17 @@ frx=fopen(filename,"rb");
 nin = states.nin;
 rx = fread(frx, nin, "short")/(states.amp_scale/2);
 f = 0;
-timing_mx_log = []; ct_est_log = []; foff_est_log = []; timing_valid_log = [];
+timing_mx_log = []; ct_est_log = []; foff_est_log = []; timing_valid_log = []; nin_log = [];
+
 while(length(rx) == nin)
   printf(" %2d ",f++);
   [timing_valid states] = ofdm_sync_search(states, rx);
-  states.nin = nin;
   timing_mx_log = [timing_mx_log states.timing_mx];
   ct_est_log = [ct_est_log states.ct_est];
   foff_est_log = [foff_est_log states.foff_est_hz];
   timing_valid_log = [timing_valid_log states.timing_valid];
+  nin_log = [nin_log states.nin];
+  states.nin = nin;
   rx = fread(frx, nin, "short")/(states.amp_scale/2);
   printf("\n");
 end   
@@ -63,6 +65,7 @@ stem_sig_and_error(fg, 211, real(foff_est_log_c), real(foff_est_log_c - foff_est
 passes += check(foff_est_log, foff_est_log_c, 'foff_est'); ntests++;
 stem_sig_and_error(fg++, 212, real(timing_valid_log_c), real(timing_valid_log_c - timing_valid_log), 'timing valid')
 passes += check(timing_valid_log, timing_valid_log_c, 'timing_valid'); ntests++;
+passes += check(nin_log, nin_log_c, 'nin'); ntests++;
 
 if passes == ntests printf("PASS\n"); else printf("FAIL\n"); end
 
