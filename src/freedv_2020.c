@@ -93,6 +93,11 @@ void freedv_2020_open(struct freedv *f) {
        the rate FREEDV_FS_8000 modem input samples before interpolation */
     f->passthrough_2020 = CALLOC(1, sizeof(float)*(FDMDV_OS_TAPS_16K + freedv_get_n_max_modem_samples(f)));
     assert(f->passthrough_2020 != NULL);
+    
+    // make sure we have enough storage for worst case nin with passthrough, in 2020
+    // we oversample the 8 kHz input Rx audio to 16 kHz
+    int nout_max = 2*freedv_get_n_max_modem_samples(f);
+    assert(nout_max <= freedv_get_n_max_speech_samples(f));
 
     f->lpcnet = lpcnet_freedv_create(1); assert(f->lpcnet != NULL);
     f->codec2 = NULL;

@@ -1155,10 +1155,7 @@ void codec2_encode_1300(struct CODEC2 *c2, unsigned char * bits, short speech[])
     int     Wo_index, e_index;
     int     i;
     unsigned int nbit = 0;
-    //#ifdef PROFILE
-    //unsigned int quant_start;
-    //#endif
-
+ 
     assert(c2 != NULL);
 
     memset(bits, '\0',  ((codec2_bits_per_frame(c2) + 7) / 8));
@@ -1186,9 +1183,6 @@ void codec2_encode_1300(struct CODEC2 *c2, unsigned char * bits, short speech[])
     Wo_index = encode_Wo(&c2->c2const, model.Wo, WO_BITS);
     pack_natural_or_gray(bits, &nbit, Wo_index, WO_BITS, c2->gray);
 
-    //#ifdef PROFILE
-    //quant_start = machdep_profile_sample();
-    //#endif
     e = speech_to_uq_lsps(lsps, ak, c2->Sn, c2->w, c2->m_pitch, LPC_ORD);
     e_index = encode_energy(e, E_BITS);
     pack_natural_or_gray(bits, &nbit, e_index, E_BITS, c2->gray);
@@ -1197,9 +1191,6 @@ void codec2_encode_1300(struct CODEC2 *c2, unsigned char * bits, short speech[])
     for(i=0; i<LSP_SCALAR_INDEXES; i++) {
 	pack_natural_or_gray(bits, &nbit, lsp_indexes[i], lsp_bits(i), c2->gray);
     }
-    //#ifdef PROFILE
-    //machdep_profile_sample_and_log(quant_start, "    quant/packing");
-    //#endif
 
     assert(nbit == (unsigned)codec2_bits_per_frame(c2));
 }
@@ -1214,7 +1205,7 @@ void codec2_encode_1300(struct CODEC2 *c2, unsigned char * bits, short speech[])
   Decodes frames of 52 bits into 320 samples (40ms) of speech.
 
 \*---------------------------------------------------------------------------*/
-static int frames;
+
 void codec2_decode_1300(struct CODEC2 *c2, short speech[], const unsigned char * bits, float ber_est)
 {
     MODEL   model[4];
@@ -1228,10 +1219,9 @@ void codec2_decode_1300(struct CODEC2 *c2, short speech[], const unsigned char *
     unsigned int nbit = 0;
     float   weight;
     COMP    Aw[FFT_ENC];
-    //PROFILE_VAR(recover_start);
 
     assert(c2 != NULL);
-    frames+= 4;
+    
     /* only need to zero these out due to (unused) snr calculation */
 
     for(i=0; i<4; i++)
@@ -1254,7 +1244,6 @@ void codec2_decode_1300(struct CODEC2 *c2, short speech[], const unsigned char *
 
     e_index = unpack_natural_or_gray(bits, &nbit, E_BITS, c2->gray);
     e[3] = decode_energy(e_index, E_BITS);
-    //fprintf(stderr, "%d %f\n", e_index, e[3]);
 
     for(i=0; i<LSP_SCALAR_INDEXES; i++) {
 	lsp_indexes[i] = unpack_natural_or_gray(bits, &nbit, lsp_bits(i), c2->gray);
@@ -1275,7 +1264,6 @@ void codec2_decode_1300(struct CODEC2 *c2, short speech[], const unsigned char *
     /* Wo, energy, and LSPs are sampled every 40ms so we interpolate
        the 3 frames in between */
 
-    //PROFILE_SAMPLE(recover_start);
     for(i=0, weight=0.25; i<3; i++, weight += 0.25) {
 	interpolate_lsp_ver2(&lsps[i][0], c2->prev_lsps_dec, &lsps[3][0], weight, LPC_ORD);
         interp_Wo2(&model[i], &c2->prev_model_dec, &model[3], weight, c2->c2const.Wo_min);
@@ -1303,14 +1291,7 @@ void codec2_decode_1300(struct CODEC2 *c2, short speech[], const unsigned char *
 	    fwrite(&ak[i][1], LPC_ORD, sizeof(float), c2->fmlfeat);
 	}
     }
-    /*
-    for(i=0; i<4; i++) {
-        printf("%d Wo: %f L: %d v: %d\n", frames, model[i].Wo, model[i].L, model[i].voiced);
-    }
-    if (frames == 4*50)
-        exit(0);
-    */
-    //PROFILE_SAMPLE_AND_LOG2(recover_start, "    recover");
+ 
     #ifdef DUMP
     dump_lsp_(&lsps[3][0]);
     dump_ak_(&ak[3][0], LPC_ORD);

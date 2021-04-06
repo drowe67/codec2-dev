@@ -43,8 +43,11 @@
 
 #define NDISCARD 5                /* BER measure optionally discards first few frames after sync */
 
+/* optioal call-back function for received txt characters */
+void my_put_next_rx_char(void *states, char c) { fprintf((FILE*)states, "%c", c); }
+
 int main(int argc, char *argv[]) {
-    FILE                      *fin, *fout;
+    FILE                      *fin, *fout, *ftxt_rx = NULL;
     struct freedv             *freedv;
     int                        nin, nout, nout_total = 0, frame = 0;
     struct MODEM_STATS         stats = {0};
@@ -63,7 +66,7 @@ int main(int argc, char *argv[]) {
         sprintf(f2020,"|2020");
         #endif
 	printf("usage: %s 1600|700C|700D|700E|2400A|2400B|800XA%s InputModemSpeechFile OutputSpeechRawFile\n"
-               " [--testframes] [-v] [--discard] [--usecomplex] [--dpsk] [--squelch leveldB]\n", argv[0],f2020);
+               " [--testframes] [-v] [--discard] [--usecomplex] [--dpsk] [--squelch leveldB] [--txtrx filename]\n", argv[0],f2020);
 	printf("e.g    %s 1600 hts1a_fdmdv.raw hts1a_out.raw\n", argv[0]);
 	exit(1);
     }
@@ -112,7 +115,10 @@ int main(int argc, char *argv[]) {
                 i++;
                 use_squelch = 1;
             } else if (strcmp(argv[i], "--dpsk") == 0) use_dpsk = 1;
-            else {
+            else if (strcmp(argv[i], "--txtrx") == 0) {
+                ftxt_rx = fopen(argv[i+1], "wt"); i++;
+                assert(ftxt_rx != NULL);
+            } else {
                 fprintf(stderr, "unkown option: %s\n", argv[i]);
                 exit(1);
             }
@@ -132,6 +138,10 @@ int main(int argc, char *argv[]) {
         freedv_set_squelch_en(freedv, 1);
     }
     freedv_set_dpsk(freedv, use_dpsk);
+
+    /* install optional handler for recevied txt characters */
+    if (ftxt_rx != NULL)
+        freedv_set_callback_txt(freedv, my_put_next_rx_char, NULL, ftxt_rx);
 
     /* note use of API functions to tell us how big our buffers need to be -----*/
 
@@ -194,6 +204,7 @@ int main(int argc, char *argv[]) {
         if (fin == stdin) fflush(stdin);
     }
 
+    if (ftxt_rx != NULL) fclose(ftxt_rx);
     fclose(fin);
     fclose(fout);
     fprintf(stderr, "frames decoded: %d  output speech samples: %d\n", frame, nout_total);
