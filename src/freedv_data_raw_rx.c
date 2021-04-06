@@ -61,9 +61,9 @@ int main(int argc, char *argv[]) {
     if (argc < 3) {
     helpmsg:
       	fprintf(stderr, "usage: %s [options] FSK_LDPC|DATAC0|DATAC1|DATAC2|DATAC3 InputModemSpeechFile BinaryDataFile\n"
-               "  -v or --vv                  verbose options\n"
-               "  --testframes                count raw and coded errors in testframes sent by tx\n"
-               "  --framesperburst  Nframes   selects burst mode, and configures state machine to reset after Nframes received\n"
+               "  -v or --vv             verbose options\n"
+               "  --testframes           count raw and coded errors in testframes sent by tx\n"
+               "  --framesperburst  N    selects burst mode, and configures state machine to reset after N frames received\n"
                "\n"
                "For FSK_LDPC only:\n\n"
                "  -m      2|4     number of FSK tones\n"
