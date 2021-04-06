@@ -429,7 +429,7 @@ int main(int argc, char *argv[]) {
     while ((fread(rx_scaled, sizeof (short), nin_frame, fin) == nin_frame) && !finish) {
 
         if (verbose >= 2)
-            fprintf(stderr, "%3d nin: %4d st: %-6s ", f, nin_frame,statemode[ofdm->last_sync_state]);
+            fprintf(stderr, "%3d nin: %4d st: %-6s ", f, nin_frame,statemode[ofdm->sync_state]);
         bool log_payload_syms = false;
         Nerrs_raw = Nerrs_coded = 0;
 
