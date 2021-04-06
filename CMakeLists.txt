@@ -612,10 +612,12 @@ endif()
     #                                FreeDV API
     # -------------------------------------------------------------------------
 
-   add_test(NAME test_freedv_api_1600
+    # Test 1600 using number of frames decoded and correct rx txt channel output
+    add_test(NAME test_freedv_api_1600
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
-                            ./freedv_tx 1600 ../../raw/ve9qrp_10s.raw - | ./freedv_rx 1600 - /dev/null")
-             set_tests_properties(test_freedv_api_1600 PROPERTIES PASS_REGULAR_EXPRESSION "frames decoded: 503")
+                            ./freedv_tx 1600 ../../raw/ve9qrp_10s.raw - | ./freedv_rx 1600 - /dev/null --txtrx 1600.txt;
+                            cat 1600.txt")
+             set_tests_properties(test_freedv_api_1600 PROPERTIES PASS_REGULAR_EXPRESSION "frames decoded: 503 .*cq cq hello")
 
     add_test(NAME test_freedv_api_700C
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
