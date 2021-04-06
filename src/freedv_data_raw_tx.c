@@ -248,7 +248,9 @@ int main(int argc, char *argv[]) {
     short mod_out_short[2*n_mod_out];
     COMP  mod_out_comp[n_mod_out];
     int frames;
-
+    size_t on_samples = 0;
+    size_t off_samples = 0;
+    
     for(int b=0; b<Nbursts; b++) {
 
         /* send preamble */
@@ -262,7 +264,8 @@ int main(int argc, char *argv[]) {
         assert(n_preamble == freedv_get_n_tx_preamble_modem_samples(freedv));
         assert(n_preamble <= n_mod_out);
         fwrite(mod_out_short, sizeof(short), shorts_per_sample*n_preamble, fout);
-
+        on_samples += n_preamble;
+        
         /* OK main loop  --------------------------------------- */
 
         frames = 0;
@@ -286,7 +289,8 @@ int main(int argc, char *argv[]) {
                 comp_to_short(mod_out_short, mod_out_comp, n_mod_out);
             }
             fwrite(mod_out_short, sizeof(short), shorts_per_sample*n_mod_out, fout);
-
+            on_samples += n_mod_out;
+            
             /* if using pipes we don't want the usual buffering to occur */
             if (fout == stdout) fflush(stdout);
             if (fin == stdin) fflush(stdin);
@@ -309,6 +313,7 @@ int main(int argc, char *argv[]) {
         assert(n_postamble == freedv_get_n_tx_postamble_modem_samples(freedv));
         assert(n_postamble <= n_mod_out);
         fwrite(mod_out_short, sizeof(short), shorts_per_sample*n_postamble, fout);
+        on_samples += n_postamble;
 
         int samples_delay = 0;
         if (inter_burst_delay_ms) {
@@ -322,6 +327,7 @@ int main(int argc, char *argv[]) {
         short sil_short[shorts_per_sample*samples_delay];
         for(int i=0; i<shorts_per_sample*samples_delay; i++) sil_short[i] = 0;
         fwrite(sil_short, sizeof(short), shorts_per_sample*samples_delay, fout);
+        off_samples += samples_delay;
     }
 
     if (postdelay_ms) {
@@ -330,7 +336,13 @@ int main(int argc, char *argv[]) {
         short sil_short[shorts_per_sample*samples_delay];
         for(int i=0; i<shorts_per_sample*samples_delay; i++) sil_short[i] = 0;
         fwrite(sil_short, sizeof(short), shorts_per_sample*samples_delay, fout);
+        off_samples += samples_delay;
     }
+    
+    /* SNR offset to use in channel simulator to account for on/off time of burst signal */
+    float mark_space_ratio = (float)on_samples/(on_samples+off_samples);
+    float mark_space_SNR_offset = 10*log10(mark_space_ratio);
+    fprintf(stderr, "marks:space: %3.2f SNR offset: %5.2f\n", mark_space_ratio, mark_space_SNR_offset);
     
     freedv_close(freedv);
     fclose(fin);
