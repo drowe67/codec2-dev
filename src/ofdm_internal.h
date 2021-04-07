@@ -137,12 +137,14 @@ struct OFDM {
     int nrxbufhistory;    /* extra storage at start of rxbuf to allow us to step back in time */
     int nrxbufmin;        /* min number of samples we need in rxbuf to process a modem frame */
     int rxbufst;          /* start of rxbuf window used for demod of current rx frame */
+    int pre, post;        /* pre-amble and post-amble detections */
     int max_samplesperframe;
     int nuwframes;
     int nrxbuf;
     int ntxtbits;         /* reserve bits/frame for aux text information */
     int nuwbits;          /* number of unique word bits used to achieve packet frame sync */
-    int bad_uw_errors;
+    int bad_uw_errors;    /* threshold for UW detection check */
+    int uw_fails;         /* number of times we exceeded bad_uw_errors and dropped sync */
     int edge_pilots;      /* insert pilots at 1 and Nc+2, to support low bandwidth phase est */
     char *data_mode;      /* "", "streaming", "burst"  */
     int packetsperburst;  /* for OFDM data modes, how many packets before we reset state machine */
@@ -223,7 +225,6 @@ struct OFDM {
     int frame_count;  /* general purpose counter of modem frames */
     int packet_count; /* data mode: number of packets received so far */ 
     int modem_frame;  /* increments for every modem frame in packet */
-    int postambledetectorcounter;
     
     // Boolean
     bool sync_start;

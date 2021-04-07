@@ -677,9 +677,10 @@ int main(int argc, char *argv[]) {
         fclose(foct);
     }
 
-    if (verbose == 2)
+    if ((strlen(ofdm->data_mode) == 0) && (verbose == 2))
         printf("time_to_sync: %f\n", time_to_sync);
 
+    int ret = 0;
     if (testframes == true) {
         float uncoded_ber = (float) Terrs / Tbits;
         float coded_ber = 0.0;
@@ -699,15 +700,20 @@ int main(int argc, char *argv[]) {
 
             if (verbose != 0) {
                 fprintf(stderr, "Coded BER: %5.4f Tbits: %5d Terrs: %5d\n", coded_ber, Tbits_coded, Terrs_coded);
-                fprintf(stderr, "Coded PER: %5.4f Tpkts: %5d Tpers: %5d\n", (float)Tper/packet_count, packet_count, Tper);
+                fprintf(stderr, "Coded PER: %5.4f Tpkts: %5d Tpers: %5d Tthruput: %5d\n", 
+                        (float)Tper/packet_count, packet_count, Tper, packet_count - Tper);
               }
             if ((Tbits_coded == 0) || (coded_ber >= 0.01f))
-                return 1;
+                ret = 1;
         }
 
         if ((Tbits == 0) || (uncoded_ber >= 0.1f))
-            return 1;
+            ret = 1;
     }
-
-    return 0;
+    
+    if (strlen(ofdm->data_mode)) {
+        fprintf(stderr, "Npre.....: %6d Npost: %5d uw_fails: %2d\n", ofdm->pre, ofdm->post, ofdm->uw_fails);
+    }
+    
+    return ret;
 }

@@ -182,7 +182,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     float tval;
     int i, j;
 
-    ofdm = (struct OFDM *) MALLOC(sizeof (struct OFDM));
+    ofdm = (struct OFDM *) CALLOC(1, sizeof (struct OFDM));
     assert(ofdm != NULL);
 
     if (config == NULL) {
@@ -319,7 +319,8 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
 
     ofdm->rxbuf = (complex float *) MALLOC(sizeof (complex float) * ofdm->nrxbuf);
     assert(ofdm->rxbuf != NULL);
-
+    for(int i=0; i<ofdm->nrxbuf; i++) ofdm->rxbuf[i] = 0;
+    
     ofdm->pilots = (complex float *) MALLOC(sizeof (complex float) * (ofdm->nc + 2));
     assert(ofdm->pilots !=  NULL);
 
@@ -523,7 +524,6 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
         ofdm_generate_preamble(ofdm, ofdm->tx_postamble, 3);
     }
     ofdm->postambledetectoren = !strcmp(ofdm->data_mode,"burst");
-    ofdm->postambledetectorcounter = 0;
     
     return ofdm; /* Success */
 }
@@ -1013,6 +1013,7 @@ void ofdm_set_dpsk(struct OFDM *ofdm, bool val) {
 void ofdm_set_packets_per_burst(struct OFDM *ofdm, int packetsperburst) {
     ofdm->data_mode = "burst";
     ofdm->packetsperburst = packetsperburst;
+    ofdm->postambledetectoren = true;
 }
 
 /*
@@ -1171,9 +1172,6 @@ static int ofdm_sync_search_burst(struct OFDM *ofdm) {
     int st = ofdm->rxbufst + ofdm->m + ofdm->ncp + ofdm->samplesperframe;
     char *pre_post = "";
     
-    if (!ofdm->postambledetectoren)
-        ofdm->postambledetectorcounter -= ofdm->nin;
-        
     int pre_ct_est; float pre_foff_est, pre_timing_mx;        
     burst_acquisition_detector(ofdm, ofdm->rxbuf, st, (complex float*)ofdm->tx_preamble, 
                                &pre_ct_est, &pre_foff_est, &pre_timing_mx);
@@ -1195,14 +1193,17 @@ static int ofdm_sync_search_burst(struct OFDM *ofdm) {
     int timing_valid = timing_mx > ofdm->timing_mx_thresh;
     if (timing_valid) {
         if (!strcmp(pre_post, "post")) {
+            ofdm->post++;
             // we won't be need any new samples for a while ....
             ofdm->nin = 0;
             // backup to first modem frame in packet
             ofdm->rxbufst -= ofdm->np*ofdm->samplesperframe; 
             ofdm->rxbufst += ct_est;
-        } else
+        } else {
+            ofdm->pre++;
             // ct_est is start of preamble, so advance past that to start of first modem frame
             ofdm->nin = ofdm->samplesperframe + ct_est - 1;
+        }
     } else 
         ofdm->nin = ofdm->samplesperframe;
     
@@ -1962,13 +1963,6 @@ void ofdm_sync_state_machine_data_burst(struct OFDM *ofdm, uint8_t *rx_uw) {
             ofdm->sync_counter = 0;
             next_state = trial;
         }
-        // re-enable postamble detector after enough samples have passed to avoid a loop
-       if (ofdm->postambledetectoren == 0) {
-           if (ofdm->postambledetectorcounter < 0) {
-               ofdm->postambledetectoren = true;
-               fprintf(stderr, "\npostamble detector on!\n");
-           }
-       }
     }
 
     ofdm->uw_errors = 0;
@@ -1988,9 +1982,10 @@ void ofdm_sync_state_machine_data_burst(struct OFDM *ofdm, uint8_t *rx_uw) {
                 ofdm->modem_frame = ofdm->nuwframes;    
             } else {
                next_state = search;
-               // make sure we only ever loop once through same samples to avoid infinte loop
-               ofdm->postambledetectoren = false;
-               ofdm->postambledetectorcounter = ofdm->np * ofdm->samplesperframe;
+               // reset rxbuf to make sure we only ever do a postamble loop once through same samples
+               ofdm->rxbufst = ofdm->nrxbufhistory;
+               for(int i=0; i<ofdm->nrxbuf; i++) ofdm->rxbuf[i] = 0;
+               ofdm->uw_fails++;
            }
        }
    }
@@ -2003,9 +1998,9 @@ void ofdm_sync_state_machine_data_burst(struct OFDM *ofdm, uint8_t *rx_uw) {
             if (ofdm->packetsperburst) {
                 if (ofdm->packet_count >= ofdm->packetsperburst) {
                     next_state = search;
-                    // make sure we only ever loop once through same samples to avoid infinte loop
-                    ofdm->postambledetectoren = false;
-                    ofdm->postambledetectorcounter = ofdm->np * ofdm->samplesperframe;
+                    // reset rxbuf to make sure we only ever do a postamble loop once through same samples
+                    ofdm->rxbufst = ofdm->nrxbufhistory;
+                    for(int i=0; i<ofdm->nrxbuf; i++) ofdm->rxbuf[i] = 0;                
                 }
             }
         }    

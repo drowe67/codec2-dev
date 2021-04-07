@@ -38,6 +38,7 @@ function ofdm_rx(filename, mode="700D", varargin)
     if strcmp(varargin{i},"packetsperburst")
       states.data_mode = "burst"; % use pre/post amble based sync
       states.packetsperburst = varargin{i+1}; i++;
+      states.postambledetectoren = 1;
     elseif strcmp(varargin{i},"passber")
       pass_ber = varargin{i+1}; i++;
     elseif strcmp(varargin{i},"passpacketcount")

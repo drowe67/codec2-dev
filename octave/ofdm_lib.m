@@ -250,7 +250,6 @@ function states = ofdm_init(config)
   states.state_machine = state_machine;                   % mode specific state machine
   states.packetsperburst = 0;                             % for OFDM data modes, how many packets before we reset state machine
   states.postambledetectoren = strcmp(data_mode,"burst");
-  states.postambledetectorcounter = 0;
   states.npre = states.npost = 0;                         % counters for logging
   
   % LDPC code is optionally enabled
@@ -766,10 +765,6 @@ end
 function [timing_valid states] = ofdm_sync_search_burst(states)
   ofdm_load_const;
 
-  if states.postambledetectoren == 0
-    states.postambledetectorcounter -= states.nin;
-  end
-  
   pre_post = "";
   st = rxbufst + M+Ncp + Nsamperframe + 1; en = st + 2*Nsamperframe - 1;
   pre = burst_acquisition_detector(states, states.rxbuf, st, states.tx_preamble);
@@ -1583,13 +1578,6 @@ function states = sync_state_machine_data_burst(states, rx_uw)
       states.sync_counter = 0;
       next_state = 'trial';
     end
-    % re-enable postamble detector after enough samples have passed to avoid a loop
-    if states.postambledetectoren == 0
-       if states.postambledetectorcounter < 0
-         states.postambledetectoren = 1;
-         printf("\npostamble detector on!");
-       end
-    end
   end
 
   states.uw_errors = sum(xor(tx_uw,rx_uw));
@@ -1607,9 +1595,9 @@ function states = sync_state_machine_data_burst(states, rx_uw)
         states.sum_sig_var = states.sum_noise_var = 0;
       else
         next_state = "search";
-        % make sure we only ever loop once through same samples to avoid infinte loop
-        states.postambledetectoren = 0;
-        states.postambledetectorcounter = Np*Nsamperframe;
+        % reset rxbuf to make sure we only ever do a postamble loop once through same samples
+        states.rxbufst = states.Nrxbufhistory;
+        states.rxbuf = zeros(1, states.Nrxbuf);
       end
     end
   end
@@ -1622,9 +1610,9 @@ function states = sync_state_machine_data_burst(states, rx_uw)
       if (states.packetsperburst)
         if (states.packet_count >= states.packetsperburst)
           next_state = "search";                        % we've finished this burst
-          % make sure we only ever loop once through same samples to avoid infinte loop
-          states.postambledetectoren = 0;
-          states.postambledetectorcounter = Np*Nsamperframe;
+          % reset rxbuf to make sure we only ever do a postamble loop once through same samples
+          states.rxbufst = states.Nrxbufhistory;
+          states.rxbuf = zeros(1, states.Nrxbuf);
         end
       end
     end

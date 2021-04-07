@@ -34,6 +34,7 @@ function ofdm_ldpc_rx(filename, mode="700D", varargin)
     if strcmp(varargin{i},"packetsperburst")
       states.data_mode = "burst"; % use pre/post amble based sync
       states.packetsperburst = varargin{i+1}; i++;
+      states.postambledetectoren = 1;
     elseif strcmp(varargin{i},"passpacketcount")
       pass_packet_count = varargin{i+1}; i++;
     else
