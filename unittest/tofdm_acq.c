@@ -33,11 +33,13 @@ int main(int argc, char *argv[])
     ofdm = ofdm_create(&ofdm_config);
     ofdm->data_mode = "burst";
     ofdm->verbose = 2;
-    ofdm->timing_mx_thresh = 0.08;
-    ofdm->postambledetectoren = 0;
+    ofdm->timing_mx_thresh = 0.15;
+    ofdm->postambledetectoren = 1;
     assert(ofdm != NULL);
     
-    int nin_frame = ofdm_get_nin(ofdm);
+    int nin = ofdm_get_nin(ofdm);
+    int rxbufst = ofdm->rxbufst;
+    
     FILE *fin = fopen(argv[1],"rb"); assert(fin != NULL);
     short rx_scaled[ofdm_get_max_samples_per_frame(ofdm)];
     int f = 0;
@@ -48,7 +50,7 @@ int main(int argc, char *argv[])
     int timing_valid_log[MAX_FRAMES];
     int nin_log[MAX_FRAMES];
     
-    while (fread(rx_scaled, sizeof (short), nin_frame, fin) == nin_frame) {
+    while (fread(rx_scaled, sizeof (short), nin, fin) == nin) {
         fprintf(stderr, "%3d ", f);
         ofdm_sync_search_shorts(ofdm, rx_scaled, ofdm->amp_scale / 2.0f);
 
@@ -61,8 +63,9 @@ int main(int argc, char *argv[])
         }
         f++;
         
-        // this is modified when a valid pre-amble is found. Force fixed nin while we run this test
-        ofdm->nin = nin_frame;
+        // reset these to defaults, as they get modified when timing_valid asserted
+        ofdm->nin = nin;
+        ofdm->rxbufst = rxbufst;
     }
     fclose(fin);
        

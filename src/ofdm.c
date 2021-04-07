@@ -1171,7 +1171,6 @@ static int ofdm_sync_search_burst(struct OFDM *ofdm) {
     int st = ofdm->rxbufst + ofdm->m + ofdm->ncp + ofdm->samplesperframe;
     char *pre_post = "";
     
-    ofdm->postambledetectoren = 0;  // tmp disable while debugging
     if (!ofdm->postambledetectoren)
         ofdm->postambledetectorcounter -= ofdm->nin;
         

@@ -14,10 +14,12 @@ ofdm_tx(filename,"datac0",1,10,"awgn","bursts",1);
 printf("\nRunning Octave version....\n");
 config = ofdm_init_mode("datac0");
 states = ofdm_init(config);  
-states.verbose = 1; states.data_mode = "burst"; states.postambledectoren = 0;
+states.verbose = 1; states.data_mode = "burst"; states.postambledetectoren = 1;
+states.timing_mx_thresh = 0.15;
+
 ofdm_load_const;
 frx=fopen(filename,"rb");
-nin = states.nin;
+nin = states.nin; rxbufst = states.rxbufst;
 rx = fread(frx, nin, "short")/(states.amp_scale/2);
 f = 0;
 timing_mx_log = []; ct_est_log = []; foff_est_log = []; timing_valid_log = []; nin_log = [];
@@ -30,7 +32,11 @@ while(length(rx) == nin)
   foff_est_log = [foff_est_log states.foff_est_hz];
   timing_valid_log = [timing_valid_log states.timing_valid];
   nin_log = [nin_log states.nin];
+  
+  % reset these to defaults, as they get modified when timing_valid asserted
   states.nin = nin;
+  states.rxbufst = rxbufst;
+  
   rx = fread(frx, nin, "short")/(states.amp_scale/2);
   printf("\n");
 end   
