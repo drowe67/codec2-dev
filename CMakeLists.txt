@@ -1090,4 +1090,29 @@ endif(NOT APPLE)
                              ./freedv_data_raw_rx -m 4 --testframes -v --Fs 40000 --Rs 1000 FSK_LDPC --mask 2000 - /dev/null")
              set_tests_properties(test_freedv_data_raw_fsk_ldpc_2k PROPERTIES PASS_REGULAR_EXPRESSION "output_frames: 10")
 
+     # ---------------------------------------------------------
+     # tests for demos
+     # ---------------------------------------------------------
+
+     add_test(NAME test_demo_c2demo
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR};
+                             ./demo/c2demo ../raw/hts1a.raw hts1a_out.raw;
+                             ls -sh hts1a_out.raw")
+             set_tests_properties(test_demo_c2demo PROPERTIES PASS_REGULAR_EXPRESSION "48K hts1a_out.raw")
+
+      add_test(NAME test_demo_700d
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR};
+                              cat ../raw/ve9qrp_10s.raw | ./demo/freedv_700d_tx |
+                              ./demo/freedv_700d_rx > ve9qrp_10s_700d.raw;
+                              ls -sh ve9qrp_10s_700d.raw")
+             set_tests_properties(test_demo_700d PROPERTIES PASS_REGULAR_EXPRESSION "156K ve9qrp_10s_700d.raw")
+ 
+      add_test(NAME test_demo_datac1
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR};
+                            head -c $((510*10)) </dev/urandom > binaryIn.bin;
+                            cat binaryIn.bin | ./demo/freedv_datac1_tx | 
+                            ./demo/freedv_datac1_rx > binaryOut.bin;
+                            diff binaryIn.bin binaryOut.bin")
+ 
+
 endif(UNITTEST)

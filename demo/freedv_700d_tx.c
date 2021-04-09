@@ -4,8 +4,17 @@
   AUTHOR......: David Rowe
   DATE CREATED: April 2021
 
-  Demo transmit program for FreeDV API functions.
+  Demo transmit program for FreeDV API 700D functions.
+ 
+  usage:
+  
+  cd ~/codec2/build_linux
+  cat ../raw/ve9qrp_10s.raw | ./demo/freedv_700d_tx | ./demo/freedv_700d_rx | aplay -f S16_LE
 
+  Listen to the modulated Tx signal:
+  
+  cat ../raw/ve9qrp_10s.raw | ./demo/freedv_700d_tx | aplay -f S16_LE
+  
 \*---------------------------------------------------------------------------*/
 
 /*
@@ -38,8 +47,7 @@ int main(int argc, char *argv[]) {
     freedv = freedv_open(FREEDV_MODE_700D);
     assert(freedv != NULL);
 
-    /* handy functions to set buffer sizes, note tx/modulator always
-       returns freedv_get_n_nom_modem_samples() (unlike rx side) */
+    /* handy functions to set buffer sizes */
     int n_speech_samples = freedv_get_n_speech_samples(freedv);
     short speech_in[n_speech_samples];
     int n_nom_modem_samples = freedv_get_n_nom_modem_samples(freedv);
@@ -50,8 +58,6 @@ int main(int argc, char *argv[]) {
     while(fread(speech_in, sizeof(short), n_speech_samples, stdin) == n_speech_samples) {
         freedv_tx(freedv, mod_out, speech_in);
         fwrite(mod_out, sizeof(short), n_nom_modem_samples, stdout);
-        fflush(stdout);
-        fflush(stdin);
     }
 
     freedv_close(freedv);

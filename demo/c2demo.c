@@ -6,7 +6,11 @@
 
   Encodes and decodes a file of raw speech samples using Codec 2.
   Demonstrates use of Codec 2 function API.
-
+  
+  cd codec2/build_linux
+  ./demo/c2demo ../raw/hts1a.raw his1a_out.raw
+  aplay -f S16_LE hts1a_out.raw
+  
 \*---------------------------------------------------------------------------*/
 
 /*

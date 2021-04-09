@@ -4,11 +4,9 @@
   AUTHOR......: David Rowe
   DATE CREATED: April 2021
 
-  Demo receive program for FreeDV API functions:
-  
-  cd ~/codec2/build_linux
-  ./freedv_700d_tx ../raw/ve9qrp_10s.raw - | ./freedv_700d_tx - - | aplay -f S16_LE
-
+  Demo receive program for FreeDV API 700D mode, see freedv_700d_tx.c for
+  instructions.
+ 
 \*---------------------------------------------------------------------------*/
 
 /*
@@ -50,8 +48,6 @@ int main(int argc, char *argv[]) {
         nout = freedv_rx(freedv, speech_out, demod_in);
         nin = freedv_nin(freedv); /* call me on every loop! */
         fwrite(speech_out, sizeof(short), nout, stdout);
-        fflush(stdout);
-        fflush(stdin);
     }
 
     freedv_close(freedv);

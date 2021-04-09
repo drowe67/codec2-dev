@@ -6,6 +6,8 @@
 
   Demonstrates receiving frames of raw data bytes using the FreeDV API.
 
+  See freedv_datac1_tx.c for instructions.
+  
 \*---------------------------------------------------------------------------*/
 
 /*
@@ -38,6 +40,7 @@ int main(int argc, char *argv[]) {
     freedv = freedv_open(FREEDV_MODE_DATAC1);
     assert(freedv != NULL);
     freedv_set_frames_per_burst(freedv, 1);
+    freedv_set_verbose(freedv, 2);
     
     int bytes_per_modem_frame = freedv_get_bits_per_modem_frame(freedv)/8;
     uint8_t bytes_out[bytes_per_modem_frame];
@@ -53,9 +56,6 @@ int main(int argc, char *argv[]) {
             // don't output CRC
             fwrite(bytes_out, sizeof(uint8_t), nbytes_out-2, stdout);
         }
-        
-        fflush(stdout);
-        fflush(stdin);
     }
 
     freedv_close(freedv);
