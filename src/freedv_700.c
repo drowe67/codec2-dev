@@ -457,20 +457,19 @@ int freedv_comp_short_rx_ofdm(struct freedv *f, void *demod_in_8kHz, int demod_i
             iter = run_ldpc_decoder(ldpc, decoded_codeword, llr, &parityCheckCount);
             memcpy(f->rx_payload_bits, decoded_codeword, Ndatabitsperpacket);
 
-            if (ofdm->data_mode) {
+            if (strlen(ofdm->data_mode)) {
                 // we need a valid CRC to declare a data packet valid
                 if (freedv_check_crc16_unpacked(f->rx_payload_bits, Ndatabitsperpacket))
                     rx_status |= FREEDV_RX_BITS;
                 else
                     rx_status |= FREEDV_RX_BIT_ERRORS;
             } else {
-
+                
                 // voice modes aren't as strict - pass everything through to the speech decoder, but flag
                 // frame with possible errors
                 rx_status |= FREEDV_RX_BITS;
                 if (parityCheckCount != ldpc->NumberParityBits)
                    rx_status |= FREEDV_RX_BIT_ERRORS;
-
             }
 
             if (f->test_frames) {

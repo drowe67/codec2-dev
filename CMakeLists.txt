@@ -681,6 +681,14 @@ endif()
              COMMAND sh -c "$<TARGET_FILE:freedv_rx> 700D ${CMAKE_CURRENT_SOURCE_DIR}/raw/testframes_700d.raw /dev/null --testframes --discard"
              )
 
+    # speech output on valid signal, to exercise freedv_bits_to_speech() speech output logic
+    add_test(NAME test_freedv_api_700D_speech
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            ./freedv_tx 700D ../../raw/ve9qrp_10s.raw - |
+                            ./cohpsk_ch - - -20 --Fs 8000 |
+                            ./freedv_rx 700D - /dev/null --squelch -2 -vv")
+             set_tests_properties(test_freedv_api_700D_speech PROPERTIES PASS_REGULAR_EXPRESSION "frames decoded: 62  output speech samples: 72960")
+
     # no random speech output due to trial sync when listening to noise
     add_test(NAME test_freedv_api_700D_burble
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
