@@ -207,7 +207,8 @@ void freedv_ofdm_data_open(struct freedv *f) {
     f->nin = f->nin_prev = ofdm_get_nin(f->ofdm);
     f->n_nat_modem_samples = ofdm_get_samples_per_packet(f->ofdm);
     f->n_nom_modem_samples = ofdm_get_samples_per_frame(f->ofdm);
-    f->n_max_modem_samples = ofdm_get_max_samples_per_frame(f->ofdm);
+    /* in burst mode we might jump a preamble frame */
+    f->n_max_modem_samples = 2*ofdm_get_max_samples_per_frame(f->ofdm);
     f->modem_sample_rate = f->ofdm->config.fs;
     f->sz_error_pattern = f->ofdm_bitsperpacket;
 
@@ -521,7 +522,7 @@ int freedv_comp_short_rx_ofdm(struct freedv *f, void *demod_in_8kHz, int demod_i
     ofdm_sync_state_machine(ofdm, rx_uw);
 
     if ((f->verbose && (ofdm->last_sync_state == search)) || (f->verbose >= 2)) {
-        if ((ofdm->modem_frame == 0) && (ofdm->sync_state == synced)) {
+        if (rx_status & FREEDV_RX_BITS) {
             fprintf(stderr, "%3d nin: %4d st: %-6s euw: %2d %2d mf: %2d f: %5.1f pbw: %d snr: %4.1f eraw: %3d ecdd: %3d iter: %3d "
                 "pcc: %3d rxst: %s\n",
                 f->frames++, ofdm->nin,
