@@ -584,15 +584,27 @@ int main(int argc, char *argv[]) {
         }
 
         if (verbose >= 2) {
-           if (ofdm->last_sync_state != search)
-                fprintf(stderr, "euw: %2d %1d mf: %2d f: %5.1f pbw: %d eraw: %3d ecdd: %3d iter: %3d pcc: %3d\n",
-                    ofdm->uw_errors,
-                    ofdm->sync_counter,
-                    ofdm->modem_frame,
-                    ofdm->foff_est_hz,
-                    ofdm->phase_est_bandwidth,
-                    Nerrs_raw, Nerrs_coded, iter, parityCheckCount);
-
+           if (ofdm->last_sync_state != search) {
+                if ((ofdm->modem_frame == 0) && (ofdm->sync_state != trial)) {
+                    /* weve just received a complete packet, so print all stats */
+                    fprintf(stderr, "euw: %2d %1d mf: %2d f: %5.1f pbw: %d eraw: %3d ecdd: %3d iter: %3d pcc: %3d\n",
+                        ofdm->uw_errors,
+                        ofdm->sync_counter,
+                        ofdm->modem_frame,
+                        ofdm->foff_est_hz,
+                        ofdm->phase_est_bandwidth,
+                        Nerrs_raw, Nerrs_coded, iter, parityCheckCount);
+                } else {
+                    /* weve just received a modem frame, abbreviated stats */
+                    fprintf(stderr, "euw: %2d %1d mf: %2d f: %5.1f pbw: %d\n",
+                        ofdm->uw_errors,
+                        ofdm->sync_counter,
+                        ofdm->modem_frame,
+                        ofdm->foff_est_hz,
+                        ofdm->phase_est_bandwidth);                    
+                }
+            }
+                        
             /* detect a successful sync for time to sync tests */
             if ((time_to_sync < 0) && ((ofdm->sync_state == synced) || (ofdm->sync_state == trial)))
                 if ((parityCheckCount > 80) && (iter != 100))

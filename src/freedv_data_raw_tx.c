@@ -174,11 +174,11 @@ int main(int argc, char *argv[]) {
     }
 
     mode = -1;
-    if (!strcmp(argv[dx],"FSK_LDPC")) mode = FREEDV_MODE_FSK_LDPC;
-    if (!strcmp(argv[dx],"DATAC0")) mode = FREEDV_MODE_DATAC0;
-    if (!strcmp(argv[dx],"DATAC1")) mode = FREEDV_MODE_DATAC1;
-    if (!strcmp(argv[dx],"DATAC2")) mode = FREEDV_MODE_DATAC2;
-    if (!strcmp(argv[dx],"DATAC3")) mode = FREEDV_MODE_DATAC3;
+    if (!strcmp(argv[dx],"FSK_LDPC") || !strcmp(argv[dx],"fsk_ldpc")) mode = FREEDV_MODE_FSK_LDPC;
+    if (!strcmp(argv[dx],"DATAC0") || !strcmp(argv[dx],"datac0")) mode = FREEDV_MODE_DATAC0;
+    if (!strcmp(argv[dx],"DATAC1") || !strcmp(argv[dx],"datac1")) mode = FREEDV_MODE_DATAC1;
+    if (!strcmp(argv[dx],"DATAC2") || !strcmp(argv[dx],"datac2")) mode = FREEDV_MODE_DATAC2;
+    if (!strcmp(argv[dx],"DATAC3") || !strcmp(argv[dx],"datac3")) mode = FREEDV_MODE_DATAC3;
     if (mode == -1) {
       fprintf(stderr, "Error: in mode: %s", argv[dx]);
       exit(1);
