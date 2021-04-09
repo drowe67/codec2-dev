@@ -60,7 +60,7 @@ int main(int argc, char *argv[]) {
     
     if (argc < 4) {
     helpmsg:
-        fprintf(stderr, "usage: %s [options] FSK_LDPC|DATAC0|DATAC1|DATAC2|DATAC3 InputBinaryDataFile OutputModemRawFile\n"
+        fprintf(stderr, "usage: %s [options] FSK_LDPC|DATAC0|DATAC1|DATAC3 InputBinaryDataFile OutputModemRawFile\n"
                "\n"
                "  --testframes      T         send T test frames (in burst mode T must equal B*N)\n"
                "  --bursts          B         select burst mode; send B bursts of N testframes\n"
@@ -177,7 +177,6 @@ int main(int argc, char *argv[]) {
     if (!strcmp(argv[dx],"FSK_LDPC") || !strcmp(argv[dx],"fsk_ldpc")) mode = FREEDV_MODE_FSK_LDPC;
     if (!strcmp(argv[dx],"DATAC0") || !strcmp(argv[dx],"datac0")) mode = FREEDV_MODE_DATAC0;
     if (!strcmp(argv[dx],"DATAC1") || !strcmp(argv[dx],"datac1")) mode = FREEDV_MODE_DATAC1;
-    if (!strcmp(argv[dx],"DATAC2") || !strcmp(argv[dx],"datac2")) mode = FREEDV_MODE_DATAC2;
     if (!strcmp(argv[dx],"DATAC3") || !strcmp(argv[dx],"datac3")) mode = FREEDV_MODE_DATAC3;
     if (mode == -1) {
       fprintf(stderr, "Error: in mode: %s", argv[dx]);

@@ -355,11 +355,6 @@ function config = ofdm_init_mode(mode="700D")
     config.ftwindow_width = 80; config.amp_est_mode = 1; config.EsNodB = 3;
     config.edge_pilots = 0; config.timing_mx_thresh = 0.10;
     config.tx_uw = [1 1 0 0  1 0 1 0  1 1 1 1  0 0 0 0];
-  elseif strcmp(mode,"datac2")
-    Ns=5; config.Np=36; Tcp = 0.006; Ts = 0.016; Nc = 9; config.data_mode = "streaming";
-    config.Ntxtbits = 0; config.Nuwbits = 12; config.bad_uw_errors = 1;
-    config.state_machine = "data";
-    config.ftwindow_width = 80; config.amp_est_mode = 1; config.EsNodB = 10;
   elseif strcmp(mode,"datac3")
     Ns=5; config.Np=29; Tcp = 0.006; Ts = 0.016; Nc = 9; config.data_mode = "streaming";
     config.edge_pilots = 0;
@@ -1742,15 +1737,11 @@ function [code_param Nbitspercodecframe Ncodecframespermodemframe] = codec_to_fr
     load H_4096_8192_3d.mat
     code_param = ldpc_init_user(HRA, modulation, mod_order, mapping);
   end
-  if strcmp(mode, "datac2")
-    load H2064_516_sparse.mat
-    code_param = ldpc_init_user(HRA, modulation, mod_order, mapping);
-  end
   if strcmp(mode, "datac3")
     load H_1024_2048_4f.mat
     code_param = ldpc_init_user(H, modulation, mod_order, mapping);
   end
-  if strcmp(mode, "datac0") || strcmp(mode, "datac1") || strcmp(mode, "datac2") || strcmp(mode, "datac3") || strcmp(mode, "qam16c1") || strcmp(mode, "qam16c2")
+  if strcmp(mode, "datac0") || strcmp(mode, "datac1") || strcmp(mode, "datac3") || strcmp(mode, "qam16c1") || strcmp(mode, "qam16c2")
     printf("ldpc_data_bits_per_frame = %d\n", code_param.ldpc_data_bits_per_frame);
     printf("ldpc_coded_bits_per_frame  = %d\n", code_param.ldpc_coded_bits_per_frame);
     printf("ldpc_parity_bits_per_frame  = %d\n", code_param.ldpc_parity_bits_per_frame);

@@ -544,14 +544,6 @@ endif()
                             DISPLAY=\"\" octave-cli -qf --eval 'ofdm_ldpc_rx(\"${CMAKE_CURRENT_BINARY_DIR}/test.raw\",\"datac1\")'")
              set_tests_properties(test_OFDM_modem_datac1_octave PROPERTIES PASS_REGULAR_EXPRESSION "Coded PER: 0.0000 Pckts:     4")
 
-    # DATAC2 C Tx, Octave Rx
-    add_test(NAME test_OFDM_modem_datac2_octave
-             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR};
-                            ./src/ofdm_mod --mode datac2 --in /dev/zero --testframes 20 --verbose 1 --ldpc > test.raw;
-                            cd ${CMAKE_CURRENT_SOURCE_DIR}/octave;
-                            DISPLAY=\"\" octave-cli -qf --eval 'ofdm_ldpc_rx(\"${CMAKE_CURRENT_BINARY_DIR}/test.raw\",\"datac2\")'")
-             set_tests_properties(test_OFDM_modem_datac2_octave PROPERTIES PASS_REGULAR_EXPRESSION "Coded PER: 0.0000 Pckts:     4")
-
     # DATAC3 C Tx, Octave Rx
     add_test(NAME test_OFDM_modem_datac3_octave
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR};
@@ -1055,13 +1047,6 @@ endif(NOT APPLE)
                             head -c $((510*10)) </dev/urandom > binaryIn.bin;
                             ./freedv_data_raw_tx DATAC1 binaryIn.bin - |
                             ./freedv_data_raw_rx DATAC1 - binaryOut.bin -v;
-                            diff binaryIn.bin binaryOut.bin")
-
-     add_test(NAME test_freedv_data_raw_ofdm_datac2
-             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
-                            head -c $((256*10)) </dev/urandom > binaryIn.bin;
-                            ./freedv_data_raw_tx DATAC2 binaryIn.bin - |
-                            ./freedv_data_raw_rx DATAC2 - binaryOut.bin -v;
                             diff binaryIn.bin binaryOut.bin")
 
      add_test(NAME test_freedv_data_raw_ofdm_datac3
