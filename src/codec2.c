@@ -402,6 +402,22 @@ int codec2_bits_per_frame(struct CODEC2 *c2) {
 
 /*---------------------------------------------------------------------------*\
 
+  FUNCTION....: codec2_bytes_per_frame
+  DATE CREATED: April 2021
+
+  Returns the number of bytes per frame.  Useful for allocated storage for
+  codec2_encode()/codec2_decode().  Note the number of bits may not be a
+  multiple of 8, thefore some bits in the last byte may be unused.
+
+\*---------------------------------------------------------------------------*/
+
+int codec2_bytes_per_frame(struct CODEC2 *c2) {
+	return (codec2_bits_per_frame(c2)+7)/8;
+}
+
+
+/*---------------------------------------------------------------------------*\
+
   FUNCTION....: codec2_samples_per_frame
   AUTHOR......: David Rowe
   DATE CREATED: Nov 14 2011
@@ -432,18 +448,41 @@ int codec2_samples_per_frame(struct CODEC2 *c2) {
     return 0; /* shouldnt get here */
 }
 
-void codec2_encode(struct CODEC2 *c2, unsigned char *bits, short speech[])
+
+/*---------------------------------------------------------------------------*\
+
+  FUNCTION....: codec2_encode
+  AUTHOR......: David Rowe
+  DATE CREATED: Nov 14 2011
+
+  Take an input buffer of speech samples, and compress them to a packed buffer
+  of bytes.
+
+\*---------------------------------------------------------------------------*/
+
+void codec2_encode(struct CODEC2 *c2, unsigned char *bytes, short speech[])
 {
     assert(c2 != NULL);
     assert(c2->encode != NULL);
 
-    c2->encode(c2, bits, speech);
+    c2->encode(c2, bytes, speech);
 
 }
 
-void codec2_decode(struct CODEC2 *c2, short speech[], const unsigned char *bits)
+/*---------------------------------------------------------------------------*\
+
+  FUNCTION....: codec2_decode
+  AUTHOR......: David Rowe
+  DATE CREATED: Nov 14 2011
+
+  Take an input packed buffer of bytes, and decode them to a buffer of speech
+  samples.
+
+\*---------------------------------------------------------------------------*/
+
+void codec2_decode(struct CODEC2 *c2, short speech[], const unsigned char *bytes)
 {
-    codec2_decode_ber(c2, speech, bits, 0.0);
+    codec2_decode_ber(c2, speech, bytes, 0.0);
 }
 
 void codec2_decode_ber(struct CODEC2 *c2, short speech[], const unsigned char *bits, float ber_est)

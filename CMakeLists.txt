@@ -250,9 +250,10 @@ endif()
 
 
 #
-# codec2 library
+# codec2 library and demo apps
 #
 add_subdirectory(src)
+add_subdirectory(demo)
 
 
 if(UNITTEST)

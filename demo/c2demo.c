@@ -26,64 +26,46 @@
   along with this program; if not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "codec2.h"
-#include "sine.h"
-#include "dump.h"
-
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
-#include <errno.h>
+#include "codec2.h"
 
 int main(int argc, char *argv[])
 {
     struct CODEC2 *codec2;
     FILE          *fin;
     FILE          *fout;
-    short         *buf;
-    unsigned char *bits;
-    int            nsam, nbit;
 
     if (argc != 3) {
-	printf("usage: %s InputRawSpeechFile OutputRawSpeechFile\n", argv[0]);
-	exit(1);
+        printf("usage: %s InputRawSpeechFile OutputRawSpeechFile\n", argv[0]);
+        exit(1);
     }
 
     if ( (fin = fopen(argv[1],"rb")) == NULL ) {
-	fprintf(stderr, "Error opening input speech file: %s: %s.\n",
-         argv[1], strerror(errno));
-	exit(1);
+        fprintf(stderr, "Error opening input speech file: %s\n", argv[1]);
+        exit(1);
     }
 
     if ( (fout = fopen(argv[2],"wb")) == NULL ) {
-	fprintf(stderr, "Error opening output speech file: %s: %s.\n",
-         argv[2], strerror(errno));
-	exit(1);
+        fprintf(stderr, "Error opening output speech file: %s\n", argv[2]);
+         exit(1);
     }
-
-    #ifdef DUMP
-    dump_on("c2demo");
-    #endif
 
     /* Note only one set of Codec 2 states is required for an encoder
        and decoder pair. */
-
     codec2 = codec2_create(CODEC2_MODE_1300);
-    nsam = codec2_samples_per_frame(codec2);
-    buf = (short*)malloc(nsam*sizeof(short));
-    nbit = codec2_bits_per_frame(codec2);
-    bits = (unsigned char*)malloc(nbit*sizeof(char));
+    size_t nsam = codec2_samples_per_frame(codec2);
+    short speech_samples[nsam];
+    /* Bits from the encoder are packed into bytes */
+    unsigned char compressed_bytes[codec2_bytes_per_frame(codec2)];
 
-    while(fread(buf, sizeof(short), nsam, fin) == (size_t)nsam) {
-	codec2_encode(codec2, bits, buf);
-	codec2_decode(codec2, buf, bits);
-	fwrite(buf, sizeof(short), nsam, fout);
+    while(fread(speech_samples, sizeof(short), nsam, fin) == nsam) {
+        codec2_encode(codec2, compressed_bytes, speech_samples);
+        codec2_decode(codec2, speech_samples, compressed_bytes);
+        fwrite(speech_samples, sizeof(short), nsam, fout);
     }
 
-    free(buf);
-    free(bits);
     codec2_destroy(codec2);
-
     fclose(fin);
     fclose(fout);
 
