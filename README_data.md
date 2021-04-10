@@ -43,14 +43,13 @@ VHF packet data API:
 
 Raw modem frame API:
 
-1. Let's send some text over the modem:
+1. Let's send a 128 byte frame containing some text over the modem:
    ```sh
-   echo "Hello World                   " |
-   ./src/freedv_data_raw_tx DATAC3 - - 2>/dev/null |
-   ./src/freedv_data_raw_rx DATAC3 - - 2>/dev/null
-   Hello World
+   padding=$(head -c 115 < /dev/zero | tr '\0' '-'); echo "Hello World" $padding > in.txt
+   ./src/freedv_data_raw_tx --bursts 1 datac3 in.txt - | ./src/fv_data_raw_rx --framesperburst 1 datac3 - - 
+   Hello World --------
    ```
-   Note we've padded the input frame to 30 bytes, the DATAC3 framesize. The `2>/dev/null` makes the output a little quieter by supressing some debug information.
+   Note we've padded the input frame to 126 bytes, the DATAC3 framesize (less CRC).
 
 # VHF Packet Data Channel
 
@@ -171,7 +170,7 @@ The raw data API can be used to send frames of bytes over radio channels.   The 
 
 Several modes are available which support FSK and OFDM modulation. FSK is aimed at VHF And UHF applications, and the OFDM modes have been optimised for multipath HF radio channels.
 
-The demo programs [freedv_data_raw_tx.c](src/freedv_data_raw_tx.c) and [freedv_data_raw_rx.c](src/freedv_data_raw_rx.c) show how to use the raw data API.
+For simple examples of how use the FreeDV API with raw data frames, see the demo programs [freedv_data1_tx.c](demo/freedv_data1_tx.c) and [freedv_data1_rx.c](src/freedv_data1_rx.c) The full featured sample programs [freedv_data_raw_tx.c](src/freedv_data_raw_tx.c) and [freedv_data_raw_rx.c](src/freedv_data_raw_rx.c) can be used to experiment with the raw data API.  
 
 ## FSK LDPC Raw Data Mode
 
@@ -249,9 +248,9 @@ Some notes on this example:
 1. Examples in the [ctests](CMakeLists.txt).
 1. [FSK_LDPC blog post](http://www.rowetel.com/?p=7467)
 
-## OFDM Raw Data modes
+## OFDM Raw Data modes for HF Radio
 
- These modes use an OFDM modem with powerful LDPC codes and are designed for sending data over HF radio channels with multipath fading.  At the time of writing (Jan 2021) they are a work in progress, but usable as is.
+ These modes use an OFDM modem with powerful LDPC codes and are designed for sending data over HF radio channels with multipath fading.  At the time of writing (April 2021) they are a work in progress, but usable as is.  The current modes supported are:
 
 | FreeDV Mode | RF bandwidth (Hz) | Payload data rate bits/s | Payload bytes/frame | FEC | Duration (sec) | MPP test | Use case |
 | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: |
@@ -259,18 +258,81 @@ Some notes on this example:
 | DATAC1 | 500 | 980 | 510 | (8192,4096) | 4.18 | 92/100 at 5dB | Forward link data (medium SNR) |
 | DATAC3 | 500 | 321 | 126 | (2048,1024) | 3.19 | 74/100 at 0dB | Forward link data (low SNR) |
 
-| FreeDV Mode | RF bandwidth (Hz) | Payload data rate bits/s | Payload bytes/frame | FEC | AWGN | MPP |
-| :-: | :-: | :-: | :-: | :-: | :-: | :-: |
-| DATAC1 | 1700 | 980 | 512 | (8192,4096) | 1 | 5 |
-| DATAC2 | 563 | 521 | 258 | (2580,2064) | 1 | 7 |
-| DATAC3 | 500 | 282 | 128 | (2048,1024) | -4 | 0 |
-
 Notes:
-1. 16 bits (2 bytes) per frame are reserved for a 16 bit CRC.
-1. AGWN is the SNR for 10% Packet Error Rate (PER) on an AWGN channel.
-1. MPP is the SNR for 10% Packet Error Rate (PER) on a MultiPath Poor channel.
+1. 16 bits (2 bytes) per frame are reserved for a 16 bit CRC, e.g. for `datac3` we have 128 byte frames, and 128-2=126 bytes/frame of payload data.
+1. SNR is the target operating point SNR for each mode.
+1. "MPP test" is the number of packets received/transmitted on a simulated MultiPath Poor channel (1Hz Doppler spread, 2ms delay) at the operating point SNR.
+
+From the callers point of vew, the frame format of each burst is:
+```
+| Preamble | payload data | CRC | payload data | CRC | ........... | Postamble | 
+           | frame 1 -----------| frame 2 -----------| ... frame N |
+```
+In the next layer down, each frame is comprised of several OFDM "modem frames", that contain pilot, unique word, and FEC symbols to handle syncronisation and error correction over the challenging HF channel.  The preamble and postamble are used to locate the burst and estimate it's frequency offset.  Having both a pre and postamble increases the probability of sucessful detection of the burst in a fading channel. Here are some single frame bursts a MPP cahnnel at 5dB SNR:
+
+![](doc/pre_post_amble_mpp.png)
+
+You can see what a mess the MPP channel makes.  Sometimes we find the pre-amble, other times the post-amble.  Using both increases the probability of detecting the burst, it's a form of time diversity.  If the probability of missing the pre-amble is P(fail)=0.1, then the probability of missing the pre and post-amble is P(fail)*P(fail)=0.01. If we find either we can work out where the burst starts and start demodulating.
+
+Here is an example of sending 3 bursts of 2 frames/burst, a total of 6 frames:
+```
+./src/freedv_data_raw_tx --framesperburst 2 --bursts 3 --testframes 6 DATAC0 /dev/zero - |
+./src/freedv_data_raw_rx --framesperburst 2 --testframes DATAC0 - /dev/null --vv
+<snip>
+BER......: 0.0000 Tbits:  1536 Terrs:     0
+Coded BER: 0.0000 Tbits:   768 Terrs:     0
+Coded PER: 0.0000 Tpkts:     6 Tpers:     0
+```
+
+Lets add some noise and a 20 Hz frequency offset:
+```
+./src/freedv_data_raw_tx --framesperburst 2 --bursts 3 --testframes 6 DATAC0 /dev/zero - |
+./src/cohpsk_ch - - -20 --Fs 8000 -f 20 |
+./src/freedv_data_raw_rx --framesperburst 2 --testframes DATAC0 - /dev/null --vv
+<snip>
+marks:space: 0.83 SNR offset: -0.79
+cohpsk_ch: SNR3k(dB):    -0.36  C/No....:    34.42
+<snip>
+BER......: 0.0195 Tbits:  1536 Terrs:    30
+Coded BER: 0.0000 Tbits:   768 Terrs:     0
+Coded PER: 0.0000 Tpkts:     6 Tpers:     0
+```
+We still received 6 frames OK (Tpkts field), but in this case there was a raw BER of about 2% which the FEC cleaned up nicely (Coded BER 0.0).  Just above that we can see the "SNR offset" and "cohpsk_ch: SNR3k" fields.  In the silence between bursts the modem signal has zero power, which biases the SNR measured by the `conhpsk_ch` channels imulation tool.  This bias is the "SNR offset".  So the true SNR for this test is actually:
+```
+SNR = -0.36 - (-0.79) = 0.43 dB
+```
+
+In the `raw` directory is a real world off-air sample of a signal sent between Adelaide and Melbourne (800km) using about 20W on 40m.  This can be decoded with:
+```
+./src/freedv_data_raw_rx datac1 --framesperburst 1 --testframes ../raw/test_datac1_006.raw /dev/null --vv
+<snip>
+BER......: 0.0134 Tbits: 73728 Terrs:   986
+Coded BER: 0.0000 Tbits: 36864 Terrs:     0
+Coded PER: 0.0000 Tpkts:     9 Tpers:     0
+```
+
+It's also useful to listen to the file, you can hear co-channel SSB, the bursts starting and stopping, and some fading:
+```
+aplay -f S16_LE ../raw/test_datac1_006.raw
+```
+
+Here is a spectrogram (waterfall on it's side - time flows from left to right, frequency on the Y axis):
+
+![](doc/test_datac1_006_spectrogram.png)
+
+The mulitipath channel carves notches out of the signal, and the level rises and falls.  The 27 carriers of the `datac1` channel can also be observed.  The SSB is the fuzz along the top. The SNR varied between 8 and 16dB. The fading is even more obvious on the scatter diagram:
+
+![](doc/test_datac1_006_scatter.png)
+
+The X shape is due to the level of each carrier changing with the fading.  In some cases a carrier is faded down to zero.  The FEC helps clean up any errors due to faded carriers.
 
 ## Reading Further
 
-1. Examples in the [ctests](CMakeLists.txt).
+Resources:
+1. See the raw data example in Quickstart section above.
+1. For simple examples of how use the FreeDV API, see the demo programs [freedv_data1_tx.c](demo/freedv_data1_tx.c) and [freedv_data1_rx.c](src/freedv_data1_rx.c) 
+1. [freedv_data_raw_tx.c](src/freedv_data_raw_tx.c) and [freedv_data_raw_rx.c](src/freedv_data_raw_rx.c) are more full deatured example programs.  
+1. The modem waveforms designs are described in this [spreadsheet](doc/modem_codec_frame_design.ods).
+1. Examples in the [ctests](CMakeLists.txt) (look for "FreeDV API raw data")
 1. [Codec 2 HF Data Modes Part 1 blog post](http://www.rowetel.com/?p=7167)
+1. [HF Data Acquisition](https://github.com/drowe67/codec2/pull/171) GitHub Pull Request
