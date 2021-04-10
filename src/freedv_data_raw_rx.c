@@ -57,18 +57,19 @@ int main(int argc, char *argv[]) {
 
     if (argc < 3) {
     helpmsg:
-      	fprintf(stderr, "usage: %s [options] FSK_LDPC|DATAC0|DATAC1|DATAC3 InputModemSpeechFile BinaryDataFile\n"
+      	fprintf(stderr, "\nusage: %s [options] FSK_LDPC|DATAC0|DATAC1|DATAC3 InputModemSpeechFile BinaryDataFile\n"
                "  -v or --vv             verbose options\n"
                "  --testframes           count raw and coded errors in testframes sent by tx\n"
-               "  --framesperburst  N    selects burst mode, and configures state machine to reset after N frames received\n"
+               "  --framesperburst  N    selects burst mode, N frames per burst (must match Tx)\n"
                "\n"
                "For FSK_LDPC only:\n\n"
                "  -m      2|4     number of FSK tones\n"
                "  --Fs    FreqHz  sample rate (default 8000)\n"
                "  --Rs    FreqHz  symbol rate (default 100)\n"
-               "  --mask shiftHz  Use \"mask\" freq estimator (default is \"peak\" estimator)\n", argv[0]);
-       	fprintf(stderr, "e.g    %s DATAC1 off_air_audio.raw received_data_bytes.bin\n", argv[0]);
-	      exit(1);
+               "  --mask shiftHz  Use \"mask\" freq estimator (default is \"peak\" estimator)\n\n", argv[0]);
+       	
+        fprintf(stderr, "example: %s --framesperburst 1 --testframes datac0 samples.s16 /dev/null\n\n", argv[0]);
+	    exit(1);
     }
 
     int o = 0;

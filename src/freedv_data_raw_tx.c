@@ -60,13 +60,13 @@ int main(int argc, char *argv[]) {
     
     if (argc < 4) {
     helpmsg:
-        fprintf(stderr, "usage: %s [options] FSK_LDPC|DATAC0|DATAC1|DATAC3 InputBinaryDataFile OutputModemRawFile\n"
+        fprintf(stderr, "\nusage: %s [options] FSK_LDPC|DATAC0|DATAC1|DATAC3 InputBinaryDataFile OutputModemRawFile\n"
                "\n"
                "  --testframes      T         send T test frames (in burst mode T must equal B*N)\n"
                "  --bursts          B         select burst mode; send B bursts of N testframes\n"
                "  --framesperburst  N         burst mode, N frames per burst (default 1)\n"
-               "  --delay           ms        testframe inter-burst delay in ms (default min rqd for demod)\n"
-               "  --postdelay       ms        additional delay at end of testframe sequence (default) 0)\n"
+               "  --delay           ms        testframe inter-burst delay in ms\n"
+               "  --postdelay       ms        additional delay at end of run in ms\n"
                "  -c                          complex signed 16 bit output format (default real)\n"
                "  --clip            0|1       clipping for reduced PAPR\n"
                "  --txbpf           0|1       bandpass filter\n"
@@ -80,8 +80,8 @@ int main(int argc, char *argv[]) {
                "  --tone1 FreqHz  freq of first tone (default 1000)\n"
                "  --shift FreqHz  shift between tones (default 200)\n\n"
                , argv[0]);
-        fprintf(stderr, "example: $ %s 700D dataBytes.bin samples.s16\n", argv[0]);
-        fprintf(stderr, "example: $ %s FSK_LDPC -c --testframes 10 /dev/zero samples.iq16\n\n", argv[0]);
+        fprintf(stderr, "example: $ %s --testframes 6 --bursts 3 --framesperburst 2 datac0 /dev/zero samples.s16\n", argv[0]);
+        fprintf(stderr, "example: $ %s  -c --testframes 10 FSK_LDPC/dev/zero samples.iq16\n\n", argv[0]);
         exit(1);
     }
 
@@ -211,7 +211,7 @@ int main(int argc, char *argv[]) {
     int bytes_per_modem_frame = freedv_get_bits_per_modem_frame(freedv)/8;
     int payload_bytes_per_modem_frame = bytes_per_modem_frame;
     payload_bytes_per_modem_frame -= 2; /* 16 bits used for the CRC */
-    fprintf(stderr, "payload bytes_per_modem_frame: %d\n", payload_bytes_per_modem_frame);
+    fprintf(stderr, "payload bytes_per_modem_frame: %d ", payload_bytes_per_modem_frame);
     assert((freedv_get_bits_per_modem_frame(freedv) % 8) == 0);
     int     n_mod_out = freedv_get_n_tx_modem_samples(freedv);
     uint8_t bytes_in[bytes_per_modem_frame];
