@@ -34,26 +34,30 @@ qam16;
 #}
 
 function states = ofdm_init(config)
-  if isfield(config,"bps") bps = config.bps; else bps=2; end
-  Rs = config.Rs; Tcp = config.Tcp; Ns = config.Ns; Nc = config.Nc;
-  if isfield(config,"Np") Np = config.Np; else Np = 1; end
-  if isfield(config,"Ntxtbits") Ntxtbits = config.Ntxtbits ; else Ntxtbits = 4; end
-  if isfield(config,"Nuwbits") Nuwbits = config.Nuwbits ; else Nuwbits = 5*bps; end
-  if isfield(config,"ftwindow_width") ftwindow_width = config.ftwindow_width; else ftwindow_width = 32; end
-  if isfield(config,"timing_mx_thresh") timing_mx_thresh = config.timing_mx_thresh; else timing_mx_thresh = 0.35; end
-  if isfield(config,"tx_uw") tx_uw = config.tx_uw; else tx_uw = zeros(1,Nuwbits); end
-  if isfield(config,"bad_uw_errors") bad_uw_errors = config.bad_uw_errors; else bad_uw_errors = 3; end
-  if isfield(config,"amp_scale") amp_scale = config.amp_scale; else amp_scale = 245E3; end
-  if isfield(config,"amp_est_mode") amp_est_mode = config.amp_est_mode; else amp_est_mode = 0; end
-  if isfield(config,"EsNo_est_all_symbols")  EsNo_est_all_symbols = config.EsNo_est_all_symbols; else EsNo_est_all_symbols = 1; end
-  if isfield(config,"EsNodB") EsNodB = config.EsNodB; else EsNodB = 3; end
-  if isfield(config,"state_machine") state_machine = config.state_machine; else state_machine = "voice1"; end
-  if isfield(config,"edge_pilots") edge_pilots = config.edge_pilots; else edge_pilots = 1; end
-  if isfield(config,"clip_gain1") clip_gain1 = config.clip_gain1; else clip_gain1 = 2.5; end
-  if isfield(config,"clip_gain2") clip_gain2 = config.clip_gain2; else clip_gain2 = 0.8; end
-  if isfield(config,"foff_limiter") foff_limiter = config.foff_limiter; else foff_limiter = 0; end
-  if isfield(config,"txbpf_width_Hz") txbpf_width_Hz = config.txbpf_width_Hz; else txbpf_width_Hz = 2000; end
-
+  Rs = config.Rs; 
+  Tcp = config.Tcp; 
+  Ns = config.Ns; 
+  Nc = config.Nc;
+  bps = config.bps;
+  Np = config.Np;
+  Ntxtbits = config.Ntxtbits;
+  Nuwbits = config.Nuwbits;
+  ftwindow_width = config.ftwindow_width;
+  timing_mx_thresh = config.timing_mx_thresh;
+  tx_uw = config.tx_uw;
+  bad_uw_errors = config.bad_uw_errors;
+  amp_scale = config.amp_scale;
+  amp_est_mode = config.amp_est_mode;
+  EsNo_est_all_symbols = config.EsNo_est_all_symbols;
+  EsNodB = config.EsNodB; 
+  state_machine = config.state_machine; 
+  edge_pilots = config.edge_pilots;
+  clip_gain1 = config.clip_gain1;
+  clip_gain2 = config.clip_gain2;
+  foff_limiter = config.foff_limiter; 
+  txbpf_width_Hz = config.txbpf_width_Hz;
+  data_mode = config.data_mode;
+       
   states.Fs = 8000;
   states.bps = bps;
   states.Rs = Rs;
@@ -88,7 +92,7 @@ function states = ofdm_init(config)
   % some basic sanity checks
   assert(floor(states.M) == states.M);
 
-  % UW symbol placement.  Use ofdm_dev.m, debug_false_sync() to test.
+  % UW symbol placement. 
   % Note we need to fill each UW symbols with bits.  The LDPC decoder
   % works on symbols so we can't break up any symbols into UW/FEC
   % encoded bits.
@@ -101,10 +105,10 @@ function states = ofdm_init(config)
   Ndatasymsperframe = (Ns-1)*Nc;
   last_sym = floor(Nuwsyms*uw_step/bps+1);
   if last_sym > states.Np*Ndatasymsperframe
-    uw_step = Nc-1;                              % try a different step
+    uw_step = Nc-1;                                 % try a different step
   end
   last_sym = floor(Nuwsyms*uw_step/bps+1);
-  assert(last_sym <= states.Np*Ndatasymsperframe);         % we still can't fit them all
+  assert(last_sym <= states.Np*Ndatasymsperframe);  % we still can't fit them all
 
   % Place UW symbols in frame
   for i=1:Nuwsyms
@@ -152,10 +156,14 @@ function states = ofdm_init(config)
   states.pilots = 1 - 2*(rand(1,Nc+2) > 0.5);
   %printf("number of pilots total: %d\n", length(states.pilots));
 
-  % place pilots at carrier 1 and Nc+2 to support low bandwith phase est over grid
+  % If set, place pilots at carrier 1 and Nc+2 to support low bandwith phase est over grid
   % of 12 pilot_samples.  Used for 700D and 2020
   states.edge_pilots = edge_pilots;
-
+  if states.edge_pilots == 0
+     states.pilots(1) = 0;
+     states.pilots(Nc+2) = 0;
+  end
+  
   % carrier tables for up and down conversion
   states.fcentre = fcentre = 1500;
   alower = fcentre - Rs * (Nc/2);  % approx frequency of lowest carrier
@@ -170,18 +178,27 @@ function states = ofdm_init(config)
   states.W = W;
 
   % fine timing search +/- window_width/2 from current timing instant,
-  % adjust this to be roughly the maximum delay spread
+  % set this to roughly twice the maximum delay spread
   states.ftwindow_width = ftwindow_width;
 
   % magic number we adjust by experiment (see ofdm_dev.m acquisition tests, blog post on 700D sync)
   states.timing_mx_thresh = timing_mx_thresh;
 
-  % Receive buffer: D P DDD P DDD P DDD P D
-  %                         ^
-  % also see ofdm_demod() ...
-
-  %                       D                 P DDD P DDD P DDD             P                    D
-  states.Nrxbuf = states.Nsampersymbol + 3*states.Nsamperframe + states.Nsampersymbol + states.Nsampersymbol;
+  % Receive buffer: rxbufst + D P DDD P DDD P DDD P D
+  %                                   ^
+  %                                   nominal start of current modem frame
+  
+  if length(data_mode)
+    Nrxbufhistory = (states.Np+2)*states.Nsamperframe;     % extra storage at start of rxbuf to allow us to step back in time 
+  else
+    Nrxbufhistory = 0;
+  end
+  states.rxbufst = Nrxbufhistory;                          % start of rxbuf window used for demod of current rx frame
+  states.Nrxbufhistory = Nrxbufhistory;
+  
+  %                       D                    P DDD P DDD P DDD             P                    D
+  states.Nrxbufmin = states.Nsampersymbol + 3*states.Nsamperframe + states.Nsampersymbol + states.Nsampersymbol;
+  states.Nrxbuf = Nrxbufhistory + states.Nrxbufmin;
   states.rxbuf = zeros(1, states.Nrxbuf);
 
   % default settings on a bunch of options and states
@@ -231,7 +248,10 @@ function states = ofdm_init(config)
   states.sync_end = 0;
   states.modem_frame = 0;                                 % keep track of how many frames received in packet
   states.state_machine = state_machine;                   % mode specific state machine
-
+  states.packetsperburst = 0;                             % for OFDM data modes, how many packets before we reset state machine
+  states.postambledetectoren = strcmp(data_mode,"burst");
+  states.npre = states.npost = 0;                         % counters for logging
+  
   % LDPC code is optionally enabled
 
   states.rate = 1.0;
@@ -250,6 +270,13 @@ function states = ofdm_init(config)
   states.sum_noise_var = 0;
   states.clock_offset_est = 0;
 
+  % pre-amble for data modes
+  states.data_mode = data_mode;
+  if length(states.data_mode)
+    states.tx_preamble = ofdm_generate_preamble(states, 2);
+    states.tx_postamble = ofdm_generate_preamble(states, 3);
+  end
+  
   % automated tests
   test_qam16_mod_demod(states.qam16);
   test_assemble_disassemble(states);
@@ -262,12 +289,35 @@ endfunction
 %------------------------------------------------------------------------------
 
 function config = ofdm_init_mode(mode="700D")
-  Tcp = 0.002; Ns=8;
+  % defaults for 700D
+  
+  Tcp = 0.002; 
+  Ns = 8;
+  Ts = 0.018; 
+  Nc = 17;
+  config.bps = 2; 
+  config.txbpf_width_Hz = 1500;
+  config.Np = 1;
+  config.Ntxtbits = 4;
+  config.Nuwbits = 5*config.bps;
+  config.ftwindow_width = 32;
+  config.timing_mx_thresh  = 0.35;
+  config.bad_uw_errors = 3;
+  config.amp_scale = 245E3;
+  config.amp_est_mode = 0;
+  config.EsNo_est_all_symbols = 1;
+  config.EsNodB = 3;
+  config.state_machine = "voice1";
+  config.edge_pilots = 1;
+  config.clip_gain1 = 2.5;
+  config.clip_gain2 = 0.8;
+  config.foff_limiter = 0;
+  config.txbpf_width_Hz = 2000;
+  config.data_mode = "";
 
-  % some "canned" modes
-  if strcmp(mode,"700D")
-    Ts = 0.018; Nc = 17; config.txbpf_width_Hz = 1500;
-  elseif strcmp(mode,"700E")
+  if strcmp(mode,"700D") ||  strcmp(mode,"700d")
+    % defaults above
+  elseif strcmp(mode,"700E") ||  strcmp(mode,"700e")
     Ts = 0.014; Tcp=0.006; Nc = 21; Ns=4;
     config.edge_pilots = 0; config.state_machine = "voice2";
     config.Nuwbits = 12; config.bad_uw_errors = 3; config.Ntxtbits = 2;
@@ -277,40 +327,44 @@ function config = ofdm_init_mode(mode="700D")
   elseif strcmp(mode,"2020")
     Ts = 0.0205; Nc = 31; config.amp_scale = 167E3;
   elseif strcmp(mode,"qam16c1")
-    Ns=5; config.Np=5; Tcp = 0.004; Ts = 0.016; Nc = 33; config.data_mode = 1;
+    Ns=5; config.Np=5; Tcp = 0.004; Ts = 0.016; Nc = 33; config.data_mode = "streaming";
     config.bps=4; config.Ntxtbits = 0; config.Nuwbits = 15*4; config.bad_uw_errors = 5;
     config.state_machine = "data";
     config.ftwindow_width = 32; config.amp_scale = 132E3;
     config.EsNo_est_all_symbols = 0; config.amp_est_mode = 1; config.EsNodB = 10;
   elseif strcmp(mode,"qam16c2")
-    Ns=5; config.Np=31; Tcp = 0.004; Ts = 0.016; Nc = 33; config.data_mode = 1;
+    Ns=5; config.Np=31; Tcp = 0.004; Ts = 0.016; Nc = 33; config.data_mode = "streaming";
     config.bps=4; config.Ntxtbits = 0; config.Nuwbits = 42*4; config.bad_uw_errors = 15;
     config.ftwindow_width = 80; config.amp_scale = 135E3; config.state_machine = "data";
     config.EsNo_est_all_symbols = 0; config.amp_est_mode = 1; config.EsNodB = 10;
     config.tx_uw = zeros(1,config.Nuwbits = 42*4);
     config.tx_uw(1:24) = [1 1 0 0  1 0 1 0  1 1 1 1  0 0 0 0  1 1 1 1  0 0 0 0];
     config.tx_uw(end-24+1:end) = [1 1 0 0  1 0 1 0  1 1 1 1  0 0 0 0  1 1 1 1  0 0 0 0];
-  elseif strcmp(mode,"datac1")
-    Ns=5; config.Np=38; Tcp = 0.006; Ts = 0.016; Nc = 27; config.data_mode = 1;
-    config.Ntxtbits = 0; config.Nuwbits = 16; config.bad_uw_errors = 2;
+  elseif strcmp(mode,"datac0")
+    Ns=5; config.Np=4; Tcp = 0.006; Ts = 0.016; Nc = 9; config.data_mode = "streaming";
+    config.Ntxtbits = 0; config.Nuwbits = 32; config.bad_uw_errors = 9;
     config.state_machine = "data";
     config.ftwindow_width = 80; config.amp_est_mode = 1; config.EsNodB = 3;
-    config.edge_pilots = 0;
-    config.tx_uw = [1 1 0 0  1 0 1 0  1 1 1 1  0 0 0 0];
-  elseif strcmp(mode,"datac2")
-    Ns=5; config.Np=36; Tcp = 0.006; Ts = 0.016; Nc = 9; config.data_mode = 1;
-    config.Ntxtbits = 0; config.Nuwbits = 12; config.bad_uw_errors = 1;
+    config.edge_pilots = 0; config.timing_mx_thresh = 0.08;
+    config.tx_uw = zeros(1,config.Nuwbits);
+    config.tx_uw(1:16) = [1 1 0 0  1 0 1 0  1 1 1 1  0 0 0 0];
+  elseif strcmp(mode,"datac1")
+    Ns=5; config.Np=38; Tcp = 0.006; Ts = 0.016; Nc = 27; config.data_mode = "streaming";
+    config.Ntxtbits = 0; config.Nuwbits = 16; config.bad_uw_errors = 6;
     config.state_machine = "data";
-    config.ftwindow_width = 80; config.amp_est_mode = 1; config.EsNodB = 10;
+    config.ftwindow_width = 80; config.amp_est_mode = 1; config.EsNodB = 3;
+    config.edge_pilots = 0; config.timing_mx_thresh = 0.10;
+    config.tx_uw = [1 1 0 0  1 0 1 0  1 1 1 1  0 0 0 0];
   elseif strcmp(mode,"datac3")
-    Ns=5; config.Np=33; Tcp = 0.006; Ts = 0.016; Nc = 8; config.data_mode = 1;
-    config.Ntxtbits = 0; config.Nuwbits = 64; config.bad_uw_errors = 15;
-    config.ftwindow_width = 80; config.timing_mx_thresh = 0.30;
+    Ns=5; config.Np=29; Tcp = 0.006; Ts = 0.016; Nc = 9; config.data_mode = "streaming";
+    config.edge_pilots = 0;
+    config.Ntxtbits = 0; config.Nuwbits = 40; config.bad_uw_errors = 10;
+    config.ftwindow_width = 80; config.timing_mx_thresh = 0.10;
     config.tx_uw = zeros(1,config.Nuwbits);
     config.tx_uw(1:24) = [1 1 0 0  1 0 1 0  1 1 1 1  0 0 0 0  1 1 1 1  0 0 0 0];
     config.tx_uw(end-24+1:end) = [1 1 0 0  1 0 1 0  1 1 1 1  0 0 0 0  1 1 1 1  0 0 0 0];
     config.amp_est_mode = 1; config.EsNodB = 3;
-    config.state_machine = "data"; config.amp_scale = 400E3;
+    config.state_machine = "data"; 
   elseif strcmp(mode,"1")
     Ns=5; config.Np=10; Tcp=0; Tframe = 0.1; Ts = Tframe/Ns; Nc = 1;
   else
@@ -320,6 +374,9 @@ function config = ofdm_init_mode(mode="700D")
   end
   Rs=1/Ts;
   config.Rs = Rs; config.Tcp = Tcp; config.Ns = Ns; config.Nc = Nc;
+  if !isfield(config,"tx_uw") 
+    config.tx_uw = zeros(1,config.Nuwbits); 
+  end  
 end
 
 
@@ -332,11 +389,7 @@ function print_config(states)
 
   % ASCII-art packet visualisation
   s=1; u=1; Nuwsyms=length(uw_ind_sym);
-  if states.edge_pilots
-    cr = 1:Nc+2;
-  else
-    cr = 2:Nc+1;
-  end
+  cr = 1:Nc+2;
   for f=1:Np
     for r=1:Ns
       for c=cr
@@ -434,10 +487,6 @@ function tx = ofdm_txframe(states, tx_sym_lin)
     if mod(r-1,Ns) == 0
       % row of pilots
       tx_frame(r,:) = pilots;
-      if states.edge_pilots == 0
-        tx_frame(r,1) = 0;
-        tx_frame(r,Nc+2) = 0;
-      end
     else
       % row of data symbols
       arowofsymbols = tx_sym_lin(s:s+Nc-1);
@@ -467,18 +516,19 @@ endfunction
 % -----------------------------------------------------------
 
 #{
-  Correlates the OFDM pilot symbol samples with a window of received
-  samples to determine the most likely timing offset.  Combines two
-  frames pilots so we need at least Nsamperframe+M+Ncp samples in rx.
+  Correlates known samples (for example pilots or a preamble) with a window of received
+  samples to determine the most likely timing offset.  Optionally combines
+  known samples from two frames (e.g. pilots at start of this and next frame)
+  so we need at least Nsamperframe+M+Ncp samples in rx.
 
   Can be used for acquisition (coarse timing), and fine timing.  Tends
   to break down when freq offset approaches +/- symbol rate (e.g +/-
   25 Hz for 700D).
 #}
 
-function [t_est timing_valid timing_mx av_level] = est_timing(states, rx, rate_fs_pilot_samples, step)
+function [t_est timing_valid timing_mx av_level] = est_timing(states, rx, known_samples, step, dual=1)
     ofdm_load_const;
-    Npsam = length(rate_fs_pilot_samples);
+    Npsam = length(known_samples);
 
     Ncorr = length(rx) - (Nsamperframe+Npsam);
     corr = zeros(1,Ncorr);
@@ -488,102 +538,71 @@ function [t_est timing_valid timing_mx av_level] = est_timing(states, rx, rate_f
 
     av_level = 2*sqrt(states.timing_norm*(rx*rx')/length(rx)) + 1E-12;
 
-    % correlate with pilots at start and end of frame to determine timing offset
+    % correlate with pilots at start and (optionally) end of frame to determine timing offset
 
     for i=1:step:Ncorr
-      rx1     = rx(i:i+Npsam-1); rx2 = rx(i+Nsamperframe:i+Nsamperframe+Npsam-1);
-      corr_st = rx1 * rate_fs_pilot_samples'; corr_en = rx2 * rate_fs_pilot_samples';
+      rx1 = rx(i:i+Npsam-1); 
+      corr_st = rx1 * known_samples'; 
+      corr_en = 0;
+      if dual
+        % for the streaming voice modes we also correlate with pilot samples at start of next frame 
+        rx2 = rx(i+Nsamperframe:i+Nsamperframe+Npsam-1);
+        corr_en = rx2 * known_samples';
+      end
       corr(i) = (abs(corr_st) + abs(corr_en))/av_level;
     end
 
-    [timing_mx t_est] = max(corr);
+    [timing_mx t_est] = max(abs(corr));
     % only declare timing valid if there are enough samples in rxbuf to demodulate a frame
     timing_valid = (abs(rx(t_est)) > 0) && (timing_mx > timing_mx_thresh);
-
+    
     if verbose > 1
       printf("  av_level: %5.4f mx: %4.3f timing_est: %4d timing_valid: %d\n", av_level, timing_mx, t_est, timing_valid);
     end
     if verbose > 2
-      figure(3); clf;
+      figure(10); clf;
       subplot(211); plot(rx)
       subplot(212); plot(corr)
-      figure(4); clf; plot(real(rate_fs_pilot_samples));
+      figure(11); clf; plot(real(known_samples));
     end
 
 endfunction
 
 
 % -----------------------------------------------------------
-% est_freq_offset
+% est_freq_offset_known_corr
 % -----------------------------------------------------------
 
 #{
   Determines frequency offset at current timing estimate, used for
-  coarse freq offset estimation during acquisition.
-
-  This estimator works well for AWGN channels but has problems with
-  fading channels.  With stationary/slow fading channels (say a notch
-  in the spectrum), ot exhibits bias which can delay sync for 10's of
-  seconds.
+  coarse freq offset estimation during streaming mode acquisition.
 #}
 
-function [foff_est states] = est_freq_offset(states, rx, rate_fs_pilot_samples, t_est)
+function foff_est = est_freq_offset_known_corr(states, rx, known_samples, t_est, dual=1)
     ofdm_load_const;
-    Npsam = length(rate_fs_pilot_samples);
-
-    % Freq offset can be considered as change in phase over two halves
-    % of pilot symbols.  We average this statistic over this and next
-    % frames pilots.
-
-    Npsam2 = floor(Npsam/2);
-    p1 = rx(t_est:t_est+Npsam2-1) * rate_fs_pilot_samples(1:Npsam2)';
-    p2 = rx(t_est+Npsam2:t_est+Npsam-1) * rate_fs_pilot_samples(Npsam2+1:Npsam)';
-    p3 = rx(t_est+Nsamperframe:t_est+Nsamperframe+Npsam2-1) * rate_fs_pilot_samples(1:Npsam2)';
-    p4 = rx(t_est+Nsamperframe+Npsam2:t_est+Nsamperframe+Npsam-1) * rate_fs_pilot_samples(Npsam2+1:Npsam)';
-
-    Fs1 = Fs/(Npsam/2);
-
-    states.foff_metric = (conj(p1)*p2 + conj(p3)*p4);
-    foff_est = Fs1*angle(states.foff_metric)/(2*pi);
-
-    if states.verbose > 1
-        printf("  foff_metric: %f %f foff_est: %f\n", real(states.foff_metric), imag(states.foff_metric), foff_est);
-    end
-
-endfunction
-
-
-% -----------------------------------------------------------
-% est_freq_offset_pilot_corr
-% -----------------------------------------------------------
-
-#{
-  Determines frequency offset at current timing estimate, used for
-  coarse freq offset estimation during acquisition.
-
-  This is an alternative algorithm to est_freq_offset() above that is less noisey
-  and performs better on HF channels using the acquistion tests in ofdm_dev.m
-#}
-
-function foff_est = est_freq_offset_pilot_corr(states, rx, rate_fs_pilot_samples, t_est)
-    ofdm_load_const;
-    Npsam = length(rate_fs_pilot_samples);
+    Npsam = length(known_samples);
 
     % extract pilot samples from either end of frame
     rx1  = rx(t_est:t_est+Npsam-1); rx2 = rx(t_est+Nsamperframe:t_est+Nsamperframe+Npsam-1);
 
     % "mix" these down (correlate) with 0 Hz offset pilot samples
-    corr_st = rx1 .* conj(rate_fs_pilot_samples);
-    corr_en = rx2 .* conj(rate_fs_pilot_samples);
-
+    corr_st = rx1 .* conj(known_samples);
+    if dual 
+      corr_en = rx2 .* conj(known_samples);
+    end
+    
     % sample sum of DFT magnitude of correlated signals at each freq offset and look for peak
     st = -20; en = 20; foff_est = 0; Cabs_max = 0;
 
     for f=st:en
        w = 2*pi*f/Fs;
        C_st = corr_st * exp(j*w*(0:Npsam-1))';
-       C_en = corr_en * exp(j*w*(0:Npsam-1))';
+       C_en = 0;
+       if dual
+          C_en = corr_en * exp(j*w*(0:Npsam-1))';
+       end
        Cabs = abs(C_st) + abs(C_en);
+       %printf("f: %4.1f Cabs: %f Cmax: %f\n", f, Cabs, Cabs_max);
        if Cabs > Cabs_max
          Cabs_max = Cabs;
          foff_est = f;
@@ -593,10 +612,202 @@ function foff_est = est_freq_offset_pilot_corr(states, rx, rate_fs_pilot_samples
     if states.verbose > 1
       printf("  foff_est: %f\n", foff_est);
     end
+
+endfunction
+
+
+% Joint estimation used for data mode burst acquistion
+
+function [t_est foff_est timing_mx] = est_timing_and_freq(states, rx, known_samples, tstep, fmin, fmax, fstep)
+    ofdm_load_const;
+    Npsam = length(known_samples);
+
+    Ncorr = length(rx) - Npsam + 1;
+    corr = zeros(1,Ncorr);
+    
+    % set up matrix of freq shifted known samples for correlation with received signal.  Each row
+    % is the known samples shifted by a different freq offset
+    
+    M = [];
+    for afcoarse=fmin:fstep:fmax
+       w = 2*pi*afcoarse/Fs;
+       wvec = exp(j*w*(0:Npsam-1));
+       M = [M; known_samples .* wvec];
+    end
+    
+    % At each timing position, correlate with known samples at all possible freq offsets.  Result
+    % is a column vector for each timing offset.  Each matrix cell is s freq,timing coordinate
+    
+    corr = [];
+    for t=1:tstep:Ncorr
+      rx1 = rx(t:t+Npsam-1); 
+      col = M * rx1';
+      corr = [corr, col];
+    end
+    
+    % best timing offset is the col with the global max of the corr matrix
+    max_col = max(abs(corr));
+    [mx mx_col] = max(max_col);
+    t_est = (mx_col-1)*tstep;
+    
+    % obtain normalised real number for timing mx
+    mag1 = known_samples*known_samples';
+    mag2 = rx(t_est+1:t_est+Npsam)*rx(t_est+1:t_est+Npsam)';
+    timing_mx = mx*mx'/(mag1*mag2+1E-12);
+    
+    % determine frequency offset for row where max is located
+    [tmp freq_row] = max(corr(:,mx_col));
+    foff_est = fmin + fstep*(freq_row-1);
+       
+    if verbose > 1
+      printf("  t_est: %d timing:mx: %f foff_est: %f\n", t_est, timing_mx, foff_est);
+    end
     if verbose > 2
       figure(10); clf;
-      plot(st:en,C(Fs/2+st:Fs/2+en)); grid;
+      subplot(211); plot(rx)
+      subplot(212); plot(corr)
+      figure(11); clf; plot(real(known_samples));
     end
+
+endfunction
+
+
+% streaming mode acquistion, used mainly for voice modes
+
+function [timing_valid states] = ofdm_sync_search_stream(states)
+    ofdm_load_const;
+    
+    st = rxbufst + M+Ncp + Nsamperframe + 1; en = st + 2*Nsamperframe + M+Ncp - 1;
+  
+    % Attempt coarse timing estimate (i.e. detect start of frame) at a range of frequency offsets
+
+    timing_mx = 0; fcoarse = 0; timing_valid = 0; ct_est = 1;
+    for afcoarse=-40:40:40
+      % vector of local oscillator samples to shift input vector
+      % these could be computed on the fly to save memory, or pre-computed in flash at tables as they are static
+
+      if afcoarse != 0
+        w = 2*pi*afcoarse/Fs;
+        wvec = exp(-j*w*(0:2*Nsamperframe+M+Ncp-1));
+
+        % choose best timing offset metric at this freq offset
+        [act_est atiming_valid atiming_mx] = est_timing(states, wvec .* states.rxbuf(st:en), states.rate_fs_pilot_samples, 2);
+      else
+        % exp(-j*0) is just 1 when afcoarse is 0
+        [act_est atiming_valid atiming_mx] = est_timing(states, states.rxbuf(st:en), states.rate_fs_pilot_samples, 2);
+      end
+
+      %printf("afcoarse: %f atiming_mx: %f\n", afcoarse, atiming_mx);
+
+      if atiming_mx > timing_mx
+        ct_est = act_est;
+        timing_valid = atiming_valid;
+        timing_mx = atiming_mx;
+        fcoarse = afcoarse;
+      end
+    end
+
+    % refine freq est within -/+ 20 Hz window
+
+    if fcoarse != 0
+      w = 2*pi*fcoarse/Fs;
+      wvec = exp(-j*w*(0:2*Nsamperframe+M+Ncp-1));
+      foff_est = est_freq_offset_known_corr(states, wvec .* states.rxbuf(st:en), states.rate_fs_pilot_samples, ct_est);
+      foff_est += fcoarse;
+    else
+      % exp(-j*0) is just 1 when fcoarse is 0
+      foff_est = est_freq_offset_known_corr(states, states.rxbuf(st:en), states.rate_fs_pilot_samples, ct_est);
+    end
+
+    if verbose
+      printf(" ct_est: %4d mx: %3.2f coarse_foff: %5.1f timing_valid: %d", ct_est, timing_mx, foff_est, timing_valid);
+    end
+    
+  if timing_valid
+    states.nin = ct_est - 1;
+  else
+    states.nin = Nsamperframe;
+  end
+
+  states.timing_valid = timing_valid;
+  states.timing_mx = timing_mx;
+  states.coarse_foff_est_hz = foff_est;
+  states.sample_point = states.timing_est = 1;
+endfunction
+ 
+
+% two stage acquisition detector for burst mode
+
+function results = burst_acquisition_detector(states, rx, n, known_sequence)
+  ofdm_load_const;
+    
+  % initial search over coarse grid
+  tstep = 4; fstep = 5;
+  [ct_est foff_est timing_mx] = est_timing_and_freq(states, rx(n:n+2*Nsamperframe-1), known_sequence, 
+                                                    tstep, fmin = -50, fmax = 50, fstep);
+  % refine estimate over finer grid                             
+  fmin = foff_est - ceil(fstep/2); fmax = foff_est + ceil(fstep/2); 
+  fine_st = max(1, n + ct_est - tstep/2); fine_en = fine_st + Nsamperframe + tstep - 1;
+  [ct_est foff_est timing_mx] = est_timing_and_freq(states, rx(fine_st:fine_en), known_sequence, 1, fmin, fmax, 1);
+  % refer ct_est to nominal start of frame rx_buf(n)
+  ct_est += fine_st - n;
+  results.ct_est = ct_est; results.foff_est = foff_est; results.timing_mx = timing_mx;
+end
+
+
+% Burst mode acquisition ------------------------------------------
+
+function [timing_valid states] = ofdm_sync_search_burst(states)
+  ofdm_load_const;
+
+  pre_post = "";
+  st = rxbufst + M+Ncp + Nsamperframe + 1; en = st + 2*Nsamperframe - 1;
+  pre = burst_acquisition_detector(states, states.rxbuf, st, states.tx_preamble);
+  if states.postambledetectoren
+    post = burst_acquisition_detector(states, states.rxbuf, st, states.tx_postamble);
+  end
+  
+  if isfield(states,"postambletest") pre.timing_mx = 0; end % force ignore preamble to test postamble
+
+  if (states.postambledetectoren == 0) || (pre.timing_mx > post.timing_mx)
+    timing_mx = pre.timing_mx; ct_est = pre.ct_est; foff_est = pre.foff_est;
+    pre_post = "pre";
+  else
+    timing_mx = post.timing_mx; ct_est = post.ct_est; foff_est = post.foff_est;
+    pre_post = "post";
+  end
+  timing_valid = timing_mx > timing_mx_thresh;
+  
+  if timing_valid
+    % potential candidate found ....
+
+    % calculate number of samples we need on next buffer to get into sync
+    if strcmp(pre_post, "post")
+      states.nin = 0;
+      % printf("\n  rxbufst: %d ", states.rxbufst);
+      states.rxbufst -= states.Np*states.Nsamperframe; % backup to first modem frame in packet
+      states.rxbufst += ct_est - 1;
+      states.npost++;
+      % printf("%d\n", states.rxbufst);
+    else
+      % ct_est is start of preamble, so advance past that to start of first modem frame
+      states.nin = Nsamperframe + ct_est - 1;
+      states.npre++;
+    end
+  else
+    states.nin = Nsamperframe;
+  end
+
+  states.ct_est = ct_est;
+  states.timing_valid = timing_valid;
+  states.timing_mx = timing_mx;
+  states.sample_point = states.timing_est = 1;
+  states.foff_est_hz = foff_est;
+
+  if verbose
+    printf("  ct_est: %4d nin: %4d mx: %3.2f foff_est: %5.1f timing_valid: %d %4s", 
+           ct_est, states.nin, timing_mx, foff_est, timing_valid, pre_post);
+  end
 endfunction
 
 
@@ -607,74 +818,16 @@ endfunction
 function [timing_valid states] = ofdm_sync_search(states, rxbuf_in)
   ofdm_load_const;
 
-  % insert latest input samples into rxbuf so it is primed for when we have to call ofdm_demod()
+  % update rxbuf so it is primed for when we have to call ofdm_demod()
 
   states.rxbuf(1:Nrxbuf-states.nin) = states.rxbuf(states.nin+1:Nrxbuf);
   states.rxbuf(Nrxbuf-states.nin+1:Nrxbuf) = rxbuf_in;
-
-  % Attempt coarse timing estimate (i.e. detect start of frame) at a range of frequency offsets
-
-  st = M+Ncp + Nsamperframe + 1; en = st + 2*Nsamperframe +  M+Ncp - 1;
-  timing_mx = 0; fcoarse = 0; timing_valid = 0; ct_est = 1;
-  for afcoarse=-40:40:40
-    % vector of local oscillator samples to shift input vector
-    % these could be computed on the fly to save memory, or pre-computed in flash at tables as they are static
-
-    if afcoarse != 0
-      w = 2*pi*afcoarse/Fs;
-      wvec = exp(-j*w*(0:2*Nsamperframe+M+Ncp-1));
-
-      % choose best timing offset metric at this freq offset
-      [act_est atiming_valid atiming_mx] = est_timing(states, wvec .* states.rxbuf(st:en), states.rate_fs_pilot_samples, 2);
-    else
-      % exp(-j*0) is just 1 when afcoarse is 0
-      [act_est atiming_valid atiming_mx] = est_timing(states, states.rxbuf(st:en), states.rate_fs_pilot_samples, 2);
-    end
-
-    %printf("afcoarse: %f atiming_mx: %f\n", afcoarse, atiming_mx);
-
-    if atiming_mx > timing_mx
-      ct_est = act_est;
-      timing_valid = atiming_valid;
-      timing_mx = atiming_mx;
-      fcoarse = afcoarse;
-    end
-  end
-
-  % refine freq est within -/+ 20 Hz window
-
-  if fcoarse != 0
-    w = 2*pi*fcoarse/Fs;
-    wvec = exp(-j*w*(0:2*Nsamperframe+M+Ncp-1));
-    foff_est = est_freq_offset_pilot_corr(states, wvec .* states.rxbuf(st:en), states.rate_fs_pilot_samples, ct_est);
-    foff_est += fcoarse;
+  
+  if strcmp(states.data_mode, "burst")
+    [timing_valid states] = ofdm_sync_search_burst(states);
   else
-    % exp(-j*0) is just 1 when fcoarse is 0
-    foff_est = est_freq_offset_pilot_corr(states, states.rxbuf(st:en), states.rate_fs_pilot_samples, ct_est);
+    [timing_valid states] = ofdm_sync_search_stream(states);
   end
-
-  if verbose
-    printf(" ct_est: %4d mx: %3.2f coarse_foff: %5.1f timing_valid: %d", ct_est, timing_mx, foff_est, timing_valid);
-  end
-
-  if timing_valid
-    % potential candidate found ....
-
-    % calculate number of samples we need on next buffer to get into sync
-
-    states.nin = ct_est - 1;
-
-    % reset modem states
-
-    states.sample_point = states.timing_est = 1;
-    states.foff_est_hz = foff_est;
-  else
-    states.nin = Nsamperframe;
-  end
-
-  states.timing_valid = timing_valid;
-  states.timing_mx = timing_mx;
-  states.coarse_foff_est_hz = foff_est;
 endfunction
 
 
@@ -722,20 +875,31 @@ function [states rx_bits achannel_est_rect_log rx_np rx_amp] = ofdm_demod(states
   if timing_en
     % update timing at start of every frame
 
-    st = M+Ncp + Nsamperframe + 1 - floor(ftwindow_width/2) + (timing_est-1);
+    % search for timing in a window centered on timing_est, the window will typically be around 2Ncp wide as we could
+    % get a shift of +Ncp or -Ncp if we swing from one delay extreme to another
+    st = rxbufst + M+Ncp + Nsamperframe + 1 - floor(ftwindow_width/2) + (timing_est-1);
     en = st + Nsamperframe-1 + M+Ncp + ftwindow_width-1;
 
     [ft_est timing_valid timing_mx] = est_timing(states, rxbuf(st:en) .* exp(-j*woff_est*(st:en)), rate_fs_pilot_samples, 1);
     % printf("  timing_est: %d ft_est: %d timing_valid: %d timing_mx: %d\n", timing_est, ft_est, timing_valid, timing_mx);
 
+    % if we are in a deep fade timing_valid will not be asserted as ft_est will be garbage, so we don't
+    % adjust timing est, just freewheel for now
     if timing_valid
+        
+      % adjust timing_est based on ft_est    
       timing_est = timing_est + ft_est - ceil(ftwindow_width/2);
 
-      % Black magic to keep sample_point 4 samples (0.5ms) inside edges of cyclic prefix.  Or something like that.
-
-      delta_t = ft_est - ceil(ftwindow_width/2);
-      sample_point = max(timing_est+4, sample_point);
-      sample_point = min(timing_est+Ncp-4, sample_point);
+      % Track the ideal sampling point, which is Ncp for a multipath signal whose delay varies between 0 and Ncp.  The
+      % timing est will be bouncing back and forth due to multipath so we may need to use the upper or lower limit of
+      % the timing est to track the ideal sample_point. A good way to explore this algorithm is to disable the feedback
+      % loop for nin adjustment below, and look at the plots from ofdm_rx with +ve and -ve sample clock offsets 
+      % (sox can be used to resample).  The "4" constants are small guard bands so we don't stumble outside of the CP 
+      % due to noise.
+      
+      delta_t = ft_est - ceil(ftwindow_width/2);           % just used for plotting
+      sample_point = max(timing_est+4, sample_point);      % we are at max timing est, so sample point just above
+      sample_point = min(timing_est+Ncp-4, sample_point);  % we are at min timing_est, so sample point Ncp above
     end
 
     if verbose > 1
@@ -746,13 +910,11 @@ function [states rx_bits achannel_est_rect_log rx_np rx_amp] = ofdm_demod(states
 
   % down convert at current timing instant----------------------------------
 
-  % todo: this cld be more efficent, as pilot r becomes r-Ns on next frame
-
-  rx_sym = zeros(1+Ns+1+1, Nc+2);
+   rx_sym = zeros(1+Ns+1+1, Nc+2);
 
   % previous pilot
 
-  st = M+Ncp + Nsamperframe + (-Ns)*(M+Ncp) + 1 + sample_point; en = st + M - 1;
+  st = rxbufst + M+Ncp + Nsamperframe + (-Ns)*(M+Ncp) + 1 + sample_point; en = st + M - 1;
 
   for c=1:Nc+2
     acarrier = rxbuf(st:en) .* exp(-j*woff_est*(st:en)) .* conj(W(c,:));
@@ -762,7 +924,7 @@ function [states rx_bits achannel_est_rect_log rx_np rx_amp] = ofdm_demod(states
   % pilot - this frame - pilot
 
   for rr=1:Ns+1
-    st = M+Ncp + Nsamperframe + (rr-1)*(M+Ncp) + 1 + sample_point; en = st + M - 1;
+    st = rxbufst + M+Ncp + Nsamperframe + (rr-1)*(M+Ncp) + 1 + sample_point; en = st + M - 1;
     for c=1:Nc+2
       acarrier = rxbuf(st:en) .* exp(-j*woff_est*(st:en)) .* conj(W(c,:));
       rx_sym(rr+1,c) = sum(acarrier);
@@ -771,7 +933,7 @@ function [states rx_bits achannel_est_rect_log rx_np rx_amp] = ofdm_demod(states
 
   % next pilot
 
-  st = M+Ncp + Nsamperframe + (2*Ns)*(M+Ncp) + 1 + sample_point; en = st + M - 1;
+  st = rxbufst + M+Ncp + Nsamperframe + (2*Ns)*(M+Ncp) + 1 + sample_point; en = st + M - 1;
   for c=1:Nc+2
     acarrier = rxbuf(st:en) .* exp(-j*woff_est*(st:en)) .* conj(W(c,:));
     rx_sym(Ns+3,c) = sum(acarrier);
@@ -891,7 +1053,8 @@ function [states rx_bits achannel_est_rect_log rx_np rx_amp] = ofdm_demod(states
     achannel_est_rect_log = [achannel_est_rect_log; achannel_est_rect(2:Nc+1)];
   end
 
-  % Adjust nin to take care of sample clock offset
+  % Adjust nin to take care of sample clock offset.  When debugong or exploring how timing loop works
+  % it's a good idea to comment out ths code to "open the loop".
 
   nin = Nsamperframe;
   if timing_en && timing_valid
@@ -910,6 +1073,16 @@ function [states rx_bits achannel_est_rect_log rx_np rx_amp] = ofdm_demod(states
     end
   end
 
+  % use internal rxbuf samples if they are available
+  rxbufst_next = rxbufst + nin;
+  %printf("\nrxbufst: %d rxbufst_next: %d nin: %d Nrxbufmin: %d rqd: %d Nrxbuf: %d\n", 
+  %     rxbufst, rxbufst_next, nin, Nrxbufmin, rxbufst_next + Nrxbufmin, Nrxbuf);
+  if rxbufst_next + Nrxbufmin <= Nrxbuf
+     % printf("Can maybe use rxbufst!\n");
+     rxbufst = rxbufst_next;
+     nin = 0;
+  end
+      
   % Estimate signal and noise power to estimate EsNo.  This is used for SNR estimation and (possible) LDPC decoding
   if states.EsNo_est_all_symbols
     [sig_var noise_var] = est_signal_and_noise_var(rx_np);
@@ -929,6 +1102,7 @@ function [states rx_bits achannel_est_rect_log rx_np rx_amp] = ofdm_demod(states
   states.rx_sym = rx_sym;
   states.rxbuf = rxbuf;
   states.nin = nin;
+  states.rxbufst = rxbufst;
   states.timing_valid = timing_valid;
   states.timing_mx = timing_mx;
   states.timing_est = timing_est;
@@ -1133,12 +1307,23 @@ endfunction
 %             int between 0 and 32767
 %-----------------------------------------------------------------------
 
-function r = ofdm_rand(n)
-  r = zeros(1,n); seed = 1;
+function r = ofdm_rand(n, seed=1)
+  r = zeros(1,n);
   for i=1:n
     seed = mod(1103515245 * seed + 12345, 32768);
     r(i) = seed;
   end
+endfunction
+
+
+% build a single modem frame preamble vector for reliable single frame acquisition
+% on data modes
+function tx_preamble = ofdm_generate_preamble(states, seed=2)
+  tmp_states = states;
+  % tweak local copy of states so we can generate a 1 modem-frame packet
+  tmp_states.Np = 1; tmp_states.Nbitsperpacket = tmp_states.Nbitsperframe;
+  preamble_bits = ofdm_rand(tmp_states.Nbitsperframe, seed) > 16384;
+  tx_preamble = ofdm_mod(tmp_states, preamble_bits);
 endfunction
 
 
@@ -1223,16 +1408,19 @@ function test_assemble_disassemble(states)
   assert(codeword_syms == rx_codeword_syms);
 endfunction
 
-%-------------------------------------------------------
-% sync_state_machine - determines mode-specific sync
-%                      state state_machine
-%-------------------------------------------------------
+%-------------------------------------------------------------------
+% sync_state_machine - calls mode-specific sync state state_machine
+%-------------------------------------------------------------------
 
 function states = sync_state_machine(states, rx_uw)
   if strcmp(states.state_machine, "voice1")
     states = sync_state_machine_voice1(states, rx_uw);
   elseif strcmp(states.state_machine, "data")
-    states = sync_state_machine_data(states, rx_uw);
+    if strcmp(states.data_mode, "streaming")
+      states = sync_state_machine_data_streaming(states, rx_uw);
+    else
+      states = sync_state_machine_data_burst(states, rx_uw);
+    end
   elseif strcmp(states.state_machine, "voice2")
     states = sync_state_machine_voice2(states, rx_uw);
   else
@@ -1318,17 +1506,18 @@ endfunction
 
 
 %-------------------------------------------------------
-% data waveform state machine
+% data (streaming mode) state machine
 %-------------------------------------------------------
 
-function states = sync_state_machine_data(states, rx_uw)
+function states = sync_state_machine_data_streaming(states, rx_uw)
   ofdm_load_const;
   next_state = states.sync_state;
   states.sync_start = states.sync_end = 0;
 
   if strcmp(states.sync_state,'search')
     if states.timing_valid
-      states.sync_start = 1; states.sync_counter = 0;
+      states.sync_start = 1; 
+      states.sync_counter = 0;
       next_state = 'trial';
     end
   end
@@ -1336,29 +1525,94 @@ function states = sync_state_machine_data(states, rx_uw)
   states.uw_errors = sum(xor(tx_uw,rx_uw));
 
   if strcmp(states.sync_state,'trial')
-    if strcmp(states.sync_state,'trial')
-      if states.uw_errors < states.bad_uw_errors;
-        next_state = "synced";
-        states.frame_count = Nuwframes;
-        states.modem_frame = Nuwframes;
-        states.sum_sig_var = states.sum_noise_var = 0;
-      else
-        states.sync_counter++;
-        if states.sync_counter > Np
+    if states.uw_errors < states.bad_uw_errors;
+      next_state = "synced";
+      states.packet_count = 0;
+      states.modem_frame = Nuwframes;
+      states.sum_sig_var = states.sum_noise_var = 0;
+    else
+      states.sync_counter++;
+      if states.sync_counter > Np
+        next_state = "search";
+      end
+    end
+  end
+ 
+  % Note packetsperburst==0 we don't ever lose sync, which is useful for 
+  % stream based testing or external control of state machine
+  
+  if strcmp(states.sync_state,'synced')
+    states.modem_frame++;
+    if (states.modem_frame >= states.Np) 
+      states.modem_frame = 0; 
+      states.packet_count++;
+      if (states.packetsperburst)
+        if (states.packet_count >= states.packetsperburst)
           next_state = "search";
         end
       end
     end
   end
+  
+  states.last_sync_state = states.sync_state;
+  states.sync_state = next_state;
+endfunction
 
-  % Note we don't every lose sync, we assume there are a known number of frames being sent,
-  % or the packets contain an "end of stream" information.
-  if strcmp(states.sync_state,'synced')
-    states.frame_count++;
-    states.modem_frame++;
-    if (states.modem_frame >= states.Np) states.modem_frame = 0; end
+%-------------------------------------------------------
+% data (burst mode) state machine
+%-------------------------------------------------------
+
+function states = sync_state_machine_data_burst(states, rx_uw)
+  ofdm_load_const;
+  next_state = states.sync_state;
+  states.sync_start = states.sync_end = 0;
+
+  if strcmp(states.sync_state,'search')
+    if states.timing_valid
+      states.sync_start = 1; 
+      states.sync_counter = 0;
+      next_state = 'trial';
+    end
   end
 
+  states.uw_errors = sum(xor(tx_uw,rx_uw));
+
+  % pre or post-amble has told us this is the start of the packet.  Confirm we 
+  % have a valid frame by checking the UW after the modem frames containing
+  % the UW have been received 
+  if strcmp(states.sync_state,'trial')
+    states.sync_counter++;
+    if states.sync_counter == Nuwframes
+      if states.uw_errors < states.bad_uw_errors;
+        next_state = "synced";
+        states.packet_count = 0;                          % number of packets in this burst
+        states.modem_frame = Nuwframes;                   % which modem frame we are up to in packet
+        states.sum_sig_var = states.sum_noise_var = 0;
+      else
+        next_state = "search";
+        % reset rxbuf to make sure we only ever do a postamble loop once through same samples
+        states.rxbufst = states.Nrxbufhistory;
+        states.rxbuf = zeros(1, states.Nrxbuf);
+      end
+    end
+  end
+  
+  if strcmp(states.sync_state,'synced')
+    states.modem_frame++;
+    if (states.modem_frame >= states.Np) 
+      states.modem_frame = 0;                           % start of new packet
+      states.packet_count++;
+      if (states.packetsperburst)
+        if (states.packet_count >= states.packetsperburst)
+          next_state = "search";                        % we've finished this burst
+          % reset rxbuf to make sure we only ever do a postamble loop once through same samples
+          states.rxbufst = states.Nrxbufhistory;
+          states.rxbuf = zeros(1, states.Nrxbuf);
+        end
+      end
+    end
+  end
+  
   states.last_sync_state = states.sync_state;
   states.sync_state = next_state;
 endfunction
@@ -1475,19 +1729,19 @@ function [code_param Nbitspercodecframe Ncodecframespermodemframe] = codec_to_fr
       framesize = 16200; rate = 0.6;
       code_param = ldpc_init_builtin("dvbs2", rate, framesize, modulation='QAM', mod_order=16, mapping="", reshape(states.qam16,1,16));
   end
+  if strcmp(mode, "datac0")
+    load H_128_256_5.mat
+    code_param = ldpc_init_user(H, modulation, mod_order, mapping);
+  end
   if strcmp(mode, "datac1")
     load H_4096_8192_3d.mat
-    code_param = ldpc_init_user(HRA, modulation, mod_order, mapping);
-  end
-  if strcmp(mode, "datac2")
-    load H2064_516_sparse.mat
     code_param = ldpc_init_user(HRA, modulation, mod_order, mapping);
   end
   if strcmp(mode, "datac3")
     load H_1024_2048_4f.mat
     code_param = ldpc_init_user(H, modulation, mod_order, mapping);
   end
-  if strcmp(mode, "datac1") || strcmp(mode, "datac2") || strcmp(mode, "datac3") || strcmp(mode, "qam16c1") || strcmp(mode, "qam16c2")
+  if strcmp(mode, "datac0") || strcmp(mode, "datac1") || strcmp(mode, "datac3") || strcmp(mode, "qam16c1") || strcmp(mode, "qam16c2")
     printf("ldpc_data_bits_per_frame = %d\n", code_param.ldpc_data_bits_per_frame);
     printf("ldpc_coded_bits_per_frame  = %d\n", code_param.ldpc_coded_bits_per_frame);
     printf("ldpc_parity_bits_per_frame  = %d\n", code_param.ldpc_parity_bits_per_frame);
@@ -1636,15 +1890,17 @@ function [tx nclipped] = ofdm_clip(states, tx, threshold_level, plot_en=0)
   endif
 end
 
-
-function [rx_real rx] = ofdm_clip_channel(states, tx, SNR3kdB, channel, freq_offset_Hz, tx_clip_en)
+% two stage Hilbert clipper to improve PAPR 
+function tx = ofdm_hilbert_clipper(states, tx, tx_clip_en)
   tx *= states.amp_scale;
 
   % optional compressor to improve PAPR
 
   nclipped = 0;
   if tx_clip_en
-    printf("%f %f\n", states.clip_gain1, states.clip_gain2);
+    if states.verbose
+      printf("%f %f\n", states.clip_gain1, states.clip_gain2);
+    end
     [tx nclipped] = ofdm_clip(states, tx*states.clip_gain1, states.ofdm_peak);
     tx *= states.clip_gain2;
     ssbfilt_n = 100;
@@ -1655,20 +1911,27 @@ function [rx_real rx] = ofdm_clip_channel(states, tx, SNR3kdB, channel, freq_off
   end
 
   % Hilbert Clipper 2 - remove any really low probability outliers after clipping/filtering
-  % or even on vanilla Tx
+  % even on vanilla Tx
   [tx tmp] = ofdm_clip(states, tx, states.ofdm_peak);
 
   % note this is PAPR of complex signal, PAPR of real signal will be 3dB-ish larger
   peak = max(abs(tx)); RMS = sqrt(mean(abs(tx).^2));
   cpapr = 10*log10((peak.^2)/(RMS.^2));
 
-  % channel simulation and save to disk
+  if states.verbose
+    printf("Peak: %4.2f RMS: %5.2f CPAPR: %4.1f clipped: %5.2f%%\n",
+           peak, RMS, cpapr, nclipped*100/length(tx));
+  end
+endfunction
 
-  printf("Peak: %4.2f RMS: %5.2f CPAPR: %4.1f clipped: %5.2f%%\n",
-         peak, RMS, cpapr, nclipped*100/length(tx));
-  printf("foff: %3.1f Hz SNR(3k): %3.1f dB  ", freq_offset_Hz, SNR3kdB);
-  [rx_real rx] = channel_simulate(states.Fs, SNR3kdB, freq_offset_Hz, channel, tx);
 
+%  helper function that adds channel simulation and ensures we don't clip int output samples  
+function [rx_real rx] = ofdm_channel(states, tx, SNR3kdB, channel, freq_offset_Hz)
+  [rx_real rx sigma] = channel_simulate(states.Fs, SNR3kdB, freq_offset_Hz, channel, tx);
+    
+  % add a few seconds of no signal either side
+  rx_real = [sigma*randn(1,states.Fs) rx_real sigma*randn(1,states.Fs/2)];
+  
   % multipath models can lead to clipping of int16 samples
   num_clipped = length(find(abs(rx_real>32767)));
   while num_clipped/length(rx_real) > 0.001

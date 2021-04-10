@@ -37,8 +37,6 @@ end
 % Run Octave version 
 % ---------------------------------------------------------------------
 
-Ts = 0.018; Tcp = 0.002; Rs = 1/Ts; bps = 2;
-
 % useful to test the modem at other Nc's, but if Nc != 17 we aren't set up for
 % LDPC testing so disable
 if getenv("NC")
@@ -49,8 +47,8 @@ else
 end
 printf("Nc = %d LDPC testing: %d\n", Nc, cml_support);
 
-Ns = 8;
-config.Ns = Ns; config.Rs = Rs; config.Tcp = Tcp; config.Nc = Nc;
+config = ofdm_init_mode("700D");
+config.Nc = Nc;
 states = ofdm_init(config);
 states.verbose = 0;
 ofdm_load_const;

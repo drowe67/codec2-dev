@@ -35,9 +35,18 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <getopt.h>
+#include  <signal.h>
 
 #include "freedv_api.h"
 #include "fsk.h"
+
+/* other processes can end this program using signals */
+
+static volatile int finish = 0;
+void  INThandler(int sig) {
+    fprintf(stderr,"signal received: %d\n", sig);
+    finish = 1;
+}
 
 int main(int argc, char *argv[]) {
     FILE                      *fin, *fout;
@@ -47,35 +56,37 @@ int main(int argc, char *argv[]) {
     int                        mode;
     int                        verbose = 0, use_testframes = 0;
     int                        mask = 0;
-    int                        resetsync = 0;
+    int                        framesperburst = 0;
 
     if (argc < 3) {
     helpmsg:
-      	fprintf(stderr, "usage: %s [options] FSK_LDPC|DATAC1|DATAC2|DATAC3 InputModemSpeechFile BinaryDataFile\n"
-               "  -v or --vv              verbose options\n"
-               "  --testframes            count raw and coded errors in testframes sent by tx\n"
-               "  --resetsync  Nframes    reset sync after Nframes received\n"
+      	fprintf(stderr, "\nusage: %s [options] FSK_LDPC|DATAC0|DATAC1|DATAC3 InputModemSpeechFile BinaryDataFile\n"
+               "  -v or --vv             verbose options\n"
+               "  --testframes           count raw and coded errors in testframes sent by tx\n"
+               "  --framesperburst  N    selects burst mode, N frames per burst (must match Tx)\n"
                "\n"
                "For FSK_LDPC only:\n\n"
                "  -m      2|4     number of FSK tones\n"
                "  --Fs    FreqHz  sample rate (default 8000)\n"
                "  --Rs    FreqHz  symbol rate (default 100)\n"
-               "  --mask shiftHz  Use \"mask\" freq estimator (default is \"peak\" estimator)\n", argv[0]);
-       	fprintf(stderr, "e.g    %s DATAC1 off_air_audio.raw received_data_bytes.bin\n", argv[0]);
-	      exit(1);
+               "  --mask shiftHz  Use \"mask\" freq estimator (default is \"peak\" estimator)\n\n", argv[0]);
+       	
+        fprintf(stderr, "example: %s --framesperburst 1 --testframes datac0 samples.s16 /dev/null\n\n", argv[0]);
+	    exit(1);
     }
 
     int o = 0;
     int opt_idx = 0;
     while( o != -1 ){
         static struct option long_opts[] = {
-            {"testframes", no_argument,        0, 't'},
-            {"help",       no_argument,        0, 'h'},
-            {"Fs",         required_argument,  0, 'f'},
-            {"Rs",         required_argument,  0, 'r'},
-            {"vv",         no_argument,        0, 'x'},
-            {"mask",       required_argument,  0, 'k'},
-            {"resetsync",  required_argument,  0, 's'},
+            {"testframes",      no_argument,        0, 't'},
+            {"help",            no_argument,        0, 'h'},
+            {"Fs",              required_argument,  0, 'f'},
+            {"Rs",              required_argument,  0, 'r'},
+            {"vv",              no_argument,        0, 'x'},
+            {"vvv",             no_argument,        0, 'y'},
+            {"mask",            required_argument,  0, 'k'},
+            {"framesperburst",  required_argument,  0, 's'},
             {0, 0, 0, 0}
         };
 
@@ -96,7 +107,8 @@ int main(int argc, char *argv[]) {
             adv.Rs = atoi(optarg);
             break;
         case 's':
-            resetsync = atoi(optarg);
+            fprintf(stderr,"burst mode!\n");
+            framesperburst = atoi(optarg);
             break;
         case 't':
             use_testframes = 1;
@@ -106,6 +118,9 @@ int main(int argc, char *argv[]) {
             break;
         case 'x':
             verbose = 2;
+            break;
+        case 'y':
+            verbose = 3;
             break;
         case 'h':
         case '?':
@@ -121,10 +136,10 @@ int main(int argc, char *argv[]) {
     }
 
     mode = -1;
-    if (!strcmp(argv[dx],"FSK_LDPC")) mode = FREEDV_MODE_FSK_LDPC;
-    if (!strcmp(argv[dx],"DATAC1")) mode = FREEDV_MODE_DATAC1;
-    if (!strcmp(argv[dx],"DATAC2")) mode = FREEDV_MODE_DATAC2;
-    if (!strcmp(argv[dx],"DATAC3")) mode = FREEDV_MODE_DATAC3;
+    if (!strcmp(argv[dx],"FSK_LDPC") || !strcmp(argv[dx],"fsk_ldpc")) mode = FREEDV_MODE_FSK_LDPC;
+    if (!strcmp(argv[dx],"DATAC0") || !strcmp(argv[dx],"datac0")) mode = FREEDV_MODE_DATAC0;
+    if (!strcmp(argv[dx],"DATAC1") || !strcmp(argv[dx],"datac1")) mode = FREEDV_MODE_DATAC1;
+    if (!strcmp(argv[dx],"DATAC3") || !strcmp(argv[dx],"datac3")) mode = FREEDV_MODE_DATAC3;
     if (mode == -1) {
         fprintf(stderr, "Error in mode: %s\n", argv[dx]);
         exit(1);
@@ -155,6 +170,8 @@ int main(int argc, char *argv[]) {
     assert(freedv != NULL);
     freedv_set_verbose(freedv, verbose);
     freedv_set_test_frames(freedv, use_testframes);
+    freedv_set_frames_per_burst(freedv, framesperburst);
+    
     if (mode == FREEDV_MODE_FSK_LDPC) {
         struct FSK *fsk = freedv_get_fsk(freedv);
         fprintf(stderr, "Nbits: %d N: %d Ndft: %d\n", fsk->Nbits, fsk->N, fsk->Ndft);
@@ -168,12 +185,15 @@ int main(int argc, char *argv[]) {
     uint8_t bytes_out[bytes_per_modem_frame];
     short  demod_in[freedv_get_n_max_modem_samples(freedv)];
 
+    signal(SIGINT, INThandler);
+    signal(SIGTERM, INThandler);
+
     /* We need to work out how many samples the demod needs on each
        call (nin).  This is used to adjust for differences in the tx
        and rx sample clock frequencies */
 
     nin = freedv_nin(freedv);
-    while(fread(demod_in, sizeof(short), nin, fin) == nin) {
+    while((fread(demod_in, sizeof(short), nin, fin) == nin) && !finish) {
         buf++;
 
         nbytes = freedv_rawdatarx(freedv, bytes_out, demod_in);
@@ -184,16 +204,9 @@ int main(int argc, char *argv[]) {
             fwrite(bytes_out, sizeof(uint8_t), nbytes-2, fout);
             nbytes_out += nbytes-2;
             nframes_out++;
-            if (resetsync && (nframes_out >= resetsync))
-                freedv_set_sync(freedv, FREEDV_SYNC_UNSYNC);
         }
-
-        if (verbose == 3) {
-            fprintf(stderr, "buf: %d nin: %d sync: %d nbytes: %d status: 0x%02x\n",
-                    buf, nin, freedv_get_sync(freedv), nbytes, freedv_get_rx_status(freedv));
-        }
-
-	      /* if using pipes we probably don't want the usual buffering */
+        
+	    /* if using pipes we probably don't want the usual buffering */
         if (fout == stdout) fflush(stdout);
         if (fin == stdin) fflush(stdin);
     }

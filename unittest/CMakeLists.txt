@@ -20,8 +20,11 @@ target_link_libraries(tdeframer m codec2)
 
 add_definitions(-DMODEMPROBE_ENABLE -DXXXXX)
 
-add_executable(tofdm tofdm.c ../src/ofdm.c ../src/octave.c ../src/kiss_fft.c ../src/modem_probe.c ../src/mpdecode_core.c ../src/phi0.c ../src/filter.c ../src/HRA_112_112.c)
-target_link_libraries(tofdm m)
+add_executable(tofdm tofdm.c ../src/octave.c)
+target_link_libraries(tofdm m codec2)
+
+add_executable(tofdm_acq tofdm_acq.c ../src/octave.c)
+target_link_libraries(tofdm_acq m codec2)
 
 if(UNIX) # Uses pthreads
 add_executable(tfifo tfifo.c ../src/codec2_fifo.c)

@@ -56,6 +56,7 @@
 #define FREEDV_MODE_DATAC1     10
 #define FREEDV_MODE_DATAC2     11
 #define FREEDV_MODE_DATAC3     12
+#define FREEDV_MODE_DATAC0     14
 
 // Sample rates used
 #define FREEDV_FS_8000          8000
@@ -114,6 +115,9 @@
 #endif
 #if !defined(FREEDV_MODE_FSK_LDPC_EN)
         #define FREEDV_MODE_FSK_LDPC_EN FREEDV_MODE_EN_DEFAULT
+#endif
+#if !defined(FREEDV_MODE_DATAC0_EN)
+        #define FREEDV_MODE_DATAC0_EN FREEDV_MODE_EN_DEFAULT
 #endif
 #if !defined(FREEDV_MODE_DATAC1_EN)
         #define FREEDV_MODE_DATAC1_EN FREEDV_MODE_EN_DEFAULT
@@ -185,6 +189,8 @@ void freedv_rawdatatx      (struct freedv *f, short mod_out[], unsigned char *pa
 void freedv_rawdatacomptx  (struct freedv *f, COMP mod_out[], unsigned char *packed_payload_bits);
 int  freedv_rawdatapreambletx      (struct freedv *f, short mod_out[]);
 int  freedv_rawdatapreamblecomptx  (struct freedv *f, COMP mod_out[]);
+int  freedv_rawdatapostambletx      (struct freedv *f, short mod_out[]);
+int  freedv_rawdatapostamblecomptx  (struct freedv *f, COMP mod_out[]);
 
 // Receive -------------------------------------------------------------------
 
@@ -211,13 +217,13 @@ int freedv_check_crc16_unpacked(unsigned char *unpacked_bits, int nbits);
 void freedv_set_callback_txt            (struct freedv *freedv, freedv_callback_rx rx, freedv_callback_tx tx, void *callback_state);
 void freedv_set_callback_protocol       (struct freedv *freedv, freedv_callback_protorx rx, freedv_callback_prototx tx, void *callback_state);
 void freedv_set_callback_data           (struct freedv *freedv, freedv_callback_datarx datarx, freedv_callback_datatx datatx, void *callback_state);
-void freedv_set_test_frames		          (struct freedv *freedv, int test_frames);
-void freedv_set_test_frames_diversity	  (struct freedv *freedv, int test_frames_diversity);
-void freedv_set_smooth_symbols		      (struct freedv *freedv, int smooth_symbols);
-void freedv_set_squelch_en		          (struct freedv *freedv, int squelch_en);
+void freedv_set_test_frames		        (struct freedv *freedv, int test_frames);
+void freedv_set_test_frames_diversity	(struct freedv *freedv, int test_frames_diversity);
+void freedv_set_smooth_symbols		    (struct freedv *freedv, int smooth_symbols);
+void freedv_set_squelch_en		        (struct freedv *freedv, int squelch_en);
 void freedv_set_snr_squelch_thresh	    (struct freedv *freedv, float snr_squelch_thresh);
-void freedv_set_clip	                  (struct freedv *freedv, int val);
-void freedv_set_total_bit_errors    	  (struct freedv *freedv, int val);
+void freedv_set_clip	                (struct freedv *freedv, int val);
+void freedv_set_total_bit_errors    	(struct freedv *freedv, int val);
 void freedv_set_total_bits              (struct freedv *freedv, int val);
 void freedv_set_total_bit_errors_coded  (struct freedv *freedv, int val);
 void freedv_set_total_bits_coded        (struct freedv *freedv, int val);
@@ -235,6 +241,7 @@ void freedv_set_dpsk                    (struct freedv *freedv, int val);
 void freedv_set_ext_vco                 (struct freedv *f, int val);
 void freedv_set_phase_est_bandwidth_mode(struct freedv *f, int val);
 void freedv_set_eq                      (struct freedv *f, int val);
+void freedv_set_frames_per_burst        (struct freedv *f, int framesperburst);
 
 // Get parameters -------------------------------------------------------------------------
 
@@ -256,6 +263,8 @@ int freedv_get_modem_symbol_rate    (struct freedv *freedv);
 int freedv_get_n_max_modem_samples  (struct freedv *freedv);
 int freedv_get_n_nom_modem_samples  (struct freedv *freedv);
 int freedv_get_n_tx_modem_samples   (struct freedv *freedv);
+int freedv_get_n_tx_preamble_modem_samples(struct freedv *freedv);
+int freedv_get_n_tx_postamble_modem_samples(struct freedv *freedv);
 
 // bit error rate stats
 int freedv_get_total_bits	            (struct freedv *freedv);

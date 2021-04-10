@@ -50,56 +50,66 @@ int main(int argc, char *argv[]) {
     struct freedv_advanced    adv = {0,2,100,8000,1000,200, "H_256_512_4"};
     struct freedv            *freedv;
     int                       mode;
-    int                       use_clip, use_txbpf, testframes, Nframes = 0;
+    int                       use_clip, use_txbpf, testframes, Ntestframes = 0;
     int                       use_complex = 0;
     float                     amp = FSK_SCALE;
     int                       shorts_per_sample = 1;
     int                       Nbursts = 1, sequence_numbers = 0;
-
+    int                       inter_burst_delay_ms = 0;
+    int                       postdelay_ms = 0;
+    
     if (argc < 4) {
     helpmsg:
-        fprintf(stderr, "usage: %s [options] FSK_LDPC|DATAC1|DATAC2|DATAC3 InputBinaryDataFile OutputModemRawFile\n"
+        fprintf(stderr, "\nusage: %s [options] FSK_LDPC|DATAC0|DATAC1|DATAC3 InputBinaryDataFile OutputModemRawFile\n"
                "\n"
-               "  --testframes N  send N test frames per burst\n"
-               "  --bursts     B  send B bursts on N testframes (default 1)\n"
-               "  -a amp          maximum amplitude of FSK signal\n"
-               "  -c              complex signed 16 bit output format (default real)\n"
-               "  --clip  0|1     clipping for reduced PAPR\n"
-               "  --txbpf 0|1     bandpass filter\n"
-               "  --seq           send packet sequence numbers (breaks testframe BER counting)\n"
+               "  --testframes      T         send T test frames (in burst mode T must equal B*N)\n"
+               "  --bursts          B         select burst mode; send B bursts of N testframes\n"
+               "  --framesperburst  N         burst mode, N frames per burst (default 1)\n"
+               "  --delay           ms        testframe inter-burst delay in ms\n"
+               "  --postdelay       ms        additional delay at end of run in ms\n"
+               "  -c                          complex signed 16 bit output format (default real)\n"
+               "  --clip            0|1       clipping for reduced PAPR\n"
+               "  --txbpf           0|1       bandpass filter\n"
+               "  --seq                       send packet sequence numbers (breaks testframe BER counting)\n"
                "\n"
                "For FSK_LDPC only:\n\n"
+               "  -a      amp     maximum amplitude of FSK signal\n"
                "  -m      2|4     number of FSK tones\n"
                "  --Fs    FreqHz  sample rate (default 8000)\n"
                "  --Rs    FreqHz  symbol rate (default 100)\n"
                "  --tone1 FreqHz  freq of first tone (default 1000)\n"
                "  --shift FreqHz  shift between tones (default 200)\n\n"
                , argv[0]);
-        fprintf(stderr, "example: $ %s 700D dataBytes.bin samples.s16\n", argv[0]);
-        fprintf(stderr, "example: $ %s FSK_LDPC -c --testframes 10 /dev/zero samples.iq16\n\n", argv[0]);
+        fprintf(stderr, "example: $ %s --testframes 6 --bursts 3 --framesperburst 2 datac0 /dev/zero samples.s16\n", argv[0]);
+        fprintf(stderr, "example: $ %s  -c --testframes 10 FSK_LDPC/dev/zero samples.iq16\n\n", argv[0]);
         exit(1);
     }
 
-    use_clip = 0; use_txbpf = 0; testframes = 0; use_complex = 0;
-
+    use_clip = 0; use_txbpf = 0; testframes = 0; use_complex = 0; 
+    int framesperburst = 1;
+    int burst_mode = 0;
+    
     int o = 0;
     int opt_idx = 0;
     while( o != -1 ){
         static struct option long_opts[] = {
-            {"testframes", required_argument,  0, 't'},
-            {"help",       no_argument,        0, 'h'},
-            {"txbpf",      required_argument,  0, 'b'},
-            {"clip",       required_argument,  0, 'l'},
-            {"Fs",         required_argument,  0, 'f'},
-            {"Rs",         required_argument,  0, 'r'},
-            {"tone1",      required_argument,  0, '1'},
-            {"shift",      required_argument,  0, 's'},
-            {"bursts",     required_argument,  0, 'e'},
-            {"seq",        no_argument,        0, 'q'},
+            {"testframes",     required_argument,  0, 't'},
+            {"help",           no_argument,        0, 'h'},
+            {"txbpf",          required_argument,  0, 'b'},
+            {"clip",           required_argument,  0, 'l'},
+            {"Fs",             required_argument,  0, 'f'},
+            {"Rs",             required_argument,  0, 'r'},
+            {"tone1",          required_argument,  0, '1'},
+            {"shift",          required_argument,  0, 's'},
+            {"bursts",         required_argument,  0, 'e'},
+            {"framesperburst", required_argument,  0, 'g'},
+            {"delay",          required_argument,  0, 'j'},
+            {"postdelay",      required_argument,  0, 'k'},
+            {"seq",            no_argument,        0, 'q'},
             {0, 0, 0, 0}
         };
 
-        o = getopt_long(argc,argv,"a:ct:hb:l:e:f:r:1:s:m:q",long_opts,&opt_idx);
+        o = getopt_long(argc,argv,"a:ct:hb:l:e:f:g:r:1:s:m:q",long_opts,&opt_idx);
 
         switch(o) {
         case 'a':
@@ -113,11 +123,21 @@ int main(int argc, char *argv[]) {
             shorts_per_sample = 2;
             break;
         case 'e':
+            burst_mode = 1;
             Nbursts = atoi(optarg);
+            break;
+        case 'g':
+            framesperburst = atoi(optarg);
+            break;
+        case 'j':
+            inter_burst_delay_ms = atoi(optarg);
+            break;
+        case 'k':
+            postdelay_ms = atoi(optarg);
             break;
         case 't':
             testframes = 1;
-            Nframes = atoi(optarg);
+            Ntestframes = atoi(optarg);
             break;
         case 'l':
             use_clip = atoi(optarg);
@@ -154,10 +174,10 @@ int main(int argc, char *argv[]) {
     }
 
     mode = -1;
-    if (!strcmp(argv[dx],"FSK_LDPC")) mode = FREEDV_MODE_FSK_LDPC;
-    if (!strcmp(argv[dx],"DATAC1")) mode = FREEDV_MODE_DATAC1;
-    if (!strcmp(argv[dx],"DATAC2")) mode = FREEDV_MODE_DATAC2;
-    if (!strcmp(argv[dx],"DATAC3")) mode = FREEDV_MODE_DATAC3;
+    if (!strcmp(argv[dx],"FSK_LDPC") || !strcmp(argv[dx],"fsk_ldpc")) mode = FREEDV_MODE_FSK_LDPC;
+    if (!strcmp(argv[dx],"DATAC0") || !strcmp(argv[dx],"datac0")) mode = FREEDV_MODE_DATAC0;
+    if (!strcmp(argv[dx],"DATAC1") || !strcmp(argv[dx],"datac1")) mode = FREEDV_MODE_DATAC1;
+    if (!strcmp(argv[dx],"DATAC3") || !strcmp(argv[dx],"datac3")) mode = FREEDV_MODE_DATAC3;
     if (mode == -1) {
       fprintf(stderr, "Error: in mode: %s", argv[dx]);
       exit(1);
@@ -191,7 +211,7 @@ int main(int argc, char *argv[]) {
     int bytes_per_modem_frame = freedv_get_bits_per_modem_frame(freedv)/8;
     int payload_bytes_per_modem_frame = bytes_per_modem_frame;
     payload_bytes_per_modem_frame -= 2; /* 16 bits used for the CRC */
-    fprintf(stderr, "payload bytes_per_modem_frame: %d\n", payload_bytes_per_modem_frame);
+    fprintf(stderr, "payload bytes_per_modem_frame: %d ", payload_bytes_per_modem_frame);
     assert((freedv_get_bits_per_modem_frame(freedv) % 8) == 0);
     int     n_mod_out = freedv_get_n_tx_modem_samples(freedv);
     uint8_t bytes_in[bytes_per_modem_frame];
@@ -206,9 +226,11 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    if ((Nbursts != 1) && (testframes == 0)) {
-        fprintf(stderr, "Error: --bursts can only be used with --testframes\n");
-        exit(1);
+    if (framesperburst && testframes) {
+        if (Ntestframes != framesperburst*Nbursts) {
+            fprintf(stderr, "Error: In burst mode with testframes: T must equal B*N\n");
+            exit(1);
+        }
     }
 
     /* optionally set up a known testframe */
@@ -225,21 +247,24 @@ int main(int argc, char *argv[]) {
     short mod_out_short[2*n_mod_out];
     COMP  mod_out_comp[n_mod_out];
     int frames;
-
+    size_t on_samples = 0;
+    size_t off_samples = 0;
+    
     for(int b=0; b<Nbursts; b++) {
 
-        /* send preamble to help estimators lock up at start of burst */
+        /* send preamble */
         int n_preamble = 0;
-        if (mode == FREEDV_MODE_FSK_LDPC) {
-            if (use_complex == 0) {
-                n_preamble = freedv_rawdatapreambletx(freedv, mod_out_short);
-            } else {
-                n_preamble = freedv_rawdatapreamblecomptx(freedv, mod_out_comp);
-                comp_to_short(mod_out_short, mod_out_comp, n_preamble);
-            }
-            fwrite(mod_out_short, sizeof(short), shorts_per_sample*n_preamble, fout);
+        if (use_complex == 0) {
+            n_preamble = freedv_rawdatapreambletx(freedv, mod_out_short);
+        } else {
+            n_preamble = freedv_rawdatapreamblecomptx(freedv, mod_out_comp);
+            comp_to_short(mod_out_short, mod_out_comp, n_preamble);
         }
-
+        assert(n_preamble == freedv_get_n_tx_preamble_modem_samples(freedv));
+        assert(n_preamble <= n_mod_out);
+        fwrite(mod_out_short, sizeof(short), shorts_per_sample*n_preamble, fout);
+        on_samples += n_preamble;
+        
         /* OK main loop  --------------------------------------- */
 
         frames = 0;
@@ -249,7 +274,7 @@ int main(int argc, char *argv[]) {
                 if (sequence_numbers) bytes_in[0] = (frames+1) & 0xff;
             }
 
-            /* This mode requires a CRC in the last two bytes. TODO: consider moving inside freedv_rawdatatx(),
+            /* The raw data modes requires a CRC in the last two bytes. TODO: consider moving inside freedv_rawdatatx(),
                although there may be some advantage in leaving the CRC visible to upper layers */
 
             uint16_t crc16 = freedv_gen_crc16(bytes_in, payload_bytes_per_modem_frame);
@@ -263,24 +288,61 @@ int main(int argc, char *argv[]) {
                 comp_to_short(mod_out_short, mod_out_comp, n_mod_out);
             }
             fwrite(mod_out_short, sizeof(short), shorts_per_sample*n_mod_out, fout);
-
+            on_samples += n_mod_out;
+            
             /* if using pipes we don't want the usual buffering to occur */
             if (fout == stdout) fflush(stdout);
             if (fin == stdin) fflush(stdin);
 
             frames++;
-            if (testframes && (frames >= Nframes)) break;
+            // streaming mode with testframes, break out of loop after we have sent Nframes
+            if (!burst_mode && testframes && (frames >= Ntestframes)) break;
+            // burst mode, break out of loop after we have sent framesperburst frames
+            if (burst_mode && (frames >= framesperburst)) break;
         }
+        
+        /* send postamble */
+        int n_postamble = 0;
+        if (use_complex == 0) {
+            n_postamble = freedv_rawdatapostambletx(freedv, mod_out_short);
+        } else {
+            n_postamble = freedv_rawdatapostamblecomptx(freedv, mod_out_comp);
+            comp_to_short(mod_out_short, mod_out_comp, n_preamble);
+        }
+        assert(n_postamble == freedv_get_n_tx_postamble_modem_samples(freedv));
+        assert(n_postamble <= n_mod_out);
+        fwrite(mod_out_short, sizeof(short), shorts_per_sample*n_postamble, fout);
+        on_samples += n_postamble;
 
-        /* some silence at the end to allow demod to complete processing */
-
-        int n_demod_in = freedv_get_n_nom_modem_samples(freedv);
-        short sil_short[shorts_per_sample*n_demod_in];
-        for(int i=0; i<shorts_per_sample*n_demod_in; i++) sil_short[i] = 0;
-        fwrite(sil_short, sizeof(short), shorts_per_sample*n_demod_in, fout);
-        fwrite(sil_short, sizeof(short), shorts_per_sample*n_demod_in, fout);
+        int samples_delay = 0;
+        if (inter_burst_delay_ms) {
+            /* user defined inter-burst delay */
+            samples_delay = FREEDV_FS_8000*inter_burst_delay_ms/1000;
+        }
+        else {                
+            /* just enough silence at the end to allow demod to complete processing */
+            samples_delay = 2*freedv_get_n_nom_modem_samples(freedv);
+        }
+        short sil_short[shorts_per_sample*samples_delay];
+        for(int i=0; i<shorts_per_sample*samples_delay; i++) sil_short[i] = 0;
+        fwrite(sil_short, sizeof(short), shorts_per_sample*samples_delay, fout);
+        off_samples += samples_delay;
     }
 
+    if (postdelay_ms) {
+        int samples_delay = FREEDV_FS_8000*postdelay_ms/1000;
+        fprintf(stderr, "postdelay: %d %d\n", postdelay_ms, samples_delay);
+        short sil_short[shorts_per_sample*samples_delay];
+        for(int i=0; i<shorts_per_sample*samples_delay; i++) sil_short[i] = 0;
+        fwrite(sil_short, sizeof(short), shorts_per_sample*samples_delay, fout);
+        off_samples += samples_delay;
+    }
+    
+    /* SNR offset to use in channel simulator to account for on/off time of burst signal */
+    float mark_space_ratio = (float)on_samples/(on_samples+off_samples);
+    float mark_space_SNR_offset = 10*log10(mark_space_ratio);
+    fprintf(stderr, "marks:space: %3.2f SNR offset: %5.2f\n", mark_space_ratio, mark_space_SNR_offset);
+    
     freedv_close(freedv);
     fclose(fin);
     fclose(fout);
