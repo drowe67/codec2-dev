@@ -4,7 +4,7 @@
 
 FreeDV can be used to send data over radio channels.  Two APis are supported:
 + VHF packet data channel which uses Ethernet style framing.
-+ Raw frames of modem data
++ Raw frames of modem data over VHF and HF channels.
 
 ## Credits
 
@@ -253,7 +253,11 @@ Some notes on this example:
 
  These modes use an OFDM modem with powerful LDPC codes and are designed for sending data over HF radio channels with multipath fading.  At the time of writing (Jan 2021) they are a work in progress, but usable as is.
 
- See example in Quickstart section above, and the demo programs [freedv_data_raw_tx.c](src/freedv_data_raw_tx.c) and [freedv_data_raw_rx.c](src/freedv_data_raw_rx.c).  The waveforms designs are described in this [spreadsheet](doc/modem_codec_frame_design.ods).
+| FreeDV Mode | RF bandwidth (Hz) | Payload data rate bits/s | Payload bytes/frame | FEC | Duration (sec) | MPP test | Use case |
+| :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: |
+| DATAC0 | 1700 | 291 | 14 | (256,128) | 0.44 | 70/100 at 0dB | Reverse link ACK packets (all SNRs) |
+| DATAC1 | 500 | 980 | 510 | (8192,4096) | 4.18 | 92/100 at 5dB | Forward link data (medium SNR) |
+| DATAC3 | 500 | 321 | 126 | (2048,1024) | 3.19 | 74/100 at 0dB | Forward link data (low SNR) |
 
 | FreeDV Mode | RF bandwidth (Hz) | Payload data rate bits/s | Payload bytes/frame | FEC | AWGN | MPP |
 | :-: | :-: | :-: | :-: | :-: | :-: | :-: |
