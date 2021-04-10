@@ -16,17 +16,12 @@ import pathlib
 libname = pathlib.Path().absolute() / "src/libcodec2.so"
 c_lib = ctypes.CDLL(libname)
 c_lib.freedv_open.restype = ctypes.POINTER(ctypes.c_ubyte)
-c_lib.freedv_get_n_max_modem_samples.restype = c_int
 c_lib.freedv_get_n_max_speech_samples.restype = c_int
 c_lib.freedv_nin.restype = c_int
 
 FREEDV_MODE_700D = 7 # from freedv_api.h             
 freedv = c_lib.freedv_open(FREEDV_MODE_700D)
-
-n_max_speech_samples = int(c_lib.freedv_get_n_max_speech_samples(freedv))
-n_max_modem_samples = c_lib.freedv_get_n_max_modem_samples(freedv)
-c_lib.freedv_rawdatarx.argtype = [POINTER(c_ubyte), c_short * n_max_speech_samples, c_short * n_max_modem_samples]
-
+n_max_speech_samples = c_lib.freedv_get_n_max_speech_samples(freedv)
 speech_out = (ctypes.c_short * n_max_speech_samples)()
 speech_out = bytes(speech_out)
 
