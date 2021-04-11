@@ -441,7 +441,7 @@ if(UNITTEST)
     # Check C port of burst acquisition
     add_test(NAME test_OFDM_modem_burst_acq_port
              COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/octave;
-                            echo \"tofdm_acq; quit\" | DISPLAY=\"\" octave-cli")
+                            echo \"tofdm_acq; quit\" | PATH_TO_UNITTEST=${CMAKE_CURRENT_BINARY_DIR}/unittest DISPLAY=\"\" octave-cli")
              set_tests_properties(test_OFDM_modem_burst_acq_port PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
 
     # Give uncoded Octave burst data modem a workout on a poor channel (0dB SNR MPP)
