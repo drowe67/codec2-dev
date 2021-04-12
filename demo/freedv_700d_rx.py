@@ -12,8 +12,12 @@ import ctypes
 from ctypes import *
 import sys
 import pathlib
+import platform
 
-libname = pathlib.Path().absolute() / "src/libcodec2.so"
+if platform.system == 'Darwin':
+    libname = pathlib.Path().absolute() / "src/libcodec2.dylib" 
+else:
+    libname = pathlib.Path().absolute() / "src/libcodec2.so" 
 c_lib = ctypes.CDLL(libname)
 
 FREEDV_MODE_700D = 7 # from freedv_api.h             

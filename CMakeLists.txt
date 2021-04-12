@@ -1097,15 +1097,15 @@ endif(NOT APPLE)
      add_test(NAME test_demo_c2demo
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR};
                              ./demo/c2demo ../raw/hts1a.raw hts1a_out.raw;
-                             ls -sh hts1a_out.raw")
-             set_tests_properties(test_demo_c2demo PROPERTIES PASS_REGULAR_EXPRESSION "48K hts1a_out.raw")
+                             ls -l hts1a_out.raw")
+             set_tests_properties(test_demo_c2demo PROPERTIES PASS_REGULAR_EXPRESSION "48000")
 
       add_test(NAME test_demo_700d
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR};
                               cat ../raw/ve9qrp_10s.raw | ./demo/freedv_700d_tx |
                               ./demo/freedv_700d_rx > ve9qrp_10s_700d.raw;
-                              ls -sh ve9qrp_10s_700d.raw")
-             set_tests_properties(test_demo_700d PROPERTIES PASS_REGULAR_EXPRESSION "156K ve9qrp_10s_700d.raw")
+                              ls -l ve9qrp_10s_700d.raw")
+             set_tests_properties(test_demo_700d PROPERTIES PASS_REGULAR_EXPRESSION "158720")
  
       add_test(NAME test_demo_700d_python
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR};
