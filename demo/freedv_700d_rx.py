@@ -18,13 +18,28 @@ if platform.system == 'Darwin':
     libname = pathlib.Path().absolute() / "src/libcodec2.dylib" 
 else:
     libname = pathlib.Path().absolute() / "src/libcodec2.so" 
+
+# See: https://docs.python.org/3/library/ctypes.html
+ 
 c_lib = ctypes.CDLL(libname)
+
+c_lib.freedv_open.argype = c_int
+c_lib.freedv_open.restype = c_void_p
+
+c_lib.freedv_get_n_max_speech_samples.argtype = c_void_p
+c_lib.freedv_get_n_max_speech_samples.restype = c_int
+
+c_lib.freedv_nin.argtype = c_void_p
+c_lib.freedv_nin.restype = c_int
+
+c_lib.freedv_rx.argtype = [c_void_p, c_char_p, c_char_p]
+c_lib.freedv_rx.restype = c_int
 
 FREEDV_MODE_700D = 7 # from freedv_api.h             
 freedv = c_lib.freedv_open(FREEDV_MODE_700D)
+
 n_max_speech_samples = c_lib.freedv_get_n_max_speech_samples(freedv)
-speech_out = (ctypes.c_short * n_max_speech_samples)()
-speech_out = bytes(speech_out)
+speech_out = create_string_buffer(2*n_max_speech_samples)
 
 while True:
     nin = c_lib.freedv_nin(freedv)
