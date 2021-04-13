@@ -46,7 +46,7 @@ Raw modem frame API:
 1. Let's send a 128 byte frame containing some text over the modem:
    ```sh
    padding=$(head -c 115 < /dev/zero | tr '\0' '-'); echo "Hello World" $padding > in.txt
-   ./src/freedv_data_raw_tx --bursts 1 datac3 in.txt - | ./src/fv_data_raw_rx --framesperburst 1 datac3 - - 
+   ./src/freedv_data_raw_tx --bursts 1 datac3 in.txt - | ./src/freedv_data_raw_rx --framesperburst 1 datac3 - - 
    Hello World --------
    ```
    Note we've padded the input frame to 126 bytes, the DATAC3 framesize (less CRC).
@@ -330,7 +330,7 @@ The X shape is due to the level of each carrier changing with the fading.  In so
 
 Resources:
 1. See the raw data example in Quickstart section above.
-1. For simple examples of how use the FreeDV API, see the demo programs [freedv_data1_tx.c](demo/freedv_data1_tx.c) and [freedv_data1_rx.c](src/freedv_data1_rx.c) 
+1. For simple examples of how use the FreeDV API, see the demo programs [freedv_datac1_tx.c](demo/freedv_datac1_tx.c) and [freedv_datac1_rx.c](src/freedv_datac1_rx.c) 
 1. [freedv_data_raw_tx.c](src/freedv_data_raw_tx.c) and [freedv_data_raw_rx.c](src/freedv_data_raw_rx.c) are more full deatured example programs.  
 1. The modem waveforms designs are described in this [spreadsheet](doc/modem_codec_frame_design.ods).
 1. Examples in the [ctests](CMakeLists.txt) (look for "FreeDV API raw data")
