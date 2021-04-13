@@ -330,7 +330,7 @@ The X shape is due to the level of each carrier changing with the fading.  In so
 
 Resources:
 1. See the raw data example in Quickstart section above.
-1. For simple examples of how use the FreeDV API, see the demo programs [freedv_datac1_tx.c](demo/freedv_datac1_tx.c) and [freedv_datac1_rx.c](src/freedv_datac1_rx.c) 
+1. For simple examples of how use the FreeDV API, see the demo programs [freedv_datac1_tx.c](demo/freedv_datac1_tx.c) and [freedv_datac1_rx.c](demo/freedv_datac1_rx.c) 
 1. [freedv_data_raw_tx.c](src/freedv_data_raw_tx.c) and [freedv_data_raw_rx.c](src/freedv_data_raw_rx.c) are more full deatured example programs.  
 1. The modem waveforms designs are described in this [spreadsheet](doc/modem_codec_frame_design.ods).
 1. Examples in the [ctests](CMakeLists.txt) (look for "FreeDV API raw data")
