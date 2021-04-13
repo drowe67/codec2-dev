@@ -23,20 +23,20 @@ else:
  
 c_lib = ctypes.CDLL(libname)
 
-c_lib.freedv_open.argype = c_int
+c_lib.freedv_open.argype = [c_int]
 c_lib.freedv_open.restype = c_void_p
 
-c_lib.freedv_get_n_max_speech_samples.argtype = c_void_p
+c_lib.freedv_get_n_max_speech_samples.argtype = [c_void_p]
 c_lib.freedv_get_n_max_speech_samples.restype = c_int
 
-c_lib.freedv_nin.argtype = c_void_p
+c_lib.freedv_nin.argtype = [c_void_p]
 c_lib.freedv_nin.restype = c_int
 
 c_lib.freedv_rx.argtype = [c_void_p, c_char_p, c_char_p]
 c_lib.freedv_rx.restype = c_int
 
 FREEDV_MODE_700D = 7 # from freedv_api.h             
-freedv = c_lib.freedv_open(FREEDV_MODE_700D)
+freedv = cast(c_lib.freedv_open(FREEDV_MODE_700D), c_void_p)
 
 n_max_speech_samples = c_lib.freedv_get_n_max_speech_samples(freedv)
 speech_out = create_string_buffer(2*n_max_speech_samples)

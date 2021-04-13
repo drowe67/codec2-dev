@@ -1111,8 +1111,8 @@ endif(NOT APPLE)
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR};
                               cat ../raw/ve9qrp_10s.raw | ./demo/freedv_700d_tx |
                               ../demo/freedv_700d_rx.py > ve9qrp_10s_700d.raw;
-                              ls -sh ve9qrp_10s_700d.raw")
-             set_tests_properties(test_demo_700d_python PROPERTIES PASS_REGULAR_EXPRESSION "160K ve9qrp_10s_700d.raw")
+                              ls -l ve9qrp_10s_700d.raw")
+             set_tests_properties(test_demo_700d_python PROPERTIES PASS_REGULAR_EXPRESSION "161280")
  
       add_test(NAME test_demo_datac1
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR};
