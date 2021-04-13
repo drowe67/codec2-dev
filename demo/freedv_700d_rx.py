@@ -14,7 +14,7 @@ import sys
 import pathlib
 import platform
 
-if platform.system == 'Darwin':
+if platform.system() == 'Darwin':
     libname = pathlib.Path().absolute() / "src/libcodec2.dylib" 
 else:
     libname = pathlib.Path().absolute() / "src/libcodec2.so" 
