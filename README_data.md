@@ -4,7 +4,7 @@
 
 FreeDV can be used to send data over radio channels.  Two APis are supported:
 + VHF packet data channel which uses Ethernet style framing.
-+ Raw frames of modem data
++ Raw frames of modem data over VHF and HF channels.
 
 ## Credits
 
@@ -250,11 +250,11 @@ Some notes on this example:
 
 ## OFDM Raw Data modes for HF Radio
 
- These modes use an OFDM modem with powerful LDPC codes and are designed for sending data over HF radio channels with multipath fading.  At the time of writing (April 2021) they are a work in progress, but usable as is.  The current modes supported are:
+These modes use an OFDM modem with powerful LDPC codes and are designed for sending data over HF radio channels with multipath fading.  At the time of writing (April 2021) they are a work in progress, but usable as is.  The current modes supported are:
 
- | FreeDV Mode | RF bandwidth (Hz) | Payload data rate bits/s | Payload bytes/frame | FEC | Duration (sec) | MPP test | Use case |
+| FreeDV Mode | RF bandwidth (Hz) | Payload data rate bits/s | Payload bytes/frame | FEC | Duration (sec) | MPP test | Use case |
 | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: |
-| DATAC0 | 1700 | 291 | 14 | (128,128) | 0.44 | 70/100 at 0dB | Reverse link ACK packets (all SNRs) |
+| DATAC0 | 1700 | 291 | 14 | (256,128) | 0.44 | 70/100 at 0dB | Reverse link ACK packets (all SNRs) |
 | DATAC1 | 500 | 980 | 510 | (8192,4096) | 4.18 | 92/100 at 5dB | Forward link data (medium SNR) |
 | DATAC3 | 500 | 321 | 126 | (2048,1024) | 3.19 | 74/100 at 0dB | Forward link data (low SNR) |
 
@@ -263,12 +263,12 @@ Notes:
 1. SNR is the target operating point SNR for each mode.
 1. "MPP test" is the number of packets received/transmitted on a simulated MultiPath Poor channel (1Hz Doppler spread, 2ms delay) at the operating point SNR.
 
-From the callers point of vew, the frame format of each burst is:
+From the callers point of view, the frame format of each burst is:
 ```
 | Preamble | payload data | CRC | payload data | CRC | ........... | Postamble | 
            | frame 1 -----------| frame 2 -----------| ... frame N |
 ```
-In the next layer down, each frame is comprised of several OFDM "modem frames", that contain pilot, unique word, and FEC symbols to handle syncronisation and error correction over the challenging HF channel.  The preamble and postamble are used to locate the burst and estimate it's frequency offset.  Having both a pre and postamble increases the probability of sucessful detection of the burst in a fading channel. Here are some single frame bursts a MPP cahnnel at 5dB SNR:
+In the next layer down, each frame is comprised of several OFDM "modem frames", that contain pilot, unique word, and FEC symbols to handle syncronisation and error correction over the challenging HF channel.  The preamble and postamble are used to locate the burst and estimate it's frequency offset.  Having both a pre and postamble increases the probability of successful detection of the burst in a fading channel. Here are some single frame bursts a MPP channel at 5dB SNR:
 
 ![](doc/pre_post_amble_mpp.png)
 
@@ -297,7 +297,7 @@ BER......: 0.0195 Tbits:  1536 Terrs:    30
 Coded BER: 0.0000 Tbits:   768 Terrs:     0
 Coded PER: 0.0000 Tpkts:     6 Tpers:     0
 ```
-We still received 6 frames OK (Tpkts field), but in this case there was a raw BER of about 2% which the FEC cleaned up nicely (Coded BER 0.0).  Just above that we can see the "SNR offset" and "cohpsk_ch: SNR3k" fields.  In the silence between bursts the modem signal has zero power, which biases the SNR measured by the `conhpsk_ch` channels imulation tool.  This bias is the "SNR offset".  So the true SNR for this test is actually:
+We still received 6 frames OK (Tpkts field), but in this case there was a raw BER of about 2% which the FEC cleaned up nicely (Coded BER 0.0).  Just above that we can see the "SNR offset" and "cohpsk_ch: SNR3k" fields.  In the silence between bursts the modem signal has zero power, which biases the SNR measured by the `conhpsk_ch` channels simulation tool.  This bias is the "SNR offset".  So the true SNR for this test is actually:
 ```
 SNR = -0.36 - (-0.79) = 0.43 dB
 ```
@@ -320,7 +320,7 @@ Here is a spectrogram (waterfall on it's side - time flows from left to right, f
 
 ![](doc/test_datac1_006_spectrogram.png)
 
-The mulitipath channel carves notches out of the signal, and the level rises and falls.  The 27 carriers of the `datac1` channel can also be observed.  The SSB is the fuzz along the top. The SNR varied between 8 and 16dB. The fading is even more obvious on the scatter diagram:
+The multipath channel carves notches out of the signal, and the level rises and falls.  The 27 carriers of the `datac1` channel can also be observed.  The SSB is the fuzz along the top. The SNR varied between 8 and 16dB. The fading is even more obvious on the scatter diagram:
 
 ![](doc/test_datac1_006_scatter.png)
 

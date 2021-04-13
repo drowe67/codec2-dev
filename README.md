@@ -34,9 +34,10 @@ Also included:
    make
    ```
 
-1. Listen to Codec 2 (run from ```codec2/build_linux```):
+1. Listen to Codec 2:
    ```
-   ./src/c2demo ../raw/hts1a.raw hts1a_c2.raw
+   cd codec2/build_linux
+   ./demo/c2demo ../raw/hts1a.raw hts1a_c2.raw
    aplay -f S16_LE ../raw/hts1a.raw
    aplay -f S16_LE hts1a_c2.raw
    ```
@@ -89,23 +90,25 @@ Also included:
 
 ## Programs
 
-+ ```c2demo``` encodes a file of speech samples, then decodes them and saves the result.
++ See `demo` directory for simple examples of using Codec and the FreeDV API.
 
-+ ```c2enc``` encodes a file of speech samples to a compressed file of encoded bits.  ```c2dec``` decodes a compressed file of bits to a file of speech samples.
++ `c2demo` encodes a file of speech samples, then decodes them and saves the result.
 
-+ ```c2sim``` is a simulation/development version of Codec 2.  It allows selective use of the various Codec 2 algorithms.  For example switching phase modelling or quantisation on and off.
++ `c2enc` encodes a file of speech samples to a compressed file of encoded bits.  `c2dec` decodes a compressed file of bits to a file of speech samples.
 
-+ ```freedv_tx``` & ```freedv_rx``` are command line implementations of the FreeDV protocol, which combines Codec 2, modems, and Forward Error Correction (FEC).
++ `c2sim` is a simulation/development version of Codec 2.  It allows selective use of the various Codec 2 algorithms.  For example switching phase modelling or quantisation on and off.
+
++ `freedv_tx` & `freedv_rx` are command line implementations of the FreeDV protocol, which combines Codec 2, modems, and Forward Error Correction (FEC).
   
-+ ```cohpsk_*``` are coherent PSK (COHPSK) HF modem command line programs.
++ `cohpsk_*`` are coherent PSK (COHPSK) HF modem command line programs.
 
-+ ```fdmdv_*``` are differential PSK HF modem command line programs (README_fdmdv).
++ `fdmdv_*` are differential PSK HF modem command line programs (README_fdmdv).
 
-+ ```fsk_*``` are command line programs for a non-coherent FSK modem (README_fsk).
++ `fsk_*` are command line programs for a non-coherent FSK modem (README_fsk).
 
-+ ```ldpc_*``` are LDPC encoder/decoder command line programs, based on the CML library.
++ `ldpc_*` are LDPC encoder/decoder command line programs, based on the CML library.
 
-+ ```ofdm_*``` are OFDM PSK HF modem command line programs (README_ofdm).
++ `ofdm_*` are OFDM PSK HF modem command line programs (README_ofdm).
 
 ## Building and Running Unit Tests
 
@@ -149,6 +152,7 @@ CTest is used as a test framework, with support from [GNU Octave](https://www.gn
 ## Directories
 ```
 cmake       - cmake support files
+demo        - Simple Codec 2 and FreeDv API demo applications
 misc        - misc C programs that have been useful in development,
               not reqd for Codec 2 release. Part of Debug build.
 octave      - Octave scripts used to support development
