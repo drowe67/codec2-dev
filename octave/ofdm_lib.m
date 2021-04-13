@@ -1117,27 +1117,37 @@ endfunction
   ----------------------------------------------------------------------------
   Estimates of signal and noise power (see cohpsk.m for further
   explanation).  Signal power is distance from axis on complex
-  plane. We just measure noise power on imag axis, as it isn't
-  affected by fading.  For 700D using all symbols in frame worked
-  better than just pilots, but for QAM we need to use pilots as they
-  don't have modulation that affects estimate.
+  plane. Noise power is the distance orthogonal to each symbol, to provide an
+  estimate that is insenstive to fading.
+  
+  For 700D using all symbols in frame worked better than just pilots, but for 
+  QAM we need to use pilots as they don't have modulation that affects estimate.
   ----------------------------------------------------------------------------
 #}
 
 function [sig_var noise_var] = est_signal_and_noise_var(rx_syms)
   sig_var = sum(abs(rx_syms) .^ 2)/length(rx_syms);
   sig_rms = sqrt(sig_var);
-
+   
   sum_x = 0;
   sum_xx = 0;
   n = 0;
   for i=1:length(rx_syms)
     s = rx_syms(i);
-    if abs(real(s)) > sig_rms
-      % select two constellation points on real axis
-      sum_x  += imag(s);
-      sum_xx += imag(s)*imag(s);
-      n++;
+    % only consider symbols a reasonable distance from the origin, as these are
+    % more likely to be valid and not errors that will mess up the estimate
+    if abs(s) > sig_rms
+        % rough demodulation, determine if symbol is on real or imag axis
+        if abs(real(s)) > abs(imag(s))
+          % assume noise is orthogonal to real axis
+          sum_x  += imag(s);
+          sum_xx += imag(s)*imag(s);
+        else
+          % assume noise is orthogonal to imag axis
+          sum_x  += real(s);
+          sum_xx += real(s)*real(s);
+        end
+        n++;
     end
   end
 
@@ -1146,11 +1156,51 @@ function [sig_var noise_var] = est_signal_and_noise_var(rx_syms)
     noise_var = (n*sum_xx - sum_x*sum_x)/(n*(n-1));
   end
 
-  % Total noise power is twice estimate of imaginary-axis noise.  This
-  % effectively gives us the an estimate of Es/No
+  % Total noise power is twice estimate of single-axis noise.
   noise_var = 2*noise_var;
 endfunction
 
+function test_est_signal_and_noise_var(channel="awgn")
+    Nsym=1000; rand('seed',1); randn('seed',1);
+    tx_symbols = 2*(rand(1,Nsym) > 0.5) -1 + j*(2*(rand(1,Nsym) > 0.5) - 1);
+    tx_symbols *= exp(-j*pi/4)/sqrt(2);
+    
+    if strcmp(channel,"mpp")
+        % for fading we assume perfect phase recovery, so just multiply by mag
+        spread = doppler_spread(2.0, 50, length(tx_symbols));
+        tx_symbols = tx_symbols .* abs(spread);
+        % normalise power over the multipath channel run
+        S = tx_symbols*tx_symbols'
+        tx_symbols *= sqrt(Nsym/S);
+    end
+    
+    EsNodB = 0:20;
+    for i = 1:length(EsNodB)
+        aEsNodB = EsNodB(i);
+        EsNo = 10 .^ (aEsNodB/10);
+        N = 1/EsNo;
+        noise = sqrt(N/2)*randn(1,Nsym) +  sqrt(N/2)*j*randn(1,Nsym);  
+        S = tx_symbols*tx_symbols';
+        N = noise*noise';
+        EsNo_meas(i) = 10*log10(S/N);
+        rx_symbols = tx_symbols + noise;  
+        [sig_var noise_var] = est_signal_and_noise_var(rx_symbols);
+        EsNo_est(i) = 10*log10(sig_var/noise_var);
+        printf("EsNo: %5.2f EsNo_meas: %5.2f EsNo_est: %5.2f\n", aEsNodB, EsNo_meas(i), EsNo_est(i));
+    end
+    figure(1);
+    plot(EsNodB, EsNo_meas, '+-;EsNo meas;');  hold on; plot(EsNodB, EsNo_est, 'o-;EsNo est;'); hold off;
+    axis([0 max(EsNodB) 0 max(EsNodB)]); grid;
+    figure(2); plot(tx_symbols,'+');
+    test_point_dB = 5; test_point_index = find(EsNodB == test_point_dB)
+    diff = abs(EsNodB(test_point_index) - EsNo_est(test_point_index));
+    printf("test_point: %5.2f dB diff: %5.2f dB\n", EsNodB(test_point_index), EsNo_est(test_point_index));
+    if diff < 1.0
+        printf("Pass\n");
+    else
+        printf("Fail\n");
+    end
+endfunction
 
 % ----------------------------------------------------------------------------------
 % assemble_modem_packet - assemble modem packet from UW, payload, and txt bits
@@ -1927,7 +1977,7 @@ endfunction
 
 %  helper function that adds channel simulation and ensures we don't clip int output samples  
 function [rx_real rx] = ofdm_channel(states, tx, SNR3kdB, channel, freq_offset_Hz)
-  [rx_real rx sigma] = channel_simulate(states.Fs, SNR3kdB, freq_offset_Hz, channel, tx);
+  [rx_real rx sigma] = channel_simulate(states.Fs, SNR3kdB, freq_offset_Hz, channel, tx, states.verbose);
     
   % add a few seconds of no signal either side
   rx_real = [sigma*randn(1,states.Fs) rx_real sigma*randn(1,states.Fs/2)];
