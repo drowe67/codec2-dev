@@ -424,6 +424,19 @@ if(UNITTEST)
                             DISPLAY=\"\" octave-cli")
              set_tests_properties(test_OFDM_modem_octave_qam16_uncoded PROPERTIES PASS_REGULAR_EXPRESSION "Pass")
 
+    add_test(NAME test_OFDM_modem_esno_est_octave
+             COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/octave;
+                            echo 'pkg load signal; esno_est; esno_est_tests_octave' |
+                            PATH_TO_UNITEST=${CMAKE_CURRENT_BINARY_DIR}/unittest/ DISPLAY=\"\" octave-cli")
+             set_tests_properties(test_OFDM_modem_esno_est_octave PROPERTIES PASS_REGULAR_EXPRESSION "AWGN Pass.*MPP Pass")
+
+    add_test(NAME test_OFDM_modem_esno_est_c
+             COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/octave;
+                            echo 'pkg load signal; esno_est; esno_est_tests_c' |
+                            PATH_TO_UNITEST=${CMAKE_CURRENT_BINARY_DIR}/unittest/ DISPLAY=\"\" octave-cli")
+             set_tests_properties(test_OFDM_modem_esno_est_c PROPERTIES PASS_REGULAR_EXPRESSION "AWGN Pass.*MPP Pass")
+
+
     #  ---------------------------------- Data Mode burst acquisition tests ----------------------------------
     
     add_test(NAME test_OFDM_modem_octave_burst_acq

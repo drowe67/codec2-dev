@@ -1751,53 +1751,42 @@ static void ofdm_demod_core(struct OFDM *ofdm, int *rx_bits) {
         ofdm->nin = 0;
     }
      
-    /*
-     * estimate signal and noise power, see ofdm_lib.m,
-     * cohpsk.m for more info
-     */
-    complex float *rx_np = ofdm->rx_np;
+    esno_est_calc(&ofdm->sig_var, &ofdm->noise_var, ofdm->rx_np, ofdm->rowsperframe * ofdm->nc);
+}
 
-    float sig_var = 0.0f;
 
-    /*
-     * sig_var gets a little large, so tamp it down
-     * each step
-     */
-    float step = (1.0f / (ofdm->rowsperframe * ofdm->nc));
+/*
+ * estimate signal and noise power, see esno_est.m for more info
+ */
+void esno_est_calc(float *sig_var, float *noise_var, complex float *rx_sym, int nsym) {
 
-    for (i = 0; i < (ofdm->rowsperframe * ofdm->nc); i++) {
-        sig_var += (cnormf(rx_np[i]) * step);
-    }
+    *sig_var = 0; 
+    float step = 1.0f/nsym;
+    for (int i = 0; i < nsym; i++)
+        *sig_var += (cnormf(rx_sym[i]) * step);
+    float sig_rms = sqrtf(*sig_var);
 
-    float sig_rms = sqrtf(sig_var);
+    float sum_x = 0.0f; float sum_xx = 0.0f; int n = 0;
+    for (int i = 0; i < nsym; i++) {
+        complex float s = rx_sym[i];
 
-    float sum_x = 0.0f;
-    float sum_xx = 0.0f;
-    int n = 0;
-
-    for (i = 0; i < (ofdm->rowsperframe * ofdm->nc); i++) {
-        complex float s = rx_np[i];
-
-        if (fabsf(crealf(s)) > sig_rms) {
-            sum_x += cimagf(s);
-            sum_xx += cimagf(s) * cimagf(s);
+        if (cabsf(s) > sig_rms) {
+            if (fabs(crealf(s)) > fabs(cimagf(s))) {
+                sum_x += cimagf(s);
+                sum_xx += cimagf(s) * cimagf(s);
+            } else {
+                sum_x += crealf(s);
+                sum_xx += crealf(s) * crealf(s);                
+            }
             n++;
         }
     }
 
-    /*
-     * with large interfering carriers this alg can break down - in
-     * that case set a benign value for noise_var that will produce a
-     * sensible (probably low) SNR est
-     */
-    float noise_var = 1.0f;
-
+    *noise_var = 1.0f;
     if (n > 1) {
-        noise_var = (n * sum_xx - sum_x * sum_x) / (n * (n - 1));
+        *noise_var = (n * sum_xx - sum_x * sum_x) / (n * (n - 1));
     }
-
-    ofdm->noise_var = 2.0f * noise_var;
-    ofdm->sig_var = sig_var;
+    *noise_var *= 2.0f;
 }
 
 

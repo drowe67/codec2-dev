@@ -132,6 +132,12 @@ function ofdm_rx(filename, mode="700D", varargin)
         Terrs += Nerrs;
         Tbits += Nbitsperpacket;
         packet_count++;
+        
+        EsNo_est = states.sig_var/states.noise_var;
+        EsNo_estdB = 10*log10(EsNo_est);
+        pilot_power = 10*log10((Ncp+M)/M);
+        SNR_estdB = EsNo_estdB + 10*log10(Nc*Rs/3000) + pilot_power;
+        printf("SNR: %4.2f\n", SNR_estdB);
       end
 
       % we are in sync so log states
