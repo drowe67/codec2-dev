@@ -7,17 +7,18 @@
 
 #{
   ----------------------------------------------------------------------------
-  Estimates of signal and noise power (see cohpsk.m for further
-  explanation).  Signal power is distance from axis on complex
+  Estimate the energy and noise of received symbols.
+  
+  Signal power is distance from axis on complex
   plane. Noise power is the distance orthogonal to each symbol, to provide an
   estimate that is insensitive to fading that moves symbol towards he origin.
   
-  For 700D using all symbols in frame worked better than just pilots, but for 
-  QAM we need to use pilots as they don't have modulation that affects estimate.
+  For QAM we need to use pilots as they don't have modulation that affects 
+  estimate, for QPSK Modes we can use all rx symbols.
   ----------------------------------------------------------------------------
 #}
 
-function [sig_var noise_var] = esno_est_calc(rx_syms)
+function EsNodB = esno_est_calc(rx_syms)
   sig_var = sum(abs(rx_syms) .^ 2)/length(rx_syms);
   sig_rms = sqrt(sig_var);
    
@@ -43,14 +44,19 @@ function [sig_var noise_var] = esno_est_calc(rx_syms)
     end
   end
 
-  noise_var = 0;
+  % trap corner case
   if n > 1
     noise_var = (n*sum_xx - sum_x*sum_x)/(n*(n-1));
+  else
+    noise_var = sig_var;
   end
 
   % Total noise power is twice estimate of single-axis noise.
   noise_var = 2*noise_var;
+  
+  EsNodB = 10*log10(sig_var/noise_var);  
 endfunction
+
 
 #{
   Plot curves of Es/No estimator in action.

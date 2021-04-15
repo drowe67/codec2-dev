@@ -134,11 +134,8 @@ function ofdm_rx(filename, mode="700D", varargin)
         packet_count++;
         
         % per-packet SNR estimate
-        [sig_var noise_var] = esno_est_calc(rx_syms);
-        EsNo_est = sig_var/noise_var;
-        EsNo_estdB = 10*log10(EsNo_est);
-        pilot_power = 10*log10((Ncp+M)/M);
-        SNR_estdB = EsNo_estdB + 10*log10(Nc*Rs/3000) + pilot_power;
+        EsNo_estdB = esno_est_calc(rx_syms);
+        SNR_estdB = snr_from_esno(states, EsNo_estdB);
         snr_log = [snr_log SNR_estdB];
       end
 

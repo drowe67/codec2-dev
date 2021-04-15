@@ -70,8 +70,7 @@ function ofdm_ldpc_rx(filename, mode="700D", varargin)
   % init logs and BER stats
 
   rx_bits = []; rx_np_log = []; timing_est_log = []; delta_t_log = []; foff_est_hz_log = [];
-  channel_est_pilot_log = [];
-  sig_var_log = []; noise_var_log = []; EsNo_log = []; mean_amp_log = [];
+  channel_est_pilot_log = []; snr_log = []; mean_amp_log = [];
   Terrs = Tbits = Terrs_coded = Tbits_coded = Perrs_coded = 0;
   Nerrs_coded_log = Nerrs_log = [];
   error_positions = [];
@@ -157,15 +156,16 @@ function ofdm_ldpc_rx(filename, mode="700D", varargin)
         rx_bits = rx_codeword(1:code_param.data_bits_per_frame);
         errors = xor(payload_bits, rx_bits);
         Nerrs_coded  = sum(errors);
-        EsNo_log = [EsNo_log EsNo];
-
-        % reset EsNo estimator for next packet
-        states.sum_sig_var = states.sum_noise_var = 0;
 
         if Nerrs_coded Perrs_coded++; end
         Terrs_coded += Nerrs_coded;
         Tbits_coded += code_param.data_bits_per_frame;
         Nerrs_coded_log = [Nerrs_coded_log Nerrs_coded];
+        
+        % per-packet SNR estimate
+        EsNo_estdB = esno_est_calc(rx_syms);
+        SNR_estdB = snr_from_esno(states, EsNo_estdB);
+        snr_log = [snr_log SNR_estdB];
       end
 
       % we are in sync so log modem states
@@ -175,8 +175,6 @@ function ofdm_ldpc_rx(filename, mode="700D", varargin)
       delta_t_log = [delta_t_log states.delta_t];
       foff_est_hz_log = [foff_est_hz_log states.foff_est_hz];
       channel_est_pilot_log = [channel_est_pilot_log; achannel_est_pilot_log];
-      sig_var_log = [sig_var_log states.sig_var];
-      noise_var_log = [noise_var_log states.noise_var];
       frame_count++;
     end
 
@@ -191,9 +189,9 @@ function ofdm_ldpc_rx(filename, mode="700D", varargin)
         end
         % complete logging line
         if (states.modem_frame == 0) && (strcmp(states.sync_state, "trial") == 0)
-            printf("euw: %3d %d mf: %2d pbw: %s foff: %4.1f eraw: %3d ecod: %3d iter: %3d pcc: %3d EsNo: %4.2f",
+            printf("euw: %3d %d mf: %2d pbw: %s foff: %4.1f eraw: %3d ecod: %3d iter: %3d pcc: %3d snr: %5.2f",
                     states.uw_errors, states.sync_counter, states.modem_frame, states.phase_est_bandwidth(1), states.foff_est_hz,
-                    Nerrs_raw, Nerrs_coded, iter, pcc, 10*log10(EsNo));
+                    Nerrs_raw, Nerrs_coded, iter, pcc, SNR_estdB);
         else
             printf("euw: %3d %d mf: %2d pbw: %s foff: %4.1f",
                     states.uw_errors, states.sync_counter, states.modem_frame, states.phase_est_bandwidth(1), states.foff_est_hz);        
@@ -215,7 +213,7 @@ function ofdm_ldpc_rx(filename, mode="700D", varargin)
   end
   Nframes = f;
   
-  printf("Raw BER..: %5.4f Tbits: %5d Terrs: %5d\n", Terrs/(Tbits+1E-12), Tbits, Terrs);
+  printf("Raw BER..: %5.4f Tbits: %5d Terrs: %5d SNR3k: %5.2f\n", Terrs/(Tbits+1E-12), Tbits, Terrs, mean(snr_log));
   printf("Coded BER: %5.4f Tbits: %5d Terrs: %5d\n", Terrs_coded/(Tbits_coded+1E-12), Tbits_coded, Terrs_coded);
   printf("Coded PER: %5.4f Pckts: %5d Perrs: %5d Npre: %d Npost: %d\n", 
          Perrs_coded/(packet_count+1E-12), packet_count, Perrs_coded,  states.npre, states.npost);
@@ -239,7 +237,7 @@ function ofdm_ldpc_rx(filename, mode="700D", varargin)
       axis([1 length(channel_est_pilot_log) min(amp_est(:)) max(amp_est(:))]);
 
       figure(4); clf;
-      subplot(211); plot(10*log10(EsNo_log+1E-12)); ylabel('EsNodB');
+      subplot(211); plot(snr_log); ylabel('SNR3kdB');
       subplot(212); plot(mean_amp_log); ylabel('mean amp');
 
       figure(5); clf;
@@ -271,13 +269,6 @@ function ofdm_ldpc_rx(filename, mode="700D", varargin)
       axis([1 length(Nerrs_coded_log) 0 Nbitsperpacket*0.2]);
     end
   end
-
-  figure(8); clf;
-  snr_estdB = 10*log10(sig_var_log) - 10*log10(noise_var_log+1E-12) + 10*log10(Nc*Rs/3000);
-  snr_smoothed_estdB = filter(0.1,[1 -0.9],snr_estdB);
-  plot(snr_smoothed_estdB);
-  title('Signal and Noise Power estimates');
-  ylabel('SNR (dB)')
 
   figure(9); clf; plot_specgram(rx);
 
