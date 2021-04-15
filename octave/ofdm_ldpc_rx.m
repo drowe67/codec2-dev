@@ -188,7 +188,7 @@ function ofdm_ldpc_rx(filename, mode="700D", varargin)
           if paritychecks(i) iter=i; end
         end
         % complete logging line
-        if (states.modem_frame == 0) && (strcmp(states.sync_state, "trial") == 0)
+        if (states.modem_frame == 0) && (strcmp(states.last_sync_state, "trial") == 0)
             printf("euw: %3d %d mf: %2d pbw: %s foff: %4.1f eraw: %3d ecod: %3d iter: %3d pcc: %3d snr: %5.2f",
                     states.uw_errors, states.sync_counter, states.modem_frame, states.phase_est_bandwidth(1), states.foff_est_hz,
                     Nerrs_raw, Nerrs_coded, iter, pcc, SNR_estdB);

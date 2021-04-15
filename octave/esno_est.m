@@ -89,8 +89,7 @@ function [EsNo_est rx_symbols] = esno_est_curves(EsNodB=0:20, channel="awgn", pl
         N = noise*noise';
         EsNo_meas(i) = 10*log10(S/N);
         rx_symbols = tx_symbols + noise;  
-        [sig_var noise_var] = esno_est_calc(rx_symbols);
-        EsNo_est(i) = 10*log10(sig_var/noise_var);
+        EsNo_est(i) = esno_est_calc(rx_symbols);
         printf("EsNo: %5.2f EsNo_meas: %5.2f EsNo_est: %5.2f\n", aEsNodB, EsNo_meas(i), EsNo_est(i));
     end
     if plot_en

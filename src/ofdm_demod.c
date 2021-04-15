@@ -305,7 +305,7 @@ int main(int argc, char *argv[]) {
     float phase_est_pilot_log[ofdm_rowsperframe * NFRAMES][ofdm_config->nc];
     COMP rx_np_log[ofdm_rowsperframe * ofdm_config->nc * NFRAMES];
     float rx_amp_log[ofdm_rowsperframe * ofdm_config->nc * NFRAMES];
-    float foff_hz_log[NFRAMES], snr_est_log[NFRAMES];
+    float foff_hz_log[NFRAMES];
     int timing_est_log[NFRAMES];
 
     /* zero out the log arrays in case we don't run for NFRAMES and fill them with data */
@@ -324,7 +324,6 @@ int main(int argc, char *argv[]) {
 
     for (i = 0; i < NFRAMES; i++) {
         foff_hz_log[i] = 0.0f;
-        snr_est_log[i] = 0.0f;
         timing_est_log[i] = 0.0f;
     }
 
@@ -392,14 +391,15 @@ int main(int argc, char *argv[]) {
     int Tper = 0;
     int iter = 0;
     int parityCheckCount = 0;
-
+    float SNR3kdB = 0.0;
+    float sum_SNR3kdB = 0.0;
+    
     if (strlen(ofdm->data_mode) == 0)
         Ndiscard = NDISCARD; /* backwards compatability with 700D/2020        */
     else
         Ndiscard = 1;        /* much longer packets, so discard thresh smaller */
 
     float EsNo = 3.0f;
-    float snr_est_smoothed_dB = 0.0f;
 
     if (verbose == 2)
         fprintf(stderr, "Warning EsNo: %f hard coded\n", EsNo);
@@ -457,10 +457,6 @@ int main(int argc, char *argv[]) {
             int st_uw = Nsymsperpacket - ofdm->nuwframes*Nsymsperframe;
             ofdm_extract_uw(ofdm, &rx_syms[st_uw], &rx_amps[st_uw], rx_uw);
 
-            /* SNR estimation and smoothing */
-            float snr_est_dB = 10.0f * log10f((ofdm->sig_var / ofdm->noise_var) * ofdm_config->nc * ofdm_config->rs / 3000.0f);
-            snr_est_smoothed_dB = 0.9f * snr_est_smoothed_dB + 0.1f * snr_est_dB;
-
             if (ofdm->modem_frame == (ofdm->np-1)) {
 
                 /* we have received enough frames to make a complete packet .... */
@@ -481,7 +477,7 @@ int main(int argc, char *argv[]) {
                     uint8_t out_char[Npayloadbitsperpacket];
 
                     if (testframes == true) {
-                        Terrs += count_uncoded_errors(&ldpc, ofdm_config, payload_syms_de,0);
+                        Nerrs_raw  = count_uncoded_errors(&ldpc, ofdm_config, payload_syms_de,0); Terrs += Nerrs_raw;
                         Tbits += Npayloadbitsperpacket; /* not counting errors in txt bits */
                     }
 
@@ -565,7 +561,10 @@ int main(int argc, char *argv[]) {
                     }
                 }
                 packet_count++;
-            }
+                
+                float EsNodB = ofdm_esno_est_calc(rx_syms, Npayloadsymsperpacket);
+                SNR3kdB = ofdm_snr_from_esno(ofdm, EsNodB); sum_SNR3kdB += SNR3kdB;
+            } /* complete packet */
 
             frame_count++;
         }
@@ -585,15 +584,15 @@ int main(int argc, char *argv[]) {
 
         if (verbose >= 2) {
            if (ofdm->last_sync_state != search) {
-                if ((ofdm->modem_frame == 0) && (ofdm->sync_state != trial)) {
+                if ((ofdm->modem_frame == 0) && (ofdm->last_sync_state != trial)) {
                     /* weve just received a complete packet, so print all stats */
-                    fprintf(stderr, "euw: %2d %1d mf: %2d f: %5.1f pbw: %d eraw: %3d ecdd: %3d iter: %3d pcc: %3d\n",
+                    fprintf(stderr, "euw: %2d %1d mf: %2d f: %5.1f pbw: %d eraw: %3d ecdd: %3d iter: %3d pcc: %3d snr: %5.2f\n",
                         ofdm->uw_errors,
                         ofdm->sync_counter,
                         ofdm->modem_frame,
                         ofdm->foff_est_hz,
                         ofdm->phase_est_bandwidth,
-                        Nerrs_raw, Nerrs_coded, iter, parityCheckCount);
+                        Nerrs_raw, Nerrs_coded, iter, parityCheckCount, SNR3kdB);
                 } else {
                     /* weve just received a modem frame, abbreviated stats */
                     fprintf(stderr, "euw: %2d %1d mf: %2d f: %5.1f pbw: %d\n",
@@ -633,9 +632,6 @@ int main(int argc, char *argv[]) {
 
             foff_hz_log[f] = ofdm->foff_est_hz;
             timing_est_log[f] = ofdm->timing_est + 1; /* offset by 1 to match Octave */
-
-            snr_est_log[f] = snr_est_smoothed_dB;
-
             if (log_payload_syms == true) {
                 for (i = 0; i < Npayloadsymsperpacket; i++) {
                     payload_syms_log[f][i].real = payload_syms[i].real;
@@ -682,7 +678,6 @@ int main(int argc, char *argv[]) {
         octave_save_float(foct, "rx_amp_log_c", (float*) rx_amp_log, 1, ofdm_rowsperframe * ofdm_config->nc*NFRAMES, ofdm_rowsperframe * ofdm_config->nc * NFRAMES);
         octave_save_float(foct, "foff_hz_log_c", foff_hz_log, NFRAMES, 1, 1);
         octave_save_int(foct, "timing_est_log_c", timing_est_log, NFRAMES, 1);
-        octave_save_float(foct, "snr_est_log_c", snr_est_log, NFRAMES, 1, 1);
         octave_save_complex(foct, "payload_syms_log_c", (COMP*) payload_syms_log, NFRAMES, Npayloadsymsperpacket, Npayloadsymsperpacket);
         octave_save_float(foct, "payload_amps_log_c", (float*) payload_amps_log, NFRAMES, Npayloadsymsperpacket, Npayloadsymsperpacket);
 
@@ -698,7 +693,8 @@ int main(int argc, char *argv[]) {
         float coded_ber = 0.0;
 
         if (verbose != 0) {
-            fprintf(stderr, "BER......: %5.4f Tbits: %5d Terrs: %5d Tpackets: %5d\n", uncoded_ber, Tbits, Terrs, packet_count);
+            fprintf(stderr, "BER......: %5.4f Tbits: %5d Terrs: %5d Tpackets: %5d SNR3kdB: %5.2f\n", 
+                uncoded_ber, Tbits, Terrs, packet_count, sum_SNR3kdB/packet_count);
 
             if ((ldpc_en == 0) && (packet_count > Ndiscard)) {
                 fprintf(stderr, "BER2.....: %5.4f Tbits: %5d Terrs: %5d\n", (float) Terrs2 / Tbits2, Tbits2, Terrs2);

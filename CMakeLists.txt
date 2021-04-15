@@ -569,7 +569,7 @@ endif()
     add_test(NAME test_OFDM_modem_datac1
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
                             ./ofdm_mod   --mode datac1 --in  /dev/zero --testframes 10 --verbose 1 |
-                            ./ofdm_demod --mode datac1 --out /dev/null --testframes   --verbose 1")
+                            ./ofdm_demod --mode datac1 --out /dev/null --testframes --verbose 1")
 
     # DATAC1 C Tx, C Rx, coded
     add_test(NAME test_OFDM_modem_datac1_ldpc

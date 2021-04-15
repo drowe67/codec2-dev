@@ -24,9 +24,8 @@ int main(int argc, char *argv[])
     assert(nread == nsym);
     fclose(fin);
     
-    float sig_var, noise_var;
-    esno_est_calc(&sig_var, &noise_var, rx_sym, nsym);
-    printf("%f\n",10.0*log10(sig_var/noise_var));
+    float EsNodB = ofdm_esno_est_calc(rx_sym, nsym);
+    printf("%f\n",EsNodB);
 
     return 0;
 }

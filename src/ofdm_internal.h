@@ -259,7 +259,8 @@ int ofdm_get_phase_est_bandwidth_mode(struct OFDM *);
 void ofdm_set_phase_est_bandwidth_mode(struct OFDM *, int);
 void ofdm_clip(complex float tx[], float clip_thresh, int n);
 void ofdm_hilbert_clipper(struct OFDM *ofdm, complex float *tx, size_t n);
-void esno_est_calc(float *sig_var, float *noise_var, complex float *rx_sym, int nsym);
+float ofdm_esno_est_calc(complex float *rx_sym, int nsym);
+float ofdm_snr_from_esno(struct OFDM *ofdm, float EsNodB);
 
 #ifdef __cplusplus
 }

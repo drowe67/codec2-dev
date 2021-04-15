@@ -1750,21 +1750,19 @@ static void ofdm_demod_core(struct OFDM *ofdm, int *rx_bits) {
         ofdm->rxbufst = rxbufst_next;
         ofdm->nin = 0;
     }
-     
-    esno_est_calc(&ofdm->sig_var, &ofdm->noise_var, ofdm->rx_np, ofdm->rowsperframe * ofdm->nc);
 }
 
 
 /*
- * estimate signal and noise power, see esno_est.m for more info
+ * Returns an estimate of Es/No in dB - see esno_est.m for more info
  */
-void esno_est_calc(float *sig_var, float *noise_var, complex float *rx_sym, int nsym) {
+float ofdm_esno_est_calc(complex float *rx_sym, int nsym) {
 
-    *sig_var = 0; 
+    float sig_var = 0; 
     float step = 1.0f/nsym;
     for (int i = 0; i < nsym; i++)
-        *sig_var += (cnormf(rx_sym[i]) * step);
-    float sig_rms = sqrtf(*sig_var);
+        sig_var += (cnormf(rx_sym[i]) * step);
+    float sig_rms = sqrtf(sig_var);
 
     float sum_x = 0.0f; float sum_xx = 0.0f; int n = 0;
     for (int i = 0; i < nsym; i++) {
@@ -1782,13 +1780,21 @@ void esno_est_calc(float *sig_var, float *noise_var, complex float *rx_sym, int 
         }
     }
 
-    *noise_var = 1.0f;
-    if (n > 1) {
-        *noise_var = (n * sum_xx - sum_x * sum_x) / (n * (n - 1));
-    }
-    *noise_var *= 2.0f;
+    float noise_var;
+    if (n > 1)
+        noise_var = (n * sum_xx - sum_x * sum_x) / (n * (n - 1));
+    else
+        noise_var = sig_var;
+    noise_var *= 2.0f;
+    
+    return 10.0*log10(sig_var/noise_var); 
 }
 
+
+float ofdm_snr_from_esno(struct OFDM *ofdm, float EsNodB) {
+    float cyclic_power = 10.0*log10((float)(ofdm->ncp+ofdm->m)/ofdm->m);
+    return EsNodB + 10.0*log10((float)(ofdm->nc*ofdm->rs)/3000.0) + cyclic_power;
+}
 
 /*
  * state machine for 700D/2020
