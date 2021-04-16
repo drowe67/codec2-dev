@@ -430,7 +430,7 @@ int freedv_comp_short_rx_ofdm(struct freedv *f, void *demod_in_8kHz, int demod_i
         }
         memcpy(&rx_syms[Nsymsperpacket-Nsymsperframe], ofdm->rx_np, sizeof(complex float)*Nsymsperframe);
         memcpy(&rx_amps[Nsymsperpacket-Nsymsperframe], ofdm->rx_amp, sizeof(float)*Nsymsperframe);
-
+        
         /* look for UW as frames enter packet buffer, note UW may span several modem frames */
         int st_uw = Nsymsperpacket - ofdm->nuwframes*Nsymsperframe;
         ofdm_extract_uw(ofdm, &rx_syms[st_uw], &rx_amps[st_uw], rx_uw);
@@ -440,7 +440,6 @@ int freedv_comp_short_rx_ofdm(struct freedv *f, void *demod_in_8kHz, int demod_i
 
         if (ofdm->modem_frame == (ofdm->np-1)) {
             /* we have received enough modem frames to complete packet and run LDPC decoder */
-
             ofdm_disassemble_qpsk_modem_packet(ofdm, rx_syms, rx_amps, payload_syms, payload_amps, txt_bits);
 
             COMP payload_syms_de[Npayloadsymsperpacket];
@@ -493,13 +492,15 @@ int freedv_comp_short_rx_ofdm(struct freedv *f, void *demod_in_8kHz, int demod_i
 
             /* decode txt bits (if used) */
             for(k=0; k<f->ofdm_ntxtbits; k++)  {
-                //fprintf(stderr, "txt_bits[%d] = %d\n", k, rx_bits[i]);
                 n_ascii = varicode_decode(&f->varicode_dec_states, &ascii_out, &txt_bits[k], 1, 1);
                 if (n_ascii && (f->freedv_put_next_rx_char != NULL)) {
                     (*f->freedv_put_next_rx_char)(f->callback_state, ascii_out);
                 }
             }
-        }
+
+            ofdm_get_demod_stats(ofdm, &f->stats, rx_syms, Nsymsperpacket);
+            f->snr_est = f->stats.snr_est;
+        }  /* complete packet */
 
         if ((ofdm->np == 1) && (ofdm->modem_frame == 0)) {
            /* add in UW bit errors, useful in non-testframe, 
@@ -512,9 +513,7 @@ int freedv_comp_short_rx_ofdm(struct freedv *f, void *demod_in_8kHz, int demod_i
             f->total_bits += f->ofdm_nuwbits;
         }
         
-        ofdm_get_demod_stats(f->ofdm, &f->stats, rx_syms, Nsymsperframe);
-        f->snr_est = f->stats.snr_est;
-    } /* complete packet */
+    } 
 
     /* iterate state machine and update nin for next call */
 

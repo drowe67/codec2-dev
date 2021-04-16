@@ -38,6 +38,8 @@
 #include  <signal.h>
 
 #include "freedv_api.h"
+#include "modem_stats.h"
+#include "octave.h"
 #include "fsk.h"
 
 /* other processes can end this program using signals */
@@ -57,13 +59,15 @@ int main(int argc, char *argv[]) {
     int                        verbose = 0, use_testframes = 0;
     int                        mask = 0;
     int                        framesperburst = 0;
-
+    FILE                      *foct = NULL;
+    
     if (argc < 3) {
     helpmsg:
       	fprintf(stderr, "\nusage: %s [options] FSK_LDPC|DATAC0|DATAC1|DATAC3 InputModemSpeechFile BinaryDataFile\n"
-               "  -v or --vv             verbose options\n"
-               "  --testframes           count raw and coded errors in testframes sent by tx\n"
-               "  --framesperburst  N    selects burst mode, N frames per burst (must match Tx)\n"
+               "  -v or --vv              verbose options\n"
+               "  --testframes            count raw and coded errors in testframes sent by tx\n"
+               "  --framesperburst  N     selects burst mode, N frames per burst (must match Tx)\n"
+               "  --scatter         file  write scatter diagram symbols to file (Octave text file format)\n"
                "\n"
                "For FSK_LDPC only:\n\n"
                "  -m      2|4     number of FSK tones\n"
@@ -87,12 +91,17 @@ int main(int argc, char *argv[]) {
             {"vvv",             no_argument,        0, 'y'},
             {"mask",            required_argument,  0, 'k'},
             {"framesperburst",  required_argument,  0, 's'},
+            {"scatter",         required_argument,  0, 'c'},
             {0, 0, 0, 0}
         };
 
         o = getopt_long(argc,argv,"f:hm:r:tvx",long_opts,&opt_idx);
 
         switch(o) {
+        case 'c':
+            foct = fopen(optarg,"wt");
+            assert(foct != NULL);
+            break;
         case 'f':
             adv.Fs = atoi(optarg);
             break;
@@ -204,6 +213,12 @@ int main(int argc, char *argv[]) {
             fwrite(bytes_out, sizeof(uint8_t), nbytes-2, fout);
             nbytes_out += nbytes-2;
             nframes_out++;
+            if (foct) {
+                struct MODEM_STATS stats;
+                freedv_get_modem_extended_stats(freedv, &stats);
+                char name[64]; sprintf(name, "rx_symbols_%d", nframes_out);
+                octave_save_complex(foct, name, (COMP*) stats.rx_symbols, stats.nr, stats.Nc, MODEM_STATS_NC_MAX+1);
+            }
         }
         
 	    /* if using pipes we probably don't want the usual buffering */
@@ -237,5 +252,6 @@ int main(int argc, char *argv[]) {
     }
 
     freedv_close(freedv);
+    if (foct) fclose(foct);
     return 0;
 }

@@ -305,7 +305,7 @@ target_link_libraries(freedv_rx ${CMAKE_REQUIRED_LIBRARIES} codec2)
 add_executable(freedv_data_raw_tx freedv_data_raw_tx.c)
 target_link_libraries(freedv_data_raw_tx ${CMAKE_REQUIRED_LIBRARIES} codec2)
 
-add_executable(freedv_data_raw_rx freedv_data_raw_rx.c)
+add_executable(freedv_data_raw_rx freedv_data_raw_rx.c octave.c)
 target_link_libraries(freedv_data_raw_rx ${CMAKE_REQUIRED_LIBRARIES} codec2)
 
 add_executable(freedv_data_tx freedv_data_tx.c)

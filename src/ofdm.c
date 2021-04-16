@@ -2151,15 +2151,14 @@ void ofdm_get_demod_stats(struct OFDM *ofdm, struct MODEM_STATS *stats, complex 
 
     stats->sync_metric = ofdm->timing_mx;
 
-    // note scatter plot points are just last modem frame, so a sub-sample in Np>1
 #ifndef __EMBEDDED__
-    assert(ofdm->rowsperframe < MODEM_STATS_NR_MAX);
-    stats->nr = ofdm->rowsperframe;
-
+    assert(Nsymsperpacket % ofdm->nc == 0);
+    int Nrowsperpacket = Nsymsperpacket/ofdm->nc;
+    assert(Nrowsperpacket <= MODEM_STATS_NR_MAX);
+    stats->nr = Nrowsperpacket;
     for (int c = 0; c < ofdm->nc; c++) {
-        for (int r = 0; r < ofdm->rowsperframe; r++) {
-            complex float rot = ofdm->rx_np[r * c] * cmplx(ROT45);
-
+        for (int r = 0; r < Nrowsperpacket; r++) {
+            complex float rot = rx_syms[r * ofdm->nc + c] * cmplx(ROT45);
             stats->rx_symbols[r][c].real = crealf(rot);
             stats->rx_symbols[r][c].imag = cimagf(rot);
         }

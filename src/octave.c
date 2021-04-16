@@ -127,7 +127,6 @@ void octave_save_complex(FILE *f, char name[], COMP data[], int rows, int cols, 
     char buffer[OCTAVE_BUFSIZE];
     size_t buf_idx = 0;
 
-
     printf_header(f, buffer, OCTAVE_BUFSIZE, &buf_idx, name, "complex matrix", rows, cols, 1);
 
     for(r=0; r<rows; r++) {
