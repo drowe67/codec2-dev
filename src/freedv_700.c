@@ -520,9 +520,13 @@ int freedv_comp_short_rx_ofdm(struct freedv *f, void *demod_in_8kHz, int demod_i
     f->nin = ofdm_get_nin(ofdm);
     ofdm_sync_state_machine(ofdm, rx_uw);
 
-    if (f->verbose >= 2) {
-        if ((rx_status & FREEDV_RX_BITS) || (rx_status &  FREEDV_RX_BIT_ERRORS)) {
-            fprintf(stderr, "%3d nin: %4d st: %-6s euw: %2d %2d mf: %2d f: %5.1f pbw: %d snr: %4.1f eraw: %3d ecdd: %3d iter: %3d "
+    int print_full = 0; int print_truncated = 0;
+    if (f->verbose && ((rx_status & FREEDV_RX_BITS) || (rx_status &  FREEDV_RX_BIT_ERRORS)))
+        print_full = 1;
+    if ((f->verbose == 2) && !((rx_status & FREEDV_RX_BITS) || (rx_status &  FREEDV_RX_BIT_ERRORS)))
+        print_truncated = 1;
+    if (print_full) { 
+        fprintf(stderr, "%3d nin: %4d st: %-6s euw: %2d %2d mf: %2d f: %5.1f pbw: %d snr: %4.1f eraw: %4d ecdd: %4d iter: %3d "
                 "pcc: %3d rxst: %s\n",
                 f->frames++, ofdm->nin,
                 ofdm_statemode[ofdm->last_sync_state],
@@ -531,8 +535,8 @@ int freedv_comp_short_rx_ofdm(struct freedv *f, void *demod_in_8kHz, int demod_i
                 ofdm->modem_frame,
 	 	            (double)ofdm->foff_est_hz, ofdm->phase_est_bandwidth,
                 f->snr_est, Nerrs_raw, Nerrs_coded, iter, parityCheckCount, rx_sync_flags_to_text[rx_status]);
-        }
-        else {
+    }
+    if (print_truncated) { 
             fprintf(stderr, "%3d nin: %4d st: %-6s euw: %2d %2d mf: %2d f: %5.1f pbw: %d                                        "
                 "         rxst: %s\n",
                 f->frames++, ofdm->nin,
@@ -542,7 +546,6 @@ int freedv_comp_short_rx_ofdm(struct freedv *f, void *demod_in_8kHz, int demod_i
                 ofdm->modem_frame,
 	 	            (double)ofdm->foff_est_hz, ofdm->phase_est_bandwidth,
                 rx_sync_flags_to_text[rx_status]);
-        }
     }
 
     return rx_status;
