@@ -1881,7 +1881,7 @@ endfunction
 
 %  helper function that adds channel simulation and ensures we don't clip int output samples  
 function [rx_real rx] = ofdm_channel(states, tx, SNR3kdB, channel, freq_offset_Hz)
-  [rx_real rx sigma] = channel_simulate(states.Fs, SNR3kdB, freq_offset_Hz, channel, tx);
+  [rx_real rx sigma] = channel_simulate(states.Fs, SNR3kdB, freq_offset_Hz, channel, tx, states.verbose);
     
   % add a few seconds of no signal either side
   rx_real = [sigma*randn(1,states.Fs) rx_real sigma*randn(1,states.Fs/2)];

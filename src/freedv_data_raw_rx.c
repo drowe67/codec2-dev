@@ -31,11 +31,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <stdint.h>
 #include <getopt.h>
-#include  <signal.h>
+#include <signal.h>
 
 #include "freedv_api.h"
 #include "modem_stats.h"

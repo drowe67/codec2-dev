@@ -89,13 +89,14 @@
 
 struct CODEC2;
 
-struct CODEC2 *  codec2_create(int mode);
+struct CODEC2 *codec2_create(int mode);
 void codec2_destroy(struct CODEC2 *codec2_state);
-void codec2_encode(struct CODEC2 *codec2_state, unsigned char * bits, short speech_in[]);
-void codec2_decode(struct CODEC2 *codec2_state, short speech_out[], const unsigned char *bits);
-void codec2_decode_ber(struct CODEC2 *codec2_state, short speech_out[], const unsigned char *bits, float ber_est);
+void codec2_encode(struct CODEC2 *codec2_state, unsigned char bytes[], short speech_in[]);
+void codec2_decode(struct CODEC2 *codec2_state, short speech_out[], const unsigned char bytes[]);
+void codec2_decode_ber(struct CODEC2 *codec2_state, short speech_out[], const unsigned char *bytes, float ber_est);
 int  codec2_samples_per_frame(struct CODEC2 *codec2_state);
 int  codec2_bits_per_frame(struct CODEC2 *codec2_state);
+int  codec2_bytes_per_frame(struct CODEC2 *codec2_state);
 
 void codec2_set_lpc_post_filter(struct CODEC2 *codec2_state, int enable, int bass_boost, float beta, float gamma);
 int  codec2_get_spare_bit_index(struct CODEC2 *codec2_state);

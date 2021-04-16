@@ -1,6 +1,6 @@
 # FreeDV Technology
 
-FreeDV is an open source digital voice protocol that integrates modems, codecs, and FEC.
+FreeDV is an open source digital voice protocol that integrates modems, speech codecs, and FEC.
 
 On transmit, FreeDV converts speech to a modem signal you can send over a radio channel.  On receive, FreeDV takes off air modem signals and converts them to speech samples.
 
@@ -82,7 +82,13 @@ The FSK_LDPC mode is used for data, and has user defined bit rate and a variety 
 
 ## FreeDV API
 
-See [freedv_api.h](src/freedv_api.h) and [freedv_api.c](src/freedv_api.c), and the command line demo programs [freedv_tx.c](src/freedv_tx.c) & [freedv_rx.c](src/freedv_rx.c).  Quickstart demo using FreeDV 1600:
+The `codec2/demo` directory provides simple FreeDV API demo programs written in C and Python to help you get started, for example:
+```
+cd codec2/build_linux
+cat ../raw/ve9qrp_10s.raw | ./demo/freedv_700d_tx | ./demo/freedv_700d_rx | aplay -f S16_LE
+```
+
+See also [freedv_api.h](src/freedv_api.h) and [freedv_api.c](src/freedv_api.c), and the full featured command line demo programs [freedv_tx.c](src/freedv_tx.c) & [freedv_rx.c](src/freedv_rx.c):
 ```
 $ ./freedv_tx 1600 ../../raw/hts1.raw - | ./freedv_rx 1600 - - | aplay -f S16_LE
 $ cat freedv_rx_log.txt

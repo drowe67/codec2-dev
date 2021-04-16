@@ -43,9 +43,9 @@ end
 fclose(frx);
 
 printf("\nRunning C version....\n");
-path_to_unittest = "../build_linux/unittest"
-if getenv("PATH_TO_UNITEST")
-  path_to_unittest_exe = getenv("PATH_TO_UNITTEST")
+path_to_unittest = "../build_linux/unittest";
+if getenv("PATH_TO_UNITTEST")
+  path_to_unittest = getenv("PATH_TO_UNITTEST")
   printf("setting path from env var to %s\n", path_to_unittest);
 end
 system(sprintf("%s/tofdm_acq %s", path_to_unittest, filename));
