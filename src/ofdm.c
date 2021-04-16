@@ -512,7 +512,6 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
 
     ofdm->timing_norm = ofdm->samplespersymbol * acc;
     ofdm->clock_offset_counter = 0;
-    ofdm->sig_var = ofdm->noise_var = 1.0f;
     ofdm->dpsk_en = false;
 
     if (strlen(ofdm->data_mode)) {
@@ -1750,56 +1749,51 @@ static void ofdm_demod_core(struct OFDM *ofdm, int *rx_bits) {
         ofdm->rxbufst = rxbufst_next;
         ofdm->nin = 0;
     }
-     
-    /*
-     * estimate signal and noise power, see ofdm_lib.m,
-     * cohpsk.m for more info
-     */
-    complex float *rx_np = ofdm->rx_np;
+}
 
-    float sig_var = 0.0f;
 
-    /*
-     * sig_var gets a little large, so tamp it down
-     * each step
-     */
-    float step = (1.0f / (ofdm->rowsperframe * ofdm->nc));
+/*
+ * Returns an estimate of Es/No in dB - see esno_est.m for more info
+ */
+float ofdm_esno_est_calc(complex float *rx_sym, int nsym) {
 
-    for (i = 0; i < (ofdm->rowsperframe * ofdm->nc); i++) {
-        sig_var += (cnormf(rx_np[i]) * step);
-    }
-
+    float sig_var = 0; 
+    float step = 1.0f/nsym;
+    for (int i = 0; i < nsym; i++)
+        sig_var += (cnormf(rx_sym[i]) * step);
     float sig_rms = sqrtf(sig_var);
 
-    float sum_x = 0.0f;
-    float sum_xx = 0.0f;
-    int n = 0;
+    float sum_x = 0.0f; float sum_xx = 0.0f; int n = 0;
+    for (int i = 0; i < nsym; i++) {
+        complex float s = rx_sym[i];
 
-    for (i = 0; i < (ofdm->rowsperframe * ofdm->nc); i++) {
-        complex float s = rx_np[i];
-
-        if (fabsf(crealf(s)) > sig_rms) {
-            sum_x += cimagf(s);
-            sum_xx += cimagf(s) * cimagf(s);
+        if (cabsf(s) > sig_rms) {
+            if (fabs(crealf(s)) > fabs(cimagf(s))) {
+                sum_x += cimagf(s);
+                sum_xx += cimagf(s) * cimagf(s);
+            } else {
+                sum_x += crealf(s);
+                sum_xx += crealf(s) * crealf(s);                
+            }
             n++;
         }
     }
 
-    /*
-     * with large interfering carriers this alg can break down - in
-     * that case set a benign value for noise_var that will produce a
-     * sensible (probably low) SNR est
-     */
-    float noise_var = 1.0f;
-
-    if (n > 1) {
+    float noise_var;
+    if (n > 1)
         noise_var = (n * sum_xx - sum_x * sum_x) / (n * (n - 1));
-    }
-
-    ofdm->noise_var = 2.0f * noise_var;
-    ofdm->sig_var = sig_var;
+    else
+        noise_var = sig_var;
+    noise_var *= 2.0f;
+    
+    return 10.0*log10(sig_var/noise_var); 
 }
 
+
+float ofdm_snr_from_esno(struct OFDM *ofdm, float EsNodB) {
+    float cyclic_power = 10.0*log10((float)(ofdm->ncp+ofdm->m)/ofdm->m);
+    return EsNodB + 10.0*log10((float)(ofdm->nc*ofdm->rs)/3000.0) + cyclic_power;
+}
 
 /*
  * state machine for 700D/2020
@@ -2123,29 +2117,34 @@ void ofdm_set_sync(struct OFDM *ofdm, int sync_cmd) {
   AUTHOR......: David Rowe
   DATE CREATED: May 2018
 
-  Fills stats structure with a bunch of demod information.
+  Fills stats structure with a bunch of demod information. Call once per
+  packet.
 
 \*---------------------------------------------------------------------------*/
 
-void ofdm_get_demod_stats(struct OFDM *ofdm, struct MODEM_STATS *stats) {
+void ofdm_get_demod_stats(struct OFDM *ofdm, struct MODEM_STATS *stats, complex float *rx_syms, int Nsymsperpacket) {
     stats->Nc = ofdm->nc;
     assert(stats->Nc <= MODEM_STATS_NC_MAX);
 
-    float snr_est = 10.0f * log10f((0.1f + (ofdm->sig_var / ofdm->noise_var)) *
-            ofdm->nc * ofdm->rs / 3000.0f);
-    float total = ofdm->frame_count * ofdm->samplesperframe;
-
-    /* fast attack, slow decay */
-    if (snr_est > stats->snr_est)
-        stats->snr_est = snr_est;
-    else
-        stats->snr_est = 0.9f * stats->snr_est + 0.1f * snr_est;
-
+    float EsNodB = ofdm_esno_est_calc(rx_syms, Nsymsperpacket);
+    float SNR3kdB = ofdm_snr_from_esno(ofdm, EsNodB);
+    
+    if (strlen(ofdm->data_mode))
+        /* no smoothing as we have a large number of symbols per packet */
+        stats->snr_est = SNR3kdB;
+    else {        
+        /* in voice modes we furrther smloth SNR est, fast attack, slow decay */
+        if (SNR3kdB > stats->snr_est)
+            stats->snr_est = SNR3kdB;
+        else
+            stats->snr_est = 0.9f * stats->snr_est + 0.1f * SNR3kdB;
+    }
     stats->sync = ((ofdm->sync_state == synced) || (ofdm->sync_state == trial));
     stats->foff = ofdm->foff_est_hz;
     stats->rx_timing = ofdm->timing_est;
-    stats->clock_offset = 0;
 
+    float total = ofdm->frame_count * ofdm->samplesperframe;
+    stats->clock_offset = 0;
     if (total != 0.0f) {
         stats->clock_offset = ofdm->clock_offset_counter / total;
     }
@@ -2153,13 +2152,13 @@ void ofdm_get_demod_stats(struct OFDM *ofdm, struct MODEM_STATS *stats) {
     stats->sync_metric = ofdm->timing_mx;
 
 #ifndef __EMBEDDED__
-    assert(ofdm->rowsperframe < MODEM_STATS_NR_MAX);
-    stats->nr = ofdm->rowsperframe;
-
+    assert(Nsymsperpacket % ofdm->nc == 0);
+    int Nrowsperpacket = Nsymsperpacket/ofdm->nc;
+    assert(Nrowsperpacket <= MODEM_STATS_NR_MAX);
+    stats->nr = Nrowsperpacket;
     for (int c = 0; c < ofdm->nc; c++) {
-        for (int r = 0; r < ofdm->rowsperframe; r++) {
-            complex float rot = ofdm->rx_np[r * c] * cmplx(ROT45);
-
+        for (int r = 0; r < Nrowsperpacket; r++) {
+            complex float rot = rx_syms[r * ofdm->nc + c] * cmplx(ROT45);
             stats->rx_symbols[r][c].real = crealf(rot);
             stats->rx_symbols[r][c].imag = cimagf(rot);
         }
@@ -2382,8 +2381,6 @@ void ofdm_print_info(struct OFDM *ofdm) {
     fprintf(stderr, "ofdm->timing_mx = %g\n", (double)ofdm->timing_mx);
     fprintf(stderr, "ofdm->coarse_foff_est_hz = %g\n", (double)ofdm->coarse_foff_est_hz);
     fprintf(stderr, "ofdm->timing_norm = %g\n", (double)ofdm->timing_norm);
-    fprintf(stderr, "ofdm->sig_var = %g\n", (double)ofdm->sig_var);
-    fprintf(stderr, "ofdm->noise_var = %g\n", (double)ofdm->noise_var);
     fprintf(stderr, "ofdm->mean_amp = %g\n", (double)ofdm->mean_amp);
     fprintf(stderr, "ofdm->clock_offset_counter = %d\n", ofdm->clock_offset_counter);
     fprintf(stderr, "ofdm->verbose = %d\n", ofdm->verbose);

@@ -266,9 +266,6 @@ export(TARGETS codec2
     FILE ${CMAKE_BINARY_DIR}/codec2.cmake
 )
 
-add_executable(c2demo c2demo.c)
-target_link_libraries(c2demo ${CMAKE_REQUIRED_LIBRARIES} codec2)
-
 add_executable(c2enc c2enc.c)
 target_link_libraries(c2enc ${CMAKE_REQUIRED_LIBRARIES} codec2)
 
@@ -305,7 +302,7 @@ target_link_libraries(freedv_rx ${CMAKE_REQUIRED_LIBRARIES} codec2)
 add_executable(freedv_data_raw_tx freedv_data_raw_tx.c)
 target_link_libraries(freedv_data_raw_tx ${CMAKE_REQUIRED_LIBRARIES} codec2)
 
-add_executable(freedv_data_raw_rx freedv_data_raw_rx.c)
+add_executable(freedv_data_raw_rx freedv_data_raw_rx.c octave.c)
 target_link_libraries(freedv_data_raw_rx ${CMAKE_REQUIRED_LIBRARIES} codec2)
 
 add_executable(freedv_data_tx freedv_data_tx.c)

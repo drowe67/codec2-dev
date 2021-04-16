@@ -71,6 +71,7 @@ int main(int argc, char *argv[]) {
                "  --clip            0|1       clipping for reduced PAPR\n"
                "  --txbpf           0|1       bandpass filter\n"
                "  --seq                       send packet sequence numbers (breaks testframe BER counting)\n"
+               "  --quiet\n"
                "\n"
                "For FSK_LDPC only:\n\n"
                "  -a      amp     maximum amplitude of FSK signal\n"
@@ -88,6 +89,7 @@ int main(int argc, char *argv[]) {
     use_clip = 0; use_txbpf = 0; testframes = 0; use_complex = 0; 
     int framesperburst = 1;
     int burst_mode = 0;
+    int quiet = 0;
     
     int o = 0;
     int opt_idx = 0;
@@ -105,11 +107,13 @@ int main(int argc, char *argv[]) {
             {"framesperburst", required_argument,  0, 'g'},
             {"delay",          required_argument,  0, 'j'},
             {"postdelay",      required_argument,  0, 'k'},
-            {"seq",            no_argument,        0, 'q'},
+            {"seq",            no_argument,        0, 'd'},
+            {"amp",            required_argument,  0, 'a'},
+            {"quiet",          no_argument,        0, 'q'},
             {0, 0, 0, 0}
         };
 
-        o = getopt_long(argc,argv,"a:ct:hb:l:e:f:g:r:1:s:m:q",long_opts,&opt_idx);
+        o = getopt_long(argc,argv,"a:cdt:hb:l:e:f:g:r:1:s:m:q",long_opts,&opt_idx);
 
         switch(o) {
         case 'a':
@@ -121,6 +125,9 @@ int main(int argc, char *argv[]) {
         case 'c':
             use_complex = 1;
             shorts_per_sample = 2;
+            break;
+        case 'd':
+            sequence_numbers = 1;
             break;
         case 'e':
             burst_mode = 1;
@@ -145,6 +152,9 @@ int main(int argc, char *argv[]) {
         case 'm':
             adv.M = atoi(optarg);
             break;
+        case 'q':
+            quiet = 1;
+            break;
         case 'f':
             adv.Fs = atoi(optarg);
             break;
@@ -156,9 +166,6 @@ int main(int argc, char *argv[]) {
             break;
         case 's':
             adv.tone_spacing = atoi(optarg);
-            break;
-        case 'q':
-            sequence_numbers = 1;
             break;
         case 'h':
         case '?':
@@ -211,14 +218,14 @@ int main(int argc, char *argv[]) {
     int bytes_per_modem_frame = freedv_get_bits_per_modem_frame(freedv)/8;
     int payload_bytes_per_modem_frame = bytes_per_modem_frame;
     payload_bytes_per_modem_frame -= 2; /* 16 bits used for the CRC */
-    fprintf(stderr, "payload bytes_per_modem_frame: %d ", payload_bytes_per_modem_frame);
+    if (!quiet) fprintf(stderr, "payload bytes_per_modem_frame: %d ", payload_bytes_per_modem_frame);
     assert((freedv_get_bits_per_modem_frame(freedv) % 8) == 0);
     int     n_mod_out = freedv_get_n_tx_modem_samples(freedv);
     uint8_t bytes_in[bytes_per_modem_frame];
 
     if (mode == FREEDV_MODE_FSK_LDPC) {
-        fprintf(stderr, "Frequency: Fs: %4.1f kHz Rs: %4.1f kHz Tone1: %4.1f kHz Shift: %4.1f kHz M: %d \n",
-                (float)adv.Fs/1E3, (float)adv.Rs/1E3, (float)adv.first_tone/1E3, (float)adv.tone_spacing/1E3, adv.M);
+        if (!quiet) fprintf(stderr, "Frequency: Fs: %4.1f kHz Rs: %4.1f kHz Tone1: %4.1f kHz Shift: %4.1f kHz M: %d \n",
+                        (float)adv.Fs/1E3, (float)adv.Rs/1E3, (float)adv.first_tone/1E3, (float)adv.tone_spacing/1E3, adv.M);
 
         if (adv.tone_spacing < adv.Rs) {
             fprintf(stderr, "Need shift: %d > Rs: %d\n", adv.tone_spacing, adv.Rs);
@@ -242,7 +249,7 @@ int main(int argc, char *argv[]) {
         ofdm_generate_payload_data_bits(testframe_bits, bits_per_frame);
         freedv_pack(testframe_bytes, testframe_bits, bits_per_frame);
     }
-    fprintf(stderr, "\n");
+    if (!quiet) fprintf(stderr, "\n");
 
     short mod_out_short[2*n_mod_out];
     COMP  mod_out_comp[n_mod_out];
@@ -331,7 +338,7 @@ int main(int argc, char *argv[]) {
 
     if (postdelay_ms) {
         int samples_delay = FREEDV_FS_8000*postdelay_ms/1000;
-        fprintf(stderr, "postdelay: %d %d\n", postdelay_ms, samples_delay);
+        if (!quiet) fprintf(stderr, "postdelay: %d %d\n", postdelay_ms, samples_delay);
         short sil_short[shorts_per_sample*samples_delay];
         for(int i=0; i<shorts_per_sample*samples_delay; i++) sil_short[i] = 0;
         fwrite(sil_short, sizeof(short), shorts_per_sample*samples_delay, fout);
@@ -341,7 +348,7 @@ int main(int argc, char *argv[]) {
     /* SNR offset to use in channel simulator to account for on/off time of burst signal */
     float mark_space_ratio = (float)on_samples/(on_samples+off_samples);
     float mark_space_SNR_offset = 10*log10(mark_space_ratio);
-    fprintf(stderr, "marks:space: %3.2f SNR offset: %5.2f\n", mark_space_ratio, mark_space_SNR_offset);
+    if (!quiet) fprintf(stderr, "marks:space: %3.2f SNR offset: %5.2f\n", mark_space_ratio, mark_space_SNR_offset);
     
     freedv_close(freedv);
     fclose(fin);

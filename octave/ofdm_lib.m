@@ -7,6 +7,7 @@
 
 1;
 qam16;
+esno_est;
 
 %-------------------------------------------------------------
 % ofdm_init
@@ -264,10 +265,6 @@ function states = ofdm_init(config)
   % Es/No (SNR) est states
 
   states.EsNo_est_all_symbols = EsNo_est_all_symbols;
-  states.noise_var = 0;
-  states.sig_var = 0;
-  states.sum_sig_var = 0;
-  states.sum_noise_var = 0;
   states.clock_offset_est = 0;
 
   % pre-amble for data modes
@@ -1083,19 +1080,6 @@ function [states rx_bits achannel_est_rect_log rx_np rx_amp] = ofdm_demod(states
      nin = 0;
   end
       
-  % Estimate signal and noise power to estimate EsNo.  This is used for SNR estimation and (possible) LDPC decoding
-  if states.EsNo_est_all_symbols
-    [sig_var noise_var] = est_signal_and_noise_var(rx_np);
-  else
-    % For QAM we just use this frame's pilots, as these have no amplitude modulation on them
-    [sig_var noise_var] = est_signal_and_noise_var(rx_sym(2,:).*exp(-j*aphase_est_pilot));
-  end
-
-  states.noise_var = noise_var;
-  states.sig_var = sig_var;
-  states.sum_noise_var += noise_var;
-  states.sum_sig_var += sig_var;
-
   % maintain mean amp estimate for LDPC decoder
   states.mean_amp = 0.9*states.mean_amp + 0.1*mean(rx_amp);
 
@@ -1113,44 +1097,16 @@ function [states rx_bits achannel_est_rect_log rx_np rx_amp] = ofdm_demod(states
 endfunction
 
 
-#{
-  ----------------------------------------------------------------------------
-  Estimates of signal and noise power (see cohpsk.m for further
-  explanation).  Signal power is distance from axis on complex
-  plane. We just measure noise power on imag axis, as it isn't
-  affected by fading.  For 700D using all symbols in frame worked
-  better than just pilots, but for QAM we need to use pilots as they
-  don't have modulation that affects estimate.
-  ----------------------------------------------------------------------------
-#}
+function SNR3kdB = snr_from_esno(states, EsNodB)
+    ofdm_load_const;
 
-function [sig_var noise_var] = est_signal_and_noise_var(rx_syms)
-  sig_var = sum(abs(rx_syms) .^ 2)/length(rx_syms);
-  sig_rms = sqrt(sig_var);
-
-  sum_x = 0;
-  sum_xx = 0;
-  n = 0;
-  for i=1:length(rx_syms)
-    s = rx_syms(i);
-    if abs(real(s)) > sig_rms
-      % select two constellation points on real axis
-      sum_x  += imag(s);
-      sum_xx += imag(s)*imag(s);
-      n++;
-    end
-  end
-
-  noise_var = 0;
-  if n > 1
-    noise_var = (n*sum_xx - sum_x*sum_x)/(n*(n-1));
-  end
-
-  % Total noise power is twice estimate of imaginary-axis noise.  This
-  % effectively gives us the an estimate of Es/No
-  noise_var = 2*noise_var;
+    % We integrate over M samples to get the received symbols.  Additional signal power
+    % is used for the cyclic prefix samples.
+    cyclic_power = 10*log10((Ncp+M)/M);
+    % Es is the energy for each symbol.  To get signal power lets
+    % multiply by symbols/second, and calculate noise power in 3000 Hz.
+    SNR3kdB = EsNodB + 10*log10(Nc*Rs/3000) + cyclic_power;
 endfunction
-
 
 % ----------------------------------------------------------------------------------
 % assemble_modem_packet - assemble modem packet from UW, payload, and txt bits
@@ -1529,7 +1485,6 @@ function states = sync_state_machine_data_streaming(states, rx_uw)
       next_state = "synced";
       states.packet_count = 0;
       states.modem_frame = Nuwframes;
-      states.sum_sig_var = states.sum_noise_var = 0;
     else
       states.sync_counter++;
       if states.sync_counter > Np
@@ -1587,7 +1542,6 @@ function states = sync_state_machine_data_burst(states, rx_uw)
         next_state = "synced";
         states.packet_count = 0;                          % number of packets in this burst
         states.modem_frame = Nuwframes;                   % which modem frame we are up to in packet
-        states.sum_sig_var = states.sum_noise_var = 0;
       else
         next_state = "search";
         % reset rxbuf to make sure we only ever do a postamble loop once through same samples
@@ -1927,7 +1881,7 @@ endfunction
 
 %  helper function that adds channel simulation and ensures we don't clip int output samples  
 function [rx_real rx] = ofdm_channel(states, tx, SNR3kdB, channel, freq_offset_Hz)
-  [rx_real rx sigma] = channel_simulate(states.Fs, SNR3kdB, freq_offset_Hz, channel, tx);
+  [rx_real rx sigma] = channel_simulate(states.Fs, SNR3kdB, freq_offset_Hz, channel, tx, states.verbose);
     
   % add a few seconds of no signal either side
   rx_real = [sigma*randn(1,states.Fs) rx_real sigma*randn(1,states.Fs/2)];

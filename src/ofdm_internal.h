@@ -208,8 +208,6 @@ struct OFDM {
     float timing_mx;
     float coarse_foff_est_hz;
     float timing_norm;
-    float sig_var;
-    float noise_var;
     float mean_amp;
 
     // Integer
@@ -259,6 +257,9 @@ int ofdm_get_phase_est_bandwidth_mode(struct OFDM *);
 void ofdm_set_phase_est_bandwidth_mode(struct OFDM *, int);
 void ofdm_clip(complex float tx[], float clip_thresh, int n);
 void ofdm_hilbert_clipper(struct OFDM *ofdm, complex float *tx, size_t n);
+float ofdm_esno_est_calc(complex float *rx_sym, int nsym);
+float ofdm_snr_from_esno(struct OFDM *ofdm, float EsNodB);
+void ofdm_get_demod_stats(struct OFDM *ofdm, struct MODEM_STATS *stats, complex float *rx_syms, int Nsymsperpacket);
 
 #ifdef __cplusplus
 }

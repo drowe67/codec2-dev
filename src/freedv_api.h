@@ -54,7 +54,6 @@
 // available data modes
 #define FREEDV_MODE_FSK_LDPC    9
 #define FREEDV_MODE_DATAC1     10
-#define FREEDV_MODE_DATAC2     11
 #define FREEDV_MODE_DATAC3     12
 #define FREEDV_MODE_DATAC0     14
 
@@ -121,9 +120,6 @@
 #endif
 #if !defined(FREEDV_MODE_DATAC1_EN)
         #define FREEDV_MODE_DATAC1_EN FREEDV_MODE_EN_DEFAULT
-#endif
-#if !defined(FREEDV_MODE_DATAC2_EN)
-        #define FREEDV_MODE_DATAC2_EN FREEDV_MODE_EN_DEFAULT
 #endif
 #if !defined(FREEDV_MODE_DATAC3_EN)
         #define FREEDV_MODE_DATAC3_EN FREEDV_MODE_EN_DEFAULT

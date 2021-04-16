@@ -253,8 +253,8 @@ int main(int argc, char *argv[])
     float symbol_likelihood_log[ (CODED_BITSPERFRAME/ofdm_bps) * (1<<ofdm_bps) * NFRAMES];
     float bit_likelihood_log[CODED_BITSPERFRAME * NFRAMES];
     int detected_data_log[CODED_BITSPERFRAME * NFRAMES];
-    float sig_var_log[NFRAMES], noise_var_log[NFRAMES];
     float mean_amp_log[NFRAMES];
+    float snr_log[NFRAMES];
 
     FILE *fout;
     int f,i,j;
@@ -525,8 +525,8 @@ int main(int argc, char *argv[])
         timing_mx_log[f] = ofdm->timing_mx;
         coarse_foff_est_hz_log[f] = ofdm->coarse_foff_est_hz;
         sample_point_log[f] = ofdm->sample_point + 1; /* offset by 1 to match Octave */
-        sig_var_log[f] = ofdm->sig_var;
-        noise_var_log[f] = ofdm->noise_var;
+        float EsNodB = ofdm_esno_est_calc(ofdm->rx_np, ofdm_rowsperframe*ofdm_nc);
+        snr_log[f] = ofdm_snr_from_esno(ofdm, EsNodB);
         mean_amp_log[f] = ofdm->mean_amp;
 
         memcpy(&rx_bits_log[ofdm_bitsperframe*f], rx_bits, sizeof(rx_bits));
@@ -570,8 +570,7 @@ int main(int argc, char *argv[])
     octave_save_float(fout, "symbol_likelihood_log_c", symbol_likelihood_log, (CODED_BITSPERFRAME/ofdm_bps) * (1<<ofdm_bps) * NFRAMES, 1, 1);
     octave_save_float(fout, "bit_likelihood_log_c", bit_likelihood_log, CODED_BITSPERFRAME * NFRAMES, 1, 1);
     octave_save_int(fout, "detected_data_log_c", detected_data_log, 1, CODED_BITSPERFRAME*NFRAMES);
-    octave_save_float(fout, "sig_var_log_c", sig_var_log, NFRAMES, 1, 1);
-    octave_save_float(fout, "noise_var_log_c", noise_var_log, NFRAMES, 1, 1);
+    octave_save_float(fout, "snr_log_c", snr_log, NFRAMES, 1, 1);
     octave_save_float(fout, "mean_amp_log_c", mean_amp_log, NFRAMES, 1, 1);
     fclose(fout);
 #ifdef TESTING_FILE
