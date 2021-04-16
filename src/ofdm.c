@@ -2118,35 +2118,41 @@ void ofdm_set_sync(struct OFDM *ofdm, int sync_cmd) {
   AUTHOR......: David Rowe
   DATE CREATED: May 2018
 
-  Fills stats structure with a bunch of demod information.
+  Fills stats structure with a bunch of demod information. Call once per
+  packet.
 
 \*---------------------------------------------------------------------------*/
 
-void ofdm_get_demod_stats(struct OFDM *ofdm, struct MODEM_STATS *stats) {
+void ofdm_get_demod_stats(struct OFDM *ofdm, struct MODEM_STATS *stats, complex float *rx_syms, int Nsymsperpacket) {
     stats->Nc = ofdm->nc;
     assert(stats->Nc <= MODEM_STATS_NC_MAX);
 
-    float snr_est = 10.0f * log10f((0.1f + (ofdm->sig_var / ofdm->noise_var)) *
-            ofdm->nc * ofdm->rs / 3000.0f);
-    float total = ofdm->frame_count * ofdm->samplesperframe;
-
-    /* fast attack, slow decay */
-    if (snr_est > stats->snr_est)
-        stats->snr_est = snr_est;
-    else
-        stats->snr_est = 0.9f * stats->snr_est + 0.1f * snr_est;
-
+    float EsNodB = ofdm_esno_est_calc(rx_syms, Nsymsperpacket);
+    float SNR3kdB = ofdm_snr_from_esno(ofdm, EsNodB);
+    
+    if (strlen(ofdm->data_mode))
+        /* no smoothing as we have a large number of symbols per packet */
+        stats->snr_est = SNR3kdB;
+    else {        
+        /* in voice modes we furrther smloth SNR est, fast attack, slow decay */
+        if (SNR3kdB > stats->snr_est)
+            stats->snr_est = SNR3kdB;
+        else
+            stats->snr_est = 0.9f * stats->snr_est + 0.1f * SNR3kdB;
+    }
     stats->sync = ((ofdm->sync_state == synced) || (ofdm->sync_state == trial));
     stats->foff = ofdm->foff_est_hz;
     stats->rx_timing = ofdm->timing_est;
-    stats->clock_offset = 0;
 
+    float total = ofdm->frame_count * ofdm->samplesperframe;
+    stats->clock_offset = 0;
     if (total != 0.0f) {
         stats->clock_offset = ofdm->clock_offset_counter / total;
     }
 
     stats->sync_metric = ofdm->timing_mx;
 
+    // note scatter plot points are just last modem frame, so a sub-sample in Np>1
 #ifndef __EMBEDDED__
     assert(ofdm->rowsperframe < MODEM_STATS_NR_MAX);
     stats->nr = ofdm->rowsperframe;

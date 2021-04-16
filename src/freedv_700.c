@@ -437,8 +437,6 @@ int freedv_comp_short_rx_ofdm(struct freedv *f, void *demod_in_8kHz, int demod_i
 
         // update some FreeDV API level stats
         f->sync = 1;
-        ofdm_get_demod_stats(f->ofdm, &f->stats);
-        f->snr_est = f->stats.snr_est;
 
         if (ofdm->modem_frame == (ofdm->np-1)) {
             /* we have received enough modem frames to complete packet and run LDPC decoder */
@@ -513,7 +511,10 @@ int freedv_comp_short_rx_ofdm(struct freedv *f, void *demod_in_8kHz, int demod_i
             }
             f->total_bits += f->ofdm_nuwbits;
         }
-    }
+        
+        ofdm_get_demod_stats(f->ofdm, &f->stats, rx_syms, Nsymsperframe);
+        f->snr_est = f->stats.snr_est;
+    } /* complete packet */
 
     /* iterate state machine and update nin for next call */
 
@@ -521,7 +522,7 @@ int freedv_comp_short_rx_ofdm(struct freedv *f, void *demod_in_8kHz, int demod_i
     ofdm_sync_state_machine(ofdm, rx_uw);
 
     if ((f->verbose && (ofdm->last_sync_state == search)) || (f->verbose >= 2)) {
-        if (rx_status & FREEDV_RX_BITS) {
+        if ((rx_status & FREEDV_RX_BITS) || (rx_status | FREEDV_RX_BIT_ERRORS)) {
             fprintf(stderr, "%3d nin: %4d st: %-6s euw: %2d %2d mf: %2d f: %5.1f pbw: %d snr: %4.1f eraw: %3d ecdd: %3d iter: %3d "
                 "pcc: %3d rxst: %s\n",
                 f->frames++, ofdm->nin,
