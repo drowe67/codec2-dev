@@ -60,6 +60,7 @@ int main(int argc, char *argv[]) {
     int                        mask = 0;
     int                        framesperburst = 0;
     FILE                      *foct = NULL;
+    int                        quiet = 0;
     
     if (argc < 3) {
     helpmsg:
@@ -68,6 +69,7 @@ int main(int argc, char *argv[]) {
                "  --testframes            count raw and coded errors in testframes sent by tx\n"
                "  --framesperburst  N     selects burst mode, N frames per burst (must match Tx)\n"
                "  --scatter         file  write scatter diagram symbols to file (Octave text file format)\n"
+               "  --quiet\n"
                "\n"
                "For FSK_LDPC only:\n\n"
                "  -m      2|4     number of FSK tones\n"
@@ -92,10 +94,11 @@ int main(int argc, char *argv[]) {
             {"mask",            required_argument,  0, 'k'},
             {"framesperburst",  required_argument,  0, 's'},
             {"scatter",         required_argument,  0, 'c'},
+            {"quiet",           required_argument,  0, 'q'},
             {0, 0, 0, 0}
         };
 
-        o = getopt_long(argc,argv,"f:hm:r:tvx",long_opts,&opt_idx);
+        o = getopt_long(argc,argv,"f:hm:qr:tvx",long_opts,&opt_idx);
 
         switch(o) {
         case 'c':
@@ -112,11 +115,13 @@ int main(int argc, char *argv[]) {
         case 'm':
             adv.M = atoi(optarg);
             break;
+        case 'q':
+            quiet = 1;
+            break;
         case 'r':
             adv.Rs = atoi(optarg);
             break;
         case 's':
-            fprintf(stderr,"burst mode!\n");
             framesperburst = atoi(optarg);
             break;
         case 't':
@@ -183,14 +188,14 @@ int main(int argc, char *argv[]) {
     
     if (mode == FREEDV_MODE_FSK_LDPC) {
         struct FSK *fsk = freedv_get_fsk(freedv);
-        fprintf(stderr, "Nbits: %d N: %d Ndft: %d\n", fsk->Nbits, fsk->N, fsk->Ndft);
+        if (!quiet) fprintf(stderr, "Nbits: %d N: %d Ndft: %d\n", fsk->Nbits, fsk->N, fsk->Ndft);
     }
 
     /* for streaming bytes it's much easier use the modes that have a multiple of 8 payload bits/frame */
     assert((freedv_get_bits_per_modem_frame(freedv) % 8) == 0);
     int bytes_per_modem_frame = freedv_get_bits_per_modem_frame(freedv)/8;
     // last two bytes used for CRC
-    fprintf(stderr, "payload bytes_per_modem_frame: %d\n", bytes_per_modem_frame - 2);
+    if (!quiet) fprintf(stderr, "payload bytes_per_modem_frame: %d\n", bytes_per_modem_frame - 2);
     uint8_t bytes_out[bytes_per_modem_frame];
     short  demod_in[freedv_get_n_max_modem_samples(freedv)];
 
