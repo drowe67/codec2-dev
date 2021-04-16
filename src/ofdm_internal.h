@@ -208,8 +208,6 @@ struct OFDM {
     float timing_mx;
     float coarse_foff_est_hz;
     float timing_norm;
-    float sig_var;
-    float noise_var;
     float mean_amp;
 
     // Integer

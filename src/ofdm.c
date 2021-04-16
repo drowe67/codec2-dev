@@ -512,7 +512,6 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
 
     ofdm->timing_norm = ofdm->samplespersymbol * acc;
     ofdm->clock_offset_counter = 0;
-    ofdm->sig_var = ofdm->noise_var = 1.0f;
     ofdm->dpsk_en = false;
 
     if (strlen(ofdm->data_mode)) {
@@ -2383,8 +2382,6 @@ void ofdm_print_info(struct OFDM *ofdm) {
     fprintf(stderr, "ofdm->timing_mx = %g\n", (double)ofdm->timing_mx);
     fprintf(stderr, "ofdm->coarse_foff_est_hz = %g\n", (double)ofdm->coarse_foff_est_hz);
     fprintf(stderr, "ofdm->timing_norm = %g\n", (double)ofdm->timing_norm);
-    fprintf(stderr, "ofdm->sig_var = %g\n", (double)ofdm->sig_var);
-    fprintf(stderr, "ofdm->noise_var = %g\n", (double)ofdm->noise_var);
     fprintf(stderr, "ofdm->mean_amp = %g\n", (double)ofdm->mean_amp);
     fprintf(stderr, "ofdm->clock_offset_counter = %d\n", ofdm->clock_offset_counter);
     fprintf(stderr, "ofdm->verbose = %d\n", ofdm->verbose);
