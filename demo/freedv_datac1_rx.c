@@ -53,7 +53,7 @@ int main(int argc, char *argv[]) {
         nbytes_out = freedv_rawdatarx(freedv, bytes_out, demod_in);    
         nin = freedv_nin(freedv); /* must call this every loop */
         if (nbytes_out) {
-            // don't output CRC
+            /* don't output CRC */
             fwrite(bytes_out, sizeof(uint8_t), nbytes_out-2, stdout);
         }
     }

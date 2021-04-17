@@ -62,7 +62,7 @@ int main(int argc, char *argv[]) {
     helpmsg:
         fprintf(stderr, "\nusage: %s [options] FSK_LDPC|DATAC0|DATAC1|DATAC3 InputBinaryDataFile OutputModemRawFile\n"
                "\n"
-               "  --testframes      T         send T test frames (in burst mode T must equal B*N)\n"
+               "  --testframes      T         send T test frames (in burst mode T should equal B*N)\n"
                "  --bursts          B         select burst mode; send B bursts of N testframes\n"
                "  --framesperburst  N         burst mode, N frames per burst (default 1)\n"
                "  --delay           ms        testframe inter-burst delay in ms\n"
@@ -235,8 +235,8 @@ int main(int argc, char *argv[]) {
 
     if (framesperburst && testframes) {
         if (Ntestframes != framesperburst*Nbursts) {
-            fprintf(stderr, "Error: In burst mode with testframes: T must equal B*N\n");
-            exit(1);
+            if (!quiet) fprintf(stderr, "Adjusting testframes to equal framesperburst*bursts\n");
+            Ntestframes = framesperburst*Nbursts;
         }
     }
 

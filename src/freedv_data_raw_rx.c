@@ -58,6 +58,8 @@ int main(int argc, char *argv[]) {
     int                        framesperburst = 0;
     FILE                      *foct = NULL;
     int                        quiet = 0;
+    int                        single_line_summary = 0;
+    float                      snr_sum = 0.0;
     
     if (argc < 3) {
     helpmsg:
@@ -66,6 +68,7 @@ int main(int argc, char *argv[]) {
                "  --testframes            count raw and coded errors in testframes sent by tx\n"
                "  --framesperburst  N     selects burst mode, N frames per burst (must match Tx)\n"
                "  --scatter         file  write scatter diagram symbols to file (Octave text file format)\n"
+               "  --singleline            single line summary at end of test, used for logging\n"
                "  --quiet\n"
                "\n"
                "For FSK_LDPC only:\n\n"
@@ -92,12 +95,16 @@ int main(int argc, char *argv[]) {
             {"framesperburst",  required_argument,  0, 's'},
             {"scatter",         required_argument,  0, 'c'},
             {"quiet",           required_argument,  0, 'q'},
+            {"singleline",      no_argument,        0, 'b'},
             {0, 0, 0, 0}
         };
 
-        o = getopt_long(argc,argv,"f:hm:qr:tvx",long_opts,&opt_idx);
+        o = getopt_long(argc,argv,"bf:hm:qr:tvx",long_opts,&opt_idx);
 
         switch(o) {
+        case 'b':
+            single_line_summary = 1;
+            break;
         case 'c':
             foct = fopen(optarg,"wt");
             assert(foct != NULL);
@@ -213,11 +220,14 @@ int main(int argc, char *argv[]) {
         if (nbytes) {
             // dont output CRC
             fwrite(bytes_out, sizeof(uint8_t), nbytes-2, fout);
+            
+            // log some stats
             nbytes_out += nbytes-2;
             nframes_out++;
+            struct MODEM_STATS stats;
+            freedv_get_modem_extended_stats(freedv, &stats);
+            snr_sum += stats.snr_est;
             if (foct) {
-                struct MODEM_STATS stats;
-                freedv_get_modem_extended_stats(freedv, &stats);
                 char name[64]; sprintf(name, "rx_symbols_%d", nframes_out);
                 octave_save_complex(foct, name, (COMP*) stats.rx_symbols, stats.nr, stats.Nc, MODEM_STATS_NC_MAX+1);
             }
@@ -230,8 +240,11 @@ int main(int argc, char *argv[]) {
 
     fclose(fin);
     fclose(fout);
-    fprintf(stderr, "modem bufs processed: %d  output bytes: %d output_frames: %d \n", buf, nbytes_out, nframes_out);
-
+    if (!quiet) 
+        fprintf(stderr, "modembufs: %6d bytes: %5d Frms.: %5d SNRAv: %5.2f\n", 
+                buf, nbytes_out, nframes_out, snr_sum/nframes_out);
+    int ret = 0;
+    
     /* in testframe mode finish up with some stats */
 
     if (freedv_get_test_frames(freedv)) {
@@ -245,15 +258,24 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "Coded BER: %5.4f Tbits: %5d Terrs: %5d\n", (double)coded_ber, Tbits_coded, Terrs_coded);
         int Tpackets = freedv_get_total_packets(freedv);
         int Tpacket_errors = freedv_get_total_packet_errors(freedv);
-        fprintf(stderr, "Coded PER: %5.4f Tpkts: %5d Tpers: %5d\n", (float)Tpacket_errors/Tpackets, Tpackets, Tpacket_errors);
+        fprintf(stderr, "Coded FER: %5.4f Tfrms: %5d Tfers: %5d\n", (float)Tpacket_errors/Tpackets, Tpackets, Tpacket_errors);
+        
+        if (single_line_summary) {
+            struct MODEM_STATS stats;
+            freedv_get_modem_extended_stats(freedv, &stats);
+            fprintf(stderr, "GdFrm FrmDt Bytes SNRAv RawBER    Pre  Post UWfails\n");
+            fprintf(stderr, "%5d %5d %5d %5.2f %5.4f  %5d %5d   %5d\n", 
+                    nframes_out, Tpackets, nbytes_out, snr_sum/nframes_out, uncoded_ber, stats.pre, stats.post, stats.uw_fails);
+        }
+        
         /* set return code for Ctest */
         if ((uncoded_ber < 0.1f) && (coded_ber < 0.01f))
-            return 0;
+            ret = 0;
         else
-            return 1;
+            ret = 1;
     }
 
     freedv_close(freedv);
     if (foct) fclose(foct);
-    return 0;
+    return ret;
 }
