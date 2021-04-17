@@ -2150,7 +2150,10 @@ void ofdm_get_demod_stats(struct OFDM *ofdm, struct MODEM_STATS *stats, complex 
     }
 
     stats->sync_metric = ofdm->timing_mx;
-
+    stats->pre = ofdm->pre;
+    stats->post = ofdm->post;
+    stats->uw_fails = ofdm->uw_fails;
+    
 #ifndef __EMBEDDED__
     assert(Nsymsperpacket % ofdm->nc == 0);
     int Nrowsperpacket = Nsymsperpacket/ofdm->nc;
