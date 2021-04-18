@@ -240,9 +240,8 @@ int main(int argc, char *argv[]) {
 
     fclose(fin);
     fclose(fout);
-    if (!quiet) 
-        fprintf(stderr, "modembufs: %6d bytes: %5d Frms.: %5d SNRAv: %5.2f\n", 
-                buf, nbytes_out, nframes_out, snr_sum/nframes_out);
+    fprintf(stderr, "modembufs: %6d bytes: %5d Frms.: %5d SNRAv: %5.2f\n", 
+            buf, nbytes_out, nframes_out, snr_sum/nframes_out);
     int ret = 0;
     
     /* in testframe mode finish up with some stats */
@@ -263,7 +262,7 @@ int main(int argc, char *argv[]) {
         if (single_line_summary) {
             struct MODEM_STATS stats;
             freedv_get_modem_extended_stats(freedv, &stats);
-            fprintf(stderr, "GdFrm FrmDt Bytes SNRAv RawBER    Pre  Post UWfails\n");
+            fprintf(stderr, "FrmGd FrmDt Bytes SNRAv RawBER    Pre  Post UWfails\n");
             fprintf(stderr, "%5d %5d %5d %5.2f %5.4f  %5d %5d   %5d\n", 
                     nframes_out, Tpackets, nbytes_out, snr_sum/nframes_out, uncoded_ber, stats.pre, stats.post, stats.uw_fails);
         }

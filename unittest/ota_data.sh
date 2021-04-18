@@ -5,35 +5,46 @@
 #
 # 1. Build codec2
 # 2. Install kiwclient:
-#    git clone git@github.com:jks-prv/kiwiclient.git
+#    cd ~ && git clone git@github.com:jks-prv/kiwiclient.git
 # 3. Install Hamlib cli tools
 #
 # TODO:
-#  [ ] plot scatter diagram
-#  [ ] SNR output
 #  [ ] timestamps
 #  [ ] option to listen to recording as it comes in
 
 PATH=${PATH}:${HOME}/codec2/build_linux/src:${HOME}/kiwiclient
+CODEC2=${HOME}/codec2
 
 kiwi_url=""
 port=8073
 freq_kHz="7177"
 tx_only=0
-Nbursts=10
+Nbursts=5
 mode="datac0"
+model=361
 
 function print_help {
     echo
     echo "Automated Over The Air (OTA) data test for FreeDV OFDM HF data modems"
     echo
-    echo "  usage ./ota_data.sh [-d] [-f freq_kHz] [-t] [-b Nbursts] [-p port] kiwi_url"
+    echo "  usage ./ota_data.sh [-d] [-f freq_kHz] [-t] [-n Nbursts] [-o model] [-p port] kiwi_url"
     echo
-    echo "    -d       debug mode; trace script execution"
-    echo "    -m mode  datac0|datac1|datac3"
-    echo "    -t       Tx only, useful for manually observing SDRs which block multiple sessions from one IP"
+    echo "    -d        debug mode; trace script execution"
+    echo "    -o model  select radio model number ('rigctl -l' to list)"
+    echo "    -m mode   datac0|datac1|datac3"
+    echo "    -t        Tx only, useful for manually observing SDRs which block multiple sessions from one IP"
     echo
     exit
+}
+
+function run_rigctl {
+    command=$1
+    model=$2
+    echo $command | rigctl -m $model -r /dev/ttyUSB0 > /dev/null
+    if [ $? -ne 0 ]; then
+        echo "Can't talk to Tx"
+        exit 1
+    fi
 }
 
 POSITIONAL=()
@@ -47,6 +58,11 @@ case $key in
     ;;
     -f)
         freq_kHz="$2"	
+        shift
+        shift
+    ;;
+    -o)
+        model="$2"	
         shift
         shift
     ;;
@@ -84,7 +100,8 @@ if [ $tx_only -eq 0 ]; then
     if [ $# -lt 1 ]; then
         print_help
     fi
-    kiwi_url="$1"	
+    kiwi_url="$1"
+    echo $kiwi_url
 fi
 
 # create test Tx file
@@ -92,8 +109,8 @@ freedv_data_raw_tx -q --framesperburst 1 --bursts ${Nbursts} --testframes ${Nbur
 
 usb_lsb=$(python3 -c "print('usb') if ${freq_kHz} >= 10000 else print('lsb')")
 
-echo -n "waiting for KiwiSDR "
 if [ $tx_only -eq 0 ]; then
+    echo -n "waiting for KiwiSDR "
     # start recording from remote kiwisdr
     kiwi_stdout=$(mktemp)
     kiwirecorder.py -s $kiwi_url -p ${port} -f $freq_kHz -m ${usb_lsb} -r 8000 --filename=rx --time-limit=60 >$kiwi_stdout &
@@ -118,11 +135,11 @@ fi
 echo "Tx data signal"
 freq_Hz=$((freq_kHz*1000))
 usb_lsb_upper=$(echo ${usb_lsb} | awk '{print toupper($0)}')
-echo "\\set_mode PKT${usb_lsb_upper} 0" | rigctl -m 361 -r /dev/ttyUSB0 > /dev/null
-echo "\\set_freq ${freq_Hz}" | rigctl -m 361 -r /dev/ttyUSB0  > /dev/null
-echo "\\set_ptt 1" | rigctl -m 361 -r /dev/ttyUSB0  > /dev/null
+run_rigctl "\\set_mode PKT${usb_lsb_upper} 0" $model
+run_rigctl "\\set_freq ${freq_Hz}" $model
+run_rigctl "\\set_ptt 1" $model
 aplay --device="plughw:CARD=CODEC,DEV=0" -f S16_LE test_datac0.raw 2>/dev/null
-echo "\\set_ptt 0" | rigctl -m 361 -r /dev/ttyUSB0  > /dev/null
+run_rigctl "\\set_ptt 0" $model
 
 if [ $tx_only -eq 0 ]; then
     sleep 2
@@ -135,12 +152,13 @@ if [ $tx_only -eq 0 ]; then
     echo "pkg load signal; warning('off', 'all'); \
           s=load_raw('rx.wav'); \
           plot_specgram(s, 8000, 500, 2500); print('spec.png', '-dpng'); \
-          quit" | octave-cli -p ../octave -qf
+          quit" | octave-cli -p ${CODEC2}/octave -qf
     # attempt to demodulate
-    freedv_data_raw_rx -q --framesperburst 1 --testframes ${mode} -v --scatter scatter.txt rx.wav /dev/null
+    freedv_data_raw_rx -q --framesperburst 1 --testframes ${mode} -v --scatter scatter.txt --singleline rx.wav /dev/null
     # render scatter plot (if we get any frames)
     scatter_sz=$(ls -l scatter.txt | cut -f 5 -d' ')
     if [ $scatter_sz -ne 0 ]; then
-        echo "pkg load signal; warning('off', 'all'); pl_scatter('scatter.txt'); quit"  | octave-cli -p ../octave -qf
+        echo "pkg load signal; warning('off', 'all'); pl_scatter('scatter.txt'); quit"  | octave-cli -p ${CODEC2}/octave -qf
     fi
 fi
+
