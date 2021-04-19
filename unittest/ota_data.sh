@@ -7,10 +7,6 @@
 # 2. Install kiwclient:
 #    cd ~ && git clone git@github.com:jks-prv/kiwiclient.git
 # 3. Install Hamlib cli tools
-#
-# TODO:
-#  [ ] timestamps
-#  [ ] option to listen to recording as it comes in
 
 PATH=${PATH}:${HOME}/codec2/build_linux/src:${HOME}/kiwiclient
 CODEC2=${HOME}/codec2
@@ -105,6 +101,7 @@ if [ $tx_only -eq 0 ]; then
 fi
 
 # create test Tx file
+echo $mode
 freedv_data_raw_tx -q --framesperburst 1 --bursts ${Nbursts} --testframes ${Nbursts} ${mode} /dev/zero test_datac0.raw
 
 usb_lsb=$(python3 -c "print('usb') if ${freq_kHz} >= 10000 else print('lsb')")
@@ -152,13 +149,13 @@ if [ $tx_only -eq 0 ]; then
     echo "pkg load signal; warning('off', 'all'); \
           s=load_raw('rx.wav'); \
           plot_specgram(s, 8000, 500, 2500); print('spec.png', '-dpng'); \
-          quit" | octave-cli -p ${CODEC2}/octave -qf
+          quit" | octave-cli -p ${CODEC2}/octave -qf > /dev/null
     # attempt to demodulate
     freedv_data_raw_rx -q --framesperburst 1 --testframes ${mode} -v --scatter scatter.txt --singleline rx.wav /dev/null
     # render scatter plot (if we get any frames)
     scatter_sz=$(ls -l scatter.txt | cut -f 5 -d' ')
     if [ $scatter_sz -ne 0 ]; then
-        echo "pkg load signal; warning('off', 'all'); pl_scatter('scatter.txt'); quit"  | octave-cli -p ${CODEC2}/octave -qf
+        echo "pkg load signal; warning('off', 'all'); pl_scatter('scatter.txt'); quit"  | octave-cli -p ${CODEC2}/octave -qf > /dev/null
     fi
 fi
 

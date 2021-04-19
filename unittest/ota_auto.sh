@@ -10,5 +10,6 @@ cd $timestamp
 ../ota_data.sh "$@" >> log.txt 2>&1
 cd $start_dir
 kiwi_sdr=$(head -n 1 ${timestamp}/log.txt)
-result=$(tail -n 1 ${timestamp}/log.txt)
-echo $timestamp $kiwi_sdr $result >> log.txt
+mode=$(head -n 2 ${timestamp}/log.txt | tail -n 1)
+result=$(awk '/FrmGd/{getline; print}' ${timestamp}/log.txt)
+printf "%s %-25s %s %s\n" $timestamp $kiwi_sdr $mode "$result" >> log.txt
