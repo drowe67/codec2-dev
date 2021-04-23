@@ -7,7 +7,7 @@ timestamp=$(date +"%F-%T")
 mkdir -p $timestamp
 start_dir=$(pwd)
 cd $timestamp
-../ota_data.sh "$@" >> log.txt 2>&1
+../ota_test.sh "$@" >> log.txt 2>&1
 cd $start_dir
 kiwi_sdr=$(head -n 1 ${timestamp}/log.txt)
 mode=$(head -n 2 ${timestamp}/log.txt | tail -n 1)

@@ -1,5 +1,5 @@
 #!/bin/bash
-# ota_data.sh
+# ota_test.sh
 #
 # Automated Over The Air (OTA) data test for FreeDV OFDM HF data modems
 #
@@ -23,7 +23,7 @@ function print_help {
     echo
     echo "Automated Over The Air (OTA) data test for FreeDV OFDM HF data modems"
     echo
-    echo "  usage ./ota_data.sh [-d] [-f freq_kHz] [-t] [-n Nbursts] [-o model] [-p port] kiwi_url"
+    echo "  usage ./ota_test.sh [-d] [-f freq_kHz] [-t] [-n Nbursts] [-o model] [-p port] kiwi_url"
     echo
     echo "    -d        debug mode; trace script execution"
     echo "    -o model  select radio model number ('rigctl -l' to list)"
@@ -148,7 +148,7 @@ if [ $tx_only -eq 0 ]; then
     # generate spectrogram
     echo "pkg load signal; warning('off', 'all'); \
           s=load_raw('rx.wav'); \
-          plot_specgram(s, 8000, 500, 2500); print('spec.png', '-dpng'); \
+          plot_specgram(s, 8000, 500, 2500); print('spec.jpg', '-djpg'); \
           quit" | octave-cli -p ${CODEC2}/octave -qf > /dev/null
     # attempt to demodulate
     freedv_data_raw_rx -q --framesperburst 1 --testframes ${mode} -v --scatter scatter.txt --singleline rx.wav /dev/null
