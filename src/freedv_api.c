@@ -1221,17 +1221,19 @@ void freedv_set_tx_amp                    (struct freedv *f, float amp) {f->tx_a
 
 void freedv_set_clip(struct freedv *f, int val) {
     f->clip_en = val;
-    if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_700E, f->mode)) {
+    if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_700E, f->mode)
+        || FDV_MODE_ACTIVE( FREEDV_MODE_DATAC0, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_DATAC3, f->mode)) {
       f->ofdm->clip_en = val;
       /* really should have BPF if we clip */
       if (val) ofdm_set_tx_bpf(f->ofdm, true);
     }
 }
 
-/* Band Pass Filter to cleanup OFDM tx waveform, only supported by FreeDV 700D and 700E */
+/* Band Pass Filter to cleanup OFDM tx waveform, only supported by some modes */
 
 void freedv_set_tx_bpf(struct freedv *f, int val) {
-    if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_700E, f->mode)) {
+    if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_700E, f->mode) 
+        || FDV_MODE_ACTIVE( FREEDV_MODE_DATAC0, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_DATAC3, f->mode)) {
         ofdm_set_tx_bpf(f->ofdm, val);
     }
 }

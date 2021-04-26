@@ -87,7 +87,7 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
-    use_clip = 0; use_txbpf = 0; testframes = 0;
+    use_clip = -1; use_txbpf = -1; testframes = 0;
     int framesperburst = 1;
     int burst_mode = 0;
     int quiet = 0;
@@ -212,8 +212,8 @@ int main(int argc, char *argv[]) {
     assert(freedv != NULL);
 
     /* these are optional ------------------ */
-    freedv_set_clip(freedv, use_clip);
-    freedv_set_tx_bpf(freedv, use_txbpf);
+    if (use_clip != -1) freedv_set_clip(freedv, use_clip);
+    if (use_txbpf != -1) freedv_set_tx_bpf(freedv, use_txbpf);
     freedv_set_tx_amp(freedv, amp);
 
     /* for streaming bytes it's much easier to use modes that have a multiple of 8 payload bits/frame */

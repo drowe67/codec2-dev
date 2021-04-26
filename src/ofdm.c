@@ -533,12 +533,16 @@ static void allocate_tx_bpf(struct OFDM *ofdm) {
 
     /* Transmit bandpass filter; complex coefficients, center frequency */
 
-    if (!strcmp(ofdm->mode, "700D") || !strcmp(ofdm->mode, "datac0") || !strcmp(ofdm->mode, "datac3")) {
+    if (!strcmp(ofdm->mode, "700D")) {
         quisk_filt_cfInit(ofdm->tx_bpf, filtP650S900, sizeof (filtP650S900) / sizeof (float));
         quisk_cfTune(ofdm->tx_bpf, ofdm->tx_centre / ofdm->fs);
     }
     else if (!strcmp(ofdm->mode, "700E")) {
         quisk_filt_cfInit(ofdm->tx_bpf, filtP900S1100, sizeof (filtP900S1100) / sizeof (float));
+        quisk_cfTune(ofdm->tx_bpf, ofdm->tx_centre / ofdm->fs);
+    }
+    else if  (!strcmp(ofdm->mode, "datac0") || !strcmp(ofdm->mode, "datac3")) {
+        quisk_filt_cfInit(ofdm->tx_bpf, filtP400S600, sizeof (filtP400S600) / sizeof (float));
         quisk_cfTune(ofdm->tx_bpf, ofdm->tx_centre / ofdm->fs);
     }
     else assert(0);
