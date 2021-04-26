@@ -110,7 +110,7 @@ if [ $tx_only -eq 0 ]; then
     echo -n "waiting for KiwiSDR "
     # start recording from remote kiwisdr
     kiwi_stdout=$(mktemp)
-    kiwirecorder.py -s $kiwi_url -p ${port} -f $freq_kHz -m ${usb_lsb} -r 8000 --filename=rx --time-limit=60 >$kiwi_stdout &
+    kiwirecorder.py -s $kiwi_url -p ${port} -f $freq_kHz -m ${usb_lsb} -r 8000 --filename=rx --time-limit=300 >$kiwi_stdout &
     kiwi_pid=$!
 
     # wait for kiwi to start recording

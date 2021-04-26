@@ -11,6 +11,7 @@ function print_help {
     echo "  usage ./ota_summary.sh [-t]"
     echo
     echo "  -t create/update thumbnail directory"
+    exit 0
 }
 
 thumbnails=0
