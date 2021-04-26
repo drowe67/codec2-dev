@@ -533,7 +533,7 @@ static void allocate_tx_bpf(struct OFDM *ofdm) {
 
     /* Transmit bandpass filter; complex coefficients, center frequency */
 
-    if (!strcmp(ofdm->mode, "700D")) {
+    if (!strcmp(ofdm->mode, "700D") || !strcmp(ofdm->mode, "datac0") || !strcmp(ofdm->mode, "datac3")) {
         quisk_filt_cfInit(ofdm->tx_bpf, filtP650S900, sizeof (filtP650S900) / sizeof (float));
         quisk_cfTune(ofdm->tx_bpf, ofdm->tx_centre / ofdm->fs);
     }
@@ -910,7 +910,7 @@ void ofdm_txframe(struct OFDM *ofdm, complex float *tx, complex float *tx_sym_li
             tx[m + j] = asymbol_cp[j];
         }
     }
-    
+
     size_t samplesperpacket = ofdm->np*ofdm->samplesperframe;
     ofdm_hilbert_clipper(ofdm, tx, samplesperpacket);
 }
@@ -930,7 +930,8 @@ void ofdm_hilbert_clipper(struct OFDM *ofdm, complex float *tx, size_t n) {
 
    /* BPF to remove out of band energy clipper introduces */
     if (ofdm->tx_bpf_en) {
-        assert(!strcmp(ofdm->mode, "700D") || !strcmp(ofdm->mode, "700E"));
+        assert(!strcmp(ofdm->mode, "700D") || !strcmp(ofdm->mode, "700E") 
+               || !strcmp(ofdm->mode, "datac0") || !strcmp(ofdm->mode, "datac3"));
         assert(ofdm->tx_bpf != NULL);
         complex float tx_filt[n];
 
@@ -945,6 +946,7 @@ void ofdm_hilbert_clipper(struct OFDM *ofdm, complex float *tx, size_t n) {
     /* a very small percentage of samples may still exceed OFDM_PEAK, in
        clipped or unclipped mode.  Lets remove them so we present consistent
        levels to the transmitter */
+    
     ofdm_clip(tx, OFDM_PEAK, n);
 }
 
@@ -2405,7 +2407,7 @@ void ofdm_print_info(struct OFDM *ofdm) {
     fprintf(stderr, "ofdm->phase_est_bandwidth_mode = %s\n", phase_est_bandwidth_mode[ofdm->phase_est_bandwidth_mode]);
 }
 
-// carbon copy of cohpsk.ch:cohpsk_clip() to avoid having to link cohpsk.[ch]
+// hilbert clipper
 void ofdm_clip(complex float tx[], float clip_thresh, int n) {
     complex float sam;
     float mag;

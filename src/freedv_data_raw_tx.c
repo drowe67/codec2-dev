@@ -71,6 +71,7 @@ int main(int argc, char *argv[]) {
                "  --clip            0|1       clipping for reduced PAPR\n"
                "  --txbpf           0|1       bandpass filter\n"
                "  --seq                       send packet sequence numbers (breaks testframe BER counting)\n"
+               "  --complexout                complex sample output (default real)\n"
                "  --quiet\n"
                "\n"
                "For FSK_LDPC only:\n\n"
@@ -86,7 +87,7 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
-    use_clip = 0; use_txbpf = 0; testframes = 0; use_complex = 0; 
+    use_clip = 0; use_txbpf = 0; testframes = 0;
     int framesperburst = 1;
     int burst_mode = 0;
     int quiet = 0;
@@ -110,6 +111,7 @@ int main(int argc, char *argv[]) {
             {"seq",            no_argument,        0, 'd'},
             {"amp",            required_argument,  0, 'a'},
             {"quiet",          no_argument,        0, 'q'},
+            {"complexout",     no_argument,        0, 'c'},
             {0, 0, 0, 0}
         };
 
@@ -233,7 +235,7 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    if (framesperburst && testframes) {
+    if (burst_mode && testframes) {
         if (Ntestframes != framesperburst*Nbursts) {
             if (!quiet) fprintf(stderr, "Adjusting testframes to equal framesperburst*bursts\n");
             Ntestframes = framesperburst*Nbursts;

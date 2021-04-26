@@ -345,11 +345,14 @@ function config = ofdm_init_mode(mode="700D")
     config.edge_pilots = 0; config.timing_mx_thresh = 0.08;
     config.tx_uw = zeros(1,config.Nuwbits);
     config.tx_uw(1:16) = [1 1 0 0  1 0 1 0  1 1 1 1  0 0 0 0];
+    config.amp_scale = 300E3; config.clip_gain1 = 2.2; config.clip_gain2 = 0.8;
   elseif strcmp(mode,"datac1")
     Ns=5; config.Np=38; Tcp = 0.006; Ts = 0.016; Nc = 27; config.data_mode = "streaming";
     config.Ntxtbits = 0; config.Nuwbits = 16; config.bad_uw_errors = 6;
     config.state_machine = "data";
     config.ftwindow_width = 80; config.amp_est_mode = 1; config.EsNodB = 3;
+    % just use default clipper (with no BPF) and let SSB BPF clean it up
+    % config.amp_scale = 125E3; config.clip_gain1 = 2.5; config.clip_gain2 = 0.8;
     config.edge_pilots = 0; config.timing_mx_thresh = 0.10;
     config.tx_uw = [1 1 0 0  1 0 1 0  1 1 1 1  0 0 0 0];
   elseif strcmp(mode,"datac3")
@@ -362,6 +365,7 @@ function config = ofdm_init_mode(mode="700D")
     config.tx_uw(end-24+1:end) = [1 1 0 0  1 0 1 0  1 1 1 1  0 0 0 0  1 1 1 1  0 0 0 0];
     config.amp_est_mode = 1; config.EsNodB = 3;
     config.state_machine = "data"; 
+    config.amp_scale = 300E3; config.clip_gain1 = 2.2; config.clip_gain2 = 0.8;
   elseif strcmp(mode,"1")
     Ns=5; config.Np=10; Tcp=0; Tframe = 0.1; Ts = Tframe/Ns; Nc = 1;
   else
@@ -1847,7 +1851,7 @@ end
 % two stage Hilbert clipper to improve PAPR 
 function tx = ofdm_hilbert_clipper(states, tx, tx_clip_en)
   tx *= states.amp_scale;
-
+  
   % optional compressor to improve PAPR
 
   nclipped = 0;
@@ -1856,12 +1860,15 @@ function tx = ofdm_hilbert_clipper(states, tx, tx_clip_en)
       printf("%f %f\n", states.clip_gain1, states.clip_gain2);
     end
     [tx nclipped] = ofdm_clip(states, tx*states.clip_gain1, states.ofdm_peak);
-    tx *= states.clip_gain2;
+    
+    % BPF, we actually shift the signal back down to baseband to filter
     ssbfilt_n = 100;
     ssbfilt_coeff = fir1(ssbfilt_n, states.txbpf_width_Hz/states.Fs);
-    %figure(2); freqz(ssbfilt_coeff);
     lo = exp(j*2*pi*states.fcentre*(1:length(tx))/(states.Fs));
     tx = lo.*filter(ssbfilt_coeff,1,tx.*conj(lo));
+    
+    % filter messs up peak levels use this to get us back to approx 16384
+    tx *= states.clip_gain2;
   end
 
   % Hilbert Clipper 2 - remove any really low probability outliers after clipping/filtering
@@ -1879,7 +1886,7 @@ function tx = ofdm_hilbert_clipper(states, tx, tx_clip_en)
 endfunction
 
 
-%  helper function that adds channel simulation and ensures we don't clip int output samples  
+%  helper function that adds channel simulation and ensures we don't saturate int16 output samples  
 function [rx_real rx] = ofdm_channel(states, tx, SNR3kdB, channel, freq_offset_Hz)
   [rx_real rx sigma] = channel_simulate(states.Fs, SNR3kdB, freq_offset_Hz, channel, tx, states.verbose);
     
