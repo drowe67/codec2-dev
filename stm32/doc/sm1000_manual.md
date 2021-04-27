@@ -169,6 +169,7 @@ To perform a factory reset, hold down BACK whilst powering the device on. A loud
 1. [SM1000 Hardware Design](https://svn.code.sf.net/p/freetel/code/smartmic)
 1. [Series of blog posts on the SM1000 development](http://www.rowetel.com/?page_id=6172) (2014 section of archive)
 1. Nice write up of a mobile [Codan NGT SM1000 installation](http://rfhead.net/?p=582) by Mark VK5QI including tips on testing and debugging a microphone level problem.
+1. [Sample wiring](http://rowetel.com/downloads/freedv/vk5kx_radio_sm1000_connections_model.pdf) diagrams for several radios from Peter, VK5KX.  These are not tested and provided as examples only.
 
 # Credits
 

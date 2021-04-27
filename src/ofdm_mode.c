@@ -9,9 +9,9 @@
 \*---------------------------------------------------------------------------*/
 
 #include <assert.h>
-#include "comp.h"
+#include <string.h>
+#include "codec2_ofdm.h"
 #include "ofdm_internal.h"
-#include "ofdm_mode.h"
 
 void ofdm_init_mode(char mode[], struct OFDM_CONFIG *config) {
     assert(mode != NULL);
@@ -38,6 +38,7 @@ void ofdm_init_mode(char mode[], struct OFDM_CONFIG *config) {
     config->timing_mx_thresh = 0.30f;
     config->edge_pilots = 1;
     config->state_machine = "voice1";
+    config->data_mode = "";
     config->codename = "HRA_112_112";
     config->clip_gain1 = 2.5;
     config->clip_gain2 = 0.8;
@@ -50,6 +51,7 @@ void ofdm_init_mode(char mode[], struct OFDM_CONFIG *config) {
     if (strcmp(mode,"700D") == 0) {
     } else if (strcmp(mode,"700E") == 0) {
          config->ts = 0.014;  config->tcp = 0.006; config->nc = 21; config->ns=4;
+         config->edge_pilots = 0;
          config->nuwbits = 12; config->bad_uw_errors = 3; config->txtbits = 2;
          config->state_machine = "voice2"; config->amp_est_mode = 1;
          config->ftwindowwidth = 80;
@@ -64,27 +66,42 @@ void ofdm_init_mode(char mode[], struct OFDM_CONFIG *config) {
         config->bps=4; config->txtbits = 0; config->nuwbits = 15*4; config->bad_uw_errors = 5;
         config->ftwindowwidth = 32; config->state_machine = "data"; config->amp_est_mode = 1;
         config->tx_bpf_en = false;
+        config->data_mode = "streaming";
+    } else if (strcmp(mode,"datac0") == 0) {
+        config->ns=5; config->np=4; config->tcp = 0.006; config->ts = 0.016; config->nc = 9;
+        config->edge_pilots = 0;
+        config->txtbits = 0; config->nuwbits = 32; config->bad_uw_errors = 9;
+        config->state_machine = "data"; config->amp_est_mode = 1; config->tx_bpf_en = false;
+        config->ftwindowwidth = 80; config->codename = "H_128_256_5";
+        uint8_t uw[] = {1,1,0,0, 1,0,1,0,  1,1,1,1, 0,0,0,0};
+        memcpy(config->tx_uw, uw, sizeof(uw));
+        config->timing_mx_thresh = 0.08f;    
+        config->data_mode = "streaming";
     } else if (strcmp(mode,"datac1") == 0) {
-        config->ns=5; config->np=18; config->tcp = 0.006; config->ts = 0.016; config-> nc = 18;
-        config->txtbits = 0; config->nuwbits = 12; config->bad_uw_errors = 2;
+        config->ns=5; config->np=38; config->tcp = 0.006; config->ts = 0.016; config->nc = 27;
+        config->edge_pilots = 0;
+        config->txtbits = 0; config->nuwbits = 16; config->bad_uw_errors = 6;
         config->state_machine = "data"; config->amp_est_mode = 1; config->tx_bpf_en = false;
-        config->ftwindowwidth = 32; config->codename = "H2064_516_sparse";
-    } else if (strcmp(mode,"datac2") == 0) {
-        config->ns=5; config->np=36; config->tcp = 0.006; config->ts = 0.016; config->nc = 9;
-        config->txtbits = 0; config->nuwbits = 12; config->bad_uw_errors = 1;
-        config->state_machine = "data"; config->amp_est_mode = 1; config->tx_bpf_en = false;
-        config->ftwindowwidth = 32; config->codename = "H2064_516_sparse";
-    } else if (strcmp(mode,"datac3") == 0) {
-        config->ns=5; config->np=11; config->tcp = 0.006; config->ts = 0.016; config->nc = 9;
-        config->txtbits = 0; config->state_machine = "data";
-        config->ftwindowwidth = 32; config->timing_mx_thresh = 0.30;
-        config->codename = "H_256_768_22"; config->amp_est_mode = 1; config->tx_bpf_en = false;
-        /* custom UW - we use a longer UW with higher bad_uw_errors threshold due to high raw BER */
-        config->nuwbits = 24; config->bad_uw_errors = 5;
-        uint8_t uw[] = {1,1,0,0, 1,0,1,0,  1,1,1,1, 0,0,0,0, 1,1,1,1, 0,0,0,0};
+        config->ftwindowwidth = 80; config->codename = "H_4096_8192_3d";
+        uint8_t uw[] = {1,1,0,0, 1,0,1,0,  1,1,1,1, 0,0,0,0};
         assert(sizeof(uw) == config->nuwbits);
         memcpy(config->tx_uw, uw, config->nuwbits);
-    }
+        config->timing_mx_thresh = 0.10f;    
+        config->data_mode = "streaming";
+    } else if (strcmp(mode,"datac3") == 0) {
+        config->ns=5; config->np=29; config->tcp = 0.006; config->ts = 0.016; config->nc = 9;
+        config->edge_pilots = 0;
+        config->txtbits = 0; config->state_machine = "data";
+        config->ftwindowwidth = 80; config->timing_mx_thresh = 0.10;
+        config->codename = "H_1024_2048_4f"; config->amp_est_mode = 1; config->tx_bpf_en = false;
+        /* custom UW - we use a longer UW with higher bad_uw_errors threshold due to high raw BER */
+        config->nuwbits = 40; config->bad_uw_errors = 10;
+        uint8_t uw[] = {1,1,0,0, 1,0,1,0,  1,1,1,1, 0,0,0,0, 1,1,1,1, 0,0,0,0};
+        assert(sizeof(uw) <= MAX_UW_BITS);
+        memcpy(config->tx_uw, uw, sizeof(uw));
+        memcpy(&config->tx_uw[config->nuwbits-sizeof(uw)], uw, sizeof(uw));
+        config->data_mode = "streaming";
+     }
     else {
         assert(0);
     }

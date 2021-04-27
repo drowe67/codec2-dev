@@ -143,9 +143,7 @@ int count_uncoded_errors(struct LDPC *ldpc, struct OFDM_CONFIG *config, COMP cod
     Nerrs = 0;
 
     for (i = 0; i < coded_bits_per_frame; i++) {
-        if (test_codeword[i] != rx_bits_raw[i]) {
-            Nerrs++;
-        }
+        if (test_codeword[i] != rx_bits_raw[i]) Nerrs++;
     }
 
     return Nerrs;

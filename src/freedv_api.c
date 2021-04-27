@@ -120,6 +120,7 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
     struct freedv *f;
 
     assert(FREEDV_PEAK == OFDM_PEAK);
+    assert(FREEDV_VARICODE_MAX_BITS == VARICODE_MAX_BITS);
 
     if ((FDV_MODE_ACTIVE( FREEDV_MODE_1600,   mode)   ||
          FDV_MODE_ACTIVE( FREEDV_MODE_700C,   mode)   ||
@@ -130,6 +131,7 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
          FDV_MODE_ACTIVE( FREEDV_MODE_800XA,  mode)   ||
          FDV_MODE_ACTIVE( FREEDV_MODE_2020,   mode)   ||
          FDV_MODE_ACTIVE( FREEDV_MODE_FSK_LDPC, mode) ||
+         FDV_MODE_ACTIVE( FREEDV_MODE_DATAC0, mode)   ||
          FDV_MODE_ACTIVE( FREEDV_MODE_DATAC1, mode)   ||
          FDV_MODE_ACTIVE( FREEDV_MODE_DATAC2, mode)   ||
          FDV_MODE_ACTIVE( FREEDV_MODE_DATAC3, mode))
@@ -152,6 +154,7 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
     if (FDV_MODE_ACTIVE( FREEDV_MODE_2400B, mode)) freedv_2400b_open(f);
     if (FDV_MODE_ACTIVE( FREEDV_MODE_800XA, mode)) freedv_800xa_open(f);
     if (FDV_MODE_ACTIVE( FREEDV_MODE_FSK_LDPC, mode)) freedv_fsk_ldpc_open(f, adv);
+    if (FDV_MODE_ACTIVE( FREEDV_MODE_DATAC0, mode)) freedv_ofdm_data_open(f);
     if (FDV_MODE_ACTIVE( FREEDV_MODE_DATAC1, mode)) freedv_ofdm_data_open(f);
     if (FDV_MODE_ACTIVE( FREEDV_MODE_DATAC2, mode)) freedv_ofdm_data_open(f);
     if (FDV_MODE_ACTIVE( FREEDV_MODE_DATAC3, mode)) freedv_ofdm_data_open(f);
@@ -230,7 +233,8 @@ void freedv_close(struct freedv *freedv) {
         FREE(freedv->twoframes_hard);
     }
 
-    if (FDV_MODE_ACTIVE( FREEDV_MODE_DATAC1, freedv->mode) ||
+    if (FDV_MODE_ACTIVE( FREEDV_MODE_DATAC0, freedv->mode) ||
+        FDV_MODE_ACTIVE( FREEDV_MODE_DATAC1, freedv->mode) ||
         FDV_MODE_ACTIVE( FREEDV_MODE_DATAC2, freedv->mode) ||
         FDV_MODE_ACTIVE( FREEDV_MODE_DATAC3, freedv->mode))
     {
@@ -254,7 +258,22 @@ static void codec2_encode_upacked(struct freedv *f, uint8_t unpacked_bits[], sho
     freedv_unpack(unpacked_bits, packed_codec_bits, f->bits_per_codec_frame);
 }
 
-
+static int is_ofdm_mode(struct freedv *f) {
+    return FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode)   ||
+           FDV_MODE_ACTIVE( FREEDV_MODE_700E, f->mode)   ||
+           FDV_MODE_ACTIVE( FREEDV_MODE_DATAC0, f->mode) ||
+           FDV_MODE_ACTIVE( FREEDV_MODE_DATAC1, f->mode) ||
+           FDV_MODE_ACTIVE( FREEDV_MODE_DATAC2, f->mode) ||
+           FDV_MODE_ACTIVE( FREEDV_MODE_DATAC3, f->mode);
+}
+       
+static int is_ofdm_data_mode(struct freedv *f) {
+    return FDV_MODE_ACTIVE( FREEDV_MODE_DATAC0, f->mode) ||
+           FDV_MODE_ACTIVE( FREEDV_MODE_DATAC1, f->mode) ||
+           FDV_MODE_ACTIVE( FREEDV_MODE_DATAC2, f->mode) ||
+           FDV_MODE_ACTIVE( FREEDV_MODE_DATAC3, f->mode);
+}
+       
 /*---------------------------------------------------------------------------*\
 
   FUNCTION....: freedv_tx
@@ -437,6 +456,7 @@ void freedv_rawdatacomptx(struct freedv *f, COMP mod_out[], unsigned char *packe
     if (FDV_MODE_ACTIVE( FREEDV_MODE_1600, f->mode)) freedv_comptx_fdmdv_1600(f, mod_out);
     if (FDV_MODE_ACTIVE( FREEDV_MODE_700C, f->mode)) freedv_comptx_700c(f, mod_out);
     if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode)   ||
+        FDV_MODE_ACTIVE( FREEDV_MODE_DATAC0, f->mode) ||
         FDV_MODE_ACTIVE( FREEDV_MODE_DATAC1, f->mode) ||
         FDV_MODE_ACTIVE( FREEDV_MODE_DATAC2, f->mode) ||
         FDV_MODE_ACTIVE( FREEDV_MODE_DATAC3, f->mode)) freedv_comptx_ofdm(f, mod_out);
@@ -469,32 +489,71 @@ void freedv_rawdatatx(struct freedv *f, short mod_out[], unsigned char *packed_p
 
 int freedv_rawdatapreamblecomptx(struct freedv *f, COMP mod_out[]) {
     assert(f != NULL);
-    assert(f->mode == FREEDV_MODE_FSK_LDPC);
-    struct FSK *fsk = f->fsk;
+    int npreamble_samples = 0;
+    
+    if (f->mode == FREEDV_MODE_FSK_LDPC) {
+        struct FSK *fsk = f->fsk;
 
-    int npreamble_symbols = 50*(fsk->mode>>1);
-    int npreamble_bits = npreamble_symbols*(fsk->mode>>1);
-    int npreamble_samples = fsk->Ts*npreamble_symbols;
-    //fprintf(stderr, "npreamble_symbols: %d npreamble_bits: %d npreamble_samples: %d Nbits: %d N: %d\n",
-    //npreamble_symbols, npreamble_bits, npreamble_samples, fsk->Nbits, fsk->N);
+        int npreamble_symbols = 50*(fsk->mode>>1);
+        int npreamble_bits = npreamble_symbols*(fsk->mode>>1);
+        npreamble_samples = fsk->Ts*npreamble_symbols;
+        //fprintf(stderr, "npreamble_symbols: %d npreamble_bits: %d npreamble_samples: %d Nbits: %d N: %d\n",
+        //npreamble_symbols, npreamble_bits, npreamble_samples, fsk->Nbits, fsk->N);
 
-    assert(npreamble_samples < f->n_nom_modem_samples); /* caller probably using an array of this size */
-    freedv_tx_fsk_ldpc_data_preamble(f, mod_out, npreamble_bits, npreamble_samples);
+        assert(npreamble_samples < f->n_nom_modem_samples); /* caller probably using an array of this size */
+        freedv_tx_fsk_ldpc_data_preamble(f, mod_out, npreamble_bits, npreamble_samples);
+    } else if (is_ofdm_data_mode(f)) {
+        struct OFDM *ofdm = f->ofdm;
+        complex float *tx_preamble = (complex float*)mod_out;
+        memcpy(tx_preamble, ofdm->tx_preamble, sizeof(COMP)*ofdm->samplesperframe);
+        ofdm_hilbert_clipper(ofdm, tx_preamble, ofdm->samplesperframe);
+        npreamble_samples = ofdm->samplesperframe;
+    }
 
     return npreamble_samples;
 }
 
 int freedv_rawdatapreambletx(struct freedv *f, short mod_out[]) {
     assert(f != NULL);
-    COMP mod_out_comp[f->n_nom_modem_samples];
+    COMP mod_out_comp[f->n_nat_modem_samples];
 
     int npreamble_samples = freedv_rawdatapreamblecomptx(f, mod_out_comp);
+    assert(npreamble_samples <= f->n_nat_modem_samples);
 
     /* convert complex to real */
     for(int i=0; i<npreamble_samples; i++)
         mod_out[i] = mod_out_comp[i].real;
 
     return npreamble_samples;
+}
+
+int freedv_rawdatapostamblecomptx(struct freedv *f, COMP mod_out[]) {
+    assert(f != NULL);
+    int npostamble_samples = 0;
+    
+    if (is_ofdm_data_mode(f)) {
+        struct OFDM *ofdm = f->ofdm;
+        complex float *tx_postamble = (complex float*)mod_out;
+        memcpy(tx_postamble, ofdm->tx_postamble, sizeof(COMP)*ofdm->samplesperframe);
+        ofdm_hilbert_clipper(ofdm, tx_postamble, ofdm->samplesperframe);
+        npostamble_samples = ofdm->samplesperframe;
+    }
+
+    return npostamble_samples;
+}
+
+int freedv_rawdatapostambletx(struct freedv *f, short mod_out[]) {
+    assert(f != NULL);
+    COMP mod_out_comp[f->n_nat_modem_samples];
+
+    int npostamble_samples = freedv_rawdatapostamblecomptx(f, mod_out_comp);
+    assert(npostamble_samples <= f->n_nat_modem_samples);
+
+    /* convert complex to real */
+    for(int i=0; i<npostamble_samples; i++)
+        mod_out[i] = mod_out_comp[i].real;
+
+    return npostamble_samples;
 }
 
 /* VHF packet data tx function */
@@ -854,7 +913,7 @@ int freedv_bits_to_speech(struct freedv *f, short speech_out[], short demod_in[]
            }
            else {
                /* sync is solid - decode even through fades as there is still some speech info there */
-               if (f->stats.snr_est > f->snr_squelch_thresh)
+               if (f->snr_est > f->snr_squelch_thresh)
                    decode_speech = 1;
            }
        }
@@ -951,6 +1010,7 @@ int freedv_rawdatacomprx(struct freedv *f, unsigned char *packed_payload_bits, C
     if (FDV_MODE_ACTIVE( FREEDV_MODE_1600, f->mode)) rx_status = freedv_comprx_fdmdv_1600(f, demod_in);
     if (FDV_MODE_ACTIVE( FREEDV_MODE_700C, f->mode)) rx_status = freedv_comprx_700c(f, demod_in);
     if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode)   ||
+        FDV_MODE_ACTIVE( FREEDV_MODE_DATAC0, f->mode) ||
         FDV_MODE_ACTIVE( FREEDV_MODE_DATAC1, f->mode) ||
         FDV_MODE_ACTIVE( FREEDV_MODE_DATAC2, f->mode) ||
         FDV_MODE_ACTIVE( FREEDV_MODE_DATAC3, f->mode)) rx_status = freedv_comp_short_rx_ofdm(f, (void*)demod_in, 0, 1.0f);
@@ -1211,8 +1271,8 @@ void freedv_set_verbose(struct freedv *f, int verbosity) {
     if (FDV_MODE_ACTIVE( FREEDV_MODE_700C, f->mode)) {
         cohpsk_set_verbose(f->cohpsk, f->verbose);
     }
-    if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode)) {
-        ofdm_set_verbose(f->ofdm, f->verbose);
+    if (is_ofdm_mode(f)) {
+        ofdm_set_verbose(f->ofdm, f->verbose-1);
     }
 }
 
@@ -1234,13 +1294,8 @@ void freedv_set_carrier_ampl(struct freedv *f, int c, float ampl) {
   AUTHOR......: David Rowe
   DATE CREATED: May 2018
 
-  Extended control of sync state machines, especially for FreeDV 700D.
-  This mode is required to acquire sync up at very low SNRS.  This is
-  difficult to implement, for example we may get a false sync, or the
-  state machine may fall out of sync by mistake during a long fade.
-
-  So with this API call we allow some operator assistance.
-
+  Extended control of sync state machines for OFDM modes.
+ 
   Ensure this is called in the same thread as freedv_rx().
 
 \*---------------------------------------------------------------------------*/
@@ -1248,8 +1303,18 @@ void freedv_set_carrier_ampl(struct freedv *f, int c, float ampl) {
 void freedv_set_sync(struct freedv *freedv, int sync_cmd) {
     assert (freedv != NULL);
 
-    if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, freedv->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_700E, freedv->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_2020, freedv->mode)) {
+    if (freedv->ofdm != NULL) {
         ofdm_set_sync(freedv->ofdm, sync_cmd);
+    }
+}
+
+// this also selects burst mode
+void freedv_set_frames_per_burst(struct freedv *freedv, int framesperburst) {
+    assert (freedv != NULL);
+    if (freedv->ofdm != NULL) {
+        // change of nomenclature as we cross into the OFDM modem layer. In the
+        // OFDM modem we have packets that contain multiple "modem frames"
+        ofdm_set_packets_per_burst(freedv->ofdm, framesperburst);
     }
 }
 
@@ -1293,11 +1358,18 @@ void freedv_get_fsk_S_and_N               (struct freedv *f, float *S, float *N)
 int freedv_get_n_max_speech_samples(struct freedv *f) {
     /* When "passing through" demod samples to the speech output
        (e.g. no sync and squelch off) f->nin bounces around with
-       timing variations.  So is is possible we may return
+       timing variations.  So we may return
        freedv_get_n_max_modem_samples() via the speech_output[]
        array */
-    if (freedv_get_n_max_modem_samples(f) > f->n_speech_samples)
-        return freedv_get_n_max_modem_samples(f);
+    int max_output_passthrough_samples;
+    if (FDV_MODE_ACTIVE(FREEDV_MODE_2020, f->mode))
+       // In 2020 we oversample the input modem samples from 8->16 kHz
+       max_output_passthrough_samples = 2*freedv_get_n_max_modem_samples(f);
+    else
+       max_output_passthrough_samples = freedv_get_n_max_modem_samples(f);
+    
+    if (max_output_passthrough_samples > f->n_speech_samples)
+        return max_output_passthrough_samples;
     else
         return f->n_speech_samples;
 }
@@ -1340,6 +1412,26 @@ void freedv_get_modem_extended_stats(struct freedv *f, struct MODEM_STATS *stats
     if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_700E, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_2020, f->mode)) {
         ofdm_get_demod_stats(f->ofdm, stats);
     }
+}
+
+int freedv_get_n_tx_preamble_modem_samples(struct freedv *f) {
+    if (f->mode == FREEDV_MODE_FSK_LDPC) {
+        struct FSK *fsk = f->fsk;
+        int npreamble_symbols = 50*(fsk->mode>>1);
+        return fsk->Ts*npreamble_symbols;
+    } else if (is_ofdm_data_mode(f)) {
+        return f->ofdm->samplesperframe;
+    }
+    
+    return 0; 
+}
+
+int freedv_get_n_tx_postamble_modem_samples(struct freedv *f) {
+    if (is_ofdm_data_mode(f)) {
+        return f->ofdm->samplesperframe;
+    }
+    
+    return 0; 
 }
 
 // from http://stackoverflow.com/questions/10564491/function-to-calculate-a-crc16-checksum

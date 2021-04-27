@@ -4,7 +4,8 @@
   AUTHOR......: David Rowe
   DATE CREATED: May 2020
 
-  Functions that implement the various FreeDV 700 modes.
+  Functions that implement the various FreeDV 700 modes, and more generally 
+  OFDM data modes.
 
 \*---------------------------------------------------------------------------*/
 
@@ -27,7 +28,6 @@
 
 #include "codec2_ofdm.h"
 #include "ofdm_internal.h"
-#include "ofdm_mode.h"
 #include "mpdecode_core.h"
 #include "gp_interleaver.h"
 #include "ldpc_codes.h"
@@ -166,8 +166,8 @@ void freedv_ofdm_voice_open(struct freedv *f, char *mode) {
 void freedv_ofdm_data_open(struct freedv *f) {
     struct OFDM_CONFIG ofdm_config;
     char mode[32];
+    if (f->mode == FREEDV_MODE_DATAC0) strcpy(mode, "datac0");
     if (f->mode == FREEDV_MODE_DATAC1) strcpy(mode, "datac1");
-    if (f->mode == FREEDV_MODE_DATAC2) strcpy(mode, "datac2");
     if (f->mode == FREEDV_MODE_DATAC3) strcpy(mode, "datac3");
 
     ofdm_init_mode(mode, &ofdm_config);
@@ -206,7 +206,8 @@ void freedv_ofdm_data_open(struct freedv *f) {
     f->nin = f->nin_prev = ofdm_get_nin(f->ofdm);
     f->n_nat_modem_samples = ofdm_get_samples_per_packet(f->ofdm);
     f->n_nom_modem_samples = ofdm_get_samples_per_frame(f->ofdm);
-    f->n_max_modem_samples = ofdm_get_max_samples_per_frame(f->ofdm);
+    /* in burst mode we might jump a preamble frame */
+    f->n_max_modem_samples = 2*ofdm_get_max_samples_per_frame(f->ofdm);
     f->modem_sample_rate = f->ofdm->config.fs;
     f->sz_error_pattern = f->ofdm_bitsperpacket;
 
@@ -456,32 +457,31 @@ int freedv_comp_short_rx_ofdm(struct freedv *f, void *demod_in_8kHz, int demod_i
             iter = run_ldpc_decoder(ldpc, decoded_codeword, llr, &parityCheckCount);
             memcpy(f->rx_payload_bits, decoded_codeword, Ndatabitsperpacket);
 
-            if (ofdm->data_mode) {
+            if (strlen(ofdm->data_mode)) {
                 // we need a valid CRC to declare a data packet valid
                 if (freedv_check_crc16_unpacked(f->rx_payload_bits, Ndatabitsperpacket))
                     rx_status |= FREEDV_RX_BITS;
                 else
                     rx_status |= FREEDV_RX_BIT_ERRORS;
             } else {
-
+                
                 // voice modes aren't as strict - pass everything through to the speech decoder, but flag
                 // frame with possible errors
                 rx_status |= FREEDV_RX_BITS;
                 if (parityCheckCount != ldpc->NumberParityBits)
                    rx_status |= FREEDV_RX_BIT_ERRORS;
-
             }
 
-            if (f->test_frames && (rx_status & FREEDV_RX_BITS)) {
+            if (f->test_frames) {
                 /* est uncoded BER from payload bits */
-                Nerrs_raw = count_uncoded_errors(ldpc, &f->ofdm->config, payload_syms_de, ofdm->data_mode);
+                Nerrs_raw = count_uncoded_errors(ldpc, &f->ofdm->config, payload_syms_de, strlen(ofdm->data_mode));
                 f->total_bit_errors += Nerrs_raw;
                 f->total_bits += Npayloadbitsperpacket;
 
                 /* coded errors from decoded bits */
                 uint8_t payload_data_bits[Ndatabitsperpacket];
                 ofdm_generate_payload_data_bits(payload_data_bits, Ndatabitsperpacket);
-                if (ofdm->data_mode) {
+                if (strlen(ofdm->data_mode)) {
                     uint16_t tx_crc16 = freedv_crc16_unpacked(payload_data_bits, Ndatabitsperpacket - 16);
                     uint8_t tx_crc16_bytes[] = { tx_crc16 >> 8, tx_crc16 & 0xff };
                     freedv_unpack(payload_data_bits + Ndatabitsperpacket - 16, tx_crc16_bytes, 16);
@@ -503,8 +503,9 @@ int freedv_comp_short_rx_ofdm(struct freedv *f, void *demod_in_8kHz, int demod_i
             }
         }
 
-        if (ofdm->modem_frame == 0) {
-           /* estimate uncoded BER from UW bits, useful in non-testframe modes */
+        if ((ofdm->np == 1) && (ofdm->modem_frame == 0)) {
+           /* add in UW bit errors, useful in non-testframe, 
+              single modem frame per packet modes */
             for(i=0; i<f->ofdm_nuwbits; i++) {
                 if (rx_uw[i] != ofdm->tx_uw[i]) {
                     f->total_bit_errors++;
@@ -519,8 +520,9 @@ int freedv_comp_short_rx_ofdm(struct freedv *f, void *demod_in_8kHz, int demod_i
     f->nin = ofdm_get_nin(ofdm);
     ofdm_sync_state_machine(ofdm, rx_uw);
 
-    if ((f->verbose && (ofdm->last_sync_state == search)) || (f->verbose == 2)) {
-        fprintf(stderr, "%3d nin: %4d st: %-6s euw: %2d %1d mf: %2d f: %5.1f pbw: %d snr: %4.1f eraw: %3d ecdd: %3d iter: %3d "
+    if ((f->verbose && (ofdm->last_sync_state == search)) || (f->verbose >= 2)) {
+        if (rx_status & FREEDV_RX_BITS) {
+            fprintf(stderr, "%3d nin: %4d st: %-6s euw: %2d %2d mf: %2d f: %5.1f pbw: %d snr: %4.1f eraw: %3d ecdd: %3d iter: %3d "
                 "pcc: %3d rxst: %s\n",
                 f->frames++, ofdm->nin,
                 ofdm_statemode[ofdm->last_sync_state],
@@ -529,6 +531,18 @@ int freedv_comp_short_rx_ofdm(struct freedv *f, void *demod_in_8kHz, int demod_i
                 ofdm->modem_frame,
 	 	            (double)ofdm->foff_est_hz, ofdm->phase_est_bandwidth,
                 f->snr_est, Nerrs_raw, Nerrs_coded, iter, parityCheckCount, rx_sync_flags_to_text[rx_status]);
+        }
+        else {
+            fprintf(stderr, "%3d nin: %4d st: %-6s euw: %2d %2d mf: %2d f: %5.1f pbw: %d snr: %4.1f                               "
+                "         rxst: %s\n",
+                f->frames++, ofdm->nin,
+                ofdm_statemode[ofdm->last_sync_state],
+                ofdm->uw_errors,
+                ofdm->sync_counter,
+                ofdm->modem_frame,
+	 	            (double)ofdm->foff_est_hz, ofdm->phase_est_bandwidth,
+                f->snr_est, rx_sync_flags_to_text[rx_status]);
+        }
     }
 
     return rx_status;

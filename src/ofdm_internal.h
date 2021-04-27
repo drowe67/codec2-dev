@@ -46,7 +46,7 @@ extern "C"
 
 #define TAU         (2.0f * M_PI)
 #define ROT45       (M_PI / 4.0f)
-#define MAX_UW_BITS 32
+#define MAX_UW_BITS 64
 
 #define cmplx(value) (cosf(value) + sinf(value) * I)
 #define cmplxconj(value) (cosf(value) + sinf(value) * -I)
@@ -104,7 +104,8 @@ struct OFDM_CONFIG {
     float clip_gain1;     /* gain we apply to Tx signal before clipping to control PAPR*/
     float clip_gain2;     /* gain we apply to Tx signal after clipping and BBF to control peak level */
     bool  clip_en;
-    char mode[16];        /* OFDM mode isn string form */
+    char mode[16];        /* OFDM mode in string form */
+    char *data_mode;
 };
 
 struct OFDM {
@@ -133,14 +134,20 @@ struct OFDM {
     int rowsperframe;
     int samplespersymbol;
     int samplesperframe;
+    int nrxbufhistory;    /* extra storage at start of rxbuf to allow us to step back in time */
+    int nrxbufmin;        /* min number of samples we need in rxbuf to process a modem frame */
+    int rxbufst;          /* start of rxbuf window used for demod of current rx frame */
+    int pre, post;        /* pre-amble and post-amble detections */
     int max_samplesperframe;
     int nuwframes;
     int nrxbuf;
     int ntxtbits;         /* reserve bits/frame for aux text information */
     int nuwbits;          /* number of unique word bits used to achieve packet frame sync */
-    int bad_uw_errors;
+    int bad_uw_errors;    /* threshold for UW detection check */
+    int uw_fails;         /* number of times we exceeded bad_uw_errors and dropped sync */
     int edge_pilots;      /* insert pilots at 1 and Nc+2, to support low bandwidth phase est */
-    int data_mode;        /* true of a data mode, false for voice mode */
+    char *data_mode;      /* "", "streaming", "burst"  */
+    int packetsperburst;  /* for OFDM data modes, how many packets before we reset state machine */
     int amp_est_mode;     /* amplitude estimtor algorithm */
     float amp_scale;
     float clip_gain1;
@@ -169,6 +176,8 @@ struct OFDM {
     complex float **rx_sym;
     complex float *rx_np;
     complex float *tx_uw_syms;
+    COMP          *tx_preamble;
+    COMP          *tx_postamble;
 
     float *rx_amp;
     float *aphase_est_pilot_log;
@@ -209,12 +218,14 @@ struct OFDM {
     int sample_point;
     int timing_est;
     int timing_valid;
+    int ct_est;
     int nin;
     int uw_errors;
     int sync_counter;
-    int frame_count;
-    int modem_frame; /* increments for every modem frame in packet */
-
+    int frame_count;  /* general purpose counter of modem frames */
+    int packet_count; /* data mode: number of packets received so far */ 
+    int modem_frame;  /* increments for every modem frame in packet */
+    
     // Boolean
     bool sync_start;
     bool sync_end;
@@ -223,7 +234,8 @@ struct OFDM {
     bool phase_est_en;
     bool tx_bpf_en;
     bool dpsk_en;
-
+    bool postambledetectoren; /* allows us to optionally disable the postamble detector */
+    
     char *codename;
     char *state_machine;
 };
@@ -240,10 +252,13 @@ void ofdm_assemble_qpsk_modem_packet_symbols(struct OFDM *, complex float [], CO
 void ofdm_disassemble_qpsk_modem_packet(struct OFDM *, complex float rx_syms[], float rx_amps[], COMP [], float [], short []);
 void ofdm_extract_uw(struct OFDM *ofdm, complex float rx_syms[], float rx_amps[], uint8_t rx_uw[]);
 void ofdm_rand(uint16_t [], int);
-void ofdm_generate_payload_data_bits(uint8_t [], int);
+void ofdm_rand_seed(uint16_t r[], int n, uint64_t seed) ;
+void ofdm_generate_payload_data_bits(uint8_t data_bits[], int n);
+void ofdm_generate_preamble(struct OFDM *ofdm, COMP *tx_preamble, int seed);
 int ofdm_get_phase_est_bandwidth_mode(struct OFDM *);
 void ofdm_set_phase_est_bandwidth_mode(struct OFDM *, int);
 void ofdm_clip(complex float tx[], float clip_thresh, int n);
+void ofdm_hilbert_clipper(struct OFDM *ofdm, complex float *tx, size_t n);
 
 #ifdef __cplusplus
 }

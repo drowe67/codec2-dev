@@ -677,8 +677,8 @@ void generate_pilot_lut(COMP pilot_lut[], COMP *pilot_freq)
 	if (f >= 4)
 	    memcpy(&pilot_lut[M_FAC*(f-4)], pilot, M_FAC*sizeof(COMP));
     }
-   
-    // create complex conjugate since we need this and only this later on 
+
+    // create complex conjugate since we need this and only this later on
     for (f=0;f<4*M_FAC;f++)
     {
         pilot_lut[f] = cconj(pilot_lut[f]);
@@ -841,8 +841,8 @@ float rx_est_freq_offset(struct FDMDV *f, COMP rx_fdm[], int nin, int do_fft)
 	f->pilot_baseband2[j] = cmult(rx_fdm[i], prev_pilot[i]);
     }
 #else
-    // TODO: Maybe a handwritten mult taking advantage of rx_fdm[0] being 
-    // used twice would be faster but this is for sure faster than 
+    // TODO: Maybe a handwritten mult taking advantage of rx_fdm[0] being
+    // used twice would be faster but this is for sure faster than
     // the implementation above in any case.
     arm_cmplx_mult_cmplx_f32(&rx_fdm[0].real,&pilot[0].real,&f->pilot_baseband1[NPILOTBASEBAND-nin].real,nin);
     arm_cmplx_mult_cmplx_f32(&rx_fdm[0].real,&prev_pilot[0].real,&f->pilot_baseband2[NPILOTBASEBAND-nin].real,nin);
@@ -1157,13 +1157,13 @@ void down_convert_and_rx_filter(COMP rx_filt[NC+1][P+1], int Nc, COMP rx_fdm[],
         entire rx_fdm_mem array.  To downconvert these we need the LO
         phase referenced to the start of the rx_fdm_mem array.
 
-      
+
         <--------------- Nrx_filt_mem ------->
         nin
         |--------------------------|---------|
         1                          |
         phase_rx(c)
-     
+
         This means winding phase(c) back from this point
         to ensure phase continuity.
 
@@ -1257,7 +1257,7 @@ float rx_est_timing(COMP rx_symbols[],
     adjust = P - nin*P/m;
 
     /* update buffer of NT rate P filtered symbols */
- 
+
     for(c=0; c<Nc+1; c++)
 	for(i=0,j=P-adjust; i<(NT-1)*P+adjust; i++,j++)
 	    rx_filter_mem_timing[c][i] = rx_filter_mem_timing[c][j];
@@ -1318,7 +1318,7 @@ float rx_est_timing(COMP rx_symbols[],
 
     /* This value will be +/- half a symbol so will wrap around at +/-
        M/2 or +/- 80 samples with M=160 */
-    
+
     return norm_rx_timing*m;
 }
 
@@ -1635,7 +1635,7 @@ void fdmdv_demod(struct FDMDV *fdmdv, int rx_bits[],
     PROFILE_SAMPLE(demod_start);
     foff_coarse = rx_est_freq_offset(fdmdv, rx_fdm_bb, *nin, !fdmdv->sync);
     PROFILE_SAMPLE_AND_LOG(fdmdv_freq_shift_start, demod_start, "    rx_est_freq_offset");
-    
+
     if (fdmdv->sync == 0)
 	fdmdv->foff = foff_coarse;
     fdmdv_freq_shift(rx_fdm_fcorr, rx_fdm_bb, -fdmdv->foff, &fdmdv->foff_phase_rect, *nin);
@@ -1759,21 +1759,16 @@ void fdmdv_get_demod_stats(struct FDMDV *fdmdv, struct MODEM_STATS *stats)
 
 \*---------------------------------------------------------------------------*/
 
-void fdmdv_8_to_16(float out16k[], float in8k[], int n)
+void fdmdv_8_to_16(float out16k[], float in8k[], int n8k)
 {
     int i,k,l;
     float acc;
-
-    /* make sure n is an integer multiple of the oversampling rate, ow
-       this function breaks */
-
-    assert((n % FDMDV_OS) == 0);
 
     /* this version unrolled for specific FDMDV_OS */
 
     assert(FDMDV_OS == 2);
 
-    for(i=0; i<n; i++) {
+    for(i=0; i<n8k; i++) {
         acc = 0.0;
         for(k=0,l=0; k<FDMDV_OS_TAPS_16K; k+=FDMDV_OS,l++)
             acc += fdmdv_os_filter[k]*in8k[i-l];
@@ -1788,25 +1783,20 @@ void fdmdv_8_to_16(float out16k[], float in8k[], int n)
     /* update filter memory */
 
     for(i=-(FDMDV_OS_TAPS_8K); i<0; i++)
-	in8k[i] = in8k[i + n];
+	in8k[i] = in8k[i + n8k];
 
 }
 
-void fdmdv_8_to_16_short(short out16k[], short in8k[], int n)
+void fdmdv_8_to_16_short(short out16k[], short in8k[], int n8k)
 {
     int i,k,l;
     float acc;
-
-    /* make sure n is an integer multiple of the oversampling rate, ow
-       this function breaks */
-
-    assert((n % FDMDV_OS) == 0);
 
     /* this version unrolled for specific FDMDV_OS */
 
     assert(FDMDV_OS == 2);
 
-    for(i=0; i<n; i++) {
+    for(i=0; i<n8k; i++) {
         acc = 0.0;
         for(k=0,l=0; k<FDMDV_OS_TAPS_16K; k+=FDMDV_OS,l++)
             acc += fdmdv_os_filter[k]*(float)in8k[i-l];
@@ -1821,7 +1811,7 @@ void fdmdv_8_to_16_short(short out16k[], short in8k[], int n)
     /* update filter memory */
 
     for(i=-(FDMDV_OS_TAPS_8K); i<0; i++)
-	in8k[i] = in8k[i + n];
+	in8k[i] = in8k[i + n8k];
 
 }
 
@@ -1956,6 +1946,9 @@ void fdmdv_simulate_channel(float *sig_pwr_av, COMP samples[], int nin, float ta
     float sig_pwr, target_snr_linear, noise_pwr, noise_pwr_1Hz, noise_pwr_4000Hz, noise_gain;
     int   i;
 
+    /* prevent NAN when we divide by nin below */
+    if (nin == 0) return;
+
     /* estimate signal power */
 
     sig_pwr = 0.0;
@@ -1982,6 +1975,6 @@ void fdmdv_simulate_channel(float *sig_pwr_av, COMP samples[], int nin, float ta
     }
     /*
     fprintf(stderr, "sig_pwr: %f f->sig_pwr_av: %e target_snr_linear: %f noise_pwr_4000Hz: %e noise_gain: %e\n",
-            sig_pwr, f->sig_pwr_av, target_snr_linear, noise_pwr_4000Hz, noise_gain);
+            sig_pwr, *sig_pwr_av, target_snr_linear, noise_pwr_4000Hz, noise_gain);
     */
 }

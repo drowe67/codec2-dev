@@ -94,7 +94,7 @@ struct lsp_codebook {
     int			k;        /* dimension of vector	*/
     int			log2m;    /* number of bits in m	*/
     int			m;        /* elements in codebook	*/
-#ifdef __EMBEDDED                 /* make sure stored in flash  */
+#ifdef __EMBEDDED__       /* make sure stored in flash  */
   const float        *cb;	  /* The elements		*/
 #else
   float              *cb;	  /* The elements		*/

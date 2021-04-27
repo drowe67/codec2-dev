@@ -1,6 +1,6 @@
 # FreeDV Technology
 
-FreeDV is an open source digital voice protocol that integrates modems, codecs, and FEC.
+FreeDV is an open source digital voice protocol that integrates modems, speech codecs, and FEC.
 
 On transmit, FreeDV converts speech to a modem signal you can send over a radio channel.  On receive, FreeDV takes off air modem signals and converts them to speech samples.
 
@@ -33,13 +33,13 @@ This document gives an overview of the technology inside FreeDV, and some additi
 
 These are designed for use with a HF SSB radio.
 
-| Mode | Date | Codec | Modem | RF BW | Raw bits/s | FEC | Text | SNR min | Multipath |
+| Mode | Date | Codec | Modem | RF BW | Raw bits/s | FEC | Text bits/s | SNR min | Multipath |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1600 | 2012 | Codec2 1300 | DQPSK + pilot | 1125 | 1600 | Golay (23,12) | Y | 4 | poor |
-| 700C | 2017 | Codec2 700C | coherent QPSK + diversity | 1500 | 1400 | - | - | 2 | good |
-| 700D | 2018 | Codec2 700C | coherent OFDM/QPSK | 1000 | 1900 | LDPC (224,112)  | Y | -2 | fair |
-| 700E | 2020 | Codec2 700C | coherent OFDM/QPSK | 1500 | 3000 | LDPC (112,56)  | Y | 1 | good |
-| 2020 | 2019 | LPCNet 1733 | coherent OFDM/QPSK | 1600 | 3000 | LDPC (504,396)  | Y | 2 | poor |
+| 1600 | 2012 | Codec2 1300 | 14 DQPSK + 1 DBPSK pilot carrier | 1125 | 1600 | Golay (23,12) | 25 | 4 | poor |
+| 700C | 2017 | Codec2 700C | 14 carrier coherent QPSK + diversity | 1500 | 1400 | - | - | 2 | good |
+| 700D | 2018 | Codec2 700C | 17 carrier coherent OFDM/QPSK | 1000 | 1900 | LDPC (224,112)  | 25 | -2 | fair |
+| 700E | 2020 | Codec2 700C | 21 carrier coherent OFDM/QPSK | 1500 | 3000 | LDPC (112,56)  | 25 | 1 | good |
+| 2020 | 2019 | LPCNet 1733 | 31 carrier coherent OFDM/QPSK | 1600 | 3000 | LDPC (504,396)  | 22.2 | 2 | poor |
 
 Notes:
 
@@ -71,10 +71,10 @@ Notes:
 
 These modes use constant amplitude modulation like FSK or FM, and are designed for VHF and above.  However 800XA can be run over HF or VHF on a SSB radio.
 
-| Mode | Date | Codec2 | Modem | RF BW | Raw bits/s | FEC | Text |
+| Mode | Date | Codec2 | Modem | RF BW | Raw bits/s | FEC | Text bits/s |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| 2400A | 2016 | 1300 | 4FSK | 2400 | 5kHz | Golay (23,12) | Y |
-| 2400B | 2016 | 1300 | baseband/analog FM | analog FM | 2400 | Golay (23,12) | Y |
+| 2400A | 2016 | 1300 | 4FSK | 5kHz | 2400 | Golay (23,12) | 50 |
+| 2400B | 2016 | 1300 | baseband/analog FM | analog FM | 2400 | Golay (23,12) | 50 |
 | 800XA | 2017 | 700C |  4FSK | 2000 | 800 | - | N |
 | FSK_LDPC | 2020 | - | 2 or 4 FSK |  user defined | user defined | LDPC | - | - |
 
@@ -82,7 +82,13 @@ The FSK_LDPC mode is used for data, and has user defined bit rate and a variety 
 
 ## FreeDV API
 
-See [freedv_api.h](src/freedv_api.h) and [freedv_api.c](src/freedv_api.c), and the command line demo programs [freedv_tx.c](src/freedv_tx.c) & [freedv_rx.c](src/freedv_rx.c).  Quickstart demo using FreeDV 1600:
+The `codec2/demo` directory provides simple FreeDV API demo programs written in C and Python to help you get started, for example:
+```
+cd codec2/build_linux
+cat ../raw/ve9qrp_10s.raw | ./demo/freedv_700d_tx | ./demo/freedv_700d_rx | aplay -f S16_LE
+```
+
+See also [freedv_api.h](src/freedv_api.h) and [freedv_api.c](src/freedv_api.c), and the full featured command line demo programs [freedv_tx.c](src/freedv_tx.c) & [freedv_rx.c](src/freedv_rx.c):
 ```
 $ ./freedv_tx 1600 ../../raw/hts1.raw - | ./freedv_rx 1600 - - | aplay -f S16_LE
 $ cat freedv_rx_log.txt
@@ -182,13 +188,4 @@ MultiPath Poor (MPP):
 $ ./src/freedv_tx 700D ../raw/ve9qrp.raw - --clip 0 --testframes | ./src/cohpsk_ch - - -24 --fast --raw_dir ../raw/ --Fs 8000 | ./src/freedv_rx 700D - /dev/null --testframes
 ```
 
-Adjust `--clip [0|1]` and 3rd argument of `cohpsk_ch` to obtain a PER of just less than 0.1, and note the SNR and PAPR reported by `cohpsk_ch`.  The use of the `ve9qrp` samples makes teh test run for a few minutes, to get reasonable multipath channel results.
-
-## Further work
-
-1. ~~Spell check/proofread~~
-1. Screen shots of each modes (waterfall and spectrum), discussing aspects of waveforms
-1. ~~Link to this doc from freedv-gui user manual, rowetel/codec2 page, freedv.org~~
-1. ~~README_fdmdv.txt -> .md~~
-1. nice image or two
-1. table of source files
+Adjust `--clip [0|1]` and 3rd argument of `cohpsk_ch` to obtain a PER of just less than 0.1, and note the SNR and PAPR reported by `cohpsk_ch`.  The use of the `ve9qrp` samples makes the test run for a few minutes, in order to get reasonable multipath channel results.
