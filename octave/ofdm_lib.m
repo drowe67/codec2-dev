@@ -7,6 +7,7 @@
 
 1;
 qam16;
+esno_est;
 
 %-------------------------------------------------------------
 % ofdm_init
@@ -264,10 +265,6 @@ function states = ofdm_init(config)
   % Es/No (SNR) est states
 
   states.EsNo_est_all_symbols = EsNo_est_all_symbols;
-  states.noise_var = 0;
-  states.sig_var = 0;
-  states.sum_sig_var = 0;
-  states.sum_noise_var = 0;
   states.clock_offset_est = 0;
 
   % pre-amble for data modes
@@ -348,11 +345,14 @@ function config = ofdm_init_mode(mode="700D")
     config.edge_pilots = 0; config.timing_mx_thresh = 0.08;
     config.tx_uw = zeros(1,config.Nuwbits);
     config.tx_uw(1:16) = [1 1 0 0  1 0 1 0  1 1 1 1  0 0 0 0];
+    config.amp_scale = 300E3; config.clip_gain1 = 2.2; config.clip_gain2 = 0.8;
   elseif strcmp(mode,"datac1")
     Ns=5; config.Np=38; Tcp = 0.006; Ts = 0.016; Nc = 27; config.data_mode = "streaming";
     config.Ntxtbits = 0; config.Nuwbits = 16; config.bad_uw_errors = 6;
     config.state_machine = "data";
     config.ftwindow_width = 80; config.amp_est_mode = 1; config.EsNodB = 3;
+    % just use default clipper (with no BPF) and let SSB BPF clean it up
+    % config.amp_scale = 125E3; config.clip_gain1 = 2.5; config.clip_gain2 = 0.8;
     config.edge_pilots = 0; config.timing_mx_thresh = 0.10;
     config.tx_uw = [1 1 0 0  1 0 1 0  1 1 1 1  0 0 0 0];
   elseif strcmp(mode,"datac3")
@@ -365,6 +365,7 @@ function config = ofdm_init_mode(mode="700D")
     config.tx_uw(end-24+1:end) = [1 1 0 0  1 0 1 0  1 1 1 1  0 0 0 0  1 1 1 1  0 0 0 0];
     config.amp_est_mode = 1; config.EsNodB = 3;
     config.state_machine = "data"; 
+    config.amp_scale = 300E3; config.clip_gain1 = 2.2; config.clip_gain2 = 0.8;
   elseif strcmp(mode,"1")
     Ns=5; config.Np=10; Tcp=0; Tframe = 0.1; Ts = Tframe/Ns; Nc = 1;
   else
@@ -1083,19 +1084,6 @@ function [states rx_bits achannel_est_rect_log rx_np rx_amp] = ofdm_demod(states
      nin = 0;
   end
       
-  % Estimate signal and noise power to estimate EsNo.  This is used for SNR estimation and (possible) LDPC decoding
-  if states.EsNo_est_all_symbols
-    [sig_var noise_var] = est_signal_and_noise_var(rx_np);
-  else
-    % For QAM we just use this frame's pilots, as these have no amplitude modulation on them
-    [sig_var noise_var] = est_signal_and_noise_var(rx_sym(2,:).*exp(-j*aphase_est_pilot));
-  end
-
-  states.noise_var = noise_var;
-  states.sig_var = sig_var;
-  states.sum_noise_var += noise_var;
-  states.sum_sig_var += sig_var;
-
   % maintain mean amp estimate for LDPC decoder
   states.mean_amp = 0.9*states.mean_amp + 0.1*mean(rx_amp);
 
@@ -1113,93 +1101,15 @@ function [states rx_bits achannel_est_rect_log rx_np rx_amp] = ofdm_demod(states
 endfunction
 
 
-#{
-  ----------------------------------------------------------------------------
-  Estimates of signal and noise power (see cohpsk.m for further
-  explanation).  Signal power is distance from axis on complex
-  plane. Noise power is the distance orthogonal to each symbol, to provide an
-  estimate that is insenstive to fading.
-  
-  For 700D using all symbols in frame worked better than just pilots, but for 
-  QAM we need to use pilots as they don't have modulation that affects estimate.
-  ----------------------------------------------------------------------------
-#}
+function SNR3kdB = snr_from_esno(states, EsNodB)
+    ofdm_load_const;
 
-function [sig_var noise_var] = est_signal_and_noise_var(rx_syms)
-  sig_var = sum(abs(rx_syms) .^ 2)/length(rx_syms);
-  sig_rms = sqrt(sig_var);
-   
-  sum_x = 0;
-  sum_xx = 0;
-  n = 0;
-  for i=1:length(rx_syms)
-    s = rx_syms(i);
-    % only consider symbols a reasonable distance from the origin, as these are
-    % more likely to be valid and not errors that will mess up the estimate
-    if abs(s) > sig_rms
-        % rough demodulation, determine if symbol is on real or imag axis
-        if abs(real(s)) > abs(imag(s))
-          % assume noise is orthogonal to real axis
-          sum_x  += imag(s);
-          sum_xx += imag(s)*imag(s);
-        else
-          % assume noise is orthogonal to imag axis
-          sum_x  += real(s);
-          sum_xx += real(s)*real(s);
-        end
-        n++;
-    end
-  end
-
-  noise_var = 0;
-  if n > 1
-    noise_var = (n*sum_xx - sum_x*sum_x)/(n*(n-1));
-  end
-
-  % Total noise power is twice estimate of single-axis noise.
-  noise_var = 2*noise_var;
-endfunction
-
-function test_est_signal_and_noise_var(channel="awgn")
-    Nsym=1000; rand('seed',1); randn('seed',1);
-    tx_symbols = 2*(rand(1,Nsym) > 0.5) -1 + j*(2*(rand(1,Nsym) > 0.5) - 1);
-    tx_symbols *= exp(-j*pi/4)/sqrt(2);
-    
-    if strcmp(channel,"mpp")
-        % for fading we assume perfect phase recovery, so just multiply by mag
-        spread = doppler_spread(2.0, 50, length(tx_symbols));
-        tx_symbols = tx_symbols .* abs(spread);
-        % normalise power over the multipath channel run
-        S = tx_symbols*tx_symbols'
-        tx_symbols *= sqrt(Nsym/S);
-    end
-    
-    EsNodB = 0:20;
-    for i = 1:length(EsNodB)
-        aEsNodB = EsNodB(i);
-        EsNo = 10 .^ (aEsNodB/10);
-        N = 1/EsNo;
-        noise = sqrt(N/2)*randn(1,Nsym) +  sqrt(N/2)*j*randn(1,Nsym);  
-        S = tx_symbols*tx_symbols';
-        N = noise*noise';
-        EsNo_meas(i) = 10*log10(S/N);
-        rx_symbols = tx_symbols + noise;  
-        [sig_var noise_var] = est_signal_and_noise_var(rx_symbols);
-        EsNo_est(i) = 10*log10(sig_var/noise_var);
-        printf("EsNo: %5.2f EsNo_meas: %5.2f EsNo_est: %5.2f\n", aEsNodB, EsNo_meas(i), EsNo_est(i));
-    end
-    figure(1);
-    plot(EsNodB, EsNo_meas, '+-;EsNo meas;');  hold on; plot(EsNodB, EsNo_est, 'o-;EsNo est;'); hold off;
-    axis([0 max(EsNodB) 0 max(EsNodB)]); grid;
-    figure(2); plot(tx_symbols,'+');
-    test_point_dB = 5; test_point_index = find(EsNodB == test_point_dB)
-    diff = abs(EsNodB(test_point_index) - EsNo_est(test_point_index));
-    printf("test_point: %5.2f dB diff: %5.2f dB\n", EsNodB(test_point_index), EsNo_est(test_point_index));
-    if diff < 1.0
-        printf("Pass\n");
-    else
-        printf("Fail\n");
-    end
+    % We integrate over M samples to get the received symbols.  Additional signal power
+    % is used for the cyclic prefix samples.
+    cyclic_power = 10*log10((Ncp+M)/M);
+    % Es is the energy for each symbol.  To get signal power lets
+    % multiply by symbols/second, and calculate noise power in 3000 Hz.
+    SNR3kdB = EsNodB + 10*log10(Nc*Rs/3000) + cyclic_power;
 endfunction
 
 % ----------------------------------------------------------------------------------
@@ -1579,7 +1489,6 @@ function states = sync_state_machine_data_streaming(states, rx_uw)
       next_state = "synced";
       states.packet_count = 0;
       states.modem_frame = Nuwframes;
-      states.sum_sig_var = states.sum_noise_var = 0;
     else
       states.sync_counter++;
       if states.sync_counter > Np
@@ -1637,7 +1546,6 @@ function states = sync_state_machine_data_burst(states, rx_uw)
         next_state = "synced";
         states.packet_count = 0;                          % number of packets in this burst
         states.modem_frame = Nuwframes;                   % which modem frame we are up to in packet
-        states.sum_sig_var = states.sum_noise_var = 0;
       else
         next_state = "search";
         % reset rxbuf to make sure we only ever do a postamble loop once through same samples
@@ -1943,7 +1851,7 @@ end
 % two stage Hilbert clipper to improve PAPR 
 function tx = ofdm_hilbert_clipper(states, tx, tx_clip_en)
   tx *= states.amp_scale;
-
+  
   % optional compressor to improve PAPR
 
   nclipped = 0;
@@ -1952,12 +1860,15 @@ function tx = ofdm_hilbert_clipper(states, tx, tx_clip_en)
       printf("%f %f\n", states.clip_gain1, states.clip_gain2);
     end
     [tx nclipped] = ofdm_clip(states, tx*states.clip_gain1, states.ofdm_peak);
-    tx *= states.clip_gain2;
+    
+    % BPF, we actually shift the signal back down to baseband to filter
     ssbfilt_n = 100;
     ssbfilt_coeff = fir1(ssbfilt_n, states.txbpf_width_Hz/states.Fs);
-    %figure(2); freqz(ssbfilt_coeff);
     lo = exp(j*2*pi*states.fcentre*(1:length(tx))/(states.Fs));
     tx = lo.*filter(ssbfilt_coeff,1,tx.*conj(lo));
+    
+    % filter messs up peak levels use this to get us back to approx 16384
+    tx *= states.clip_gain2;
   end
 
   % Hilbert Clipper 2 - remove any really low probability outliers after clipping/filtering
@@ -1975,7 +1886,7 @@ function tx = ofdm_hilbert_clipper(states, tx, tx_clip_en)
 endfunction
 
 
-%  helper function that adds channel simulation and ensures we don't clip int output samples  
+%  helper function that adds channel simulation and ensures we don't saturate int16 output samples  
 function [rx_real rx] = ofdm_channel(states, tx, SNR3kdB, channel, freq_offset_Hz)
   [rx_real rx sigma] = channel_simulate(states.Fs, SNR3kdB, freq_offset_Hz, channel, tx, states.verbose);
     

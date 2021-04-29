@@ -326,6 +326,20 @@ The multipath channel carves notches out of the signal, and the level rises and 
 
 The X shape is due to the level of each carrier changing with the fading.  In some cases a carrier is faded down to zero.  The FEC helps clean up any errors due to faded carriers.
 
+## SNR estimation and clipping
+
+The modem estimates the SNR of every received packet, which can be useful for selecting the best mode to maximise bit rate while  minimising the packet error rate.
+
+Clipping (compression) is enabled by default on each modem waveform to maximise the Peak to Average Power Ratio (PAPR).  Power amplifiers are usually rated in terms of peak power (PEP). For a given peak power, clipping increases SNR over the channel by 3-4dB.
+
+Clipping works by introducing controlled distortion, which affects the SNR estimator in the modem.  When clipping is enabled, the SNR reported by the datac0 and datac3 modes will start to roll off and reach a plateau at about 8dB with no channel noise.  For the same channel SNR, datac1 will return a higher (and more accurate) SNR estimate.  If clipping is disabled, the datac0 and datac3 modes will report a more accurate SNR.
+
+This command line demonstrates the effect:
+```
+/src/freedv_data_raw_tx datac3 /dev/zero - --testframes 10 --bursts 10 --clip 1 | ./src/cohpsk_ch - - -100 --raw_dir ../raw  --Fs 8000 | ./src/freedv_data_raw_rx datac3 - /dev/null --testframes --framesperburst 1 -v
+```
+Try adjusting `--clip` and third argument of `cohpsk_ch` (noise level) for different modes.  Note the SNR estimates returned from `freedv_data_raw_rx` compared to the SNR from the channel simulator `cohpsh_ch`. You will notice clipping also increases the RMS power and reduces the PER for a given noise level.
+
 ## Reading Further
 
 Resources:

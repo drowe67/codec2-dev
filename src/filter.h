@@ -41,5 +41,6 @@ extern float quiskFilt120t480[480];
 extern float filtP550S750[160];
 extern float filtP900S1100[100];
 extern float filtP650S900[100];
+extern float filtP400S600[100];
 
 #endif

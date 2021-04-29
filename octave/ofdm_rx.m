@@ -69,7 +69,7 @@ function ofdm_rx(filename, mode="700D", varargin)
 
   rx_np_log = []; timing_est_log = []; delta_t_log = []; foff_est_hz_log = [];
   sample_point_log = [];
-  channel_est_pilot_log = []; sig_var_log = []; noise_var_log = [];
+  channel_est_pilot_log = []; snr_log = [];
   Terrs = Tbits = Terrs_coded = Tbits_coded = Tpackets = Tpacketerrs = 0;
   packet_count = frame_count = 0;
   Nerrs_coded_log = Nerrs_log = [];
@@ -132,6 +132,11 @@ function ofdm_rx(filename, mode="700D", varargin)
         Terrs += Nerrs;
         Tbits += Nbitsperpacket;
         packet_count++;
+        
+        % per-packet SNR estimate
+        EsNo_estdB = esno_est_calc(rx_syms);
+        SNR_estdB = snr_from_esno(states, EsNo_estdB);
+        snr_log = [snr_log SNR_estdB];
       end
 
       % we are in sync so log states
@@ -142,8 +147,6 @@ function ofdm_rx(filename, mode="700D", varargin)
       delta_t_log = [delta_t_log states.delta_t];
       foff_est_hz_log = [foff_est_hz_log states.foff_est_hz];
       channel_est_pilot_log = [channel_est_pilot_log; achannel_est_pilot_log];
-      sig_var_log = [sig_var_log states.sig_var];
-      noise_var_log = [noise_var_log states.noise_var];
 
       frame_count++;
     end
@@ -153,9 +156,9 @@ function ofdm_rx(filename, mode="700D", varargin)
     if states.verbose
       if strcmp(states.last_sync_state,'search') == 0
         if (states.modem_frame == 0) && (strcmp(states.sync_state, "trial") == 0)
-          printf(" euw: %3d %d mf: %2d pbw: %s foff: %4.1f eraw: %3d ",
+          printf(" euw: %3d %d mf: %2d pbw: %s foff: %4.1f eraw: %3d snr: %5.2f",
                  states.uw_errors, states.sync_counter, states.modem_frame, states.phase_est_bandwidth(1),
-                 states.foff_est_hz, Nerrs);
+                 states.foff_est_hz, Nerrs, SNR_estdB);
         else
           printf(" euw: %3d %d mf: %2d pbw: %s foff: %4.1f",
                  states.uw_errors, states.sync_counter, states.modem_frame, states.phase_est_bandwidth(1),
@@ -189,11 +192,9 @@ function ofdm_rx(filename, mode="700D", varargin)
     printf("BER2.: %5.4f Tbits: %5d Terrs: %5d\n", Terrs/Tbits, Tbits, Terrs);
   end
 
-  EsNo_est = mean(sig_var_log)/mean(noise_var_log);
-  EsNo_estdB = 10*log10(EsNo_est);
-  SNR_estdB = EsNo_estdB + 10*log10(Nc*Rs*bps/3000);
-  printf("Packets: %3d Npre: %d Npost: %d Es/No est dB: % -4.1f SNR3k: %3.2f\n",
-         packet_count, states.npre, states.npost, EsNo_estdB, SNR_estdB);
+  SNR_estdB = mean(snr_log);
+  printf("Packets: %3d Npre: %d Npost: %d SNR3k: %3.2f\n",
+         packet_count, states.npre, states.npost, SNR_estdB);
 
   figure(1); clf;
   tmp = exp(j*pi/4)*rx_np_log(floor(end/4):floor(end-end/8));
@@ -235,14 +236,8 @@ function ofdm_rx(filename, mode="700D", varargin)
   endif
 
   figure(7); clf;
-  plot(10*log10(sig_var_log),'b;Es;');
-  hold on;
-  plot(10*log10(noise_var_log),'r;No;');
-  snr_estdB = 10*log10(sig_var_log) - 10*log10(noise_var_log) + 10*log10(Nc*Rs/3000);
-  snr_smoothed_estdB = filter(0.1,[1 -0.9],snr_estdB);
-  plot(snr_smoothed_estdB,'g;SNR3k;');
-  hold off;
-  title('Signal and Noise Power estimates');
+  plot(snr_log);
+  title('SNR estimates');
 
   figure(8); clf; plot_specgram(rx, 8000, 500, 2500);
 

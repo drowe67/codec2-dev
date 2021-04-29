@@ -35,6 +35,8 @@
 #include <signal.h>
 
 #include "freedv_api.h"
+#include "modem_stats.h"
+#include "octave.h"
 #include "fsk.h"
 
 /* other processes can end this program using signals */
@@ -54,13 +56,20 @@ int main(int argc, char *argv[]) {
     int                        verbose = 0, use_testframes = 0;
     int                        mask = 0;
     int                        framesperburst = 0;
-
+    FILE                      *foct = NULL;
+    int                        quiet = 0;
+    int                        single_line_summary = 0;
+    float                      snr_sum = 0.0;
+    
     if (argc < 3) {
     helpmsg:
       	fprintf(stderr, "\nusage: %s [options] FSK_LDPC|DATAC0|DATAC1|DATAC3 InputModemSpeechFile BinaryDataFile\n"
-               "  -v or --vv             verbose options\n"
-               "  --testframes           count raw and coded errors in testframes sent by tx\n"
-               "  --framesperburst  N    selects burst mode, N frames per burst (must match Tx)\n"
+               "  -v or --vv              verbose options\n"
+               "  --testframes            count raw and coded errors in testframes sent by tx\n"
+               "  --framesperburst  N     selects burst mode, N frames per burst (must match Tx)\n"
+               "  --scatter         file  write scatter diagram symbols to file (Octave text file format)\n"
+               "  --singleline            single line summary at end of test, used for logging\n"
+               "  --quiet\n"
                "\n"
                "For FSK_LDPC only:\n\n"
                "  -m      2|4     number of FSK tones\n"
@@ -84,12 +93,22 @@ int main(int argc, char *argv[]) {
             {"vvv",             no_argument,        0, 'y'},
             {"mask",            required_argument,  0, 'k'},
             {"framesperburst",  required_argument,  0, 's'},
+            {"scatter",         required_argument,  0, 'c'},
+            {"quiet",           required_argument,  0, 'q'},
+            {"singleline",      no_argument,        0, 'b'},
             {0, 0, 0, 0}
         };
 
-        o = getopt_long(argc,argv,"f:hm:r:tvx",long_opts,&opt_idx);
+        o = getopt_long(argc,argv,"bf:hm:qr:tvx",long_opts,&opt_idx);
 
         switch(o) {
+        case 'b':
+            single_line_summary = 1;
+            break;
+        case 'c':
+            foct = fopen(optarg,"wt");
+            assert(foct != NULL);
+            break;
         case 'f':
             adv.Fs = atoi(optarg);
             break;
@@ -100,11 +119,13 @@ int main(int argc, char *argv[]) {
         case 'm':
             adv.M = atoi(optarg);
             break;
+        case 'q':
+            quiet = 1;
+            break;
         case 'r':
             adv.Rs = atoi(optarg);
             break;
         case 's':
-            fprintf(stderr,"burst mode!\n");
             framesperburst = atoi(optarg);
             break;
         case 't':
@@ -171,14 +192,14 @@ int main(int argc, char *argv[]) {
     
     if (mode == FREEDV_MODE_FSK_LDPC) {
         struct FSK *fsk = freedv_get_fsk(freedv);
-        fprintf(stderr, "Nbits: %d N: %d Ndft: %d\n", fsk->Nbits, fsk->N, fsk->Ndft);
+        if (!quiet) fprintf(stderr, "Nbits: %d N: %d Ndft: %d\n", fsk->Nbits, fsk->N, fsk->Ndft);
     }
 
     /* for streaming bytes it's much easier use the modes that have a multiple of 8 payload bits/frame */
     assert((freedv_get_bits_per_modem_frame(freedv) % 8) == 0);
     int bytes_per_modem_frame = freedv_get_bits_per_modem_frame(freedv)/8;
     // last two bytes used for CRC
-    fprintf(stderr, "payload bytes_per_modem_frame: %d\n", bytes_per_modem_frame - 2);
+    if (!quiet) fprintf(stderr, "payload bytes_per_modem_frame: %d\n", bytes_per_modem_frame - 2);
     uint8_t bytes_out[bytes_per_modem_frame];
     short  demod_in[freedv_get_n_max_modem_samples(freedv)];
 
@@ -199,8 +220,17 @@ int main(int argc, char *argv[]) {
         if (nbytes) {
             // dont output CRC
             fwrite(bytes_out, sizeof(uint8_t), nbytes-2, fout);
+            
+            // log some stats
             nbytes_out += nbytes-2;
             nframes_out++;
+            struct MODEM_STATS stats;
+            freedv_get_modem_extended_stats(freedv, &stats);
+            snr_sum += stats.snr_est;
+            if (foct) {
+                char name[64]; sprintf(name, "rx_symbols_%d", nframes_out);
+                octave_save_complex(foct, name, (COMP*) stats.rx_symbols, stats.nr, stats.Nc, MODEM_STATS_NC_MAX+1);
+            }
         }
         
 	    /* if using pipes we probably don't want the usual buffering */
@@ -210,8 +240,10 @@ int main(int argc, char *argv[]) {
 
     fclose(fin);
     fclose(fout);
-    fprintf(stderr, "modem bufs processed: %d  output bytes: %d output_frames: %d \n", buf, nbytes_out, nframes_out);
-
+    fprintf(stderr, "modembufs: %6d bytes: %5d Frms.: %5d SNRAv: %5.2f\n", 
+            buf, nbytes_out, nframes_out, snr_sum/nframes_out);
+    int ret = 0;
+    
     /* in testframe mode finish up with some stats */
 
     if (freedv_get_test_frames(freedv)) {
@@ -225,14 +257,24 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "Coded BER: %5.4f Tbits: %5d Terrs: %5d\n", (double)coded_ber, Tbits_coded, Terrs_coded);
         int Tpackets = freedv_get_total_packets(freedv);
         int Tpacket_errors = freedv_get_total_packet_errors(freedv);
-        fprintf(stderr, "Coded PER: %5.4f Tpkts: %5d Tpers: %5d\n", (float)Tpacket_errors/Tpackets, Tpackets, Tpacket_errors);
+        fprintf(stderr, "Coded FER: %5.4f Tfrms: %5d Tfers: %5d\n", (float)Tpacket_errors/Tpackets, Tpackets, Tpacket_errors);
+        
+        if (single_line_summary) {
+            struct MODEM_STATS stats;
+            freedv_get_modem_extended_stats(freedv, &stats);
+            fprintf(stderr, "FrmGd FrmDt Bytes SNRAv RawBER    Pre  Post UWfails\n");
+            fprintf(stderr, "%5d %5d %5d %5.2f %5.4f  %5d %5d   %5d\n", 
+                    nframes_out, Tpackets, nbytes_out, snr_sum/nframes_out, uncoded_ber, stats.pre, stats.post, stats.uw_fails);
+        }
+        
         /* set return code for Ctest */
         if ((uncoded_ber < 0.1f) && (coded_ber < 0.01f))
-            return 0;
+            ret = 0;
         else
-            return 1;
+            ret = 1;
     }
 
     freedv_close(freedv);
-    return 0;
+    if (foct) fclose(foct);
+    return ret;
 }

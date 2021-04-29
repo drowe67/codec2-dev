@@ -35,7 +35,7 @@
 #endif
 
 #define MODEM_STATS_NC_MAX      50
-#define MODEM_STATS_NR_MAX      8
+#define MODEM_STATS_NR_MAX      160
 #define MODEM_STATS_ET_MAX      8
 #define MODEM_STATS_EYE_IND_MAX 160
 #define MODEM_STATS_NSPEC       512
@@ -55,8 +55,10 @@ struct MODEM_STATS {
     float  rx_timing;                        /* estimated optimum timing offset in samples         */
     float  clock_offset;                     /* Estimated tx/rx sample clock offset in ppm         */
     float  sync_metric;                      /* number between 0 and 1 indicating quality of sync  */
-
-    /* eye diagram traces */
+    int    pre, post;                        /* preamble/postamble det counters for burst data     */
+    int    uw_fails;                         /* Failed to detect Unique word (burst data)          */
+    
+    /* FSK eye diagram traces */
     /* Eye diagram plot -- first dim is trace number, second is the trace idx */
 #ifndef __EMBEDDED__
     float  rx_eye[MODEM_STATS_ET_MAX][MODEM_STATS_EYE_IND_MAX];
