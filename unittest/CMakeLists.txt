@@ -26,6 +26,9 @@ target_link_libraries(tofdm m codec2)
 add_executable(tofdm_acq tofdm_acq.c ../src/octave.c)
 target_link_libraries(tofdm_acq m codec2)
 
+add_executable(tesno_est tesno_est.c)
+target_link_libraries(tesno_est m codec2)
+
 if(UNIX) # Uses pthreads
 add_executable(tfifo tfifo.c ../src/codec2_fifo.c)
 target_link_libraries(tfifo codec2 ${CMAKE_THREAD_LIBS_INIT})

@@ -133,7 +133,6 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
          FDV_MODE_ACTIVE( FREEDV_MODE_FSK_LDPC, mode) ||
          FDV_MODE_ACTIVE( FREEDV_MODE_DATAC0, mode)   ||
          FDV_MODE_ACTIVE( FREEDV_MODE_DATAC1, mode)   ||
-         FDV_MODE_ACTIVE( FREEDV_MODE_DATAC2, mode)   ||
          FDV_MODE_ACTIVE( FREEDV_MODE_DATAC3, mode))
          == false) return NULL;
 
@@ -156,7 +155,6 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
     if (FDV_MODE_ACTIVE( FREEDV_MODE_FSK_LDPC, mode)) freedv_fsk_ldpc_open(f, adv);
     if (FDV_MODE_ACTIVE( FREEDV_MODE_DATAC0, mode)) freedv_ofdm_data_open(f);
     if (FDV_MODE_ACTIVE( FREEDV_MODE_DATAC1, mode)) freedv_ofdm_data_open(f);
-    if (FDV_MODE_ACTIVE( FREEDV_MODE_DATAC2, mode)) freedv_ofdm_data_open(f);
     if (FDV_MODE_ACTIVE( FREEDV_MODE_DATAC3, mode)) freedv_ofdm_data_open(f);
 
     varicode_decode_init(&f->varicode_dec_states, 1);
@@ -235,7 +233,6 @@ void freedv_close(struct freedv *freedv) {
 
     if (FDV_MODE_ACTIVE( FREEDV_MODE_DATAC0, freedv->mode) ||
         FDV_MODE_ACTIVE( FREEDV_MODE_DATAC1, freedv->mode) ||
-        FDV_MODE_ACTIVE( FREEDV_MODE_DATAC2, freedv->mode) ||
         FDV_MODE_ACTIVE( FREEDV_MODE_DATAC3, freedv->mode))
     {
         FREE(freedv->rx_syms);
@@ -263,14 +260,12 @@ static int is_ofdm_mode(struct freedv *f) {
            FDV_MODE_ACTIVE( FREEDV_MODE_700E, f->mode)   ||
            FDV_MODE_ACTIVE( FREEDV_MODE_DATAC0, f->mode) ||
            FDV_MODE_ACTIVE( FREEDV_MODE_DATAC1, f->mode) ||
-           FDV_MODE_ACTIVE( FREEDV_MODE_DATAC2, f->mode) ||
            FDV_MODE_ACTIVE( FREEDV_MODE_DATAC3, f->mode);
 }
        
 static int is_ofdm_data_mode(struct freedv *f) {
     return FDV_MODE_ACTIVE( FREEDV_MODE_DATAC0, f->mode) ||
            FDV_MODE_ACTIVE( FREEDV_MODE_DATAC1, f->mode) ||
-           FDV_MODE_ACTIVE( FREEDV_MODE_DATAC2, f->mode) ||
            FDV_MODE_ACTIVE( FREEDV_MODE_DATAC3, f->mode);
 }
        
@@ -458,7 +453,6 @@ void freedv_rawdatacomptx(struct freedv *f, COMP mod_out[], unsigned char *packe
     if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode)   ||
         FDV_MODE_ACTIVE( FREEDV_MODE_DATAC0, f->mode) ||
         FDV_MODE_ACTIVE( FREEDV_MODE_DATAC1, f->mode) ||
-        FDV_MODE_ACTIVE( FREEDV_MODE_DATAC2, f->mode) ||
         FDV_MODE_ACTIVE( FREEDV_MODE_DATAC3, f->mode)) freedv_comptx_ofdm(f, mod_out);
 
     if (FDV_MODE_ACTIVE( FREEDV_MODE_FSK_LDPC, f->mode)) {
@@ -1012,7 +1006,6 @@ int freedv_rawdatacomprx(struct freedv *f, unsigned char *packed_payload_bits, C
     if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode)   ||
         FDV_MODE_ACTIVE( FREEDV_MODE_DATAC0, f->mode) ||
         FDV_MODE_ACTIVE( FREEDV_MODE_DATAC1, f->mode) ||
-        FDV_MODE_ACTIVE( FREEDV_MODE_DATAC2, f->mode) ||
         FDV_MODE_ACTIVE( FREEDV_MODE_DATAC3, f->mode)) rx_status = freedv_comp_short_rx_ofdm(f, (void*)demod_in, 0, 1.0f);
     if (FDV_MODE_ACTIVE( FREEDV_MODE_FSK_LDPC, f->mode)) {
         rx_status = freedv_rx_fsk_ldpc_data(f, demod_in);
@@ -1192,9 +1185,6 @@ void freedv_get_modem_stats(struct freedv *f, int *sync, float *snr_est)
         fdmdv_get_demod_stats(f->fdmdv, &f->stats);
     if (FDV_MODE_ACTIVE( FREEDV_MODE_700C, f->mode))
         cohpsk_get_demod_stats(f->cohpsk, &f->stats);
-    if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_700E, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_2020, f->mode)) {
-        ofdm_get_demod_stats(f->ofdm, &f->stats);
-    }
     if (FDV_MODE_ACTIVE( FREEDV_MODE_2400B, f->mode)) {
         fmfsk_get_demod_stats(f->fmfsk, &f->stats);
     }
@@ -1231,17 +1221,19 @@ void freedv_set_tx_amp                    (struct freedv *f, float amp) {f->tx_a
 
 void freedv_set_clip(struct freedv *f, int val) {
     f->clip_en = val;
-    if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_700E, f->mode)) {
+    if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_700E, f->mode)
+        || FDV_MODE_ACTIVE( FREEDV_MODE_DATAC0, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_DATAC3, f->mode)) {
       f->ofdm->clip_en = val;
       /* really should have BPF if we clip */
       if (val) ofdm_set_tx_bpf(f->ofdm, true);
     }
 }
 
-/* Band Pass Filter to cleanup OFDM tx waveform, only supported by FreeDV 700D and 700E */
+/* Band Pass Filter to cleanup OFDM tx waveform, only supported by some modes */
 
 void freedv_set_tx_bpf(struct freedv *f, int val) {
-    if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_700E, f->mode)) {
+    if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_700E, f->mode) 
+        || FDV_MODE_ACTIVE( FREEDV_MODE_DATAC0, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_DATAC3, f->mode)) {
         ofdm_set_tx_bpf(f->ofdm, val);
     }
 }
@@ -1397,7 +1389,7 @@ void freedv_get_modem_extended_stats(struct freedv *f, struct MODEM_STATS *stats
 
     if (FDV_MODE_ACTIVE( FREEDV_MODE_2400A, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_800XA, f->mode)) {
         fsk_get_demod_stats(f->fsk, stats);
-        float EbNodB = stats->snr_est;                       /* fsk demod actually estimates Eb/No     */
+        float EbNodB = stats->snr_est;                          /* fsk demod actually estimates Eb/No     */
         stats->snr_est = EbNodB + 10.0f*log10f(800.0f/3000.0f); /* so convert to SNR Rb=800, noise B=3000 */
     }
 
@@ -1409,8 +1401,9 @@ void freedv_get_modem_extended_stats(struct freedv *f, struct MODEM_STATS *stats
         cohpsk_get_demod_stats(f->cohpsk, stats);
     }
 
-    if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_700E, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_2020, f->mode)) {
-        ofdm_get_demod_stats(f->ofdm, stats);
+    if (is_ofdm_mode(f)) {
+        // OFDM modem stats updated when demod runs, just copy last update
+        memcpy(stats, &f->stats, sizeof(struct MODEM_STATS));
     }
 }
 

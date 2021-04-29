@@ -18,4 +18,5 @@ function S = plot_specgram(x, Fs=8000, fmin, fmax)
   if nargin > 2
     axis([0 max(t) fmin fmax])
   end
+  xlabel('Time (s)'); ylabel('Freq (Hz)');
 endfunction

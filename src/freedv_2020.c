@@ -208,8 +208,6 @@ int freedv_comprx_2020(struct freedv *f, COMP demod_in[]) {
         ofdm_disassemble_qpsk_modem_packet(ofdm, ofdm->rx_np, ofdm->rx_amp, payload_syms, payload_amps, txt_bits);
 
         f->sync = 1;
-        ofdm_get_demod_stats(f->ofdm, &f->stats);
-        f->snr_est = f->stats.snr_est;
 
         assert((f->ofdm_nuwbits+f->ofdm_ntxtbits+coded_bits_per_frame) == f->ofdm_bitsperframe);
 
@@ -295,6 +293,9 @@ int freedv_comprx_2020(struct freedv *f, COMP demod_in[]) {
             }
         }
         f->total_bits += f->ofdm_nuwbits;
+        
+        ofdm_get_demod_stats(f->ofdm, &f->stats, ofdm->rx_np, ofdm->rowsperframe*ofdm->nc);
+        f->snr_est = f->stats.snr_est;
     }
 
     /* iterate state machine and update nin for next call */
