@@ -367,7 +367,10 @@ function config = ofdm_init_mode(mode="700D")
     config.state_machine = "data"; 
     config.amp_scale = 300E3; config.clip_gain1 = 2.2; config.clip_gain2 = 0.8;
   elseif strcmp(mode,"1")
-    Ns=5; config.Np=10; Tcp=0; Tframe = 0.1; Ts = Tframe/Ns; Nc = 1;
+    Ns=5; config.Np=10; Tcp=0; Ts=0.010; Nc = 1;
+    config.state_machine = "data"; config.data_mode = "streaming";
+    config.edge_pilots = 0;    
+    config.Ntxtbits = 0; config.Nuwbits = 10; config.bad_uw_errors = 3;
   else
     % try to parse mode string for user defined mode
     vec = sscanf(mode, "Ts=%f Nc=%d Ncp=%f");
@@ -395,7 +398,10 @@ function print_config(states)
     for r=1:Ns
       for c=cr
         if r == 1
-          sym="P";
+          sym=" ";
+          if states.edge_pilots || (c>1 && c <=(Nc+1))
+             sym="P";
+          end
         elseif c>1 && c <=(Nc+1)
           sym=".";
           if (u <= Nuwsyms) && (s == uw_ind_sym(u)) sym="U"; u++; end
