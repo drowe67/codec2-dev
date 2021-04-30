@@ -3,7 +3,6 @@
 # David June 2019
 # Tests 700D OFDM modem fading channel performance, using a simulated channel
 
-PATH=$PATH:@CMAKE_CURRENT_BINARY_DIR@/src
 RAW=$PWD/../raw
 results=$(mktemp)
 

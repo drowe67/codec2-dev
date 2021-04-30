@@ -2,7 +2,6 @@
 # test_700c_eq.sh
 # make sure 700C EQ is reducing VQ distortion
 
-PATH=@CMAKE_CURRENT_BINARY_DIR@/src:$PATH
 results=$(mktemp)
 
 c2enc 700C ../raw/kristoff.raw /dev/null --var 2> $results
