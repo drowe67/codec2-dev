@@ -1402,8 +1402,11 @@ void freedv_get_modem_extended_stats(struct freedv *f, struct MODEM_STATS *stats
     }
 
     if (is_ofdm_mode(f)) {
-        // OFDM modem stats updated when demod runs, just copy last update
-        memcpy(stats, &f->stats, sizeof(struct MODEM_STATS));
+        // OFDM modem stats updated when demod runs, so copy last update
+        // We need to avoid over writing the FFT states which are updated by a different function
+        // TODO we need a better ddesign here: Issue #182
+        size_t ncopy = (void*)stats->rx_eye - (void*)stats;
+        memcpy(stats, &f->stats, ncopy);
     }
 }
 
