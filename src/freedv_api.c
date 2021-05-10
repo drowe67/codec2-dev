@@ -799,7 +799,7 @@ int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]) {
 
 int freedv_shortrx(struct freedv *f, short speech_out[], short demod_in[], float gain) {
     assert(f != NULL);
-    int rx_status;
+    int rx_status = 0;
     f->nin_prev = f->nin;
 
     // At this stage short interface only supported for 700D, to help
