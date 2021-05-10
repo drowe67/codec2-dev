@@ -133,8 +133,7 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
          FDV_MODE_ACTIVE( FREEDV_MODE_FSK_LDPC, mode) ||
          FDV_MODE_ACTIVE( FREEDV_MODE_DATAC0, mode)   ||
          FDV_MODE_ACTIVE( FREEDV_MODE_DATAC1, mode)   ||
-         FDV_MODE_ACTIVE( FREEDV_MODE_DATAC3, mode))
-         == false) return NULL;
+         FDV_MODE_ACTIVE( FREEDV_MODE_DATAC3, mode)) == false) return NULL;
 
     /* set everything to zero just in case */
     f = (struct freedv*)CALLOC(1, sizeof(struct freedv));

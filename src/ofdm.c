@@ -1792,7 +1792,9 @@ float ofdm_esno_est_calc(complex float *rx_sym, int nsym) {
         noise_var = sig_var;
     noise_var *= 2.0f;
     
-    return 10.0*log10(sig_var/noise_var); 
+    float EsNodB = 10.0*log10((1E-12+sig_var)/(1E-12+noise_var));
+    assert(isnan(EsNodB) == 0);
+    return EsNodB;
 }
 
 
