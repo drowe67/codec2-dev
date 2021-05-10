@@ -14,7 +14,15 @@
 #include <math.h>
 #include <stdlib.h>
 #include <stdio.h>
+
 #include "defines.h"
+
+#ifndef M_PI
+#define M_PI        3.14159265358979323846f
+#endif
+
+#define cmplx(value) (cosf(value) + sinf(value) * I)
+#define cmplxconj(value) (cosf(value) + sinf(value) * -I)
 
 int main(int argc, char *argv[]) {
     MODEL model;
@@ -51,28 +59,31 @@ int main(int argc, char *argv[]) {
     int wr = 0;
     while(fread(&model, sizeof(MODEL), 1, stdin)) {
 	float Wo = model.Wo; int L = model.L;
-	float P = 2.0*M_PI/Wo;
-	float best_error = 1E32; float best_n0=0.0;
+	float P = 2.0f * M_PI / Wo;
+	float best_error = 1E32f; float best_n0=0.0f;
 
 	/* note weighting MSE by log10(Am) works much better than
            Am*Am, the latter tends to fit a linear phase model between
            the two highest amplitude harmonics */
 
-	for(float n0=0; n0<=P; n0+=0.25) {
-	    float error = 0.0;
+	for(float n0 = 0.0f; n0 <= P; n0 += 0.25f) {
+	    float error = 0.0f;
+
 	    for(int m=1; m<=L; m++) {
-		complex diff = cexp(I*model.phi[m]) - cexp(I*n0*m*Wo);
-		error += log10(model.A[m])*cabs(diff)*cabs(diff);
+		complex float diff = cmplx(model.phi[m]) - cmplx(n0 * m * Wo);
+		error += log10f(model.A[m]) * powf(cabsf(diff), 2.0f); // cabsf is expensive
 	    }
+
 	    if (error < best_error) {
 		best_error = error;
 		best_n0 = n0;
 	    }
 	}
+        
 	if (extract) {
 	    for(int m=1; m<=L; m++) {
-		complex diff = cexp(I*model.phi[m])*cexp(-I*best_n0*m*Wo);		
-		model.phi[m] = carg(diff);
+		complex float diff = cmplx(model.phi[m]) * cmplxconj(best_n0 * m * Wo);
+		model.phi[m] = cargf(diff);
 	    }
 	    assert(fwrite(&model, sizeof(MODEL), 1, stdout));
 	    wr++;
@@ -81,8 +92,8 @@ int main(int argc, char *argv[]) {
 	    MODEL disp;
 	    assert(fread(&disp, sizeof(MODEL), 1, fdisp) == 1);
 	    for(int m=1; m<=L; m++) {
-		complex combined = cexp(I*disp.phi[m])*cexp(I*best_n0*m*Wo);		
-		model.phi[m] = carg(combined);
+		complex float combined = cmplx(disp.phi[m]) * cmplx(best_n0 * m * Wo);
+		model.phi[m] = cargf(combined);
 	    }
 	    assert(fwrite(&model, sizeof(MODEL), 1, stdout));
 	    wr++;
