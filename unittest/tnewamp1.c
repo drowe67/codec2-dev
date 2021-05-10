@@ -102,7 +102,7 @@ int main(int argc, char *argv[]) {
             H[f][m].real = 0.0;
             H[f][m].imag = 0.0;
         }
-        for(k=0; m<K; k++)
+        for(k=0; k<K; k++)
             interpolated_surface_[f][k] = 0.0;
         voicing_[f] = 0;
     }

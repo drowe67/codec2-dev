@@ -90,7 +90,7 @@ int main(int argc, char *argv[])
     Tbits = Terrs = Tbits_raw = Terrs_raw = Tpackets = Tpacketerrs = 0;
     
     FILE *fin, *fout;
-    int   sdinput, nread, offset;
+    int   sdinput, nread, offset=0;
 
     /* File I/O mode ------------------------------------------------*/
 

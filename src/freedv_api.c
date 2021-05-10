@@ -133,8 +133,7 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
          FDV_MODE_ACTIVE( FREEDV_MODE_FSK_LDPC, mode) ||
          FDV_MODE_ACTIVE( FREEDV_MODE_DATAC0, mode)   ||
          FDV_MODE_ACTIVE( FREEDV_MODE_DATAC1, mode)   ||
-         FDV_MODE_ACTIVE( FREEDV_MODE_DATAC3, mode))
-         == false) return NULL;
+         FDV_MODE_ACTIVE( FREEDV_MODE_DATAC3, mode)) == false) return NULL;
 
     /* set everything to zero just in case */
     f = (struct freedv*)CALLOC(1, sizeof(struct freedv));
@@ -800,7 +799,7 @@ int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]) {
 
 int freedv_shortrx(struct freedv *f, short speech_out[], short demod_in[], float gain) {
     assert(f != NULL);
-    int rx_status;
+    int rx_status = 0;
     f->nin_prev = f->nin;
 
     // At this stage short interface only supported for 700D, to help
