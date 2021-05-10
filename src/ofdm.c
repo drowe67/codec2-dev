@@ -1792,15 +1792,15 @@ float ofdm_esno_est_calc(complex float *rx_sym, int nsym) {
         noise_var = sig_var;
     noise_var *= 2.0f;
     
-    float EsNodB = 10.0*log10((1E-12+sig_var)/(1E-12+noise_var));
+    float EsNodB = 10.0f * log10f((1E-12f + sig_var) / (1E-12f + noise_var));
     assert(isnan(EsNodB) == 0);
     return EsNodB;
 }
 
 
 float ofdm_snr_from_esno(struct OFDM *ofdm, float EsNodB) {
-    float cyclic_power = 10.0*log10((float)(ofdm->ncp+ofdm->m)/ofdm->m);
-    return EsNodB + 10.0*log10((float)(ofdm->nc*ofdm->rs)/3000.0) + cyclic_power;
+    float cyclic_power = 10.0f * log10f((float)(ofdm->ncp + ofdm->m) / ofdm->m);
+    return EsNodB + 10.0f * log10f((float)(ofdm->nc * ofdm->rs) / 3000.0f) + cyclic_power;
 }
 
 /*
