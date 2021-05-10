@@ -39,6 +39,7 @@
 #include <math.h>
 #include <ctype.h>
 #include <getopt.h>
+#include <time.h>
 
 /*-----------------------------------------------------------------------*\
 
@@ -58,7 +59,7 @@
 void zero(float v[], int k);
 void acc(float v1[], float v2[], int k);
 void norm(float v[], int k, long n);
-long quantise(float cb[], float vec[], int k, int m, float *beste, float *se);
+long quantise(float cb[], float vec[], int k, int m, int st, int en, float *beste, float *se);
 
 /*-----------------------------------------------------------------------* \
 
@@ -85,6 +86,8 @@ int main(int argc, char *argv[]) {
     int     ret;
     float   deltaq_stop = DELTAQ;
     FILE   *fres = NULL;
+    int     st = -1;
+    int     en = -1;
     
     int o = 0;
     int opt_idx = 0;
@@ -93,10 +96,12 @@ int main(int argc, char *argv[]) {
             {"help",     no_argument,       0, 'h'},
             {"residual", required_argument, 0, 'r'},
             {"stop",     required_argument, 0, 's'},
+            {"st",       required_argument, 0, 't'},
+            {"en",       required_argument, 0, 'e'},
             {0, 0, 0, 0}
         };
         
-        o = getopt_long(argc,argv,"hr:s:",long_opts,&opt_idx);
+        o = getopt_long(argc,argv,"hr:s:t:e:",long_opts,&opt_idx);
         
         switch(o) {
         case 'r':
@@ -106,6 +111,12 @@ int main(int argc, char *argv[]) {
         case 's':
             deltaq_stop = atof(optarg);
             //fprintf(stderr, "deltaq_stop :%f\n", deltaq_stop);
+            break;
+        case 't':
+            st = atoi(optarg);
+            break;
+        case 'e':
+            en = atoi(optarg);
             break;
         case 'h':
         case '?':
@@ -122,11 +133,12 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "usage: %s [Options] TrainFile.f32 K(dimension) M(codebook size) VQFile.f32\n", argv[0]);
         fprintf(stderr, "  -r --residual VQResidualErrorFile.f32usage\n");
         fprintf(stderr, "  -s --stop StopDelta\n");
+        fprintf(stderr, "     --st   Kst        start vector element for error calculation (default 0)\n");
+        fprintf(stderr, "     --en   Ken        end vector element for error calculation (default K-1)\n");
         exit(1);
     }
 
     /* Open training file */
-
     ftrain = fopen(argv[dx],"rb");
     if (ftrain == NULL) {
 	printf("Error opening training database file: %s\n",argv[dx]);
@@ -134,9 +146,13 @@ int main(int argc, char *argv[]) {
     }
 
     /* determine k and m, and allocate arrays */
-
     k = atol(argv[dx+1]);
     m = atol(argv[dx+2]);
+
+    /* default to measuring error on entire vector */
+    if (st == -1) st = 0; 
+    if (en == -1) en = k-1;
+
     printf("vector dimension K=%ld  codebook size M=%ld ", k, m);
     vec = (float*)malloc(sizeof(float)*k);
     cb = (float*)malloc(sizeof(float)*k*m);
@@ -148,7 +164,6 @@ int main(int argc, char *argv[]) {
     }
 
     /* determine size of training set */
-
     J = 0; zero(cent, k);
     while(fread(vec, sizeof(float), k, ftrain) == (size_t)k) {
         J++;
@@ -156,8 +171,7 @@ int main(int argc, char *argv[]) {
     }
     printf("J=%ld vectors in training set\n", J);
 
-    /* Interation is a 0 bit VQ (i.e. mean of training set) as starting point */
-    
+    /* Lets measure 0 bit VQ (i.e. mean of training set) as starting point */   
     norm(cent, k, J);
     memcpy(cb, cent, k*sizeof(float));
     se = 0.0;
@@ -165,13 +179,12 @@ int main(int argc, char *argv[]) {
     for(i=0; i<J; i++) {
         ret = fread(vec, sizeof(float), k, ftrain);
         assert(ret == k);
-        quantise(cb, vec, k, 1, &e, &se);
+        quantise(cb, vec, k, 1, st, en, &e, &se);
     }
     var = se/(J*k);
     printf("\r  It: 0, var: %f sd: %f\n", var, sqrt(var));
 
     /* set up initial codebook state from samples of training set */
-
     for(i=0; i<m; i++) {
         j = i*(J/m);
         fseek(ftrain, j*k*sizeof(float), SEEK_SET);
@@ -180,26 +193,23 @@ int main(int argc, char *argv[]) {
     }
 
     /* main loop */
-
     j = 1;
     do {
 	var_1 = var;
 
 	/* zero centroids */
-
 	for(i=0; i<m; i++) {
 	    zero(&cent[i*k], k);
 	    n[i] = 0;
 	}
 
 	/* quantise training set */
-
 	se = 0.0; noutliers[0] = noutliers[1] = noutliers[2] = 0;
 	rewind(ftrain);
 	for(i=0; i<J; i++) {
 	    ret = fread(vec, sizeof(float), k, ftrain);
             assert(ret == k);
-	    ind = quantise(cb, vec, k, m, &e, &se);
+	    ind = quantise(cb, vec, k, m, st, en, &e, &se);
 	    n[ind]++;
 	    acc(&cent[ind*k], vec, k);
             //if (i < 100)
@@ -210,13 +220,17 @@ int main(int argc, char *argv[]) {
 	}
 	var = se/(J*k);
 	delta = (var_1-var)/var;
-
-	printf("\r  It: %ld, var: %f sd: %f outliers > 1/2/3 dB = %3.2f/%f3.2/%3.2f Delta = %5.4f\n", j, var, sqrt(var),
-               (float)noutliers[0]/J, (float)noutliers[1]/J, (float)noutliers[2]/J, delta);
+        int n_min = J;
+        int n_max = 0;
+	for(i=0; i<m; i++) {
+            if (n[i] < n_min) n_min = n[i];
+            if (n[i] > n_max) n_max = n[i];
+        }
+	printf("\r  It: %2ld, var: %5f sd: %f outliers > 1/2/3 dB = %3.2f/%3.2f/%3.2f Delta = %5.4f %d %d\n", j, var, sqrt(var),
+               (float)noutliers[0]/J, (float)noutliers[1]/J, (float)noutliers[2]/J, delta, n_min, n_max);
 	j++;
 
 	/* determine new codebook from centroids */
-
 	if (delta > deltaq_stop)
 	    for(i=0; i<m; i++) {
 		if (n[i] != 0) {
@@ -228,7 +242,6 @@ int main(int argc, char *argv[]) {
     } while (delta > deltaq_stop);
 
     /* save VQ to disk */
-
     fvq = fopen(argv[dx+3],"wt");
     if (fvq == NULL) {
 	printf("Error opening VQ file: %s\n",argv[dx+3]);
@@ -238,13 +251,12 @@ int main(int argc, char *argv[]) {
     fwrite(cb, sizeof(float), m*k, fvq);
     
     /* optionally output residual error for next stage VQ */
-
     if (fres != NULL) {
         float res[k];
 	rewind(ftrain);
 	for(j=0; j<J; j++) {
 	    ret = fread(vec, sizeof(float), k, ftrain);
-	    ind = quantise(cb, vec, k, m, &e, &se);
+	    ind = quantise(cb, vec, k, m, st, en, &e, &se);
             for(i=0; i<k; i++) {
                 res[i] = vec[i] - cb[k*ind+i];
             }
@@ -346,13 +358,14 @@ void norm(float v[], int k, long n)
 
 \*---------------------------------------------------------------------------*/
 
-long quantise(float cb[], float vec[], int k, int m, float *beste, float *se)
-/* float   cb[][K];	current VQ codebook		*/
-/* float   vec[];	vector to quantise		*/
-/* int	   k;		dimension of vectors		*/
-/* int     m;		size of codebook		*/
-/* float   beste;	current squared error		*/
-/* float   *se;		accumulated squared error 	*/
+long quantise(float  cb[],   // current VQ codebook
+              float  vec[],  // cb[][k];	current VQ codebook
+              int    k,      // dimension of vectors
+              int    m,      // size of codebook
+              int    st,     // start sample of vector to use in error calc
+              int    en,     // end sample of vector to use in error calc
+              float *beste,  // current squared error
+              float *se)     // accumulated squared error
 {
    long	   besti;	/* best index so far		*/
    long	   j;
@@ -363,7 +376,7 @@ long quantise(float cb[], float vec[], int k, int m, float *beste, float *se)
    *beste = 1E32;
    for(j=0; j<m; j++) {
 	e = 0.0;
-	for(i=0; i<k; i++) {
+	for(i=st; i<=en; i++) {
 	    diff = cb[j*k+i]-vec[i];
 	    e += diff*diff;
 	}
