@@ -88,6 +88,7 @@ int main(int argc, char *argv[]) {
     FILE   *fres = NULL;
     int     st = -1;
     int     en = -1;
+    int     init_rand = 0;
     
     int o = 0;
     int opt_idx = 0;
@@ -98,6 +99,7 @@ int main(int argc, char *argv[]) {
             {"stop",     required_argument, 0, 's'},
             {"st",       required_argument, 0, 't'},
             {"en",       required_argument, 0, 'e'},
+            {"rand",     no_argument,       0, 'i'},
             {0, 0, 0, 0}
         };
         
@@ -118,6 +120,9 @@ int main(int argc, char *argv[]) {
         case 'e':
             en = atoi(optarg);
             break;
+        case 'i':
+            init_rand = 1;
+            break;
         case 'h':
         case '?':
             goto helpmsg;
@@ -135,6 +140,7 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "  -s --stop StopDelta\n");
         fprintf(stderr, "     --st   Kst        start vector element for error calculation (default 0)\n");
         fprintf(stderr, "     --en   Ken        end vector element for error calculation (default K-1)\n");
+        fprintf(stderr, "     --rand            use random sampling for initial VQ population\n");
         exit(1);
     }
 
@@ -185,8 +191,12 @@ int main(int argc, char *argv[]) {
     printf("\r  It: 0, var: %f sd: %f\n", var, sqrt(var));
 
     /* set up initial codebook state from samples of training set */
+    if (init_rand) srand(time(NULL));
     for(i=0; i<m; i++) {
-        j = i*(J/m);
+        if (init_rand)
+            j = J*(float)rand()/RAND_MAX;
+        else
+            j = i*(J/m);
         fseek(ftrain, j*k*sizeof(float), SEEK_SET);
         ret = fread(&cb[i*k], sizeof(float), k, ftrain);
         assert(ret == k);

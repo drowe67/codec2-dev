@@ -46,8 +46,24 @@ function vq_700c_plots(fn_array)
 endfunction
 
 
-% single stage vq a target matrix
+% limit mean of each vector to between lower_lim and upper_lim
+function vout = limit_vec(vin, lower_lim, upper_lim)
+  m = mean(vin');
+  vout = zeros(size(vin));
+  for i=1:length(vin)
+    vec_no_mean = vin(i,:) - m(i);
+    if m(i) < lower_lim
+      m(i) = lower_lim;
+    end
+    if m(i) > upper_lim
+      m(i) = upper_lim;
+    end
+    vout(i,:) = vec_no_mean + m(i);
+  end
+endfunction
 
+
+% single stage vq a target matrix
 function errors = vq_targets(vq, targets)
   errors = [];
   for i=1:length(targets)
@@ -347,7 +363,7 @@ more off
 
 %interactive("train_120_1.txt", "cq_freedv_8k_lfboost.f32")
 %table_across_samples;
-vq_700c_plots({"all_speech_8k.f32" "all_speech_8k_hp300.f32" "dev-clean-8k.f32" "train_8k.f32" } )
+%vq_700c_plots({"all_speech_8k.f32" "all_speech_8k_hp300.f32" "dev-clean-8k.f32" "train_8k.f32" } )
 %vq_700c_plots({"ve9qrp_10s.f32" "cq_freedv_8k_lfboost.f32" "cq_ref.f32" "hts1a.f32" "vk5qi.f32"})
 %experiment_iterate_block("train_120_1.txt", "ve9qrp_10s.f32")
 %experiment_iterate_block("train_120_1.txt", "cq_freedv_8k_lfboost.f32")
