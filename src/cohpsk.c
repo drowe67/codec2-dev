@@ -527,17 +527,20 @@ void tx_filter_and_upconvert_coh(COMP tx_fdm[], int Nc, const COMP tx_symbols[],
 
 void corr_with_pilots(float *corr_out, float *mag_out, struct COHPSK *coh, int t, float f_fine)
 {
-    COMP  acorr, f_fine_rect, f_corr;
+    COMP  acorr, f_fine_rect[NPILOTSFRAME+2], f_corr;
     float mag, corr;
     int   c, p, pc;
+
+    for (p=0; p<NPILOTSFRAME+2; p++) {
+        f_fine_rect[p].real = cosf(f_fine*2.0*M_PI*(sampling_points[p]+1.0)/COHPSK_RS);
+        f_fine_rect[p].imag = sinf(f_fine*2.0*M_PI*(sampling_points[p]+1.0)/COHPSK_RS);
+    }
 
     corr = 0.0; mag = 0.0;
     for (c=0; c<COHPSK_NC*ND; c++) {
         acorr.real = 0.0; acorr.imag = 0.0;
         for (p=0; p<NPILOTSFRAME+2; p++) {
-            f_fine_rect.real = cosf(f_fine*2.0*M_PI*(sampling_points[p]+1.0)/COHPSK_RS);
-            f_fine_rect.imag = sinf(f_fine*2.0*M_PI*(sampling_points[p]+1.0)/COHPSK_RS);
-            f_corr = cmult(f_fine_rect, coh->ct_symb_buf[t+sampling_points[p]][c]);
+            f_corr = cmult(f_fine_rect[p], coh->ct_symb_buf[t+sampling_points[p]][c]);
             pc = c % COHPSK_NC;
             acorr = cadd(acorr, fcmult(coh->pilot2[p][pc], f_corr));
             mag  += cabsolute(f_corr);
