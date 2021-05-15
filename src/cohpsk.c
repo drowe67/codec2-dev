@@ -86,7 +86,8 @@ struct COHPSK *cohpsk_create(void)
     struct COHPSK *coh;
     struct FDMDV  *fdmdv;
     int            r,c,p,i;
-    float          freq_hz;
+    float          freq_hz, result;
+    float          tau = 2.0f * M_PI;
 
     assert(COHPSK_NC == PILOTS_NC);
     assert(COHPSK_NOM_SAMPLES_PER_FRAME == (COHPSK_M*NSYMROWPILOT));
@@ -141,11 +142,12 @@ struct COHPSK *cohpsk_create(void)
 
         /* note non-linear carrier spacing to help PAPR, works v well in conjunction with CLIP */
 
-        freq_hz = fdmdv->fsep*( -(COHPSK_NC*ND)/2 - 0.5 + pow(c + 1.0, 0.98) );
+        freq_hz = fdmdv->fsep*( -(COHPSK_NC*ND)/2 - 0.5f + powf(c + 1.0f, 0.98f) );
+        result = tau * freq_hz/COHPSK_FS;
 
-	fdmdv->freq[c].real = cosf(2.0*M_PI*freq_hz/COHPSK_FS);
- 	fdmdv->freq[c].imag = sinf(2.0*M_PI*freq_hz/COHPSK_FS);
- 	fdmdv->freq_pol[c]  = 2.0*M_PI*freq_hz/COHPSK_FS;
+	fdmdv->freq[c].real = cosf(result);
+ 	fdmdv->freq[c].imag = sinf(result);
+ 	fdmdv->freq_pol[c]  = result;
 
         //printf("c: %d %f %f\n",c,freq_hz,fdmdv->freq_pol[c]);
         for(i=0; i<COHPSK_NFILTER; i++) {
@@ -157,9 +159,11 @@ struct COHPSK *cohpsk_create(void)
 
         coh->carrier_ampl[c] = 1.0;
     }
-    fdmdv->fbb_rect.real     = cosf(2.0*PI*FDMDV_FCENTRE/COHPSK_FS);
-    fdmdv->fbb_rect.imag     = sinf(2.0*PI*FDMDV_FCENTRE/COHPSK_FS);
-    fdmdv->fbb_pol           = 2.0*PI*FDMDV_FCENTRE/COHPSK_FS;
+    
+    result = tau * FDMDV_FCENTRE/COHPSK_FS;
+    fdmdv->fbb_rect.real     = cosf(result);
+    fdmdv->fbb_rect.imag     = sinf(result);
+    fdmdv->fbb_pol           = result;
 
     coh->fdmdv = fdmdv;
 
@@ -309,9 +313,10 @@ void qpsk_symbols_to_bits(struct COHPSK *coh, float rx_bits[], COMP ct_symb_buf[
     COMP   __attribute__((unused)) corr, rot, pi_on_4, phi_rect, div_symb;
     float mag,  __attribute__((unused)) phi_,  __attribute__((unused)) amp_;
     float sum_x, sum_xx, noise_var;
+    float spi_4 = M_PI / 4.0f;
     COMP  s;
 
-    pi_on_4.real = cosf(M_PI/4); pi_on_4.imag = sinf(M_PI/4);
+    pi_on_4.real = cosf(spi_4); pi_on_4.imag = sinf(spi_4);
 
     for(c=0; c<COHPSK_NC*ND; c++) {
 
@@ -328,12 +333,12 @@ void qpsk_symbols_to_bits(struct COHPSK *coh, float rx_bits[], COMP ct_symb_buf[
         for(r=0; r<NSYMROW; r++) {
             x1 = (float)(r+NPILOTSFRAME);
             yfit = cadd(fcmult(x1,m),b);
-            coh->phi_[r][c] = atan2(yfit.imag, yfit.real);
+            coh->phi_[r][c] = atan2f(yfit.imag, yfit.real);
         }
 
         /* amplitude estimation */
 
-        mag = 0.0;
+        mag = 0.0f;
         for(p=0; p<NPILOTSFRAME+2; p++) {
             mag  += cabsolute(ct_symb_buf[sampling_points[p]][c]);
         }
@@ -384,13 +389,13 @@ void qpsk_symbols_to_bits(struct COHPSK *coh, float rx_bits[], COMP ct_symb_buf[
 
     /* estimate RMS signal and noise */
 
-    mag = 0.0;
+    mag = 0.0f;
     for(i=0; i<NSYMROW*COHPSK_NC*ND; i++)
         mag += cabsolute(rx_symb_linear[i]);
     coh->sig_rms = mag/(NSYMROW*COHPSK_NC*ND);
 
-    sum_x = 0;
-    sum_xx = 0;
+    sum_x = 0.0f;
+    sum_xx = 0.0f;
     n = 0;
     for (i=0; i<NSYMROW*COHPSK_NC*ND; i++) {
       s = rx_symb_linear[i];
@@ -401,7 +406,7 @@ void qpsk_symbols_to_bits(struct COHPSK *coh, float rx_bits[], COMP ct_symb_buf[
       }
     }
 
-    noise_var = 0;
+    noise_var = 0.0f;
     if (n > 1) {
       noise_var = (n*sum_xx - sum_x*sum_x)/(n*(n-1));
     }
@@ -569,7 +574,8 @@ void corr_with_pilots(float *corr_out, float *mag_out, struct COHPSK *coh, int t
 void frame_sync_fine_freq_est(struct COHPSK *coh, COMP ch_symb[][COHPSK_NC*ND], int sync, int *next_sync)
 {
     int   t;
-    float f_fine, mag, max_corr, max_mag, corr;
+    float f_fine, mag, max_corr, max_mag, corr, result;
+    float tau = 2.0f * M_PI;
 
     update_ct_symb_buf(coh->ct_symb_buf, ch_symb);
 
@@ -594,8 +600,10 @@ void frame_sync_fine_freq_est(struct COHPSK *coh, COMP ch_symb[][COHPSK_NC*ND], 
         }
 
 
-        coh->ff_rect.real = cosf(coh->f_fine_est*2.0*M_PI/COHPSK_RS);
-        coh->ff_rect.imag = -sinf(coh->f_fine_est*2.0*M_PI/COHPSK_RS);
+        result = coh->f_fine_est * tau / COHPSK_RS;
+
+        coh->ff_rect.real = cosf(result);
+        coh->ff_rect.imag = -sinf(result);
         if (coh->verbose)
             fprintf(stderr, "  [%d]   fine freq f: %6.2f max_ratio: %f ct: %d\n", coh->frame, coh->f_fine_est, max_corr/max_mag, coh->ct);
 
@@ -906,8 +914,8 @@ void rate_Fs_rx_processing(struct COHPSK *coh, COMP ch_symb[][COHPSK_NC*ND], COM
             /* loop filter made up of 1st order IIR plus integrator.  Integerator
                was found to be reqd  */
 
-            fdmdv->foff_filt = (1.0-beta)*fdmdv->foff_filt + beta*atan2(mod_strip.imag, mod_strip.real);
-            //printf("foff_filt: %f angle: %f\n", fdmdv->foff_filt, atan2(mod_strip.imag, mod_strip.real));
+            fdmdv->foff_filt = (1.0f-beta)*fdmdv->foff_filt + beta*atan2f(mod_strip.imag, mod_strip.real);
+            //printf("foff_filt: %f angle: %f\n", fdmdv->foff_filt, atan2f(mod_strip.imag, mod_strip.real));
             *f_est += g*fdmdv->foff_filt;
         }
 
@@ -1045,7 +1053,7 @@ void cohpsk_demod(struct COHPSK *coh, float rx_bits[], int *sync_good, COMP rx_f
             */
              frame_sync_fine_freq_est(coh, &ch_symb[(NSW-1)*NSYMROWPILOT], sync, &next_sync);
 
-            if (fabs(coh->f_fine_est) > 2.0) {
+            if (fabsf(coh->f_fine_est) > 2.0) {
                 if (coh->verbose)
                     fprintf(stderr, "  [%d] Hmm %f is a bit big :(\n", coh->frame, coh->f_fine_est);
                 next_sync = 0;
@@ -1155,20 +1163,21 @@ void cohpsk_get_demod_stats(struct COHPSK *coh, struct MODEM_STATS *stats)
 {
     COMP  pi_4;
     float new_snr_est;
-
-    pi_4.real = cosf(M_PI/4.0);
-    pi_4.imag = sinf(M_PI/4.0);
+    float spi_4 = M_PI/4.0f;
+    
+    pi_4.real = cosf(spi_4);
+    pi_4.imag = sinf(spi_4);
 
     stats->Nc = COHPSK_NC*ND;
     assert(stats->Nc <= MODEM_STATS_NC_MAX);
-    new_snr_est = 20*log10((coh->sig_rms+1E-6)/(coh->noise_rms+1E-6)) - 10*log10(3000.0/700.0);
-    stats->snr_est = 0.9*stats->snr_est + 0.1*new_snr_est;
+    new_snr_est = 20.0f * log10f((coh->sig_rms+1E-6f)/(coh->noise_rms+1E-6f)) - 10.0f*log10f(3000.0f/700.0f);
+    stats->snr_est = 0.9f*stats->snr_est + 0.1f*new_snr_est;
 
     //fprintf(stderr, "sig_rms: %f noise_rms: %f snr_est: %f\n", coh->sig_rms, coh->noise_rms, stats->snr_est);
     stats->sync = coh->sync;
     stats->foff = coh->f_est - FDMDV_FCENTRE;
     stats->rx_timing = coh->rx_timing;
-    stats->clock_offset = 0.0; /* TODO - implement clock offset estimation */
+    stats->clock_offset = 0.0f; /* TODO - implement clock offset estimation */
 
 #ifndef __EMBEDDED__
     assert(NSYMROW <= MODEM_STATS_NR_MAX);
