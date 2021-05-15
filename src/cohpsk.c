@@ -528,20 +528,21 @@ void tx_filter_and_upconvert_coh(COMP tx_fdm[], int Nc, const COMP tx_symbols[],
 void corr_with_pilots(float *corr_out, float *mag_out, struct COHPSK *coh, int t, float f_fine)
 {
     COMP  acorr, f_fine_rect[NPILOTSFRAME+2], f_corr;
-    float mag, corr;
+    float mag, corr, result;
+    float tau = 2.0f * M_PI;
     int   c, p, pc;
 
     for (p=0; p<NPILOTSFRAME+2; p++) {
-        f_fine_rect[p].real = cosf(f_fine*2.0*M_PI*(sampling_points[p]+1.0)/COHPSK_RS);
-        f_fine_rect[p].imag = sinf(f_fine*2.0*M_PI*(sampling_points[p]+1.0)/COHPSK_RS);
+        result = f_fine * tau * (sampling_points[p]+1.0) / COHPSK_RS;
+        f_fine_rect[p].real = cosf(result);
+        f_fine_rect[p].imag = sinf(result);
     }
 
     corr = 0.0; mag = 0.0;
     for (c=0; c<COHPSK_NC*ND; c++) {
-        acorr.real = 0.0; acorr.imag = 0.0;
+        acorr.real = 0.0f; acorr.imag = 0.0f; pc = c % COHPSK_NC;
         for (p=0; p<NPILOTSFRAME+2; p++) {
             f_corr = cmult(f_fine_rect[p], coh->ct_symb_buf[t+sampling_points[p]][c]);
-            pc = c % COHPSK_NC;
             acorr = cadd(acorr, fcmult(coh->pilot2[p][pc], f_corr));
             mag  += cabsolute(f_corr);
         }
@@ -827,10 +828,12 @@ void fdmdv_freq_shift_coh(COMP rx_fdm_fcorr[], COMP rx_fdm[], float foff, float 
 {
     COMP  foff_rect;
     float mag;
+    float tau = 2.0f * M_PI;
+    float result = tau * foff/Fs;
     int   i;
 
-    foff_rect.real = cosf(2.0*PI*foff/Fs);
-    foff_rect.imag = sinf(2.0*PI*foff/Fs);
+    foff_rect.real = cosf(result);
+    foff_rect.imag = sinf(result);
     for(i=0; i<nin; i++) {
 	*foff_phase_rect = cmult(*foff_phase_rect, foff_rect);
 	rx_fdm_fcorr[i] = cmult(rx_fdm[i], *foff_phase_rect);
