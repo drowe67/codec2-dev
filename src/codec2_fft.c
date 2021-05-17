@@ -140,11 +140,13 @@ void codec2_fft_inplace(codec2_fft_cfg cfg, codec2_fft_cpx* inout)
     // is much faster and uses less RAM
     if (cfg->nfft*sizeof(kiss_fft_cpx) <= 512)
     {
+        fprintf(stderr, "codepath 1 nfft: %d\n",cfg->nfft );
         memcpy(in,inout,cfg->nfft*sizeof(kiss_fft_cpx));
         kiss_fft(cfg, in, (kiss_fft_cpx*)inout);
     }
     else
     {
+        fprintf(stderr, "codepath 2 nfft: %d\n", cfg->nfft);
         kiss_fft(cfg, (kiss_fft_cpx*)inout, (kiss_fft_cpx*)inout);
     }
 #else
