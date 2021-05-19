@@ -195,6 +195,7 @@ int freedv_comprx_2020(struct freedv *f, COMP demod_in[]) {
 
     if (ofdm->sync_state == search) {
         ofdm_sync_search(f->ofdm, demod_in);
+        f->stats->snr_est = 0.0;
     }
 
     /* OK modem is in sync */

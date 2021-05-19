@@ -412,6 +412,7 @@ int freedv_comp_short_rx_ofdm(struct freedv *f, void *demod_in_8kHz, int demod_i
             ofdm_sync_search_shorts(f->ofdm, (short*)demod_in_8kHz, new_gain);
         else
             ofdm_sync_search(f->ofdm, (COMP*)demod_in_8kHz);
+        f->stats->snr_est = 0.0;
     }
 
     if ((ofdm->sync_state == synced) || (ofdm->sync_state == trial)) {

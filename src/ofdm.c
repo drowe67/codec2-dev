@@ -2141,7 +2141,7 @@ void ofdm_get_demod_stats(struct OFDM *ofdm, struct MODEM_STATS *stats, complex 
         /* no smoothing as we have a large number of symbols per packet */
         stats->snr_est = SNR3kdB;
     else {        
-        /* in voice modes we furrther smloth SNR est, fast attack, slow decay */
+        /* in voice modes we further smooth SNR est, fast attack, slow decay */
         if (SNR3kdB > stats->snr_est)
             stats->snr_est = SNR3kdB;
         else
