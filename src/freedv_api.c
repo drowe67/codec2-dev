@@ -255,7 +255,8 @@ static void codec2_encode_upacked(struct freedv *f, uint8_t unpacked_bits[], sho
 }
 
 static int is_ofdm_mode(struct freedv *f) {
-    return FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode)   ||
+    return FDV_MODE_ACTIVE( FREEDV_MODE_2020, f->mode)   ||
+           FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode)   ||
            FDV_MODE_ACTIVE( FREEDV_MODE_700E, f->mode)   ||
            FDV_MODE_ACTIVE( FREEDV_MODE_DATAC0, f->mode) ||
            FDV_MODE_ACTIVE( FREEDV_MODE_DATAC1, f->mode) ||
