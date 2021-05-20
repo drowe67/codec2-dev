@@ -1185,9 +1185,6 @@ void freedv_get_modem_stats(struct freedv *f, int *sync, float *snr_est)
         fdmdv_get_demod_stats(f->fdmdv, &f->stats);
     if (FDV_MODE_ACTIVE( FREEDV_MODE_700C, f->mode))
         cohpsk_get_demod_stats(f->cohpsk, &f->stats);
-    if (FDV_MODE_ACTIVE( FREEDV_MODE_2400B, f->mode)) {
-        fmfsk_get_demod_stats(f->fmfsk, &f->stats);
-    }
     if (sync) *sync = f->stats.sync;
     if (snr_est) *snr_est = f->stats.snr_est;
 }
@@ -1388,13 +1385,15 @@ void freedv_get_modem_extended_stats(struct freedv *f, struct MODEM_STATS *stats
         fdmdv_get_demod_stats(f->fdmdv, stats);
 
     if (FDV_MODE_ACTIVE( FREEDV_MODE_2400A, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_800XA, f->mode)) {
-        fsk_get_demod_stats(f->fsk, stats);
-        float EbNodB = stats->snr_est;                          /* fsk demod actually estimates Eb/No     */
-        stats->snr_est = EbNodB + 10.0f*log10f(800.0f/3000.0f); /* so convert to SNR Rb=800, noise B=3000 */
+        fsk_get_demod_stats(f->fsk, stats);   /* eye diagram samples, clock offset etc */
+        stats->snr_est = f->snr_est;          /* estimated when fsk_demod() called in freedv_fsk.c */
+        stats->sync = f->stats.sync;          /* sync indicator comes from framing layer */
     }
 
     if (FDV_MODE_ACTIVE( FREEDV_MODE_2400B, f->mode)) {
         fmfsk_get_demod_stats(f->fmfsk, stats);
+        stats->snr_est = f->snr_est;
+        stats->sync = f->stats.sync;
     }
 
     if (FDV_MODE_ACTIVE( FREEDV_MODE_700C, f->mode)) {
