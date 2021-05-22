@@ -1185,8 +1185,8 @@ void freedv_get_modem_stats(struct freedv *f, int *sync, float *snr_est)
         fdmdv_get_demod_stats(f->fdmdv, &f->stats);
     if (FDV_MODE_ACTIVE( FREEDV_MODE_700C, f->mode))
         cohpsk_get_demod_stats(f->cohpsk, &f->stats);
-    if (sync) *sync = f->stats.sync;
-    if (snr_est) *snr_est = f->stats.snr_est;
+    if (sync) *sync = f->sync;
+    if (snr_est) *snr_est = f->snr_est;
 }
 
 /*---------------------------------------------------------------------------*\
@@ -1337,7 +1337,7 @@ int freedv_get_total_bits_coded           (struct freedv *f) {return f->total_bi
 int freedv_get_total_bit_errors_coded     (struct freedv *f) {return f->total_bit_errors_coded;}
 int freedv_get_total_packets              (struct freedv *f) {return f->total_packets;}
 int freedv_get_total_packet_errors        (struct freedv *f) {return f->total_packet_errors;}
-int freedv_get_sync                       (struct freedv *f) {return f->stats.sync;}
+int freedv_get_sync                       (struct freedv *f) {return f->sync;}
 struct CODEC2 *freedv_get_codec2	        (struct freedv *f) {return  f->codec2;}
 int freedv_get_bits_per_codec_frame       (struct freedv *f) {return f->bits_per_codec_frame;}
 int freedv_get_bits_per_modem_frame       (struct freedv *f) {return f->bits_per_modem_frame;}
@@ -1387,13 +1387,13 @@ void freedv_get_modem_extended_stats(struct freedv *f, struct MODEM_STATS *stats
     if (FDV_MODE_ACTIVE( FREEDV_MODE_2400A, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_800XA, f->mode)) {
         fsk_get_demod_stats(f->fsk, stats);   /* eye diagram samples, clock offset etc */
         stats->snr_est = f->snr_est;          /* estimated when fsk_demod() called in freedv_fsk.c */
-        stats->sync = f->stats.sync;          /* sync indicator comes from framing layer */
+        stats->sync = f->sync;                /* sync indicator comes from framing layer */
     }
 
     if (FDV_MODE_ACTIVE( FREEDV_MODE_2400B, f->mode)) {
         fmfsk_get_demod_stats(f->fmfsk, stats);
         stats->snr_est = f->snr_est;
-        stats->sync = f->stats.sync;
+        stats->sync = f->sync;
     }
 
     if (FDV_MODE_ACTIVE( FREEDV_MODE_700C, f->mode)) {
@@ -1406,7 +1406,9 @@ void freedv_get_modem_extended_stats(struct freedv *f, struct MODEM_STATS *stats
         // TODO we need a better design here: Issue #182
         size_t ncopy = (void*)stats->rx_eye - (void*)stats;
         memcpy(stats, &f->stats, ncopy);
-    }
+        stats->snr_est = f->snr_est;
+        stats->sync = f->sync;
+  }
 }
 
 int freedv_get_n_tx_preamble_modem_samples(struct freedv *f) {

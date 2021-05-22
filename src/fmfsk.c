@@ -332,7 +332,7 @@ void fmfsk_demod(struct FMFSK *fmfsk, uint8_t rx_bits[],float fmfsk_in[]){
     /* Zero out all of the other things */
     fmfsk->stats->foff = 0;
 
-    /* Use moving average to smooth SNR display */
+    /* Use moving average to smooth SNR */
     var_signal += 1E-6/3.1; var_noise += 1E-6; /* prevent NAN and bias towards -5dB SNR for zero signal inputs */
     if(fmfsk->snr_mean < 0.1)
         fmfsk->snr_mean = (10.0 * log10f(var_signal / var_noise));

@@ -186,7 +186,7 @@ int freedv_comprx_2020(struct freedv *f, COMP demod_in[]) {
     int parityCheckCount = 0;
     uint8_t rx_uw[f->ofdm_nuwbits];
 
-    f->sync = f->stats.sync = 0;
+    f->sync = 0;
 
     // TODO: should be higher for 2020?
     float EsNo = 3.0;
@@ -195,7 +195,7 @@ int freedv_comprx_2020(struct freedv *f, COMP demod_in[]) {
 
     if (ofdm->sync_state == search) {
         ofdm_sync_search(f->ofdm, demod_in);
-        f->stats.snr_est = -5.0;
+        f->snr_est = -5.0;
     }
 
     /* OK modem is in sync */
