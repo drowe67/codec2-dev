@@ -1119,7 +1119,7 @@ static float est_timing_and_freq(struct OFDM *ofdm,
         for(int t=0; t<Ncorr; t+=tstep) {
             complex float corr = 0;
             for(int i=0; i<Npsam; i++)
-                corr += rx[i+t]*conj(mvec[i]);
+                corr += rx[i+t]*conjf(mvec[i]);
             if (cabsf(corr) > max_corr) {
                 max_corr = cabsf(corr);
                 *t_est = t;
@@ -1131,8 +1131,8 @@ static float est_timing_and_freq(struct OFDM *ofdm,
     /* obtain normalised real number for timing_mx */
     float mag1=0, mag2=0;
     for(int i=0; i<Npsam; i++) {
-        mag1 += cabsf(known_samples[i]*conj(known_samples[i]));
-        mag2 += cabsf(rx[i+*t_est]*conj(rx[i+*t_est]));
+        mag1 += cabsf(known_samples[i]*conjf(known_samples[i]));
+        mag2 += cabsf(rx[i+*t_est]*conjf(rx[i+*t_est]));
     }
     float timing_mx = max_corr*max_corr/(mag1*mag2+1E-12);
     if (ofdm->verbose > 2) {
@@ -1792,13 +1792,15 @@ float ofdm_esno_est_calc(complex float *rx_sym, int nsym) {
         noise_var = sig_var;
     noise_var *= 2.0f;
     
-    return 10.0*log10(sig_var/noise_var); 
+    float EsNodB = 10.0f * log10f((1E-12f + sig_var) / (1E-12f + noise_var));
+    assert(isnan(EsNodB) == 0);
+    return EsNodB;
 }
 
 
 float ofdm_snr_from_esno(struct OFDM *ofdm, float EsNodB) {
-    float cyclic_power = 10.0*log10((float)(ofdm->ncp+ofdm->m)/ofdm->m);
-    return EsNodB + 10.0*log10((float)(ofdm->nc*ofdm->rs)/3000.0) + cyclic_power;
+    float cyclic_power = 10.0f * log10f((float)(ofdm->ncp + ofdm->m) / ofdm->m);
+    return EsNodB + 10.0f * log10f((float)(ofdm->nc * ofdm->rs) / 3000.0f) + cyclic_power;
 }
 
 /*

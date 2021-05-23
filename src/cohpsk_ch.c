@@ -220,7 +220,7 @@ int main(int argc, char *argv[])
         //fprintf(stderr, "hf_gain: %f\n", hf_gain);
     }
 
-    assert(2*HT_N == sizeof(ht_coeff)/sizeof(float));
+    assert(HT_N == sizeof(ht_coeff)/sizeof(COMP));
     for(i=0; i<HT_N; i++) {
         htbuf[i] = 0.0;
     }

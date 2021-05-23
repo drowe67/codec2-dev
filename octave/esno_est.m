@@ -126,7 +126,7 @@ function esno_est_test_c(channel="awgn")
     printf("\nRunning C version....\n");
     path_to_unittest = "../build_linux/unittest"
     if getenv("PATH_TO_UNITEST")
-      path_to_unittest_exe = getenv("PATH_TO_UNITTEST")
+      path_to_unittest = getenv("PATH_TO_UNITEST")
       printf("setting path from env var to %s\n", path_to_unittest);
     end
     system(sprintf("%s/tesno_est %s %d > tesno_est_out.txt", path_to_unittest, "esno_est.iqfloat", length(rx_syms)));
