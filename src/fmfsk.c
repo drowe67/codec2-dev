@@ -76,7 +76,7 @@ struct FMFSK * fmfsk_create(int Fs,int Rb){
         free(fmfsk);
         return NULL;
     }
-    
+    for(int i=0; i<fmfsk->nmem; i++) oldsamps[i] = 0.0;
     fmfsk->oldsamps = oldsamps;
 
     fmfsk->stats = (struct MODEM_STATS*)malloc(sizeof(struct MODEM_STATS));
