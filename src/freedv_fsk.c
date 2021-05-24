@@ -584,6 +584,8 @@ int freedv_comprx_fsk(struct freedv *f, COMP demod_in[]) {
             demod_in_float[i] = demod_in[i].real;
         }
         fmfsk_demod(f->fmfsk,(uint8_t*)f->tx_bits,demod_in_float);
+        /* The fmfsk modem operates on the baseband output of an analog FM demod so the
+           mapping to SNR in 8k is hard to determine */
         f->snr_est = f->fmfsk->snr_mean;
         f->nin = fmfsk_nin(f->fmfsk);
     }
@@ -603,9 +605,9 @@ int freedv_comprx_fsk(struct freedv *f, COMP demod_in[]) {
         if( f->freedv_put_next_proto != NULL){
             (*f->freedv_put_next_proto)(f->proto_callback_state,(char*)proto_bits);
         }
-    }
-    f->sync = f->deframer->state;
-    f->stats.sync = f->deframer->state;
+        f->sync = 1;
+    } else
+        f->sync = 0;
 
     return rx_status;
 }
