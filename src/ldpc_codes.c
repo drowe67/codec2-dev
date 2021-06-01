@@ -25,7 +25,6 @@
 
 struct LDPC ldpc_codes[] = {
     /* short rate 1/2 code for FreeDV 700D */
-    #ifdef __EMBEDDED__
     {
         "HRA_112_112",
         HRA_112_112_MAX_ITER,
@@ -39,8 +38,9 @@ struct LDPC ldpc_codes[] = {
         HRA_112_112_MAX_COL_WEIGHT,
         (uint16_t *)HRA_112_112_H_rows,
         (uint16_t *)HRA_112_112_H_cols
-    },
-    #else
+    }
+    #ifndef __EMBEDDED__
+    ,
     /* short rate 1/2 code for FreeDV 700E */
     {
         "HRA_56_56",
@@ -55,7 +55,6 @@ struct LDPC ldpc_codes[] = {
         HRA_56_56_MAX_COL_WEIGHT,
         (uint16_t *)HRA_56_56_H_rows,
         (uint16_t *)HRA_56_56_H_cols
-    }
     },
 
     /* default Wenet High Alitiude Balloon rate 0.8 code */
@@ -201,7 +200,7 @@ struct LDPC ldpc_codes[] = {
         (uint16_t *)H_1024_2048_4f_H_rows,
         (uint16_t *)H_1024_2048_4f_H_cols
     }
-#endif
+    #endif
 };
 
 int ldpc_codes_num(void) { return sizeof(ldpc_codes)/sizeof(struct LDPC); }
