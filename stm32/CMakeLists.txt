@@ -184,6 +184,7 @@ ${CODEC2_SRC}/kiss_fftr.c
 ${CODEC2_SRC}/interp.c
 ${CODEC2_SRC}/lsp.c
 ${CODEC2_SRC}/ofdm.c
+${CODEC2_SRC}/ofdm_mode.c
 ${CODEC2_SRC}/phase.c
 ${CODEC2_SRC}/quantise.c
 ${CODEC2_SRC}/pack.c

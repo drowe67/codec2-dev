@@ -239,13 +239,13 @@ int main(int argc, char *argv[]) {
 
         if (ofdm->sync_state == search) {
             if (config_profile) PROFILE_SAMPLE(ofdm_demod_sync_search);
-            ofdm_sync_search_shorts(ofdm, rx_scaled, (OFDM_AMP_SCALE/2));
+            ofdm_sync_search_shorts(ofdm, rx_scaled, (OFDM_PEAK/2));
             if (config_profile) PROFILE_SAMPLE_AND_LOG2(ofdm_demod_sync_search, "  ofdm_demod_sync_search");
         }
 
         if ((ofdm->sync_state == synced) || (ofdm->sync_state == trial) ) {
             if (config_profile) PROFILE_SAMPLE(ofdm_demod_demod);
-            ofdm_demod_shorts(ofdm, rx_bits, rx_scaled, (OFDM_AMP_SCALE/2));
+            ofdm_demod_shorts(ofdm, rx_bits, rx_scaled, (OFDM_PEAK/2));
             if (config_profile) PROFILE_SAMPLE_AND_LOG2(ofdm_demod_demod, "  ofdm_demod_demod");
             if (config_profile) PROFILE_SAMPLE(ofdm_demod_diss);
             ofdm_extract_uw(ofdm, ofdm->rx_np, ofdm->rx_amp, rx_uw);
@@ -255,8 +255,8 @@ int main(int argc, char *argv[]) {
 
             /* SNR estimation and smoothing */
             if (config_profile) PROFILE_SAMPLE(ofdm_demod_snr);
-            float snr_est_dB = 10*log10((ofdm->sig_var/ofdm->noise_var) * 
-                                ofdm_config->nc * ofdm_config->rs / 3000);
+            float EsNodB = ofdm_esno_est_calc((complex float*)payload_syms, coded_syms_per_frame);
+            float snr_est_dB = ofdm_snr_from_esno(ofdm, EsNodB);
             snr_est_smoothed_dB = 0.9f * snr_est_smoothed_dB + 0.1f  *snr_est_dB;
             if (config_profile) {
                 PROFILE_SAMPLE_AND_LOG2(ofdm_demod_snr, "  ofdm_demod_snr");
