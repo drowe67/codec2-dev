@@ -60,10 +60,10 @@ Also included:
    ```
    ./src/c2enc 1300 ../raw/hts1a.raw - | ./src/c2dec 1300 - - | aplay -f S16_LE
    ```
-   ```
+
 1. Or you can use your microphone and headphones to encode and listen to the result on the fly:
    ```
-   br=450; arecord -f S16_LE -c 1 -r 8000 | ./src/c2enc $br - - | ./src/c2dec $br - - | aplay -f S16_LE -
+   br=1300; arecord -f S16_LE -c 1 -r 8000 | ./src/c2enc $br - - | ./src/c2dec $br - - | aplay -f S16_LE -
    ```
    
 ## FreeDV 2020 support (building with LPCNet)
