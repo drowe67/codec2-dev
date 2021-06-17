@@ -33,16 +33,20 @@ function vq_700c_plots(fn_array)
     Nsec = 10; Tframe = 0.01; frames_per_seg = Nsec/Tframe
     Nsegs = floor(length(bands)/frames_per_seg)
     max_holds = zeros(Nsegs, K);
-    % TODO: freq, log scale, slope, read up
-    for s=1:Nsegs
-      st = (s-1)*frames_per_seg+1; en = st + frames_per_seg - 1;
-      max_holds(s,:) = max(bands(st:en,:));
+    if Nsegs == 0
+       max_holds = max(bands)
+    else
+      for s=1:Nsegs
+        st = (s-1)*frames_per_seg+1; en = st + frames_per_seg - 1;
+        max_holds(s,:) = max(bands(st:en,:));
+      end
+      max_holds = mean(max_holds);
     end
-    figure(1); semilogx(freq_Hz, mean(max_holds), '+-', 'linewidth', 2);
-    figure(2); semilogx(freq_Hz, mean(bands), '+-', 'linewidth', 2);
+    figure(1); plot(freq_Hz, max_holds, '+-', 'linewidth', 2);
+    figure(2); plot(freq_Hz, mean(bands), '+-', 'linewidth', 2);
   end
-  figure(1); legend(fn_array); grid minor;
-  figure(2); legend(fn_array); grid minor;
+  figure(1); legend(fn_array); grid; xlabel('Freq (Hz)'); ylabel('Amp dB');
+  figure(2); legend(fn_array); grid; xlabel('Freq (Hz)'); ylabel('Amp dB');
 endfunction
 
 
