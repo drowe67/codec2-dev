@@ -37,6 +37,7 @@ Nbursts=5
 mode="700D"
 model=361
 gain=6
+serialPort="/dev/ttyUSB0"
 
 function print_help {
     echo
@@ -49,6 +50,7 @@ function print_help {
     echo "    -o model  select radio model number ('rigctl -l' to list)"
     echo "    -m mode   700c|700d|700e"
     echo "    -t        Tx only, useful for manually observing SDRs"
+    echo "    -s port   The serial port (or hostname:port) to connect to for TX, default /dev/ttyUSB0"
     echo
     exit
 }
@@ -66,7 +68,7 @@ function analog_compressor {
 function run_rigctl {
     command=$1
     model=$2
-    echo $command | rigctl -m $model -r /dev/ttyUSB0 > /dev/null
+    echo $command | rigctl -m $model -r $serialPort > /dev/null
     if [ $? -ne 0 ]; then
         echo "Can't talk to Tx"
         exit 1
@@ -109,6 +111,11 @@ case $key in
     ;;
     -t)
         tx_only=1	
+        shift
+    ;;
+    -s)
+        serialPort="$2"
+        shift
         shift
     ;;
     -h)
