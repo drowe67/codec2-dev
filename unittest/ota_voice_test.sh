@@ -53,7 +53,7 @@ function print_help {
     exit
 }
 
-# Approximation of Hilbert clipper type compressor 
+# Approximation of Hilbert clipper type compressor
 function analog_compressor {
     input_file=$1
     output_file=$2
@@ -71,6 +71,13 @@ function run_rigctl {
         echo "Can't talk to Tx"
         exit 1
     fi
+}
+
+function clean_up {
+    echo "killing KiwiSDR process"
+    kill ${kiwi_pid}
+    wait ${kiwi_pid} 2>/dev/null
+    exit 1
 }
 
 POSITIONAL=()
@@ -137,20 +144,24 @@ if [ $tx_only -eq 0 ]; then
 fi
 
 # create Tx file ------------------------
+
 # create compressed analog
 speech_comp=$(mktemp)
 speech_freedv=$(mktemp)
 analog_compressor $speechfile $speech_comp $gain
+
 # create modulated FreeDV
 freedv_tx $mode $speechfile $speech_freedv
 cat $speech_comp $speech_freedv > tx.raw
 sox -t .s16 -r 8000 -c 1 tx.raw tx.wav
 
-usb_lsb=$(python3 -c "print('usb') if ${freq_kHz} >= 10000 else print('lsb')")
-
 # kick off KiwiSDR ----------------------------
 
+usb_lsb=$(python3 -c "print('usb') if ${freq_kHz} >= 10000 else print('lsb')")
 if [ $tx_only -eq 0 ]; then
+    # clean up any kiwiSDR processes if we get a ctrl-C
+    trap clean_up SIGHUP SIGINT SIGTERM
+
     echo -n "waiting for KiwiSDR "
     # start recording from remote kiwisdr
     kiwi_stdout=$(mktemp)
@@ -164,6 +175,8 @@ if [ $tx_only -eq 0 ]; then
         timeout_counter=$((timeout_counter+1))
         if [ $timeout_counter -eq 10 ]; then
             echo "can't connect to ${kiwi_url}"
+            kill ${kiwi_pid}
+            wait ${kiwi_pid} 2>/dev/null
             exit 1
         fi
         echo -n "."
