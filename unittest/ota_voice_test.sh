@@ -11,12 +11,20 @@
 #
 # TODO
 # [ ] compression only test mode, to measure compression (maybe play back)
-# [ ] function to compress analog
-# [ ] function to concatenate analog and digital 
-# [ ] first Tx to SDR
-# [ ] inspect peak levels to ake sure they are the same
-# [ ] simple drop power test on local
-# [ ] split received file into SSB/FreeDV
+# [X] function to compress analog
+# [X] function to concatenate analog and digital 
+# [X] first Tx to SDR
+# [X] inspect peak levels to ake sure they are the same
+# [X] simple drop power test on local/no fading
+#     + comparisons not straight forward
+#     + SSB degrades and improves slowly with power
+# [ ] split received file into SSB/FreeDV?
+# [X] higher gain on analog
+# [X] generate Octave plot of output speech
+#     + Hmm not sure this is useful
+#     + plot of sync/SNR might be better
+#     + be good to tell from inspection of plot if it has decent audio
+# [ ] worth logging/plotting SNR?
 
 PATH=${PATH}:${HOME}/codec2/build_linux/src:${HOME}/kiwiclient
 CODEC2=${HOME}/codec2
@@ -29,6 +37,7 @@ Nbursts=5
 mode="700D"
 model=361
 gain=6
+serialPort="/dev/ttyUSB0"
 
 function print_help {
     echo
@@ -41,6 +50,7 @@ function print_help {
     echo "    -o model  select radio model number ('rigctl -l' to list)"
     echo "    -m mode   700c|700d|700e"
     echo "    -t        Tx only, useful for manually observing SDRs"
+    echo "    -s port   The serial port (or hostname:port) to connect to for TX, default /dev/ttyUSB0"
     echo
     exit
 }
@@ -58,7 +68,7 @@ function analog_compressor {
 function run_rigctl {
     command=$1
     model=$2
-    echo $command | rigctl -m $model -r /dev/ttyUSB0 > /dev/null
+    echo $command | rigctl -m $model -r $serialPort > /dev/null
     if [ $? -ne 0 ]; then
         echo "Can't talk to Tx"
         exit 1
@@ -94,11 +104,6 @@ case $key in
         shift
         shift
     ;;
-    -n)
-        Nbursts="$2"	
-        shift
-        shift
-    ;;
     -p)
         port="$2"	
         shift
@@ -106,6 +111,11 @@ case $key in
     ;;
     -t)
         tx_only=1	
+        shift
+    ;;
+    -s)
+        serialPort="$2"
+        shift
         shift
     ;;
     -h)
@@ -120,6 +130,11 @@ done
 set -- "${POSITIONAL[@]}" # restore positional parameters
 
 speechfile="$1"
+if [ ! -f $speechfile ]; then
+    echo "Can't find ${speechfile}!"
+    exit 1
+fi
+
 if [ $tx_only -eq 0 ]; then
     if [ $# -lt 1 ]; then
         print_help
@@ -184,9 +199,14 @@ if [ $tx_only -eq 0 ]; then
     # generate spectrogram
     echo "pkg load signal; warning('off', 'all'); \
           s=load_raw('rx.wav'); \
-          plot_specgram(s, 8000, 500, 2500); print('spec.jpg', '-djpg'); \
+          plot_specgram(s, 8000, 200, 3000); print('spec.jpg', '-djpg'); \
           quit" | octave-cli -p ${CODEC2}/octave -qf > /dev/null
     # attempt to decode
     freedv_rx ${mode} rx.wav - | sox -t .s16 -r 8000 -c 1 - rx_freedv.wav
+    # time domain plot of output speech
+    echo "pkg load signal; warning('off', 'all'); \
+          s=load_raw('rx_freedv.wav'); \
+          plot(s); print('time.jpg', '-djpg'); \
+          quit" | octave-cli -p ${CODEC2}/octave -qf > /dev/null
 fi
 
