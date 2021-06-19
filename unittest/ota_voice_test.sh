@@ -8,7 +8,9 @@
 #    cd ~ && git clone git@github.com:jks-prv/kiwiclient.git
 # 3. Install Hamlib cli tools
 
-PATH=${PATH}:${HOME}/codec2/build_linux/src:${HOME}/kiwiclient
+MY_PATH=`dirname $0`
+BUILD_PATH=`echo $MY_PATH/../build_*/src`
+PATH=${PATH}:${BUILD_PATH}:${HOME}/kiwiclient
 CODEC2=${HOME}/codec2
 
 kiwi_url=""
@@ -181,7 +183,11 @@ usb_lsb_upper=$(echo ${usb_lsb} | awk '{print toupper($0)}')
 run_rigctl "\\set_mode PKT${usb_lsb_upper} 0" $model
 run_rigctl "\\set_freq ${freq_Hz}" $model
 run_rigctl "\\set_ptt 1" $model
-aplay --device="plughw:CARD=CODEC,DEV=0" -f S16_LE tx.raw 2>/dev/null
+if [ `uname` == "Darwin" ]; then
+    play -t raw -b 16 -c 1 -r 8000 -e signed-integer --endian little tx.raw 
+else
+    aplay --device="plughw:CARD=CODEC,DEV=0" -f S16_LE tx.raw 2>/dev/null
+fi
 run_rigctl "\\set_ptt 0" $model
 
 if [ $tx_only -eq 0 ]; then
