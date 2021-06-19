@@ -8,24 +8,6 @@
 #    cd ~ && git clone git@github.com:jks-prv/kiwiclient.git
 # 3. Install Hamlib cli tools
 
-#
-# TODO
-# [ ] compression only test mode, to measure compression (maybe play back)
-# [X] function to compress analog
-# [X] function to concatenate analog and digital 
-# [X] first Tx to SDR
-# [X] inspect peak levels to ake sure they are the same
-# [X] simple drop power test on local/no fading
-#     + comparisons not straight forward
-#     + SSB degrades and improves slowly with power
-# [ ] split received file into SSB/FreeDV?
-# [X] higher gain on analog
-# [X] generate Octave plot of output speech
-#     + Hmm not sure this is useful
-#     + plot of sync/SNR might be better
-#     + be good to tell from inspection of plot if it has decent audio
-# [ ] worth logging/plotting SNR?
-
 PATH=${PATH}:${HOME}/codec2/build_linux/src:${HOME}/kiwiclient
 CODEC2=${HOME}/codec2
 
@@ -157,8 +139,8 @@ speech_comp=$(mktemp)
 speech_freedv=$(mktemp)
 analog_compressor $speechfile $speech_comp $gain
 
-# create modulated FreeDV
-freedv_tx $mode $speechfile $speech_freedv
+# create modulated FreeDV, with compressor enabled
+freedv_tx $mode $speechfile $speech_freedv --clip 1 
 cat $speech_comp $speech_freedv > tx.raw
 sox -t .s16 -r 8000 -c 1 tx.raw tx.wav
 
@@ -215,11 +197,15 @@ if [ $tx_only -eq 0 ]; then
           plot_specgram(s, 8000, 200, 3000); print('spec.jpg', '-djpg'); \
           quit" | octave-cli -p ${CODEC2}/octave -qf > /dev/null
     # attempt to decode
-    freedv_rx ${mode} rx.wav - | sox -t .s16 -r 8000 -c 1 - rx_freedv.wav
-    # time domain plot of output speech
+    freedv_rx ${mode} rx.wav - -v 2>log.txt | sox -t .s16 -r 8000 -c 1 - rx_freedv.wav
+    cat log.txt | tr -s ' ' | cut -f5 -d' ' | awk '$0==($0+0)' > sync.txt
+    cat log.txt | tr -s ' ' | cut -f10 -d' ' | awk '$0==($0+0)' > snr.txt
+    # time domain plot of output speech, SNR, and sync
     echo "pkg load signal; warning('off', 'all'); \
-          s=load_raw('rx_freedv.wav'); \
-          plot(s); print('time.jpg', '-djpg'); \
+          s=load_raw('rx_freedv.wav'); snr=load('snr.txt'); sync=load('sync.txt'); \
+          subplot(211); plot(s); subplot(212); x=1:length(sync); plotyy(x,snr,x,sync); \
+          ylim([-5 15]); ylabel('SNR (dB)'); grid; \
+          print('time_snr.jpg', '-djpg'); \
           quit" | octave-cli -p ${CODEC2}/octave -qf > /dev/null
 fi
 
