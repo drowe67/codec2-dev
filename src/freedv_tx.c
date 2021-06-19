@@ -119,7 +119,8 @@ int main(int argc, char *argv[]) {
     freedv_set_tx_bpf(freedv, use_txbpf);
     freedv_set_dpsk(freedv, use_dpsk);
     freedv_set_verbose(freedv, 1);
-
+    freedv_set_eq(freedv, 1); /* for 700C/D/E */
+    
     /* set up callback for txt msg chars */
     struct my_callback_state  my_cb_state;
     sprintf(my_cb_state.tx_str, "cq cq cq hello world\r");
