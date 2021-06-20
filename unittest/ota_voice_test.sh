@@ -86,16 +86,18 @@ function process_rx {
           plot_specgram(s, 8000, 200, 3000); print('spec.jpg', '-djpg'); \
           quit" | octave-cli -p ${CODEC2}/octave -qf > /dev/null
     # attempt to decode
-    freedv_rx ${mode} ${rx} - -v 2>log.txt | sox -t .s16 -r 8000 -c 1 - rx_freedv.wav
-    cat log.txt | tr -s ' ' | cut -f5 -d' ' | awk '$0==($0+0)' > sync.txt
-    cat log.txt | tr -s ' ' | cut -f10 -d' ' | awk '$0==($0+0)' > snr.txt
+    freedv_rx ${mode} ${rx} - -v 2>rx_stats.txt | sox -t .s16 -r 8000 -c 1 - rx_freedv.wav
+    cat rx_stats.txt | tr -s ' ' | cut -f5 -d' ' | awk '$0==($0+0)' > sync.txt
+    cat rx_stats.txt | tr -s ' ' | cut -f10 -d' ' | awk '$0==($0+0)' > snr.txt
     # time domain plot of output speech, SNR, and sync
     echo "pkg load signal; warning('off', 'all'); \
           s=load_raw('rx_freedv.wav'); snr=load('snr.txt'); sync=load('sync.txt'); \
           subplot(211); plot(s); subplot(212); x=1:length(sync); plotyy(x,snr,x,sync); \
           ylim([-5 15]); ylabel('SNR (dB)'); grid; \
           print('time_snr.jpg', '-djpg'); \
-          quit" | octave-cli -p ${CODEC2}/octave -qf > /dev/null
+          printf('Nsync: %3d\n', sum(sync)); \
+          snr_valid = snr(find(snr != -5.0)); printf('SNRav: %5.2f\n', mean(snr_valid)); \
+          quit" | octave-cli -p ${CODEC2}/octave -qf
 }
 
 POSITIONAL=()
@@ -185,6 +187,7 @@ if [ $tx_only -eq 0 ]; then
 fi
 
 # create Tx file ------------------------
+echo $mode
 
 # create compressed analog
 speech_comp=$(mktemp)
