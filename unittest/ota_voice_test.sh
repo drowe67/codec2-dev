@@ -22,18 +22,22 @@ mode="700D"
 model=361
 gain=6
 serialPort="/dev/ttyUSB0"
+rxwavefile=0
 
 function print_help {
     echo
     echo "Automated Over The Air (OTA) voice test for FreeDV HF voice modes"
     echo
     echo "  usage ./ota_voice_test.sh [-d] [-f freq_kHz] [-g cgain] [-m mode] [-o model] [-p port] [-t] SpeechFile kiwi_url"
+    echo "  or:"
+    echo "  usage ./ota_voice_test.sh -r rxWaveFile"
     echo
     echo "    -d        debug mode; trace script execution"
     echo "    -g        SSB (analog) compressor gain"
     echo "    -o model  select radio model number ('rigctl -l' to list)"
     echo "    -m mode   700c|700d|700e"
     echo "    -t        Tx only, useful for manually observing SDRs"
+    echo "    -r        Rx wave file mode: Rx process supplied rx wave file"
     echo "    -s port   The serial port (or hostname:port) to connect to for TX, default /dev/ttyUSB0"
     echo
     exit
@@ -64,6 +68,27 @@ function clean_up {
     kill ${kiwi_pid}
     wait ${kiwi_pid} 2>/dev/null
     exit 1
+}
+
+function process_rx {
+    echo "Process receiver sample"
+    rx=$1
+    # generate spectrogram
+    echo "pkg load signal; warning('off', 'all'); \
+          s=load_raw('${rx}'); \
+          plot_specgram(s, 8000, 200, 3000); print('spec.jpg', '-djpg'); \
+          quit" | octave-cli -p ${CODEC2}/octave -qf > /dev/null
+    # attempt to decode
+    freedv_rx ${mode} ${rx} - -v 2>log.txt | sox -t .s16 -r 8000 -c 1 - rx_freedv.wav
+    cat log.txt | tr -s ' ' | cut -f5 -d' ' | awk '$0==($0+0)' > sync.txt
+    cat log.txt | tr -s ' ' | cut -f10 -d' ' | awk '$0==($0+0)' > snr.txt
+    # time domain plot of output speech, SNR, and sync
+    echo "pkg load signal; warning('off', 'all'); \
+          s=load_raw('rx_freedv.wav'); snr=load('snr.txt'); sync=load('sync.txt'); \
+          subplot(211); plot(s); subplot(212); x=1:length(sync); plotyy(x,snr,x,sync); \
+          ylim([-5 15]); ylabel('SNR (dB)'); grid; \
+          print('time_snr.jpg', '-djpg'); \
+          quit" | octave-cli -p ${CODEC2}/octave -qf > /dev/null
 }
 
 POSITIONAL=()
@@ -104,6 +129,10 @@ case $key in
         tx_only=1	
         shift
     ;;
+    -r)
+        rxwavefile=1	
+        shift
+    ;;
     -s)
         serialPort="$2"
         shift
@@ -119,6 +148,11 @@ case $key in
 esac
 done
 set -- "${POSITIONAL[@]}" # restore positional parameters
+
+if [ $rxwavefile -eq 1 ]; then
+    process_rx $1
+    exit 0
+fi
 
 speechfile="$1"
 if [ ! -f $speechfile ]; then
@@ -196,22 +230,6 @@ if [ $tx_only -eq 0 ]; then
     kill ${kiwi_pid}
     wait ${kiwi_pid} 2>/dev/null
 
-    echo "Process receiver sample"
-    # generate spectrogram
-    echo "pkg load signal; warning('off', 'all'); \
-          s=load_raw('rx.wav'); \
-          plot_specgram(s, 8000, 200, 3000); print('spec.jpg', '-djpg'); \
-          quit" | octave-cli -p ${CODEC2}/octave -qf > /dev/null
-    # attempt to decode
-    freedv_rx ${mode} rx.wav - -v 2>log.txt | sox -t .s16 -r 8000 -c 1 - rx_freedv.wav
-    cat log.txt | tr -s ' ' | cut -f5 -d' ' | awk '$0==($0+0)' > sync.txt
-    cat log.txt | tr -s ' ' | cut -f10 -d' ' | awk '$0==($0+0)' > snr.txt
-    # time domain plot of output speech, SNR, and sync
-    echo "pkg load signal; warning('off', 'all'); \
-          s=load_raw('rx_freedv.wav'); snr=load('snr.txt'); sync=load('sync.txt'); \
-          subplot(211); plot(s); subplot(212); x=1:length(sync); plotyy(x,snr,x,sync); \
-          ylim([-5 15]); ylabel('SNR (dB)'); grid; \
-          print('time_snr.jpg', '-djpg'); \
-          quit" | octave-cli -p ${CODEC2}/octave -qf > /dev/null
+    process_rx rx.wav
 fi
 
