@@ -24,35 +24,40 @@ gain=6
 serialPort="/dev/ttyUSB0"
 rxwavefile=0
 soundDevice="plughw:CARD=CODEC,DEV=0"
+txstats=0
 
 function print_help {
     echo
     echo "Automated Over The Air (OTA) voice test for FreeDV HF voice modes"
     echo
-    echo "  usage ./ota_voice_test.sh [-d] [-f freq_kHz] [-g cgain] [-m mode] [-o model] [-p port] [-t] [-s port] [-c dev] SpeechFile kiwi_url"
+    echo "  usage ./ota_voice_test.sh [options] SpeechFile [kiwi_url]"
     echo "  or:"
     echo "  usage ./ota_voice_test.sh -r rxWaveFile"
     echo
+    echo "    -c dev    The sound device (in ALSA format on Linux, CoreAudio for macOS)"
     echo "    -d        debug mode; trace script execution"
     echo "    -g        SSB (analog) compressor gain"
-    echo "    -o model  select radio model number ('rigctl -l' to list)"
     echo "    -m mode   700c|700d|700e"
-    echo "    -t        Tx only, useful for manually observing SDRs"
+    echo "    -o model  select radio model number ('rigctl -l' to list)"
     echo "    -r        Rx wave file mode: Rx process supplied rx wave file"
     echo "    -s port   The serial port (or hostname:port) to connect to for TX, default /dev/ttyUSB0"
-    echo "    -c dev    The sound device (in ALSA format on Linux, CoreAudio for macOS)"
+    echo "    -t        Tx only, useful for manually observing SDRs"
+    echo "    -x        Generate tx.wav file and exit"
     echo
     exit
 }
 
-# Approximation of Hilbert clipper type compressor
+# Approximation of Hilbert clipper type compressor.  Could do with some HF boost
 function analog_compressor {
     input_file=$1
     output_file=$2
     gain=$3
-    cat $input_file | cohpsk_ch - - -100 --Fs 8000 | \
-    cohpsk_ch - - -100 --Fs 8000 --clip 16384 --gain $gain | \
-    cohpsk_ch - - -100 --Fs 8000 --clip 16384 > $output_file
+    cat $input_file | cohpsk_ch - - -100 --Fs 8000 2>/dev/null | \
+    cohpsk_ch - - -100 --Fs 8000 --clip 16384 --gain $gain 2>/dev/null | \
+    # final line prints peak and CPAPR for SSB
+    cohpsk_ch - - -100 --Fs 8000 --clip 16384 |
+    # manually adjusted to get similar peak levels for SSB and FreeDV
+    sox -t .s16 -r 8000 -c 1 -v 0.85 - -t .s16 $output_file
 }
 
 function run_rigctl {
@@ -135,6 +140,10 @@ case $key in
         rxwavefile=1	
         shift
     ;;
+    -x)
+        txstats=1	
+        shift
+    ;;
     -c)
         soundDevice="$2"
         shift
@@ -186,6 +195,17 @@ analog_compressor $speechfile $speech_comp $gain
 freedv_tx $mode $speechfile $speech_freedv --clip 1 
 cat $speech_comp $speech_freedv > tx.raw
 sox -t .s16 -r 8000 -c 1 tx.raw tx.wav
+
+if [ $txstats -eq 1 ]; then
+    # cohpsk_ch just used to monitor observe peak and RMS level
+    cohpsk_ch $speech_freedv /dev/null -100
+    # time domain plot of tx signal
+    echo "pkg load signal; warning('off', 'all'); \
+          s=load_raw('tx.raw'); plot(s); \
+          print('tx.jpg', '-djpg'); \
+          quit" | octave-cli -p ${CODEC2}/octave -qf > /dev/null
+    exit 0
+fi
 
 # kick off KiwiSDR ----------------------------
 
