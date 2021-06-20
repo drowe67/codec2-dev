@@ -23,12 +23,13 @@ model=361
 gain=6
 serialPort="/dev/ttyUSB0"
 rxwavefile=0
+soundDevice="plughw:CARD=CODEC,DEV=0"
 
 function print_help {
     echo
     echo "Automated Over The Air (OTA) voice test for FreeDV HF voice modes"
     echo
-    echo "  usage ./ota_voice_test.sh [-d] [-f freq_kHz] [-g cgain] [-m mode] [-o model] [-p port] [-t] SpeechFile kiwi_url"
+    echo "  usage ./ota_voice_test.sh [-d] [-f freq_kHz] [-g cgain] [-m mode] [-o model] [-p port] [-t] [-s port] [-c dev] SpeechFile kiwi_url"
     echo "  or:"
     echo "  usage ./ota_voice_test.sh -r rxWaveFile"
     echo
@@ -39,6 +40,7 @@ function print_help {
     echo "    -t        Tx only, useful for manually observing SDRs"
     echo "    -r        Rx wave file mode: Rx process supplied rx wave file"
     echo "    -s port   The serial port (or hostname:port) to connect to for TX, default /dev/ttyUSB0"
+    echo "    -c dev    The sound device (in ALSA format on Linux, CoreAudio for macOS)"
     echo
     exit
 }
@@ -133,6 +135,11 @@ case $key in
         rxwavefile=1	
         shift
     ;;
+    -c)
+        soundDevice="$2"
+        shift
+        shift
+    ;;
     -s)
         serialPort="$2"
         shift
@@ -218,9 +225,9 @@ run_rigctl "\\set_mode PKT${usb_lsb_upper} 0" $model
 run_rigctl "\\set_freq ${freq_Hz}" $model
 run_rigctl "\\set_ptt 1" $model
 if [ `uname` == "Darwin" ]; then
-    play -t raw -b 16 -c 1 -r 8000 -e signed-integer --endian little tx.raw 
+    AUDIODEV="${soundDevice}" play -t raw -b 16 -c 1 -r 8000 -e signed-integer --endian little tx.raw 
 else
-    aplay --device="plughw:CARD=CODEC,DEV=0" -f S16_LE tx.raw 2>/dev/null
+    aplay --device="${soundDevice}" -f S16_LE tx.raw 2>/dev/null
 fi
 run_rigctl "\\set_ptt 0" $model
 
