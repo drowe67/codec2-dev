@@ -1270,10 +1270,11 @@ void freedv_set_callback_error_pattern(struct freedv *f, freedv_calback_error_pa
 }
 
 void freedv_set_carrier_ampl(struct freedv *f, int c, float ampl) {
-    assert(FDV_MODE_ACTIVE( FREEDV_MODE_700C, f->mode));
-    cohpsk_set_carrier_ampl(f->cohpsk, c, ampl);
+    if (FDV_MODE_ACTIVE( FREEDV_MODE_700C, f->mode))
+    {
+        cohpsk_set_carrier_ampl(f->cohpsk, c, ampl);
+    }
 }
-
 
 /*---------------------------------------------------------------------------* \
 
