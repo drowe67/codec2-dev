@@ -96,7 +96,8 @@ function process_rx {
           ylim([-5 15]); ylabel('SNR (dB)'); grid; \
           print('time_snr.jpg', '-djpg'); \
           printf('Nsync: %3d\n', sum(sync)); \
-          snr_valid = snr(find(snr != -5.0)); printf('SNRav: %5.2f\n', mean(snr_valid)); \
+          snr_valid = snr(find(snr != -5.0)); \
+          if length(snr_valid) printf('SNRav: %5.2f\n', mean(snr_valid)); else printf('SNRav: %5.2f\n', -5); end;
           quit" | octave-cli -p ${CODEC2}/octave -qf
 }
 
