@@ -286,11 +286,13 @@ else()
     set(CPACK_PACKAGE_VERSION_PATCH 0)
 endif()
 
+# Return the date (yyyy-mm-dd)
 macro(DATE RESULT)
   execute_process(COMMAND "date" "+%Y%m%d" OUTPUT_VARIABLE ${RESULT})
 endmacro()
-string(REGEX REPLACE "\n$" "" DATE_RESULT "${DATE_RESULT}")
 DATE(DATE_RESULT)
+string(REGEX REPLACE "\n$" "" DATE_RESULT "${DATE_RESULT}")
+message(STATUS "Compilation date = XX${DATE_RESULT}XX")
 
 set(CPACK_PACKAGE_VERSION_PATCH "${CPACK_PACKAGE_VERSION_PATCH}-${DATE_RESULT}-${FREEDV_HASH}")
 
