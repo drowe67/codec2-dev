@@ -286,6 +286,8 @@ else()
     set(CPACK_PACKAGE_VERSION_PATCH 0)
 endif()
 
+set(CPACK_PACKAGE_VERSION_PATCH "${CPACK_PACKAGE_VERSION_PATCH}-${DATE_RESULT}-${FREEDV_HASH}")
+
 if(WIN32)
     #
     # Cpack NSIS installer configuration for Windows.
