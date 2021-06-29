@@ -1236,7 +1236,6 @@ void freedv_set_tx_bpf(struct freedv *f, int val) {
 }
 
 /* DPSK option for OFDM modem, useful for high SNR, fast fading */
-
 void freedv_set_dpsk(struct freedv *f, int val) {
     if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_2020, f->mode)) {
         ofdm_set_dpsk(f->ofdm, val);
@@ -1249,9 +1248,9 @@ void freedv_set_phase_est_bandwidth_mode(struct freedv *f, int val) {
     }
 }
 
+// For those FreeDV modes using the codec 2 700C vocoder 700C/D/E/800XA
 void freedv_set_eq(struct freedv *f, int val) {
-    if (FDV_MODE_ACTIVE( FREEDV_MODE_700C, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode) || 
-        FDV_MODE_ACTIVE( FREEDV_MODE_700E, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_800XA, f->mode)) {
+    if (f->codec2 != NULL) {
         codec2_700c_eq(f->codec2, val);
     }
 }
