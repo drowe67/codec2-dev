@@ -4,7 +4,7 @@
 
 dir=voice_summary
 mkdir -p ${dir}
-time_snr_files=$(find . -name time_snr.jpg)
+time_snr_files=$(find . -name time_snr.jpg | sort)
 p=$(pwd)
 serial=0
 for f in $time_snr_files
@@ -30,6 +30,9 @@ do
             ;;
         "kiwisdr.owdjim.gen.nz")
             sdr="marahau"
+            ;;
+        "kiwisdrzl1kfm.ddns.net")
+            sdr="zl1kfm"
             ;;
         *)
             echo "Unknown Kiwi SDR"
