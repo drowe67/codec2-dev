@@ -11,7 +11,7 @@
 MY_PATH=`dirname $0`
 BUILD_PATH=`echo $MY_PATH/../build_*/src`
 PATH=${PATH}:${BUILD_PATH}:${HOME}/kiwiclient
-CODEC2=${HOME}/codec2
+CODEC2=${MY_PATH}/..
 
 kiwi_url=""
 port=8073
