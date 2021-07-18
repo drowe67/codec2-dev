@@ -10,9 +10,9 @@
 % [X]  Will this mess up a perfectly received signal, i.e. all
 %      codewords perfectly received.  This should dominate prob
 %      calc (with small No)
-% [ ] can we measure erroneous decodes?  Whn it makes it worse?
+% [ ] can we measure erroneous decodes?  When it makes it worse?
 %     + like all FEC, at some point, it will get a poorer BER
-%     + can we drawa curve of coded versus uncoded errors?
+%     + can we draw a curve of coded versus uncoded errors?
 % [ ] test with actual data, add errors, see if it corrects any
 % [ ] can we draw a trellis with actual values?
 %
@@ -23,15 +23,13 @@ graphics_toolkit ("gnuplot");
 more off;
 randn('state',1);
 
-% Before I couldn't even sp3ll functional programmer.  Now I are one ;)
-
 function [bits_per_frame bit_fields] = codec2_700_bit_fields
   bits_per_frame = 28;                % number of bits/frame for "700" mode
   bit_fields = [1 5 3 3 2 4 3 3 2 2]; % number of bits in each field for "700" mode
   % voiced, Wo, energy, LSP 1..6, 2 spare
 endfunction
 
-% builds a metric of trasnition probablilities for each codec field (model parameter)
+% builds a matrix of transition probablilities for each codec field (model parameter)
 
 function [tp codewords] = build_tp(bitstream_filename)
   [bits_per_frame bit_fields] = codec2_700_bit_fields;
@@ -82,7 +80,7 @@ function [tp codewords] = build_tp(bitstream_filename)
 endfunction
 
 
-% converts a decimal vlaue to a soft dec binary value
+% converts a decimal value to a soft dec binary value
 
 function c = dec2sd(dec, nbits)
     
@@ -107,7 +105,7 @@ function lnp = ln_prob_of_tx_codeword_c_given_rx_codeword_y(y)
   nbits = length(y);
   np    = 2.^nbits;
 
-  % work through all possible received codeworks and determine probability
+  % work through all possible received codewords and determine probability
   % given a number of bits
   
   lnp = zeros(1,np);
@@ -125,7 +123,7 @@ endfunction
 
 % y is the received soft decision codedwords, each row is one codeword in time
 % tp is the transition probabilities, each row is the start state
-% returns the most likely transitted codeword c
+% returns the most likely transmitted codeword c
 
 function c = find_most_likely_codeword(y, tp, nstages, verbose)
     [ncodewords nbits] = size(y);
@@ -344,7 +342,7 @@ function test_traj(tx_codewords, tp, nstages, var, verbose)
 endfunction
 
 
-% A contrived trajectories to check out the idea
+% A contrived trajectory to check out the idea
 
 function simple_traj
   %tp      = [1 0 0 0; 1 0 0 0; 1 0 0 0; 1 0 0 0];
