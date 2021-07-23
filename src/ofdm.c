@@ -300,7 +300,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     ofdm->rowsperframe = ofdm->bitsperframe / (ofdm->nc * ofdm->bps);
     ofdm->samplespersymbol = (ofdm->m + ofdm->ncp);
     ofdm->samplesperframe = ofdm->ns * ofdm->samplespersymbol;
-    if (ofdm->data_mode)
+    if (*ofdm->data_mode != 0)
         // in burst data modes we skip ahead one frame to jump over preamble
         ofdm->max_samplesperframe = 2*ofdm->samplesperframe;
     else
