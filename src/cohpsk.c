@@ -771,7 +771,24 @@ void fdm_downconvert_coh(COMP rx_baseband[COHPSK_NC][COHPSK_M+COHPSK_M/P], int N
     }
 }
 
+/* Determine if we can use vector ops below. */
+#if __GNUC__ > 4 || \
+    (__GNUC__ == 4 && (__GNUC_MINOR__ > 6 || \
+                       (__GNUC_MINOR__ == 6 && \
+                        __GNUC_PATCHLEVEL__ > 0)))
+#define USE_VECTOR_OPS 1
+#elif __clang_major__ > 3 || \
+    (__clang_minor__ == 3 && (__clang_minor__ > 7 || \
+                       (__clang_minor__ == 7 && \
+                        __clang_patchlevel__ > 0)))
+#define USE_VECTOR_OPS 1
+#endif
 
+#if USE_VECTOR_OPS
+/* Vector of 8 floating point numbers for use by the below function */
+typedef float float8 __attribute__ ((vector_size (256)));
+#endif /* USE_VECTOR_OPS */
+    
 /*---------------------------------------------------------------------------*\
 
   FUNCTION....: rx_filter_coh()
@@ -784,38 +801,87 @@ void fdm_downconvert_coh(COMP rx_baseband[COHPSK_NC][COHPSK_M+COHPSK_M/P], int N
 
 \*---------------------------------------------------------------------------*/
 
-void rx_filter_coh(COMP rx_filt[COHPSK_NC+1][P+1], int Nc, COMP rx_baseband[COHPSK_NC+1][COHPSK_M+COHPSK_M/P], COMP rx_filter_memory[COHPSK_NC+1][+COHPSK_NFILTER], int nin)
+inline void rx_filter_coh(COMP rx_filt[COHPSK_NC+1][P+1], int Nc, COMP rx_baseband[COHPSK_NC+1][COHPSK_M+COHPSK_M/P], COMP rx_filter_memory[COHPSK_NC+1][+COHPSK_NFILTER], int nin)
 {
-    int c, i,j,k,l;
+    int c, i,j,k;
     int n=COHPSK_M/P;
-
+    
     /* rx filter each symbol, generate P filtered output samples for
        each symbol.  Note we keep filter memory at rate M, it's just
        the filter output at rate P */
 
-    for(i=0, j=0; i<nin; i+=n,j++) {
+    for(i=0, j=0; i<nin; i+=n,j++) 
+    {
 
-	/* latest input sample */
+    	/* latest input sample */
 
-	for(c=0; c<Nc; c++)
-	    for(k=COHPSK_NFILTER-n,l=i; k<COHPSK_NFILTER; k++,l++)
-		rx_filter_memory[c][k] = rx_baseband[c][l];
+    	for(c=0; c<Nc; c++)
+        {
+            rx_filt[c][j].real = 0.0; 
+            rx_filt[c][j].imag = 0.0;
+        
+            /*
+                This call is equivalent to the code below:
+            
+        	    for(k=COHPSK_NFILTER-n,l=i; k<COHPSK_NFILTER; k++,l++)
+                {
+                    rx_filter_memory[c][k] = rx_baseband[c][l];
+                }
+            */
+            memcpy(
+                &rx_filter_memory[c][COHPSK_NFILTER-n], 
+                &rx_baseband[c][i], 
+                sizeof(COMP)*n);
+        
+            /* convolution (filtering) */
+       
+#if USE_VECTOR_OPS
+            /* assumes COHPSK_NFILTER is divisible by 4 */
+            for(k=0; k<COHPSK_NFILTER; k += 4)
+            {
+                float8 alpha5Vec = {
+                    gt_alpha5_root_coh[k], gt_alpha5_root_coh[k], gt_alpha5_root_coh[k + 1], gt_alpha5_root_coh[k + 1],
+                    gt_alpha5_root_coh[k + 2], gt_alpha5_root_coh[k + 2], gt_alpha5_root_coh[k + 3], gt_alpha5_root_coh[k + 3]
+                };
+                float8 filterMemVec = {
+                    rx_filter_memory[c][k].real, rx_filter_memory[c][k].imag, rx_filter_memory[c][k + 1].real, rx_filter_memory[c][k + 1].imag, 
+                    rx_filter_memory[c][k + 2].real, rx_filter_memory[c][k + 2].imag, rx_filter_memory[c][k + 3].real, rx_filter_memory[c][k + 3].imag 
+                };
+                float8 resultVec = alpha5Vec * filterMemVec;
+                
+                rx_filt[c][j].real += resultVec[0] + resultVec[2] + resultVec[4] + resultVec[6]; 
+                rx_filt[c][j].imag += resultVec[1] + resultVec[3] + resultVec[5] + resultVec[7];
+            }
+#else
+    	    for(k=0; k<COHPSK_NFILTER; k++)
+            {
+                /*
+                    Equivalent to this code:
 
-	/* convolution (filtering) */
-
-	for(c=0; c<Nc; c++) {
-	    rx_filt[c][j].real = 0.0; rx_filt[c][j].imag = 0.0;
-	    for(k=0; k<COHPSK_NFILTER; k++)
-		rx_filt[c][j] = cadd(rx_filt[c][j], fcmult(gt_alpha5_root_coh[k], rx_filter_memory[c][k]));
-	}
-
-	/* make room for next input sample */
-
-	for(c=0; c<Nc; c++)
-	    for(k=0,l=n; k<COHPSK_NFILTER-n; k++,l++)
-		rx_filter_memory[c][k] = rx_filter_memory[c][l];
+                    rx_filt[c][j] = cadd(rx_filt[c][j], fcmult(gt_alpha5_root_coh[k], rx_filter_memory[c][k]));
+                */
+                rx_filt[c][j].real += gt_alpha5_root_coh[k] * rx_filter_memory[c][k].real;
+                rx_filt[c][j].imag += gt_alpha5_root_coh[k] * rx_filter_memory[c][k].imag;
+    	    }
+#endif /* USE_VECTOR_OPS */
+            
+    	    /* 
+                make room for next input sample.
+            
+                The below call is equivalent to this code:
+            
+                for(k=0,l=n; k<COHPSK_NFILTER-n; k++,l++)
+                {
+                    rx_filter_memory[c][k] = rx_filter_memory[c][l];
+                }
+            */
+            memmove(
+                &rx_filter_memory[c][0], 
+                &rx_filter_memory[c][n], 
+                sizeof(COMP)*(COHPSK_NFILTER-n));
+        }
     }
-
+    
     assert(j <= (P+1)); /* check for any over runs */
 }
 
