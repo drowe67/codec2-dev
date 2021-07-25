@@ -101,25 +101,27 @@ endfunction
 
 % y is vector of +/- 1 soft decision values for 0,1 transmitted bits
 
-function lnp = ln_prob_of_tx_codeword_c_given_rx_codeword_y(y)
+function [lnp indexes] = ln_prob_of_tx_codeword_c_given_rx_codeword_y(y, top_n, C)
   nbits = length(y);
   np    = 2.^nbits;
-
-  % work through all possible received codewords and determine probability
-  % given a number of bits
   
-  lnp = zeros(1,np);
-  for i=0:np-1
+  % Find log probability of all possible transmitted codewords
+  lnp = C * y;
+  
+  % return top_n most probable codewords
+  [lnp indexes] = sort(lnp,"descend");  
+endfunction
 
-    c = dec2sd(i,nbits);
+% A matrix of all possible tx codewords C, one per row
+function C = precompute_C(nbits)
+  np    = 2.^nbits;
 
-    % probability calculation for this i
-
-    lnp(i+1) = sum(y .* c);
+  C = zeros(np, nbits);
+  for r=1:np
+    C(r,:) = dec2sd(r,nbits);
   end
   
 endfunction
-
 
 % y is the received soft decision codedwords, each row is one codeword in time
 % tp is the transition probabilities, each row is the start state
@@ -512,10 +514,43 @@ function process_test_file(bitstream_filename)
 
 endfunction
 
+% Given a normalised histogram, estimate probability from SD
+function p = prob_from_hist(sd_table, h_table, sd)
+  p = interp1 (sd_table, h_table, sd, "extrap");
+endfunction
+
+% Calculate a normalised histogram of the SD of adjacent frames from
+% a file of training data
+function [sd_table h_table] = vq_hist(test_fn, dec=1)
+  K=20; K_st=2; K_en=16;
+  vq_test = load_f32(test_fn, K);
+  [r c]= size(vq_test);
+  diff = vq_test(dec+1:end,K_st:K_en) - vq_test(1:end-dec,K_st:K_en);
+  sd_adj = var(diff');
+  [h_table sd_table] = hist(sd_adj,50,1);
+endfunction
+
+function vq_hist_dec(test_fn)
+  figure(1); clf;
+  [sd_table h_table] = vq_hist(test_fn, dec=1);
+  plot(sd_table, h_table, "b;dec=1;");
+  hold on;
+  [sd_table h_table] = vq_hist(test_fn, dec=2);
+  plot(sd_table, h_table, "r;dec=2;");
+  [sd_table h_table] = vq_hist(test_fn, dec=3);
+  plot(sd_table, h_table, "g;dec=3;");  
+  [sd_table h_table] = vq_hist(test_fn, dec=4);
+  plot(sd_table, h_table, "c;dec=4;");  
+  hold off;
+  axis([0 300 0 0.5])
+  xlabel("SD dB*dB"); title('Histogram of SD(n,n+1)');
+endfunction
+
 % uncomment one of the below to run a simulation
 
 %test_single
 %simple_traj;
-test_codec_model_parameter("ve9qrp_10s.bit", 6);
+%test_codec_model_parameter("ve9qrp_10s.bit", 6);
 %process_test_file("ve9qrp_10s.bit")
 
+vq_hist_dec("../build_linux/all_speech_8k_test.f32");
