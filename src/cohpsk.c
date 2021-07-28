@@ -785,8 +785,16 @@ void fdm_downconvert_coh(COMP rx_baseband[COHPSK_NC][COHPSK_M+COHPSK_M/P], int N
 #endif
 
 #if USE_VECTOR_OPS
-/* Vector of 8 floating point numbers for use by the below function */
-typedef float float8 __attribute__ ((vector_size (32)));
+
+#ifdef __ARM_NEON
+#include "arm_neon.h"
+
+typedef float32x4_t float4;
+#else
+/* Vector of 4 floating point numbers for use by the below function */
+typedef float float4 __attribute__ ((vector_size (16)));
+#endif // __ARM_NEON
+
 #endif /* USE_VECTOR_OPS */
     
 /*---------------------------------------------------------------------------*\
@@ -836,22 +844,36 @@ inline void rx_filter_coh(COMP rx_filt[COHPSK_NC+1][P+1], int Nc, COMP rx_baseba
             /* convolution (filtering) */
        
 #if USE_VECTOR_OPS
-            /* assumes COHPSK_NFILTER is divisible by 4 */
-            for(k=0; k<COHPSK_NFILTER; k += 4)
+            /* assumes COHPSK_NFILTER is divisible by 2 */
+            float4 resultVec = {0, 0, 0, 0};
+            for(k=0; k<COHPSK_NFILTER; k += 2)
             {
-                float8 alpha5Vec = {
+                float4 alpha5Vec = {
                     gt_alpha5_root_coh[k], gt_alpha5_root_coh[k], gt_alpha5_root_coh[k + 1], gt_alpha5_root_coh[k + 1],
-                    gt_alpha5_root_coh[k + 2], gt_alpha5_root_coh[k + 2], gt_alpha5_root_coh[k + 3], gt_alpha5_root_coh[k + 3]
                 };
-                float8 filterMemVec = {
+#ifdef __ARM_NEON
+                // Load two COMP elements (each containing two floats) into 4 element vector.
+                float4 filterMemVec = vld1q_f32((const float32_t *)&rx_filter_memory[c][k]);
+
+                // Multiply each element of filterMemVec by alpha5Vec from above and add to the
+                // running total in resultVec. Odd indices are reals, even imag.
+                resultVec = vaddq_f32(resultVec, vmulq_f32(alpha5Vec, filterMemVec));
+#else
+                // Load two COMP elements (each containing two floats) into 4 element vector.
+                float4 filterMemVec = {
                     rx_filter_memory[c][k].real, rx_filter_memory[c][k].imag, rx_filter_memory[c][k + 1].real, rx_filter_memory[c][k + 1].imag, 
-                    rx_filter_memory[c][k + 2].real, rx_filter_memory[c][k + 2].imag, rx_filter_memory[c][k + 3].real, rx_filter_memory[c][k + 3].imag 
                 };
-                float8 resultVec = alpha5Vec * filterMemVec;
-                
-                rx_filt[c][j].real += resultVec[0] + resultVec[2] + resultVec[4] + resultVec[6]; 
-                rx_filt[c][j].imag += resultVec[1] + resultVec[3] + resultVec[5] + resultVec[7];
+
+                // Multiply each element of filterMemVec by alpha5Vec from above and add to the
+                // running total in resultVec. Odd indices are reals, even imag.
+                resultVec += alpha5Vec * filterMemVec;
+            
+#endif // __ARM_NEON
             }
+
+            // Add total from resultVec to rx_filt.
+            rx_filt[c][j].real += resultVec[0] + resultVec[2];
+            rx_filt[c][j].imag += resultVec[1] + resultVec[3];
 #else
     	    for(k=0; k<COHPSK_NFILTER; k++)
             {
