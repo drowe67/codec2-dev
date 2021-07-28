@@ -786,7 +786,7 @@ void fdm_downconvert_coh(COMP rx_baseband[COHPSK_NC][COHPSK_M+COHPSK_M/P], int N
 
 #if USE_VECTOR_OPS
 /* Vector of 8 floating point numbers for use by the below function */
-typedef float float8 __attribute__ ((vector_size (256)));
+typedef float float8 __attribute__ ((vector_size (32)));
 #endif /* USE_VECTOR_OPS */
     
 /*---------------------------------------------------------------------------*\
