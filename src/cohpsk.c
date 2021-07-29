@@ -855,12 +855,9 @@ inline void rx_filter_coh(COMP rx_filt[COHPSK_NC+1][P+1], int Nc, COMP rx_baseba
             for(k=0; k<COHPSK_NFILTER; k += 2)
             {
 #ifdef __ARM_NEON
-               // Fetch gt_alpha5_root_coh and place it into a vector for later use.
+                // Fetch gt_alpha5_root_coh and place it into a vector for later use.
                 // First half at index k, second half at index k + 1.
-                float32x2_t alpha5 = vld1_f32((const float*)&gt_alpha5_root_coh[k]);
-                float32x2_t alpha5upper = vdup_lane_f32(alpha5, 0);
-                float32x2_t alpha5lower = vdup_lane_f32(alpha5, 1);
-                float4 alpha5Vec = vcombine_f32(alpha5upper, alpha5lower);
+                float4 alpha5Vec = vld1q_f32((const float32_t*)&gt_alpha5_root_coh_neon[k]);
 
                 // Load two COMP elements (each containing two floats) into 4 element vector.
                 float4 filterMemVec = vld1q_f32((const float32_t *)&rx_filter_memory[c][k]);
@@ -872,7 +869,7 @@ inline void rx_filter_coh(COMP rx_filt[COHPSK_NC+1][P+1], int Nc, COMP rx_baseba
                 // Fetch gt_alpha5_root_coh and place it into a vector for later use.
                 // First half at index k, second half at index k + 1.
                 float4 alpha5Vec = {
-                    gt_alpha5_root_coh[k], gt_alpha5_root_coh[k], gt_alpha5_root_coh[k + 1], gt_alpha5_root_coh[k + 1],
+                    gt_alpha5_root_coh_neon[k], gt_alpha5_root_coh_neon[k + 1], gt_alpha5_root_coh_neon[k + 2], gt_alpha5_root_coh_neon[k + 3],
                 };
 
                 // Load two COMP elements (each containing two floats) into 4 element vector.
