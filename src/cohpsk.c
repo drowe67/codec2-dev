@@ -845,20 +845,36 @@ inline void rx_filter_coh(COMP rx_filt[COHPSK_NC+1][P+1], int Nc, COMP rx_baseba
        
 #if USE_VECTOR_OPS
             /* assumes COHPSK_NFILTER is divisible by 2 */
+
+#ifdef __ARM_NEON
+            float4 resultVec = vdupq_n_f32(0);
+#else
             float4 resultVec = {0, 0, 0, 0};
+#endif // __ARM_NEON
+
             for(k=0; k<COHPSK_NFILTER; k += 2)
             {
-                float4 alpha5Vec = {
-                    gt_alpha5_root_coh[k], gt_alpha5_root_coh[k], gt_alpha5_root_coh[k + 1], gt_alpha5_root_coh[k + 1],
-                };
 #ifdef __ARM_NEON
+               // Fetch gt_alpha5_root_coh and place it into a vector for later use.
+                // First half at index k, second half at index k + 1.
+                float32x2_t alpha5 = vld1_f32((const float*)&gt_alpha5_root_coh[k]);
+                float32x2_t alpha5upper = vdup_lane_f32(alpha5, 0);
+                float32x2_t alpha5lower = vdup_lane_f32(alpha5, 1);
+                float4 alpha5Vec = vcombine_f32(alpha5upper, alpha5lower);
+
                 // Load two COMP elements (each containing two floats) into 4 element vector.
                 float4 filterMemVec = vld1q_f32((const float32_t *)&rx_filter_memory[c][k]);
 
                 // Multiply each element of filterMemVec by alpha5Vec from above and add to the
                 // running total in resultVec. Odd indices are reals, even imag.
-                resultVec = vaddq_f32(resultVec, vmulq_f32(alpha5Vec, filterMemVec));
+                resultVec = vmlaq_f32(resultVec, alpha5Vec, filterMemVec);
 #else
+                // Fetch gt_alpha5_root_coh and place it into a vector for later use.
+                // First half at index k, second half at index k + 1.
+                float4 alpha5Vec = {
+                    gt_alpha5_root_coh[k], gt_alpha5_root_coh[k], gt_alpha5_root_coh[k + 1], gt_alpha5_root_coh[k + 1],
+                };
+
                 // Load two COMP elements (each containing two floats) into 4 element vector.
                 float4 filterMemVec = {
                     rx_filter_memory[c][k].real, rx_filter_memory[c][k].imag, rx_filter_memory[c][k + 1].real, rx_filter_memory[c][k + 1].imag, 
