@@ -209,7 +209,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
         ofdm->codename = "HRA_112_112";
         ofdm->amp_est_mode = 0;
         ofdm->tx_bpf_en = true;
-        ofdm->amp_scale = 217E3;
+        ofdm->amp_scale = 245E3;
         ofdm->clip_gain1 = 2.0;
         ofdm->clip_gain2 = 0.9;
         ofdm->clip_en = false;
