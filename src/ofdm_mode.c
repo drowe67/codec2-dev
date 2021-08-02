@@ -44,7 +44,7 @@ void ofdm_init_mode(char mode[], struct OFDM_CONFIG *config) {
     config->clip_gain2 = 0.8;
     config->clip_en = false;
     config->tx_bpf_en = true;
-    config->amp_scale = 217E3;
+    config->amp_scale = 245E3;
     config->foff_limiter = false;
     memset(config->tx_uw, 0, MAX_UW_BITS);
 
