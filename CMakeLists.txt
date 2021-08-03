@@ -110,7 +110,7 @@ if(NOT WIN32)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC")
 endif()
 
-set(CMAKE_C_FLAGS_DEBUG "-g -O2 -DDUMP -Wall")
+set(CMAKE_C_FLAGS_DEBUG "-g -O2 -DDUMP")
 set(CMAKE_C_FLAGS_RELEASE "-O3")
 
 #
