@@ -543,7 +543,7 @@ void corr_with_pilots(float *corr_out, float *mag_out, struct COHPSK *coh, int t
         f_fine_rect[p].imag = sinf(result);
     }
 
-    corr = 0.0; mag = 0.0;
+    corr = 0.0; mag = 1E-12;
     for (c=0; c<COHPSK_NC*ND; c++) {
         acorr.real = 0.0f; acorr.imag = 0.0f; pc = c % COHPSK_NC;
         for (p=0; p<NPILOTSFRAME+2; p++) {
@@ -585,7 +585,7 @@ void frame_sync_fine_freq_est(struct COHPSK *coh, COMP ch_symb[][COHPSK_NC*ND], 
 
         /* sample correlation over 2D grid of time and fine freq points */
 
-        max_corr = max_mag = 0;
+        max_corr = 0.0; max_mag = 1E-12;
         for (f_fine=-20; f_fine<=20; f_fine+=0.25) {
             for (t=0; t<NSYMROWPILOT; t++) {
                 corr_with_pilots(&corr, &mag, coh, t, f_fine);

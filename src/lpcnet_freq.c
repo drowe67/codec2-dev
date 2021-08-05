@@ -1,6 +1,6 @@
 /*
    lpcnet_freq.c
-   
+
    freq.c from LPCnet project, I think this code originally came from
    Opus.
 */
@@ -42,15 +42,14 @@
 
 /* FFT bin index of centre of each band, assuming an 80 sample time
    domain window (5ms at 16 kHz), which results in 40 samples in the
-   positive freq side of the FFT */
-static int eband5ms[] = { /*0 200 400 600 800 1k 1.2 1.4 1.6 2k 2.4
-2.8 3.2 4k 4.8 5.6 6.8 8k*/
+   positive freq side of the FFT.  TODO - refactor this to something more generic */
+static float eband5ms[] = {
   0,  1,  2,  3,  4,  5,  6,  7,  8, 10, 12, 14, 16, 20, 24, 28, 34, 40
 };
 
 /* bandE[i] is the sum of energy in a triangular window centred on
    eband5ms[i], with adjustments for first and last band */
-int lpcnet_compute_band_energy(float *bandE, COMP *X, float Fs, int Nfft) {
+int lpcnet_compute_band_energy(float *bandE, float *bandCentrekHz, COMP *X, float Fs, int Nfft) {
     float sum[LPCNET_FREQ_MAX_BANDS] = {0};
     int nb_bands;
     float scale;
@@ -73,7 +72,7 @@ int lpcnet_compute_band_energy(float *bandE, COMP *X, float Fs, int Nfft) {
 	    float tmp;
 	    float frac = (float)j/band_size;
 	    int bin = eband5ms[i]*scale;
-	    assert((bin+j) < Nfft/2); 
+	    assert((bin+j) < Nfft/2);
 	    tmp = SQUARE(X[bin + j].real);
 	    tmp += SQUARE(X[bin + j].imag);
 	    sum[i] += (1-frac)*tmp;
@@ -84,9 +83,10 @@ int lpcnet_compute_band_energy(float *bandE, COMP *X, float Fs, int Nfft) {
     /* first and last band only summed from half of triangular window */
     sum[0] *= 2;
     sum[nb_bands-1] *= 2;
-    for (int i=0;i<nb_bands;i++)
-	bandE[i] = log10(sum[i]);
+    for (int i=0;i<nb_bands;i++) {
+        bandCentrekHz[i] = eband5ms[i]*Fs/40.0/1000.0;
+	bandE[i] = 10.0*log10(sum[i]);
+    }
 
     return nb_bands;
 }
-

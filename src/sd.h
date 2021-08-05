@@ -28,6 +28,8 @@
 #ifndef __SD__
 #define __SD__
 
-float spectral_dist(float ak1[], float ak2[], int p, int n);
+#include "codec2_fft.h"
+
+float spectral_dist(float ak1[], float ak2[], int p, codec2_fft_cfg fft_fwd_cfg, int n);
 
 #endif	/* __SD__  */
