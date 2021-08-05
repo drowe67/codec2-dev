@@ -863,9 +863,6 @@ int freedv_bits_to_speech(struct freedv *f, short speech_out[], short demod_in[]
 
         if (f->squelch_en == 0) {
 
-            /* attenuate audio 12dB as channel noise isn't that pleasant */
-            float passthrough_gain = 0.25;
-
             /* pass through received samples so we can hear what's going on, e.g. during tuning */
 
             if (f->mode == FREEDV_MODE_2020) {
@@ -878,13 +875,13 @@ int freedv_bits_to_speech(struct freedv *f, short speech_out[], short demod_in[]
                     f->passthrough_2020[FDMDV_OS_TAPS_16K+i] = demod_in[i];
                 fdmdv_8_to_16(tmp, &f->passthrough_2020[FDMDV_OS_TAPS_16K], nout/2);
                 for(int i=0; i<nout; i++)
-                    speech_out[i] = passthrough_gain*tmp[i];
+                    speech_out[i] = f->passthrough_gain*tmp[i];
             } else {
       	        /* Speech and modem rates might be different */
       	        int rate_factor = f->modem_sample_rate / f-> speech_sample_rate;
                 nout = f->nin_prev / rate_factor;
                 for(int i=0; i<nout; i++)
-                    speech_out[i] = passthrough_gain*demod_in[i * rate_factor];
+                    speech_out[i] = f->passthrough_gain*demod_in[i * rate_factor];
             }
         }
     }
@@ -1213,6 +1210,7 @@ void freedv_set_varicode_code_num         (struct freedv *f, int val) {varicode_
 void freedv_set_ext_vco                   (struct freedv *f, int val) {f->ext_vco = val;}
 void freedv_set_snr_squelch_thresh        (struct freedv *f, float val) {f->snr_squelch_thresh = val;}
 void freedv_set_tx_amp                    (struct freedv *f, float amp) {f->tx_amp = amp;}
+void freedv_passthrough_gain              (struct freedv *f, float g) {f->passthrough_gain = g;}
 
 /* supported by 700C, 700D, 700E */
 

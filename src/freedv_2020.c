@@ -113,6 +113,9 @@ void freedv_2020_open(struct freedv *f) {
     assert(f->tx_payload_bits != NULL);
     f->rx_payload_bits = (unsigned char*)MALLOC(f->bits_per_modem_frame);
     assert(f->rx_payload_bits != NULL);
+    
+    /* attenuate audio 12dB as channel noise isn't that pleasant */
+    f->passthrough_gain = 0.25;
 }
 
 void freedv_comptx_2020(struct freedv *f, COMP mod_out[]) {
