@@ -69,7 +69,7 @@ struct freedv {
     struct FMFSK        *fmfsk;
     struct OFDM         *ofdm;
     struct LDPC         *ldpc;
-    struct MODEM_STATS   stats;
+    struct MODEM_STATS   stats;                 // working memory for when we call xxx_stats function for each demod
 #ifdef __LPCNET__
     struct LPCNetFreeDV *lpcnet;
 #endif
@@ -130,9 +130,9 @@ struct freedv {
     int                  tx_sync_bit;
     int                  frames;
     int                  clip_en;                            /* non-zero for modem Tx clipping to lower PAPR */
-    int                  sync;
+    int                  sync;                               /* we set this when a mode is in sync */
     int                  evenframe;
-    float                snr_est;
+    float                snr_est;                            /* we set this each time the modes's demod estimates SNR */
     float                snr_squelch_thresh;
     int                  squelch_en;
     int                  nin, nin_prev;
@@ -140,7 +140,8 @@ struct freedv {
     int                  ext_vco;                            /* 2400A/800XA use external VCO flag */
     float               *passthrough_2020;                   /* 2020 interpolating filter */
     float                tx_amp;                             /* amplitude of tx samples */
-
+    float                passthrough_gain;
+    
     /* useful constants for OFDM modes ------------------------------------------------------------------*/
 
     int                  ofdm_bitsperpacket;

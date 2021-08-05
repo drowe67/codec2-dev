@@ -255,7 +255,8 @@ static void codec2_encode_upacked(struct freedv *f, uint8_t unpacked_bits[], sho
 }
 
 static int is_ofdm_mode(struct freedv *f) {
-    return FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode)   ||
+    return FDV_MODE_ACTIVE( FREEDV_MODE_2020, f->mode)   ||
+           FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode)   ||
            FDV_MODE_ACTIVE( FREEDV_MODE_700E, f->mode)   ||
            FDV_MODE_ACTIVE( FREEDV_MODE_DATAC0, f->mode) ||
            FDV_MODE_ACTIVE( FREEDV_MODE_DATAC1, f->mode) ||
@@ -862,9 +863,6 @@ int freedv_bits_to_speech(struct freedv *f, short speech_out[], short demod_in[]
 
         if (f->squelch_en == 0) {
 
-            /* attenuate audio 12dB as channel noise isn't that pleasant */
-            float passthrough_gain = 0.25;
-
             /* pass through received samples so we can hear what's going on, e.g. during tuning */
 
             if (f->mode == FREEDV_MODE_2020) {
@@ -877,13 +875,13 @@ int freedv_bits_to_speech(struct freedv *f, short speech_out[], short demod_in[]
                     f->passthrough_2020[FDMDV_OS_TAPS_16K+i] = demod_in[i];
                 fdmdv_8_to_16(tmp, &f->passthrough_2020[FDMDV_OS_TAPS_16K], nout/2);
                 for(int i=0; i<nout; i++)
-                    speech_out[i] = passthrough_gain*tmp[i];
+                    speech_out[i] = f->passthrough_gain*tmp[i];
             } else {
       	        /* Speech and modem rates might be different */
       	        int rate_factor = f->modem_sample_rate / f-> speech_sample_rate;
                 nout = f->nin_prev / rate_factor;
                 for(int i=0; i<nout; i++)
-                    speech_out[i] = passthrough_gain*demod_in[i * rate_factor];
+                    speech_out[i] = f->passthrough_gain*demod_in[i * rate_factor];
             }
         }
     }
@@ -1184,11 +1182,8 @@ void freedv_get_modem_stats(struct freedv *f, int *sync, float *snr_est)
         fdmdv_get_demod_stats(f->fdmdv, &f->stats);
     if (FDV_MODE_ACTIVE( FREEDV_MODE_700C, f->mode))
         cohpsk_get_demod_stats(f->cohpsk, &f->stats);
-    if (FDV_MODE_ACTIVE( FREEDV_MODE_2400B, f->mode)) {
-        fmfsk_get_demod_stats(f->fmfsk, &f->stats);
-    }
-    if (sync) *sync = f->stats.sync;
-    if (snr_est) *snr_est = f->stats.snr_est;
+    if (sync) *sync = f->sync;
+    if (snr_est) *snr_est = f->snr_est;
 }
 
 /*---------------------------------------------------------------------------*\
@@ -1215,6 +1210,7 @@ void freedv_set_varicode_code_num         (struct freedv *f, int val) {varicode_
 void freedv_set_ext_vco                   (struct freedv *f, int val) {f->ext_vco = val;}
 void freedv_set_snr_squelch_thresh        (struct freedv *f, float val) {f->snr_squelch_thresh = val;}
 void freedv_set_tx_amp                    (struct freedv *f, float amp) {f->tx_amp = amp;}
+void freedv_passthrough_gain              (struct freedv *f, float g) {f->passthrough_gain = g;}
 
 /* supported by 700C, 700D, 700E */
 
@@ -1238,7 +1234,6 @@ void freedv_set_tx_bpf(struct freedv *f, int val) {
 }
 
 /* DPSK option for OFDM modem, useful for high SNR, fast fading */
-
 void freedv_set_dpsk(struct freedv *f, int val) {
     if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_2020, f->mode)) {
         ofdm_set_dpsk(f->ofdm, val);
@@ -1251,8 +1246,9 @@ void freedv_set_phase_est_bandwidth_mode(struct freedv *f, int val) {
     }
 }
 
+// For those FreeDV modes using the codec 2 700C vocoder 700C/D/E/800XA
 void freedv_set_eq(struct freedv *f, int val) {
-    if (FDV_MODE_ACTIVE( FREEDV_MODE_700C, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode)) {
+    if (f->codec2 != NULL) {
         codec2_700c_eq(f->codec2, val);
     }
 }
@@ -1274,10 +1270,11 @@ void freedv_set_callback_error_pattern(struct freedv *f, freedv_calback_error_pa
 }
 
 void freedv_set_carrier_ampl(struct freedv *f, int c, float ampl) {
-    assert(FDV_MODE_ACTIVE( FREEDV_MODE_700C, f->mode));
-    cohpsk_set_carrier_ampl(f->cohpsk, c, ampl);
+    if (FDV_MODE_ACTIVE( FREEDV_MODE_700C, f->mode))
+    {
+        cohpsk_set_carrier_ampl(f->cohpsk, c, ampl);
+    }
 }
-
 
 /*---------------------------------------------------------------------------* \
 
@@ -1339,7 +1336,7 @@ int freedv_get_total_bits_coded           (struct freedv *f) {return f->total_bi
 int freedv_get_total_bit_errors_coded     (struct freedv *f) {return f->total_bit_errors_coded;}
 int freedv_get_total_packets              (struct freedv *f) {return f->total_packets;}
 int freedv_get_total_packet_errors        (struct freedv *f) {return f->total_packet_errors;}
-int freedv_get_sync                       (struct freedv *f) {return f->stats.sync;}
+int freedv_get_sync                       (struct freedv *f) {return f->sync;}
 struct CODEC2 *freedv_get_codec2	        (struct freedv *f) {return  f->codec2;}
 int freedv_get_bits_per_codec_frame       (struct freedv *f) {return f->bits_per_codec_frame;}
 int freedv_get_bits_per_modem_frame       (struct freedv *f) {return f->bits_per_modem_frame;}
@@ -1387,13 +1384,15 @@ void freedv_get_modem_extended_stats(struct freedv *f, struct MODEM_STATS *stats
         fdmdv_get_demod_stats(f->fdmdv, stats);
 
     if (FDV_MODE_ACTIVE( FREEDV_MODE_2400A, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_800XA, f->mode)) {
-        fsk_get_demod_stats(f->fsk, stats);
-        float EbNodB = stats->snr_est;                          /* fsk demod actually estimates Eb/No     */
-        stats->snr_est = EbNodB + 10.0f*log10f(800.0f/3000.0f); /* so convert to SNR Rb=800, noise B=3000 */
+        fsk_get_demod_stats(f->fsk, stats);   /* eye diagram samples, clock offset etc */
+        stats->snr_est = f->snr_est;          /* estimated when fsk_demod() called in freedv_fsk.c */
+        stats->sync = f->sync;                /* sync indicator comes from framing layer */
     }
 
     if (FDV_MODE_ACTIVE( FREEDV_MODE_2400B, f->mode)) {
         fmfsk_get_demod_stats(f->fmfsk, stats);
+        stats->snr_est = f->snr_est;
+        stats->sync = f->sync;
     }
 
     if (FDV_MODE_ACTIVE( FREEDV_MODE_700C, f->mode)) {
@@ -1406,7 +1405,9 @@ void freedv_get_modem_extended_stats(struct freedv *f, struct MODEM_STATS *stats
         // TODO we need a better design here: Issue #182
         size_t ncopy = (void*)stats->rx_eye - (void*)stats;
         memcpy(stats, &f->stats, ncopy);
-    }
+        stats->snr_est = f->snr_est;
+        stats->sync = f->sync;
+  }
 }
 
 int freedv_get_n_tx_preamble_modem_samples(struct freedv *f) {

@@ -99,18 +99,18 @@ FreeDV 2400A and FreeDV 2400B are modes designed for VHF radio. FreeDV 2400A is 
 
 Demos of FreeDV 2400A and 2400B:
 ```
-$ ./freedv_tx 2400A ../../raw/ve9qrp_10s.raw - | ./freedv_rx 2400A - - | play -t raw -r 8000 -s -2 -
-$ ./freedv_tx 2400B ../../raw/ve9qrp_10s.raw - | ./freedv_rx 2400B - - | play -t raw -r 8000 -s -2 -
+$ ./freedv_tx 2400A ../../raw/ve9qrp_10s.raw - | ./freedv_rx 2400A - - | play -t .s16 -r 8000 -
+$ ./freedv_tx 2400B ../../raw/ve9qrp_10s.raw - | ./freedv_rx 2400B - - | play -t .s16 -r 8000 -
 ```
 Note for FreeDV 2400A/2400B the modem signal sample rate is 48kHz.  To
 listen to the modem tones from FreeDV 2400B, or play them into a FM HT
 mic input:
 ```
-$ ./freedv_tx 2400B ../../raw/ve9qrp_10s.raw - | play -t raw -r 48000 -s -2 -
+$ ./freedv_tx 2400B ../../raw/ve9qrp_10s.raw - | play -t .s16 -r 48000 -
 ```
 Simulate FreeDV 2400B passing through a 300 to 3000 Hz audio path using sox to filter:
 ```
-$  ./freedv_tx 2400B ../../raw/ve9qrp_10s.raw - | sox -t raw -r 48000 -s -2 - -t raw - sinc 300-3000 | ./freedv_rx 2400B - - | play -t raw -r 8000 -s -2 -
+$  ./freedv_tx 2400B ../../raw/ve9qrp_10s.raw - | sox -t .s16 -r 48000 - -t .s16 - sinc 300-3000 | ./freedv_rx 2400B - - | play -t .s16 -r 8000 -
 ```
 
 ## FreeDV 2020 support (building with LPCNet)

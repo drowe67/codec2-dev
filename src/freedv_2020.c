@@ -113,6 +113,9 @@ void freedv_2020_open(struct freedv *f) {
     assert(f->tx_payload_bits != NULL);
     f->rx_payload_bits = (unsigned char*)MALLOC(f->bits_per_modem_frame);
     assert(f->rx_payload_bits != NULL);
+    
+    /* attenuate audio 12dB as channel noise isn't that pleasant */
+    f->passthrough_gain = 0.25;
 }
 
 void freedv_comptx_2020(struct freedv *f, COMP mod_out[]) {
@@ -186,7 +189,7 @@ int freedv_comprx_2020(struct freedv *f, COMP demod_in[]) {
     int parityCheckCount = 0;
     uint8_t rx_uw[f->ofdm_nuwbits];
 
-    f->sync = f->stats.sync = 0;
+    f->sync = 0;
 
     // TODO: should be higher for 2020?
     float EsNo = 3.0;
@@ -195,6 +198,7 @@ int freedv_comprx_2020(struct freedv *f, COMP demod_in[]) {
 
     if (ofdm->sync_state == search) {
         ofdm_sync_search(f->ofdm, demod_in);
+        f->snr_est = -5.0;
     }
 
     /* OK modem is in sync */

@@ -129,8 +129,9 @@ int main(int argc, char *argv[]) {
     /* set up a few options, calling these is optional -------------------------*/
 
     freedv_set_test_frames(freedv, use_testframes);
-    freedv_set_verbose(freedv, verbose);
-
+    if (verbose == 2) freedv_set_verbose(freedv, verbose);
+    freedv_passthrough_gain(freedv, 1.0);
+    
     if (use_squelch) {
         freedv_set_snr_squelch_thresh(freedv, squelch);
         freedv_set_squelch_en(freedv, 1);

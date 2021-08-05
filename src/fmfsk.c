@@ -76,7 +76,7 @@ struct FMFSK * fmfsk_create(int Fs,int Rb){
         free(fmfsk);
         return NULL;
     }
-    
+    for(int i=0; i<fmfsk->nmem; i++) oldsamps[i] = 0.0;
     fmfsk->oldsamps = oldsamps;
 
     fmfsk->stats = (struct MODEM_STATS*)malloc(sizeof(struct MODEM_STATS));
@@ -332,13 +332,14 @@ void fmfsk_demod(struct FMFSK *fmfsk, uint8_t rx_bits[],float fmfsk_in[]){
     /* Zero out all of the other things */
     fmfsk->stats->foff = 0;
 
-    /* Use moving average to smooth SNR display */
+    /* Use moving average to smooth SNR */
+    var_signal += 1E-6/3.1; var_noise += 1E-6; /* prevent NAN and bias towards -5dB SNR for zero signal inputs */
     if(fmfsk->snr_mean < 0.1)
         fmfsk->snr_mean = (10.0 * log10f(var_signal / var_noise));
     else
         fmfsk->snr_mean = 0.9 * fmfsk->snr_mean + 0.1 * (10.0 * log10f(var_signal / var_noise));
     fmfsk->stats->snr_est = fmfsk->snr_mean;
-        
+
     /* Collect an eye diagram */
     /* Take a sample for the eye diagrams */
     neyesamp = fmfsk->stats->neyesamp = Ts*4;

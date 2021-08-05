@@ -159,6 +159,9 @@ void freedv_ofdm_voice_open(struct freedv *f, char *mode) {
     assert(f->tx_payload_bits != NULL);
     f->rx_payload_bits = (unsigned char*)MALLOC(f->bits_per_modem_frame);
     assert(f->rx_payload_bits != NULL);
+    
+    /* attenuate audio 12dB as channel noise isn't that pleasant */
+    f->passthrough_gain = 0.25;
 }
 
 // open function for OFDM data modes, TODO consider moving to a new
@@ -400,18 +403,17 @@ int freedv_comp_short_rx_ofdm(struct freedv *f, void *demod_in_8kHz, int demod_i
 
     assert((demod_in_is_short == 0) || (demod_in_is_short == 1));
 
-    f->sync = f->stats.sync = 0;
     int rx_status = 0;
-
-    /* TODO estimate this properly from signal */
-    float EsNo = 3.0;
-
+    float EsNo = 3.0;    /* further work: estimate this properly from signal */
+    f->sync = 0;
+    
     /* looking for OFDM modem sync */
     if (ofdm->sync_state == search) {
         if (demod_in_is_short)
             ofdm_sync_search_shorts(f->ofdm, (short*)demod_in_8kHz, new_gain);
         else
             ofdm_sync_search(f->ofdm, (COMP*)demod_in_8kHz);
+        f->snr_est = -5.0;
     }
 
     if ((ofdm->sync_state == synced) || (ofdm->sync_state == trial)) {
@@ -519,7 +521,7 @@ int freedv_comp_short_rx_ofdm(struct freedv *f, void *demod_in_8kHz, int demod_i
 
     f->nin = ofdm_get_nin(ofdm);
     ofdm_sync_state_machine(ofdm, rx_uw);
-
+     
     int print_full = 0; int print_truncated = 0;
     if (f->verbose && ((rx_status & FREEDV_RX_BITS) || (rx_status &  FREEDV_RX_BIT_ERRORS)))
         print_full = 1;
