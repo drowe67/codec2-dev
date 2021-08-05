@@ -25,11 +25,7 @@
   along with this program; if not, see <http://www.gnu.org/licenses/>.
 */
 
-#define	MAX_N	2048	/* maximum DFT size	*/
-
 #include <math.h>
-#include "four1.h"
-#include "comp.h"
 #include "sd.h"
 
 /*---------------------------------------------------------------------------*\
@@ -39,19 +35,20 @@
 	AUTHOR......: David Rowe
 	DATE CREATED: 20/7/93
 
-	This function returns the soectral distoertion between two
+	This function returns the spectral distoertion between two
 	sets of LPCs.
 
 \*---------------------------------------------------------------------------*/
 
-float spectral_dist(float ak1[], float ak2[], int p, int n)
+float spectral_dist(float ak1[], float ak2[], int p, codec2_fft_cfg fft_fwd_cfg, int n)
 /*  float ak1[];	unquantised set of p+1 LPCs 			 */
 /*  float ak2[];	quantised set of p+1 LPCs 			 */
 /*  int p;		LP order					 */
+/*  fft_fwd_cfg         FFT constants                                    */
 /*  int n;		DFT size to use for SD calculations (power of 2) */
 {
-    COMP  A1[MAX_N];	/* DFT of ak1[] 		*/
-    COMP  A2[MAX_N];	/* DFT of ak2[]			*/
+    COMP  A1[n];	/* DFT of ak1[] 		*/
+    COMP  A2[n];	/* DFT of ak2[]			*/
     float P1,P2;	/* power of current bin		*/
     float sd;
     int i;
@@ -68,17 +65,16 @@ float spectral_dist(float ak1[], float ak2[], int p, int n)
 	A2[i].real = ak2[i];
     }
 
-    #warn Array index -1 is out of bounds
-    four1(&A1[-1].imag,n,-1);
-    four1(&A2[-1].imag,n,-1);
+    codec2_fft_inplace(fft_fwd_cfg, A1);
+    codec2_fft_inplace(fft_fwd_cfg, A2);
 
     sd = 0.0;
     for(i=0; i<n; i++) {
 	P1 = A1[i].real*A1[i].real + A1[i].imag*A1[i].imag;
 	P2 = A2[i].real*A2[i].real + A2[i].imag*A2[i].imag;
-	sd += pow(log10(P2/P1),2.0);
+	sd += pow(10.0*log10(P2/P1),2.0);
     }
-    sd = 10.0*sqrt(sd/n);	/* sd in dB */
+    sd = sd/n;	/* mean sd for this frame in dB*dB, whch can be further averaged across frames */
 
     return(sd);
 }
