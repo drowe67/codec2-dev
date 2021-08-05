@@ -1,33 +1,15 @@
 % trellis.m
-% David Rowe June 2015
+% David Rowe July 2021
 %
-% Testing ideas for trellis decoding of codec parameters.  Uses
-% soft decision information, probablility of state transitions,
-% and left over redundancy to correct errors on codec parameter
+
+% Testing trellis decoding of Codec 2 Vector Quantiser (VQ)
+% information.  Uses soft decision information, probablility of state
+% transitions, and left over redundancy to correct errors on VQ
 % reception.
-%
-% [X]  Add probability of transition
-% [X]  Will this mess up a perfectly received signal, i.e. all
-%      codewords perfectly received.  This should dominate prob
-%      calc (with small No)
-% [ ] can we measure erroneous decodes?  When it makes it worse?
-%     + like all FEC, at some point, it will get a poorer BER
-%     + can we draw a curve of coded versus uncoded errors?
-% [ ] test with actual data, add errors, see if it corrects any
-% [ ] can we draw a trellis with actual values?
-%
-% Note we need SD bits and natural binary order encoding, for example
-%   ./c2enc 700 ../../raw/ve9qrp_10s.raw ../../octave/ve9qrp_10s.bit --softdec --natural
 
 graphics_toolkit ("gnuplot");
 more off;
 randn('state',1);
-
-function [bits_per_frame bit_fields] = codec2_700_bit_fields
-  bits_per_frame = 28;                % number of bits/frame for "700" mode
-  bit_fields = [1 5 3 3 2 4 3 3 2 2]; % number of bits in each field for "700" mode
-  % voiced, Wo, energy, LSP 1..6, 2 spare
-endfunction
 
 % builds a matrix of transition probablilities for each codec field (model parameter)
 
@@ -63,7 +45,7 @@ function [tp codewords] = build_tp(bitstream_filename)
   end
 
   % determine transition probablilities of each codeword
-  % state at time n, state a time n+1
+  % state at time n, state at time n+1
   % prob must add to 1
   % so for every state, of every codeword, compute histogram of 
   % transition probabilities
@@ -101,14 +83,14 @@ endfunction
 
 % y is vector of +/- 1 soft decision values for 0,1 transmitted bits
 
-function [lnp indexes] = ln_prob_of_tx_codeword_c_given_rx_codeword_y(y, top_n, C)
+function [lnp indexes] = ln_prob_of_tx_codeword_c_given_rx_codeword_y(y, nstates, C)
   nbits = length(y);
   np    = 2.^nbits;
   
   % Find log probability of all possible transmitted codewords
   lnp = C * y;
   
-  % return top_n most probable codewords
+  % return most probable codewords (number of states to search)
   [lnp indexes] = sort(lnp,"descend");  
 endfunction
 
@@ -123,23 +105,43 @@ function C = precompute_C(nbits)
   
 endfunction
 
-% y is the received soft decision codedwords, each row is one codeword in time
-% tp is the transition probabilities, each row is the start state
-% returns the most likely transmitted codeword c
 
-function c = find_most_likely_codeword(y, tp, nstages, verbose)
+% work out transition probability matrix, given lists of current and next
+% candidate codewords
+
+function tp = calculate_tp(vq, sd_table, h_table, indexes_current, indexes_next)
+  ntxcw = length(indexes_prev);
+  tp = zeros(ntxcw, ntxwc);
+  for txcw_current:=1:ntxcw
+    index_current = indexes_current(txcw_current);
+    for txcw_next:=1:ntxcw
+      index_next = indexes_next(txcw_next);
+      sd = vq(index_current,:)*vq(index_next,:)';
+      p = prob_from_hist(sd_table, h_table, sd);
+      tp(txcw_current, txcw_next) = log(p);
+    end
+  end
+endfunction
+
+
+% y are the received soft decision codewords, each row is one codeword in time.
+% sd_table and h_table map SD to probability. Returns the most likely transmitted
+% codeword c.  We search the most likely n tx codewords (ntxcw) out of
+% 2^nbits possibilities.
+
+function c = find_most_likely_codeword(y, vq, C, sd_table, h_table, nstages, ntxcw, verbose)
     [ncodewords nbits] = size(y);
-    nstates = 2^nbits;
-    n = ones(1,nstages);
-    
-    lnp = zeros(nstages, nstates);
+
+    % populate the nodes of the trellis with the most likely transmitted codewords
+
+    lnp = zeros(nstages, ntxcw); indexes = zeros(nstages, ntxcw);
     for s=1:nstages
-      lnp(s,:) = ln_prob_of_tx_codeword_c_given_rx_codeword_y(y(s,:));
+      [lnp indexes] = ln_prob_of_tx_codeword_c_given_rx_codeword_y(y, ntxcw, C);
+      lnp(s,:) = lnp;
+      indexes(s,:) = indexes;
     end
 
     if verbose
-      % printf received codewords
-
       printf("rx_codewords:\n");
       for r=1:ncodewords
         for c=1:nbits
@@ -147,8 +149,6 @@ function c = find_most_likely_codeword(y, tp, nstages, verbose)
         end
         printf("\n");
       end
-
-      % print probability of each rx codeword table
 
       printf("\nProbability of each tx codeword:\n");
       printf("tx_codeword      stage\n");
@@ -158,7 +158,7 @@ function c = find_most_likely_codeword(y, tp, nstages, verbose)
       end
       printf("\n");
 
-      for i=1:nstates
+      for i=1:ntxcw
         printf("%3s  %2d  ", dec2bin(i-1,nbits), i-1);
         for s=1:nstages
           printf("    %9.2f", lnp(s, i));
@@ -166,29 +166,17 @@ function c = find_most_likely_codeword(y, tp, nstages, verbose)
         printf("\n");
       end
       printf("\n");
-
-      printf("\nTransition Probability table:\n");
-      printf("state/next_state\n");
-      for r=1:nstates
-        for c=1:nstates
-          printf("%7.2f", tp(r,c));
-        end
-        printf("\n");
-      end
-      printf("\n");
     end
 
     % determine probability of each path
-    % (prob of start state)(prob of transition)(prob of next state)
-    % cycle through all possibilities of states
-    % state variable for possible state
-    % step through them exhaustively
+    % (prob of start tx cw)(prob of transition)(prob of next tx cw)
+    % cycle through all possibilities of tx cw
 
     if verbose
       printf("Evaulation of all possible paths:\n");
       printf("tx codewords\n");
       printf("   n");
-      for s=1:nstages-1
+      for s=1:ntxcw-1
         printf(" n+%d", s);
       end
       printf("  ");
@@ -201,12 +189,21 @@ function c = find_most_likely_codeword(y, tp, nstages, verbose)
       printf("     prob  max_prob\n");
     end
 
+    % Determine transition probability matrix for each stage, this
+    % changes between stages as lists of candidate tx codewords
+    % changes
+ 
+    tp = zeros(nstates, ntxcw, ntxcw);
+    for s=1:nstages-1
+      tp(s,:,:) = calculate_tp(vq, sd_table, h_table, indexes(s,:), indexes(s+1,:));
+    end
+
+    % OK lets search all possible paths and find most probable
+
+    n = ones(1,nstages); % current node at each stage through trellis, describes current path
     max_prob = -100;
-
     do
-
-      % add up probabilities for this path
-   
+      
       if verbose
         for s=1:nstages
           printf("%4d", n(s)-1);
@@ -214,6 +211,7 @@ function c = find_most_likely_codeword(y, tp, nstages, verbose)
         printf("  ");
       end
 
+      % find the probability of current path
       prob = 0;
       for s=1:nstages
          prob += lnp(s, n(s));
@@ -221,9 +219,9 @@ function c = find_most_likely_codeword(y, tp, nstages, verbose)
            printf("%8.2f ", lnp(s, n(s)));
          end
          if s < nstages
-           prob += tp(n(s),n(s+1));
+	   prob += tp(s, n(s), n(s+1));
            if verbose
-             printf("%8.2f ", tp(n(s),n(s+1)));
+             printf("%8.2f ", tp(s, n(s), n(s+1)));
            end
          end
       end
@@ -263,7 +261,7 @@ endfunction
 
 % Simulations ---------------------------
 
-function [dec_hat dec_simple_hat dec_tx_codewords] = run_test(tx_codewords, transition_probabilities, nstages, var, verbose)
+function [dec_hat dec_simple_hat dec_tx_codewords] = run_test(tx_codewords, sd_table, h_table, nstages, var, verbose)
   [frames nbits]    = size(tx_codewords);
   nerrors           = 0;
   nerrors_simple    = 0;
@@ -277,7 +275,9 @@ function [dec_hat dec_simple_hat dec_tx_codewords] = run_test(tx_codewords, tran
   for f=ns2+1:frames-ns2
     tx_bits        = tx_codewords(f,:) < 0;
     dec_tx_codewords(f) = sum(tx_bits .* 2.^(nbits-1:-1:0));
-    dec_hat(f)     = find_most_likely_codeword(rx_codewords(f-ns2:f+ns2,:)/(2*var),log(transition_probabilities+0.001), nstages, verbose);
+    find_most_likely_codeword(y, vq, C, sd_table, h_table, nstages, ntxcw, verbose)
+    dec_hat(f)     = find_most_likely_codeword(rx_codewords(f-ns2:f+ns2,:)/(2*var),
+                                               vq, C, sd_table, h_table, nstages, ntxcw, verbose);
     rx_bits        = dec2sd(dec_hat(f), nbits) < 0;
     rx_bits_simple = rx_codewords(f,:) < 0;
     dec_simple_hat(f) = sum(rx_bits_simple .* 2.^(nbits-1:-1:0));
@@ -400,13 +400,6 @@ function test_codec_model_parameter(bitstream_filename, model_param)
   figure(3)
   plot(codewords_test(1:frames, model_param))
 
-if 0
-  figure(4);
-  fs=fopen("../raw/ve9qrp_10s.raw","rb");
-  s = fread(fs,Inf,"short");
-  plot(s(1:320*frames))
-  axis([1 320*frames -3E4 3E4 ])
-end
 endfunction
 
 
