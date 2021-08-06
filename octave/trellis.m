@@ -78,7 +78,7 @@ function c = dec2sd(dec, nbits)
 
     % map to +/- 1
 
-    c = 1 - 2*c;
+    c = -1 + 2*c;
 endfunction
 
 % y is vector of +/- 1 soft decision values for 0,1 transmitted bits
@@ -88,7 +88,7 @@ function [lnp indexes] = ln_prob_of_tx_codeword_c_given_rx_codeword_y(y, nstates
   np    = 2.^nbits;
   
   % Find log probability of all possible transmitted codewords
-  lnp = C * y;
+  lnp = C * y';
   
   % return most probable codewords (number of states to search)
   [lnp indexes] = sort(lnp,"descend");  
@@ -99,8 +99,8 @@ function C = precompute_C(nbits)
   np    = 2.^nbits;
 
   C = zeros(np, nbits);
-  for r=1:np
-    C(r,:) = dec2sd(r,nbits);
+  for r=0:np-1
+    C(r+1,:) = dec2sd(r,nbits);
   end
   
 endfunction
@@ -109,15 +109,19 @@ endfunction
 % work out transition probability matrix, given lists of current and next
 % candidate codewords
 
-function tp = calculate_tp(vq, sd_table, h_table, indexes_current, indexes_next)
-  ntxcw = length(indexes_prev);
-  tp = zeros(ntxcw, ntxwc);
-  for txcw_current:=1:ntxcw
+function tp = calculate_tp(vq, sd_table, h_table, indexes_current, indexes_next, verbose)
+  ntxcw = length(indexes_current);
+  tp = zeros(ntxcw, ntxcw);
+  for txcw_current=1:ntxcw
     index_current = indexes_current(txcw_current);
-    for txcw_next:=1:ntxcw
+    for txcw_next=1:ntxcw
       index_next = indexes_next(txcw_next);
-      sd = vq(index_current,:)*vq(index_next,:)';
+      dist = vq(index_current,:) - vq(index_next,:);
+      sd = dist * dist';
       p = prob_from_hist(sd_table, h_table, sd);
+      if verbose
+        printf("index_current: %d index_next: %d sd: %f p: %f\n", index_current, index_next, sd, p);
+      end
       tp(txcw_current, txcw_next) = log(p);
     end
   end
@@ -136,11 +140,11 @@ function c = find_most_likely_codeword(y, vq, C, sd_table, h_table, nstages, ntx
 
     lnp = zeros(nstages, ntxcw); indexes = zeros(nstages, ntxcw);
     for s=1:nstages
-      [lnp indexes] = ln_prob_of_tx_codeword_c_given_rx_codeword_y(y, ntxcw, C);
-      lnp(s,:) = lnp;
-      indexes(s,:) = indexes;
+      [alnp aindexes] = ln_prob_of_tx_codeword_c_given_rx_codeword_y(y(s,:), ntxcw, C);
+      lnp(s,:) = alnp;
+      indexes(s,:) = aindexes;
     end
-
+    indexes
     if verbose
       printf("rx_codewords:\n");
       for r=1:ncodewords
@@ -176,7 +180,7 @@ function c = find_most_likely_codeword(y, vq, C, sd_table, h_table, nstages, ntx
       printf("Evaulation of all possible paths:\n");
       printf("tx codewords\n");
       printf("   n");
-      for s=1:ntxcw-1
+      for s=1:nstages-1
         printf(" n+%d", s);
       end
       printf("  ");
@@ -193,9 +197,9 @@ function c = find_most_likely_codeword(y, vq, C, sd_table, h_table, nstages, ntx
     % changes between stages as lists of candidate tx codewords
     % changes
  
-    tp = zeros(nstates, ntxcw, ntxcw);
+    tp = zeros(nstages, ntxcw, ntxcw);
     for s=1:nstages-1
-      tp(s,:,:) = calculate_tp(vq, sd_table, h_table, indexes(s,:), indexes(s+1,:));
+      tp(s,:,:) = calculate_tp(vq, sd_table, h_table, indexes(s,:), indexes(s+1,:), verbose);
     end
 
     % OK lets search all possible paths and find most probable
@@ -239,7 +243,7 @@ function c = find_most_likely_codeword(y, vq, C, sd_table, h_table, nstages, ntx
 
       s = nstages;
       n(s)++;
-      while (s && (n(s) == (nstates+1))) 
+      while (s && (n(s) == (ntxcw+1))) 
         n(s) = 1;
         s--;
         if s > 0
@@ -275,7 +279,6 @@ function [dec_hat dec_simple_hat dec_tx_codewords] = run_test(tx_codewords, sd_t
   for f=ns2+1:frames-ns2
     tx_bits        = tx_codewords(f,:) < 0;
     dec_tx_codewords(f) = sum(tx_bits .* 2.^(nbits-1:-1:0));
-    find_most_likely_codeword(y, vq, C, sd_table, h_table, nstages, ntxcw, verbose)
     dec_hat(f)     = find_most_likely_codeword(rx_codewords(f-ns2:f+ns2,:)/(2*var),
                                                vq, C, sd_table, h_table, nstages, ntxcw, verbose);
     rx_bits        = dec2sd(dec_hat(f), nbits) < 0;
@@ -297,17 +300,23 @@ function [dec_hat dec_simple_hat dec_tx_codewords] = run_test(tx_codewords, sd_t
   
 endfunction
 
-
 % Single point test, print out tables
 
 function test_single
-  tp       = [1 0 0 0; 1 0 0 0; 1 0 0 0; 1 0 0 0];
   nstages  = 3;
-  var      = 0.5;
   verbose  = 1;
-
-  tx_codewords = [1 1; 1 1; 1 1];
-  run_test(tx_codewords, tp, nstages, var, verbose);
+  nbits = 2;
+  ntxcw = 4;
+  
+  rx_codewords = [-1 -1; -1 -1; -1 -1; -1 -1];
+  vq = [0 0 0 1;
+        0 0 1 0;
+	0 1 0 0;
+	1 0 0 0];
+  sd_table = [0 1 2 4];
+  h_table = [0.5 0.25 0.15 0.1];
+  C = precompute_C(nbits);
+  c = find_most_likely_codeword(rx_codewords, vq, C, sd_table, h_table, nstages, ntxcw, verbose);
 endfunction
 
 
@@ -541,9 +550,9 @@ endfunction
 
 % uncomment one of the below to run a simulation
 
-%test_single
+test_single
 %simple_traj;
 %test_codec_model_parameter("ve9qrp_10s.bit", 6);
 %process_test_file("ve9qrp_10s.bit")
 
-vq_hist_dec("../build_linux/all_speech_8k_test.f32");
+%vq_hist_dec("../build_linux/all_speech_8k_test.f32");
