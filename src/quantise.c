@@ -74,19 +74,6 @@ int lsp_pred_vq_bits(int i) {
 
 /*---------------------------------------------------------------------------*\
 
-  quantise_init
-
-  Loads the entire LSP quantiser comprised of several vector quantisers
-  (codebooks).
-
-\*---------------------------------------------------------------------------*/
-
-void quantise_init()
-{
-}
-
-/*---------------------------------------------------------------------------*\
-
   quantise
 
   Quantises vec by choosing the nearest vector in codebook cb, and
@@ -135,7 +122,7 @@ long quantise(const float * cb, float vec[], float w[], int k, int m, float *se)
 
   encode_lspds_scalar()
 
-  Scalar/VQ LSP difference quantiser.
+  Scalar/VQ LSP difference-in-frequency quantiser.
 
 \*---------------------------------------------------------------------------*/
 
@@ -167,7 +154,7 @@ void encode_lspds_scalar(
     wt[0] = 1.0;
     for(i=0; i<order; i++) {
 
-	/* find difference from previous qunatised lsp */
+	/* find difference from previous quantised lsp */
 
 	if (i)
 	    dlsp[i] = lsp_hz[i] - lsp__hz[i-1];
@@ -179,7 +166,6 @@ void encode_lspds_scalar(
 	cb = lsp_cbd[i].cb;
 	indexes[i] = quantise(cb, &dlsp[i], wt, k, m, &se);
  	dlsp_[i] = cb[indexes[i]*k];
-
 
 	if (i)
 	    lsp__hz[i] = lsp__hz[i-1] + dlsp_[i];

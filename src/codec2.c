@@ -179,7 +179,6 @@ struct CODEC2 * codec2_create(int mode)
     make_analysis_window(&c2->c2const, c2->fft_fwd_cfg, c2->w,c2->W);
     make_synthesis_window(&c2->c2const, c2->Pn);
     c2->fftr_inv_cfg = codec2_fftr_alloc(FFT_DEC, 1, NULL, NULL);
-    quantise_init();
     c2->prev_f0_enc = 1/P_MAX_S;
     c2->bg_est = 0.0;
     c2->ex_phase = 0.0;
