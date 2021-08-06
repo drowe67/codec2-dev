@@ -536,7 +536,7 @@ int freedv_comp_short_rx_ofdm(struct freedv *f, void *demod_in_8kHz, int demod_i
                 ofdm->sync_counter,
                 ofdm->modem_frame,
 	 	            (double)ofdm->foff_est_hz, ofdm->phase_est_bandwidth,
-                f->snr_est, Nerrs_raw, Nerrs_coded, iter, parityCheckCount, rx_sync_flags_to_text[rx_status]);
+                (double)f->snr_est, Nerrs_raw, Nerrs_coded, iter, parityCheckCount, rx_sync_flags_to_text[rx_status]);
     }
     if (print_truncated) { 
             fprintf(stderr, "%3d nin: %4d st: %-6s euw: %2d %2d mf: %2d f: %5.1f pbw: %d                                        "

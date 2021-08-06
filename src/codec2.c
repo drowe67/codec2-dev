@@ -1851,7 +1851,7 @@ void codec2_encode_450(struct CODEC2 *c2, unsigned char * bits, short speech[])
         for(h = 0;h<(model.L);h++){
 			//only detect above 300 Hz
 			if(h*model.Wo*(c2->c2const.Fs/2000.0)/M_PI > 0.3){
-				energydelta[i] = energydelta[i] + 20.0*log10(model.A[10]+1E-16);
+				energydelta[i] = (double)energydelta[i] + (double)20.0*log10(model.A[10]+1E-16);
 				spectralCounter = spectralCounter+1;
 			}
 				

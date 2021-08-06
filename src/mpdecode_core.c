@@ -582,7 +582,7 @@ void sd_to_llr(float llr[], float sd[], int n) {
     sum = sumsq = 0.0;
     for(i=0; i<n; i++) {
         sign = (sd[i] > 0.0L) - (sd[i] < 0.0L);
-        x = (sd[i]/mean - sign);
+        x = ((double)sd[i]/mean - sign);
         sum += x;
         sumsq += x*x;
     }
