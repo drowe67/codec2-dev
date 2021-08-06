@@ -238,7 +238,7 @@ void post_filter_newamp1(float vec[], float sample_freq_kHz[], int K, float pf_g
       vec is rate K vector describing spectrum of current frame lets
       pre-emp before applying PF. 20dB/dec over 300Hz.  Postfilter
       affects energy of frame so we measure energy before and after
-      and normalise.  Plenty of room for experiment here as well.
+      and normalise.  Plenty of room for experimentation here.
     */
     
     float pre[K];

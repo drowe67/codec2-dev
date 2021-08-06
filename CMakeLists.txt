@@ -43,11 +43,11 @@ endif("${CMAKE_SOURCE_DIR}" STREQUAL "${CMAKE_BINARY_DIR}")
 # Set project version information. This should probably be done via external
 # file at some point.
 #
-set(CODEC2_VERSION_MAJOR 0)
-set(CODEC2_VERSION_MINOR 9)
+set(CODEC2_VERSION_MAJOR 1)
+set(CODEC2_VERSION_MINOR 0)
 # Set to patch level if needed, otherwise leave FALSE.
 # Must be positive (non-zero) if set, since 0 == FALSE in CMake.
-set(CODEC2_VERSION_PATCH 2)
+set(CODEC2_VERSION_PATCH 0)
 set(CODEC2_VERSION "${CODEC2_VERSION_MAJOR}.${CODEC2_VERSION_MINOR}")
 # Patch level version bumps should not change API/ABI.
 set(SOVERSION "${CODEC2_VERSION_MAJOR}.${CODEC2_VERSION_MINOR}")
@@ -88,6 +88,12 @@ if(EXISTS ${CMAKE_SOURCE_DIR}/.git)
 else()
         add_definitions(-DGIT_HASH="None")
 endif()
+
+set(ARCHIVE_NAME "codec2-${CODEC2_VERSION_MAJOR}.${CODEC2_VERSION_MINOR}.${CODEC2_VERSION_PATCH}")
+add_custom_target(dist
+    COMMAND git archive --prefix=${ARCHIVE_NAME}/ HEAD
+        | bzip2 > ${CMAKE_BINARY_DIR}/${ARCHIVE_NAME}.tar.bz2
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 
 # Set default C flags.
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wno-strict-overflow")
@@ -513,11 +519,9 @@ if(UNITTEST)
              COMMAND sh -c "$<TARGET_FILE:ofdm_mod> --in /dev/zero --ldpc --testframes 60 --txbpf | $<TARGET_FILE:cohpsk_ch> - - -20 --Fs 8000 -f -50 | $<TARGET_FILE:ofdm_demod> --out /dev/null --testframes --ldpc --verbose 1"
              )
 
-    configure_file(unittest/ofdm_fade.sh.in unittest/ofdm_fade.sh)
     add_test(NAME test_OFDM_modem_fading_BER
-             COMMAND ${CMAKE_CURRENT_BINARY_DIR}/unittest/ofdm_fade.sh
-             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/unittest
-             )
+             COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/unittest;
+                            PATH=$PATH:${CMAKE_CURRENT_BINARY_DIR}/src ./ofdm_fade.sh")
 
     add_test(NAME test_OFDM_modem_phase_est_bw
              COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/unittest;
@@ -905,22 +909,16 @@ endif(NOT APPLE)
              WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/src
              )
 
-     configure_file(unittest/est_n0.sh.in unittest/est_n0.sh)
-     add_test(NAME test_est_n0
-             COMMAND ${CMAKE_CURRENT_BINARY_DIR}/unittest/est_n0.sh
-             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/unittest
-             )
      add_test(NAME test_vq_mbest
              COMMAND sh -c "./tvq_mbest; \
                             cat target.f32 | ../misc/vq_mbest -k 2 -q vq1.f32,vq2.f32 --mbest 2 -v > out.f32; \
                             diff target.f32 out.f32"
              WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/unittest
              )
-     configure_file(unittest/test_700c_eq.sh.in unittest/test_700c_eq.sh)
+
      add_test(NAME test_700c_eq
-             COMMAND ${CMAKE_CURRENT_BINARY_DIR}/unittest/test_700c_eq.sh
-             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/unittest
-             )
+             COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/unittest;
+                            PATH=$PATH:${CMAKE_CURRENT_BINARY_DIR}/src ./test_700c_eq.sh")
 
      # -------------------------------------------------------------------------
      #                                FSK Modem

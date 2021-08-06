@@ -5,37 +5,69 @@
 % See also scripts/train_700c_quant.sh, tnewamp1.m
 
 melvq;
+newamp_700c;
 
 % general purpose plot function for looking at averages of K-band
 % sequences in scripts dir and VQs:
 %   vq_700c_plots({"hts2a.f32" "vk5qi.f32" "train_120_1.txt"})
 
 function vq_700c_plots(fn_array)
-  nb_features = 41
-  K = 20
-  figure(1); clf; hold on; axis([1 20 -20 40]); title('Max Hold');
-  figure(2); clf; hold on; axis([1 20 -20 30]); title('Average'); 
+  K = 20; rate_K_sample_freqs_kHz = mel_sample_freqs_kHz(K);
+  freq_Hz = rate_K_sample_freqs_kHz * 1000;
+  
+  figure(1); clf; hold on; axis([200 4000 40 90]); title('Max Hold');
+  figure(2); clf; hold on; axis([200 4000  0 40]); title('Average'); 
+  
   for i=1:length(fn_array)
     [dir name ext] = fileparts(fn_array{i});
     if strcmp(ext, ".f32")
       % f32 feature file
-      fn = sprintf("../script/%s_feat%s", name, ext)
-      feat = load_f32(fn , nb_features);
-      bands = feat(:,2:K+1);
+      fn = sprintf("../build_linux/%s%s", name, ext)
+      bands = load_f32(fn , K);
     else
       % text file (e.g. existing VQ)
       bands = load(fn_array{i});
     end
-    figure(1); plot(max(bands),'linewidth', 5);
-    figure(2); plot(mean(bands),'linewidth', 5);
+    % for max hold: break into segments of Nsec, find max, average maximums
+    % this avoids very rare global peaks setting the max
+    Nsec = 10; Tframe = 0.01; frames_per_seg = Nsec/Tframe
+    Nsegs = floor(length(bands)/frames_per_seg)
+    max_holds = zeros(Nsegs, K);
+    if Nsegs == 0
+       max_holds = max(bands)
+    else
+      for s=1:Nsegs
+        st = (s-1)*frames_per_seg+1; en = st + frames_per_seg - 1;
+        max_holds(s,:) = max(bands(st:en,:));
+      end
+      max_holds = mean(max_holds);
+    end
+    figure(1); plot(freq_Hz, max_holds, '+-', 'linewidth', 2);
+    figure(2); plot(freq_Hz, mean(bands), '+-', 'linewidth', 2);
   end
-  figure(1); legend(fn_array);
-  figure(2); legend(fn_array);
+  figure(1); legend(fn_array); grid; xlabel('Freq (Hz)'); ylabel('Amp dB');
+  figure(2); legend(fn_array); grid; xlabel('Freq (Hz)'); ylabel('Amp dB');
+endfunction
+
+
+% limit mean of each vector to between lower_lim and upper_lim
+function vout = limit_vec(vin, lower_lim, upper_lim)
+  m = mean(vin');
+  vout = zeros(size(vin));
+  for i=1:length(vin)
+    vec_no_mean = vin(i,:) - m(i);
+    if m(i) < lower_lim
+      m(i) = lower_lim;
+    end
+    if m(i) > upper_lim
+      m(i) = upper_lim;
+    end
+    vout(i,:) = vec_no_mean + m(i);
+  end
 endfunction
 
 
 % single stage vq a target matrix
-
 function errors = vq_targets(vq, targets)
   errors = [];
   for i=1:length(targets)
@@ -335,8 +367,8 @@ more off
 
 %interactive("train_120_1.txt", "cq_freedv_8k_lfboost.f32")
 %table_across_samples;
-%vq_700c_plots({"hts1a.f32" "hts2a.f32" "ve9qrp_10s.f32" "ma01_01.f32" "train_120_1.txt"})
+%vq_700c_plots({"all_speech_8k.f32" "all_speech_8k_hp300.f32" "dev-clean-8k.f32" "train_8k.f32" } )
 %vq_700c_plots({"ve9qrp_10s.f32" "cq_freedv_8k_lfboost.f32" "cq_ref.f32" "hts1a.f32" "vk5qi.f32"})
 %experiment_iterate_block("train_120_1.txt", "ve9qrp_10s.f32")
 %experiment_iterate_block("train_120_1.txt", "cq_freedv_8k_lfboost.f32")
-experiment_front_eq("train_120_1.txt", "cq_freedv_8k_lfboost.f32")
+%experiment_front_eq("train_120_1.txt", "cq_freedv_8k_lfboost.f32")

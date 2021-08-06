@@ -159,6 +159,9 @@ void freedv_ofdm_voice_open(struct freedv *f, char *mode) {
     assert(f->tx_payload_bits != NULL);
     f->rx_payload_bits = (unsigned char*)MALLOC(f->bits_per_modem_frame);
     assert(f->rx_payload_bits != NULL);
+    
+    /* attenuate audio 12dB as channel noise isn't that pleasant */
+    f->passthrough_gain = 0.25;
 }
 
 // open function for OFDM data modes, TODO consider moving to a new

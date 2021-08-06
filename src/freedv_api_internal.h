@@ -140,7 +140,8 @@ struct freedv {
     int                  ext_vco;                            /* 2400A/800XA use external VCO flag */
     float               *passthrough_2020;                   /* 2020 interpolating filter */
     float                tx_amp;                             /* amplitude of tx samples */
-
+    float                passthrough_gain;
+    
     /* useful constants for OFDM modes ------------------------------------------------------------------*/
 
     int                  ofdm_bitsperpacket;
