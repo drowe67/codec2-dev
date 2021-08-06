@@ -105,7 +105,7 @@ Also included:
 
 + `freedv_tx` & `freedv_rx` are command line implementations of the FreeDV protocol, which combines Codec 2, modems, and Forward Error Correction (FEC).
   
-+ `cohpsk_*`` are coherent PSK (COHPSK) HF modem command line programs.
++ `cohpsk_*` are coherent PSK (COHPSK) HF modem command line programs.
 
 + `fdmdv_*` are differential PSK HF modem command line programs (README_fdmdv).
 
