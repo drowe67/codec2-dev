@@ -433,11 +433,11 @@ src/memtools.c
 list(APPEND SM1000_SRCS ${CODEC2_SRCS})
 
 
-add_mapped_executable(sm1000v4 ${SM1000_SRCS} ${SYSTEM_SRCS})
-target_link_libraries(sm1000v4 stm32f4_adac stm32f4 CMSIS)
-target_compile_options(sm1000v4 PRIVATE "-O3")
-elf2bin(sm1000v4)
-elf2dfu(sm1000v4)
+add_mapped_executable(sm1000v5 ${SM1000_SRCS} ${SYSTEM_SRCS})
+target_link_libraries(sm1000v5 stm32f4_adac stm32f4 CMSIS)
+target_compile_options(sm1000v5 PRIVATE "-O3")
+elf2bin(sm1000v5)
+elf2dfu(sm1000v5)
 
 set(FREEDV_TX_PROFILE_SRCS
 src/freedv_tx_profile.c
