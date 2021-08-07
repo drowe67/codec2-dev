@@ -86,7 +86,7 @@ function process_rx {
           plot_specgram(s, 8000, 200, 3000); print('spec.jpg', '-djpg'); \
           quit" | octave-cli -p ${CODEC2}/octave -qf > /dev/null
     # attempt to decode
-    freedv_rx ${mode} ${rx} - -v 2>rx_stats.txt | sox -t .s16 -r 8000 -c 1 - rx_freedv.wav
+    freedv_rx ${mode} ${rx} - -v --highpassthroughgain 2>rx_stats.txt | sox -t .s16 -r 8000 -c 1 - rx_freedv.wav
     cat rx_stats.txt | tr -s ' ' | cut -f5 -d' ' | awk '$0==($0+0)' > sync.txt
     cat rx_stats.txt | tr -s ' ' | cut -f10 -d' ' | awk '$0==($0+0)' > snr.txt
     # time domain plot of output speech, SNR, and sync
