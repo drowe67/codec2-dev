@@ -37,6 +37,8 @@
 #include <stm32f4xx_gpio.h>
 #include <stm32f4xx_rcc.h>
 #include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
 
 #include "sfx.h"
 #include "sounds.h"

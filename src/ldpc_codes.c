@@ -211,7 +211,7 @@ void ldpc_codes_list() {
         int n =  ldpc_codes[c].NumberRowsHcols + ldpc_codes[c].NumberParityBits;
         int k = ldpc_codes[c].NumberRowsHcols;
         float rate = (float)k/n;
-        fprintf(stderr, "%-20s rate %3.2f (%d,%d) \n", ldpc_codes[c].name, rate, n, k);
+        fprintf(stderr, "%-20s rate %3.2f (%d,%d) \n", ldpc_codes[c].name, (double)rate, n, k);
     }
     fprintf(stderr, "\n");
 }
