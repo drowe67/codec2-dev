@@ -133,10 +133,11 @@
  */
 uint8_t core_state = STATE_RX;
 
-#define MAX_MODES  3
+#define MAX_MODES  4
 #define ANALOG     0
 #define DV1600     1
 #define DV700D     2
+#define DV700E     3
 
 struct switch_t sw_select;  /*!< Switch driver for SELECT button */
 struct switch_t sw_back;    /*!< Switch driver for BACK button */
@@ -306,6 +307,15 @@ struct freedv *set_freedv_mode(int op_mode, int *n_samples) {
         freedv_set_eq(f, 1);                     /* equaliser on by default */
         *n_samples = freedv_get_n_speech_samples(f);
         break;
+    case DV700E:
+        usart_printf("FreeDV 700E\n");
+        f = freedv_open(FREEDV_MODE_700E);
+        assert(f != NULL);
+        freedv_set_snr_squelch_thresh(f, 0.0);  /* squelch at 0.0 dB      */
+        freedv_set_squelch_en(f, 1);
+        freedv_set_eq(f, 1);                     /* equaliser on by default */
+        *n_samples = freedv_get_n_speech_samples(f);
+        break;
     }
     return f;
 }
@@ -468,6 +478,8 @@ int main(void) {
         snprintf(startup_announcement, 16, VERSION " 1600");
     else if (op_mode == DV700D)
         snprintf(startup_announcement, 16, VERSION " 700D");
+    else if (op_mode == DV700E)
+        snprintf(startup_announcement, 16, VERSION " 700E");
     morse_play(&morse_player, startup_announcement);
 
     usart_printf("entering main loop...\n");
@@ -512,7 +524,7 @@ int main(void) {
         }
 
         /* if we have moved from tx to rx reset sync state of rx so we re-start acquisition */
-        if ((op_mode == DV1600) || (op_mode == DV700D))
+        if ((op_mode == DV1600) || (op_mode == DV700D) || (op_mode == DV700E))
             if ((prev_core_state == STATE_TX) && (core_state == STATE_RX))
                 freedv_set_sync(f, FREEDV_SYNC_UNSYNC);
             
@@ -591,7 +603,7 @@ int main(void) {
                         lastms = ms;
                     }
                     
-                    /* 1600 or 700D DV mode */
+                    /* 1600 or 700D/E DV mode */
 
                     nin = freedv_nin(f);
                     nout = nin;
@@ -745,6 +757,8 @@ int process_core_state_machine(int core_state, struct menu_t *menu, int *op_mode
                         morse_play(&morse_player, "1600");
                     else if (*op_mode == DV700D)
                         morse_play(&morse_player, "700D");
+                    else if (*op_mode == DV700E)
+                        morse_play(&morse_player, "700E");
                     sfx_play(&sfx_player, sound_click);
                 }
             }
@@ -867,6 +881,7 @@ int process_core_state_machine(int core_state, struct menu_t *menu, int *op_mode
  * 	|   |- "ANA"    - Analog
  * 	|   |- "DV1600" - FreeDV 1600 
  * 	|   |- "DV700D" - FreeDV 700D
+ * 	|   |- "DV700E" - FreeDV 700E
  *      |
  * 	|- "TOT"        Timer Out Timer options
  * 	|   |- "TIME"   - Set timeout time (a sub menu)
@@ -998,10 +1013,20 @@ static const struct menu_item_t menu_op_mode_dv700D = {
         .ui         = DV700D,
     },
 };
+static const struct menu_item_t menu_op_mode_dv700E = {
+    .label          = "700E",
+    .event_cb       = NULL,
+    .children       = NULL,
+    .num_children   = 0,
+    .data           = {
+        .ui         = DV700E,
+    },
+};
 static struct menu_item_t const* menu_op_mode_children[] = {
     &menu_op_mode_analog,
     &menu_op_mode_dv1600,
     &menu_op_mode_dv700D,
+    &menu_op_mode_dv700E,
 };
 /* Callback function */
 static void menu_op_mode_cb(struct menu_t* const menu, uint32_t event)
@@ -1019,6 +1044,9 @@ static void menu_op_mode_cb(struct menu_t* const menu, uint32_t event)
                     break;
                 case DV700D:
                     menu->current = 2;
+                    break;
+                case DV700E:
+                    menu->current = 3;
                     break;
                 default:
                     menu->current = 0;
