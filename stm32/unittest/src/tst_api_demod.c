@@ -132,6 +132,11 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
     config_mode = config[0] - '0';
+    if (config_mode == 8)
+    {
+        // For the purposes of the UT system, '8' is 700E.
+        config_mode = FREEDV_MODE_700E;
+    }
     config_testframes = config[1] - '0';
     config_verbose = config[6] - '0';
     //config_profile = config[7] - '0';
