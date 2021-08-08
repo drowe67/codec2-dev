@@ -123,6 +123,14 @@ add_test(NAME tst_api_mod_700D_CODEC
          COMMAND sh -c "./run_stm32_tst tst_api_mod 700D_CODEC ${UT_PARAMS}"
          WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../scripts)
 
+add_test(NAME tst_api_mod_700E_TEST
+         COMMAND sh -c "./run_stm32_tst tst_api_mod 700E_TEST ${UT_PARAMS}"
+         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../scripts)
+
+add_test(NAME tst_api_mod_700E_CODEC
+         COMMAND sh -c "./run_stm32_tst tst_api_mod 700E_CODEC ${UT_PARAMS}"
+         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../scripts)
+
 add_test(NAME tst_api_demod_700D_plain_test
          COMMAND sh -c "./run_stm32_tst tst_api_demod 700D_plain_test ${UT_PARAMS}"
          WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../scripts)
