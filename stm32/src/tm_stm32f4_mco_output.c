@@ -82,7 +82,7 @@ void TM_MCOOUTPUT_SetOutput1(TM_MCOOUTPUT1_Source_t Source, TM_MCOOUTPUT_Prescal
 }
 
 void TM_MCOOUTPUT_SetOutput2(TM_MCOOUTPUT2_Source_t Source, TM_MCOOUTPUT_Prescaler_t Prescaler) {
-	uint32_t presc, src;
+	uint32_t presc = 0, src = 0;
 	
 	/* Get prescaler */
 	switch (Prescaler) {

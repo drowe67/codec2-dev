@@ -43,6 +43,10 @@
 #include "debug_alloc.h"
 #include "machdep.h"
 
+#ifdef __EMBEDDED__
+#include "arm_math.h"
+#endif /* __EMBEDDED_ */
+
 /* Static Prototypes */
 
 static float cnormf(complex float);
@@ -209,7 +213,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
         ofdm->codename = "HRA_112_112";
         ofdm->amp_est_mode = 0;
         ofdm->tx_bpf_en = true;
-        ofdm->amp_scale = 217E3;
+        ofdm->amp_scale = 245E3;
         ofdm->clip_gain1 = 2.0;
         ofdm->clip_gain2 = 0.9;
         ofdm->clip_en = false;
@@ -300,7 +304,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     ofdm->rowsperframe = ofdm->bitsperframe / (ofdm->nc * ofdm->bps);
     ofdm->samplespersymbol = (ofdm->m + ofdm->ncp);
     ofdm->samplesperframe = ofdm->ns * ofdm->samplespersymbol;
-    if (ofdm->data_mode)
+    if (*ofdm->data_mode != 0)
         // in burst data modes we skip ahead one frame to jump over preamble
         ofdm->max_samplesperframe = 2*ofdm->samplesperframe;
     else
@@ -739,10 +743,10 @@ static int est_timing(struct OFDM *ofdm, complex float *rx, int length,
 #else
 	float re,im;
 
-	arm_cmplx_dot_prod_f32(&rx[i], wvec_pilot, ofdm->samplespersymbol, &re, &im);
+	arm_cmplx_dot_prod_f32((float*)&rx[i], (float*)wvec_pilot, ofdm->samplespersymbol, &re, &im);
 	corr_st = re + im * I;
 
-	arm_cmplx_dot_prod_f32(&rx[i+ ofdm->samplesperframe], wvec_pilot, ofdm->samplespersymbol, &re, &im);
+	arm_cmplx_dot_prod_f32((float*)&rx[i+ ofdm->samplesperframe], (float*)wvec_pilot, ofdm->samplespersymbol, &re, &im);
 	corr_en = re + im * I;
 #endif
 #else
@@ -1136,7 +1140,7 @@ static float est_timing_and_freq(struct OFDM *ofdm,
     }
     float timing_mx = max_corr*max_corr/(mag1*mag2+1E-12);
     if (ofdm->verbose > 2) {
-        fprintf(stderr, "  t_est: %4d timing:mx: %f foff_est: %f\n", *t_est, timing_mx, *foff_est);
+        fprintf(stderr, "  t_est: %4d timing:mx: %f foff_est: %f\n", *t_est, (double)timing_mx, (double)*foff_est);
     }
     
     return timing_mx;
@@ -1219,7 +1223,7 @@ static int ofdm_sync_search_burst(struct OFDM *ofdm) {
 
     if (ofdm->verbose > 1) {
         fprintf(stderr, "  ct_est: %4d nin: %4d mx: %3.2f foff_est: % 5.1f timing_valid: %d %4s\n",
-                ct_est, ofdm->nin, timing_mx, foff_est, timing_valid, pre_post);
+                ct_est, ofdm->nin, (double)timing_mx, (double)foff_est, timing_valid, pre_post);
     }
 
     return ofdm->timing_valid;

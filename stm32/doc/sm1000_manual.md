@@ -106,6 +106,7 @@ You can program the flash memory on your SM1000 via USB using a Windows or Linux
    2   | July 2019 | [sm1000v2.bin](http://www.rowetel.com/downloads/codec2/smartmic/sm1000v2.bin) |  [sm1000v2.dfu](http://www.rowetel.com/downloads/codec2/smartmic/sm1000v2.dfu) | FreeDV 700D and morse menus
    3   | March 2020 | [sm1000v3.bin](http://www.rowetel.com/downloads/codec2/smartmic/sm1000v3.bin) |  [sm1000v3.dfu](http://www.rowetel.com/downloads/codec2/smartmic/sm1000v3.dfu) | Menu bug fixes, 700D modem improvements & automatic Mic EQ
    4   | May 2020 | [sm1000v4.bin](http://www.rowetel.com/downloads/codec2/smartmic/sm1000v4.bin) |  [sm1000v4.dfu](http://www.rowetel.com/downloads/codec2/smartmic/sm1000v4.dfu) | 700D sync logic to reduce stop burbling with no signal
+   5   | August 2021 | [sm1000v5.bin](http://www.rowetel.com/downloads/codec2/smartmic/sm1000v5.bin) |  [sm1000v5.dfu](http://www.rowetel.com/downloads/codec2/smartmic/sm1000v5.dfu) | maintenance release due to FreeDV API refactoring, no changes to SM1000 behaivour
    
 ## Windows
 
@@ -132,7 +133,7 @@ Power cycle the SM1000 and the new firmware will run.
 1. To flash the SM1000
    ```
    $ sudo apt-get install dfu-util
-   $ sudo dfu-util -d 0483:df11 -c 1 -i 0 -a 0 -s 0x08000000 -D sm1000v4.bin
+   $ sudo dfu-util -d 0483:df11 -c 1 -i 0 -a 0 -s 0x08000000 -D sm1000v5.bin
    ```
    After about 10 seconds you will be returned to the command line.
 1. Power cycle the SM1000 and the new firmware will run.

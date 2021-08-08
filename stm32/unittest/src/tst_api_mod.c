@@ -207,6 +207,7 @@ int main(int argc, char *argv[]) {
     freedv_set_clip(freedv, use_clip);
     freedv_set_tx_bpf(freedv, use_txbpf);
     freedv_set_ext_vco(freedv, use_ext_vco);
+    freedv_set_eq(freedv, 1);
     
     memtools_find_unused(printf);
 

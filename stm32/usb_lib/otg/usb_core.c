@@ -174,7 +174,7 @@ USB_OTG_STS USB_OTG_WritePacket(USB_OTG_CORE_HANDLE *pdev,
     fifo = pdev->regs.DFIFO[ch_ep_num];
     for (i = 0; i < count32b; i++, src+=4)
     {
-      USB_OTG_WRITE_REG32( fifo, *((__packed uint32_t *)src) );
+      USB_OTG_WRITE_REG32( fifo, *((uint32_t *)src) );
     }
   }
   return status;
@@ -199,7 +199,7 @@ void *USB_OTG_ReadPacket(USB_OTG_CORE_HANDLE *pdev,
 
   for ( i = 0; i < count32b; i++, dest += 4 )
   {
-    *(__packed uint32_t *)dest = USB_OTG_READ_REG32(fifo);
+    *(uint32_t *)dest = USB_OTG_READ_REG32(fifo);
 
   }
   return ((void *)dest);

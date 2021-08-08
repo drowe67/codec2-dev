@@ -54,7 +54,7 @@ int main(int argc, char *argv[]) {
     float                      snr_est;
     float                      clock_offset;
     int                        use_testframes, verbose, discard, use_complex, use_dpsk;
-    int                        use_squelch;
+    int                        use_squelch, highpassthroughgain;
     float                      squelch = 0;
     int                        i;
 
@@ -64,7 +64,8 @@ int main(int argc, char *argv[]) {
         sprintf(f2020,"|2020");
         #endif
 	printf("usage: %s 1600|700C|700D|700E|2400A|2400B|800XA%s InputModemSpeechFile OutputSpeechRawFile\n"
-               " [--testframes] [-v] [--discard] [--usecomplex] [--dpsk] [--squelch leveldB] [--txtrx filename]\n", argv[0],f2020);
+               " [--testframes] [-v] [--discard] [--usecomplex] [--dpsk] [--squelch leveldB] [--txtrx filename]\n"
+	       " [--highpassthroughgain]\n", argv[0],f2020);
 	printf("e.g    %s 1600 hts1a_fdmdv.raw hts1a_out.raw\n", argv[0]);
 	exit(1);
     }
@@ -100,7 +101,8 @@ int main(int argc, char *argv[]) {
     }
 
     use_testframes = verbose = discard = use_complex = use_dpsk = use_squelch = 0;
-
+    highpassthroughgain = 0;
+    
     if (argc > 4) {
         for (i = 4; i < argc; i++) {
             if (strcmp(argv[i], "--testframes") == 0) use_testframes = 1;
@@ -108,6 +110,7 @@ int main(int argc, char *argv[]) {
             else if (strcmp(argv[i], "-vv") == 0) verbose = 2;
             else if (strcmp(argv[i], "--discard") == 0) discard = 1;
             else if (strcmp(argv[i], "--usecomplex") == 0) use_complex = 1;
+            else if (strcmp(argv[i], "--highpassthroughgain") == 0) highpassthroughgain = 1;
             else if (strcmp(argv[i], "--squelch") == 0) {
                 squelch = atof(argv[i + 1]);
                 i++;
@@ -130,7 +133,7 @@ int main(int argc, char *argv[]) {
 
     freedv_set_test_frames(freedv, use_testframes);
     if (verbose == 2) freedv_set_verbose(freedv, verbose);
-    freedv_passthrough_gain(freedv, 1.0);
+    if (highpassthroughgain) { freedv_passthrough_gain(freedv, 1.0); }
     
     if (use_squelch) {
         freedv_set_snr_squelch_thresh(freedv, squelch);

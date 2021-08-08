@@ -38,7 +38,9 @@ struct LDPC ldpc_codes[] = {
         HRA_112_112_MAX_COL_WEIGHT,
         (uint16_t *)HRA_112_112_H_rows,
         (uint16_t *)HRA_112_112_H_cols
-    },
+    }
+    #ifndef __EMBEDDED__
+    ,
     /* short rate 1/2 code for FreeDV 700E */
     {
         "HRA_56_56",
@@ -53,9 +55,6 @@ struct LDPC ldpc_codes[] = {
         HRA_56_56_MAX_COL_WEIGHT,
         (uint16_t *)HRA_56_56_H_rows,
         (uint16_t *)HRA_56_56_H_cols
-#ifdef __EMBEDDED__
-    }
-#else
     },
 
     /* default Wenet High Alitiude Balloon rate 0.8 code */
@@ -201,7 +200,7 @@ struct LDPC ldpc_codes[] = {
         (uint16_t *)H_1024_2048_4f_H_rows,
         (uint16_t *)H_1024_2048_4f_H_cols
     }
-#endif
+    #endif
 };
 
 int ldpc_codes_num(void) { return sizeof(ldpc_codes)/sizeof(struct LDPC); }
@@ -212,7 +211,7 @@ void ldpc_codes_list() {
         int n =  ldpc_codes[c].NumberRowsHcols + ldpc_codes[c].NumberParityBits;
         int k = ldpc_codes[c].NumberRowsHcols;
         float rate = (float)k/n;
-        fprintf(stderr, "%-20s rate %3.2f (%d,%d) \n", ldpc_codes[c].name, rate, n, k);
+        fprintf(stderr, "%-20s rate %3.2f (%d,%d) \n", ldpc_codes[c].name, (double)rate, n, k);
     }
     fprintf(stderr, "\n");
 }

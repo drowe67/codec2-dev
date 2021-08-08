@@ -37,6 +37,8 @@
 #include <stm32f4xx_gpio.h>
 #include <stm32f4xx_rcc.h>
 #include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
 
 #include "sfx.h"
 #include "sounds.h"
@@ -44,7 +46,7 @@
 #include "menu.h"
 #include "tot.h"
 
-#define VERSION         "V4"
+#define VERSION         "V5"
 #define FORTY_MS_16K    (0.04*16000)         /* 40ms of samples at 16 kHz */
 #define FREEDV_NSAMPLES_16K (2*FREEDV_NSAMPLES)
 #define CCM             (void*)0x10000000    /* start of 64k CCM memory   */

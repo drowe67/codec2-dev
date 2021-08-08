@@ -443,7 +443,7 @@ int freedv_rx_fsk_ldpc_data(struct freedv *f, COMP demod_in[]) {
            that were placed at the end of the buffer.  We delay this
            by one frame to report the SNR of the frame we are
            currently decoding */
-        f->snr_est = 10.0*log10(f->fsk_ldpc_snr);
+        f->snr_est = (double)10.0*log10(f->fsk_ldpc_snr);
         f->fsk_ldpc_snr = fsk->SNRest;
         f->fsk_S[0] = f->fsk_S[1]; f->fsk_N[0] = f->fsk_N[1];
         /* also store delayed versions of signal and noise power, useful for channel estimation */
@@ -548,7 +548,7 @@ int freedv_rx_fsk_ldpc_data(struct freedv *f, COMP demod_in[]) {
             fprintf(stderr, "%3d nbits: %3d st: %d uwloc: %3d uwerr: %2d bad_uw: %d snrdB: %4.1f eraw: %3d ecdd: %3d "
                             "iter: %3d pcc: %3d seq: %3d rxst: %s\n",
                     ++(f->frames), f->frame_llr_nbits, f->fsk_ldpc_state, f->fsk_ldpc_best_location, errors,
-                    f->fsk_ldpc_baduw, f->snr_est, Nerrs_raw, Nerrs_coded, iter, parityCheckCount,
+                    f->fsk_ldpc_baduw, (double)f->snr_est, Nerrs_raw, Nerrs_coded, iter, parityCheckCount,
                     seq, rx_sync_flags_to_text[rx_status]);
         }
     }

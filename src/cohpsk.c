@@ -605,7 +605,7 @@ void frame_sync_fine_freq_est(struct COHPSK *coh, COMP ch_symb[][COHPSK_NC*ND], 
         coh->ff_rect.real = cosf(result);
         coh->ff_rect.imag = -sinf(result);
         if (coh->verbose)
-            fprintf(stderr, "  [%d]   fine freq f: %6.2f max_ratio: %f ct: %d\n", coh->frame, coh->f_fine_est, max_corr/max_mag, coh->ct);
+            fprintf(stderr, "  [%d]   fine freq f: %6.2f max_ratio: %f ct: %d\n", coh->frame, (double)coh->f_fine_est, (double)max_corr/(double)max_mag, coh->ct);
 
         if (max_corr/max_mag > 0.9) {
             if (coh->verbose)
@@ -1108,7 +1108,7 @@ void cohpsk_demod(struct COHPSK *coh, float rx_bits[], int *sync_good, COMP rx_f
         for (coh->f_est = FDMDV_FCENTRE-40.0; coh->f_est <= FDMDV_FCENTRE+40.0; coh->f_est += 40.0) {
 
             if (coh->verbose)
-                fprintf(stderr, "  [%d] acohpsk.f_est: %f +/- 20\n", coh->frame, coh->f_est);
+                fprintf(stderr, "  [%d] acohpsk.f_est: %f +/- 20\n", coh->frame, (double)coh->f_est);
 
             /* we are out of sync so reset f_est and process two frames to clean out memories */
 
@@ -1136,7 +1136,7 @@ void cohpsk_demod(struct COHPSK *coh, float rx_bits[], int *sync_good, COMP rx_f
             coh->f_est = f_est;
 
             if (coh->verbose)
-                fprintf(stderr, "  [%d] trying sync and f_est: %f\n", coh->frame, coh->f_est);
+                fprintf(stderr, "  [%d] trying sync and f_est: %f\n", coh->frame, (double)coh->f_est);
 
             rate_Fs_rx_processing(coh, ch_symb, coh->ch_fdm_frame_buf, &coh->f_est, NSW*NSYMROWPILOT, COHPSK_M, 0);
             for (i=0; i<NSW-1; i++) {
@@ -1156,7 +1156,7 @@ void cohpsk_demod(struct COHPSK *coh, float rx_bits[], int *sync_good, COMP rx_f
 
             if (fabsf(coh->f_fine_est) > 2.0) {
                 if (coh->verbose)
-                    fprintf(stderr, "  [%d] Hmm %f is a bit big :(\n", coh->frame, coh->f_fine_est);
+                    fprintf(stderr, "  [%d] Hmm %f is a bit big :(\n", coh->frame, (double)coh->f_fine_est);
                 next_sync = 0;
             }
         }
@@ -1166,7 +1166,7 @@ void cohpsk_demod(struct COHPSK *coh, float rx_bits[], int *sync_good, COMP rx_f
                demodulate first frame (demod completed below) */
 
             if (coh->verbose)
-                fprintf(stderr, "  [%d] in sync! f_est: %f ratio: %f \n", coh->frame, coh->f_est, coh->ratio);
+                fprintf(stderr, "  [%d] in sync! f_est: %f ratio: %f \n", coh->frame, (double)coh->f_est, (double)coh->ratio);
             for(r=0; r<NSYMROWPILOT+2; r++)
                 for(c=0; c<COHPSK_NC*ND; c++)
                     coh->ct_symb_ff_buf[r][c] = coh->ct_symb_buf[coh->ct+r][c];
@@ -1262,12 +1262,14 @@ int cohpsk_fs_offset(COMP out[], COMP in[], int n, float sample_rate_ppm)
 
 void cohpsk_get_demod_stats(struct COHPSK *coh, struct MODEM_STATS *stats)
 {
-    COMP  pi_4;
     float new_snr_est;
-    float spi_4 = M_PI/4.0f;
     
+#ifndef __EMBEDDED__
+    float spi_4 = M_PI/4.0f;
+    COMP  pi_4;
     pi_4.real = cosf(spi_4);
     pi_4.imag = sinf(spi_4);
+#endif
 
     stats->Nc = COHPSK_NC*ND;
     assert(stats->Nc <= MODEM_STATS_NC_MAX);
@@ -1420,5 +1422,5 @@ float *cohpsk_get_rx_bits_upper(struct COHPSK *coh) {
 void cohpsk_set_carrier_ampl(struct COHPSK *coh, int c, float ampl) {
     assert(c < COHPSK_NC*ND);
     coh->carrier_ampl[c] = ampl;
-    fprintf(stderr, "cohpsk_set_carrier_ampl: %d %f\n", c, ampl);
+    fprintf(stderr, "cohpsk_set_carrier_ampl: %d %f\n", c, (double)ampl);
 }
