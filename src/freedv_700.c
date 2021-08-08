@@ -140,9 +140,10 @@ void freedv_ofdm_voice_open(struct freedv *f, char *mode) {
 
     f->tx_bits = NULL; /* not used for 700D */
 
-    /* tx BPF off on embedded platforms, as it consumes significant CPU */
+    /* tx BPF off on embedded platforms for 700D, as it consumes significant CPU */
 #ifdef __EMBEDDED__
-    ofdm_set_tx_bpf(f->ofdm, 0);
+    if (strcmp(mode, "700E") != 0)
+        ofdm_set_tx_bpf(f->ofdm, 0);
 #endif
 
     f->speech_sample_rate = FREEDV_FS_8000;
