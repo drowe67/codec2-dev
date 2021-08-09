@@ -60,8 +60,8 @@ case "${TEST_OPT}" in
 
     700D_AWGN_test)
 	echo "Check reference decode"
-	uber_ref=$(cat ref_gen.log | sed -n "s/^BER.* \([0-9..]*\) Tbits.*/\1/p")
-	cber_ref=$(cat ref_gen.log | sed -n "s/^Coded BER.* \([0-9..]*\) Tbits.*/\1/p")
+	uber_ref=$(cat ref_gen.log | sed -n "s/^BER.*: \([0-9..]*\).*Tbits.*/\1/p")
+	cber_ref=$(cat ref_gen.log | sed -n "s/^Coded BER.*: \([0-9..]*\).*Tbits.*/\1/p")
 	printf "REF   uncoded BER: %f coded BER: %f\n" $uber_ref $cber_ref
 
 	# As per notes in tst_api_demod_setup, coded BER is unreliable
@@ -75,8 +75,8 @@ case "${TEST_OPT}" in
      	fi
 
 	echo "Check target decode"
-	uber_target=$(cat ref_gen.log | sed -n "s/^BER.* \([0-9..]*\) Tbits.*/\1/p")
-	cber_target=$(cat ref_gen.log | sed -n "s/^Coded BER.* \([0-9..]*\) Tbits.*/\1/p")
+	uber_target=$(cat ref_gen.log | sed -n "s/^BER.*: \([0-9..]*\).*Tbits.*/\1/p")
+	cber_target=$(cat ref_gen.log | sed -n "s/^Coded BER.*: \([0-9..]*\).*Tbits.*/\1/p")
 	printf "TARGET uncoded BER: %f coded BER: %f\n" $uber_target $cber_target
 	python -c "import sys; sys.exit(1) if $uber_target < 0.1 and abs($cber_ref-$cber_target) < 0.01 else sys.exit(0)"
 	if [[ $? -eq 1 ]]; then echo "OK"; 
@@ -137,8 +137,8 @@ case "${TEST_OPT}" in
 
     700E_AWGN_test)
 	echo "Check reference decode"
-	uber_ref=$(cat ref_gen.log | sed -n "s/^BER.* \([0-9..]*\) Tbits.*/\1/p")
-	cber_ref=$(cat ref_gen.log | sed -n "s/^Coded BER.* \([0-9..]*\) Tbits.*/\1/p")
+	uber_ref=$(cat ref_gen.log | sed -n "s/^BER.*: \([0-9..]*\).*Tbits.*/\1/p")
+	cber_ref=$(cat ref_gen.log | sed -n "s/^Coded BER.*: \([0-9..]*\).*Tbits.*/\1/p")
 	printf "REF   uncoded BER: %f coded BER: %f\n" $uber_ref $cber_ref
 
 	# As per notes in tst_api_demod_setup, coded BER is unreliable
@@ -152,8 +152,8 @@ case "${TEST_OPT}" in
      	fi
 
 	echo "Check target decode"
-	uber_target=$(cat ref_gen.log | sed -n "s/^BER.* \([0-9..]*\) Tbits.*/\1/p")
-	cber_target=$(cat ref_gen.log | sed -n "s/^Coded BER.* \([0-9..]*\) Tbits.*/\1/p")
+	uber_target=$(cat ref_gen.log | sed -n "s/^BER.*: \([0-9..]*\).*Tbits.*/\1/p")
+	cber_target=$(cat ref_gen.log | sed -n "s/^Coded BER.*: \([0-9..]*\).*Tbits.*/\1/p")
 	printf "TARGET uncoded BER: %f coded BER: %f\n" $uber_target $cber_target
 	python -c "import sys; sys.exit(1) if $uber_target < 0.1 and abs($cber_ref-$cber_target) < 0.01 else sys.exit(0)"
 	if [[ $? -eq 1 ]]; then echo "OK"; 
