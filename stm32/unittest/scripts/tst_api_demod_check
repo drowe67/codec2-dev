@@ -68,7 +68,7 @@ case "${TEST_OPT}" in
 	# for such a short test, so we'll just sanity check the
 	# reference uncoded BER here. Bash can't compare floats
 	# .... so use return code of some python script
-	python -c "import sys; sys.exit(1) if $uber_ref<0.1 else sys.exit(0)"
+	python -c "import sys; sys.exit(1) if $uber_ref < 0.1 else sys.exit(0)"
 	if [[ $? -eq 1 ]]; then echo "OK"; 
 	else echo "BAD"; 
      	    let Fails=($Fails + 1)
@@ -78,7 +78,7 @@ case "${TEST_OPT}" in
 	uber_target=$(cat ref_gen.log | sed -n "s/^BER.* \([0-9..]*\) Tbits.*/\1/p")
 	cber_target=$(cat ref_gen.log | sed -n "s/^Coded BER.* \([0-9..]*\) Tbits.*/\1/p")
 	printf "TARGET uncoded BER: %f coded BER: %f\n" $uber_target $cber_target
-	python -c "import sys; sys.exit(1) if $uber_target<0.1 and abs($cber_ref-$cber_target)<0.01 else sys.exit(0)"
+	python -c "import sys; sys.exit(1) if $uber_target < 0.1 and abs($cber_ref-$cber_target) < 0.01 else sys.exit(0)"
 	if [[ $? -eq 1 ]]; then echo "OK"; 
 	else echo "BAD"; 
      	    let Fails=($Fails + 1)
@@ -145,7 +145,7 @@ case "${TEST_OPT}" in
 	# for such a short test, so we'll just sanity check the
 	# reference uncoded BER here. Bash can't compare floats
 	# .... so use return code of some python script
-	python -c "import sys; sys.exit(1) if $uber_ref<0.1 else sys.exit(0)"
+	python -c "import sys; sys.exit(1) if $uber_ref < 0.1 else sys.exit(0)"
 	if [[ $? -eq 1 ]]; then echo "OK"; 
 	else echo "BAD"; 
      	    let Fails=($Fails + 1)
@@ -155,7 +155,7 @@ case "${TEST_OPT}" in
 	uber_target=$(cat ref_gen.log | sed -n "s/^BER.* \([0-9..]*\) Tbits.*/\1/p")
 	cber_target=$(cat ref_gen.log | sed -n "s/^Coded BER.* \([0-9..]*\) Tbits.*/\1/p")
 	printf "TARGET uncoded BER: %f coded BER: %f\n" $uber_target $cber_target
-	python -c "import sys; sys.exit(1) if $uber_target<0.1 and abs($cber_ref-$cber_target)<0.01 else sys.exit(0)"
+	python -c "import sys; sys.exit(1) if $uber_target < 0.1 and abs($cber_ref-$cber_target) < 0.01 else sys.exit(0)"
 	if [[ $? -eq 1 ]]; then echo "OK"; 
 	else echo "BAD"; 
      	    let Fails=($Fails + 1)
