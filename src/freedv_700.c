@@ -110,7 +110,7 @@ void freedv_ofdm_voice_open(struct freedv *f, char *mode) {
     ofdm_config = ofdm_get_config_param(f->ofdm);
     f->ofdm_bitsperpacket = ofdm_get_bits_per_packet(f->ofdm);
     f->ofdm_bitsperframe = ofdm_get_bits_per_frame(f->ofdm);
-    f->ofdm_nuwbits = (ofdm_config->ns - 1) * ofdm_config->bps - ofdm_config->txtbits;
+    f->ofdm_nuwbits = ofdm_config->nuwbits;
     f->ofdm_ntxtbits = ofdm_config->txtbits;
 
     f->ldpc = (struct LDPC*)MALLOC(sizeof(struct LDPC));
