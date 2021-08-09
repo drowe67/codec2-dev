@@ -1918,17 +1918,15 @@ void ofdm_sync_state_machine_data_streaming(struct OFDM *ofdm, uint8_t *rx_uw) {
     }
 
     if (ofdm->sync_state == trial) {
-        if (ofdm->sync_state == trial) {
-            if (ofdm->uw_errors < ofdm->bad_uw_errors) {
-                next_state = synced;
-                ofdm->packet_count = 0;
-                ofdm->modem_frame = ofdm->nuwframes;
-            } else {
-                ofdm->sync_counter++;
+        if (ofdm->uw_errors < ofdm->bad_uw_errors) {
+            next_state = synced;
+            ofdm->packet_count = 0;
+            ofdm->modem_frame = ofdm->nuwframes;
+        } else {
+            ofdm->sync_counter++;
 
-                if (ofdm->sync_counter > ofdm->np) {
-                    next_state = search;
-                }
+            if (ofdm->sync_counter > ofdm->np) {
+                next_state = search;
             }
         }
     }
