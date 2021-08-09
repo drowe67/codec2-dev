@@ -53,7 +53,7 @@ case "${TEST_OPT}" in
 
     700E_TEST )
     	# Config is <mode>, <teswtframes>, <clip>, <bpf>
-    	echo "81110000" > stm_cfg.txt
+    	echo "81010000" > stm_cfg.txt
 	#
         # Copy N frames of a raw audio file to stm_in.raw. 
         dd bs=1280 count=48 if=../../../../raw/hts1.raw of=stm_in.raw \
@@ -66,7 +66,7 @@ case "${TEST_OPT}" in
 
     700E_CODEC )
     	# Config is <mode>, <teswtframes>, <cip>, <bpf>
-    	echo "80110000" > stm_cfg.txt
+    	echo "80010000" > stm_cfg.txt
 	#
         # Copy N frames of a raw audio file to stm_in.raw. 
         dd bs=1280 count=48 if=../../../../raw/hts1.raw of=stm_in.raw \
