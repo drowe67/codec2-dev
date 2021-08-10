@@ -223,6 +223,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     } else {
         /* Use the users values */
 
+
         strcpy(ofdm->mode, config->mode);
         ofdm->nc = config->nc;                    /* Number of carriers */
         ofdm->np = config->np;                    /* Number of modem Frames per Packet */
@@ -251,6 +252,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
         ofdm->clip_en = config->clip_en;
         memcpy(ofdm->tx_uw, config->tx_uw, ofdm->nuwbits);
         ofdm->data_mode = config->data_mode;
+
     }
 
     ofdm->rs = (1.0f / ofdm->ts);                 /* Modulation Symbol Rate */
