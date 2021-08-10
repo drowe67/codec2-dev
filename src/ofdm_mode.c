@@ -52,7 +52,7 @@ void ofdm_init_mode(char mode[], struct OFDM_CONFIG *config) {
     } else if (strcmp(mode,"700E") == 0) {
          config->ts = 0.014;  config->tcp = 0.006; config->nc = 21; config->ns=4;
          config->edge_pilots = 0;
-         config->nuwbits = 12; config->bad_uw_errors = 3; config->txtbits = 2;
+         config->nuwbits = 6; config->bad_uw_errors = 3; config->txtbits = 2;
          config->state_machine = "voice2"; config->amp_est_mode = 1;
          config->ftwindowwidth = 80;
          config->codename = "HRA_56_56"; config->tx_bpf_en = false;
