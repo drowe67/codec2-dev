@@ -163,6 +163,9 @@ void freedv_ofdm_voice_open(struct freedv *f, char *mode) {
     
     /* attenuate audio 12dB as channel noise isn't that pleasant */
     f->passthrough_gain = 0.25;
+    
+    /* nuwbits is dependent on ns, bps and txtbits. */
+    assert((ofdm_config->ns - 1) * ofdm_config->bps - ofdm_config->txtbits == f->ofdm_nuwbits);
 }
 
 // open function for OFDM data modes, TODO consider moving to a new
