@@ -109,22 +109,7 @@ case "${TEST_OPT}" in
 		> setup.log 2>&1
 	freedv_tx 700E spch_in.raw mod_bits.raw --testframes --txbpf 1 \
 		  >> setup.log 2>&1
-	cohpsk_ch mod_bits.raw stm_in.raw -20 --Fs 8000 -f -5  2>&1 | tee setup.log
-	
-        # Reference: - When the OFDM modem initially syncs, it often
-	#              has residual freq offset that causes abnormally
-	#              high LDPC decoder bit errors forthe first few
-	#              seconds.  This leads to a high coded BER being
-	#              reported for short duration tests.  This
-	#              settles down after a few seconds, and we get
-	#              the expected coded BER when averaging over
-	#              longer periods (e.g. 60s). However this
-	#              particular test is necessarily short due to the
-	#              slow speed of the semihosting system.  It is
-	#              therefore sufficient to check that the
-	#              performance is similar to the x86 C verison,
-	#              rather than expecting a low coded BER for a
-	#              short run.
+	cohpsk_ch mod_bits.raw stm_in.raw -22 --Fs 8000 -f -5  2>&1 | tee setup.log
 	
         freedv_rx 700E stm_in.raw ref_demod.raw -v --testframes  2>&1 --discard | tee ref_gen.log
 	;;
