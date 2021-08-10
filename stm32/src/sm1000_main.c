@@ -314,6 +314,11 @@ struct freedv *set_freedv_mode(int op_mode, int *n_samples) {
         freedv_set_snr_squelch_thresh(f, 0.0);  /* squelch at 0.0 dB      */
         freedv_set_squelch_en(f, 1);
         freedv_set_eq(f, 1);                     /* equaliser on by default */
+
+        /* Clipping and TXBPF needed for 700E. */
+        freedv_set_clip(f, 1);
+        freedv_set_tx_bpf(f, 1);
+
         *n_samples = freedv_get_n_speech_samples(f);
         break;
     }
