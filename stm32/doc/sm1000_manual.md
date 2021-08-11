@@ -9,7 +9,8 @@
 1. The SELECT button steps through the mode:
    + Analog pass through (ANA)
    + FreeDV 1600 (1600)
-   + FreeDV 700D  (700D)
+   + FreeDV 700D (700D)
+   + FreeDV 700E (700E)
 
 1. Select 1600 mode.
   
@@ -78,7 +79,8 @@ The menu structure looks like this:
         |---> "MODE": Boot-up Operating mode
         |       |---> "ANA":    Analogue mode
         |       |---> "1600":   FreeDV 1600
-        |       '---> "700D":   FreeDV 700D
+        |       |---> "700D":   FreeDV 700D
+        |       '---> "700E":   FreeDV 700E
         |
         |---> "TOT": Time-out timer
         |       |---> "TIME":   Total time-out period (0 == disabled)
