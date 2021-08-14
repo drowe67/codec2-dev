@@ -755,7 +755,12 @@ int process_core_state_machine(int core_state, struct menu_t *menu, int *op_mode
                     mode_changed = 1;
                 } else if (switch_released(&sw_back)) {
                     /* Shortcut: change current mode */
-                    *op_mode = (*op_mode - 1) % MAX_MODES;
+                    *op_mode = *op_mode - 1;
+                    if (*op_mode < 0)
+                    {
+                        // Loop back around to the end of the mode list if we reach 0.
+                        *op_mode = MAX_MODES - 1;
+                    }
                     mode_changed = 1;
                 }
 
@@ -940,7 +945,11 @@ static void menu_default_cb(struct menu_t* const menu, uint32_t event)
             break;
         case MENU_EVT_PREV:
             sfx_play(&sfx_player, sound_click);
-            menu->current = (menu->current - 1) % item->num_children;
+            menu->current = menu->current - 1;
+            if (menu->current < 0)
+            {
+                menu->current = item->num_children - 1;
+            }
             announce = 1;
             break;
         case MENU_EVT_SELECT:
@@ -1072,7 +1081,11 @@ static void menu_op_mode_cb(struct menu_t* const menu, uint32_t event)
             break;
         case MENU_EVT_PREV:
             sfx_play(&sfx_player, sound_click);
-            menu->current = (menu->current - 1) % item->num_children;
+            menu->current = menu->current - 1;
+            if (menu->current < 0)
+            {
+                menu->current = item->num_children - 1;
+            }
             announce = 1;
             break;
         case MENU_EVT_SELECT:
