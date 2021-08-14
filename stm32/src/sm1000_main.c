@@ -945,10 +945,13 @@ static void menu_default_cb(struct menu_t* const menu, uint32_t event)
             break;
         case MENU_EVT_PREV:
             sfx_play(&sfx_player, sound_click);
-            menu->current = menu->current - 1;
-            if (menu->current < 0)
+            if (menu->current == 0)
             {
                 menu->current = item->num_children - 1;
+            }
+            else
+            {
+                menu->current = menu->current - 1;
             }
             announce = 1;
             break;
@@ -1002,7 +1005,7 @@ static const struct menu_item_t menu_op_mode = {
     .label          = "MODE",
     .event_cb       = menu_op_mode_cb,
     .children       = menu_op_mode_children,
-    .num_children   = 3,
+    .num_children   = 4,
 };
 /* Children */
 static const struct menu_item_t menu_op_mode_analog = {
@@ -1081,10 +1084,13 @@ static void menu_op_mode_cb(struct menu_t* const menu, uint32_t event)
             break;
         case MENU_EVT_PREV:
             sfx_play(&sfx_player, sound_click);
-            menu->current = menu->current - 1;
-            if (menu->current < 0)
+            if (menu->current == 0)
             {
                 menu->current = item->num_children - 1;
+            }
+            else
+            {
+                menu->current = menu->current - 1;
             }
             announce = 1;
             break;
