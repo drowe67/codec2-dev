@@ -211,7 +211,7 @@ static void reliable_text_freedv_callback_rx(void *state, char chr)
         memset(decodedStr, 0, RELIABLE_TEXT_MAX_RAW_LENGTH + 1);
         memset(fullRawStr, 0, RELIABLE_TEXT_MAX_RAW_LENGTH + 1);
         
-        for (int charIndex = bufferIndex; (charIndex + RELIABLE_TEXT_ENCODED_SEGMENT_LENGTH - 1) < RELIABLE_TEXT_TOTAL_ENCODED_LENGTH + RELIABLE_TEXT_ENCODED_SEGMENT_LENGTH; charIndex += RELIABLE_TEXT_ENCODED_SEGMENT_LENGTH)
+        for (int charIndex = bufferIndex; (charIndex + RELIABLE_TEXT_ENCODED_SEGMENT_LENGTH - 1) < RELIABLE_TEXT_TOTAL_ENCODED_LENGTH + RELIABLE_TEXT_ENCODED_SEGMENT_LENGTH && strlen(fullRawStr) < RELIABLE_TEXT_MAX_RAW_LENGTH; charIndex += RELIABLE_TEXT_ENCODED_SEGMENT_LENGTH)
         {
             int encodedInput =
                 ((obj->inbound_pending_chars[charIndex] & 0x3F) << 18) |
