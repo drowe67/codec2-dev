@@ -783,6 +783,16 @@ if(UNIX) # Uses pthreads
 endif()
 
     # -------------------------------------------------------------------------
+    #                                Reliable Text
+    # -------------------------------------------------------------------------
+    add_test(NAME test_freedv_reliable_text_ideal_1600
+          COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                         ./freedv_tx 1600 ../../raw/ve9qrp_10s.raw - --reliabletext AB1CDEF > 1600_reliable_raw;
+                         ./freedv_rx 1600 1600_reliable_raw /dev/null --txtrx 1600_reliable.txt --reliabletext;
+                         cat 1600_reliable.txt")
+          set_tests_properties(test_freedv_reliable_text_ideal_1600 PROPERTIES PASS_REGULAR_EXPRESSION "AB1CDEF")
+
+    # -------------------------------------------------------------------------
     #                                FreeDv API memory leaks
     # -------------------------------------------------------------------------
 
