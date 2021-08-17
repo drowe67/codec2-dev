@@ -6,61 +6,17 @@
 % information.  Uses soft decision information, probablility of state
 % transitions, and left over redundancy to correct errors on VQ
 % reception.
+%
+% VQ indexes are transmitted as codewords mapped to +-1
+%
+%   y = c + n
+%
+% where c is the transmitted codeword, y is the received codeword,
+% and n is Gaussian noise.
 
 graphics_toolkit ("gnuplot");
 more off;
 randn('state',1);
-
-% builds a matrix of transition probablilities for each codec field (model parameter)
-
-function [tp codewords] = build_tp(bitstream_filename)
-  [bits_per_frame bit_fields] = codec2_700_bit_fields;
-  nfields = length(bit_fields);
-
-  % load encoded speech file (one float per bit)
-
-  fbitstream = fopen(bitstream_filename, "rb"); 
-  bitstream = fread(fbitstream, "float32");
-  fclose(fbitstream);
-  nframes = floor(length(bitstream)/bits_per_frame);
-  bitstream = bitstream < 0;
-  
-  % extract each field (model parameter) for bit stream
-
-  codewords = zeros(nframes,nfields);
-  for f=1:nframes
-    aframe = bitstream((f-1)*bits_per_frame+1:f*bits_per_frame);
-    field = 1;
-    st = bit_fields(field);
-    for l=1:nfields
-      nbits = bit_fields(field);
-      %printf("st: %d %d\n", st, st+nbits-1);
-      codeword = aframe(st:st+nbits-1)';
-      %printf("codeword: %d\n", codeword);
-      codewords(f,l) = sum(codeword .* 2.^(nbits-1:-1:0));
-      %printf("nbits: %d lsp(%d, %d) = %d\n", nbits, f, l, codewords(f,l));
-      st += nbits;
-      field++;
-    end
-  end
-
-  % determine transition probablilities of each codeword
-  % state at time n, state at time n+1
-  % prob must add to 1
-  % so for every state, of every codeword, compute histogram of 
-  % transition probabilities
-
-  tp = zeros(32,32,nfields);
-  for f=1:nframes-1
-    for l=1:nfields
-      acodeword = codewords(f,l);
-      bcodeword = codewords(f+1,l);
-      %printf("%d %d %d %d\n", f, l, acodeword, bcodeword);
-      tp(acodeword+1,bcodeword+1,l)++;
-    end
-  end
-endfunction
-
 
 % converts a decimal value to a soft dec binary value
 
@@ -81,17 +37,18 @@ function c = dec2sd(dec, nbits)
     c = -1 + 2*c;
 endfunction
 
-% y is vector of +/- 1 soft decision values for 0,1 transmitted bits
 
-function [lnp indexes] = ln_prob_of_tx_codeword_c_given_rx_codeword_y(y, nstates, C)
+% y is vector of received soft decision values (e.g +/-1 + noise)
+
+function [txp indexes] = ln_tx_codeword_prob_given_rx_codeword_y(y, nstates, C)
   nbits = length(y);
   np    = 2.^nbits;
   
   % Find log probability of all possible transmitted codewords
-  lnp = C * y';
+  txp = C * y';
   
   % return most probable codewords (number of states to search)
-  [lnp indexes] = sort(lnp,"descend");  
+  [txp indexes] = sort(txp,"descend");  
 endfunction
 
 % A matrix of all possible tx codewords C, one per row
@@ -119,7 +76,7 @@ function tp = calculate_tp(vq, sd_table, h_table, indexes_current, indexes_next,
       dist = vq(index_current,:) - vq(index_next,:);
       sd = dist * dist';
       p = prob_from_hist(sd_table, h_table, sd);
-      if verbose
+      if bitand(verbose, 0x2)
         printf("index_current: %d index_next: %d sd: %f p: %f\n", index_current, index_next, sd, p);
       end
       tp(txcw_current, txcw_next) = log(p);
@@ -138,13 +95,13 @@ function c = find_most_likely_codeword(y, vq, C, sd_table, h_table, nstages, ntx
 
     % populate the nodes of the trellis with the most likely transmitted codewords
 
-    lnp = zeros(nstages, ntxcw); indexes = zeros(nstages, ntxcw);
+    txp = zeros(nstages, ntxcw); indexes = zeros(nstages, ntxcw);
     for s=1:nstages
-      [alnp aindexes] = ln_prob_of_tx_codeword_c_given_rx_codeword_y(y(s,:), ntxcw, C);
-      lnp(s,:) = alnp;
+      [atxp aindexes] = ln_tx_codeword_prob_given_rx_codeword_y(y(s,:), ntxcw, C);
+      txp(s,:) = atxp;
       indexes(s,:) = aindexes;
     end
-    indexes
+    
     if verbose
       printf("rx_codewords:\n");
       for r=1:ncodewords
@@ -154,38 +111,39 @@ function c = find_most_likely_codeword(y, vq, C, sd_table, h_table, nstages, ntx
         printf("\n");
       end
 
-      printf("\nProbability of each tx codeword:\n");
-      printf("tx_codeword      stage\n");
-      printf("bin dec  ");
+      printf("\nProbability of each tx codeword index/binary/ln(prob):\n");
+      printf("     ");
       for s=1:nstages
-        printf("    %9d", s);
+        printf("Time n%+d       ", s - (floor(nstages/2)+1));
       end
       printf("\n");
 
       for i=1:ntxcw
-        printf("%3s  %2d  ", dec2bin(i-1,nbits), i-1);
+        printf("%d   ", i);
         for s=1:nstages
-          printf("    %9.2f", lnp(s, i));
+	  ind = indexes(s,i) - 1;
+          printf("%2d %3s %5.2f   ", ind, dec2bin(ind,nbits), txp(s, i));
         end
         printf("\n");
       end
       printf("\n");
     end
-
+    
     % determine probability of each path
     % (prob of start tx cw)(prob of transition)(prob of next tx cw)
     % cycle through all possibilities of tx cw
 
     if verbose
       printf("Evaulation of all possible paths:\n");
-      printf("tx codewords\n");
-      printf("   n");
-      for s=1:nstages-1
-        printf(" n+%d", s);
-      end
       printf("  ");
       for s=1:nstages
-        printf("  lnp(%d) ", s-1);
+        printf(" n%+d", s - (floor(nstages/2)+1));
+      end
+      printf("   indexes");
+      printf(" ");
+      
+      for s=1:nstages
+        printf("  txp(%d) ", s-1);
         if s < nstages
           printf(" tp(%d,%d) ", s-1,s);
         end
@@ -209,18 +167,22 @@ function c = find_most_likely_codeword(y, vq, C, sd_table, h_table, nstages, ntx
     do
       
       if verbose
-        for s=1:nstages
+       printf("  ");
+       for s=1:nstages
           printf("%4d", n(s)-1);
         end
         printf("  ");
+         for s=1:nstages
+          printf("%2d ", indexes(s,n(s))-1);
+        end
       end
 
       % find the probability of current path
       prob = 0;
       for s=1:nstages
-         prob += lnp(s, n(s));
+         prob += txp(s, n(s));
          if verbose
-           printf("%8.2f ", lnp(s, n(s)));
+           printf("%8.2f ", txp(s, n(s)));
          end
          if s < nstages
 	   prob += tp(s, n(s), n(s+1));
@@ -254,11 +216,15 @@ function c = find_most_likely_codeword(y, vq, C, sd_table, h_table, nstages, ntx
 
     c = max_n((nstages+1)/2) - 1;
     if verbose
-      printf("\nMost likely path....: ");
+      printf("\nMost likely path through nodes... ");
       for s=1:nstages
         printf("%4d", max_n(s)-1);
       end
-      printf("\nMost likely codeword: %4d\n", c);
+      printf("\nMost likely path through indexes: ");
+      for s=1:nstages
+        printf("%4d", indexes(s,max_n(s))-1);
+      end
+      printf("\nMost likely codeword at time n..: %4d\n", c);
     end
 endfunction
 
@@ -307,8 +273,10 @@ function test_single
   verbose  = 1;
   nbits = 2;
   ntxcw = 4;
+  EbNo = 1;
   
-  rx_codewords = [-1 -1; -1 -1; -1 -1; -1 -1];
+  tx_codewords = [-1 -1; -1 -1; -1 -1];
+  rx_codewords = [-1 -1; -1 -1; -1 -1] + randn(nstages, nbits)/EbNo;
   vq = [0 0 0 1;
         0 0 1 0;
 	0 1 0 0;
@@ -316,7 +284,7 @@ function test_single
   sd_table = [0 1 2 4];
   h_table = [0.5 0.25 0.15 0.1];
   C = precompute_C(nbits);
-  c = find_most_likely_codeword(rx_codewords, vq, C, sd_table, h_table, nstages, ntxcw, verbose);
+  c = find_most_likely_codeword(EbNo*rx_codewords, vq, C, sd_table, h_table, nstages, ntxcw, verbose);
 endfunction
 
 
