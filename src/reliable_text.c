@@ -20,6 +20,7 @@
 //
 //==========================================================================
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
@@ -181,6 +182,8 @@ static unsigned char convertHexStringToDigit_(char* src)
 
 static void reliable_text_freedv_callback_rx(void *state, char chr)
 {
+    fprintf(stderr, "received char: %d\n", (chr & 0x3F));
+    
     reliable_text_impl_t* obj = (reliable_text_impl_t*)state;
         
     // No need to further process if we got a valid string already.
@@ -254,6 +257,8 @@ static char reliable_text_freedv_callback_tx(void *state)
     
     char ret = obj->tx_text[obj->tx_text_index];
     obj->tx_text_index = (obj->tx_text_index + 1) % (obj->tx_text_length + 1); // to ensure the null at the end is sent
+    
+    fprintf(stderr, "sent char: %d\n", ret);
     return ret;
 }
 
