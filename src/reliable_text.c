@@ -205,8 +205,8 @@ static void reliable_text_freedv_callback_rx(void *state, char chr)
     
     for (int bufferIndex = 0; bufferIndex < RELIABLE_TEXT_ENCODED_SEGMENT_LENGTH; bufferIndex++)
     {
-        char decodedStr[RELIABLE_TEXT_MAX_RAW_LENGTH + 1];
-        char fullRawStr[RELIABLE_TEXT_MAX_RAW_LENGTH + 1];
+        char decodedStr[RELIABLE_TEXT_MAX_RAW_LENGTH + 2];
+        char fullRawStr[RELIABLE_TEXT_MAX_RAW_LENGTH + 2];
         char* decodedStrPtr = &decodedStr[0];
         memset(decodedStr, 0, RELIABLE_TEXT_MAX_RAW_LENGTH + 1);
         memset(fullRawStr, 0, RELIABLE_TEXT_MAX_RAW_LENGTH + 1);
