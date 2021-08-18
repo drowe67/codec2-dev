@@ -247,6 +247,13 @@ static void reliable_text_freedv_callback_rx(void *state, char chr)
             // We got a valid string. Call assigned callback.
             obj->has_successfully_decoded = 1;
             obj->text_rx_callback(&decodedStr[RELIABLE_TEXT_CRC_LENGTH], strlen(&decodedStr[RELIABLE_TEXT_CRC_LENGTH]));
+            
+            // Resync so that byte 0 of the queue is the data immediately after the packet we found.
+            memmove(
+                &obj->inbound_pending_chars[0],
+                &obj->inbound_pending_chars[bufferIndex + RELIABLE_TEXT_TOTAL_ENCODED_LENGTH], 
+                RELIABLE_TEXT_ENCODED_SEGMENT_LENGTH  - bufferIndex);
+            obj->current_inbound_queue_pos = &obj->inbound_pending_chars[RELIABLE_TEXT_ENCODED_SEGMENT_LENGTH - bufferIndex];
         }
     }
 }
