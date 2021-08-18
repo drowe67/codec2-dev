@@ -145,50 +145,11 @@ static char calculateCRC8_(char* input, int length)
     return crc;
 }
 
-static void convertDigitToASCII_(char* dest, unsigned char digit)
-{
-    if (digit >= 0 && digit <= 9)
-    {
-        *dest = digit + 10; // using 6 bit character set defined above.
-    }
-    else if (digit >= 0xA && digit <= 0xF)
-    {
-        *dest = (digit - 0xA) + 20; // using 6 bit character set defined above.
-    }
-    else
-    {
-        // Should not reach here.
-        *dest = 10;
-    }
-}
-
-static unsigned char convertHexStringToDigit_(char* src)
-{
-    unsigned char ret = 0;
-    for (int i = 0; i < 2; i++)
-    {
-        ret <<= 4;
-        unsigned char temp = 0;
-        if (*src >= '0' && *src <= '9')
-        {
-            temp = *src - '0';
-        }
-        else if (*src >= 'A' && *src <= 'F')
-        {
-            temp = *src - 'A' + 0xA;
-        }
-        ret |= temp;
-        src++;
-    }
-    
-    return ret;
-}
-
 static int reliable_text_ldpc_decode(reliable_text_impl_t* obj, char* dest, char* src)
 {
     float incomingData[LDPC_TOTAL_SIZE_BITS];
     float llr[LDPC_TOTAL_SIZE_BITS];
-    char output[LDPC_TOTAL_SIZE_BITS];
+    unsigned char output[LDPC_TOTAL_SIZE_BITS];
     int parityCheckCount = 0;
     
     for (int bitIndex = 0; bitIndex < LDPC_TOTAL_SIZE_BITS; bitIndex++)
@@ -199,8 +160,7 @@ static int reliable_text_ldpc_decode(reliable_text_impl_t* obj, char* dest, char
     }
     
     sd_to_llr(llr, incomingData, LDPC_TOTAL_SIZE_BITS);
-    
-    int iter = run_ldpc_decoder(&obj->ldpc, output, llr, &parityCheckCount);
+    run_ldpc_decoder(&obj->ldpc, output, llr, &parityCheckCount);
     
     // Data is valid if BER < 0.1.
     float ber_est = (float)(obj->ldpc.NumberParityBits - parityCheckCount)/obj->ldpc.NumberParityBits;
@@ -338,8 +298,8 @@ void reliable_text_set_string(reliable_text_t ptr, const char* str, int strlengt
     tmp[0] = crc;
 
     // Encode block of text using LDPC(112,56).
-    char ibits[LDPC_TOTAL_SIZE_BITS / 2];
-    char pbits[LDPC_TOTAL_SIZE_BITS / 2];
+    unsigned char ibits[LDPC_TOTAL_SIZE_BITS / 2];
+    unsigned char pbits[LDPC_TOTAL_SIZE_BITS / 2];
     memset(ibits, 0, LDPC_TOTAL_SIZE_BITS / 2);
     memset(pbits, 0, LDPC_TOTAL_SIZE_BITS / 2);
     for (int index = 0; index < 8; index++)
