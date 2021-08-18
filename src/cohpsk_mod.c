@@ -112,7 +112,6 @@ int main(int argc, char *argv[])
 	         buffering to occur */
 
         if (fout == stdout) fflush(stdout);
-        if (fin == stdin) fflush(stdin);
     }
 
     fclose(fin);

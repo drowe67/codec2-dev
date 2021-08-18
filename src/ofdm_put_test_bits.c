@@ -107,8 +107,6 @@ int main(int argc, char *argv[])
         if (verbose) {
             printf("f: %d Nerrs: %d aber: %3.2f\n", f, Nerrs, aber);
         }
-        
-        if (fin == stdin) fflush(stdin);
     }
 
     fclose(fin);

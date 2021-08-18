@@ -92,8 +92,6 @@ int main(int argc, char *argv[])
             nerrors += bit_errors;
             nbits   += COHPSK_BITS_PER_FRAME;
         }
-
-        if (fin == stdin) fflush(stdin);
     }
 
     if (foct != NULL) {
