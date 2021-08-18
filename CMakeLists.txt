@@ -815,7 +815,7 @@ endif()
 
    add_test(NAME test_freedv_reliable_text_awgn_700D
       COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
-                     ./freedv_tx 700D ../../raw/ve9qrp.raw - --reliabletext AB1CDEF --txbpf 1 --clip 1 | ./cohpsk_ch - - -15 --Fs 8000 -f -5 > 700D_reliable.raw 2>/dev/null;
+                     ./freedv_tx 700D ../../raw/ve9qrp.raw - --reliabletext AB1CDEF --txbpf 1 --clip 1 | ./cohpsk_ch - - -16 --Fs 8000 -f -5 > 700D_reliable.raw 2>/dev/null;
                      ./freedv_rx 700D 700D_reliable.raw /dev/null --txtrx 700D_reliable.txt --reliabletext 2>/dev/null;
                      cat 700D_reliable.txt")
       set_tests_properties(test_freedv_reliable_text_awgn_700D PROPERTIES PASS_REGULAR_EXPRESSION "AB1CDEF")
