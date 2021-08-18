@@ -245,8 +245,8 @@ static void reliable_text_freedv_callback_rx(void *state, char chr)
         if (receivedCRC == calcCRC)
         {
             // We got a valid string. Call assigned callback.
-            obj->text_rx_callback(&decodedStr[RELIABLE_TEXT_CRC_LENGTH], strlen(&decodedStr[RELIABLE_TEXT_CRC_LENGTH]));
             obj->has_successfully_decoded = 1;
+            obj->text_rx_callback(&decodedStr[RELIABLE_TEXT_CRC_LENGTH], strlen(&decodedStr[RELIABLE_TEXT_CRC_LENGTH]));
         }
     }
 }

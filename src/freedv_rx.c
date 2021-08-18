@@ -46,14 +46,16 @@
 void my_put_next_rx_char(void *states, char c) { fprintf((FILE*)states, "%c", c); }
 
 static FILE* reliable_tx_fp;
+reliable_text_t reliable_text_obj;
+
 void on_reliable_text_rx(const char* txt_ptr, int length)
 {
-    fprintf(reliable_tx_fp, "%s", txt_ptr);
+    fprintf(reliable_tx_fp, "%s\n", txt_ptr);
+    reliable_text_reset(reliable_text_obj);
 }
 
 int main(int argc, char *argv[]) {
     FILE                      *fin, *fout, *ftxt_rx = NULL;
-    struct freedv             *freedv;
     int                        nin, nout, nout_total = 0, frame = 0;
     struct MODEM_STATS         stats = {0};
     int                        mode;
@@ -64,8 +66,8 @@ int main(int argc, char *argv[]) {
     int                        use_squelch, highpassthroughgain;
     float                      squelch = 0;
     int                        i;
-    reliable_text_t            reliable_text_obj;
-
+    struct freedv             *freedv;
+    
     if (argc < 4) {
         char f2020[80] = {0};
         #ifdef __LPCNET__
