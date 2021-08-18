@@ -26,15 +26,17 @@
 #include <ctype.h>
 #include "freedv_api.h"
 #include "reliable_text.h"
-#include "golay23.h"
+#include "ldpc_codes.h"
+
+#define LDPC_TOTAL_SIZE_BITS (112)
 
 #define RELIABLE_TEXT_MAX_LENGTH (8)
-#define RELIABLE_TEXT_CRC_LENGTH (2)
+#define RELIABLE_TEXT_CRC_LENGTH (1)
 #define RELIABLE_TEXT_MAX_RAW_LENGTH (RELIABLE_TEXT_MAX_LENGTH + RELIABLE_TEXT_CRC_LENGTH)
 
-/* Two bytes of text/CRC equal four bytes of Golay(23,12). */
-#define RELIABLE_TEXT_BYTES_PER_ENCODED_SEGMENT (2) 
-#define RELIABLE_TEXT_ENCODED_SEGMENT_LENGTH (4)
+/* Two bytes of text/CRC equal four bytes of LDPC(112,56). */
+#define RELIABLE_TEXT_BYTES_PER_ENCODED_SEGMENT (8) 
+#define RELIABLE_TEXT_ENCODED_SEGMENT_LENGTH (16)
 
 /* Size of (RELIABLE_TEXT_MAX_LENGTH + RELIABLE_TEXT_CRC_LENGTH) once encoded. */
 #define RELIABLE_TEXT_NUMBER_SEGMENTS (RELIABLE_TEXT_MAX_RAW_LENGTH / RELIABLE_TEXT_BYTES_PER_ENCODED_SEGMENT)
@@ -52,6 +54,8 @@ typedef struct
     char inbound_pending_chars[RELIABLE_TEXT_TOTAL_ENCODED_LENGTH + RELIABLE_TEXT_ENCODED_SEGMENT_LENGTH];
     char* current_inbound_queue_pos;
     int has_successfully_decoded;
+    
+    struct LDPC ldpc;
 } reliable_text_impl_t;
 
 // 6 bit character set for text field use:
@@ -180,6 +184,48 @@ static unsigned char convertHexStringToDigit_(char* src)
     return ret;
 }
 
+static int reliable_text_ldpc_decode(reliable_text_impl_t* obj, char* dest, char* src)
+{
+    float incomingData[LDPC_TOTAL_SIZE_BITS];
+    float llr[LDPC_TOTAL_SIZE_BITS];
+    char output[LDPC_TOTAL_SIZE_BITS];
+    int parityCheckCount = 0;
+    
+    for (int bitIndex = 0; bitIndex < LDPC_TOTAL_SIZE_BITS; bitIndex++)
+    {
+        // Map to value expected by sd_to_llr().
+        int bit = (src[bitIndex / 7] & (1 << (bitIndex % 7))) != 0;
+        incomingData[bitIndex] = 1.0 - 2.0 * bit;
+    }
+    
+    sd_to_llr(llr, incomingData, LDPC_TOTAL_SIZE_BITS);
+    
+    int iter = run_ldpc_decoder(&obj->ldpc, output, llr, &parityCheckCount);
+    
+    // Data is valid if BER < 0.1.
+    float ber_est = (float)(obj->ldpc.NumberParityBits - parityCheckCount)/obj->ldpc.NumberParityBits;
+    int result = (ber_est < 0.2);
+        
+    if (result)
+    {        
+        memset(dest, 0, RELIABLE_TEXT_BYTES_PER_ENCODED_SEGMENT);
+        
+        for (int bitIndex = 0; bitIndex < 8; bitIndex++)
+        {
+            if (output[bitIndex])
+                dest[0] |= 1 << bitIndex;
+        }
+        for (int bitIndex = 8; bitIndex < (LDPC_TOTAL_SIZE_BITS / 2); bitIndex++)
+        {
+            int bitsSinceCrc = bitIndex - 8;
+            if (output[bitIndex])
+                dest[1 + (bitsSinceCrc / 6)] |= (1 << (bitsSinceCrc % 6));
+        }
+    }
+    
+    return result;
+}
+
 static void reliable_text_freedv_callback_rx(void *state, char chr)
 {
     fprintf(stderr, "received char: %d\n", (chr & 0x3F));
@@ -208,39 +254,22 @@ static void reliable_text_freedv_callback_rx(void *state, char chr)
     
     for (int bufferIndex = 0; bufferIndex < RELIABLE_TEXT_ENCODED_SEGMENT_LENGTH; bufferIndex++)
     {
-        char decodedStr[RELIABLE_TEXT_MAX_RAW_LENGTH + 2];
-        char fullRawStr[RELIABLE_TEXT_MAX_RAW_LENGTH + 2];
-        char* decodedStrPtr = &decodedStr[0];
-        memset(decodedStr, 0, RELIABLE_TEXT_MAX_RAW_LENGTH + 1);
-        memset(fullRawStr, 0, RELIABLE_TEXT_MAX_RAW_LENGTH + 1);
+        char decodedStr[RELIABLE_TEXT_MAX_LENGTH + 1];
+        char rawStr[RELIABLE_TEXT_BYTES_PER_ENCODED_SEGMENT + 1];
+        memset(rawStr, 0, RELIABLE_TEXT_BYTES_PER_ENCODED_SEGMENT + 1);
         
-        for (int charIndex = bufferIndex; (charIndex + RELIABLE_TEXT_ENCODED_SEGMENT_LENGTH - 1) < RELIABLE_TEXT_TOTAL_ENCODED_LENGTH + RELIABLE_TEXT_ENCODED_SEGMENT_LENGTH && strlen(fullRawStr) < RELIABLE_TEXT_MAX_RAW_LENGTH; charIndex += RELIABLE_TEXT_ENCODED_SEGMENT_LENGTH)
-        {
-            int encodedInput =
-                ((obj->inbound_pending_chars[charIndex] & 0x3F) << 18) |
-                ((obj->inbound_pending_chars[charIndex + 1] & 0x3F) << 12) |
-                ((obj->inbound_pending_chars[charIndex + 2] & 0x3F) << 6) |
-                (obj->inbound_pending_chars[charIndex + 3] & 0x3F);
-            encodedInput &= 0x7FFFFF;
-            
-            int rawOutput = golay23_decode(encodedInput) >> 11;
-            char rawStr[RELIABLE_TEXT_BYTES_PER_ENCODED_SEGMENT + 1];
-            
-            rawStr[0] = ((unsigned int)rawOutput) >> 6;
-            rawStr[1] = ((unsigned int)rawOutput) & 0x3F;
-            rawStr[2] = 0;
-            strncat(fullRawStr, rawStr, RELIABLE_TEXT_BYTES_PER_ENCODED_SEGMENT);
-            
-            convert_ota_string_to_callsign_(rawStr, decodedStrPtr, RELIABLE_TEXT_BYTES_PER_ENCODED_SEGMENT);
-            decodedStrPtr += RELIABLE_TEXT_BYTES_PER_ENCODED_SEGMENT;
-        }
+        // Only proceed if BER is low enough.
+        if (reliable_text_ldpc_decode(obj, rawStr, &obj->inbound_pending_chars[bufferIndex]) == 0) continue;
+        
+        convert_ota_string_to_callsign_(&rawStr[1], &decodedStr[1], RELIABLE_TEXT_BYTES_PER_ENCODED_SEGMENT);
+        decodedStr[0] = rawStr[0]; // CRC
         
         // Decoded string must be at least more than one character to proceed.
-        if (decodedStr[0] == 0 || decodedStr[1] == 0 || decodedStr[2] == 0) continue;
+        if (decodedStr[0] == 0 || decodedStr[1] == 0) continue;
         
         // Get expected and actual CRC.
-        unsigned char receivedCRC = convertHexStringToDigit_(&decodedStr[0]);
-        unsigned char calcCRC = calculateCRC8_(&fullRawStr[RELIABLE_TEXT_CRC_LENGTH], strlen(&fullRawStr[RELIABLE_TEXT_CRC_LENGTH]));
+        unsigned char receivedCRC = decodedStr[0];
+        unsigned char calcCRC = calculateCRC8_(&rawStr[RELIABLE_TEXT_CRC_LENGTH], strlen(&rawStr[RELIABLE_TEXT_CRC_LENGTH]));
         
         if (receivedCRC == calcCRC)
         {
@@ -254,6 +283,7 @@ static void reliable_text_freedv_callback_rx(void *state, char chr)
                 &obj->inbound_pending_chars[bufferIndex + RELIABLE_TEXT_TOTAL_ENCODED_LENGTH], 
                 RELIABLE_TEXT_ENCODED_SEGMENT_LENGTH  - bufferIndex);
             obj->current_inbound_queue_pos = &obj->inbound_pending_chars[RELIABLE_TEXT_ENCODED_SEGMENT_LENGTH - bufferIndex];
+            break;
         }
     }
 }
@@ -273,6 +303,11 @@ reliable_text_t reliable_text_create()
 {
     reliable_text_impl_t* ret = calloc(sizeof(reliable_text_impl_t), 1);
     ret->current_inbound_queue_pos = ret->inbound_pending_chars;
+    
+    // Load LDPC code into memory.
+    int code_index = ldpc_codes_find("HRA_56_56");
+    memcpy(&ret->ldpc, &ldpc_codes[code_index], sizeof(struct LDPC));
+    
     return (reliable_text_t)ret;
 }
 
@@ -297,23 +332,48 @@ void reliable_text_set_string(reliable_text_t ptr, const char* str, int strlengt
     convert_callsign_to_ota_string_(str, &tmp[RELIABLE_TEXT_CRC_LENGTH], strlength);
     
     int raw_length = strlen(&tmp[RELIABLE_TEXT_CRC_LENGTH]) + RELIABLE_TEXT_CRC_LENGTH;
-    impl->tx_text_length = raw_length * RELIABLE_TEXT_ENCODED_SEGMENT_LENGTH;
+    impl->tx_text_length = RELIABLE_TEXT_ENCODED_SEGMENT_LENGTH;
     impl->tx_text_index = 0;
     unsigned char crc = calculateCRC8_(&tmp[RELIABLE_TEXT_CRC_LENGTH], raw_length - RELIABLE_TEXT_CRC_LENGTH);
-    unsigned char crcDigit1 = crc >> 4;
-    unsigned char crcDigit2 = crc & 0xF;
-    convertDigitToASCII_(&tmp[0], crcDigit1);
-    convertDigitToASCII_(&tmp[1], crcDigit2);
-    
-    for(size_t index = 0, encodedIndex = 0; index < raw_length; index += RELIABLE_TEXT_BYTES_PER_ENCODED_SEGMENT, encodedIndex += RELIABLE_TEXT_ENCODED_SEGMENT_LENGTH)
+    tmp[0] = crc;
+
+    // Encode block of text using LDPC(112,56).
+    char ibits[LDPC_TOTAL_SIZE_BITS / 2];
+    char pbits[LDPC_TOTAL_SIZE_BITS / 2];
+    memset(ibits, 0, LDPC_TOTAL_SIZE_BITS / 2);
+    memset(pbits, 0, LDPC_TOTAL_SIZE_BITS / 2);
+    for (int index = 0; index < 8; index++)
     {
-        // Encode the character as four bytes with parity bits.
-        int inputRaw = ((tmp[index] & 0x3F) << 6) | (tmp[index+1] & 0x3F);
-        unsigned int outputEncoding = golay23_encode(inputRaw) & 0x7FFFFF;
-        impl->tx_text[encodedIndex] = (unsigned int)(outputEncoding >> 18) & 0x3F;
-        impl->tx_text[encodedIndex + 1] = (unsigned int)(outputEncoding >> 12) & 0x3F;
-        impl->tx_text[encodedIndex + 2] = (unsigned int)(outputEncoding >> 6) & 0x3F;
-        impl->tx_text[encodedIndex + 3] = (unsigned int)outputEncoding & 0x3F;
+        if (tmp[0] & (1 << index)) ibits[index] = 1;
+    }
+
+    // Pack 6 bit characters into single LDPC block.
+    for (int ibitsBitIndex = 8; ibitsBitIndex < (LDPC_TOTAL_SIZE_BITS / 2); ibitsBitIndex++)
+    {
+        int bitsFromCrc = ibitsBitIndex - 8;
+        if (tmp[1 + bitsFromCrc / 6] & (1 << (bitsFromCrc % 6)))
+            ibits[ibitsBitIndex] = 1;
+    }
+    
+    encode(&impl->ldpc, ibits, pbits);  
+    
+    // Split LDPC encoded bits into 7 bit characters due to varicode size limit.
+    memset(impl->tx_text, 0, RELIABLE_TEXT_ENCODED_SEGMENT_LENGTH);
+    for(int ibitsBitIndex = 0; ibitsBitIndex < (LDPC_TOTAL_SIZE_BITS / 2); ibitsBitIndex++)
+    {
+        if (ibits[ibitsBitIndex])
+        {
+            impl->tx_text[ibitsBitIndex / 7] |= (1 << (ibitsBitIndex % 7));
+        }
+    }
+    
+    // Split parity bits into 7 bit characters as well and append to the end.
+    for(int pbitsBitIndex = 0; pbitsBitIndex < (LDPC_TOTAL_SIZE_BITS / 2); pbitsBitIndex++)
+    {
+        if (pbits[pbitsBitIndex])
+        {
+            impl->tx_text[(LDPC_TOTAL_SIZE_BITS / 2) / 7 + (pbitsBitIndex / 7)] |= (1 << (pbitsBitIndex % 7));
+        }
     }
 }
 
