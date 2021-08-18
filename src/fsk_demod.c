@@ -419,8 +419,7 @@ int main(int argc,char *argv[]){
             fwrite(bitbuf,sizeof(uint8_t),fsk->Nbits,fout);
         }
 
-        if(fin == stdin || fout == stdin){
-            fflush(fin);
+        if(fout == stdin){
             fflush(fout);
         }
     } /* while(fread ...... */

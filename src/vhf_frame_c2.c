@@ -88,8 +88,7 @@ int main(int argc,char *argv[]){
         fvhff_frame_bits(frame_fmt,bitbuf,c2buf,NULL,NULL);
         fwrite(bitbuf,sizeof(uint8_t),fsize,fout);
         
-        if(fin == stdin || fout == stdin){
-            fflush(fin);
+        if(fout == stdin){
             fflush(fout);
         }
     }
