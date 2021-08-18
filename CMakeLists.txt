@@ -787,43 +787,43 @@ endif()
     # -------------------------------------------------------------------------
     add_test(NAME test_freedv_reliable_text_ideal_1600
           COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
-                         ./freedv_tx 1600 ../../raw/ve9qrp_10s.raw - --reliabletext AB1CDEF > 1600_reliable_raw;
-                         ./freedv_rx 1600 1600_reliable_raw /dev/null --txtrx 1600_reliable.txt --reliabletext;
+                         ./freedv_tx 1600 ../../raw/ve9qrp.raw - --reliabletext AB1CDEF > 1600_reliable.raw 2>/dev/null;
+                         ./freedv_rx 1600 1600_reliable.raw /dev/null --txtrx 1600_reliable.txt --reliabletext 2>/dev/null;
                          cat 1600_reliable.txt")
           set_tests_properties(test_freedv_reliable_text_ideal_1600 PROPERTIES PASS_REGULAR_EXPRESSION "AB1CDEF")
 
     add_test(NAME test_freedv_reliable_text_ideal_700D
        COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
-                      ./freedv_tx 700D ../../raw/ve9qrp_10s.raw - --reliabletext AB1CDEF > 700D_reliable_raw;
-                      ./freedv_rx 700D 700D_reliable_raw /dev/null --txtrx 700D_reliable.txt --reliabletext;
+                      ./freedv_tx 700D ../../raw/ve9qrp.raw - --reliabletext AB1CDEF --txbpf 1 --clip 1 > 700D_reliable.raw 2>/dev/null;
+                      ./freedv_rx 700D 700D_reliable.raw /dev/null --txtrx 700D_reliable.txt --reliabletext 2>/dev/null;
                       cat 700D_reliable.txt")
        set_tests_properties(test_freedv_reliable_text_ideal_700D PROPERTIES PASS_REGULAR_EXPRESSION "AB1CDEF")
                           
     add_test(NAME test_freedv_reliable_text_ideal_700E
         COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
-                       ./freedv_tx 700E ../../raw/ve9qrp_10s.raw - --reliabletext AB1CDEF > 700E_reliable_raw;
-                       ./freedv_rx 700E 700E_reliable_raw /dev/null --txtrx 700E_reliable.txt --reliabletext;
+                       ./freedv_tx 700E ../../raw/ve9qrp.raw - --reliabletext AB1CDEF --txbpf 1 --clip 1 > 700E_reliable.raw 2>/dev/null;
+                       ./freedv_rx 700E 700E_reliable.raw /dev/null --txtrx 700E_reliable.txt --reliabletext 2>/dev/null;
                        cat 700E_reliable.txt")
         set_tests_properties(test_freedv_reliable_text_ideal_700E PROPERTIES PASS_REGULAR_EXPRESSION "AB1CDEF")
 
    add_test(NAME test_freedv_reliable_text_awgn_1600
          COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
-                        ./freedv_tx 1600 ../../raw/ve9qrp_10s.raw - --reliabletext AB1CDEF | ./cohpsk_ch - - -27 --Fs 8000 -f -5 > 1600_reliable_raw;
-                        ./freedv_rx 1600 1600_reliable_raw /dev/null --txtrx 1600_reliable.txt --reliabletext;
+                        ./freedv_tx 1600 ../../raw/ve9qrp.raw - --reliabletext AB1CDEF | ./cohpsk_ch - - -27 --Fs 8000 -f -5 > 1600_reliable.raw 2>/dev/null;
+                        ./freedv_rx 1600 1600_reliable.raw /dev/null --txtrx 1600_reliable.txt --reliabletext 2>/dev/null;
                         cat 1600_reliable.txt")
          set_tests_properties(test_freedv_reliable_text_awgn_1600 PROPERTIES PASS_REGULAR_EXPRESSION "AB1CDEF")
 
    add_test(NAME test_freedv_reliable_text_awgn_700D
       COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
-                     ./freedv_tx 700D ../../raw/ve9qrp_10s.raw - --reliabletext AB1CDEF | ./cohpsk_ch - - -18 --Fs 8000 -f -5 > 700D_reliable_raw;
-                     ./freedv_rx 700D 700D_reliable_raw /dev/null --txtrx 700D_reliable.txt --reliabletext;
+                     ./freedv_tx 700D ../../raw/ve9qrp.raw - --reliabletext AB1CDEF --txbpf 1 --clip 1 | ./cohpsk_ch - - -15 --Fs 8000 -f -5 > 700D_reliable.raw 2>/dev/null;
+                     ./freedv_rx 700D 700D_reliable.raw /dev/null --txtrx 700D_reliable.txt --reliabletext 2>/dev/null;
                      cat 700D_reliable.txt")
       set_tests_properties(test_freedv_reliable_text_awgn_700D PROPERTIES PASS_REGULAR_EXPRESSION "AB1CDEF")
   
    add_test(NAME test_freedv_reliable_text_awgn_700E
        COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
-                      ./freedv_tx 700E ../../raw/ve9qrp_10s.raw - --reliabletext AB1CDEF | ./cohpsk_ch - - -22 --Fs 8000 -f -5 > 700E_reliable_raw;
-                      ./freedv_rx 700E 700E_reliable_raw /dev/null --txtrx 700E_reliable.txt --reliabletext;
+                      ./freedv_tx 700E ../../raw/ve9qrp.raw - --reliabletext AB1CDEF --txbpf 1 --clip 1 | ./cohpsk_ch - - -18 --Fs 8000 -f -5 > 700E_reliable.raw 2>/dev/null;
+                      ./freedv_rx 700E 700E_reliable.raw /dev/null --txtrx 700E_reliable.txt --reliabletext 2>/dev/null;
                       cat 700E_reliable.txt")
        set_tests_properties(test_freedv_reliable_text_awgn_700E PROPERTIES PASS_REGULAR_EXPRESSION "AB1CDEF")
                           
