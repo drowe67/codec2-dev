@@ -25,10 +25,14 @@
 #include <string.h>
 #include <ctype.h>
 #include "freedv_api.h"
+#include "freedv_api_internal.h"
 #include "reliable_text.h"
 #include "ldpc_codes.h"
 
 #define LDPC_TOTAL_SIZE_BITS (112)
+
+#define RELIABLE_TEXT_UW_LENGTH_BITS (16)
+#define RELIABLE_TEXT_MAX_ZEROES_IN_UW (4)
 
 #define RELIABLE_TEXT_MAX_LENGTH (8)
 #define RELIABLE_TEXT_CRC_LENGTH (1)
@@ -47,12 +51,14 @@ typedef struct
 {
     on_text_rx_t text_rx_callback;
     
-    char tx_text[RELIABLE_TEXT_TOTAL_ENCODED_LENGTH];
+    char tx_text[LDPC_TOTAL_SIZE_BITS + RELIABLE_TEXT_UW_LENGTH_BITS];
     int tx_text_index;
     int tx_text_length;
     
-    char inbound_pending_chars[RELIABLE_TEXT_TOTAL_ENCODED_LENGTH + RELIABLE_TEXT_ENCODED_SEGMENT_LENGTH];
-    char* current_inbound_queue_pos;
+    char inbound_pending_bits[LDPC_TOTAL_SIZE_BITS];
+    int bit_index;
+    int uw_bits_valid;
+    unsigned short uw_value;
     int has_successfully_decoded;
     
     struct LDPC ldpc;
@@ -154,18 +160,18 @@ static int reliable_text_ldpc_decode(reliable_text_impl_t* obj, char* dest, char
     
     for (int bitIndex = 0; bitIndex < LDPC_TOTAL_SIZE_BITS; bitIndex++)
     {
-        // Map to value expected by sd_to_llr().
-        int bit = (src[bitIndex / 7] & (1 << (bitIndex % 7))) != 0;
-        incomingData[bitIndex] = 1.0 - 2.0 * bit;
+        // Map to value expected by sd_to_llr()
+        incomingData[bitIndex] = 1.0 - 2.0 * src[bitIndex];
     }
     
     sd_to_llr(llr, incomingData, LDPC_TOTAL_SIZE_BITS);
     run_ldpc_decoder(&obj->ldpc, output, llr, &parityCheckCount);
     
-    // Data is valid if BER < 0.2.
+    // Data is valid if BER < 0.2
     float ber_est = (float)(obj->ldpc.NumberParityBits - parityCheckCount)/obj->ldpc.NumberParityBits;
     int result = (ber_est < 0.2);
         
+    //fprintf(stderr, "BER est: %f\n", ber_est);
     if (result)
     {        
         memset(dest, 0, RELIABLE_TEXT_BYTES_PER_ENCODED_SEGMENT);
@@ -188,7 +194,7 @@ static int reliable_text_ldpc_decode(reliable_text_impl_t* obj, char* dest, char
 
 static void reliable_text_freedv_callback_rx(void *state, char chr)
 {
-    fprintf(stderr, "received char: %d\n", (chr & 0x3F));
+    //fprintf(stderr, "received char: %d\n", (chr & 0x3F));
     
     reliable_text_impl_t* obj = (reliable_text_impl_t*)state;
         
@@ -198,53 +204,63 @@ static void reliable_text_freedv_callback_rx(void *state, char chr)
         return;
     }
     
-    // Queue up received character
-    int increment_queue_pos = 1;
-    if (obj->current_inbound_queue_pos == &obj->inbound_pending_chars[RELIABLE_TEXT_TOTAL_ENCODED_LENGTH + RELIABLE_TEXT_ENCODED_SEGMENT_LENGTH - 1])
+    // Determine whether we're still syncing with UW.
+    if (!obj->uw_bits_valid)
     {
-        // Shift all received characters left by 1.
-        memmove(obj->inbound_pending_chars, &obj->inbound_pending_chars[1], RELIABLE_TEXT_TOTAL_ENCODED_LENGTH + RELIABLE_TEXT_ENCODED_SEGMENT_LENGTH - 1);
-        increment_queue_pos = 0;
-    }
-    *obj->current_inbound_queue_pos = chr;
-    if (increment_queue_pos) 
-    {
-        obj->current_inbound_queue_pos++;
-    }
-    
-    for (int bufferIndex = 0; bufferIndex < RELIABLE_TEXT_ENCODED_SEGMENT_LENGTH; bufferIndex++)
-    {
-        char decodedStr[RELIABLE_TEXT_MAX_LENGTH + 1];
-        char rawStr[RELIABLE_TEXT_BYTES_PER_ENCODED_SEGMENT + 1];
-        memset(rawStr, 0, RELIABLE_TEXT_BYTES_PER_ENCODED_SEGMENT + 1);
+        obj->bit_index++;
+        obj->uw_value <<= 1;
+        obj->uw_value |= chr;
         
-        // Only proceed if BER is low enough.
-        if (reliable_text_ldpc_decode(obj, rawStr, &obj->inbound_pending_chars[bufferIndex]) == 0) continue;
-        
-        convert_ota_string_to_callsign_(&rawStr[1], &decodedStr[1], RELIABLE_TEXT_BYTES_PER_ENCODED_SEGMENT);
-        decodedStr[0] = rawStr[0]; // CRC
-        
-        // Decoded string must be at least more than one character to proceed.
-        if (decodedStr[0] == 0 || decodedStr[1] == 0) continue;
-        
-        // Get expected and actual CRC.
-        unsigned char receivedCRC = decodedStr[0];
-        unsigned char calcCRC = calculateCRC8_(&rawStr[RELIABLE_TEXT_CRC_LENGTH], strlen(&rawStr[RELIABLE_TEXT_CRC_LENGTH]));
-        
-        if (receivedCRC == calcCRC)
+        // Count number of errors in UW.
+        unsigned short xor_uw = obj->uw_value ^ 0xFFFF;
+        int num_zeroes = 0;
+        for (int bit = 0; bit < RELIABLE_TEXT_UW_LENGTH_BITS; bit++)
         {
-            // We got a valid string. Call assigned callback.
-            obj->has_successfully_decoded = 1;
-            obj->text_rx_callback(&decodedStr[RELIABLE_TEXT_CRC_LENGTH], strlen(&decodedStr[RELIABLE_TEXT_CRC_LENGTH]));
+            if (xor_uw & 0x8000)
+            {
+                num_zeroes++;
+            }
+            xor_uw <<= 1;
+        }
+        obj->uw_bits_valid = obj->bit_index >= RELIABLE_TEXT_UW_LENGTH_BITS && num_zeroes <= RELIABLE_TEXT_MAX_ZEROES_IN_UW;
+        obj->bit_index = obj->uw_bits_valid ? 0 : obj->bit_index;
+        //fprintf(stderr, "uw: %x, uw_valid: %d, bit_index: %d, num_zeroes: %d\n", obj->uw_value, obj->uw_bits_valid, obj->bit_index, num_zeroes);
+    }
+    else if (obj->bit_index < LDPC_TOTAL_SIZE_BITS)
+    {
+        // UW received; append bits in temporary buffer until we have enough to decode.
+        obj->inbound_pending_bits[obj->bit_index++] = chr;
+        
+        if (obj->bit_index == LDPC_TOTAL_SIZE_BITS)
+        {
+            // We have all the bits we need, so we're ready to decode.
+            char decodedStr[RELIABLE_TEXT_MAX_LENGTH + 1];
+            char rawStr[RELIABLE_TEXT_BYTES_PER_ENCODED_SEGMENT + 1];
+            memset(rawStr, 0, RELIABLE_TEXT_BYTES_PER_ENCODED_SEGMENT + 1);
             
-            // Resync so that byte 0 of the queue is the data immediately after the packet we found.
-            memmove(
-                &obj->inbound_pending_chars[0],
-                &obj->inbound_pending_chars[bufferIndex + RELIABLE_TEXT_TOTAL_ENCODED_LENGTH], 
-                RELIABLE_TEXT_ENCODED_SEGMENT_LENGTH  - bufferIndex);
-            obj->current_inbound_queue_pos = &obj->inbound_pending_chars[RELIABLE_TEXT_ENCODED_SEGMENT_LENGTH - bufferIndex];
-            memset(obj->current_inbound_queue_pos, 0, bufferIndex + RELIABLE_TEXT_BYTES_PER_ENCODED_SEGMENT);
-            break;
+            if (reliable_text_ldpc_decode(obj, rawStr, &obj->inbound_pending_bits[0]) != 0)
+            {
+                // BER is under limits.
+                convert_ota_string_to_callsign_(&rawStr[RELIABLE_TEXT_CRC_LENGTH], &decodedStr[RELIABLE_TEXT_CRC_LENGTH], RELIABLE_TEXT_BYTES_PER_ENCODED_SEGMENT);
+                decodedStr[0] = rawStr[0]; // CRC
+        
+                // Get expected and actual CRC.
+                unsigned char receivedCRC = decodedStr[0];
+                unsigned char calcCRC = calculateCRC8_(&rawStr[RELIABLE_TEXT_CRC_LENGTH], strlen(&rawStr[RELIABLE_TEXT_CRC_LENGTH]));
+        
+                //fprintf(stderr, "rxCRC: %d, calcCRC: %d, decodedStr: %s\n", receivedCRC, calcCRC, &decodedStr[RELIABLE_TEXT_CRC_LENGTH]);
+                if (receivedCRC == calcCRC)
+                {
+                    // We got a valid string. Call assigned callback.
+                    obj->has_successfully_decoded = 1;
+                    obj->text_rx_callback(&decodedStr[RELIABLE_TEXT_CRC_LENGTH], strlen(&decodedStr[RELIABLE_TEXT_CRC_LENGTH]));
+                }
+            }
+            
+            // Reset UW decoding for next callsign.
+            obj->bit_index = 0;
+            obj->uw_bits_valid = 0;
+            obj->uw_value = 0;
         }
     }
 }
@@ -254,16 +270,15 @@ static char reliable_text_freedv_callback_tx(void *state)
     reliable_text_impl_t* obj = (reliable_text_impl_t*)state;
     
     char ret = obj->tx_text[obj->tx_text_index];
-    obj->tx_text_index = (obj->tx_text_index + 1) % (obj->tx_text_length + 1); // to ensure the null at the end is sent
+    obj->tx_text_index = (obj->tx_text_index + 1) % (obj->tx_text_length);
     
-    fprintf(stderr, "sent char: %d\n", ret);
+    //fprintf(stderr, "sent char: %d\n", ret);
     return ret;
 }
 
 reliable_text_t reliable_text_create()
 {
     reliable_text_impl_t* ret = calloc(sizeof(reliable_text_impl_t), 1);
-    ret->current_inbound_queue_pos = ret->inbound_pending_chars;
     
     // Load LDPC code into memory.
     int code_index = ldpc_codes_find("HRA_56_56");
@@ -280,7 +295,9 @@ void reliable_text_destroy(reliable_text_t ptr)
 void reliable_text_reset(reliable_text_t ptr)
 {
     reliable_text_impl_t* impl = (reliable_text_impl_t*)ptr;
-    impl->current_inbound_queue_pos = impl->inbound_pending_chars;
+    impl->bit_index = 0;
+    impl->uw_bits_valid = 0;
+    impl->uw_value = 0;
     impl->has_successfully_decoded = 0;
 }
 
@@ -293,7 +310,7 @@ void reliable_text_set_string(reliable_text_t ptr, const char* str, int strlengt
     convert_callsign_to_ota_string_(str, &tmp[RELIABLE_TEXT_CRC_LENGTH], strlength);
     
     int raw_length = strlen(&tmp[RELIABLE_TEXT_CRC_LENGTH]) + RELIABLE_TEXT_CRC_LENGTH;
-    impl->tx_text_length = RELIABLE_TEXT_ENCODED_SEGMENT_LENGTH;
+    impl->tx_text_length = RELIABLE_TEXT_UW_LENGTH_BITS + LDPC_TOTAL_SIZE_BITS;
     impl->tx_text_index = 0;
     unsigned char crc = calculateCRC8_(&tmp[RELIABLE_TEXT_CRC_LENGTH], raw_length - RELIABLE_TEXT_CRC_LENGTH);
     tmp[0] = crc;
@@ -312,29 +329,30 @@ void reliable_text_set_string(reliable_text_t ptr, const char* str, int strlengt
     for (int ibitsBitIndex = 8; ibitsBitIndex < (LDPC_TOTAL_SIZE_BITS / 2); ibitsBitIndex++)
     {
         int bitsFromCrc = ibitsBitIndex - 8;
-        if (tmp[1 + bitsFromCrc / 6] & (1 << (bitsFromCrc % 6)))
+        unsigned int byte = tmp[RELIABLE_TEXT_CRC_LENGTH + bitsFromCrc / 6];
+        unsigned int bitToCheck = bitsFromCrc % 6;
+        //fprintf(stderr, "bit index: %d, byte: %x, bit to check: %d, result: %d\n", ibitsBitIndex, byte, bitToCheck, (byte & (1 << bitToCheck)) != 0);
+        
+        if (byte & (1 << bitToCheck))
+        {
             ibits[ibitsBitIndex] = 1;
+        }
     }
     
     encode(&impl->ldpc, ibits, pbits);  
     
-    // Split LDPC encoded bits into 7 bit characters due to varicode size limit.
-    memset(impl->tx_text, 0, RELIABLE_TEXT_ENCODED_SEGMENT_LENGTH);
+    // Split LDPC encoded bits into individual bits, with the first RELIABLE_TEXT_UW_LENGTH_BITS being UW.
+    memset(impl->tx_text, 1, RELIABLE_TEXT_UW_LENGTH_BITS);
+    memset(impl->tx_text + RELIABLE_TEXT_UW_LENGTH_BITS, 0, LDPC_TOTAL_SIZE_BITS);
     for(int ibitsBitIndex = 0; ibitsBitIndex < (LDPC_TOTAL_SIZE_BITS / 2); ibitsBitIndex++)
     {
-        if (ibits[ibitsBitIndex])
-        {
-            impl->tx_text[ibitsBitIndex / 7] |= (1 << (ibitsBitIndex % 7));
-        }
+        impl->tx_text[RELIABLE_TEXT_UW_LENGTH_BITS + ibitsBitIndex] = ibits[ibitsBitIndex];
     }
     
-    // Split parity bits into 7 bit characters as well and append to the end.
+    // Split parity bits into individual bits as well and append to the end.
     for(int pbitsBitIndex = 0; pbitsBitIndex < (LDPC_TOTAL_SIZE_BITS / 2); pbitsBitIndex++)
     {
-        if (pbits[pbitsBitIndex])
-        {
-            impl->tx_text[(LDPC_TOTAL_SIZE_BITS / 2) / 7 + (pbitsBitIndex / 7)] |= (1 << (pbitsBitIndex % 7));
-        }
+        impl->tx_text[RELIABLE_TEXT_UW_LENGTH_BITS + (LDPC_TOTAL_SIZE_BITS / 2) + pbitsBitIndex] = pbits[pbitsBitIndex];
     }
 }
 
@@ -344,4 +362,7 @@ void reliable_text_use_with_freedv(reliable_text_t ptr, struct freedv* fdv, on_t
     
     impl->text_rx_callback = text_rx_fn;
     freedv_set_callback_txt(fdv, reliable_text_freedv_callback_rx, reliable_text_freedv_callback_tx, impl);
+    
+    // Use code 3 for varicode en/decode and handle all framing at this level.
+    varicode_set_code_num(&fdv->varicode_dec_states, 3);
 }

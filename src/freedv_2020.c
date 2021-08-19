@@ -139,7 +139,7 @@ void freedv_comptx_2020(struct freedv *f, COMP mod_out[]) {
             char s[2];
             if (f->freedv_get_next_tx_char != NULL) {
                 s[0] = (*f->freedv_get_next_tx_char)(f->callback_state);
-                f->nvaricode_bits = varicode_encode(f->tx_varicode_bits, s, VARICODE_MAX_BITS, 1, 1);
+                f->nvaricode_bits = varicode_encode(f->tx_varicode_bits, s, VARICODE_MAX_BITS, 1, f->varicode_dec_states.code_num);
                 f->varicode_bit_index = 0;
             }
         }

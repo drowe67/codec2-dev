@@ -149,21 +149,33 @@ int varicode_encode2(short varicode_out[], char ascii_in[], int max_out, int n_i
     return n_out;
 }
 
+/* Code 3 simply allows the modem to pass incoming/outgoing bits to/from higher levels
+   in the code. */
+int varicode_encode3(short varicode_out[], char ascii_in[], int max_out, int n_in)
+{
+    // We only support one bit at a time.
+    assert(max_out >= 1 && n_in == 1);
+    
+    varicode_out[0] = ascii_in[0] != 0;
+    return 1;
+}
 
 int varicode_encode(short varicode_out[], char ascii_in[], int max_out, int n_in, int code_num) {
 
-    assert((code_num ==1) || (code_num ==2));
+    assert((code_num == 1) || (code_num == 2) || (code_num == 3));
 
     if (code_num == 1)
         return varicode_encode1(varicode_out, ascii_in, max_out, n_in);
+    else if (code_num == 2)
+        return varicode_encode2(varicode_out, ascii_in, max_out, n_in);
     else
-       return  varicode_encode2(varicode_out, ascii_in, max_out, n_in);
+        return varicode_encode3(varicode_out, ascii_in, max_out, n_in);
 }
 
 
 void varicode_decode_init(struct VARICODE_DEC *dec_states, int code_num)
 {
-    assert((code_num ==1) || (code_num == 2));
+    assert((code_num == 1) || (code_num == 2) || (code_num == 3));
 
     dec_states->state = 0;
     dec_states->n_zeros = 0;
@@ -177,7 +189,7 @@ void varicode_decode_init(struct VARICODE_DEC *dec_states, int code_num)
 
 void varicode_set_code_num(struct VARICODE_DEC *dec_states, int code_num)
 {
-    assert((code_num == 1) || (code_num == 2));
+    assert((code_num == 1) || (code_num == 2) || (code_num == 3));
     dec_states->code_num = code_num;
 }
 
@@ -355,12 +367,22 @@ int varicode_decode2(struct VARICODE_DEC *dec_states, char ascii_out[], short va
     return n_out;
 }
 
+int varicode_decode3(struct VARICODE_DEC *dec_states, char ascii_out[], short varicode_in[], int max_out, int n_in) 
+{
+    // We only handle one bit at a time.
+    assert(max_out == 1 && n_in == 1);
+    
+    ascii_out[0] = varicode_in[0] != 0;
+    return 1;
+}
 
 int varicode_decode(struct VARICODE_DEC *dec_states, char ascii_out[], short varicode_in[], int max_out, int n_in) {
     if (dec_states->code_num == 1)
         return varicode_decode1(dec_states, ascii_out, varicode_in, max_out, n_in);
-    else
+    else if (dec_states->code_num == 2)
         return varicode_decode2(dec_states, ascii_out, varicode_in, max_out, n_in);
+    else
+        return varicode_decode3(dec_states, ascii_out, varicode_in, max_out, n_in);
 }
 
 
