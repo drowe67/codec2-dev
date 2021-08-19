@@ -152,11 +152,6 @@ int main(int argc, char *argv[])
 	}
 	else
 	    printf("-");
-
-	/* if this is in a pipeline, we probably don't want the usual
-	   buffering to occur */
-
-        if (fin == stdin) fflush(stdin);
     }
 
     fclose(fin);

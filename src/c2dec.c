@@ -363,14 +363,13 @@ int main(int argc, char *argv[])
         if (f_ratek != NULL)
             ret = fread(user_ratek, sizeof(float), K, f_ratek);
         
-	codec2_decode_ber(codec2, buf, bits, ber_est);
- 	fwrite(buf, sizeof(short), nsam, fout);
+    	codec2_decode_ber(codec2, buf, bits, ber_est);
+     	fwrite(buf, sizeof(short), nsam, fout);
 
-	//if this is in a pipeline, we probably don't want the usual
+	    //if this is in a pipeline, we probably don't want the usual
         //buffering to occur
 
         if (fout == stdout) fflush(stdout);
-        if (fin == stdin) fflush(stdin);
 
         if (softdec) {
             ret = (fread(softdec_bits, sizeof(float), nbit, fin) == (size_t)nbit);

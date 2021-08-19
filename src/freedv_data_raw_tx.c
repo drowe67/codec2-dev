@@ -301,7 +301,6 @@ int main(int argc, char *argv[]) {
             
             /* if using pipes we don't want the usual buffering to occur */
             if (fout == stdout) fflush(stdout);
-            if (fin == stdin) fflush(stdin);
 
             frames++;
             // streaming mode with testframes, break out of loop after we have sent Nframes

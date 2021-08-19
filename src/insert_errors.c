@@ -77,7 +77,6 @@ int main(int argc, char *argv[])
         }
         fwrite(&abit, sizeof(char), 1, fout);
         if (fout == stdout) fflush(stdout);
-        if (fin == stdin) fflush(stdin);
     }
 
     fclose(fin);
