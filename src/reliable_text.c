@@ -162,7 +162,7 @@ static int reliable_text_ldpc_decode(reliable_text_impl_t* obj, char* dest, char
     sd_to_llr(llr, incomingData, LDPC_TOTAL_SIZE_BITS);
     run_ldpc_decoder(&obj->ldpc, output, llr, &parityCheckCount);
     
-    // Data is valid if BER < 0.1.
+    // Data is valid if BER < 0.2.
     float ber_est = (float)(obj->ldpc.NumberParityBits - parityCheckCount)/obj->ldpc.NumberParityBits;
     int result = (ber_est < 0.2);
         
@@ -243,6 +243,7 @@ static void reliable_text_freedv_callback_rx(void *state, char chr)
                 &obj->inbound_pending_chars[bufferIndex + RELIABLE_TEXT_TOTAL_ENCODED_LENGTH], 
                 RELIABLE_TEXT_ENCODED_SEGMENT_LENGTH  - bufferIndex);
             obj->current_inbound_queue_pos = &obj->inbound_pending_chars[RELIABLE_TEXT_ENCODED_SEGMENT_LENGTH - bufferIndex];
+            memset(obj->current_inbound_queue_pos, 0, bufferIndex + RELIABLE_TEXT_BYTES_PER_ENCODED_SEGMENT);
             break;
         }
     }
