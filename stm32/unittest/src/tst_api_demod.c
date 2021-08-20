@@ -132,6 +132,11 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
     config_mode = config[0] - '0';
+    if (config_mode == 8)
+    {
+        // For the purposes of the UT system, '8' is 700E.
+        config_mode = FREEDV_MODE_700E;
+    }
     config_testframes = config[1] - '0';
     config_verbose = config[6] - '0';
     //config_profile = config[7] - '0';
@@ -210,7 +215,7 @@ int main(int argc, char *argv[]) {
         int Terrs = freedv_get_total_bit_errors(freedv);
         fprintf(stderr, "BER......: %5.4f Tbits: %5d Terrs: %5d\n",
 	    (double)Terrs/Tbits, Tbits, Terrs);
-        if (config_mode == FREEDV_MODE_700D) {
+        if (config_mode == FREEDV_MODE_700D || config_mode == FREEDV_MODE_700E) {
             int Tbits_coded = freedv_get_total_bits_coded(freedv);
             int Terrs_coded = freedv_get_total_bit_errors_coded(freedv);
             fprintf(stderr, "Coded BER: %5.4f Tbits: %5d Terrs: %5d\n",

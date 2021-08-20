@@ -223,6 +223,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     } else {
         /* Use the users values */
 
+
         strcpy(ofdm->mode, config->mode);
         ofdm->nc = config->nc;                    /* Number of carriers */
         ofdm->np = config->np;                    /* Number of modem Frames per Packet */
@@ -251,6 +252,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
         ofdm->clip_en = config->clip_en;
         memcpy(ofdm->tx_uw, config->tx_uw, ofdm->nuwbits);
         ofdm->data_mode = config->data_mode;
+
     }
 
     ofdm->rs = (1.0f / ofdm->ts);                 /* Modulation Symbol Rate */
@@ -1918,17 +1920,15 @@ void ofdm_sync_state_machine_data_streaming(struct OFDM *ofdm, uint8_t *rx_uw) {
     }
 
     if (ofdm->sync_state == trial) {
-        if (ofdm->sync_state == trial) {
-            if (ofdm->uw_errors < ofdm->bad_uw_errors) {
-                next_state = synced;
-                ofdm->packet_count = 0;
-                ofdm->modem_frame = ofdm->nuwframes;
-            } else {
-                ofdm->sync_counter++;
+        if (ofdm->uw_errors < ofdm->bad_uw_errors) {
+            next_state = synced;
+            ofdm->packet_count = 0;
+            ofdm->modem_frame = ofdm->nuwframes;
+        } else {
+            ofdm->sync_counter++;
 
-                if (ofdm->sync_counter > ofdm->np) {
-                    next_state = search;
-                }
+            if (ofdm->sync_counter > ofdm->np) {
+                next_state = search;
             }
         }
     }
