@@ -166,8 +166,6 @@ static int reliable_text_ldpc_decode(reliable_text_impl_t* obj, char* dest)
     
     if (obj->bit_index == obj->sym_index * 2)
     {
-        //fprintf(stderr, "using SD\n");
-        
         // Use soft decision for the LDPC decoder.
         float EsNo = 3.0; // note: constant from freedv_700.c
         
@@ -227,6 +225,22 @@ static void reliable_text_freedv_callback_rx_sym(void *state, _Complex float sym
     //fprintf(stderr, "Got sym: %f, amp: %f\n", sym, amp);
 }
 
+static void check_uw(reliable_text_impl_t* obj)
+{
+    // Count number of errors in UW.
+    unsigned short xor_uw = obj->uw_value ^ 0xFFFF;
+    int num_zeroes = 0;
+    for (int bit = 0; bit < RELIABLE_TEXT_UW_LENGTH_BITS; bit++)
+    {
+        if (xor_uw & 0x8000)
+        {
+            num_zeroes++;
+        }
+        xor_uw <<= 1;
+    }
+    obj->uw_bits_valid = obj->bit_index >= RELIABLE_TEXT_UW_LENGTH_BITS && num_zeroes <= RELIABLE_TEXT_MAX_ZEROES_IN_UW;
+}
+
 static void reliable_text_freedv_callback_rx(void *state, char chr)
 {
     //fprintf(stderr, "received char: %d\n", (chr & 0x3F));
@@ -246,18 +260,7 @@ static void reliable_text_freedv_callback_rx(void *state, char chr)
         obj->uw_value <<= 1;
         obj->uw_value |= chr;
         
-        // Count number of errors in UW.
-        unsigned short xor_uw = obj->uw_value ^ 0xFFFF;
-        int num_zeroes = 0;
-        for (int bit = 0; bit < RELIABLE_TEXT_UW_LENGTH_BITS; bit++)
-        {
-            if (xor_uw & 0x8000)
-            {
-                num_zeroes++;
-            }
-            xor_uw <<= 1;
-        }
-        obj->uw_bits_valid = obj->bit_index >= RELIABLE_TEXT_UW_LENGTH_BITS && num_zeroes <= RELIABLE_TEXT_MAX_ZEROES_IN_UW;
+        check_uw(obj);
         obj->bit_index = obj->uw_bits_valid ? 0 : obj->bit_index;
         obj->sym_index = 0; // Symbols are ignored until we've locked onto the UW.
         
@@ -267,6 +270,8 @@ static void reliable_text_freedv_callback_rx(void *state, char chr)
     }
     else if (obj->bit_index < LDPC_TOTAL_SIZE_BITS)
     {
+        //fprintf(stderr, "bit index: %d, chr: %d\n", obj->bit_index, chr);
+        
         // UW received; append bits in temporary buffer until we have enough to decode.
         obj->inbound_pending_bits[obj->bit_index++] = chr;
         
@@ -294,15 +299,39 @@ static void reliable_text_freedv_callback_rx(void *state, char chr)
                     obj->has_successfully_decoded = 1;
                     obj->text_rx_callback(&decodedStr[RELIABLE_TEXT_CRC_LENGTH], strlen(&decodedStr[RELIABLE_TEXT_CRC_LENGTH]));
                 }
+                
+                // Reset UW decoding for next callsign.
+                obj->bit_index = 0;
+                obj->sym_index = 0;
+                obj->uw_bits_valid = 0;
+                obj->uw_value = 0;
+                memset(&obj->inbound_pending_syms, 0, sizeof(complex float)*LDPC_TOTAL_SIZE_BITS/2);
+                memset(&obj->inbound_pending_amps, 0, sizeof(float)*LDPC_TOTAL_SIZE_BITS/2);
             }
-            
-            // Reset UW decoding for next callsign.
-            obj->bit_index = 0;
-            obj->sym_index = 0;
-            obj->uw_bits_valid = 0;
-            obj->uw_value = 0;
-            memset(&obj->inbound_pending_syms, 0, sizeof(complex float)*LDPC_TOTAL_SIZE_BITS/2);
-            memset(&obj->inbound_pending_amps, 0, sizeof(float)*LDPC_TOTAL_SIZE_BITS/2);
+            else
+            {
+                // It's possible that we didn't actually sync on UW after all.
+                // Shift existing UW back 1 bit (or 2 if OFDM), add the bit(s)
+                // from the data portion to UW, and try again next bit(s) we receive.
+                do 
+                {
+                    obj->uw_value <<= 1;
+                    obj->bit_index--;
+                    obj->uw_value |= obj->inbound_pending_bits[0];
+                    memmove(&obj->inbound_pending_bits[0], &obj->inbound_pending_bits[1], LDPC_TOTAL_SIZE_BITS - 1);
+                    if (obj->sym_index > 0)
+                    {
+                        obj->uw_value <<= 1;
+                        obj->uw_value |= obj->inbound_pending_bits[0];
+                        memmove(&obj->inbound_pending_bits[0], &obj->inbound_pending_bits[1], LDPC_TOTAL_SIZE_BITS - 1);
+                        memmove(&obj->inbound_pending_syms[0], &obj->inbound_pending_syms[1], sizeof(_Complex float)*(LDPC_TOTAL_SIZE_BITS/2 - 1));
+                        memmove(&obj->inbound_pending_amps[0], &obj->inbound_pending_amps[1], sizeof(float)*(LDPC_TOTAL_SIZE_BITS/2 - 1));
+                        obj->bit_index--;
+                        obj->sym_index--;
+                    }
+                    check_uw(obj);
+                } while (!obj->uw_bits_valid && obj->bit_index > 0);
+            }
         }
     }
 }
