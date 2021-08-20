@@ -442,7 +442,8 @@ int freedv_comp_short_rx_ofdm(struct freedv *f, void *demod_in_8kHz, int demod_i
 
         if (ofdm->modem_frame == (ofdm->np-1)) {
             /* we have received enough modem frames to complete packet and run LDPC decoder */
-            ofdm_disassemble_qpsk_modem_packet(ofdm, rx_syms, rx_amps, payload_syms, payload_amps, txt_bits);
+            int txt_sym_index = 0;
+            ofdm_disassemble_qpsk_modem_packet_with_text_amps(ofdm, rx_syms, rx_amps, payload_syms, payload_amps, txt_bits, &txt_sym_index);
 
             COMP payload_syms_de[Npayloadsymsperpacket];
             float payload_amps_de[Npayloadsymsperpacket];
@@ -494,6 +495,11 @@ int freedv_comp_short_rx_ofdm(struct freedv *f, void *demod_in_8kHz, int demod_i
 
             /* decode txt bits (if used) */
             for(k=0; k<f->ofdm_ntxtbits; k++)  {
+                if (k % 2 == 0 && (f->freedv_put_next_rx_symbol != NULL))
+                {
+                    (*f->freedv_put_next_rx_symbol)(f->callback_state, rx_syms[txt_sym_index], rx_amps[txt_sym_index]);
+                    txt_sym_index++;
+                }
                 n_ascii = varicode_decode(&f->varicode_dec_states, &ascii_out, &txt_bits[k], 1, 1);
                 if (n_ascii && (f->freedv_put_next_rx_char != NULL)) {
                     (*f->freedv_put_next_rx_char)(f->callback_state, ascii_out);

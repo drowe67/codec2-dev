@@ -28,6 +28,7 @@
 #include "freedv_api_internal.h"
 #include "reliable_text.h"
 #include "ldpc_codes.h"
+#include "ofdm_internal.h"
 
 #define LDPC_TOTAL_SIZE_BITS (112)
 
@@ -56,12 +57,16 @@ typedef struct
     int tx_text_length;
     
     char inbound_pending_bits[LDPC_TOTAL_SIZE_BITS];
+    _Complex float inbound_pending_syms[LDPC_TOTAL_SIZE_BITS / 2];
+    float inbound_pending_amps[LDPC_TOTAL_SIZE_BITS / 2];
     int bit_index;
+    int sym_index;
     int uw_bits_valid;
     unsigned short uw_value;
     int has_successfully_decoded;
     
     struct LDPC ldpc;
+    struct freedv* fdv;
 } reliable_text_impl_t;
 
 // 6 bit character set for text field use:
@@ -151,20 +156,36 @@ static char calculateCRC8_(char* input, int length)
     return crc;
 }
 
-static int reliable_text_ldpc_decode(reliable_text_impl_t* obj, char* dest, char* src)
+static int reliable_text_ldpc_decode(reliable_text_impl_t* obj, char* dest)
 {
+    char* src = &obj->inbound_pending_bits[0];
     float incomingData[LDPC_TOTAL_SIZE_BITS];
     float llr[LDPC_TOTAL_SIZE_BITS];
     unsigned char output[LDPC_TOTAL_SIZE_BITS];
     int parityCheckCount = 0;
     
-    for (int bitIndex = 0; bitIndex < LDPC_TOTAL_SIZE_BITS; bitIndex++)
+    if (obj->bit_index == obj->sym_index * 2)
     {
-        // Map to value expected by sd_to_llr()
-        incomingData[bitIndex] = 1.0 - 2.0 * src[bitIndex];
+        //fprintf(stderr, "using SD\n");
+        
+        // Use soft decision for the LDPC decoder.
+        float EsNo = 3.0; // note: constant from freedv_700.c
+        
+        symbols_to_llrs(llr, (COMP*)&obj->inbound_pending_syms[0], &obj->inbound_pending_amps[0],
+                        EsNo, obj->fdv->ofdm->mean_amp, LDPC_TOTAL_SIZE_BITS / 2);
     }
+    else
+    {
+        // We don't have symbol data (likely due to incorrect mode), so we fall back
+        // to hard decision.
+        for (int bitIndex = 0; bitIndex < LDPC_TOTAL_SIZE_BITS; bitIndex++)
+        {
+            // Map to value expected by sd_to_llr()
+            incomingData[bitIndex] = 1.0 - 2.0 * src[bitIndex];
+        }
     
-    sd_to_llr(llr, incomingData, LDPC_TOTAL_SIZE_BITS);
+        sd_to_llr(llr, incomingData, LDPC_TOTAL_SIZE_BITS);
+    }
     run_ldpc_decoder(&obj->ldpc, output, llr, &parityCheckCount);
     
     // Data is valid if BER < 0.2
@@ -190,6 +211,20 @@ static int reliable_text_ldpc_decode(reliable_text_impl_t* obj, char* dest, char
     }
     
     return result;
+}
+
+static void reliable_text_freedv_callback_rx_sym(void *state, _Complex float sym, float amp)
+{
+    reliable_text_impl_t* obj = (reliable_text_impl_t*)state;
+    
+    // Ignore symbol if we're still trying to lock onto UW.
+    if (!obj->uw_bits_valid) return;
+    
+    // Save the symbol otherwise. We'll use it during the bit handling below.
+    obj->inbound_pending_syms[obj->sym_index] = (complex float)sym;
+    obj->inbound_pending_amps[obj->sym_index++] = amp;
+    
+    //fprintf(stderr, "Got sym: %f, amp: %f\n", sym, amp);
 }
 
 static void reliable_text_freedv_callback_rx(void *state, char chr)
@@ -224,6 +259,10 @@ static void reliable_text_freedv_callback_rx(void *state, char chr)
         }
         obj->uw_bits_valid = obj->bit_index >= RELIABLE_TEXT_UW_LENGTH_BITS && num_zeroes <= RELIABLE_TEXT_MAX_ZEROES_IN_UW;
         obj->bit_index = obj->uw_bits_valid ? 0 : obj->bit_index;
+        obj->sym_index = 0; // Symbols are ignored until we've locked onto the UW.
+        
+        memset(&obj->inbound_pending_syms, 0, sizeof(complex float)*LDPC_TOTAL_SIZE_BITS/2);
+        memset(&obj->inbound_pending_amps, 0, sizeof(float)*LDPC_TOTAL_SIZE_BITS/2);
         //fprintf(stderr, "uw: %x, uw_valid: %d, bit_index: %d, num_zeroes: %d\n", obj->uw_value, obj->uw_bits_valid, obj->bit_index, num_zeroes);
     }
     else if (obj->bit_index < LDPC_TOTAL_SIZE_BITS)
@@ -238,7 +277,7 @@ static void reliable_text_freedv_callback_rx(void *state, char chr)
             char rawStr[RELIABLE_TEXT_BYTES_PER_ENCODED_SEGMENT + 1];
             memset(rawStr, 0, RELIABLE_TEXT_BYTES_PER_ENCODED_SEGMENT + 1);
             
-            if (reliable_text_ldpc_decode(obj, rawStr, &obj->inbound_pending_bits[0]) != 0)
+            if (reliable_text_ldpc_decode(obj, rawStr) != 0)
             {
                 // BER is under limits.
                 convert_ota_string_to_callsign_(&rawStr[RELIABLE_TEXT_CRC_LENGTH], &decodedStr[RELIABLE_TEXT_CRC_LENGTH], RELIABLE_TEXT_BYTES_PER_ENCODED_SEGMENT);
@@ -259,8 +298,11 @@ static void reliable_text_freedv_callback_rx(void *state, char chr)
             
             // Reset UW decoding for next callsign.
             obj->bit_index = 0;
+            obj->sym_index = 0;
             obj->uw_bits_valid = 0;
             obj->uw_value = 0;
+            memset(&obj->inbound_pending_syms, 0, sizeof(complex float)*LDPC_TOTAL_SIZE_BITS/2);
+            memset(&obj->inbound_pending_amps, 0, sizeof(float)*LDPC_TOTAL_SIZE_BITS/2);
         }
     }
 }
@@ -296,9 +338,12 @@ void reliable_text_reset(reliable_text_t ptr)
 {
     reliable_text_impl_t* impl = (reliable_text_impl_t*)ptr;
     impl->bit_index = 0;
+    impl->sym_index = 0;
     impl->uw_bits_valid = 0;
     impl->uw_value = 0;
     impl->has_successfully_decoded = 0;
+    memset(&impl->inbound_pending_syms, 0, sizeof(complex float)*LDPC_TOTAL_SIZE_BITS/2);
+    memset(&impl->inbound_pending_amps, 0, sizeof(float)*LDPC_TOTAL_SIZE_BITS/2);
 }
 
 void reliable_text_set_string(reliable_text_t ptr, const char* str, int strlength)
@@ -361,7 +406,9 @@ void reliable_text_use_with_freedv(reliable_text_t ptr, struct freedv* fdv, on_t
     reliable_text_impl_t* impl = (reliable_text_impl_t*)ptr;
     
     impl->text_rx_callback = text_rx_fn;
+    impl->fdv = fdv;
     freedv_set_callback_txt(fdv, reliable_text_freedv_callback_rx, reliable_text_freedv_callback_tx, impl);
+    freedv_set_callback_txt_sym(fdv, reliable_text_freedv_callback_rx_sym, impl);
     
     // Use code 3 for varicode en/decode and handle all framing at this level.
     varicode_set_code_num(&fdv->varicode_dec_states, 3);
