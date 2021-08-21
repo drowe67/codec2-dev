@@ -207,9 +207,11 @@ int freedv_comprx_2020(struct freedv *f, COMP demod_in[]) {
         rx_status |= FREEDV_RX_SYNC;
         if (ofdm->sync_state == trial) rx_status |= FREEDV_RX_TRIAL_SYNC;
 
+        int txt_sym_index = 0;
+        
         ofdm_demod(ofdm, rx_bits, demod_in);
         ofdm_extract_uw(ofdm, ofdm->rx_np, ofdm->rx_amp, rx_uw);
-        ofdm_disassemble_qpsk_modem_packet(ofdm, ofdm->rx_np, ofdm->rx_amp, payload_syms, payload_amps, txt_bits);
+        ofdm_disassemble_qpsk_modem_packet_with_text_amps(ofdm, ofdm->rx_np, ofdm->rx_amp, payload_syms, payload_amps, txt_bits, &txt_sym_index);
 
         f->sync = 1;
 
@@ -280,6 +282,12 @@ int freedv_comprx_2020(struct freedv *f, COMP demod_in[]) {
         /* If modem is synced we can decode txt bits */
 
         for(k=0; k<f->ofdm_ntxtbits; k++)  {
+            if (k % 2 == 0 && (f->freedv_put_next_rx_symbol != NULL))
+            {
+                (*f->freedv_put_next_rx_symbol)(f->callback_state, ofdm->rx_np[txt_sym_index], ofdm->rx_amp[txt_sym_index]);
+                txt_sym_index++;
+            }
+            
             //fprintf(stderr, "txt_bits[%d] = %d\n", k, rx_bits[i]);
             n_ascii = varicode_decode(&f->varicode_dec_states, &ascii_out, &txt_bits[k], 1, 1);
             if (n_ascii && (f->freedv_put_next_rx_char != NULL)) {
