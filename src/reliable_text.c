@@ -24,6 +24,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#include <assert.h>
 #include "freedv_api.h"
 #include "freedv_api_internal.h"
 #include "reliable_text.h"
@@ -72,6 +73,10 @@ typedef struct
 // 47: ASCII ' '
 static void convert_callsign_to_ota_string_(const char* input, char* output, int maxLength)
 {
+    assert(input != NULL);
+    assert(output != NULL);
+    assert(maxLength >= 0);
+    
     int outidx = 0;
     for (size_t index = 0; index < maxLength; index++)
     {
@@ -99,6 +104,10 @@ static void convert_callsign_to_ota_string_(const char* input, char* output, int
 
 static void convert_ota_string_to_callsign_(const char* input, char* output, int maxLength)
 {
+    assert(input != NULL);
+    assert(output != NULL);
+    assert(maxLength >= 0);
+    
     int outidx = 0;
     for (size_t index = 0; index < maxLength; index++)
     {
@@ -122,6 +131,9 @@ static void convert_ota_string_to_callsign_(const char* input, char* output, int
 
 static char calculateCRC8_(char* input, int length)
 {
+    assert(input != NULL);
+    assert(length >= 0);
+    
     unsigned char generator = 0x1D;
     unsigned char crc = 0; /* start with 0 so first byte can be 'xored' in */
 
@@ -153,6 +165,9 @@ static char calculateCRC8_(char* input, int length)
 
 static int reliable_text_ldpc_decode(reliable_text_impl_t* obj, char* dest)
 {
+    assert(obj != NULL);
+    assert(dest != NULL);
+    
     char* src = &obj->inbound_pending_bits[RELIABLE_TEXT_UW_LENGTH_BITS];
     char deinterleavedBits[LDPC_TOTAL_SIZE_BITS];
     _Complex float deinterleavedSyms[LDPC_TOTAL_SIZE_BITS / 2];
@@ -224,6 +239,7 @@ static int reliable_text_ldpc_decode(reliable_text_impl_t* obj, char* dest)
 static void reliable_text_freedv_callback_rx_sym(void *state, _Complex float sym, float amp)
 {
     reliable_text_impl_t* obj = (reliable_text_impl_t*)state;
+    assert(obj != NULL);
     
     // Save the symbol. We'll use it during the bit handling below.
     obj->inbound_pending_syms[obj->sym_index] = (complex float)sym;
@@ -234,6 +250,8 @@ static void reliable_text_freedv_callback_rx_sym(void *state, _Complex float sym
 
 static int check_uw(reliable_text_impl_t* obj)
 {
+    assert(obj != NULL);
+    
     // Count number of errors in UW.
     int num_zeroes = 0;
     for (int bit = 0; bit < RELIABLE_TEXT_UW_LENGTH_BITS; bit++)
@@ -251,7 +269,8 @@ static void reliable_text_freedv_callback_rx(void *state, char chr)
     //fprintf(stderr, "char: %d\n", (chr & 0x3F));
     
     reliable_text_impl_t* obj = (reliable_text_impl_t*)state;
-        
+    assert(obj != NULL);
+    
     // No need to further process if we got a valid string already.
     if (obj->has_successfully_decoded)
     {
@@ -327,6 +346,7 @@ static void reliable_text_freedv_callback_rx(void *state, char chr)
 static char reliable_text_freedv_callback_tx(void *state)
 {
     reliable_text_impl_t* obj = (reliable_text_impl_t*)state;
+    assert(obj != NULL);
     
     char ret = obj->tx_text[obj->tx_text_index];
     obj->tx_text_index = (obj->tx_text_index + 1) % (obj->tx_text_length);
@@ -338,6 +358,7 @@ static char reliable_text_freedv_callback_tx(void *state)
 reliable_text_t reliable_text_create()
 {
     reliable_text_impl_t* ret = calloc(sizeof(reliable_text_impl_t), 1);
+    assert(ret != NULL);
     
     // Load LDPC code into memory.
     int code_index = ldpc_codes_find("HRA_56_56");
@@ -348,6 +369,8 @@ reliable_text_t reliable_text_create()
 
 void reliable_text_destroy(reliable_text_t ptr)
 {
+    assert(ptr != NULL);
+    
     reliable_text_unlink_from_freedv(ptr);
     free(ptr);
 }
@@ -355,6 +378,8 @@ void reliable_text_destroy(reliable_text_t ptr)
 void reliable_text_reset(reliable_text_t ptr)
 {
     reliable_text_impl_t* impl = (reliable_text_impl_t*)ptr;
+    assert(impl != NULL);
+    
     impl->bit_index = 0;
     impl->sym_index = 0;
     impl->has_successfully_decoded = 0;
@@ -366,6 +391,7 @@ void reliable_text_reset(reliable_text_t ptr)
 void reliable_text_set_string(reliable_text_t ptr, const char* str, int strlength)
 {
     reliable_text_impl_t* impl = (reliable_text_impl_t*)ptr;
+    assert(impl != NULL);
     
     char tmp[RELIABLE_TEXT_MAX_RAW_LENGTH + 1];
     
@@ -418,6 +444,7 @@ void reliable_text_set_string(reliable_text_t ptr, const char* str, int strlengt
 void reliable_text_use_with_freedv(reliable_text_t ptr, struct freedv* fdv, on_text_rx_t text_rx_fn)
 {
     reliable_text_impl_t* impl = (reliable_text_impl_t*)ptr;
+    assert(impl != NULL);
     
     impl->text_rx_callback = text_rx_fn;
     impl->fdv = fdv;
@@ -431,11 +458,13 @@ void reliable_text_use_with_freedv(reliable_text_t ptr, struct freedv* fdv, on_t
 void reliable_text_unlink_from_freedv(reliable_text_t ptr)
 {
     reliable_text_impl_t* impl = (reliable_text_impl_t*)ptr;
+    assert(impl != NULL);
     
     if (impl->fdv)
     {
         freedv_set_callback_txt(impl->fdv, NULL, NULL, NULL);
         freedv_set_callback_txt_sym(impl->fdv, NULL, NULL);
         varicode_set_code_num(&impl->fdv->varicode_dec_states, 1);
+        impl->fdv = NULL;
     }
 }
