@@ -838,10 +838,10 @@ endif()
         COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/unittest; ./reliable_text_fade.sh 1600 -28 3 0 '${CMAKE_CURRENT_BINARY_DIR}/src'")
 
   add_test(NAME test_freedv_reliable_text_fade_700D
-        COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/unittest; ./reliable_text_fade.sh 700D -19 10 1 '${CMAKE_CURRENT_BINARY_DIR}/src'")
+        COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/unittest; ./reliable_text_fade.sh 700D -19 8 1 '${CMAKE_CURRENT_BINARY_DIR}/src'")
                                       
   add_test(NAME test_freedv_reliable_text_fade_700E
-        COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/unittest; ./reliable_text_fade.sh 700E -22 10 1 '${CMAKE_CURRENT_BINARY_DIR}/src'")
+        COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/unittest; ./reliable_text_fade.sh 700E -22 9 1 '${CMAKE_CURRENT_BINARY_DIR}/src'")
                           
 if(LPCNET)
     add_test(NAME test_freedv_reliable_text_ideal_2020
@@ -859,7 +859,7 @@ if(LPCNET)
          set_tests_properties(test_freedv_reliable_text_awgn_1600 PROPERTIES PASS_REGULAR_EXPRESSION "1")
                             
     add_test(NAME test_freedv_reliable_text_fade_2020
-          COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/unittest; ./reliable_text_fade.sh 2020 -26 8 0 '${CMAKE_CURRENT_BINARY_DIR}/src'")
+          COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/unittest; ./reliable_text_fade.sh 2020 -26 6 0 '${CMAKE_CURRENT_BINARY_DIR}/src'")
 endif(LPCNET)
                                                      
     # -------------------------------------------------------------------------
