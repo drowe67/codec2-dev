@@ -827,6 +827,22 @@ endif()
                       if [ `cat 700E_reliable.txt | wc -l` -ge 10 ]; then echo 1; fi")
        set_tests_properties(test_freedv_reliable_text_awgn_700E PROPERTIES PASS_REGULAR_EXPRESSION "1")
                           
+if(LPCNET)
+    add_test(NAME test_freedv_reliable_text_ideal_2020
+        COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                       ./freedv_tx 2020 ../../raw/ve9qrp.raw - --reliabletext AB1CDEF > 2020_reliable.raw 2>/dev/null;
+                       ./freedv_rx 2020 2020_reliable.raw /dev/null --txtrx 2020_reliable.txt --reliabletext 2>/dev/null;
+                       cat 2020_reliable.txt | wc -l")
+        set_tests_properties(test_freedv_reliable_text_ideal_2020 PROPERTIES PASS_REGULAR_EXPRESSION "20")
+                           
+   add_test(NAME test_freedv_reliable_text_awgn_2020
+         COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                        ./freedv_tx 2020 ../../raw/ve9qrp.raw - --reliabletext AB1CDEF | ./cohpsk_ch - - -25 --Fs 8000 -f -5 > 2020_reliable.raw 2>/dev/null;
+                        ./freedv_rx 2020 2020_reliable.raw /dev/null --txtrx 2020_reliable.txt --reliabletext 2>/dev/null;
+                        if [ `cat 2020_reliable.txt | wc -l` -ge 10 ]; then echo 1; fi")
+         set_tests_properties(test_freedv_reliable_text_awgn_1600 PROPERTIES PASS_REGULAR_EXPRESSION "1")
+endif(LPCNET)
+                                                     
     # -------------------------------------------------------------------------
     #                                FreeDv API memory leaks
     # -------------------------------------------------------------------------
