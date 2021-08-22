@@ -86,12 +86,13 @@ function tp = calculate_tp(vq, sd_table, h_table, indexes_current, indexes_next,
 endfunction
 
 
-% y are the received soft decision codewords, each row is one codeword in time.
-% sd_table and h_table map SD to probability. Returns the most likely transmitted
-% codeword c.  We search the most likely n tx codewords (ntxcw) out of
-% 2^nbits possibilities.
+% y is the sequence received soft decision codewords, each row is one
+% codeword in time.  sd_table and h_table map SD to
+% probability.  Returns the most likely transmitted VQ index c in the
+% middle of the codeword sequence y.  We search the most likely ntxcw
+% tx codewords out of 2^nbits possibilities.
 
-function c = find_most_likely_codeword(y, vq, C, sd_table, h_table, nstages, ntxcw, verbose)
+function c = find_most_likely_index(y, vq, C, sd_table, h_table, nstages, ntxcw, verbose)
     [ncodewords nbits] = size(y);
 
     % populate the nodes of the trellis with the most likely transmitted codewords
@@ -225,7 +226,7 @@ function c = find_most_likely_codeword(y, vq, C, sd_table, h_table, nstages, ntx
       for s=1:nstages
         printf("%4d", indexes(s,max_n(s))-1);
       end
-      printf("\nMost likely codeword at time n..: %4d\n", c);
+      printf("\nMost likely VQ index at time n..: %4d\n", c);
     end
 endfunction
 
@@ -239,7 +240,7 @@ endfunction
 % Calculate a normalised histogram of the SD of adjacent frames from
 % a file of output vectors from the VQ.
 function [sd_table h_table] = vq_hist(vq_output_fn, dec=1)
-  K=20; K_st=2; K_en=16;
+  K=20; K_st=2+1; K_en=16+1;
   vq_out = load_f32(vq_output_fn, K);
   [r c]= size(vq_out);
   diff = vq_out(dec+1:end,K_st:K_en) - vq_out(1:end-dec,K_st:K_en);
@@ -251,7 +252,6 @@ endfunction
 % vector quantise a sequence of target input vectors, returning the VQ indexes and
 % quantised vectors target_
 function [indexes target_] = vector_quantiser(vq, target, verbose=1)
-  K_st=2; K_en=16;
   [vq_size K] = size(vq);
   [ntarget tmp] = size(target);
   target_ = zeros(ntarget,K);
@@ -274,7 +274,6 @@ endfunction
 
 % faster version of vector quantiser
 function [indexes target_] = vector_quantiser_fast(vq, target, verbose=1)
-  K_st=2; K_en=16;
   [vq_size K] = size(vq);
   [ntarget tmp] = size(target);
   target_ = zeros(ntarget,K);
@@ -297,26 +296,30 @@ function [indexes target_] = vector_quantiser_fast(vq, target, verbose=1)
 endfunction
 
 
-% Run a simulation over a sequence of vectors
-function [dec_hat dec_simple_hat dec_tx_codewords] = run_test(tx_codewords, sd_table, h_table, nstages, EbNo, verbose)
+% Run trellis decoder over a sequence of frames
+function [rx_indexes] = run_test(tx_indexes, vq, sd_table, h_table, ntxcw, nstages, EbNo, verbose)
   [frames nbits]    = size(tx_codewords);
   nerrors           = 0;
   nerrors_simple    = 0;
   tbits             = 0;
-  nstates           = 2.^nbits;
 
+  C = precompute_C(nbits);
+  % construct tx symbol codewords from VQ indexes
+  tx_codewords = zeros(frames, nbits);
+  for i=1:frames
+    tx_codewords = dec2sd(tx_indexes(i, nbits));
+  end  
   rx_codewords = tx_codewords + randn(frames, nbits)/EbNo;
-  dec_hat = dec_simple_hat = dec_tx_codewords = zeros(1,frames);
+  rx_indexes = zeros(1,frames);
   
   ns2 = floor(nstages/2);
   for f=ns2+1:frames-ns2
     tx_bits        = tx_codewords(f,:) < 0;
-    dec_tx_codewords(f) = sum(tx_bits .* 2.^(nbits-1:-1:0));
-    dec_hat(f)     = find_most_likely_codeword(rx_codewords(f-ns2:f+ns2,:)/(2*var),
-                                               vq, C, sd_table, h_table, nstages, ntxcw, verbose);
-    rx_bits        = dec2sd(dec_hat(f), nbits) < 0;
+    rx_indexes(f)  = find_most_likely_index(rx_codewords(f-ns2:f+ns2,:)/EbNo,
+                                            vq, C, sd_table, h_table, nstages, ntxcw, verbose);
+    rx_bits        = dec2sd(rx_indexes(f), nbits) < 0;
     rx_bits_simple = rx_codewords(f,:) < 0;
-    dec_simple_hat(f) = sum(rx_bits_simple .* 2.^(nbits-1:-1:0));
+    rx_indexes_van dec_simple_hat(f) = sum(rx_bits_simple .* 2.^(nbits-1:-1:0));
 
     nerrors        += sum(xor(tx_bits, rx_bits));
     nerrors_simple += sum(xor(tx_bits, rx_bits_simple));
@@ -336,21 +339,26 @@ endfunction
 % Simulations ---------------------------------------------------------------------
 
 function test_trellis_against_vanilla(vq_fn, target_fn)
-  K = 20; K_st=2; K_en=16;
+  K = 20; K_st=2+1; K_en=16+1;
+
   % load VQ
   vq = load_f32(vq_fn, K);
-  [vq_size K] = size(vq);
-
+  [vq_size tmp] = size(vq);
+  vq = vq(:,K_st:K_en);
+  
   % load sequence of target vectors we wish to VQ
   target = load_f32(target_fn, K);
+
+  % lets just test with the first ntarget vectors
   ntarget = 100;
-  target = target(1:ntarget,:);
-  size(target)
+  target = target(1:ntarget,K_st:K_en);
+  
   % mean SD of vanilla decode
   [indexes target_ ] = vector_quantiser_fast(vq, target, verbose=0);
-  size(target_)
   diff = target - target_;
-  var(diff(:))
+  mse_vanilla = mean(diff(:).^2)
+
+  
 endfunction
 
 % Plot histograms of SD at different decimations in time
@@ -372,7 +380,7 @@ endfunction
 
 % Automated tests for vanilla and fast VQ search functions
 function test_vq(vq_fn)
-  K=20; K_st=2; K_en=16;
+  K=20;
   vq = load_f32(vq_fn, K);
   vq_size = 100;
   target = vq(1:vq_size,:);
@@ -401,7 +409,7 @@ function test_single
   sd_table = [0 1 2 4];
   h_table = [0.5 0.25 0.15 0.1];
   C = precompute_C(nbits);
-  c = find_most_likely_codeword(EbNo*rx_codewords, vq, C, sd_table, h_table, nstages, ntxcw, verbose);
+  c = find_most_likely_index(EbNo*rx_codewords, vq, C, sd_table, h_table, nstages, ntxcw, verbose);
 endfunction
 
 
