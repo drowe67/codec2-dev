@@ -834,6 +834,15 @@ endif()
                       if [ `cat 700E_reliable.txt | wc -l` -ge 10 ]; then echo 1; fi")
        set_tests_properties(test_freedv_reliable_text_awgn_700E PROPERTIES PASS_REGULAR_EXPRESSION "1")
                           
+  add_test(NAME test_freedv_reliable_text_fade_1600
+        COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/unittest; ./reliable_text_fade.sh 1600 -28 3 0 '${CMAKE_CURRENT_BINARY_DIR}/src'")
+
+  add_test(NAME test_freedv_reliable_text_fade_700D
+        COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/unittest; ./reliable_text_fade.sh 700D -19 10 1 '${CMAKE_CURRENT_BINARY_DIR}/src'")
+                                      
+  add_test(NAME test_freedv_reliable_text_fade_700E
+        COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/unittest; ./reliable_text_fade.sh 700E -22 10 1 '${CMAKE_CURRENT_BINARY_DIR}/src'")
+                          
 if(LPCNET)
     add_test(NAME test_freedv_reliable_text_ideal_2020
         COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
@@ -848,6 +857,9 @@ if(LPCNET)
                         ./freedv_rx 2020 2020_reliable.raw /dev/null --txtrx 2020_reliable.txt --reliabletext 2>/dev/null;
                         if [ `cat 2020_reliable.txt | wc -l` -ge 9 ]; then echo 1; fi")
          set_tests_properties(test_freedv_reliable_text_awgn_1600 PROPERTIES PASS_REGULAR_EXPRESSION "1")
+                            
+    add_test(NAME test_freedv_reliable_text_fade_2020
+          COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/unittest; ./reliable_text_fade.sh 2020 -26 8 0 '${CMAKE_CURRENT_BINARY_DIR}/src'")
 endif(LPCNET)
                                                      
     # -------------------------------------------------------------------------
