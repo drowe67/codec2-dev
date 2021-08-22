@@ -1,7 +1,6 @@
 % trellis.m
 % David Rowe July 2021
 %
-
 % Testing trellis decoding of Codec 2 Vector Quantiser (VQ)
 % information.  Uses soft decision information, probablility of state
 % transitions, and left over redundancy to correct errors on VQ
@@ -13,6 +12,12 @@
 %
 % where c is the transmitted codeword, y is the received codeword,
 % and n is Gaussian noise.
+%
+% This script generates the test data files:
+%
+%  cd codec2/build_linux
+%  ../script/train_trellis.sh
+%
 
 1;
 
@@ -232,29 +237,29 @@ endfunction
 
 
 % Calculate a normalised histogram of the SD of adjacent frames from
-%  a file of training data.
-function [sd_table h_table] = vq_hist(test_fn, dec=1)
+% a file of output vectors from the VQ.
+function [sd_table h_table] = vq_hist(vq_output_fn, dec=1)
   K=20; K_st=2; K_en=16;
-  vq_test = load_f32(test_fn, K);
-  [r c]= size(vq_test);
-  diff = vq_test(dec+1:end,K_st:K_en) - vq_test(1:end-dec,K_st:K_en);
+  vq_out = load_f32(vq_output_fn, K);
+  [r c]= size(vq_out);
+  diff = vq_out(dec+1:end,K_st:K_en) - vq_out(1:end-dec,K_st:K_en);
   sd_adj = var(diff');
   [h_table sd_table] = hist(sd_adj,50,1);
 endfunction
 
 
-% vector quantise a sequence of input vectors x, returning the VQ indexes and
-% quantised vectors x_
-function [indexes x_] = vector_quantiser(vq, x, verbose=1)
+% vector quantise a sequence of target input vectors, returning the VQ indexes and
+% quantised vectors target_
+function [indexes target_] = vector_quantiser(vq, target, verbose=1)
   K_st=2; K_en=16;
   [vq_size K] = size(vq);
-  [lenx tmp] = size(x);
-  x_ = zeros(lenx,K);
-  indexes = zeros(1,lenx);
-  for i=1:lenx
+  [ntarget tmp] = size(target);
+  target_ = zeros(ntarget,K);
+  indexes = zeros(1,ntarget);
+  for i=1:ntarget
     best_e = 1E32;
     for ind=1:vq_size
-      e = sum((vq(ind,:)-x(i,:)).^2);
+      e = sum((vq(ind,:)-target(i,:)).^2);
       if verbose printf("i: %d ind: %d e: %f\n", i, ind, e), end;
       if e < best_e
         best_e = e;
@@ -262,67 +267,119 @@ function [indexes x_] = vector_quantiser(vq, x, verbose=1)
       end
     end
     if verbose printf("best_e: %f best_ind: %d\n", best_e, best_ind), end;
-    x_(i,:) = vq(best_ind,:); indexes(i) = best_ind;
+    target_(i,:) = vq(best_ind,:); indexes(i) = best_ind;
   end
 endfunction
 
 
 % faster version of vector quantiser
-function [indexes x_] = vector_quantiser_fast(vq, x, verbose=1)
+function [indexes target_] = vector_quantiser_fast(vq, target, verbose=1)
   K_st=2; K_en=16;
   [vq_size K] = size(vq);
-  [lenx tmp] = size(x);
-  x_ = zeros(lenx,K);
-  indexes = zeros(1,lenx);
+  [ntarget tmp] = size(target);
+  target_ = zeros(ntarget,K);
+  indexes = zeros(1,ntarget);
 
   % pre-compute energy of each VQ vector
   vqsq = zeros(vq_size,1);
   for i=1:vq_size
     vqsq(i) = vq(i,:)*vq(i,:)';
   end
-  for i=1:lenx
+
+  % use efficient matrix multiplies to search for best match to target
+  for i=1:ntarget
     best_e = 1E32;
-    e = vqsq - 2*(vq * x(i,:)');
+    e = vqsq - 2*(vq * target(i,:)');
     [best_e best_ind] = min(e);
     if verbose printf("best_e: %f best_ind: %d\n", best_e, best_ind), end;
-    x_(i,:) = vq(best_ind,:); indexes(i) = best_ind;
+    target_(i,:) = vq(best_ind,:); indexes(i) = best_ind;
   end
 endfunction
 
 
+% Run a simulation over a sequence of vectors
+function [dec_hat dec_simple_hat dec_tx_codewords] = run_test(tx_codewords, sd_table, h_table, nstages, EbNo, verbose)
+  [frames nbits]    = size(tx_codewords);
+  nerrors           = 0;
+  nerrors_simple    = 0;
+  tbits             = 0;
+  nstates           = 2.^nbits;
+
+  rx_codewords = tx_codewords + randn(frames, nbits)/EbNo;
+  dec_hat = dec_simple_hat = dec_tx_codewords = zeros(1,frames);
+  
+  ns2 = floor(nstages/2);
+  for f=ns2+1:frames-ns2
+    tx_bits        = tx_codewords(f,:) < 0;
+    dec_tx_codewords(f) = sum(tx_bits .* 2.^(nbits-1:-1:0));
+    dec_hat(f)     = find_most_likely_codeword(rx_codewords(f-ns2:f+ns2,:)/(2*var),
+                                               vq, C, sd_table, h_table, nstages, ntxcw, verbose);
+    rx_bits        = dec2sd(dec_hat(f), nbits) < 0;
+    rx_bits_simple = rx_codewords(f,:) < 0;
+    dec_simple_hat(f) = sum(rx_bits_simple .* 2.^(nbits-1:-1:0));
+
+    nerrors        += sum(xor(tx_bits, rx_bits));
+    nerrors_simple += sum(xor(tx_bits, rx_bits_simple));
+    if verbose
+      printf("[%d] %d %d\n", f, nerrors, nerrors_simple);
+    end
+    tbits += nbits;
+  end
+
+  EbNodB = 10*log10(EbNo);
+  printf("Eb/No: %3.2f dB nerrors %d %d BER: %3.2f %3.2f std dev: %3.2f %3.2f\n", 
+         EbNodB, nerrors, nerrors_simple, nerrors/tbits, nerrors_simple/tbits,
+         std(dec_tx_codewords - dec_hat), std(dec_tx_codewords - dec_simple_hat));
+  
+endfunction
+
 % Simulations ---------------------------------------------------------------------
 
-#{
-  Plot histograms of SD at different decimations in time
+function test_trellis_against_vanilla(vq_fn, target_fn)
+  K = 20; K_st=2; K_en=16;
+  % load VQ
+  vq = load_f32(vq_fn, K);
+  [vq_size K] = size(vq);
 
-  cd codec2/build_linux
-  ../script/train_trellis.sh
-  octave> vq_hist("../build_linux/all_speech_8k_test.f32")
-#}
-function vq_hist_dec(test_fn)
+  % load sequence of target vectors we wish to VQ
+  target = load_f32(target_fn, K);
+  ntarget = 100;
+  target = target(1:ntarget,:);
+  size(target)
+  % mean SD of vanilla decode
+  [indexes target_ ] = vector_quantiser_fast(vq, target, verbose=0);
+  size(target_)
+  diff = target - target_;
+  var(diff(:))
+endfunction
+
+% Plot histograms of SD at different decimations in time
+function vq_hist_dec(vq_output_fn)
   figure(1); clf;
-  [sd_table h_table] = vq_hist(test_fn, dec=1);
+  [sd_table h_table] = vq_hist(vq_output_fn, dec=1);
   plot(sd_table, h_table, "b;dec=1;");
   hold on;
-  [sd_table h_table] = vq_hist(test_fn, dec=2);
+  [sd_table h_table] = vq_hist(vq_output_fn, dec=2);
   plot(sd_table, h_table, "r;dec=2;");
-  [sd_table h_table] = vq_hist(test_fn, dec=3);
+  [sd_table h_table] = vq_hist(vq_output_fn, dec=3);
   plot(sd_table, h_table, "g;dec=3;");  
-  [sd_table h_table] = vq_hist(test_fn, dec=4);
+  [sd_table h_table] = vq_hist(vq_output_fn, dec=4);
   plot(sd_table, h_table, "c;dec=4;");  
   hold off;
   axis([0 300 0 0.5])
   xlabel("SD dB*dB"); title('Histogram of SD(n,n+1)');
 endfunction
 
-function test_vq(test_fn)
+% Automated tests for vanilla and fast VQ search functions
+function test_vq(vq_fn)
   K=20; K_st=2; K_en=16;
-  vq = load_f32(test_fn, K);
+  vq = load_f32(vq_fn, K);
   vq_size = 100;
-  indexes = vector_quantiser(vq(1:vq_size,:),vq(1:vq_size,:), verbose=0);
+  target = vq(1:vq_size,:);
+  indexes = vector_quantiser(target,target, verbose=0);
   assert(indexes == 1:vq_size);
   printf("Vanilla OK!\n");
-  indexes = vector_quantiser_fast(vq(1:vq_size,:),vq(1:vq_size,:), verbose=0);
+  indexes = vector_quantiser_fast(target,target, verbose=0);
   assert(indexes == 1:vq_size);
   printf("Fast OK!\n");
 endfunction
@@ -345,43 +402,6 @@ function test_single
   h_table = [0.5 0.25 0.15 0.1];
   C = precompute_C(nbits);
   c = find_most_likely_codeword(EbNo*rx_codewords, vq, C, sd_table, h_table, nstages, ntxcw, verbose);
-endfunction
-
-
-% Run a simulation over a sequence of vectors
-function [dec_hat dec_simple_hat dec_tx_codewords] = run_test(tx_codewords, sd_table, h_table, nstages, var, verbose)
-  [frames nbits]    = size(tx_codewords);
-  nerrors           = 0;
-  nerrors_simple    = 0;
-  tbits             = 0;
-  nstates           = 2.^nbits;
-
-  rx_codewords = tx_codewords + sqrt(var)*randn(frames, nbits);
-  dec_hat = dec_simple_hat = dec_tx_codewords = zeros(1,frames);
-  
-  ns2 = floor(nstages/2);
-  for f=ns2+1:frames-ns2
-    tx_bits        = tx_codewords(f,:) < 0;
-    dec_tx_codewords(f) = sum(tx_bits .* 2.^(nbits-1:-1:0));
-    dec_hat(f)     = find_most_likely_codeword(rx_codewords(f-ns2:f+ns2,:)/(2*var),
-                                               vq, C, sd_table, h_table, nstages, ntxcw, verbose);
-    rx_bits        = dec2sd(dec_hat(f), nbits) < 0;
-    rx_bits_simple = rx_codewords(f,:) < 0;
-    dec_simple_hat(f) = sum(rx_bits_simple .* 2.^(nbits-1:-1:0));
-
-    nerrors        += sum(xor(tx_bits, rx_bits));
-    nerrors_simple += sum(xor(tx_bits, rx_bits_simple));
-    if verbose
-      printf("[%d] %d %d\n", f, nerrors, nerrors_simple);
-    end
-    tbits += nbits;
-  end
-
-  EbNodB = 10*log10(1/(2*var));
-  printf("Eb/No: %3.2f dB nerrors %d %d BER: %3.2f %3.2f std dev: %3.2f %3.2f\n", 
-         EbNodB, nerrors, nerrors_simple, nerrors/tbits, nerrors_simple/tbits,
-         std(dec_tx_codewords - dec_hat), std(dec_tx_codewords - dec_simple_hat));
-  
 endfunction
 
 
@@ -539,12 +559,10 @@ graphics_toolkit ("gnuplot");
 more off;
 randn('state',1);
 
-% uncomment one of the below to run a simulation
+% uncomment one of the below to run a test or simulation
 
-test_vq("../build_linux/vq_stage1.f32");
+test_trellis_against_vanilla("../build_linux/vq_stage1.f32", "../build_linux/all_speech_8k_lim.f32")
+%test_vq("../build_linux/vq_stage1.f32");
 %vq_hist_dec("../build_linux/all_speech_8k_test.f32");
 %test_single
-%simple_traj;
-%test_codec_model_parameter("ve9qrp_10s.bit", 6);
-%process_test_file("ve9qrp_10s.bit")
 
