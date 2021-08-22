@@ -51,6 +51,9 @@ void reliable_text_set_string(reliable_text_t ptr, const char* str, int strlengt
 /* Link FreeDV object to reliable_text object. */
 void reliable_text_use_with_freedv(reliable_text_t ptr, struct freedv* fdv, on_text_rx_t text_rx_fn);
 
+/* Unlink FreeDV object from reliable_text object. */
+void reliable_text_unlink_from_freedv(reliable_text_t ptr);
+
 #ifdef __cplusplus
 }
 #endif // __cplusplus

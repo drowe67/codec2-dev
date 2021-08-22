@@ -348,6 +348,7 @@ reliable_text_t reliable_text_create()
 
 void reliable_text_destroy(reliable_text_t ptr)
 {
+    reliable_text_unlink_from_freedv(ptr);
     free(ptr);
 }
 
@@ -425,4 +426,16 @@ void reliable_text_use_with_freedv(reliable_text_t ptr, struct freedv* fdv, on_t
     
     // Use code 3 for varicode en/decode and handle all framing at this level.
     varicode_set_code_num(&fdv->varicode_dec_states, 3);
+}
+
+void reliable_text_unlink_from_freedv(reliable_text_t ptr)
+{
+    reliable_text_impl_t* impl = (reliable_text_impl_t*)ptr;
+    
+    if (impl->fdv)
+    {
+        freedv_set_callback_txt(impl->fdv, NULL, NULL, NULL);
+        freedv_set_callback_txt_sym(impl->fdv, NULL, NULL);
+        varicode_set_code_num(&impl->fdv->varicode_dec_states, 1);
+    }
 }
