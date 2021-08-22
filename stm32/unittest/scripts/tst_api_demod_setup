@@ -85,6 +85,51 @@ case "${TEST_OPT}" in
 		> ref_gen.log 2>&1
 	;;
 
+    700E_plain_test )
+    	# Config is <mode>, <teswtframes> 
+    	echo "81000010" > stm_cfg.txt
+	#
+        # Copy N frames of a raw audio file to stm_in.raw. 
+        dd bs=1280 count=100 if=../../../../raw/hts1.raw of=spch_in.raw \
+		> setup.log 2>&1
+	freedv_tx 700E spch_in.raw stm_in.raw --testframes --txbpf 1 \
+		>> setup.log 2>&1
+	#
+        # Reference
+        freedv_rx 700E stm_in.raw ref_demod.raw -v --testframes \
+		> ref_gen.log 2>&1
+	;;
+
+    700E_AWGN_test )
+    	# Config is <mode>, <teswtframes> 
+    	echo "81000010" > stm_cfg.txt
+	#
+        # Copy N frames of a raw audio file to stm_in.raw. 
+        dd bs=1280 count=96 if=../../../../raw/hts1.raw of=spch_in.raw \
+		> setup.log 2>&1
+	freedv_tx 700E spch_in.raw mod_bits.raw --testframes --txbpf 1 \
+		  >> setup.log 2>&1
+	cohpsk_ch mod_bits.raw stm_in.raw -22 --Fs 8000 -f -5  2>&1 | tee setup.log
+	
+        freedv_rx 700E stm_in.raw ref_demod.raw -v --testframes  2>&1 --discard | tee ref_gen.log
+	;;
+
+    700E_AWGN_codec )
+    	# Config is <mode>, <teswtframes> 
+    	echo "80000020" > stm_cfg.txt
+	#
+        # Copy N frames of a raw audio file to stm_in.raw. 
+        dd bs=1280 count=48 if=../../../../raw/hts1.raw of=spch_in.raw \
+		> setup.log 2>&1
+	freedv_tx 700E spch_in.raw mod_bits.raw --txbpf 1 \
+		>> setup.log 2>&1
+	#
+        # Reference - give it a hard time with some noise to exercise the LDPC codec and get us to max CPU
+	cohpsk_ch mod_bits.raw stm_in.raw -20 --Fs 8000 -f -5  2>&1 | tee setup.log
+        freedv_rx 700E stm_in.raw ref_demod.raw -v \
+		> ref_gen.log 2>&1
+	;;
+
     1600_plain_codec )
     	# Config is <mode>, <teswtframes> 
     	echo "00000010" > stm_cfg.txt
@@ -99,7 +144,7 @@ case "${TEST_OPT}" in
 	;;
     
     *)
-	printf "ERROR: invalid test option. Valid options are:\n  700D_plain_test\n  700D_AWGN_test\n  700D_AWGN_codec\n  1600_plain_codec\n"
+	printf "ERROR: invalid test option. Valid options are:\n  700[DE]_plain_test\n  700[DE]_AWGN_test\n  700[DE]_AWGN_codec\n  1600_plain_codec\n"
 	exit 1
       	;;
 

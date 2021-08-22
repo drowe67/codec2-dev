@@ -148,7 +148,6 @@ int main(int argc, char *argv[])
 	   buffering to occur */
 
         if (fout == stdout) fflush(stdout);
-        if (fin == stdin) fflush(stdin);
     }
 
     //fdmdv_dump_osc_mags(fdmdv);

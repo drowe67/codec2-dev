@@ -133,8 +133,7 @@ int main(int argc,char *argv[]){
             fwrite(rawbuf,bytes_per_sample,fsk->N,fout);
         }
                
-        if(fin == stdin || fout == stdin){
-            fflush(fin);
+        if(fout == stdin){
             fflush(fout);
         }
     }

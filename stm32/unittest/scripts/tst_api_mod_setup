@@ -26,7 +26,7 @@ cd "${RUN_DIR}"
 case "${TEST_OPT}" in
 
     700D_TEST )
-    	# Config is <mode>, <teswtframes> 
+    	# Config is <mode>, <teswtframes>, <clip>, <bpf>
     	echo "71000000" > stm_cfg.txt
 	#
         # Copy N frames of a raw audio file to stm_in.raw. 
@@ -39,7 +39,7 @@ case "${TEST_OPT}" in
 	;;
 
     700D_CODEC )
-    	# Config is <mode>, <teswtframes> 
+    	# Config is <mode>, <teswtframes>, <clip>, <bpf>
     	echo "70000000" > stm_cfg.txt
 	#
         # Copy N frames of a raw audio file to stm_in.raw. 
@@ -51,8 +51,34 @@ case "${TEST_OPT}" in
 		> ref_gen.log 2>&1
 	;;
 
+    700E_TEST )
+    	# Config is <mode>, <teswtframes>, <clip>, <bpf>
+    	echo "81110000" > stm_cfg.txt
+	#
+        # Copy N frames of a raw audio file to stm_in.raw. 
+        dd bs=1280 count=48 if=../../../../raw/hts1.raw of=stm_in.raw \
+		> setup.log 2>&1
+	#
+        # Reference
+        freedv_tx 700E stm_in.raw ref_mod.raw --testframes --txbpf 1 --clip 1 \
+		> ref_gen.log 2>&1
+	;;
+
+    700E_CODEC )
+    	# Config is <mode>, <teswtframes>, <cip>, <bpf>
+    	echo "80110000" > stm_cfg.txt
+	#
+        # Copy N frames of a raw audio file to stm_in.raw. 
+        dd bs=1280 count=48 if=../../../../raw/hts1.raw of=stm_in.raw \
+		> setup.log 2>&1
+	#
+        # Reference
+        freedv_tx 700E stm_in.raw ref_mod.raw --txbpf 1 --clip 1 \
+		> ref_gen.log 2>&1
+	;;
+
     *)
-	printf "ERROR: invalid test option. Valid options are:\n  700D_TEST\n  700D_CODEC\n"
+	printf "ERROR: invalid test option. Valid options are:\n  700D_TEST\n  700D_CODEC\n  700E_TEST\n  700E_CODEC\n"
 	exit 1
       	;;
     esac

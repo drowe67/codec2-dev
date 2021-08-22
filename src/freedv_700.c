@@ -110,7 +110,7 @@ void freedv_ofdm_voice_open(struct freedv *f, char *mode) {
     ofdm_config = ofdm_get_config_param(f->ofdm);
     f->ofdm_bitsperpacket = ofdm_get_bits_per_packet(f->ofdm);
     f->ofdm_bitsperframe = ofdm_get_bits_per_frame(f->ofdm);
-    f->ofdm_nuwbits = (ofdm_config->ns - 1) * ofdm_config->bps - ofdm_config->txtbits;
+    f->ofdm_nuwbits = ofdm_config->nuwbits;
     f->ofdm_ntxtbits = ofdm_config->txtbits;
 
     f->ldpc = (struct LDPC*)MALLOC(sizeof(struct LDPC));
@@ -140,11 +140,6 @@ void freedv_ofdm_voice_open(struct freedv *f, char *mode) {
 
     f->tx_bits = NULL; /* not used for 700D */
 
-    /* tx BPF off on embedded platforms, as it consumes significant CPU */
-#ifdef __EMBEDDED__
-    ofdm_set_tx_bpf(f->ofdm, 0);
-#endif
-
     f->speech_sample_rate = FREEDV_FS_8000;
     f->codec2 = codec2_create(CODEC2_MODE_700C); assert(f->codec2 != NULL);
     /* should be exactly an integer number of Codec 2 frames in a OFDM modem frame */
@@ -162,6 +157,10 @@ void freedv_ofdm_voice_open(struct freedv *f, char *mode) {
     
     /* attenuate audio 12dB as channel noise isn't that pleasant */
     f->passthrough_gain = 0.25;
+
+    /* should all add up to a complete frame */
+    assert((ofdm_config->ns - 1) * ofdm_config->nc * ofdm_config->bps ==
+	   f->ldpc->coded_bits_per_frame + ofdm_config->txtbits + f->ofdm_nuwbits);
 }
 
 // open function for OFDM data modes, TODO consider moving to a new

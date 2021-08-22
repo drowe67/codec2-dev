@@ -86,8 +86,7 @@ int main(int argc,char *argv[]){
 	}
         fwrite(rawbuf,sizeof(int16_t),fmfsk->N,fout);
         
-	if(fin == stdin || fout == stdin){
-	    fflush(fin);
+	if(fout == stdin){
 	    fflush(fout);
 	}
     }

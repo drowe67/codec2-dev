@@ -39,7 +39,6 @@ struct LDPC ldpc_codes[] = {
         (uint16_t *)HRA_112_112_H_rows,
         (uint16_t *)HRA_112_112_H_cols
     }
-    #ifndef __EMBEDDED__
     ,
     /* short rate 1/2 code for FreeDV 700E */
     {
@@ -56,6 +55,7 @@ struct LDPC ldpc_codes[] = {
         (uint16_t *)HRA_56_56_H_rows,
         (uint16_t *)HRA_56_56_H_cols
     },
+    #ifndef __EMBEDDED__
 
     /* default Wenet High Alitiude Balloon rate 0.8 code */
     {

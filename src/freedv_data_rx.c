@@ -226,11 +226,6 @@ int main(int argc, char *argv[]) {
         freedv_rx(freedv, speech_out, demod_in);
 
         nin = freedv_nin(freedv);
-
-	/* if this is in a pipeline, we probably don't want the usual
-           buffering to occur */
-
-        if (fin == stdin) fflush(stdin);
     }
 
     fclose(fin);
