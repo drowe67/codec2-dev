@@ -14,12 +14,9 @@
 % where c is the transmitted codeword, y is the received codeword,
 % and n is Gaussian noise.
 
-graphics_toolkit ("gnuplot");
-more off;
-randn('state',1);
+1;
 
 % converts a decimal value to a soft dec binary value
-
 function c = dec2sd(dec, nbits)
     
     % convert to binary
@@ -39,7 +36,6 @@ endfunction
 
 
 % y is vector of received soft decision values (e.g +/-1 + noise)
-
 function [txp indexes] = ln_tx_codeword_prob_given_rx_codeword_y(y, nstates, C)
   nbits = length(y);
   np    = 2.^nbits;
@@ -229,8 +225,130 @@ function c = find_most_likely_codeword(y, vq, C, sd_table, h_table, nstages, ntx
 endfunction
 
 
-% Simulations ---------------------------
+% Given a normalised histogram, estimate probability from SD
+function p = prob_from_hist(sd_table, h_table, sd)
+  p = interp1 (sd_table, h_table, sd, "extrap");
+endfunction
 
+
+% Calculate a normalised histogram of the SD of adjacent frames from
+%  a file of training data.
+function [sd_table h_table] = vq_hist(test_fn, dec=1)
+  K=20; K_st=2; K_en=16;
+  vq_test = load_f32(test_fn, K);
+  [r c]= size(vq_test);
+  diff = vq_test(dec+1:end,K_st:K_en) - vq_test(1:end-dec,K_st:K_en);
+  sd_adj = var(diff');
+  [h_table sd_table] = hist(sd_adj,50,1);
+endfunction
+
+
+% vector quantise a sequence of input vectors x, returning the VQ indexes and
+% quantised vectors x_
+function [indexes x_] = vector_quantiser(vq, x, verbose=1)
+  K_st=2; K_en=16;
+  [vq_size K] = size(vq);
+  [lenx tmp] = size(x);
+  x_ = zeros(lenx,K);
+  indexes = zeros(1,lenx);
+  for i=1:lenx
+    best_e = 1E32;
+    for ind=1:vq_size
+      e = sum((vq(ind,:)-x(i,:)).^2);
+      if verbose printf("i: %d ind: %d e: %f\n", i, ind, e), end;
+      if e < best_e
+        best_e = e;
+	best_ind = ind;
+      end
+    end
+    if verbose printf("best_e: %f best_ind: %d\n", best_e, best_ind), end;
+    x_(i,:) = vq(best_ind,:); indexes(i) = best_ind;
+  end
+endfunction
+
+
+% faster version of vector quantiser
+function [indexes x_] = vector_quantiser_fast(vq, x, verbose=1)
+  K_st=2; K_en=16;
+  [vq_size K] = size(vq);
+  [lenx tmp] = size(x);
+  x_ = zeros(lenx,K);
+  indexes = zeros(1,lenx);
+
+  % pre-compute energy of each VQ vector
+  vqsq = zeros(vq_size,1);
+  for i=1:vq_size
+    vqsq(i) = vq(i,:)*vq(i,:)';
+  end
+  for i=1:lenx
+    best_e = 1E32;
+    e = vqsq - 2*(vq * x(i,:)');
+    [best_e best_ind] = min(e);
+    if verbose printf("best_e: %f best_ind: %d\n", best_e, best_ind), end;
+    x_(i,:) = vq(best_ind,:); indexes(i) = best_ind;
+  end
+endfunction
+
+
+% Simulations ---------------------------------------------------------------------
+
+#{
+  Plot histograms of SD at different decimations in time
+
+  cd codec2/build_linux
+  ../script/train_trellis.sh
+  octave> vq_hist("../build_linux/all_speech_8k_test.f32")
+#}
+function vq_hist_dec(test_fn)
+  figure(1); clf;
+  [sd_table h_table] = vq_hist(test_fn, dec=1);
+  plot(sd_table, h_table, "b;dec=1;");
+  hold on;
+  [sd_table h_table] = vq_hist(test_fn, dec=2);
+  plot(sd_table, h_table, "r;dec=2;");
+  [sd_table h_table] = vq_hist(test_fn, dec=3);
+  plot(sd_table, h_table, "g;dec=3;");  
+  [sd_table h_table] = vq_hist(test_fn, dec=4);
+  plot(sd_table, h_table, "c;dec=4;");  
+  hold off;
+  axis([0 300 0 0.5])
+  xlabel("SD dB*dB"); title('Histogram of SD(n,n+1)');
+endfunction
+
+function test_vq(test_fn)
+  K=20; K_st=2; K_en=16;
+  vq = load_f32(test_fn, K);
+  vq_size = 100;
+  indexes = vector_quantiser(vq(1:vq_size,:),vq(1:vq_size,:), verbose=0);
+  assert(indexes == 1:vq_size);
+  printf("Vanilla OK!\n");
+  indexes = vector_quantiser_fast(vq(1:vq_size,:),vq(1:vq_size,:), verbose=0);
+  assert(indexes == 1:vq_size);
+  printf("Fast OK!\n");
+endfunction
+
+% Single point test, print out tables
+function test_single
+  nstages  = 3;
+  verbose  = 1;
+  nbits = 2;
+  ntxcw = 4;
+  EbNo = 1;
+  
+  tx_codewords = [-1 -1; -1 -1; -1 -1];
+  rx_codewords = [-1 -1; -1 -1; -1 -1] + randn(nstages, nbits)/EbNo;
+  vq = [0 0 0 1;
+        0 0 1 0;
+	0 1 0 0;
+	1 0 0 0];
+  sd_table = [0 1 2 4];
+  h_table = [0.5 0.25 0.15 0.1];
+  C = precompute_C(nbits);
+  c = find_most_likely_codeword(EbNo*rx_codewords, vq, C, sd_table, h_table, nstages, ntxcw, verbose);
+endfunction
+
+
+% Run a simulation over a sequence of vectors
 function [dec_hat dec_simple_hat dec_tx_codewords] = run_test(tx_codewords, sd_table, h_table, nstages, var, verbose)
   [frames nbits]    = size(tx_codewords);
   nerrors           = 0;
@@ -264,76 +382,6 @@ function [dec_hat dec_simple_hat dec_tx_codewords] = run_test(tx_codewords, sd_t
          EbNodB, nerrors, nerrors_simple, nerrors/tbits, nerrors_simple/tbits,
          std(dec_tx_codewords - dec_hat), std(dec_tx_codewords - dec_simple_hat));
   
-endfunction
-
-% Single point test, print out tables
-
-function test_single
-  nstages  = 3;
-  verbose  = 1;
-  nbits = 2;
-  ntxcw = 4;
-  EbNo = 1;
-  
-  tx_codewords = [-1 -1; -1 -1; -1 -1];
-  rx_codewords = [-1 -1; -1 -1; -1 -1] + randn(nstages, nbits)/EbNo;
-  vq = [0 0 0 1;
-        0 0 1 0;
-	0 1 0 0;
-	1 0 0 0];
-  sd_table = [0 1 2 4];
-  h_table = [0.5 0.25 0.15 0.1];
-  C = precompute_C(nbits);
-  c = find_most_likely_codeword(EbNo*rx_codewords, vq, C, sd_table, h_table, nstages, ntxcw, verbose);
-endfunction
-
-
-% plot a trajectory of codewords, to help test "distance" is better using trellis than simple decoding
-
-function test_traj(tx_codewords, tp, nstages, var, verbose)
-  [frames nbits] = size(tx_codewords);
-  nstates = 2.^nbits;
-
-  s = sum(tp+0.001,2);
-  [r c] = size(tp);
-  for i=1:r
-    tp(i,:) /= s(i);
-  end
-
-  [dec_hat dec_simple_hat dec_tx_codewords] = run_test(tx_codewords, tp, nstages, var, verbose);
-
-  figure(1);
-  subplot(211)
-  stem(dec_tx_codewords - dec_hat)
-  axis([1 frames -nstates/2 nstates/2]);
-  title('Trellis Decoding');
-  subplot(212)
-  stem(dec_tx_codewords - dec_simple_hat);
-  axis([1 frames -nstates/2 nstates/2]);
-  title('Simple Decoding');
-
-  figure(2)
-  tp
-  length(1:nstates)
-  mesh(1:nstates,1:nstates,tp)
-  ylabel('current state');
-  xlabel('next state');
-endfunction
-
-
-% A contrived trajectory to check out the idea
-
-function simple_traj
-  %tp      = [1 0 0 0; 1 0 0 0; 1 0 0 0; 1 0 0 0];
-  tp      = [0.5 0.25 0 0; 0.25 0.5 0.25 0; 0 0.25 0.5 0.25; 0 0 0.25 0.5];
-  nstages = 3;
-  var     = 0.5;
-  verbose = 0;
-  nbits   = 2;
-  frames  = 25;
-
-  tx_codewords = ones(frames, nbits);
-  test_traj(tx_codewords, tp, nstages, var, verbose)
 endfunction
 
 
@@ -484,43 +532,19 @@ function process_test_file(bitstream_filename)
 
 endfunction
 
-% Given a normalised histogram, estimate probability from SD
-function p = prob_from_hist(sd_table, h_table, sd)
-  p = interp1 (sd_table, h_table, sd, "extrap");
-endfunction
 
-% Calculate a normalised histogram of the SD of adjacent frames from
-% a file of training data
-function [sd_table h_table] = vq_hist(test_fn, dec=1)
-  K=20; K_st=2; K_en=16;
-  vq_test = load_f32(test_fn, K);
-  [r c]= size(vq_test);
-  diff = vq_test(dec+1:end,K_st:K_en) - vq_test(1:end-dec,K_st:K_en);
-  sd_adj = var(diff');
-  [h_table sd_table] = hist(sd_adj,50,1);
-endfunction
+% -------------------------------------------------------------------
 
-function vq_hist_dec(test_fn)
-  figure(1); clf;
-  [sd_table h_table] = vq_hist(test_fn, dec=1);
-  plot(sd_table, h_table, "b;dec=1;");
-  hold on;
-  [sd_table h_table] = vq_hist(test_fn, dec=2);
-  plot(sd_table, h_table, "r;dec=2;");
-  [sd_table h_table] = vq_hist(test_fn, dec=3);
-  plot(sd_table, h_table, "g;dec=3;");  
-  [sd_table h_table] = vq_hist(test_fn, dec=4);
-  plot(sd_table, h_table, "c;dec=4;");  
-  hold off;
-  axis([0 300 0 0.5])
-  xlabel("SD dB*dB"); title('Histogram of SD(n,n+1)');
-endfunction
+graphics_toolkit ("gnuplot");
+more off;
+randn('state',1);
 
 % uncomment one of the below to run a simulation
 
-test_single
+test_vq("../build_linux/vq_stage1.f32");
+%vq_hist_dec("../build_linux/all_speech_8k_test.f32");
+%test_single
 %simple_traj;
 %test_codec_model_parameter("ve9qrp_10s.bit", 6);
 %process_test_file("ve9qrp_10s.bit")
 
-%vq_hist_dec("../build_linux/all_speech_8k_test.f32");
