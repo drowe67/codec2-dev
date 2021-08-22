@@ -785,6 +785,13 @@ endif()
     # -------------------------------------------------------------------------
     #                                Reliable Text
     # -------------------------------------------------------------------------
+     add_test(NAME test_freedv_reliable_text_truncate_string
+           COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                          ./freedv_tx 1600 ../../raw/ve9qrp.raw - --reliabletext AB1CDEFGH > 1600_reliable.raw 2>/dev/null;
+                          ./freedv_rx 1600 1600_reliable.raw /dev/null --txtrx 1600_reliable.txt --reliabletext 2>/dev/null;
+                          grep 'AB1CDEFG' 1600_reliable.txt | wc -l")
+           set_tests_properties(test_freedv_reliable_text_truncate_string PROPERTIES PASS_REGULAR_EXPRESSION "20")
+                              
     add_test(NAME test_freedv_reliable_text_ideal_1600
           COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
                          ./freedv_tx 1600 ../../raw/ve9qrp.raw - --reliabletext AB1CDEF > 1600_reliable.raw 2>/dev/null;

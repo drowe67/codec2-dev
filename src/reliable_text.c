@@ -41,12 +41,7 @@
 #define RELIABLE_TEXT_MAX_RAW_LENGTH (RELIABLE_TEXT_MAX_LENGTH + RELIABLE_TEXT_CRC_LENGTH)
 
 /* Two bytes of text/CRC equal four bytes of LDPC(112,56). */
-#define RELIABLE_TEXT_BYTES_PER_ENCODED_SEGMENT (8) 
-#define RELIABLE_TEXT_ENCODED_SEGMENT_LENGTH (16)
-
-/* Size of (RELIABLE_TEXT_MAX_LENGTH + RELIABLE_TEXT_CRC_LENGTH) once encoded. */
-#define RELIABLE_TEXT_NUMBER_SEGMENTS (RELIABLE_TEXT_MAX_RAW_LENGTH / RELIABLE_TEXT_BYTES_PER_ENCODED_SEGMENT)
-#define RELIABLE_TEXT_TOTAL_ENCODED_LENGTH (RELIABLE_TEXT_NUMBER_SEGMENTS * RELIABLE_TEXT_ENCODED_SEGMENT_LENGTH)
+#define RELIABLE_TEXT_BYTES_PER_ENCODED_SEGMENT (8)
 
 /* Internal definition of reliable_text_t. */
 typedef struct 
@@ -135,8 +130,8 @@ static char calculateCRC8_(char* input, int length)
         unsigned char ch = *input++;
         length--;
 
-        // Ignore 6-bit carriage return and sync characters.
-        if (ch == 63 || ch == 48) continue;
+        // Break out if we see a null.
+        if (ch == 0) break;
         
         crc ^= ch; /* XOR-in the next input byte */
         
@@ -288,7 +283,7 @@ static void reliable_text_freedv_callback_rx(void *state, char chr)
         
                 // Get expected and actual CRC.
                 unsigned char receivedCRC = decodedStr[0];
-                unsigned char calcCRC = calculateCRC8_(&rawStr[RELIABLE_TEXT_CRC_LENGTH], strlen(&rawStr[RELIABLE_TEXT_CRC_LENGTH]));
+                unsigned char calcCRC = calculateCRC8_(&rawStr[RELIABLE_TEXT_CRC_LENGTH], RELIABLE_TEXT_MAX_LENGTH);
         
                 //fprintf(stderr, "rxCRC: %d, calcCRC: %d, decodedStr: %s\n", receivedCRC, calcCRC, &decodedStr[RELIABLE_TEXT_CRC_LENGTH]);
                 if (receivedCRC == calcCRC)
@@ -371,9 +366,9 @@ void reliable_text_set_string(reliable_text_t ptr, const char* str, int strlengt
 {
     reliable_text_impl_t* impl = (reliable_text_impl_t*)ptr;
     
-    char tmp[RELIABLE_TEXT_MAX_RAW_LENGTH];
+    char tmp[RELIABLE_TEXT_MAX_RAW_LENGTH + 1];
     
-    convert_callsign_to_ota_string_(str, &tmp[RELIABLE_TEXT_CRC_LENGTH], strlength);
+    convert_callsign_to_ota_string_(str, &tmp[RELIABLE_TEXT_CRC_LENGTH], strlength < RELIABLE_TEXT_MAX_LENGTH? strlength : RELIABLE_TEXT_MAX_LENGTH);
     
     int raw_length = strlen(&tmp[RELIABLE_TEXT_CRC_LENGTH]) + RELIABLE_TEXT_CRC_LENGTH;
     impl->tx_text_length = RELIABLE_TEXT_UW_LENGTH_BITS + LDPC_TOTAL_SIZE_BITS;
