@@ -20,7 +20,7 @@ if [ ! -f ../raw/fast_fading_samples.float ]; then
 fi
 
 if [ $clip -eq 1 ]; then 
-    clip_args="--txbpp 1 --clip 1"
+    clip_args="--txbpf 1 --clip 1"
 else
     clip_args=
 fi
