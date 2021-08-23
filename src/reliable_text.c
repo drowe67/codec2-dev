@@ -358,7 +358,7 @@ static char reliable_text_freedv_callback_tx(void *state)
 
 reliable_text_t reliable_text_create()
 {
-    reliable_text_impl_t* ret = calloc(sizeof(reliable_text_impl_t), 1);
+    reliable_text_impl_t* ret = calloc(1, sizeof(reliable_text_impl_t));
     assert(ret != NULL);
     
     // Load LDPC code into memory.
