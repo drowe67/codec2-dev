@@ -1106,7 +1106,7 @@ void freedv_set_callback_txt_sym(struct freedv *f, freedv_callback_rx_sym rx, vo
         FDV_MODE_ACTIVE( FREEDV_MODE_700E, f->mode ) ||
         FDV_MODE_ACTIVE( FREEDV_MODE_2020, f->mode ) ) {
         f->freedv_put_next_rx_symbol = rx;
-        f->callback_state = state;
+        f->callback_state_sym = state;
     }
 }
 

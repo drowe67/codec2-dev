@@ -496,7 +496,7 @@ int freedv_comp_short_rx_ofdm(struct freedv *f, void *demod_in_8kHz, int demod_i
             for(k=0; k<f->ofdm_ntxtbits; k++)  {
                 if (k % 2 == 0 && (f->freedv_put_next_rx_symbol != NULL))
                 {
-                    (*f->freedv_put_next_rx_symbol)(f->callback_state, rx_syms[txt_sym_index], rx_amps[txt_sym_index]);
+                    (*f->freedv_put_next_rx_symbol)(f->callback_state_sym, rx_syms[txt_sym_index], rx_amps[txt_sym_index]);
                     txt_sym_index++;
                 }
                 n_ascii = varicode_decode(&f->varicode_dec_states, &ascii_out, &txt_bits[k], 1, 1);

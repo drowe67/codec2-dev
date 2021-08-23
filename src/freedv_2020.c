@@ -284,7 +284,7 @@ int freedv_comprx_2020(struct freedv *f, COMP demod_in[]) {
         for(k=0; k<f->ofdm_ntxtbits; k++)  {
             if (k % 2 == 0 && (f->freedv_put_next_rx_symbol != NULL))
             {
-                (*f->freedv_put_next_rx_symbol)(f->callback_state, ofdm->rx_np[txt_sym_index], ofdm->rx_amp[txt_sym_index]);
+                (*f->freedv_put_next_rx_symbol)(f->callback_state_sym, ofdm->rx_np[txt_sym_index], ofdm->rx_amp[txt_sym_index]);
                 txt_sym_index++;
             }
             

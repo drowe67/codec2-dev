@@ -172,7 +172,8 @@ struct freedv {
     void (*freedv_put_next_rx_char)(void *callback_state, char c);
     void (*freedv_put_next_rx_symbol)(void *callback_state, _Complex float sym, float amp);
     void                *callback_state;
-
+    void                *callback_state_sym;
+    
     /* user defined functions to produce and consume protocol bits */
     /* Protocol bits are packed MSB-first */
     void (*freedv_put_next_proto)(void *callback_state, char *proto_bits_packed);
