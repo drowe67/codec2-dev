@@ -48,6 +48,7 @@
 typedef struct 
 {
     on_text_rx_t text_rx_callback;
+    void* callback_state;
     
     char tx_text[LDPC_TOTAL_SIZE_BITS + RELIABLE_TEXT_UW_LENGTH_BITS];
     int tx_text_index;
@@ -309,7 +310,7 @@ static void reliable_text_freedv_callback_rx(void *state, char chr)
                 {
                     // We got a valid string. Call assigned callback.
                     obj->has_successfully_decoded = 1;
-                    obj->text_rx_callback(&decodedStr[RELIABLE_TEXT_CRC_LENGTH], strlen(&decodedStr[RELIABLE_TEXT_CRC_LENGTH]));
+                    obj->text_rx_callback(obj, &decodedStr[RELIABLE_TEXT_CRC_LENGTH], strlen(&decodedStr[RELIABLE_TEXT_CRC_LENGTH]), obj->callback_state);
                 }
                 
                 // Reset UW decoding for next callsign.
@@ -445,11 +446,12 @@ void reliable_text_set_string(reliable_text_t ptr, const char* str, int strlengt
     gp_interleave_bits(&impl->tx_text[RELIABLE_TEXT_UW_LENGTH_BITS], tmpbits, LDPC_TOTAL_SIZE_BITS / 2);
 }
 
-void reliable_text_use_with_freedv(reliable_text_t ptr, struct freedv* fdv, on_text_rx_t text_rx_fn)
+void reliable_text_use_with_freedv(reliable_text_t ptr, struct freedv* fdv, on_text_rx_t text_rx_fn, void* state)
 {
     reliable_text_impl_t* impl = (reliable_text_impl_t*)ptr;
     assert(impl != NULL);
     
+    impl->callback_state = state;
     impl->text_rx_callback = text_rx_fn;
     impl->fdv = fdv;
     freedv_set_callback_txt(fdv, reliable_text_freedv_callback_rx, reliable_text_freedv_callback_tx, impl);
@@ -457,6 +459,14 @@ void reliable_text_use_with_freedv(reliable_text_t ptr, struct freedv* fdv, on_t
     
     // Use code 3 for varicode en/decode and handle all framing at this level.
     varicode_set_code_num(&fdv->varicode_dec_states, 3);
+}
+
+struct freedv* reliable_text_get_freedv_obj(reliable_text_t ptr)
+{
+    reliable_text_impl_t* impl = (reliable_text_impl_t*)ptr;
+    assert(impl != NULL);
+
+    return impl->fdv;
 }
 
 void reliable_text_unlink_from_freedv(reliable_text_t ptr)

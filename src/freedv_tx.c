@@ -50,7 +50,7 @@ char my_get_next_tx_char(void *callback_state) {
     return c;
 }
 
-void on_reliable_text_rx(const char* txt_ptr, int length)
+void on_reliable_text_rx(reliable_text_t rt, const char* txt_ptr, int length, void* state)
 {
     // empty since we don't expect to receive anything in this program.
 }
@@ -140,7 +140,7 @@ int main(int argc, char *argv[]) {
         reliable_text_obj = reliable_text_create();
         assert(reliable_text_obj != NULL);
         reliable_text_set_string(reliable_text_obj, callsign, strlen(callsign));
-        reliable_text_use_with_freedv(reliable_text_obj, freedv, on_reliable_text_rx);
+        reliable_text_use_with_freedv(reliable_text_obj, freedv, on_reliable_text_rx, NULL);
     }
     else
     {

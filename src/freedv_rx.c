@@ -48,7 +48,7 @@ void my_put_next_rx_char(void *states, char c) { fprintf((FILE*)states, "%c", c)
 static FILE* reliable_tx_fp;
 reliable_text_t reliable_text_obj;
 
-void on_reliable_text_rx(const char* txt_ptr, int length)
+void on_reliable_text_rx(reliable_text_t rt, const char* txt_ptr, int length, void* state)
 {
     fprintf(reliable_tx_fp, "%s\n", txt_ptr);
     reliable_text_reset(reliable_text_obj);
@@ -164,7 +164,7 @@ int main(int argc, char *argv[]) {
             reliable_text_obj = reliable_text_create();
             assert(reliable_text_obj != NULL);
             reliable_text_set_string(reliable_text_obj, "AB1CDEF", 7); // not used
-            reliable_text_use_with_freedv(reliable_text_obj, freedv, on_reliable_text_rx);
+            reliable_text_use_with_freedv(reliable_text_obj, freedv, on_reliable_text_rx, NULL);
         }
         else
         {
