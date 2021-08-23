@@ -96,7 +96,7 @@ add_custom_target(dist
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 
 # Set default C flags.
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wno-strict-overflow")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wno-strict-overflow -fsanitize=address -fno-omit-frame-pointer")
 
 # Check for what C standard is supported.
 include(CheckCCompilerFlag)

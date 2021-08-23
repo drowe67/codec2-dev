@@ -265,12 +265,12 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    freedv_close(freedv);
-    
     if (use_reliabletext)
     {
         reliable_text_destroy(reliable_text_obj);
     }
+    
+    freedv_close(freedv);
     
     return 0;
 }
