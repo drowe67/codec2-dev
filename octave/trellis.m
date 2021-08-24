@@ -49,7 +49,9 @@ function [txp indexes] = ln_tx_codeword_prob_given_rx_codeword_y(y, nstates, C)
   txp = C * y';
   
   % return most probable codewords (number of states to search)
-  [txp indexes] = sort(txp,"descend");  
+  [txp indexes] = sort(txp,"descend");
+  txp = txp(1:nstates);
+  indexes = indexes(1:nstates) - 1;
 endfunction
 
 % A matrix of all possible tx codewords C, one per row
@@ -74,7 +76,7 @@ function tp = calculate_tp(vq, sd_table, h_table, indexes_current, indexes_next,
     index_current = indexes_current(txcw_current);
     for txcw_next=1:ntxcw
       index_next = indexes_next(txcw_next);
-      dist = vq(index_current,:) - vq(index_next,:);
+      dist = vq(index_current+1,:) - vq(index_next+1,:);
       sd = dist * dist';
       p = prob_from_hist(sd_table, h_table, sd);
       if bitand(verbose, 0x2)
@@ -88,15 +90,14 @@ endfunction
 
 % y is the sequence received soft decision codewords, each row is one
 % codeword in time.  sd_table and h_table map SD to
-% probability.  Returns the most likely transmitted VQ index c in the
+% probability.  Returns the most likely transmitted VQ index ind in the
 % middle of the codeword sequence y.  We search the most likely ntxcw
 % tx codewords out of 2^nbits possibilities.
 
-function c = find_most_likely_index(y, vq, C, sd_table, h_table, nstages, ntxcw, verbose)
+function ind = find_most_likely_index(y, vq, C, sd_table, h_table, nstages, ntxcw, verbose)
     [ncodewords nbits] = size(y);
 
     % populate the nodes of the trellis with the most likely transmitted codewords
-
     txp = zeros(nstages, ntxcw); indexes = zeros(nstages, ntxcw);
     for s=1:nstages
       [atxp aindexes] = ln_tx_codeword_prob_given_rx_codeword_y(y(s,:), ntxcw, C);
@@ -123,7 +124,7 @@ function c = find_most_likely_index(y, vq, C, sd_table, h_table, nstages, ntxcw,
       for i=1:ntxcw
         printf("%d   ", i);
         for s=1:nstages
-	  ind = indexes(s,i) - 1;
+	  ind = indexes(s,i);
           printf("%2d %3s %5.2f   ", ind, dec2bin(ind,nbits), txp(s, i));
         end
         printf("\n");
@@ -131,9 +132,15 @@ function c = find_most_likely_index(y, vq, C, sd_table, h_table, nstages, ntxcw,
       printf("\n");
     end
     
-    % determine probability of each path
-    % (prob of start tx cw)(prob of transition)(prob of next tx cw)
-    % cycle through all possibilities of tx cw
+    % Determine transition probability matrix for each stage, this
+    % changes between stages as lists of candidate tx codewords
+    % changes
+ 
+    tp = zeros(nstages, ntxcw, ntxcw);
+    for s=1:nstages-1
+      if verbose printf("Calc tp(%d,:,:)\n", s), end
+      tp(s,:,:) = calculate_tp(vq, sd_table, h_table, indexes(s,:), indexes(s+1,:), verbose);
+    end
 
     if verbose
       printf("Evaulation of all possible paths:\n");
@@ -153,15 +160,6 @@ function c = find_most_likely_index(y, vq, C, sd_table, h_table, nstages, ntxcw,
       printf("     prob  max_prob\n");
     end
 
-    % Determine transition probability matrix for each stage, this
-    % changes between stages as lists of candidate tx codewords
-    % changes
- 
-    tp = zeros(nstages, ntxcw, ntxcw);
-    for s=1:nstages-1
-      tp(s,:,:) = calculate_tp(vq, sd_table, h_table, indexes(s,:), indexes(s+1,:), verbose);
-    end
-
     % OK lets search all possible paths and find most probable
 
     n = ones(1,nstages); % current node at each stage through trellis, describes current path
@@ -175,7 +173,7 @@ function c = find_most_likely_index(y, vq, C, sd_table, h_table, nstages, ntxcw,
         end
         printf("  ");
          for s=1:nstages
-          printf("%2d ", indexes(s,n(s))-1);
+          printf("%2d ", indexes(s,n(s)));
         end
       end
 
@@ -216,7 +214,8 @@ function c = find_most_likely_index(y, vq, C, sd_table, h_table, nstages, ntxcw,
       end
     until (sum(n) == nstages)
 
-    c = max_n((nstages+1)/2) - 1;
+    middle = floor(nstages/2)+1;
+    ind = indexes(middle, max_n(middle));
     if verbose
       printf("\nMost likely path through nodes... ");
       for s=1:nstages
@@ -224,9 +223,9 @@ function c = find_most_likely_index(y, vq, C, sd_table, h_table, nstages, ntxcw,
       end
       printf("\nMost likely path through indexes: ");
       for s=1:nstages
-        printf("%4d", indexes(s,max_n(s))-1);
+        printf("%4d", indexes(s,max_n(s)));
       end
-      printf("\nMost likely VQ index at time n..: %4d\n", c);
+      printf("\nMost likely VQ index at time n..: %4d\n", ind);
     end
 endfunction
 
@@ -297,48 +296,62 @@ endfunction
 
 
 % Run trellis decoder over a sequence of frames
-function [rx_indexes] = run_test(tx_indexes, vq, sd_table, h_table, ntxcw, nstages, EbNo, verbose)
-  [frames nbits]    = size(tx_codewords);
+function rx_indexes = run_test(tx_indexes, vq, sd_table, h_table, ntxcw, nstages, EbNo, verbose)
+  frames            = length(tx_indexes);
+  nbits             = log2(length(vq))
   nerrors           = 0;
-  nerrors_simple    = 0;
+  nerrors_vanilla   = 0;
   tbits             = 0;
 
   C = precompute_C(nbits);
   % construct tx symbol codewords from VQ indexes
   tx_codewords = zeros(frames, nbits);
-  for i=1:frames
-    tx_codewords = dec2sd(tx_indexes(i, nbits));
-  end  
-  rx_codewords = tx_codewords + randn(frames, nbits)/EbNo;
-  rx_indexes = zeros(1,frames);
-  
+  for f=1:frames
+    tx_codewords(f,:) = dec2sd(tx_indexes(f)-1, nbits);
+  end
+
+  rx_codewords = tx_codewords + randn(frames, nbits)*0;
+  rx_indexes = ones(1,frames);
+  rx_indexes_vanilla = ones(1,frames);
+
   ns2 = floor(nstages/2);
   for f=ns2+1:frames-ns2
-    tx_bits        = tx_codewords(f,:) < 0;
-    rx_indexes(f)  = find_most_likely_index(rx_codewords(f-ns2:f+ns2,:)/EbNo,
-                                            vq, C, sd_table, h_table, nstages, ntxcw, verbose);
-    rx_bits        = dec2sd(rx_indexes(f), nbits) < 0;
-    rx_bits_simple = rx_codewords(f,:) < 0;
-    rx_indexes_van dec_simple_hat(f) = sum(rx_bits_simple .* 2.^(nbits-1:-1:0));
+    printf("f:%d tx_indexes(f): %d\n", f, tx_indexes(f));
+    tx_codewords(f,:)
+    rx_codewords(f,:)
+    rx_indexes(f)   = find_most_likely_index(rx_codewords(f-ns2:f+ns2,:),
+                                             vq, C, sd_table, h_table, nstages, ntxcw, verbose=1);
+    tx_bits         = tx_codewords(f,:) < 0;
+    rx_bits         = dec2sd(rx_indexes(f), nbits) < 0;
+    rx_bits_vanilla = rx_codewords(f,:) < 0;
+    rx_indexes_vanilla(f) = sum(rx_bits_vanilla .* 2.^(nbits-1:-1:0));
 
-    nerrors        += sum(xor(tx_bits, rx_bits));
-    nerrors_simple += sum(xor(tx_bits, rx_bits_simple));
+    nerrors         += sum(xor(tx_bits, rx_bits));
+    nerrors_vanilla += sum(xor(tx_bits, rx_bits_vanilla));
     if verbose
-      printf("[%d] %d %d\n", f, nerrors, nerrors_simple);
+      printf("[%d] %d %d\n", f, nerrors, nerrors_vanilla);
     end
     tbits += nbits;
   end
 
   EbNodB = 10*log10(EbNo);
+  target = vq(tx_indexes(ns2+1:frames-ns2)+1,:);
+  target_vanilla_ = vq(rx_indexes_vanilla(ns2+1:frames-ns2)+1,:);
+  target_ = vq(rx_indexes(ns2+1:frames-ns2)+1,:);
+  diff_vanilla = target - target_vanilla_;
+  mse_vanilla = mean(diff_vanilla(:).^2);
+  diff = target - target_;
+  mse = mean(diff(:).^2);
+
   printf("Eb/No: %3.2f dB nerrors %d %d BER: %3.2f %3.2f std dev: %3.2f %3.2f\n", 
-         EbNodB, nerrors, nerrors_simple, nerrors/tbits, nerrors_simple/tbits,
-         std(dec_tx_codewords - dec_hat), std(dec_tx_codewords - dec_simple_hat));
+         EbNodB, nerrors, nerrors_vanilla, nerrors/tbits, nerrors_vanilla/tbits,
+         mse, mse_vanilla);
   
 endfunction
 
 % Simulations ---------------------------------------------------------------------
 
-function test_trellis_against_vanilla(vq_fn, target_fn)
+function test_trellis_against_vanilla(vq_fn, vq_output_fn, target_fn)
   K = 20; K_st=2+1; K_en=16+1;
 
   % load VQ
@@ -346,19 +359,22 @@ function test_trellis_against_vanilla(vq_fn, target_fn)
   [vq_size tmp] = size(vq);
   vq = vq(:,K_st:K_en);
   
+  % load file of VQ-ed vectors to train up SD PDF
+  [sd_table h_table] = vq_hist(vq_output_fn, dec=1);
+
   % load sequence of target vectors we wish to VQ
   target = load_f32(target_fn, K);
 
   % lets just test with the first ntarget vectors
-  ntarget = 100;
+  ntarget = 3;
   target = target(1:ntarget,K_st:K_en);
   
   % mean SD of vanilla decode
-  [indexes target_ ] = vector_quantiser_fast(vq, target, verbose=0);
+  [tx_indexes target_ ] = vector_quantiser_fast(vq, target, verbose=0);
   diff = target - target_;
   mse_vanilla = mean(diff(:).^2)
-
   
+  run_test(tx_indexes, vq, sd_table, h_table, ntxcw=1, nstages=3, EbNo=100, verbose=0);
 endfunction
 
 % Plot histograms of SD at different decimations in time
@@ -392,16 +408,12 @@ function test_vq(vq_fn)
   printf("Fast OK!\n");
 endfunction
 
-% Single point test, print out tables
-function test_single
+% Test trellis decoding a single vector in a sequence of 3
+function ind = run_test_single(tx_codewords, ntxcw, var, verbose)
   nstages  = 3;
-  verbose  = 1;
   nbits = 2;
-  ntxcw = 4;
-  EbNo = 1;
   
-  tx_codewords = [-1 -1; -1 -1; -1 -1];
-  rx_codewords = [-1 -1; -1 -1; -1 -1] + randn(nstages, nbits)/EbNo;
+  rx_codewords = tx_codewords + randn(nstages, nbits)*var;
   vq = [0 0 0 1;
         0 0 1 0;
 	0 1 0 0;
@@ -409,9 +421,24 @@ function test_single
   sd_table = [0 1 2 4];
   h_table = [0.5 0.25 0.15 0.1];
   C = precompute_C(nbits);
-  c = find_most_likely_index(EbNo*rx_codewords, vq, C, sd_table, h_table, nstages, ntxcw, verbose);
+  ind = find_most_likely_index(rx_codewords, vq, C, sd_table, h_table, nstages, ntxcw, verbose);
 endfunction
 
+% Series of single point sanity checks
+function test_single
+  printf("Single vector decode tests....\n");
+  ind = run_test_single([-1 -1; -1 -1; -1 -1], ntxcw=1, var=0, verbose=0);
+  assert(ind == 0);
+  printf("00 with no noise OK!\n");
+
+  ind = run_test_single([-1 1; 1 1; -1 1], ntxcw=1, var=0, verbose=0);
+  assert(ind == 3);
+  printf("11 with no noise OK!\n");
+  
+  ind = run_test_single([-1 -1; -1 1; -1 -1], ntxcw=4, var=1, verbose=0);
+  assert(ind == 1);
+  printf("01 with noise OK!\n");  
+endfunction
 
 % Run through a trajectory, say from a different file to what we
 % trained with.  Plot trajectory before and after passing through
@@ -569,8 +596,12 @@ randn('state',1);
 
 % uncomment one of the below to run a test or simulation
 
-test_trellis_against_vanilla("../build_linux/vq_stage1.f32", "../build_linux/all_speech_8k_lim.f32")
+#{
+test_trellis_against_vanilla("../build_linux/vq_stage1.f32",
+                             "../build_linux/all_speech_8k_test.f32",
+ 			     "../build_linux/all_speech_8k_lim.f32")
+#}
 %test_vq("../build_linux/vq_stage1.f32");
 %vq_hist_dec("../build_linux/all_speech_8k_test.f32");
-%test_single
+test_single
 
