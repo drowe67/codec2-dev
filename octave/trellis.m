@@ -295,8 +295,9 @@ function [indexes target_] = vector_quantiser_fast(vq, target, verbose=1)
 endfunction
 
 
-% Run trellis decoder over a sequence of frames
-function rx_indexes = run_test(tx_indexes, vq, sd_table, h_table, ntxcw, nstages, EbNo, verbose)
+% Run trellis decoder over a sequence of frames, tx_indexes/rx_indexes use start from 0 (C array)
+% convention
+function rx_indexes = run_test(tx_indexes, vq, sd_table, h_table, ntxcw, nstages, var, verbose)
   frames            = length(tx_indexes);
   nbits             = log2(length(vq))
   nerrors           = 0;
@@ -307,10 +308,10 @@ function rx_indexes = run_test(tx_indexes, vq, sd_table, h_table, ntxcw, nstages
   % construct tx symbol codewords from VQ indexes
   tx_codewords = zeros(frames, nbits);
   for f=1:frames
-    tx_codewords(f,:) = dec2sd(tx_indexes(f)-1, nbits);
+    tx_codewords(f,:) = dec2sd(tx_indexes(f), nbits);
   end
 
-  rx_codewords = tx_codewords + randn(frames, nbits)*0;
+  rx_codewords = tx_codewords + randn(frames, nbits)*var;
   rx_indexes = ones(1,frames);
   rx_indexes_vanilla = ones(1,frames);
 
@@ -321,9 +322,9 @@ function rx_indexes = run_test(tx_indexes, vq, sd_table, h_table, ntxcw, nstages
     rx_codewords(f,:)
     rx_indexes(f)   = find_most_likely_index(rx_codewords(f-ns2:f+ns2,:),
                                              vq, C, sd_table, h_table, nstages, ntxcw, verbose=1);
-    tx_bits         = tx_codewords(f,:) < 0;
-    rx_bits         = dec2sd(rx_indexes(f), nbits) < 0;
-    rx_bits_vanilla = rx_codewords(f,:) < 0;
+    tx_bits         = tx_codewords(f,:) > 0;
+    rx_bits         = dec2sd(rx_indexes(f), nbits) > 0;
+    rx_bits_vanilla = rx_codewords(f,:) > 0;
     rx_indexes_vanilla(f) = sum(rx_bits_vanilla .* 2.^(nbits-1:-1:0));
 
     nerrors         += sum(xor(tx_bits, rx_bits));
@@ -333,8 +334,8 @@ function rx_indexes = run_test(tx_indexes, vq, sd_table, h_table, ntxcw, nstages
     end
     tbits += nbits;
   end
-
-  EbNodB = 10*log10(EbNo);
+  
+  EbNodB = 10*log10(1/var);
   target = vq(tx_indexes(ns2+1:frames-ns2)+1,:);
   target_vanilla_ = vq(rx_indexes_vanilla(ns2+1:frames-ns2)+1,:);
   target_ = vq(rx_indexes(ns2+1:frames-ns2)+1,:);
@@ -342,11 +343,10 @@ function rx_indexes = run_test(tx_indexes, vq, sd_table, h_table, ntxcw, nstages
   mse_vanilla = mean(diff_vanilla(:).^2);
   diff = target - target_;
   mse = mean(diff(:).^2);
-
+  
   printf("Eb/No: %3.2f dB nerrors %d %d BER: %3.2f %3.2f std dev: %3.2f %3.2f\n", 
          EbNodB, nerrors, nerrors_vanilla, nerrors/tbits, nerrors_vanilla/tbits,
          mse, mse_vanilla);
-  
 endfunction
 
 % Simulations ---------------------------------------------------------------------
@@ -374,7 +374,7 @@ function test_trellis_against_vanilla(vq_fn, vq_output_fn, target_fn)
   diff = target - target_;
   mse_vanilla = mean(diff(:).^2)
   
-  run_test(tx_indexes, vq, sd_table, h_table, ntxcw=1, nstages=3, EbNo=100, verbose=0);
+  run_test(tx_indexes-1, vq, sd_table, h_table, ntxcw=1, nstages=3, var=1/100, verbose=0);
 endfunction
 
 % Plot histograms of SD at different decimations in time
@@ -596,12 +596,12 @@ randn('state',1);
 
 % uncomment one of the below to run a test or simulation
 
-#{
+
 test_trellis_against_vanilla("../build_linux/vq_stage1.f32",
                              "../build_linux/all_speech_8k_test.f32",
  			     "../build_linux/all_speech_8k_lim.f32")
-#}
+
 %test_vq("../build_linux/vq_stage1.f32");
 %vq_hist_dec("../build_linux/all_speech_8k_test.f32");
-test_single
+%test_single
 
