@@ -72,6 +72,7 @@ endfunction
 function tp = calculate_tp(vq, sd_table, h_table, indexes_current, indexes_next, verbose)
   ntxcw = length(indexes_current);
   tp = zeros(ntxcw, ntxcw);
+  verbose
   for txcw_current=1:ntxcw
     index_current = indexes_current(txcw_current);
     for txcw_next=1:ntxcw
@@ -232,7 +233,7 @@ endfunction
 
 % Given a normalised histogram, estimate probability from SD
 function p = prob_from_hist(sd_table, h_table, sd)
-  p = interp1 (sd_table, h_table, sd, "extrap");
+  p = interp1 (sd_table, h_table, sd, "extrap", "nearest");
 endfunction
 
 
@@ -303,7 +304,8 @@ function rx_indexes = run_test(tx_indexes, vq, sd_table, h_table, ntxcw, nstages
   nerrors           = 0;
   nerrors_vanilla   = 0;
   tbits             = 0;
-
+  ndecodes          = 0;
+  
   C = precompute_C(nbits);
   % construct tx symbol codewords from VQ indexes
   tx_codewords = zeros(frames, nbits);
@@ -320,8 +322,8 @@ function rx_indexes = run_test(tx_indexes, vq, sd_table, h_table, ntxcw, nstages
     printf("f:%d tx_indexes(f): %d\n", f, tx_indexes(f));
     tx_codewords(f,:)
     rx_codewords(f,:)
-    rx_indexes(f)   = find_most_likely_index(rx_codewords(f-ns2:f+ns2,:),
-                                             vq, C, sd_table, h_table, nstages, ntxcw, verbose=1);
+    rx_indexes(f)   = find_most_likely_index(rx_codewords(f-ns2:f+ns2,:)/var,
+                                             vq, C, sd_table, h_table, nstages, ntxcw, verbose);
     tx_bits         = tx_codewords(f,:) > 0;
     rx_bits         = dec2sd(rx_indexes(f), nbits) > 0;
     rx_bits_vanilla = rx_codewords(f,:) > 0;
@@ -333,6 +335,7 @@ function rx_indexes = run_test(tx_indexes, vq, sd_table, h_table, ntxcw, nstages
       printf("[%d] %d %d\n", f, nerrors, nerrors_vanilla);
     end
     tbits += nbits;
+    ndecodes++;
   end
   
   EbNodB = 10*log10(1/var);
@@ -344,8 +347,8 @@ function rx_indexes = run_test(tx_indexes, vq, sd_table, h_table, ntxcw, nstages
   diff = target - target_;
   mse = mean(diff(:).^2);
   
-  printf("Eb/No: %3.2f dB nerrors %d %d BER: %3.2f %3.2f std dev: %3.2f %3.2f\n", 
-         EbNodB, nerrors, nerrors_vanilla, nerrors/tbits, nerrors_vanilla/tbits,
+  printf("Eb/No: %3.2f dB ndecs: %2d nerrors %d %d BER: %3.2f %3.2f std dev: %3.2f %3.2f\n", 
+         EbNodB, ndecodes, nerrors, nerrors_vanilla, nerrors/tbits, nerrors_vanilla/tbits,
          mse, mse_vanilla);
 endfunction
 
@@ -366,7 +369,7 @@ function test_trellis_against_vanilla(vq_fn, vq_output_fn, target_fn)
   target = load_f32(target_fn, K);
 
   % lets just test with the first ntarget vectors
-  ntarget = 3;
+  ntarget = 10;
   target = target(1:ntarget,K_st:K_en);
   
   % mean SD of vanilla decode
@@ -374,7 +377,7 @@ function test_trellis_against_vanilla(vq_fn, vq_output_fn, target_fn)
   diff = target - target_;
   mse_vanilla = mean(diff(:).^2)
   
-  run_test(tx_indexes-1, vq, sd_table, h_table, ntxcw=1, nstages=3, var=1/100, verbose=0);
+  run_test(tx_indexes-1, vq, sd_table, h_table, ntxcw=4, nstages=3, var=0.01, verbose=0);
 endfunction
 
 % Plot histograms of SD at different decimations in time
@@ -597,11 +600,12 @@ randn('state',1);
 % uncomment one of the below to run a test or simulation
 
 
+
 test_trellis_against_vanilla("../build_linux/vq_stage1.f32",
                              "../build_linux/all_speech_8k_test.f32",
  			     "../build_linux/all_speech_8k_lim.f32")
 
 %test_vq("../build_linux/vq_stage1.f32");
-%vq_hist_dec("../build_linux/all_speech_8k_test.f32");
+#vq_hist_dec("../build_linux/all_speech_8k_test.f32");
 %test_single
 
