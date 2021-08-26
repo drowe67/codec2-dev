@@ -848,7 +848,7 @@ int main(int argc, char *argv[])
                 for(int k=0; k<K; k++)
                     rate_K_vec_no_mean[k] = rate_K_vec[k] - mean;
 
-		newamp1_eq(rate_K_vec_no_mean, eq, K, 1);
+		newamp1_eq(rate_K_vec_no_mean, eq, K);
 
                 /* two stage VQ */
                 float rate_K_vec_no_mean_[K]; int indexes[2];
