@@ -81,8 +81,9 @@ function tnewamp1(input_prefix, path_to_unittest="../build_linux/unittest/")
     mean_f(f) = mean(rate_K_surface(f,:));
     rate_K_surface_no_mean(f,:) = rate_K_surface(f,:) - mean_f(f);
     
-    if (eq_en)
+    if eq_en == 1
       [rate_K_vec eq] = front_eq(rate_K_surface_no_mean(f,:), eq);
+    end
     
     rate_K_surface_no_mean(f,:) = rate_K_vec;
   end
