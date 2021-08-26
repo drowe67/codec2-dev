@@ -83,9 +83,8 @@ function tnewamp1(input_prefix, path_to_unittest="../build_linux/unittest/")
     
     if eq_en == 1
       [rate_K_vec eq] = front_eq(rate_K_surface_no_mean(f,:), eq);
+      rate_K_surface_no_mean(f,:) = rate_K_vec;
     end
-    
-    rate_K_surface_no_mean(f,:) = rate_K_vec;
   end
   
   [res rate_K_surface_no_mean_ ind] = mbest(train_120_vq, rate_K_surface_no_mean, m);
