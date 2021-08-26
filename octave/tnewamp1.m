@@ -41,7 +41,9 @@ function tnewamp1(input_prefix, path_to_unittest="../build_linux/unittest/")
   newamp_700c;
   autotest;
   more off;
-    
+  
+  eq_en = 0;  % TODO make setable
+  
   max_amp = 80;
   postfilter = 0;   % optional postfiler that runs on Am, not used atm
   synth_phase = 1;
@@ -78,7 +80,10 @@ function tnewamp1(input_prefix, path_to_unittest="../build_linux/unittest/")
   for f=1:frames
     mean_f(f) = mean(rate_K_surface(f,:));
     rate_K_surface_no_mean(f,:) = rate_K_surface(f,:) - mean_f(f);
-    [rate_K_vec eq] = front_eq(rate_K_surface_no_mean(f,:), eq);
+    
+    if (eq_en)
+      [rate_K_vec eq] = front_eq(rate_K_surface_no_mean(f,:), eq);
+    
     rate_K_surface_no_mean(f,:) = rate_K_vec;
   end
   
