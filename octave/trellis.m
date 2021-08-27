@@ -72,13 +72,12 @@ endfunction
 function tp = calculate_tp(vq, sd_table, h_table, indexes_current, indexes_next, verbose)
   ntxcw = length(indexes_current);
   tp = zeros(ntxcw, ntxcw);
-  verbose
   for txcw_current=1:ntxcw
     index_current = indexes_current(txcw_current);
     for txcw_next=1:ntxcw
       index_next = indexes_next(txcw_next);
-      dist = vq(index_current+1,:) - vq(index_next+1,:);
-      sd = dist * dist';
+      dist = vq(index_current+1,:) - vq(index_next+1,:);      
+      sd = mean(dist.^2);
       p = prob_from_hist(sd_table, h_table, sd);
       if bitand(verbose, 0x2)
         printf("index_current: %d index_next: %d sd: %f p: %f\n", index_current, index_next, sd, p);
@@ -116,9 +115,9 @@ function ind = find_most_likely_index(y, vq, C, sd_table, h_table, nstages, ntxc
       end
 
       printf("\nProbability of each tx codeword index/binary/ln(prob):\n");
-      printf("     ");
+      printf("    ");
       for s=1:nstages
-        printf("Time n%+d       ", s - (floor(nstages/2)+1));
+        printf("Time n%+d                  ", s - (floor(nstages/2)+1));
       end
       printf("\n");
 
@@ -126,7 +125,7 @@ function ind = find_most_likely_index(y, vq, C, sd_table, h_table, nstages, ntxc
         printf("%d   ", i);
         for s=1:nstages
 	  ind = indexes(s,i);
-          printf("%2d %3s %5.2f   ", ind, dec2bin(ind,nbits), txp(s, i));
+          printf("%4d %12s %5.2f   ", ind, dec2bin(ind,nbits), txp(s, i));
         end
         printf("\n");
       end
@@ -149,11 +148,11 @@ function ind = find_most_likely_index(y, vq, C, sd_table, h_table, nstages, ntxc
       for s=1:nstages
         printf(" n%+d", s - (floor(nstages/2)+1));
       end
-      printf("   indexes");
-      printf(" ");
+      printf("    indexes");
+      printf("      ");
       
       for s=1:nstages
-        printf("  txp(%d) ", s-1);
+        printf("   txp(%d)", s-1);
         if s < nstages
           printf(" tp(%d,%d) ", s-1,s);
         end
@@ -174,7 +173,7 @@ function ind = find_most_likely_index(y, vq, C, sd_table, h_table, nstages, ntxc
         end
         printf("  ");
          for s=1:nstages
-          printf("%2d ", indexes(s,n(s)));
+          printf("%4d ", indexes(s,n(s)));
         end
       end
 
@@ -220,11 +219,11 @@ function ind = find_most_likely_index(y, vq, C, sd_table, h_table, nstages, ntxc
     if verbose
       printf("\nMost likely path through nodes... ");
       for s=1:nstages
-        printf("%4d", max_n(s)-1);
+        printf("%4d ", max_n(s)-1);
       end
       printf("\nMost likely path through indexes: ");
       for s=1:nstages
-        printf("%4d", indexes(s,max_n(s)));
+        printf("%4d ", indexes(s,max_n(s)));
       end
       printf("\nMost likely VQ index at time n..: %4d\n", ind);
     end
@@ -244,8 +243,10 @@ function [sd_table h_table] = vq_hist(vq_output_fn, dec=1)
   vq_out = load_f32(vq_output_fn, K);
   [r c]= size(vq_out);
   diff = vq_out(dec+1:end,K_st:K_en) - vq_out(1:end-dec,K_st:K_en);
-  sd_adj = var(diff');
-  [h_table sd_table] = hist(sd_adj,50,1);
+  % Octave efficient way to determine MSE or each row of matrix
+  sd_adj = meansq(diff');
+  [h_table sd_table] = hist(sd_adj,100,1);
+  h_table = max(h_table, 1E-5);
 endfunction
 
 
@@ -298,13 +299,15 @@ endfunction
 
 % Run trellis decoder over a sequence of frames, tx_indexes/rx_indexes use start from 0 (C array)
 % convention
-function rx_indexes = run_test(tx_indexes, vq, sd_table, h_table, ntxcw, nstages, var, verbose)
+function rx_indexes = run_test(tx_indexes, vq, sd_table, h_table, ntxcw, nstages, EbNo, verbose)
   frames            = length(tx_indexes);
-  nbits             = log2(length(vq))
+  nbits             = log2(length(vq));
   nerrors           = 0;
   nerrors_vanilla   = 0;
   tbits             = 0;
-  ndecodes          = 0;
+  nframes           = 0;
+  nper              = 0;
+  nper_vanilla      = 0;
   
   C = precompute_C(nbits);
   % construct tx symbol codewords from VQ indexes
@@ -313,32 +316,47 @@ function rx_indexes = run_test(tx_indexes, vq, sd_table, h_table, ntxcw, nstages
     tx_codewords(f,:) = dec2sd(tx_indexes(f), nbits);
   end
 
-  rx_codewords = tx_codewords + randn(frames, nbits)*var;
-  rx_indexes = ones(1,frames);
+  rx_codewords = tx_codewords + randn(frames, nbits)*sqrt(1/(2*EbNo));
+  rx_indexes = zeros(1,frames);
   rx_indexes_vanilla = ones(1,frames);
 
   ns2 = floor(nstages/2);
   for f=ns2+1:frames-ns2
-    printf("f:%d tx_indexes(f): %d\n", f, tx_indexes(f));
-    tx_codewords(f,:)
-    rx_codewords(f,:)
-    rx_indexes(f)   = find_most_likely_index(rx_codewords(f-ns2:f+ns2,:)/var,
-                                             vq, C, sd_table, h_table, nstages, ntxcw, verbose);
-    tx_bits         = tx_codewords(f,:) > 0;
-    rx_bits         = dec2sd(rx_indexes(f), nbits) > 0;
+    %if f==10 verbose = 1+0x2, else verbose = 0;, end
+    if verbose
+      printf("f: %d tx_indexes: ", f);
+      for i=f-ns2:f+ns2
+        printf("%d ", tx_indexes(i));
+      end
+    printf("\n");
+    end
+    tx_bits = tx_codewords(f,:) > 0;
+    if verbose
+      printf("tx_bits: ");
+      for i=1:nbits
+        printf("%d",tx_bits(i));
+      end
+      printf("\n");
+    end
     rx_bits_vanilla = rx_codewords(f,:) > 0;
+    rx_indexes(f)   = find_most_likely_index(rx_codewords(f-ns2:f+ns2,:)*EbNo,
+                                             vq, C, sd_table, h_table, nstages, ntxcw, verbose);
+    rx_bits         = dec2sd(rx_indexes(f), nbits) > 0;
     rx_indexes_vanilla(f) = sum(rx_bits_vanilla .* 2.^(nbits-1:-1:0));
-
-    nerrors         += sum(xor(tx_bits, rx_bits));
-    nerrors_vanilla += sum(xor(tx_bits, rx_bits_vanilla));
+    errors           = sum(xor(tx_bits, rx_bits));
+    nerrors         += errors;
+    if errors nper++;, end
+    errors           = sum(xor(tx_bits, rx_bits_vanilla));
+    nerrors_vanilla += errors;
+    if errors nper_vanilla++;, end
     if verbose
       printf("[%d] %d %d\n", f, nerrors, nerrors_vanilla);
     end
     tbits += nbits;
-    ndecodes++;
+    nframes++;
   end
-  
-  EbNodB = 10*log10(1/var);
+
+  EbNodB = 10*log10(EbNo);
   target = vq(tx_indexes(ns2+1:frames-ns2)+1,:);
   target_vanilla_ = vq(rx_indexes_vanilla(ns2+1:frames-ns2)+1,:);
   target_ = vq(rx_indexes(ns2+1:frames-ns2)+1,:);
@@ -346,9 +364,9 @@ function rx_indexes = run_test(tx_indexes, vq, sd_table, h_table, ntxcw, nstages
   mse_vanilla = mean(diff_vanilla(:).^2);
   diff = target - target_;
   mse = mean(diff(:).^2);
-  
-  printf("Eb/No: %3.2f dB ndecs: %2d nerrors %d %d BER: %3.2f %3.2f std dev: %3.2f %3.2f\n", 
-         EbNodB, ndecodes, nerrors, nerrors_vanilla, nerrors/tbits, nerrors_vanilla/tbits,
+  printf("Eb/No: %3.2f dB ndecs: %2d nerrors %d %d BER: %4.3f %4.3f PER: %3.2f %3.2f mse: %3.2f %3.2f\n", 
+         EbNodB, nframes, nerrors, nerrors_vanilla, nerrors/tbits, nerrors_vanilla/tbits,
+	 nper/nframes, nper_vanilla/nframes,
          mse, mse_vanilla);
 endfunction
 
@@ -369,15 +387,22 @@ function test_trellis_against_vanilla(vq_fn, vq_output_fn, target_fn)
   target = load_f32(target_fn, K);
 
   % lets just test with the first ntarget vectors
-  ntarget = 10;
+  ntarget = 100;
   target = target(1:ntarget,K_st:K_en);
   
   % mean SD of vanilla decode
   [tx_indexes target_ ] = vector_quantiser_fast(vq, target, verbose=0);
   diff = target - target_;
-  mse_vanilla = mean(diff(:).^2)
-  
-  run_test(tx_indexes-1, vq, sd_table, h_table, ntxcw=4, nstages=3, var=0.01, verbose=0);
+  mse_vanilla = mean(diff(:).^2);
+  EbNodB=3; EbNo=10^(EbNodB/10);
+  rx_indexes = run_test(tx_indexes-1, vq, sd_table, h_table, ntxcw=8, nstages=3, EbNo, verbose=0);
+#{
+for i=2:ntarget-1
+    diff = vq(tx_indexes(i),:) - vq(tx_indexes(i-1),:);
+    sd = mean(diff.^2);
+    printf("i: %3d tx_index: %4d rx_index: %4d sd(i,i-i): %f\n", i, tx_indexes(i)-1, rx_indexes(i), sd);
+  end
+#}  
 endfunction
 
 % Plot histograms of SD at different decimations in time
@@ -441,6 +466,26 @@ function test_single
   ind = run_test_single([-1 -1; -1 1; -1 -1], ntxcw=4, var=1, verbose=0);
   assert(ind == 1);
   printf("01 with noise OK!\n");  
+endfunction
+
+% BPSK simulation to check noise injection
+function test_bpsk_ber
+  nbits = 12;
+  frames = 10000;
+  tx_codewords = zeros(frames,nbits);
+  tx_bits = zeros(frames,nbits);
+  for f=1:frames
+    tx_codewords(f,:) = dec2sd(f, nbits);
+    tx_bits(f,:) = tx_codewords(f,:) > 0;
+  end
+
+  EbNodB = 5;
+  EbNo = 10^(EbNodB/10);
+  rx_codewords = tx_codewords + randn(frames, nbits)*sqrt(1/(2*EbNo));
+  rx_bits = rx_codewords > 0;
+  nerrors = sum(xor(tx_bits, rx_bits)(:));
+  tbits = frames*nbits;
+  printf("EbNo: %4.2f dB tbits: %d errs: %d BER: %4.3f %4.3f\n", EbNodB, tbits, nerrors, nerrors/tbits, 0.5*erfc(sqrt(EbNo)));
 endfunction
 
 % Run through a trajectory, say from a different file to what we
@@ -599,13 +644,13 @@ randn('state',1);
 
 % uncomment one of the below to run a test or simulation
 
-
+%test_bpsk_ber
 
 test_trellis_against_vanilla("../build_linux/vq_stage1.f32",
                              "../build_linux/all_speech_8k_test.f32",
  			     "../build_linux/all_speech_8k_lim.f32")
 
-%test_vq("../build_linux/vq_stage1.f32");
-#vq_hist_dec("../build_linux/all_speech_8k_test.f32");
-%test_single
 
+%test_vq("../build_linux/vq_stage1.f32");
+%vq_hist_dec("../build_linux/all_speech_8k_test.f32");
+%test_single
