@@ -297,10 +297,9 @@ function [indexes target_] = vector_quantiser_fast(vq, target, verbose=1)
 endfunction
 
 
-% Run trellis decoder over a sequence of frames, tx_indexes/rx_indexes use start from 0 (C array)
-% convention
-function rx_indexes = run_test(tx_indexes, vq, sd_table, h_table, ntxcw, nstages, EbNo, verbose)
-  frames            = length(tx_indexes);
+% VQ a target sequence of frames then run a test using vanilla uncoded/trellis decoder
+function results = run_test(target, vq, sd_table, h_table, ntxcw, nstages, EbNo, verbose)
+  frames            = length(target);
   nbits             = log2(length(vq));
   nerrors           = 0;
   nerrors_vanilla   = 0;
@@ -310,6 +309,15 @@ function rx_indexes = run_test(tx_indexes, vq, sd_table, h_table, ntxcw, nstages
   nper_vanilla      = 0;
   
   C = precompute_C(nbits);
+
+  % Vector Quantise target vectors sequence
+  [tx_indexes target_ ] = vector_quantiser_fast(vq, target, verbose=0);
+  % use convention of indexes starting from 0
+  tx_indexes -= 1; 
+  %  mean SD of VQ with no errors
+  diff = target - target_;
+  mse_noerrors = mean(diff(:).^2);
+  
   % construct tx symbol codewords from VQ indexes
   tx_codewords = zeros(frames, nbits);
   for f=1:frames
@@ -357,52 +365,55 @@ function rx_indexes = run_test(tx_indexes, vq, sd_table, h_table, ntxcw, nstages
   end
 
   EbNodB = 10*log10(EbNo);
-  target = vq(tx_indexes(ns2+1:frames-ns2)+1,:);
+  target = target(ns2+1:frames-ns2,:);
   target_vanilla_ = vq(rx_indexes_vanilla(ns2+1:frames-ns2)+1,:);
   target_ = vq(rx_indexes(ns2+1:frames-ns2)+1,:);
   diff_vanilla = target - target_vanilla_;
   mse_vanilla = mean(diff_vanilla(:).^2);
   diff = target - target_;
   mse = mean(diff(:).^2);
-  printf("Eb/No: %3.2f dB ndecs: %2d nerrors %d %d BER: %4.3f %4.3f PER: %3.2f %3.2f mse: %3.2f %3.2f\n", 
+  printf("Eb/No: %3.2f dB nframes: %2d nerrors %d %d BER: %4.3f %4.3f PER: %3.2f %3.2f mse: %3.2f %3.2f %3.2f\n", 
          EbNodB, nframes, nerrors, nerrors_vanilla, nerrors/tbits, nerrors_vanilla/tbits,
 	 nper/nframes, nper_vanilla/nframes,
-         mse, mse_vanilla);
+         mse_noerrors, mse, mse_vanilla);
+  results.ber = nerrors/tbits;	 
+  results.ber_vanilla = nerrors_vanilla/tbits;
+  results.per = nper/nframes;	 
+  results.per_vanilla = nper_vanilla/nframes;
+  results.mse_noerrors = mse_noerrors;
+  results.mse = mse;
+  results.mse_vanilla = mse_vanilla;
+  results.tx_indexes = tx_indexes;
+  results.rx_indexes = rx_indexes;
+  results.rx_indexes_vanilla = rx_indexes_vanilla;
 endfunction
 
 % Simulations ---------------------------------------------------------------------
 
-function test_trellis_against_vanilla(vq_fn, vq_output_fn, target_fn)
+% top level function to set up and run a test
+function results = test_trellis(nframes=100, ntxcw=8, nstages=3, EbNodB=3, verbose=0)
   K = 20; K_st=2+1; K_en=16+1;
-
+  vq_fn = "../build_linux/vq_stage1.f32";
+  vq_output_fn = "../build_linux/all_speech_8k_test.f32";
+  target_fn = "../build_linux/all_speech_8k_lim.f32";
+  
   % load VQ
   vq = load_f32(vq_fn, K);
   [vq_size tmp] = size(vq);
   vq = vq(:,K_st:K_en);
   
-  % load file of VQ-ed vectors to train up SD PDF
+  % load file of VQ-ed vectors to train up SD PDF estimator
   [sd_table h_table] = vq_hist(vq_output_fn, dec=1);
 
   % load sequence of target vectors we wish to VQ
   target = load_f32(target_fn, K);
 
-  % lets just test with the first ntarget vectors
-  ntarget = 100;
-  target = target(1:ntarget,K_st:K_en);
+  % limit test to the first nframes vectors
+  target = target(1:nframes,K_st:K_en);
   
-  % mean SD of vanilla decode
-  [tx_indexes target_ ] = vector_quantiser_fast(vq, target, verbose=0);
-  diff = target - target_;
-  mse_vanilla = mean(diff(:).^2);
-  EbNodB=3; EbNo=10^(EbNodB/10);
-  rx_indexes = run_test(tx_indexes-1, vq, sd_table, h_table, ntxcw=8, nstages=3, EbNo, verbose=0);
-#{
-for i=2:ntarget-1
-    diff = vq(tx_indexes(i),:) - vq(tx_indexes(i-1),:);
-    sd = mean(diff.^2);
-    printf("i: %3d tx_index: %4d rx_index: %4d sd(i,i-i): %f\n", i, tx_indexes(i)-1, rx_indexes(i), sd);
-  end
-#}  
+  % run a test
+  EbNo=10^(EbNodB/10);
+  results = run_test(target, vq, sd_table, h_table, ntxcw, nstages, EbNo, verbose);
 endfunction
 
 % Plot histograms of SD at different decimations in time
@@ -488,154 +499,6 @@ function test_bpsk_ber
   printf("EbNo: %4.2f dB tbits: %d errs: %d BER: %4.3f %4.3f\n", EbNodB, tbits, nerrors, nerrors/tbits, 0.5*erfc(sqrt(EbNo)));
 endfunction
 
-% Run through a trajectory, say from a different file to what we
-% trained with.  Plot trajectory before and after passing through
-% our decoder.  Try first with no noise, then with noise.
-
-function test_codec_model_parameter(bitstream_filename, model_param)
-  [bits_per_frame bit_fields] = codec2_700_bit_fields;
-
-  % load training data
-
-  printf("loading training database and generating tp .... ");
-  [tp codewords_train] = build_tp("hts.bit");
-  printf("done\n");
-
-  % load test data
-
-  printf("loading test database .... ");
-  [tp_test codewords_test] = build_tp(bitstream_filename);
-  printf("done\n");
-
-  % run test data through
-
-  nbits    = bit_fields(model_param);
-  nstates  = 2.^nbits;
-  nstages  = 3;
-  var      = 0.25;
-  verbose  = 0;
-  frames   = length(codewords_test);
-  %frames   = 100;
-
-  tx_codewords = zeros(frames, nbits);
-  for f=1:frames
-    dec = codewords_test(f, model_param);
-    tx_codewords(f,:) = dec2sd(dec, nbits);
-  end
-
-  test_traj(tx_codewords, tp(1:nstates,1:nstates,model_param), nstages, var, verbose);
-
-  figure(3)
-  plot(codewords_test(1:frames, model_param))
-
-endfunction
-
-
-% writes an output bitsream file with errors corrected
-% replay with something like:
-%   $ ./c2dec 700 ../../octave/ve9qrp_10s_trellis.bit - --softdec --natural | play -t raw -r 8000 -s -2 -
-
-function process_test_file(bitstream_filename)
-  [bits_per_frame bit_fields] = codec2_700_bit_fields;
-
-  % load training data
-
-  printf("loading training database and generating tp .... ");
-  [tp codewords_train] = build_tp("hts.bit");
-  printf("done\n");
-
-  % load test data
-
-  printf("loading test database .... ");
-  [tp_test codewords_test] = build_tp(bitstream_filename);
-  printf("done\n");
-
-  nstages  = 3;
-  var      = 0.5;
-  verbose  = 0;
-  frames   = length(codewords_test);
-  %frames   = 150;
-
-  % set up output frames
-
-  frames_out = zeros(1,frames*bits_per_frame);
-  frames_out_simple = zeros(1,frames*bits_per_frame);
- 
-  % run test data through model and trellis decoder
-
-  % just pass these fields straight through
-
-  %for mp=1:10
-  for mp=[1 2 3 10]
-    nbits = bit_fields(mp);
-
-    % pack parameters in SD format into output frame
-
-    for i=1:frames      
-      en = (i-1)*bits_per_frame + sum(bit_fields(1:mp));
-      st = en - (nbits-1);
-      %printf("fr st: %d offset: %d st: %d en: %d\n", (i-1)*bits_per_frame, sum(bit_fields(1:mp)), st, en);
-      frames_out(st:en) = dec2sd(codewords_test(i, mp), nbits);
-      frames_out_simple(st:en) = dec2sd(codewords_test(i, mp), nbits);
-      %p += bit_fields(i);
-    end
-  end
-
-  
-  % trellis decode these fields
-
-  for mp=4:9
-    nbits    = bit_fields(mp);
-    nstates  = 2.^nbits;
-
-    printf("processing parameter: %d nbits: %d\n", mp, nbits);
-
-    % normalise transition probability rows
-
-    tpmp = tp(1:nstates,1:nstates, mp);
-    s = sum(tpmp+0.001,2);
-    [r c] = size(tpmp);
-    for i=1:r
-      tpmp(i,:) /= s(i);
-    end
-
-    tx_codewords = zeros(frames, nbits);
-    for f=1:frames
-      dec = codewords_test(f, mp);
-      tx_codewords(f,:) = dec2sd(dec, nbits);
-    end
-
-    [dec_hat dec_simple_hat dec_tx_codewords] = run_test(tx_codewords, tpmp, nstages, var, verbose);
-
-    % pack decoded parameter in SD format into output frame
-
-    for i=1:frames      
-      en = (i-1)*bits_per_frame + sum(bit_fields(1:mp));
-      st = en - (nbits-1);
-      frames_out(st:en) = dec2sd(dec_hat(i), nbits);
-      frames_out_simple(st:en) = dec2sd(dec_simple_hat(i), nbits);
-    end
-
-  end
-
-  % save frames out
-
-  [tok rem] = strtok(bitstream_filename,".");
-  fn_trellis = sprintf("%s_%3.2f_trellis%s",tok,var,rem);
-  fn_simple = sprintf("%s_%3.2f_simple%s",tok,var,rem);
-  printf("writing output files: %s %s for your listening pleasure!\n", fn_trellis, fn_simple);
-
-  fbitstream = fopen(fn_trellis,"wb");
-  fwrite(fbitstream, frames_out,"float32");
-  fclose(fbitstream);
-
-  fbitstream = fopen(fn_simple,"wb");
-  fwrite(fbitstream, frames_out_simple,"float32");
-  fclose(fbitstream);
-
-endfunction
-
-
 % -------------------------------------------------------------------
 
 graphics_toolkit ("gnuplot");
@@ -646,10 +509,7 @@ randn('state',1);
 
 %test_bpsk_ber
 
-test_trellis_against_vanilla("../build_linux/vq_stage1.f32",
-                             "../build_linux/all_speech_8k_test.f32",
- 			     "../build_linux/all_speech_8k_lim.f32")
-
+test_trellis(nframes=100, ntxcw=8, nstages=3, EbNodB=3, verbose=0);
 
 %test_vq("../build_linux/vq_stage1.f32");
 %vq_hist_dec("../build_linux/all_speech_8k_test.f32");
