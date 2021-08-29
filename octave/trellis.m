@@ -18,6 +18,11 @@
 %  cd codec2/build_linux
 %  ../script/train_trellis.sh
 %
+% Results so far (August 2021):
+%
+%   1/ 2dB improvement with nstages=3, dec=1
+%   2/ No useful improvement with nstages=3, dec=4.  This is required for a practical codec to
+%      get a useful bit rate.
 
 1;
 
@@ -372,7 +377,7 @@ function results = run_test(target, vq, sd_table, h_table, ntxcw, nstages, EbNo,
   mse_vanilla = mean(diff_vanilla(:).^2);
   diff = target - target_;
   mse = mean(diff(:).^2);
-  printf("Eb/No: %3.2f dB nframes: %2d nerrors %d %d BER: %4.3f %4.3f PER: %3.2f %3.2f mse: %3.2f %3.2f %3.2f\n", 
+  printf("Eb/No: %3.2f dB nframes: %2d nerrors %3d %3d BER: %4.3f %4.3f PER: %3.2f %3.2f mse: %3.2f %3.2f %3.2f\n", 
          EbNodB, nframes, nerrors, nerrors_vanilla, nerrors/tbits, nerrors_vanilla/tbits,
 	 nper/nframes, nper_vanilla/nframes,
          mse_noerrors, mse, mse_vanilla);
@@ -391,7 +396,7 @@ endfunction
 % Simulations ---------------------------------------------------------------------
 
 % top level function to set up and run a test
-function results = test_trellis(nframes=100, ntxcw=8, nstages=3, EbNodB=3, verbose=0)
+function results = test_trellis(nframes=100, dec=1, ntxcw=8, nstages=3, EbNodB=3, verbose=0)
   K = 20; K_st=2+1; K_en=16+1;
   vq_fn = "../build_linux/vq_stage1.f32";
   vq_output_fn = "../build_linux/all_speech_8k_test.f32";
@@ -403,13 +408,13 @@ function results = test_trellis(nframes=100, ntxcw=8, nstages=3, EbNodB=3, verbo
   vq = vq(:,K_st:K_en);
   
   % load file of VQ-ed vectors to train up SD PDF estimator
-  [sd_table h_table] = vq_hist(vq_output_fn, dec=1);
+  [sd_table h_table] = vq_hist(vq_output_fn, dec);
 
   % load sequence of target vectors we wish to VQ
   target = load_f32(target_fn, K);
 
   % limit test to the first nframes vectors
-  target = target(1:nframes,K_st:K_en);
+  target = target(1:dec:dec*nframes,K_st:K_en);
   
   % run a test
   EbNo=10^(EbNodB/10);
@@ -499,6 +504,38 @@ function test_bpsk_ber
   printf("EbNo: %4.2f dB tbits: %d errs: %d BER: %4.3f %4.3f\n", EbNodB, tbits, nerrors, nerrors/tbits, 0.5*erfc(sqrt(EbNo)));
 endfunction
 
+% generate sets of curves
+function run_curves(frames=100, dec=1)
+  results_log = [];
+  EbNodB = [1 2 3 4];
+  for i=1:length(EbNodB)
+    results = test_trellis(frames, dec, ntxcw=8, nstages=3, EbNodB(i), verbose=0);
+    results_log = [results_log results];
+  end
+  for i=1:length(results_log)
+    ber(i) = results_log(i).ber;
+    ber_vanilla(i) = results_log(i).ber_vanilla;
+    per(i) = results_log(i).per;
+    per_vanilla(i) = results_log(i).per_vanilla;
+    mse_noerrors(i) = sqrt(results_log(i).mse_noerrors);
+    mse(i) = sqrt(results_log(i).mse);
+    mse_vanilla(i) = sqrt(results_log(i).mse_vanilla);
+  end
+
+  figure(1); clf; semilogy(EbNodB, ber_vanilla, "r+-;uncoded;"); hold on;
+  semilogy(EbNodB, ber, "g+-;trellis;"); hold off;
+  grid; title(sprintf("BER dec=%d nstages=%d",dec,nstages));
+
+  figure(2); clf; semilogy(EbNodB, per_vanilla, "r+-;uncoded;"); hold on;
+  semilogy(EbNodB, per, "g+-;trellis;");
+  grid; title(sprintf("PER dec=%d nstages=%d",dec,nstages));
+
+  figure(3); clf; plot(EbNodB, mse_noerrors, "b+-;no errors;"); hold on;
+  plot(EbNodB, mse_vanilla, "r+-;uncoded;");
+  plot(EbNodB, mse, "g+-;trellis;"); hold off;
+  grid; title(sprintf("RMS SD dec=%d nstages=%d",dec,nstages));
+endfunction
+
 % -------------------------------------------------------------------
 
 graphics_toolkit ("gnuplot");
@@ -507,10 +544,15 @@ randn('state',1);
 
 % uncomment one of the below to run a test or simulation
 
-%test_bpsk_ber
+% These two tests show where we are at:
+test_trellis(nframes=600, dec=1, ntxcw=8, nstages=3, EbNodB=3, verbose=0);
+test_trellis(nframes=600, dec=4, ntxcw=8, nstages=3, EbNodB=3, verbose=0);
 
-test_trellis(nframes=100, ntxcw=8, nstages=3, EbNodB=3, verbose=0);
+% run_curves(600,4)
 
+%test_trellis(nframes=200, dec=1, ntxcw=1, nstages=3, EbNodB=3, verbose=0);
+%test_trellis(nframes=100, dec=2, ntxcw=8, nstages=3, EbNodB=3, verbose=0);
 %test_vq("../build_linux/vq_stage1.f32");
 %vq_hist_dec("../build_linux/all_speech_8k_test.f32");
 %test_single
+%test_bpsk_ber
