@@ -171,7 +171,7 @@ function ind = find_most_likely_index(y, vq, C, sd_table, h_table, nstages, ntxc
     max_prob = -100;
     do
       
-      if verbose
+      if bitand(verbose, 0x4)
        printf("  ");
        for s=1:nstages
           printf("%4d", n(s)-1);
@@ -186,12 +186,12 @@ function ind = find_most_likely_index(y, vq, C, sd_table, h_table, nstages, ntxc
       prob = 0;
       for s=1:nstages
          prob += txp(s, n(s));
-         if verbose
+         if bitand(verbose,0x4)
            printf("%8.2f ", txp(s, n(s)));
          end
          if s < nstages
 	   prob += tp(s, n(s), n(s+1));
-           if verbose
+           if bitand(verbose,0x4)
              printf("%8.2f ", tp(s, n(s), n(s+1)));
            end
          end
@@ -202,7 +202,7 @@ function ind = find_most_likely_index(y, vq, C, sd_table, h_table, nstages, ntxc
         max_n = n; 
       end    
     
-      if verbose
+      if bitand(verbose,0x4)
         printf("%9.2f %9.2f\n", prob, max_prob);
       end
 
@@ -316,7 +316,7 @@ function results = run_test(target, vq, sd_table, h_table, ntxcw, nstages, EbNo,
   C = precompute_C(nbits);
 
   % Vector Quantise target vectors sequence
-  [tx_indexes target_ ] = vector_quantiser_fast(vq, target, verbose=0);
+  [tx_indexes target_ ] = vector_quantiser_fast(vq, target, verbose);
   % use convention of indexes starting from 0
   tx_indexes -= 1; 
   %  mean SD of VQ with no errors
@@ -419,6 +419,11 @@ function results = test_trellis(nframes=100, dec=1, ntxcw=8, nstages=3, EbNodB=3
   % run a test
   EbNo=10^(EbNodB/10);
   results = run_test(target, vq, sd_table, h_table, ntxcw, nstages, EbNo, verbose);
+  if verbose
+    for f=2:nframes-1
+      printf("f: %03d tx_index: %04d rx_index: %04d\n", f,  results.tx_indexes(f), results.rx_indexes(f));
+    end
+  end  
 endfunction
 
 % Plot histograms of SD at different decimations in time
