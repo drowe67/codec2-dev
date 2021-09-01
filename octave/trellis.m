@@ -304,8 +304,9 @@ endfunction
 
 % VQ a target sequence of frames then run a test using vanilla uncoded/trellis decoder
 function results = run_test(target, vq, sd_table, h_table, ntxcw, nstages, EbNo, verbose)
-  frames            = length(target);
-  nbits             = log2(length(vq));
+  [frames tmp]      = size(target);
+  [vq_length tmp]   = size(vq);
+  nbits             = log2(vq_length);
   nerrors           = 0;
   nerrors_vanilla   = 0;
   tbits             = 0;
@@ -530,15 +531,18 @@ function run_curves(frames=100, dec=1)
   figure(1); clf; semilogy(EbNodB, ber_vanilla, "r+-;uncoded;"); hold on;
   semilogy(EbNodB, ber, "g+-;trellis;"); hold off;
   grid; title(sprintf("BER dec=%d nstages=%d",dec,nstages));
-
+  print("-dpng", sprintf("trellis_dec_%d_ber.png",dec));
+  
   figure(2); clf; semilogy(EbNodB, per_vanilla, "r+-;uncoded;"); hold on;
   semilogy(EbNodB, per, "g+-;trellis;");
   grid; title(sprintf("PER dec=%d nstages=%d",dec,nstages));
+  print("-dpng", sprintf("trellis_dec_%d_per.png",dec));
 
   figure(3); clf; plot(EbNodB, mse_noerrors, "b+-;no errors;"); hold on;
   plot(EbNodB, mse_vanilla, "r+-;uncoded;");
   plot(EbNodB, mse, "g+-;trellis;"); hold off;
   grid; title(sprintf("RMS SD dec=%d nstages=%d",dec,nstages));
+  print("-dpng", sprintf("trellis_dec_%d_rms_sd.png",dec));
 endfunction
 
 % -------------------------------------------------------------------
@@ -550,10 +554,12 @@ randn('state',1);
 % uncomment one of the below to run a test or simulation
 
 % These two tests show where we are at:
-test_trellis(nframes=600, dec=1, ntxcw=8, nstages=3, EbNodB=3, verbose=0);
-test_trellis(nframes=600, dec=4, ntxcw=8, nstages=3, EbNodB=3, verbose=0);
+%test_trellis(nframes=600, dec=1, ntxcw=8, nstages=3, EbNodB=3, verbose=0);
+%test_trellis(nframes=600, dec=4, ntxcw=8, nstages=3, EbNodB=3, verbose=0);
 
-% run_curves(600,4)
+run_curves(600,1)
+run_curves(600,2)
+run_curves(600,4)
 
 %test_trellis(nframes=200, dec=1, ntxcw=1, nstages=3, EbNodB=3, verbose=0);
 %test_trellis(nframes=100, dec=2, ntxcw=8, nstages=3, EbNodB=3, verbose=0);
