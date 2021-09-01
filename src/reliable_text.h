@@ -2,7 +2,7 @@
 // Name:            reliable_text.h
 //
 // Purpose:         Handles reliable text (e.g. text with FEC).
-// Created:         August 15, 2020
+// Created:         August 15, 2021
 // Authors:         Mooneer Salem
 //
 // License:
