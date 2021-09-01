@@ -105,3 +105,39 @@ void gp_deinterleave_float(float frame[], float interleaved_frame[], int Nbits) 
     frame[i] = interleaved_frame[j];
   }
 }
+
+// The above work on complex numbers (e.g. OFDM symbols), so the below work on
+// groups of two bits at a time to remain compatible with the above.
+void gp_interleave_bits(char interleaved_frame[], char frame[], int Nbits)
+{
+    char temp[Nbits];
+    int b = choose_interleaver_b(Nbits);
+    int i,j;
+
+    for (i=0; i<Nbits; i++) {
+      j = (b*i) % Nbits;
+      temp[j] = ((frame[i*2] & 1) << 1) | (frame[i*2+1] & 1);
+    }
+    
+    for (i=0; i<Nbits; i++) {
+        interleaved_frame[i*2] = temp[i] >> 1;
+        interleaved_frame[i*2+1] = temp[i] & 1;
+    }
+}
+
+void gp_deinterleave_bits(char frame[], char interleaved_frame[], int Nbits)
+{
+    char temp[Nbits];
+    int b = choose_interleaver_b(Nbits);
+    int i,j;
+
+    for (i=0; i<Nbits; i++) {
+        j = (b*i) % Nbits;
+        temp[i] = ((interleaved_frame[j*2] & 1) << 1) | (interleaved_frame[j*2+1] & 1);
+    }
+    
+    for (i=0; i<Nbits; i++) {
+      frame[i*2] = temp[i] >> 1;
+      frame[i*2 + 1] = temp[i] & 1;
+    }
+}

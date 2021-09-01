@@ -2288,6 +2288,51 @@ void ofdm_disassemble_qpsk_modem_packet(struct OFDM *ofdm, complex float rx_syms
 }
 
 /*
+ * Disassemble a received packet of symbols into UW bits and payload data symbols
+ */
+void ofdm_disassemble_qpsk_modem_packet_with_text_amps(
+                                        struct OFDM *ofdm, complex float rx_syms[], float rx_amps[],
+                                        COMP codeword_syms[], float codeword_amps[], short txt_bits[],
+                                        int* textIndex)
+{
+    complex float *codeword = (complex float *) &codeword_syms[0]; // complex has same memory layout
+    int Nsymsperpacket = ofdm->bitsperpacket / ofdm->bps;
+    int Nuwsyms = ofdm->nuwbits / ofdm->bps;
+    int Ntxtsyms = ofdm->ntxtbits / ofdm->bps;
+    int dibit[2];
+    int s, t;
+
+    int p = 0;
+    int u = 0;
+
+    assert(ofdm->bps == 2);  /* this only works for QPSK at this stage */
+    assert(textIndex != NULL);
+    
+    for (s = 0; s < (Nsymsperpacket - Ntxtsyms); s++) {
+        if ((u < Nuwsyms) && (s == ofdm->uw_ind_sym[u])) {
+            u++;
+        } else {
+            codeword[p] = rx_syms[s];
+            codeword_amps[p] = rx_amps[s];
+            p++;
+        }
+    }
+
+    assert(u == Nuwsyms);
+    assert(p == (Nsymsperpacket - Nuwsyms - Ntxtsyms));
+
+    *textIndex = s;
+    for (t = 0; s < Nsymsperpacket; s++, t += 2) {
+        qpsk_demod(rx_syms[s], dibit);
+
+        txt_bits[t    ] = dibit[1];
+        txt_bits[t + 1] = dibit[0];
+    }
+
+    assert(t == ofdm->ntxtbits);
+}
+
+/*
  * Extract just the UW from the packet
  */
 void ofdm_extract_uw(struct OFDM *ofdm, complex float rx_syms[], float rx_amps[], uint8_t rx_uw[]) {
