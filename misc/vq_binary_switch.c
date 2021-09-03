@@ -143,9 +143,8 @@ int main(int argc, char *argv[]) {
       exit(1);
     }
 
-    if (n) {
+    if (n==0) {
       /* count how many entries m of dimension k are in this VQ file */
-      int n = 0;
       float dummy[dim];
       while (fread(dummy, sizeof(float), dim, fq) == (size_t)dim)
 	n++;
@@ -154,11 +153,12 @@ int main(int argc, char *argv[]) {
 
       rewind(fq);
     }
-    /* load VQ into memory */
-    int rd = fread(vq, sizeof(float), n*dim, fq);
-    assert(rd == n*dim);
-    fclose(fq);
 
+    /* load VQ into memory */
+    int nrd = fread(vq, sizeof(float), n*dim, fq);
+    assert(nrd == n*dim);
+    fclose(fq);
+   
     /* set probability of each vector to 1.0 for now */
     float prob[n];
     for(int l=0; l<n; l++) prob[l] = 1.0;
@@ -169,20 +169,15 @@ int main(int argc, char *argv[]) {
     int switches = 0;
     float distortion0 = distortion_of_current_mapping(vq, n, dim, prob, st, en);
     fprintf(stderr, "distortion0: %f\n", distortion0);
-    
+
     while(!finished) {
 
       // generate a list A(i) of which vectors have the largest cost of bit errors
       for(int k=0; k<n; k++) {
 	c[k] = cost_of_distance_one(vq, n, dim, prob, k, st, en, verbose);
-	//fprintf(stderr, "c[%d] = %f\n", k, c[k]);
-      }
-      
+      }      
       int A[n];
       sort_c(A, n);
-      for(int k=0; k<n; k++) {
-	//fprintf(stderr, "A[%d] = %d\n", k, A[k]);
-      }
       
       // Try switching each vector with A(i)
       float best_delta = 0; int best_j = 0;
@@ -214,11 +209,21 @@ int main(int argc, char *argv[]) {
 	swap(vq, dim, A[i], best_j);
 	switches++;
 
+	// save results
+	FILE *fq=fopen(argv[dx+1], "wb");
+	if (fq == NULL) {
+	    fprintf(stderr, "Couldn't open: %s\n", argv[dx+1]);
+	    exit(1);
+	}
+	int nwr = fwrite(vq, sizeof(float), n*dim, fq);
+	assert(nwr == n*dim);
+	fclose(fq);
+	
 	// set up for next iteration
 	iteration++;
 	float distortion = distortion_of_current_mapping(vq, n, dim, prob, st, en);
-	printf("it: %3d dist: %f %3.2f i: %3d sw: %3d\n", iteration, distortion,
-	       distortion/distortion0, i, switches);
+	fprintf(stderr, "it: %3d dist: %f %3.2f i: %3d sw: %3d\n", iteration, distortion,
+	                distortion/distortion0, i, switches);
 	if (iteration >= max_iter) finished = 1;
 	i = 0;
       }
