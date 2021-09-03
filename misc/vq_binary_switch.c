@@ -21,13 +21,13 @@
 #define MAX_ENTRIES 4096
 
 // equation (33) of [1], total cost of all hamming distance 1 vectors of vq index k
-float cost_of_distance_one(float *vq, int n, int dim, float *prob, int k, int verbose) {
+float cost_of_distance_one(float *vq, int n, int dim, float *prob, int k, int st, int en, int verbose) {
   int log2N = log2(n);
   float c = 0.0;
   for (int b=0; b<log2N; b++) {
     unsigned int index_neighbour = k ^ (1<<b);
     float dist = 0.0;
-    for(int i=0; i<dim; i++)
+    for(int i=st; i<=en; i++)
       dist += pow(vq[k*dim+i] - vq[index_neighbour*dim+i], 2.0);
     c += prob[k]*dist;
     if (verbose)
@@ -37,10 +37,10 @@ float cost_of_distance_one(float *vq, int n, int dim, float *prob, int k, int ve
 }
 
 // equation (39) of [1]
-float distortion_of_current_mapping(float *vq, int n, int dim, float *prob) {
+float distortion_of_current_mapping(float *vq, int n, int dim, float *prob, int st, int en) {
   float d = 0.0;
   for(int k=0; k<n; k++)
-    d += cost_of_distance_one(vq, n, dim, prob, k, 0);
+    d += cost_of_distance_one(vq, n, dim, prob, k, st, en, 0);
   return d;
 }
  
@@ -81,6 +81,7 @@ int main(int argc, char *argv[]) {
     int   st = -1;
     int   en = -1;
     int   verbose = 0;
+    int   n = 0;
     
     int o = 0; int opt_idx = 0;
     while (o != -1) {
@@ -89,7 +90,7 @@ int main(int argc, char *argv[]) {
            {"en",      required_argument, 0, 'e'},
 	   {0, 0, 0, 0}
         };
-        o = getopt_long(argc,argv,"hd:m:vt:e:",long_opts,&opt_idx);
+        o = getopt_long(argc,argv,"hd:m:vt:e:n:",long_opts,&opt_idx);
         switch (o) {
 	case 'd':
 	    dim = atoi(optarg);
@@ -104,13 +105,17 @@ int main(int argc, char *argv[]) {
         case 'e':
             en = atoi(optarg);
             break;
+        case 'n':
+            n = atoi(optarg);
+            break;
         case 'v':
             verbose = 1;
             break;
 	help:
 	    fprintf(stderr, "\n");
-            fprintf(stderr, "usage: %s -d dimension [-m max_iterations -v --st Kst --en Ken] vq_in.f32 vq_out.f32\n", argv[0]);
+            fprintf(stderr, "usage: %s -d dimension [-m max_iterations -v --st Kst --en Ken -n nVQ] vq_in.f32 vq_out.f32\n", argv[0]);
 	    fprintf(stderr, "\n");
+            fprintf(stderr, "-n nVQ      Run with just the first nVQ entries of the VQ\n");
             fprintf(stderr, "--st Kst    Start vector element for error calculation (default 0)\n");
             fprintf(stderr, "--en Ken    End vector element for error calculation (default K-1)\n");
             fprintf(stderr, "-v          verbose\n");
@@ -138,16 +143,18 @@ int main(int argc, char *argv[]) {
       exit(1);
     }
 
-    /* count how many entries m of dimension k are in this VQ file */
-    int n = 0;
-    float dummy[dim];
-    while (fread(dummy, sizeof(float), dim, fq) == (size_t)dim)
-      n++;
-    assert(n <= MAX_ENTRIES);
-    fprintf(stderr, "%d entries of vectors width %d\n", n, dim);
+    if (n) {
+      /* count how many entries m of dimension k are in this VQ file */
+      int n = 0;
+      float dummy[dim];
+      while (fread(dummy, sizeof(float), dim, fq) == (size_t)dim)
+	n++;
+      assert(n <= MAX_ENTRIES);
+      fprintf(stderr, "%d entries of vectors width %d\n", n, dim);
 
-    /* now load VQ into memory */
-    rewind(fq);                       
+      rewind(fq);
+    }
+    /* load VQ into memory */
     int rd = fread(vq, sizeof(float), n*dim, fq);
     assert(rd == n*dim);
     fclose(fq);
@@ -160,14 +167,14 @@ int main(int argc, char *argv[]) {
     int i = 0;
     int finished = 0;
     int switches = 0;
-    float distortion0 = distortion_of_current_mapping(vq, n, dim, prob);
+    float distortion0 = distortion_of_current_mapping(vq, n, dim, prob, st, en);
     fprintf(stderr, "distortion0: %f\n", distortion0);
     
     while(!finished) {
 
       // generate a list A(i) of which vectors have the largest cost of bit errors
       for(int k=0; k<n; k++) {
-	c[k] = cost_of_distance_one(vq, n, dim, prob, k, 0);
+	c[k] = cost_of_distance_one(vq, n, dim, prob, k, st, en, verbose);
 	//fprintf(stderr, "c[%d] = %f\n", k, c[k]);
       }
       
@@ -182,10 +189,10 @@ int main(int argc, char *argv[]) {
       for(int j=1; j<n; j++) {
 	// we can't switch with ourself
 	if (j != A[i]) {
-	  float distortion1 = distortion_of_current_mapping(vq, n, dim, prob);
+	  float distortion1 = distortion_of_current_mapping(vq, n, dim, prob, st, en);
 	  // switch vq entries A(i) and j
 	  swap(vq, dim, A[i], j);
-	  float distortion2 = distortion_of_current_mapping(vq, n, dim, prob);
+	  float distortion2 = distortion_of_current_mapping(vq, n, dim, prob, st, en);
 	  float delta = distortion2 - distortion1;
 	  if (delta < 0.0) {
 	    if (fabs(delta) > best_delta) {
@@ -209,7 +216,7 @@ int main(int argc, char *argv[]) {
 
 	// set up for next iteration
 	iteration++;
-	float distortion = distortion_of_current_mapping(vq, n, dim, prob);
+	float distortion = distortion_of_current_mapping(vq, n, dim, prob, st, en);
 	printf("it: %3d dist: %f %3.2f i: %3d sw: %3d\n", iteration, distortion,
 	       distortion/distortion0, i, switches);
 	if (iteration >= max_iter) finished = 1;
