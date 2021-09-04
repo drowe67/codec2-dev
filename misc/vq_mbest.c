@@ -12,6 +12,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <limits.h>
 #include "mbest.h"
 
 #define MAX_K       20
@@ -35,9 +36,10 @@ int main(int argc, char *argv[]) {
     char  fnames[256], fn[256], *comma, *p;
     FILE *fq;
     float lower = -1E32;
-    int     st = -1;
-    int     en = -1;
-   
+    int   st = -1;
+    int   en = -1;
+    int   num = INT_MAX;
+    
     int o = 0; int opt_idx = 0;
     while (o != -1) {
        static struct option long_opts[] = {
@@ -48,10 +50,11 @@ int main(int argc, char *argv[]) {
 	   {"verbose", required_argument, 0, 'v'},
            {"st",      required_argument, 0, 't'},
            {"en",      required_argument, 0, 'e'},
+           {"num",     required_argument, 0, 'n'},
 	   {0, 0, 0, 0}
         };
 
-        o = getopt_long(argc,argv,"hk:q:m:vt:e:",long_opts,&opt_idx);
+        o = getopt_long(argc,argv,"hk:q:m:vt:e:n:",long_opts,&opt_idx);
         switch (o) {
 	case 'k':
 	    k = atoi(optarg);
@@ -96,6 +99,9 @@ int main(int argc, char *argv[]) {
             mbest_survivors = atoi(optarg);
             fprintf(stderr, "mbest_survivors = %d\n",  mbest_survivors);
             break;
+        case 'n':
+	    num = atoi(optarg);
+            break;
         case 'l':
             lower = atof(optarg);
             break;
@@ -118,6 +124,8 @@ int main(int argc, char *argv[]) {
 	    fprintf(stderr, "--mbest N                number of survivors at each stage, set to 0 for standard VQ search\n");
             fprintf(stderr, "--st    Kst              start vector element for error calculation (default 0)\n");
             fprintf(stderr, "--en    Ken              end vector element for error calculation (default K-1)\n");
+	    fprintf(stderr, "--num   numToProcess     number of vectors to quantise (default to EOF)\n");
+	    fprintf(stderr, "-v                       Verbose\n");
             exit(1);
         }
     }
@@ -132,7 +140,7 @@ int main(int argc, char *argv[]) {
     int   indexes[num_stages], nvecs = 0;
     float target[k], quantised[k];
     float sqe = 0.0;
-    while(fread(&target, sizeof(float), k, stdin)) {
+    while(fread(&target, sizeof(float), k, stdin) && (nvecs < num)) {
 	int dont_count = 0;
 	/* optional clamping to lower limit or mean */
 	float mean = 0.0;
@@ -154,7 +162,7 @@ int main(int argc, char *argv[]) {
 	fwrite(&quantised, sizeof(float), k, stdout);
 	nvecs++;
     }
-    fprintf(stderr, "%4.2f\n", sqe/(nvecs*k));
+    fprintf(stderr, "%4.2f\n", sqe/(nvecs*(en-st+1)));
     return 0;
 }
 
