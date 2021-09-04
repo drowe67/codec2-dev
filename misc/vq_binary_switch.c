@@ -77,7 +77,7 @@ void swap(float *vq, int dim, int index1, int index2) {
 int main(int argc, char *argv[]) {
     float vq[MAX_DIM*MAX_ENTRIES];
     int   dim = MAX_DIM;
-    int   max_iter = 200;
+    int   max_iter = INT_MAX;
     int   st = -1;
     int   en = -1;
     int   verbose = 0;
