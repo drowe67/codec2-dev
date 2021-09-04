@@ -99,7 +99,7 @@ void mbest_print(char title[], struct MBEST *mbest) {
     for(i=0; i<mbest->entries; i++) {
 	for(j=0; j<MBEST_STAGES; j++)
 	    fprintf(stderr, "  %4d ", mbest->list[i].index[j]);
-	fprintf(stderr, " %f\n", mbest->list[i].error);
+	fprintf(stderr, " %f\n", (double)mbest->list[i].error);
     }
 }
 

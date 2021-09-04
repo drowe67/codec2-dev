@@ -26,6 +26,7 @@ Now build for the stm32, and run the stm32 ctests:
 $ cd ~/codec2/stm32 && mkdir build_stm32 && cd build_stm32
 $ cmake -DCMAKE_TOOLCHAIN_FILE=../cmake/STM32_Toolchain.cmake -DPERIPHLIBDIR=~/Downloads/STM32F4xx_DSP_StdPeriph_Lib_V1.8.0 ..
 $ make
+$ sudo apt install python3-numpy libncurses5
 $ ctest -V
 ```
 
@@ -175,12 +176,17 @@ source from (https://github.com/db4ple/openocd.git) instead of the official repo
     /usr/local/bin)
 
 	```Bash
+      sudo apt install libusb-1.0-0-dev libtool pkg-config autoconf automake texinfo
       git clone https://git.code.sf.net/p/openocd/code openocd-code
       cd openocd-code
       ./bootstrap
       ./configure
       sudo make install
       which openocd
+	
+      sudo cp contrib/60-openocd.rules /etc/udev/rules.d/
+      sudo udevadm control --reload-rules
+      {un plug/plug-in stm32 Discovery}
 	```
 
 2. Plug in a stm32 development board and test:
@@ -246,16 +252,6 @@ in the output of st-util.  They can be ignored.
   2018-12-29T06:52:16 INFO gdb-server.c: Chip ID is 00000413, Core ID is  2ba01477.G
   2018-12-29T06:52:16 INFO gdb-server.c: Listening at *:4242...
 ```
-
-## Install numpy for Python3
-Some test are in fact python3 scripts and require the numpy package to be installed,
-otherwise some tests will fail.
-
-On Ubuntu:
-   ```Bash
-   sudo apt-get install python3-numpy 
-   ```
- 
 
 
 

@@ -37,6 +37,8 @@
 #include <stm32f4xx_gpio.h>
 #include <stm32f4xx_rcc.h>
 #include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
 
 #include "sfx.h"
 #include "sounds.h"
@@ -44,7 +46,7 @@
 #include "menu.h"
 #include "tot.h"
 
-#define VERSION         "V4"
+#define VERSION         "V5"
 #define FORTY_MS_16K    (0.04*16000)         /* 40ms of samples at 16 kHz */
 #define FREEDV_NSAMPLES_16K (2*FREEDV_NSAMPLES)
 #define CCM             (void*)0x10000000    /* start of 64k CCM memory   */
@@ -131,10 +133,11 @@
  */
 uint8_t core_state = STATE_RX;
 
-#define MAX_MODES  3
+#define MAX_MODES  4
 #define ANALOG     0
 #define DV1600     1
 #define DV700D     2
+#define DV700E     3
 
 struct switch_t sw_select;  /*!< Switch driver for SELECT button */
 struct switch_t sw_back;    /*!< Switch driver for BACK button */
@@ -302,6 +305,25 @@ struct freedv *set_freedv_mode(int op_mode, int *n_samples) {
         freedv_set_snr_squelch_thresh(f, -2.0);  /* squelch at -2.0 dB      */
         freedv_set_squelch_en(f, 1);
         freedv_set_eq(f, 1);                     /* equaliser on by default */
+        
+        /* Clipping and TXBPF nice to have for 700D. */
+        freedv_set_clip(f, 1);
+        freedv_set_tx_bpf(f, 1);
+        
+        *n_samples = freedv_get_n_speech_samples(f);
+        break;
+    case DV700E:
+        usart_printf("FreeDV 700E\n");
+        f = freedv_open(FREEDV_MODE_700E);
+        assert(f != NULL);
+        freedv_set_snr_squelch_thresh(f, 0.0);  /* squelch at 0.0 dB      */
+        freedv_set_squelch_en(f, 1);
+        freedv_set_eq(f, 1);                     /* equaliser on by default */
+
+        /* Clipping and TXBPF needed for 700E. */
+        freedv_set_clip(f, 1);
+        freedv_set_tx_bpf(f, 1);
+
         *n_samples = freedv_get_n_speech_samples(f);
         break;
     }
@@ -466,6 +488,8 @@ int main(void) {
         snprintf(startup_announcement, 16, VERSION " 1600");
     else if (op_mode == DV700D)
         snprintf(startup_announcement, 16, VERSION " 700D");
+    else if (op_mode == DV700E)
+        snprintf(startup_announcement, 16, VERSION " 700E");
     morse_play(&morse_player, startup_announcement);
 
     usart_printf("entering main loop...\n");
@@ -510,7 +534,7 @@ int main(void) {
         }
 
         /* if we have moved from tx to rx reset sync state of rx so we re-start acquisition */
-        if ((op_mode == DV1600) || (op_mode == DV700D))
+        if ((op_mode == DV1600) || (op_mode == DV700D) || (op_mode == DV700E))
             if ((prev_core_state == STATE_TX) && (core_state == STATE_RX))
                 freedv_set_sync(f, FREEDV_SYNC_UNSYNC);
             
@@ -589,7 +613,7 @@ int main(void) {
                         lastms = ms;
                     }
                     
-                    /* 1600 or 700D DV mode */
+                    /* 1600 or 700D/E DV mode */
 
                     nin = freedv_nin(f);
                     nout = nin;
@@ -731,7 +755,12 @@ int process_core_state_machine(int core_state, struct menu_t *menu, int *op_mode
                     mode_changed = 1;
                 } else if (switch_released(&sw_back)) {
                     /* Shortcut: change current mode */
-                    *op_mode = (*op_mode - 1) % MAX_MODES;
+                    *op_mode = *op_mode - 1;
+                    if (*op_mode < 0)
+                    {
+                        // Loop back around to the end of the mode list if we reach 0.
+                        *op_mode = MAX_MODES - 1;
+                    }
                     mode_changed = 1;
                 }
 
@@ -743,6 +772,8 @@ int process_core_state_machine(int core_state, struct menu_t *menu, int *op_mode
                         morse_play(&morse_player, "1600");
                     else if (*op_mode == DV700D)
                         morse_play(&morse_player, "700D");
+                    else if (*op_mode == DV700E)
+                        morse_play(&morse_player, "700E");
                     sfx_play(&sfx_player, sound_click);
                 }
             }
@@ -865,6 +896,7 @@ int process_core_state_machine(int core_state, struct menu_t *menu, int *op_mode
  * 	|   |- "ANA"    - Analog
  * 	|   |- "DV1600" - FreeDV 1600 
  * 	|   |- "DV700D" - FreeDV 700D
+ * 	|   |- "DV700E" - FreeDV 700E
  *      |
  * 	|- "TOT"        Timer Out Timer options
  * 	|   |- "TIME"   - Set timeout time (a sub menu)
@@ -913,7 +945,14 @@ static void menu_default_cb(struct menu_t* const menu, uint32_t event)
             break;
         case MENU_EVT_PREV:
             sfx_play(&sfx_player, sound_click);
-            menu->current = (menu->current - 1) % item->num_children;
+            if (menu->current == 0)
+            {
+                menu->current = item->num_children - 1;
+            }
+            else
+            {
+                menu->current = menu->current - 1;
+            }
             announce = 1;
             break;
         case MENU_EVT_SELECT:
@@ -966,7 +1005,7 @@ static const struct menu_item_t menu_op_mode = {
     .label          = "MODE",
     .event_cb       = menu_op_mode_cb,
     .children       = menu_op_mode_children,
-    .num_children   = 3,
+    .num_children   = 4,
 };
 /* Children */
 static const struct menu_item_t menu_op_mode_analog = {
@@ -996,10 +1035,20 @@ static const struct menu_item_t menu_op_mode_dv700D = {
         .ui         = DV700D,
     },
 };
+static const struct menu_item_t menu_op_mode_dv700E = {
+    .label          = "700E",
+    .event_cb       = NULL,
+    .children       = NULL,
+    .num_children   = 0,
+    .data           = {
+        .ui         = DV700E,
+    },
+};
 static struct menu_item_t const* menu_op_mode_children[] = {
     &menu_op_mode_analog,
     &menu_op_mode_dv1600,
     &menu_op_mode_dv700D,
+    &menu_op_mode_dv700E,
 };
 /* Callback function */
 static void menu_op_mode_cb(struct menu_t* const menu, uint32_t event)
@@ -1018,6 +1067,9 @@ static void menu_op_mode_cb(struct menu_t* const menu, uint32_t event)
                 case DV700D:
                     menu->current = 2;
                     break;
+                case DV700E:
+                    menu->current = 3;
+                    break;
                 default:
                     menu->current = 0;
             }
@@ -1032,7 +1084,14 @@ static void menu_op_mode_cb(struct menu_t* const menu, uint32_t event)
             break;
         case MENU_EVT_PREV:
             sfx_play(&sfx_player, sound_click);
-            menu->current = (menu->current - 1) % item->num_children;
+            if (menu->current == 0)
+            {
+                menu->current = item->num_children - 1;
+            }
+            else
+            {
+                menu->current = menu->current - 1;
+            }
             announce = 1;
             break;
         case MENU_EVT_SELECT:

@@ -783,6 +783,86 @@ if(UNIX) # Uses pthreads
 endif()
 
     # -------------------------------------------------------------------------
+    #                                Reliable Text
+    # -------------------------------------------------------------------------
+     add_test(NAME test_freedv_reliable_text_truncate_string
+           COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                          ./freedv_tx 1600 ../../raw/ve9qrp.raw - --reliabletext AB1CDEFGH > 1600_reliable.raw 2>/dev/null;
+                          ./freedv_rx 1600 1600_reliable.raw /dev/null --txtrx 1600_reliable.txt --reliabletext 2>/dev/null;
+                          grep 'AB1CDEFG' 1600_reliable.txt | wc -l")
+           set_tests_properties(test_freedv_reliable_text_truncate_string PROPERTIES PASS_REGULAR_EXPRESSION "20")
+                              
+    add_test(NAME test_freedv_reliable_text_ideal_1600
+          COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                         ./freedv_tx 1600 ../../raw/ve9qrp.raw - --reliabletext AB1CDEF > 1600_reliable.raw 2>/dev/null;
+                         ./freedv_rx 1600 1600_reliable.raw /dev/null --txtrx 1600_reliable.txt --reliabletext 2>/dev/null;
+                         cat 1600_reliable.txt | wc -l")
+          set_tests_properties(test_freedv_reliable_text_ideal_1600 PROPERTIES PASS_REGULAR_EXPRESSION "20")
+
+    add_test(NAME test_freedv_reliable_text_ideal_700D
+       COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                      ./freedv_tx 700D ../../raw/ve9qrp.raw - --reliabletext AB1CDEF --txbpf 1 --clip 1 > 700D_reliable.raw 2>/dev/null;
+                      ./freedv_rx 700D 700D_reliable.raw /dev/null --txtrx 700D_reliable.txt --reliabletext 2>/dev/null;
+                      cat 700D_reliable.txt | wc -l")
+       set_tests_properties(test_freedv_reliable_text_ideal_700D PROPERTIES PASS_REGULAR_EXPRESSION "21")
+                          
+    add_test(NAME test_freedv_reliable_text_ideal_700E
+        COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                       ./freedv_tx 700E ../../raw/ve9qrp.raw - --reliabletext AB1CDEF --txbpf 1 --clip 1 > 700E_reliable.raw 2>/dev/null;
+                       ./freedv_rx 700E 700E_reliable.raw /dev/null --txtrx 700E_reliable.txt --reliabletext 2>/dev/null;
+                       cat 700E_reliable.txt | wc -l")
+        set_tests_properties(test_freedv_reliable_text_ideal_700E PROPERTIES PASS_REGULAR_EXPRESSION "21")
+
+   add_test(NAME test_freedv_reliable_text_awgn_1600
+         COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                        ./freedv_tx 1600 ../../raw/ve9qrp.raw - --reliabletext AB1CDEF | ./cohpsk_ch - - -25 --Fs 8000 -f -5 > 1600_reliable.raw 2>/dev/null;
+                        ./freedv_rx 1600 1600_reliable.raw /dev/null --txtrx 1600_reliable.txt --reliabletext 2>/dev/null;
+                        if [ `cat 1600_reliable.txt | wc -l` -ge 10 ]; then echo 1; fi")
+         set_tests_properties(test_freedv_reliable_text_awgn_1600 PROPERTIES PASS_REGULAR_EXPRESSION "1")
+
+   add_test(NAME test_freedv_reliable_text_awgn_700D
+      COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                     ./freedv_tx 700D ../../raw/ve9qrp.raw - --reliabletext AB1CDEF --txbpf 1 --clip 1 | ./cohpsk_ch - - -12 --Fs 8000 -f -5 > 700D_reliable.raw 2>/dev/null;
+                     ./freedv_rx 700D 700D_reliable.raw /dev/null --txtrx 700D_reliable.txt --reliabletext 2>/dev/null;
+                     if [ `cat 700D_reliable.txt | wc -l` -ge 10 ]; then echo 1; fi")
+      set_tests_properties(test_freedv_reliable_text_awgn_700D PROPERTIES PASS_REGULAR_EXPRESSION "1")
+  
+   add_test(NAME test_freedv_reliable_text_awgn_700E
+       COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                      ./freedv_tx 700E ../../raw/ve9qrp.raw - --reliabletext AB1CDEF --txbpf 1 --clip 1 | ./cohpsk_ch - - -15 --Fs 8000 -f -5 > 700E_reliable.raw 2>/dev/null;
+                      ./freedv_rx 700E 700E_reliable.raw /dev/null --txtrx 700E_reliable.txt --reliabletext 2>/dev/null;
+                      if [ `cat 700E_reliable.txt | wc -l` -ge 10 ]; then echo 1; fi")
+       set_tests_properties(test_freedv_reliable_text_awgn_700E PROPERTIES PASS_REGULAR_EXPRESSION "1")
+                          
+  add_test(NAME test_freedv_reliable_text_fade_1600
+        COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/unittest; ./reliable_text_fade.sh 1600 -28 3 0 '${CMAKE_CURRENT_BINARY_DIR}/src'")
+
+  add_test(NAME test_freedv_reliable_text_fade_700D
+        COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/unittest; ./reliable_text_fade.sh 700D -19 8 1 '${CMAKE_CURRENT_BINARY_DIR}/src'")
+                                      
+  add_test(NAME test_freedv_reliable_text_fade_700E
+        COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/unittest; ./reliable_text_fade.sh 700E -22 9 1 '${CMAKE_CURRENT_BINARY_DIR}/src'")
+                          
+if(LPCNET)
+    add_test(NAME test_freedv_reliable_text_ideal_2020
+        COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                       ./freedv_tx 2020 ../../raw/ve9qrp.raw - --reliabletext AB1CDEF > 2020_reliable.raw 2>/dev/null;
+                       ./freedv_rx 2020 2020_reliable.raw /dev/null --txtrx 2020_reliable.txt --reliabletext 2>/dev/null;
+                       cat 2020_reliable.txt | wc -l")
+        set_tests_properties(test_freedv_reliable_text_ideal_2020 PROPERTIES PASS_REGULAR_EXPRESSION "9")
+                           
+   add_test(NAME test_freedv_reliable_text_awgn_2020
+         COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                        ./freedv_tx 2020 ../../raw/ve9qrp.raw - --reliabletext AB1CDEF | ./cohpsk_ch - - -22 --Fs 8000 -f -5 > 2020_reliable.raw 2>/dev/null;
+                        ./freedv_rx 2020 2020_reliable.raw /dev/null --txtrx 2020_reliable.txt --reliabletext 2>/dev/null;
+                        if [ `cat 2020_reliable.txt | wc -l` -ge 9 ]; then echo 1; fi")
+         set_tests_properties(test_freedv_reliable_text_awgn_1600 PROPERTIES PASS_REGULAR_EXPRESSION "1")
+                            
+    add_test(NAME test_freedv_reliable_text_fade_2020
+          COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/unittest; ./reliable_text_fade.sh 2020 -26 6 0 '${CMAKE_CURRENT_BINARY_DIR}/src'")
+endif(LPCNET)
+                                                     
+    # -------------------------------------------------------------------------
     #                                FreeDv API memory leaks
     # -------------------------------------------------------------------------
 

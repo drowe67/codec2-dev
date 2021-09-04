@@ -36,6 +36,7 @@
 #include <string.h>
 #include <errno.h>
 
+#include "reliable_text.h"
 #include "freedv_api.h"
 #include "modem_stats.h"
 
@@ -44,27 +45,37 @@
 /* optioal call-back function for received txt characters */
 void my_put_next_rx_char(void *states, char c) { fprintf((FILE*)states, "%c", c); }
 
+static FILE* reliable_tx_fp;
+reliable_text_t reliable_text_obj;
+
+void on_reliable_text_rx(reliable_text_t rt, const char* txt_ptr, int length, void* state)
+{
+    fprintf(reliable_tx_fp, "%s\n", txt_ptr);
+    reliable_text_reset(reliable_text_obj);
+}
+
 int main(int argc, char *argv[]) {
     FILE                      *fin, *fout, *ftxt_rx = NULL;
-    struct freedv             *freedv;
     int                        nin, nout, nout_total = 0, frame = 0;
     struct MODEM_STATS         stats = {0};
     int                        mode;
     int                        sync;
     float                      snr_est;
     float                      clock_offset;
-    int                        use_testframes, verbose, discard, use_complex, use_dpsk;
-    int                        use_squelch;
+    int                        use_testframes, verbose, discard, use_complex, use_dpsk, use_reliabletext;
+    int                        use_squelch, highpassthroughgain;
     float                      squelch = 0;
     int                        i;
-
+    struct freedv             *freedv;
+    
     if (argc < 4) {
         char f2020[80] = {0};
         #ifdef __LPCNET__
         sprintf(f2020,"|2020");
         #endif
 	printf("usage: %s 1600|700C|700D|700E|2400A|2400B|800XA%s InputModemSpeechFile OutputSpeechRawFile\n"
-               " [--testframes] [-v] [--discard] [--usecomplex] [--dpsk] [--squelch leveldB] [--txtrx filename]\n", argv[0],f2020);
+               " [--testframes] [-v] [--discard] [--usecomplex] [--dpsk] [--squelch leveldB] [--txtrx filename] [--reliabletext]\n"
+	       " [--highpassthroughgain]\n", argv[0],f2020);
 	printf("e.g    %s 1600 hts1a_fdmdv.raw hts1a_out.raw\n", argv[0]);
 	exit(1);
     }
@@ -99,8 +110,9 @@ int main(int argc, char *argv[]) {
 	exit(1);
     }
 
-    use_testframes = verbose = discard = use_complex = use_dpsk = use_squelch = 0;
-
+    use_testframes = verbose = discard = use_complex = use_dpsk = use_squelch = 0; use_reliabletext = 0;
+    highpassthroughgain = 0;
+    
     if (argc > 4) {
         for (i = 4; i < argc; i++) {
             if (strcmp(argv[i], "--testframes") == 0) use_testframes = 1;
@@ -108,6 +120,7 @@ int main(int argc, char *argv[]) {
             else if (strcmp(argv[i], "-vv") == 0) verbose = 2;
             else if (strcmp(argv[i], "--discard") == 0) discard = 1;
             else if (strcmp(argv[i], "--usecomplex") == 0) use_complex = 1;
+            else if (strcmp(argv[i], "--highpassthroughgain") == 0) highpassthroughgain = 1;
             else if (strcmp(argv[i], "--squelch") == 0) {
                 squelch = atof(argv[i + 1]);
                 i++;
@@ -116,6 +129,9 @@ int main(int argc, char *argv[]) {
             else if (strcmp(argv[i], "--txtrx") == 0) {
                 ftxt_rx = fopen(argv[i+1], "wt"); i++;
                 assert(ftxt_rx != NULL);
+            } else if (strcmp(argv[i], "--reliabletext") == 0) {
+                use_reliabletext = 1;
+                // received text is saved to file specified by --txtrx.
             } else {
                 fprintf(stderr, "unkown option: %s\n", argv[i]);
                 exit(1);
@@ -130,7 +146,7 @@ int main(int argc, char *argv[]) {
 
     freedv_set_test_frames(freedv, use_testframes);
     if (verbose == 2) freedv_set_verbose(freedv, verbose);
-    freedv_passthrough_gain(freedv, 1.0);
+    if (highpassthroughgain) { freedv_passthrough_gain(freedv, 1.0); }
     
     if (use_squelch) {
         freedv_set_snr_squelch_thresh(freedv, squelch);
@@ -140,7 +156,21 @@ int main(int argc, char *argv[]) {
 
     /* install optional handler for recevied txt characters */
     if (ftxt_rx != NULL)
-        freedv_set_callback_txt(freedv, my_put_next_rx_char, NULL, ftxt_rx);
+    {
+        if (use_reliabletext)
+        {
+            reliable_tx_fp = ftxt_rx;
+            
+            reliable_text_obj = reliable_text_create();
+            assert(reliable_text_obj != NULL);
+            reliable_text_set_string(reliable_text_obj, "AB1CDEF", 7); // not used
+            reliable_text_use_with_freedv(reliable_text_obj, freedv, on_reliable_text_rx, NULL);
+        }
+        else
+        {
+            freedv_set_callback_txt(freedv, my_put_next_rx_char, NULL, ftxt_rx);
+        }
+    }
 
     /* note use of API functions to tell us how big our buffers need to be -----*/
 
@@ -200,7 +230,6 @@ int main(int argc, char *argv[]) {
 	/* if using pipes we probably don't want the usual buffering
            to occur */
         if (fout == stdout) fflush(stdout);
-        if (fin == stdin) fflush(stdin);
     }
 
     if (ftxt_rx != NULL) fclose(ftxt_rx);
@@ -236,6 +265,12 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    if (use_reliabletext)
+    {
+        reliable_text_destroy(reliable_text_obj);
+    }
+    
     freedv_close(freedv);
+    
     return 0;
 }

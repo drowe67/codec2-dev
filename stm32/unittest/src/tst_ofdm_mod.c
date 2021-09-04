@@ -183,7 +183,7 @@ int main(int argc, char *argv[]) {
                 ofdm_ldpc_interleave_tx(ofdm, &ldpc, tx_sams, tx_bits_char, txt_bits_char);
 
                 for(i=0; i<Nsamperframe; i++) {
-                    tx_scaled[i] = OFDM_AMP_SCALE * crealf(tx_sams[i]);
+                    tx_scaled[i] = crealf(tx_sams[i]);
                 }
 
              } else { // !config_ldpc_en
@@ -214,7 +214,7 @@ int main(int argc, char *argv[]) {
                 }
 
                 for(i=0; i<Nsamperframe; i++) {
-                    tx_scaled[i] = OFDM_AMP_SCALE * tx_sams[i].real;
+                    tx_scaled[i] = tx_sams[i].real;
                 }
             }
 

@@ -129,8 +129,7 @@ int main(int argc,char *argv[]){
             fwrite(&frequencyHz, sizeof(short), 1, fout);
         }
 
-        if(fin == stdin || fout == stdout){
-            fflush(fin);
+        if(fout == stdout){
             fflush(fout);
         }
     }

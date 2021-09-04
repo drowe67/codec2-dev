@@ -230,11 +230,10 @@ int main(int argc, char *argv[])
             }
         }
 
-	/* if this is in a pipeline, we probably don't want the usual
-	   buffering to occur */
+    	/* if this is in a pipeline, we probably don't want the usual
+    	   buffering to occur */
 
         if (fout == stdout) fflush(stdout);
-        if (fin == stdin) fflush(stdin);
     }
 
     fclose(fin);

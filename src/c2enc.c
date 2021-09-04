@@ -178,11 +178,10 @@ int main(int argc, char *argv[])
         else
             fwrite(bits, sizeof(char), nbyte, fout);
 
-	// if this is in a pipeline, we probably don't want the usual
+	    // if this is in a pipeline, we probably don't want the usual
         // buffering to occur
 
         if (fout == stdout) fflush(stdout);
-        if (fin == stdin) fflush(stdin);
     }
 
     if (report_var) {

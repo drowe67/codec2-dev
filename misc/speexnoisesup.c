@@ -25,8 +25,8 @@ int main(int argc, char *argv[]) {
     SpeexPreprocessState *st;
 
     if (argc < 2) {
-	printf("usage: %s InFile OutFile\n", argv[0]);
-	exit(0);
+	    printf("usage: %s InFile OutFile\n", argv[0]);
+	    exit(0);
     }
 
     if (strcmp(argv[1], "-")  == 0) fin = stdin;
@@ -37,16 +37,15 @@ int main(int argc, char *argv[]) {
 
     if (strcmp(argv[2], "-") == 0) fout = stdout;
     else if ((fout = fopen(argv[2],"wb")) == NULL) {
-	fprintf(stderr, "Error opening %s\n", argv[2]);
-	exit(1);
+	    fprintf(stderr, "Error opening %s\n", argv[2]);
+	    exit(1);
     }
 
     st = speex_preprocess_state_init(N, FS);
 
     while(fread(buf, sizeof(short), N, fin) == N) {
-	speex_preprocess_run(st, buf);
-	fwrite(buf, sizeof(short), N, fout);
-        if (fin == stdin) fflush(stdin);
+        speex_preprocess_run(st, buf);
+	    fwrite(buf, sizeof(short), N, fout);
         if (fout == stdout) fflush(stdout);
     }
 

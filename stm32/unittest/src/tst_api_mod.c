@@ -132,6 +132,8 @@ int main(int argc, char *argv[]) {
     // Test configuration, read from stm_cfg.txt
     int     config_mode;        // 0
     int     config_testframes;  // 1
+    int     use_clip = 0;       // 2
+    int     use_txbpf = 0;      // 3
     //int     config_verbose;   // 6
     //int     config_profile;   // 7
     char config[8];
@@ -145,7 +147,14 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
     config_mode = config[0] - '0';
+    if (config_mode == 8)
+    {
+        // For the purposes of the UT system, '8' is 700E.
+        config_mode = FREEDV_MODE_700E;
+    }
     config_testframes = config[1] - '0';
+    use_clip = config[2] - '0';
+    use_txbpf = config[3] - '0';
     //config_verbose = config[6] - '0';
     //config_profile = config[7] - '0';
     close(f_cfg);
@@ -153,8 +162,6 @@ int main(int argc, char *argv[]) {
     //int use_codectx = 0; 
     //int use_datatx = 0; 
     //int use_testframes = 0; 
-    int use_clip = 0; 
-    int use_txbpf = 0;
     int use_ext_vco = 0;
 
     ////////
@@ -207,6 +214,7 @@ int main(int argc, char *argv[]) {
     freedv_set_clip(freedv, use_clip);
     freedv_set_tx_bpf(freedv, use_txbpf);
     freedv_set_ext_vco(freedv, use_ext_vco);
+    freedv_set_eq(freedv, 1);
     
     memtools_find_unused(printf);
 

@@ -91,8 +91,7 @@ int main(int argc,char *argv[]){
         else
             fwrite(zbuf,sizeof(uint8_t),c2size,fout);
         
-        if(fin == stdin || fout == stdin){
-            fflush(fin);
+        if(fout == stdin){
             fflush(fout);
         }
     }

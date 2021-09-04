@@ -1083,6 +1083,35 @@ void freedv_set_callback_txt(struct freedv *f, freedv_callback_rx rx, freedv_cal
 
 /*---------------------------------------------------------------------------*\
 
+  FUNCTION....: freedv_set_callback_txt_sym
+  AUTHOR......: Mooneer Salem
+  DATE CREATED: 19 August 2021
+
+  Set the callback functions and the callback state pointer that will
+  be used to provide the raw symbols for the aux txt channel. The 
+  freedv_callback_rx_sym is a function pointer that will be called to 
+  return received symbols. The callback state is a user-defined
+  void pointer that will be passed to the callback function.  Any or
+  all can be NULL, and the default is all NULL.
+
+  The function signature is:
+    void receive_sym(void *callback_state, COMP sym, COMP amp);
+
+  Note: Active for OFDM modes only (700D/E, 2020).
+\*---------------------------------------------------------------------------*/
+
+void freedv_set_callback_txt_sym(struct freedv *f, freedv_callback_rx_sym rx, void *state)
+{
+    if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode ) ||
+        FDV_MODE_ACTIVE( FREEDV_MODE_700E, f->mode ) ||
+        FDV_MODE_ACTIVE( FREEDV_MODE_2020, f->mode ) ) {
+        f->freedv_put_next_rx_symbol = rx;
+        f->callback_state_sym = state;
+    }
+}
+
+/*---------------------------------------------------------------------------*\
+
   FUNCTION....: freedv_set_callback_protocol
   AUTHOR......: Brady OBrien
   DATE CREATED: 21 February 2016
@@ -1403,8 +1432,10 @@ void freedv_get_modem_extended_stats(struct freedv *f, struct MODEM_STATS *stats
         // OFDM modem stats updated when demod runs, so copy last update
         // We need to avoid over writing the FFT states which are updated by a different function
         // TODO we need a better design here: Issue #182
+#ifndef __EMBEDDED__
         size_t ncopy = (void*)stats->rx_eye - (void*)stats;
         memcpy(stats, &f->stats, ncopy);
+#endif
         stats->snr_est = f->snr_est;
         stats->sync = f->sync;
   }

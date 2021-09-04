@@ -110,7 +110,7 @@ void freedv_ofdm_voice_open(struct freedv *f, char *mode) {
     ofdm_config = ofdm_get_config_param(f->ofdm);
     f->ofdm_bitsperpacket = ofdm_get_bits_per_packet(f->ofdm);
     f->ofdm_bitsperframe = ofdm_get_bits_per_frame(f->ofdm);
-    f->ofdm_nuwbits = (ofdm_config->ns - 1) * ofdm_config->bps - ofdm_config->txtbits;
+    f->ofdm_nuwbits = ofdm_config->nuwbits;
     f->ofdm_ntxtbits = ofdm_config->txtbits;
 
     f->ldpc = (struct LDPC*)MALLOC(sizeof(struct LDPC));
@@ -140,11 +140,6 @@ void freedv_ofdm_voice_open(struct freedv *f, char *mode) {
 
     f->tx_bits = NULL; /* not used for 700D */
 
-    /* tx BPF off on embedded platforms, as it consumes significant CPU */
-#ifdef __EMBEDDED__
-    ofdm_set_tx_bpf(f->ofdm, 0);
-#endif
-
     f->speech_sample_rate = FREEDV_FS_8000;
     f->codec2 = codec2_create(CODEC2_MODE_700C); assert(f->codec2 != NULL);
     /* should be exactly an integer number of Codec 2 frames in a OFDM modem frame */
@@ -162,6 +157,10 @@ void freedv_ofdm_voice_open(struct freedv *f, char *mode) {
     
     /* attenuate audio 12dB as channel noise isn't that pleasant */
     f->passthrough_gain = 0.25;
+
+    /* should all add up to a complete frame */
+    assert((ofdm_config->ns - 1) * ofdm_config->nc * ofdm_config->bps ==
+	   f->ldpc->coded_bits_per_frame + ofdm_config->txtbits + f->ofdm_nuwbits);
 }
 
 // open function for OFDM data modes, TODO consider moving to a new
@@ -236,7 +235,7 @@ void freedv_comptx_ofdm(struct freedv *f, COMP mod_out[]) {
             char s[2];
             if (f->freedv_get_next_tx_char != NULL) {
                 s[0] = (*f->freedv_get_next_tx_char)(f->callback_state);
-                f->nvaricode_bits = varicode_encode(f->tx_varicode_bits, s, VARICODE_MAX_BITS, 1, 1);
+                f->nvaricode_bits = varicode_encode(f->tx_varicode_bits, s, VARICODE_MAX_BITS, 1, f->varicode_dec_states.code_num);
                 f->varicode_bit_index = 0;
             }
         }
@@ -442,7 +441,8 @@ int freedv_comp_short_rx_ofdm(struct freedv *f, void *demod_in_8kHz, int demod_i
 
         if (ofdm->modem_frame == (ofdm->np-1)) {
             /* we have received enough modem frames to complete packet and run LDPC decoder */
-            ofdm_disassemble_qpsk_modem_packet(ofdm, rx_syms, rx_amps, payload_syms, payload_amps, txt_bits);
+            int txt_sym_index = 0;
+            ofdm_disassemble_qpsk_modem_packet_with_text_amps(ofdm, rx_syms, rx_amps, payload_syms, payload_amps, txt_bits, &txt_sym_index);
 
             COMP payload_syms_de[Npayloadsymsperpacket];
             float payload_amps_de[Npayloadsymsperpacket];
@@ -494,6 +494,11 @@ int freedv_comp_short_rx_ofdm(struct freedv *f, void *demod_in_8kHz, int demod_i
 
             /* decode txt bits (if used) */
             for(k=0; k<f->ofdm_ntxtbits; k++)  {
+                if (k % 2 == 0 && (f->freedv_put_next_rx_symbol != NULL))
+                {
+                    (*f->freedv_put_next_rx_symbol)(f->callback_state_sym, rx_syms[txt_sym_index], rx_amps[txt_sym_index]);
+                    txt_sym_index++;
+                }
                 n_ascii = varicode_decode(&f->varicode_dec_states, &ascii_out, &txt_bits[k], 1, 1);
                 if (n_ascii && (f->freedv_put_next_rx_char != NULL)) {
                     (*f->freedv_put_next_rx_char)(f->callback_state, ascii_out);
@@ -536,7 +541,7 @@ int freedv_comp_short_rx_ofdm(struct freedv *f, void *demod_in_8kHz, int demod_i
                 ofdm->sync_counter,
                 ofdm->modem_frame,
 	 	            (double)ofdm->foff_est_hz, ofdm->phase_est_bandwidth,
-                f->snr_est, Nerrs_raw, Nerrs_coded, iter, parityCheckCount, rx_sync_flags_to_text[rx_status]);
+                (double)f->snr_est, Nerrs_raw, Nerrs_coded, iter, parityCheckCount, rx_sync_flags_to_text[rx_status]);
     }
     if (print_truncated) { 
             fprintf(stderr, "%3d nin: %4d st: %-6s euw: %2d %2d mf: %2d f: %5.1f pbw: %d                                        "

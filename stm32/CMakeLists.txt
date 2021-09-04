@@ -67,7 +67,7 @@ endif()
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -std=gnu11 -mlittle-endian -mthumb -mthumb-interwork --specs=nano.specs -u_printf_float -mcpu=cortex-m4 -ffunction-sections -fdata-sections -O3")
 
 add_definitions(-DSTM32F40_41xxx -DCORTEX_M4 -D__EMBEDDED__)
-add_definitions(-DFREEDV_MODE_EN_DEFAULT=0 -DFREEDV_MODE_1600_EN=1 -DFREEDV_MODE_700D_EN=1 -DCODEC2_MODE_EN_DEFAULT=0 -DCODEC2_MODE_1300_EN=1 -DCODEC2_MODE_700C_EN=1)
+add_definitions(-DFREEDV_MODE_EN_DEFAULT=0 -DFREEDV_MODE_1600_EN=1 -DFREEDV_MODE_700D_EN=1 -DFREEDV_MODE_700E_EN=1 -DCODEC2_MODE_EN_DEFAULT=0 -DCODEC2_MODE_1300_EN=1 -DCODEC2_MODE_700C_EN=1)
 
 if(FLOAT_TYPE STREQUAL "hard")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsingle-precision-constant -Wdouble-promotion -mfpu=fpv4-sp-d16 -mfloat-abi=hard -D__FPU_PRESENT=1 -D__FPU_USED=1")
@@ -184,6 +184,7 @@ ${CODEC2_SRC}/kiss_fftr.c
 ${CODEC2_SRC}/interp.c
 ${CODEC2_SRC}/lsp.c
 ${CODEC2_SRC}/ofdm.c
+${CODEC2_SRC}/ofdm_mode.c
 ${CODEC2_SRC}/phase.c
 ${CODEC2_SRC}/quantise.c
 ${CODEC2_SRC}/pack.c
@@ -202,6 +203,7 @@ ${CODEC2_SRC}/freedv_data_channel.c
 ${CODEC2_SRC}/newamp1.c
 ${CODEC2_SRC}/mbest.c
 ${CODEC2_SRC}/HRA_112_112.c
+${CODEC2_SRC}/HRA_56_56.c
 ${CODEC2_SRC}/linreg.c
 ${CODEC2_SRC}/mpdecode_core.c
 ${CODEC2_SRC}/ldpc_codes.c
@@ -432,11 +434,11 @@ src/memtools.c
 list(APPEND SM1000_SRCS ${CODEC2_SRCS})
 
 
-add_mapped_executable(sm1000v4 ${SM1000_SRCS} ${SYSTEM_SRCS})
-target_link_libraries(sm1000v4 stm32f4_adac stm32f4 CMSIS)
-target_compile_options(sm1000v4 PRIVATE "-O3")
-elf2bin(sm1000v4)
-elf2dfu(sm1000v4)
+add_mapped_executable(sm1000v5 ${SM1000_SRCS} ${SYSTEM_SRCS})
+target_link_libraries(sm1000v5 stm32f4_adac stm32f4 CMSIS)
+target_compile_options(sm1000v5 PRIVATE "-O3")
+elf2bin(sm1000v5)
+elf2dfu(sm1000v5)
 
 set(FREEDV_TX_PROFILE_SRCS
 src/freedv_tx_profile.c

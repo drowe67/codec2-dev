@@ -65,6 +65,44 @@ case "${TEST_OPT}" in
         fi
 	;;
 
+    700E_TEST)
+        #
+        echo -e "\nReference check"
+        if freedv_rx 700E ref_mod.raw ref_rx.raw --testframes; then
+            echo "Passed"
+        else
+            echo "Failed"
+            let Fails=($Fails + 1)
+        fi
+        #
+        echo -e "\nTarget check"
+        if freedv_rx 700E stm_out.raw stm_rx.raw --testframes; then
+            echo "Passed"
+        else
+            echo "Failed"
+            let Fails=($Fails + 1)
+        fi
+        #
+        echo -e "\nCompare output binary data"
+        if compare_ints -s -b2 -t4 ref_mod.raw stm_out.raw; then 
+            echo "Passed"
+        else
+            echo "Failed"
+            let Fails=($Fails + 1)
+        fi
+	;;
+
+    700E_CODEC)
+        #
+        echo -e "\nCompare output binary data"
+        if compare_ints -s -b2 -t4 ref_mod.raw stm_out.raw; then 
+            echo "Passed"
+        else
+            echo "Failed"
+            let Fails=($Fails + 1)
+        fi
+	;;
+
     esac
 
 if (( $Fails == 0 )); then

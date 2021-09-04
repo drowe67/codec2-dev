@@ -605,7 +605,7 @@ void frame_sync_fine_freq_est(struct COHPSK *coh, COMP ch_symb[][COHPSK_NC*ND], 
         coh->ff_rect.real = cosf(result);
         coh->ff_rect.imag = -sinf(result);
         if (coh->verbose)
-            fprintf(stderr, "  [%d]   fine freq f: %6.2f max_ratio: %f ct: %d\n", coh->frame, coh->f_fine_est, max_corr/max_mag, coh->ct);
+            fprintf(stderr, "  [%d]   fine freq f: %6.2f max_ratio: %f ct: %d\n", coh->frame, (double)coh->f_fine_est, (double)max_corr/(double)max_mag, coh->ct);
 
         if (max_corr/max_mag > 0.9) {
             if (coh->verbose)
@@ -771,7 +771,32 @@ void fdm_downconvert_coh(COMP rx_baseband[COHPSK_NC][COHPSK_M+COHPSK_M/P], int N
     }
 }
 
+/* Determine if we can use vector ops below. */
+#if __GNUC__ > 4 || \
+    (__GNUC__ == 4 && (__GNUC_MINOR__ > 6 || \
+                       (__GNUC_MINOR__ == 6 && \
+                        __GNUC_PATCHLEVEL__ > 0)))
+#define USE_VECTOR_OPS 1
+#elif __clang_major__ > 3 || \
+    (__clang_minor__ == 3 && (__clang_minor__ > 7 || \
+                       (__clang_minor__ == 7 && \
+                        __clang_patchlevel__ > 0)))
+#define USE_VECTOR_OPS 1
+#endif
 
+#if USE_VECTOR_OPS
+
+#ifdef __ARM_NEON
+#include "arm_neon.h"
+
+typedef float32x4_t float4;
+#else
+/* Vector of 4 floating point numbers for use by the below function */
+typedef float float4 __attribute__ ((vector_size (16)));
+#endif // __ARM_NEON
+
+#endif /* USE_VECTOR_OPS */
+    
 /*---------------------------------------------------------------------------*\
 
   FUNCTION....: rx_filter_coh()
@@ -784,38 +809,114 @@ void fdm_downconvert_coh(COMP rx_baseband[COHPSK_NC][COHPSK_M+COHPSK_M/P], int N
 
 \*---------------------------------------------------------------------------*/
 
-void rx_filter_coh(COMP rx_filt[COHPSK_NC+1][P+1], int Nc, COMP rx_baseband[COHPSK_NC+1][COHPSK_M+COHPSK_M/P], COMP rx_filter_memory[COHPSK_NC+1][+COHPSK_NFILTER], int nin)
+inline void rx_filter_coh(COMP rx_filt[COHPSK_NC+1][P+1], int Nc, COMP rx_baseband[COHPSK_NC+1][COHPSK_M+COHPSK_M/P], COMP rx_filter_memory[COHPSK_NC+1][+COHPSK_NFILTER], int nin)
 {
-    int c, i,j,k,l;
+    int c,i,j,k,l;
     int n=COHPSK_M/P;
-
+    
     /* rx filter each symbol, generate P filtered output samples for
        each symbol.  Note we keep filter memory at rate M, it's just
        the filter output at rate P */
 
-    for(i=0, j=0; i<nin; i+=n,j++) {
+    for(i=0, j=0; i<nin; i+=n,j++) 
+    {
 
-	/* latest input sample */
+    	/* latest input sample */
 
-	for(c=0; c<Nc; c++)
-	    for(k=COHPSK_NFILTER-n,l=i; k<COHPSK_NFILTER; k++,l++)
-		rx_filter_memory[c][k] = rx_baseband[c][l];
+    	for(c=0; c<Nc; c++)
+        {
+            rx_filt[c][j].real = 0.0; 
+            rx_filt[c][j].imag = 0.0;
+        
+            /*
+                This call is equivalent to the code below:
+            
+        	    for(k=COHPSK_NFILTER-n,l=i; k<COHPSK_NFILTER; k++,l++)
+                {
+                    rx_filter_memory[c][k] = rx_baseband[c][l];
+                }
+            */
+            memcpy(
+                &rx_filter_memory[c][COHPSK_NFILTER-n], 
+                &rx_baseband[c][i], 
+                sizeof(COMP)*n);
+        
+            /* convolution (filtering) */
+       
+#if USE_VECTOR_OPS
+            /* assumes COHPSK_NFILTER is divisible by 2 */
 
-	/* convolution (filtering) */
+#ifdef __ARM_NEON
+            float4 resultVec = vdupq_n_f32(0);
+#else
+            float4 resultVec = {0, 0, 0, 0};
+#endif // __ARM_NEON
 
-	for(c=0; c<Nc; c++) {
-	    rx_filt[c][j].real = 0.0; rx_filt[c][j].imag = 0.0;
-	    for(k=0; k<COHPSK_NFILTER; k++)
-		rx_filt[c][j] = cadd(rx_filt[c][j], fcmult(gt_alpha5_root_coh[k], rx_filter_memory[c][k]));
-	}
+            for(k=0, l=0; k<COHPSK_NFILTER; k += 2, l += 4)
+            {
+#ifdef __ARM_NEON
+                // Fetch gt_alpha5_root_coh and place it into a vector for later use.
+                // First half at index k, second half at index k + 1.
+                float4 alpha5Vec = vld1q_f32((const float32_t*)&gt_alpha5_root_coh_neon[l]);
 
-	/* make room for next input sample */
+                // Load two COMP elements (each containing two floats) into 4 element vector.
+                float4 filterMemVec = vld1q_f32((const float32_t *)&rx_filter_memory[c][k]);
 
-	for(c=0; c<Nc; c++)
-	    for(k=0,l=n; k<COHPSK_NFILTER-n; k++,l++)
-		rx_filter_memory[c][k] = rx_filter_memory[c][l];
+                // Multiply each element of filterMemVec by alpha5Vec from above and add to the
+                // running total in resultVec. Odd indices are reals, even imag.
+                resultVec = vmlaq_f32(resultVec, alpha5Vec, filterMemVec);
+#else
+                // Fetch gt_alpha5_root_coh and place it into a vector for later use.
+                // First half at index k, second half at index k + 1.
+                float4 alpha5Vec = {
+                    gt_alpha5_root_coh_neon[l], gt_alpha5_root_coh_neon[l + 1], gt_alpha5_root_coh_neon[l + 2], gt_alpha5_root_coh_neon[l + 3],
+                };
+
+                // Load two COMP elements (each containing two floats) into 4 element vector.
+                float4 filterMemVec = {
+                    rx_filter_memory[c][k].real, rx_filter_memory[c][k].imag, rx_filter_memory[c][k + 1].real, rx_filter_memory[c][k + 1].imag, 
+                };
+
+                // Multiply each element of filterMemVec by alpha5Vec from above and add to the
+                // running total in resultVec. Odd indices are reals, even imag.
+                resultVec += alpha5Vec * filterMemVec;
+            
+#endif // __ARM_NEON
+            }
+
+            // Add total from resultVec to rx_filt.
+            rx_filt[c][j].real += resultVec[0] + resultVec[2];
+            rx_filt[c][j].imag += resultVec[1] + resultVec[3];
+#else
+    	    for(k=0; k<COHPSK_NFILTER; k++)
+            {
+                /*
+                    Equivalent to this code:
+
+                    rx_filt[c][j] = cadd(rx_filt[c][j], fcmult(gt_alpha5_root_coh[k], rx_filter_memory[c][k]));
+                */
+                rx_filt[c][j].real += gt_alpha5_root_coh[k] * rx_filter_memory[c][k].real;
+                rx_filt[c][j].imag += gt_alpha5_root_coh[k] * rx_filter_memory[c][k].imag;
+    	    }
+#endif /* USE_VECTOR_OPS */
+            
+    	    /* 
+                make room for next input sample.
+            
+                The below call is equivalent to this code:
+            
+                for(k=0,l=n; k<COHPSK_NFILTER-n; k++,l++)
+                {
+                    rx_filter_memory[c][k] = rx_filter_memory[c][l];
+                }
+            */
+            memmove(
+                &rx_filter_memory[c][0], 
+                &rx_filter_memory[c][n], 
+                sizeof(COMP)*(COHPSK_NFILTER-n));
+        }
     }
-
+    
     assert(j <= (P+1)); /* check for any over runs */
 }
 
@@ -1007,7 +1108,7 @@ void cohpsk_demod(struct COHPSK *coh, float rx_bits[], int *sync_good, COMP rx_f
         for (coh->f_est = FDMDV_FCENTRE-40.0; coh->f_est <= FDMDV_FCENTRE+40.0; coh->f_est += 40.0) {
 
             if (coh->verbose)
-                fprintf(stderr, "  [%d] acohpsk.f_est: %f +/- 20\n", coh->frame, coh->f_est);
+                fprintf(stderr, "  [%d] acohpsk.f_est: %f +/- 20\n", coh->frame, (double)coh->f_est);
 
             /* we are out of sync so reset f_est and process two frames to clean out memories */
 
@@ -1035,7 +1136,7 @@ void cohpsk_demod(struct COHPSK *coh, float rx_bits[], int *sync_good, COMP rx_f
             coh->f_est = f_est;
 
             if (coh->verbose)
-                fprintf(stderr, "  [%d] trying sync and f_est: %f\n", coh->frame, coh->f_est);
+                fprintf(stderr, "  [%d] trying sync and f_est: %f\n", coh->frame, (double)coh->f_est);
 
             rate_Fs_rx_processing(coh, ch_symb, coh->ch_fdm_frame_buf, &coh->f_est, NSW*NSYMROWPILOT, COHPSK_M, 0);
             for (i=0; i<NSW-1; i++) {
@@ -1055,7 +1156,7 @@ void cohpsk_demod(struct COHPSK *coh, float rx_bits[], int *sync_good, COMP rx_f
 
             if (fabsf(coh->f_fine_est) > 2.0) {
                 if (coh->verbose)
-                    fprintf(stderr, "  [%d] Hmm %f is a bit big :(\n", coh->frame, coh->f_fine_est);
+                    fprintf(stderr, "  [%d] Hmm %f is a bit big :(\n", coh->frame, (double)coh->f_fine_est);
                 next_sync = 0;
             }
         }
@@ -1065,7 +1166,7 @@ void cohpsk_demod(struct COHPSK *coh, float rx_bits[], int *sync_good, COMP rx_f
                demodulate first frame (demod completed below) */
 
             if (coh->verbose)
-                fprintf(stderr, "  [%d] in sync! f_est: %f ratio: %f \n", coh->frame, coh->f_est, coh->ratio);
+                fprintf(stderr, "  [%d] in sync! f_est: %f ratio: %f \n", coh->frame, (double)coh->f_est, (double)coh->ratio);
             for(r=0; r<NSYMROWPILOT+2; r++)
                 for(c=0; c<COHPSK_NC*ND; c++)
                     coh->ct_symb_ff_buf[r][c] = coh->ct_symb_buf[coh->ct+r][c];
@@ -1161,12 +1262,14 @@ int cohpsk_fs_offset(COMP out[], COMP in[], int n, float sample_rate_ppm)
 
 void cohpsk_get_demod_stats(struct COHPSK *coh, struct MODEM_STATS *stats)
 {
-    COMP  pi_4;
     float new_snr_est;
-    float spi_4 = M_PI/4.0f;
     
+#ifndef __EMBEDDED__
+    float spi_4 = M_PI/4.0f;
+    COMP  pi_4;
     pi_4.real = cosf(spi_4);
     pi_4.imag = sinf(spi_4);
+#endif
 
     stats->Nc = COHPSK_NC*ND;
     assert(stats->Nc <= MODEM_STATS_NC_MAX);
@@ -1319,5 +1422,5 @@ float *cohpsk_get_rx_bits_upper(struct COHPSK *coh) {
 void cohpsk_set_carrier_ampl(struct COHPSK *coh, int c, float ampl) {
     assert(c < COHPSK_NC*ND);
     coh->carrier_ampl[c] = ampl;
-    fprintf(stderr, "cohpsk_set_carrier_ampl: %d %f\n", c, ampl);
+    fprintf(stderr, "cohpsk_set_carrier_ampl: %d %f\n", c, (double)ampl);
 }
