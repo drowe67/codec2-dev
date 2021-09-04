@@ -82,6 +82,7 @@ int main(int argc, char *argv[]) {
     int   en = -1;
     int   verbose = 0;
     int   n = 0;
+    int   fast_en = 0;
     
     int o = 0; int opt_idx = 0;
     while (o != -1) {
@@ -90,7 +91,7 @@ int main(int argc, char *argv[]) {
            {"en",      required_argument, 0, 'e'},
 	   {0, 0, 0, 0}
         };
-        o = getopt_long(argc,argv,"hd:m:vt:e:n:",long_opts,&opt_idx);
+        o = getopt_long(argc,argv,"hd:m:vt:e:n:f",long_opts,&opt_idx);
         switch (o) {
 	case 'd':
 	    dim = atoi(optarg);
@@ -104,6 +105,9 @@ int main(int argc, char *argv[]) {
             break;
         case 'e':
             en = atoi(optarg);
+            break;
+        case 'f':
+	    fast_en = 1;
             break;
         case 'n':
             n = atoi(optarg);
@@ -167,6 +171,7 @@ int main(int argc, char *argv[]) {
     int i = 0;
     int finished = 0;
     int switches = 0;
+    int log2N = log2(n);
     float distortion0 = distortion_of_current_mapping(vq, n, dim, prob, st, en);
     fprintf(stderr, "distortion0: %f\n", distortion0);
 
@@ -182,13 +187,49 @@ int main(int argc, char *argv[]) {
       // Try switching each vector with A(i)
       float best_delta = 0; int best_j = 0;
       for(int j=1; j<n; j++) {
+	float distortion1, distortion2, delta = 0.0;
+	
 	// we can't switch with ourself
 	if (j != A[i]) {
-	  float distortion1 = distortion_of_current_mapping(vq, n, dim, prob, st, en);
+	  if (fast_en) {
+	    // subtract just those contributions to delta that will change
+	    delta -= cost_of_distance_one(vq, n, dim, prob, A[i], st, en, verbose);
+	    delta -= cost_of_distance_one(vq, n, dim, prob, j, st, en, verbose);
+	    for (int b=0; b<log2N; b++) {
+	      unsigned int index_neighbour;
+	      index_neighbour = A[i] ^ (1<<b);
+	      if ((index_neighbour != j) && (index_neighbour != A[i]))
+		   delta -= cost_of_distance_one(vq, n, dim, prob, index_neighbour, st, en, verbose);
+	      index_neighbour = j ^ (1<<b);
+	      if ((index_neighbour != j) && (index_neighbour != A[i]))
+		   delta -= cost_of_distance_one(vq, n, dim, prob, index_neighbour, st, en, verbose);
+	    }
+	  }
+	  else
+	    distortion1 = distortion_of_current_mapping(vq, n, dim, prob, st, en);
+
 	  // switch vq entries A(i) and j
 	  swap(vq, dim, A[i], j);
-	  float distortion2 = distortion_of_current_mapping(vq, n, dim, prob, st, en);
-	  float delta = distortion2 - distortion1;
+
+	  if (fast_en) {
+	    // add just those contributions to delta that will change
+	    delta += cost_of_distance_one(vq, n, dim, prob, A[i], st, en, verbose);
+	    delta += cost_of_distance_one(vq, n, dim, prob, j, st, en, verbose);
+	    for (int b=0; b<log2N; b++) {
+	      unsigned int index_neighbour;
+	      index_neighbour = A[i] ^ (1<<b);
+	      if ((index_neighbour != j) && (index_neighbour != A[i]))
+		   delta += cost_of_distance_one(vq, n, dim, prob, index_neighbour, st, en, verbose);
+	      index_neighbour = j ^ (1<<b);
+	      if ((index_neighbour != j) && (index_neighbour != A[i]))
+		   delta += cost_of_distance_one(vq, n, dim, prob, index_neighbour, st, en, verbose);
+	    }
+	  }
+	  else {
+	    distortion2 = distortion_of_current_mapping(vq, n, dim, prob, st, en);
+	    delta = distortion2 - distortion1;
+	  }
+
 	  if (delta < 0.0) {
 	    if (fabs(delta) > best_delta) {
 	      best_delta = fabs(delta);

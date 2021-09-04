@@ -170,6 +170,11 @@ function test_fast
 
   training_data = randn(Ntrain,K);
   [idx vq1] = kmeans(training_data, N);
+  f=fopen("vq1.f32","wb");
+  for r=1:rows(vq1)
+    fwrite(f,vq1(r,:),"float32");
+  end
+  fclose(f);
   [vq2 distortion] = binary_switching(vq1, [1 ones(1,N-1)], 1000, fast_en = 0);
   [vq3 distortion] = binary_switching(vq1, [1 ones(1,N-1)], 1000, fast_en = 1);
   assert(vq2 == vq3);  
