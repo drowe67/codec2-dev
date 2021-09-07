@@ -294,6 +294,7 @@ static void reliable_text_freedv_callback_rx(void *state, char chr)
             char decodedStr[RELIABLE_TEXT_MAX_RAW_LENGTH + 1];
             char rawStr[RELIABLE_TEXT_MAX_RAW_LENGTH + 1];
             memset(rawStr, 0, RELIABLE_TEXT_MAX_RAW_LENGTH + 1);
+            memset(decodedStr, 0, RELIABLE_TEXT_MAX_RAW_LENGTH + 1);
             
             if (reliable_text_ldpc_decode(obj, rawStr) != 0)
             {
@@ -304,7 +305,7 @@ static void reliable_text_freedv_callback_rx(void *state, char chr)
                 // Get expected and actual CRC.
                 unsigned char receivedCRC = decodedStr[0];
                 unsigned char calcCRC = calculateCRC8_(&rawStr[RELIABLE_TEXT_CRC_LENGTH], RELIABLE_TEXT_MAX_LENGTH);
-        
+    
                 //fprintf(stderr, "rxCRC: %d, calcCRC: %d, decodedStr: %s\n", receivedCRC, calcCRC, &decodedStr[RELIABLE_TEXT_CRC_LENGTH]);
                 if (receivedCRC == calcCRC)
                 {
@@ -318,6 +319,7 @@ static void reliable_text_freedv_callback_rx(void *state, char chr)
                 obj->sym_index = 0;
                 memset(&obj->inbound_pending_syms, 0, sizeof(complex float)*LDPC_TOTAL_SIZE_BITS/2);
                 memset(&obj->inbound_pending_amps, 0, sizeof(float)*LDPC_TOTAL_SIZE_BITS/2);
+                memset(&obj->inbound_pending_bits, 0, LDPC_TOTAL_SIZE_BITS + RELIABLE_TEXT_UW_LENGTH_BITS);
             }
             else
             {
@@ -395,8 +397,9 @@ void reliable_text_set_string(reliable_text_t ptr, const char* str, int strlengt
     assert(impl != NULL);
     
     char tmp[RELIABLE_TEXT_MAX_RAW_LENGTH + 1];
+    memset(tmp, 0, RELIABLE_TEXT_MAX_RAW_LENGTH + 1);
     
-    convert_callsign_to_ota_string_(str, &tmp[RELIABLE_TEXT_CRC_LENGTH], strlength < RELIABLE_TEXT_MAX_LENGTH? strlength : RELIABLE_TEXT_MAX_LENGTH);
+    convert_callsign_to_ota_string_(str, &tmp[RELIABLE_TEXT_CRC_LENGTH], strlength < RELIABLE_TEXT_MAX_LENGTH ? strlength : RELIABLE_TEXT_MAX_LENGTH);
     
     int txt_length = strlen(&tmp[RELIABLE_TEXT_CRC_LENGTH]);
     if (txt_length >= RELIABLE_TEXT_MAX_LENGTH)
@@ -407,7 +410,7 @@ void reliable_text_set_string(reliable_text_t ptr, const char* str, int strlengt
     impl->tx_text_index = 0;
     unsigned char crc = calculateCRC8_(&tmp[RELIABLE_TEXT_CRC_LENGTH], txt_length);
     tmp[0] = crc;
-
+    
     // Encode block of text using LDPC(112,56).
     unsigned char ibits[LDPC_TOTAL_SIZE_BITS / 2];
     unsigned char pbits[LDPC_TOTAL_SIZE_BITS / 2];
