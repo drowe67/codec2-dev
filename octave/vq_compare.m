@@ -16,12 +16,29 @@
 
     ./misc/vq_binary_switch -d 20 vq_stage1.f32 vq_stage1_bs001.f32 -m 5000 --st 2 --en 16 -f
 
-    This can take a while, but if you ctrl-C at any time it will have saved the most recent codebook.
+    This can take a while, but if you ctrl-C at any time it will have saved the most recent optimised VQ.
    
   3. Run this script to compare the two VQs:
 
     octave:34> vq_compare
-1;
+#}
+
+
+function vq_compare(action="run_curves", vq_fn, EbNodB=3, in_fn, out_fn)
+  graphics_toolkit ("gnuplot");
+  more off;
+  randn('state',1);
+
+  if strcmp(action, "run_curves")
+    run_curves(600);
+  end
+  if strcmp(action, "vq_file")
+    vq_file(vq_fn, EbNodB, in_fn, out_fn)
+  end
+endfunction
+
+
+% -------------------------------------------------------------------
 
 % converts a decimal value to a soft dec binary value
 function c = dec2sd(dec, nbits)
@@ -120,42 +137,50 @@ endfunction
 % Simulations ---------------------------------------------------------------------
 
 % top level function to set up and run a test with a specific vq
-function results = run_test_vq(vq_fn, nframes=100, dec=1, EbNodB=3, verbose=0)
+function [results target_] = run_test_vq(vq_fn, target_fn, nframes=100, dec=1, EbNodB=3, verbose=0)
   K = 20; K_st=2+1; K_en=16+1;
-  target_fn = "../build_linux/all_speech_8k_lim.f32";
   
   % load VQ
   vq = load_f32(vq_fn, K);
   [vq_size tmp] = size(vq);
-  vq = vq(:,K_st:K_en);
+  vqsub = vq(:,K_st:K_en);
   
   % load sequence of target vectors we wish to VQ
   target = load_f32(target_fn, K);
 
   % limit test to the first nframes vectors
-  target = target(1:dec:dec*nframes,K_st:K_en);
+  if nframes != -1
+    last = dec*nframes
+  else
+    last = length(target);
+  end
+  target = target(1:dec:last, K_st:K_en);
   
   % run a test
   EbNo=10^(EbNodB/10);
-  results = run_test(target, vq, EbNo, verbose);
+  results = run_test(target, vqsub, EbNo, verbose);
   if verbose
     for f=2:nframes-1
       printf("f: %03d tx_index: %04d rx_index: %04d\n", f,  results.tx_indexes(f), results.rx_indexes(f));
     end
-  end  
+  end
+
+  % return full band vq-ed vectors
+  target_ = vq(results.rx_indexes+1,:);
 endfunction
 
 % generate sets of curves
 function run_curves(frames=100, dec=1)
+  target_fn = "../build_linux/all_speech_8k_lim.f32";
   results1_log = [];
   EbNodB = 0:5;
   for i=1:length(EbNodB)
-    results = run_test_vq("../build_linux/vq_stage1.f32", frames, dec, EbNodB(i), verbose=0);
+    results = run_test_vq("../build_linux/vq_stage1.f32", target_fn, frames, dec, EbNodB(i), verbose=0);
     results1_log = [results1_log results];
   end
   results2_log = [];
   for i=1:length(EbNodB)
-    results = run_test_vq("../build_linux/vq_stage1_bs001.f32", frames, dec, EbNodB(i), verbose=0);
+    results = run_test_vq("../build_linux/vq_stage1_bs001.f32", target_fn, frames, dec, EbNodB(i), verbose=0);
     results2_log = [results2_log results];
   end
   for i=1:length(results1_log)
@@ -185,10 +210,10 @@ function run_curves(frames=100, dec=1)
   hold off; grid; title("RMS SD (dB)"); xlabel('Eb/No(dB)');
 endfunction
 
-% -------------------------------------------------------------------
 
-graphics_toolkit ("gnuplot");
-more off;
-randn('state',1);
+function vq_file(vq_fn, EbNodB, in_fn, out_fn)
+  [results target_] = run_test_vq(vq_fn, in_fn, nframes=-1, dec=1, EbNodB, verbose=0);
+  save_f32(out_fn, target_);
+endfunction
 
-run_curves(600,4)
+
