@@ -37,13 +37,14 @@ function listen() {
 
   fullfile_out=$2
   vq_fn=$3
-
+  EbNodB=$4
+  
   sox $fullfile -t raw - | c2sim - --rateK --rateKout ${filename}.f32
 
   echo "ratek=load_f32('../build_linux/${filename}.f32',20); vq_700c_eq; ratek_lim=limit_vec(ratek, 0, 40); save_f32('../build_linux/${filename}_lim.f32', ratek_lim); quit" | \
   octave -p ${CODEC2_PATH}/octave -qf
 
-  echo "pkg load statistics; vq_compare(action='vq_file', '${vq_fn}', EbNodB=100, '${filename}_lim.f32', '${filename}_test.f32'); quit" \ |
+  echo "pkg load statistics; vq_compare(action='vq_file', '${vq_fn}', EbNodB=${EbNodB}, '${filename}_lim.f32', '${filename}_test.f32'); quit" \ |
   octave -p ${CODEC2_PATH}/octave -qf
       
   sox $fullfile -t raw - | c2sim - --rateK --rateKin ${filename}_test.f32 -o - | sox -t .s16 -r 8000 -c 1 - ${fullfile_out}
@@ -53,7 +54,7 @@ function print_help {
     echo
     echo "Trellis/VQ optimisation support script"
     echo
-    echo "  usage ./train_trellis.sh [-d] [-t] [-v in.wav out.wav vq.f32]"
+    echo "  usage ./train_trellis.sh [-d] [-t] [-v in.wav out.wav vq.f32 EbNodB]"
     echo
     echo "    -d        debug mode; trace script execution"
     echo "    -t        train VQ and generate a fully quantised version of training vectors"
@@ -88,7 +89,9 @@ case $key in
 	in_wav="$2"
 	out_wav="$3"
 	vq_fn="$4"
+	EbNodB="$5"
         shift
+	shift
 	shift
 	shift
 	shift
@@ -109,5 +112,5 @@ if [ $do_train -eq 1 ]; then
 fi
 
 if [ $do_vq -eq 1 ]; then
-  listen ${in_wav} ${out_wav} ${vq_fn}
+  listen ${in_wav} ${out_wav} ${vq_fn} ${EbNodB}
 fi
