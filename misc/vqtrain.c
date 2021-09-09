@@ -187,7 +187,7 @@ int main(int argc, char *argv[]) {
         assert(ret == k);
         quantise(cb, vec, k, 1, st, en, &e, &se);
     }
-    var = se/(J*k);
+    var = se/(J*(en-st+1));
     printf("\r  It: 0, var: %f sd: %f\n", var, sqrt(var));
 
     /* set up initial codebook state from samples of training set */
@@ -224,11 +224,11 @@ int main(int argc, char *argv[]) {
 	    acc(&cent[ind*k], vec, k);
             //if (i < 100)
             //    printf("e: %f sqrt(e/k): %f sd: %f noutliers: %ld\n", e, sqrt(e/k), sd, noutliers[0]);
-            if (sqrt(e/k) > 1.0) noutliers[0]++;
-            if (sqrt(e/k) > 2.0) noutliers[1]++;
-            if (sqrt(e/k) > 3.0) noutliers[2]++;
+            if (sqrt(e/(en-st+1)) > 1.0) noutliers[0]++;
+            if (sqrt(e/(en-st+1)) > 2.0) noutliers[1]++;
+            if (sqrt(e/(en-st+1)) > 3.0) noutliers[2]++;
 	}
-	var = se/(J*k);
+	var = se/(J*(en-st+1));
 	delta = (var_1-var)/var;
         int n_min = J;
         int n_max = 0;
