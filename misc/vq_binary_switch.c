@@ -67,11 +67,15 @@ void sort_c(int *idx, const size_t n) {
     qsort(idx, n, sizeof(int), compare_increase);
 }
 
-void swap(float *vq, int dim, int index1, int index2) {
+void swap(float *vq, int dim, float *prob, int index1, int index2) {
   float tmp[dim];
   for(int i=0; i<dim; i++) tmp[i] = vq[index1*dim+i];
   for(int i=0; i<dim; i++) vq[index1*dim+i] = vq[index2*dim+i];
   for(int i=0; i<dim; i++) vq[index2*dim+i] = tmp[i];
+
+  tmp[0] = prob[index1];
+  prob[index1] = prob[index2];
+  prob[index2] = tmp[0];
 }
 
 int main(int argc, char *argv[]) {
@@ -83,15 +87,17 @@ int main(int argc, char *argv[]) {
     int   verbose = 0;
     int   n = 0;
     int   fast_en = 0;
+    char  prob_fn[80]="";
     
     int o = 0; int opt_idx = 0;
     while (o != -1) {
        static struct option long_opts[] = {
+           {"prob",    required_argument, 0, 'p'},
            {"st",      required_argument, 0, 't'},
            {"en",      required_argument, 0, 'e'},
 	   {0, 0, 0, 0}
         };
-        o = getopt_long(argc,argv,"hd:m:vt:e:n:f",long_opts,&opt_idx);
+        o = getopt_long(argc,argv,"hd:m:vt:e:n:fp:",long_opts,&opt_idx);
         switch (o) {
 	case 'd':
 	    dim = atoi(optarg);
@@ -112,6 +118,9 @@ int main(int argc, char *argv[]) {
         case 'n':
             n = atoi(optarg);
             break;
+        case 'p':
+	    strcpy(prob_fn,optarg);
+            break;	    
         case 'v':
             verbose = 1;
             break;
@@ -119,10 +128,11 @@ int main(int argc, char *argv[]) {
 	    fprintf(stderr, "\n");
             fprintf(stderr, "usage: %s -d dimension [-m max_iterations -v --st Kst --en Ken -n nVQ] vq_in.f32 vq_out.f32\n", argv[0]);
 	    fprintf(stderr, "\n");
-            fprintf(stderr, "-n nVQ      Run with just the first nVQ entries of the VQ\n");
-            fprintf(stderr, "--st Kst    Start vector element for error calculation (default 0)\n");
-            fprintf(stderr, "--en Ken    End vector element for error calculation (default K-1)\n");
-            fprintf(stderr, "-v          verbose\n");
+            fprintf(stderr, "-n nVQ           Run with just the first nVQ entries of the VQ\n");
+            fprintf(stderr, "--st Kst         Start vector element for error calculation (default 0)\n");
+            fprintf(stderr, "--en Ken         End vector element for error calculation (default K-1)\n");
+            fprintf(stderr, "--prob probFile  f32 file of probabilities for each VQ element (default 1.0)\n");
+            fprintf(stderr, "-v               verbose\n");
             exit(1);
         }
     }
@@ -163,9 +173,20 @@ int main(int argc, char *argv[]) {
     assert(nrd == n*dim);
     fclose(fq);
    
-    /* set probability of each vector to 1.0 for now */
+    /* set probability of each vector to 1.0 as default */
     float prob[n];
     for(int l=0; l<n; l++) prob[l] = 1.0;
+    if (strlen(prob_fn)) {
+      fprintf(stderr, "Reading probability file: %s\n", prob_fn);
+      FILE *fp = fopen(prob_fn,"rb");
+      assert(fp != NULL);
+      int nrd = fread(prob, sizeof(float), n, fp);
+      assert(nrd == n);
+      fclose(fp);
+      float sum = 0.0;
+      for(int l=0; l<n; l++) sum += prob[l];
+      fprintf(stderr, "sum = %f\n", sum);
+    }
     
     int iteration = 0;
     int i = 0;
@@ -209,7 +230,7 @@ int main(int argc, char *argv[]) {
 	    distortion1 = distortion_of_current_mapping(vq, n, dim, prob, st, en);
 
 	  // switch vq entries A(i) and j
-	  swap(vq, dim, A[i], j);
+	  swap(vq, dim, prob, A[i], j);
 
 	  if (fast_en) {
 	    // add just those contributions to delta that will change
@@ -237,7 +258,7 @@ int main(int argc, char *argv[]) {
 	    }
 	  }
 	  // unswitch
-	  swap(vq, dim, A[i], j);
+	  swap(vq, dim, prob, A[i], j);
 	}
       } //next j
 
@@ -247,7 +268,7 @@ int main(int argc, char *argv[]) {
 	if (i == n-1) finished = 1; else i++;
       } else {
 	// OK keep the switch that minimised the distortion
-	swap(vq, dim, A[i], best_j);
+	swap(vq, dim, prob, A[i], best_j);
 	switches++;
 
 	// save results

@@ -30,7 +30,7 @@ function vq_compare(action="run_curves", vq_fn, dec=1, EbNodB=3, in_fn, out_fn)
   randn('state',1);
 
   if strcmp(action, "run_curves")
-    run_curves(600);
+    run_curves(30*100);
   end
   if strcmp(action, "vq_file")
     vq_file(vq_fn, dec, EbNodB, in_fn, out_fn)
@@ -150,7 +150,7 @@ function [results target_] = run_test_vq(vq_fn, target_fn, nframes=100, dec=1, E
 
   % limit test to the first nframes vectors
   if nframes != -1
-    last = nframes
+    last = nframes;
   else
     last = length(target);
   end
@@ -194,12 +194,18 @@ function run_curves(frames=100, dec=1)
     results = run_test_vq("../build_linux/vq_stage1_bs001.f32", target_fn, frames, dec, EbNodB(i), verbose=0);
     results2_log = [results2_log results];
   end
+  results4_log = [];
+  for i=1:length(EbNodB)
+    results = run_test_vq("../build_linux/vq_stage1_bs004.f32", target_fn, frames, dec, EbNodB(i), verbose=0);
+    results4_log = [results4_log results];
+  end
   for i=1:length(results1_log)
     ber(i) = results1_log(i).ber;
     per(i) = results1_log(i).per;
     mse_noerrors(i) = sqrt(results1_log(i).mse_noerrors);
     mse_vq1(i) = sqrt(results1_log(i).mse);
     mse_vq2(i) = sqrt(results2_log(i).mse);
+    mse_vq4(i) = sqrt(results4_log(i).mse);
   end
 
   figure(1); clf;
@@ -216,8 +222,9 @@ function run_curves(frames=100, dec=1)
   
   figure(2); clf;
   plot(EbNodB, mse_noerrors, "b+-;no errors;"); hold on;
-  plot(EbNodB, mse_vq1, "g+-;vq1;");
-  plot(EbNodB, mse_vq2, "r+-;vq2;");
+  plot(EbNodB, mse_vq1, "g+-;vanilla;");
+  plot(EbNodB, mse_vq2, "r+-;binary switch;");
+  plot(EbNodB, mse_vq4, "b+-;binary switch with prob;");
   hold off; grid; title("RMS SD (dB)"); xlabel('Eb/No(dB)');
 endfunction
 
