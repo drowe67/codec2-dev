@@ -30,35 +30,44 @@ function train() {
 }
 
 function listen() {
-  fullfile=$1
+  vq_fn=$1
+  dec=$2
+  EbNodB=$3
+  fullfile=$4
   filename=$(basename -- "$fullfile")
   extension="${filename##*.}"
   filename="${filename%.*}"
-
-  fullfile_out=$2
-  vq_fn=$3
-  EbNodB=$4
   
-  sox $fullfile -t raw - | c2sim - --rateK --rateKout ${filename}.f32
-
+  fullfile_out=$5
+  sox_options='-t raw -e signed-integer -b 16' 
+  sox $fullfile $sox_options - | c2sim - --rateK --rateKout ${filename}.f32
+  
   echo "ratek=load_f32('../build_linux/${filename}.f32',20); vq_700c_eq; ratek_lim=limit_vec(ratek, 0, 40); save_f32('../build_linux/${filename}_lim.f32', ratek_lim); quit" | \
   octave -p ${CODEC2_PATH}/octave -qf
 
-  echo "pkg load statistics; vq_compare(action='vq_file', '${vq_fn}', EbNodB=${EbNodB}, '${filename}_lim.f32', '${filename}_test.f32'); quit" \ |
+  echo "pkg load statistics; vq_compare(action='vq_file', '${vq_fn}', ${dec}, ${EbNodB}, '${filename}_lim.f32', '${filename}_test.f32'); quit" \ |
   octave -p ${CODEC2_PATH}/octave -qf
       
-  sox $fullfile -t raw - | c2sim - --rateK --rateKin ${filename}_test.f32 -o - | sox -t .s16 -r 8000 -c 1 - ${fullfile_out}
+  if [ "$fullfile_out" = "aplay" ]; then
+     sox $fullfile $sox_options - | c2sim - --rateK --rateKin ${filename}_test.f32 -o - | aplay -f S16_LE
+  else
+     sox $fullfile $sox_options - | c2sim - --rateK --rateKin ${filename}_test.f32 -o - | sox -t .s16 -r 8000 -c 1 - ${fullfile_out}
+  fi
+     
 }
 
 function print_help {
     echo
     echo "Trellis/VQ optimisation support script"
     echo
-    echo "  usage ./train_trellis.sh [-d] [-t] [-v in.wav out.wav vq.f32 EbNodB]"
+    echo "  usage ./train_trellis.sh [-x] [-t] [-v vq.f32 in.wav out.wav] [-e EbNodB] [-d dec]"
     echo
-    echo "    -d        debug mode; trace script execution"
-    echo "    -t        train VQ and generate a fully quantised version of training vectors"
-    echo "    -v        synthesis an output file out.wav from in.raw, using the VQ vq.f32"
+    echo "    -x                         debug mode; trace script execution"
+    echo "    -t                         train VQ and generate a fully quantised version of training vectors"
+    echo "    -v  in.wav out.wav vq.f32  synthesise an output file out.wav from in.raw, using the VQ vq.f32"
+    echo "    -v  in.wav aplay vq.f32    synthesise output, play immediately using aplay, using the VQ vq.f32"
+    echo "    -e  EbNodB                 Eb/No in dB for AWGn channel simulation (error insertion)"
+    echo "    -d  dec                    decimation/interpolation rate"
     echo
     exit
 }
@@ -71,12 +80,14 @@ fi
 
 do_train=0
 do_vq=0
+EbNodB=100
+dec=1
 POSITIONAL=()
 while [[ $# -gt 0 ]]
 do
 key="$1"
 case $key in
-    -d)
+    -x)
         set -x	
         shift
     ;;
@@ -86,16 +97,24 @@ case $key in
     ;;
     -v)
         do_vq=1
-	in_wav="$2"
-	out_wav="$3"
-	vq_fn="$4"
-	EbNodB="$5"
-        shift
+	vq_fn="$2"
+	in_wav="$3"
+	out_wav="$4"
 	shift
 	shift
 	shift
 	shift
     ;;
+    -d)
+	dec="$2"
+	shift
+	shift	
+	;;
+    -e)
+	EbNodB="$2"
+	shift
+	shift	
+	;;
     -h)
         print_help	
     ;;
@@ -112,5 +131,5 @@ if [ $do_train -eq 1 ]; then
 fi
 
 if [ $do_vq -eq 1 ]; then
-  listen ${in_wav} ${out_wav} ${vq_fn} ${EbNodB}
+  listen ${vq_fn} ${dec} ${EbNodB} ${in_wav} ${out_wav}
 fi

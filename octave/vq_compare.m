@@ -24,7 +24,7 @@
 #}
 
 
-function vq_compare(action="run_curves", vq_fn, EbNodB=3, in_fn, out_fn)
+function vq_compare(action="run_curves", vq_fn, dec=1, EbNodB=3, in_fn, out_fn)
   graphics_toolkit ("gnuplot");
   more off;
   randn('state',1);
@@ -33,7 +33,7 @@ function vq_compare(action="run_curves", vq_fn, EbNodB=3, in_fn, out_fn)
     run_curves(600);
   end
   if strcmp(action, "vq_file")
-    vq_file(vq_fn, EbNodB, in_fn, out_fn)
+    vq_file(vq_fn, dec, EbNodB, in_fn, out_fn)
   end
 endfunction
 
@@ -150,7 +150,7 @@ function [results target_] = run_test_vq(vq_fn, target_fn, nframes=100, dec=1, E
 
   % limit test to the first nframes vectors
   if nframes != -1
-    last = dec*nframes
+    last = nframes
   else
     last = length(target);
   end
@@ -166,7 +166,18 @@ function [results target_] = run_test_vq(vq_fn, target_fn, nframes=100, dec=1, E
   end
 
   % return full band vq-ed vectors
-  target_ = vq(results.rx_indexes+1,:);
+  target_ = zeros(last,K);
+  target_(1:dec:last,:) = vq(results.rx_indexes+1,:);
+  
+  % use linear interpolation to restore original frame rate
+  for f=1:dec:last-dec
+    prev = f; next = f + dec;
+    for g=prev+1:next-1
+      cnext = (g-prev)/dec; cprev = 1 - cnext;
+      target_(g,:) = cprev*target_(prev,:) + cnext*target_(next,:);
+      %printf("f: %d g: %d cprev: %f cnext: %f\n", f, g, cprev, cnext);
+    end
+  end
 endfunction
 
 % generate sets of curves
@@ -211,8 +222,8 @@ function run_curves(frames=100, dec=1)
 endfunction
 
 
-function vq_file(vq_fn, EbNodB, in_fn, out_fn)
-  [results target_] = run_test_vq(vq_fn, in_fn, nframes=-1, dec=1, EbNodB, verbose=0);
+function vq_file(vq_fn, dec, EbNodB, in_fn, out_fn)
+  [results target_] = run_test_vq(vq_fn, in_fn, nframes=-1, dec, EbNodB, verbose=0);
   save_f32(out_fn, target_);
 endfunction
 
