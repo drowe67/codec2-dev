@@ -25,7 +25,6 @@
 
 
 function vq_compare(action="run_curves", vq_fn, dec=1, EbNodB=3, in_fn, out_fn)
-  graphics_toolkit ("gnuplot");
   more off;
   randn('state',1);
 
@@ -211,14 +210,9 @@ function run_curves(frames=100, dec=1)
   figure(1); clf;
   semilogy(EbNodB, ber, 'g+-;ber;','linewidth', 2); hold on;
   semilogy(EbNodB, per, 'b+-;per;','linewidth', 2);
-  grid; xlabel('Eb/No(dB)');
-  % grid minor is busted
-  for y=2:9
-    semilogy([min(EbNodB) max(EbNodB)],[0.001*y 0.001*y],'--k');
-    semilogy([min(EbNodB) max(EbNodB)],[0.01*y 0.01*y],'--k');
-    semilogy([min(EbNodB) max(EbNodB)-1],[0.1*y 0.1*y],'--k');
-  end
-  hold off;
+  grid('minor'); xlabel('Eb/No(dB)');
+
+hold off;
   
   figure(2); clf;
   plot(EbNodB, mse_noerrors, "b+-;no errors;"); hold on;
