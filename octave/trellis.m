@@ -399,7 +399,7 @@ endfunction
 % top level function to set up and run a test
 function results = test_trellis(nframes=100, dec=1, ntxcw=8, nstages=3, EbNodB=3, verbose=0)
   K = 20; K_st=2+1; K_en=16+1;
-  vq_fn = "../build_linux/vq_stage1.f32";
+  vq_fn = "../build_linux/vq_stage1_bs004.f32";
   vq_output_fn = "../build_linux/all_speech_8k_test.f32";
   target_fn = "../build_linux/all_speech_8k_lim.f32";
   
@@ -511,11 +511,11 @@ function test_bpsk_ber
 endfunction
 
 % generate sets of curves
-function run_curves(frames=100, dec=1)
+function run_curves(frames=100, dec=1, nstages=5)
   results_log = [];
-  EbNodB = [1 2 3 4];
+  EbNodB = [0 1 2 3 4 5];
   for i=1:length(EbNodB)
-    results = test_trellis(frames, dec, ntxcw=8, nstages=3, EbNodB(i), verbose=0);
+    results = test_trellis(frames, dec, ntxcw=8, nstages, EbNodB(i), verbose=0);
     results_log = [results_log results];
   end
   for i=1:length(results_log)
@@ -530,24 +530,23 @@ function run_curves(frames=100, dec=1)
 
   figure(1); clf; semilogy(EbNodB, ber_vanilla, "r+-;uncoded;"); hold on;
   semilogy(EbNodB, ber, "g+-;trellis;"); hold off;
-  grid; title(sprintf("BER dec=%d nstages=%d",dec,nstages));
+  grid('minor'); title(sprintf("BER dec=%d nstages=%d",dec,nstages));
   print("-dpng", sprintf("trellis_dec_%d_ber.png",dec));
   
   figure(2); clf; semilogy(EbNodB, per_vanilla, "r+-;uncoded;"); hold on;
   semilogy(EbNodB, per, "g+-;trellis;");
-  grid; title(sprintf("PER dec=%d nstages=%d",dec,nstages));
+  grid('minor'); title(sprintf("PER dec=%d nstages=%d",dec,nstages));
   print("-dpng", sprintf("trellis_dec_%d_per.png",dec));
 
   figure(3); clf; plot(EbNodB, mse_noerrors, "b+-;no errors;"); hold on;
   plot(EbNodB, mse_vanilla, "r+-;uncoded;");
   plot(EbNodB, mse, "g+-;trellis;"); hold off;
-  grid; title(sprintf("RMS SD dec=%d nstages=%d",dec,nstages));
+  grid('minor'); title(sprintf("RMS SD dec=%d nstages=%d",dec,nstages));
   print("-dpng", sprintf("trellis_dec_%d_rms_sd.png",dec));
 endfunction
 
 % -------------------------------------------------------------------
 
-graphics_toolkit ("gnuplot");
 more off;
 randn('state',1);
 
@@ -557,9 +556,10 @@ randn('state',1);
 %test_trellis(nframes=600, dec=1, ntxcw=8, nstages=3, EbNodB=3, verbose=0);
 %test_trellis(nframes=600, dec=4, ntxcw=8, nstages=3, EbNodB=3, verbose=0);
 
-run_curves(600,1)
-run_curves(600,2)
-run_curves(600,4)
+%run_curves(600,1)
+%run_curves(600,2)
+%run_curves(600,4)
+run_curves(600,3,5)
 
 %test_trellis(nframes=200, dec=1, ntxcw=1, nstages=3, EbNodB=3, verbose=0);
 %test_trellis(nframes=100, dec=2, ntxcw=8, nstages=3, EbNodB=3, verbose=0);
