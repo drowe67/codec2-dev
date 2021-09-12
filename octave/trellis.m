@@ -511,7 +511,7 @@ function test_bpsk_ber
 endfunction
 
 % generate sets of curves
-function run_curves(frames=100, dec=1, nstages=5)
+function [EbNodB rms_sd] = run_curves(frames=100, dec=1, nstages=5)
   results_log = [];
   EbNodB = [0 1 2 3 4 5];
   for i=1:length(EbNodB)
@@ -523,9 +523,9 @@ function run_curves(frames=100, dec=1, nstages=5)
     ber_vanilla(i) = results_log(i).ber_vanilla;
     per(i) = results_log(i).per;
     per_vanilla(i) = results_log(i).per_vanilla;
-    mse_noerrors(i) = sqrt(results_log(i).mse_noerrors);
-    mse(i) = sqrt(results_log(i).mse);
-    mse_vanilla(i) = sqrt(results_log(i).mse_vanilla);
+    rms_sd_noerrors(i) = sqrt(results_log(i).mse_noerrors);
+    rms_sd(i) = sqrt(results_log(i).mse);
+    rms_sd_vanilla(i) = sqrt(results_log(i).mse_vanilla);
   end
 
   figure(1); clf; semilogy(EbNodB, ber_vanilla, "r+-;uncoded;"); hold on;
@@ -538,9 +538,9 @@ function run_curves(frames=100, dec=1, nstages=5)
   grid('minor'); title(sprintf("PER dec=%d nstages=%d",dec,nstages));
   print("-dpng", sprintf("trellis_dec_%d_per.png",dec));
 
-  figure(3); clf; plot(EbNodB, mse_noerrors, "b+-;no errors;"); hold on;
-  plot(EbNodB, mse_vanilla, "r+-;uncoded;");
-  plot(EbNodB, mse, "g+-;trellis;"); hold off;
+  figure(3); clf; plot(EbNodB, rms_sd_noerrors, "b+-;no errors;"); hold on;
+  plot(EbNodB, rms_sd_vanilla, "r+-;uncoded;");
+  plot(EbNodB, rms_sd, "g+-;trellis;"); hold off;
   grid('minor'); title(sprintf("RMS SD dec=%d nstages=%d",dec,nstages));
   print("-dpng", sprintf("trellis_dec_%d_rms_sd.png",dec));
 endfunction
@@ -559,7 +559,7 @@ randn('state',1);
 %run_curves(600,1)
 %run_curves(600,2)
 %run_curves(600,4)
-run_curves(600,3,5)
+[EbNodB rms_sd] = run_curves(30*100,3,3)
 
 %test_trellis(nframes=200, dec=1, ntxcw=1, nstages=3, EbNodB=3, verbose=0);
 %test_trellis(nframes=100, dec=2, ntxcw=8, nstages=3, EbNodB=3, verbose=0);
