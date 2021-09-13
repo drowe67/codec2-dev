@@ -30,7 +30,7 @@ function train() {
   cat ${filename}_lim.f32 | vq_mbest --st $Kst --en $Ken -k $K -q vq_stage1.f32 > ${filename}_test.f32
 }
 
-function listen() {
+function listen_vq() {
   vq_fn=$1
   dec=$2
   EbNodB=$3
@@ -40,15 +40,21 @@ function listen() {
   filename="${filename%.*}"
   
   fullfile_out=$5
+  do_trellis=$6
   sox_options='-t raw -e signed-integer -b 16' 
   sox $fullfile $sox_options - | c2sim - --rateK --rateKout ${filename}.f32
   
   echo "ratek=load_f32('../build_linux/${filename}.f32',20); vq_700c_eq; ratek_lim=limit_vec(ratek, 0, 40); save_f32('../build_linux/${filename}_lim.f32', ratek_lim); quit" | \
   octave -p ${CODEC2_PATH}/octave -qf
 
-  echo "pkg load statistics; vq_compare(action='vq_file', '${vq_fn}', ${dec}, ${EbNodB}, '${filename}_lim.f32', '${filename}_test.f32'); quit" \ |
-  octave -p ${CODEC2_PATH}/octave -qf
-      
+  if [ "$do_trellis" -eq 0 ]; then
+     echo "pkg load statistics; vq_compare(action='vq_file', '${vq_fn}', ${dec}, ${EbNodB}, '${filename}_lim.f32', '${filename}_test.f32'); quit" \ |
+     octave -p ${CODEC2_PATH}/octave -qf
+  else
+     echo "pkg load statistics; trellis; vq_file('${vq_fn}', ${dec}, ${EbNodB}, '${filename}_lim.f32', '${filename}_test.f32'); quit" \ |
+     octave -p ${CODEC2_PATH}/octave -qf
+  fi
+  
   if [ "$fullfile_out" = "aplay" ]; then
      sox $fullfile $sox_options - | c2sim - --rateK --rateKin ${filename}_test.f32 -o - | aplay -f S16_LE
   else
@@ -65,10 +71,11 @@ function print_help {
     echo
     echo "    -x                         debug mode; trace script execution"
     echo "    -t                         train VQ and generate a fully quantised version of training vectors"
-    echo "    -v  in.wav out.wav vq.f32  synthesise an output file out.wav from in.raw, using the VQ vq.f32"
-    echo "    -v  in.wav aplay vq.f32    synthesise output, play immediately using aplay, using the VQ vq.f32"
+    echo "    -v  vq.f32 in.wav out.wav  synthesise an output file out.wav from in.raw, using the VQ vq.f32"
+    echo "    -v  vq.f32 in.wav aplay    synthesise output, play immediately using aplay, using the VQ vq.f32"
     echo "    -e  EbNodB                 Eb/No in dB for AWGn channel simulation (error insertion)"
     echo "    -d  dec                    decimation/interpolation rate"
+    echo "    -r                         use trellis decoder"
     echo
     exit
 }
@@ -81,6 +88,7 @@ fi
 
 do_train=0
 do_vq=0
+do_trellis=0
 EbNodB=100
 dec=1
 POSITIONAL=()
@@ -104,6 +112,10 @@ case $key in
 	shift
 	shift
 	shift
+	shift
+    ;;
+    -r)
+        do_trellis=1
 	shift
     ;;
     -d)
@@ -132,5 +144,5 @@ if [ $do_train -eq 1 ]; then
 fi
 
 if [ $do_vq -eq 1 ]; then
-  listen ${vq_fn} ${dec} ${EbNodB} ${in_wav} ${out_wav}
+  listen_vq ${vq_fn} ${dec} ${EbNodB} ${in_wav} ${out_wav} ${do_trellis}
 fi
