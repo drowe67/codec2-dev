@@ -43,9 +43,9 @@
 #include "debug_alloc.h"
 #include "machdep.h"
 
-#ifdef __EMBEDDED__
+#ifdef STM32F40_41xxx
 #include "arm_math.h"
-#endif /* __EMBEDDED_ */
+#endif /* STM32F40_41xxx */
 
 /* Static Prototypes */
 
@@ -731,7 +731,7 @@ static int est_timing(struct OFDM *ofdm, complex float *rx, int length,
         corr_st = 0.0f;
         corr_en = 0.0f;
 
-#ifdef __EMBEDDED__
+#ifdef STM32F40_41xxx
 #ifdef __REAL__
 	float re,im;
 
@@ -758,7 +758,7 @@ static int est_timing(struct OFDM *ofdm, complex float *rx, int length,
 	    corr_st = corr_st + (rx[ind                        ] * wvec_pilot[j]);
             corr_en = corr_en + (rx[ind + ofdm->samplesperframe] * wvec_pilot[j]);
         }
-#endif
+#endif // STM32F40_41xxx
         corr[i] = (cabsf(corr_st) + cabsf(corr_en)) * av_level;
     }
 
