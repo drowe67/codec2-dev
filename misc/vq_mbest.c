@@ -39,22 +39,24 @@ int main(int argc, char *argv[]) {
     int   st = -1;
     int   en = -1;
     int   num = INT_MAX;
+    int   output_vec_usage = 0;
     
     int o = 0; int opt_idx = 0;
     while (o != -1) {
        static struct option long_opts[] = {
-	   {"k",       required_argument, 0, 'k'},
-	   {"quant",   required_argument, 0, 'q'},
-	   {"mbest",   required_argument, 0, 'm'},
-	   {"lower",   required_argument, 0, 'l'},
-	   {"verbose", required_argument, 0, 'v'},
-           {"st",      required_argument, 0, 't'},
-           {"en",      required_argument, 0, 'e'},
-           {"num",     required_argument, 0, 'n'},
+	   {"k",         required_argument, 0, 'k'},
+	   {"quant",     required_argument, 0, 'q'},
+	   {"mbest",     required_argument, 0, 'm'},
+	   {"lower",     required_argument, 0, 'l'},
+	   {"verbose",   required_argument, 0, 'v'},
+           {"st",        required_argument, 0, 't'},
+           {"en",        required_argument, 0, 'e'},
+           {"num",       required_argument, 0, 'n'},
+           {"vec_usage", no_argument, 0, 'u'},
 	   {0, 0, 0, 0}
         };
 
-        o = getopt_long(argc,argv,"hk:q:m:vt:e:n:",long_opts,&opt_idx);
+        o = getopt_long(argc,argv,"hk:q:m:vt:e:n:u",long_opts,&opt_idx);
         switch (o) {
 	case 'k':
 	    k = atoi(optarg);
@@ -111,7 +113,10 @@ int main(int argc, char *argv[]) {
         case 'e':
             en = atoi(optarg);
             break;
-        case 'v':
+        case 'u':
+            output_vec_usage = 1;
+            break;
+	case 'v':
             verbose = 1;
             break;
 	help:
@@ -125,7 +130,8 @@ int main(int argc, char *argv[]) {
             fprintf(stderr, "--st    Kst              start vector element for error calculation (default 0)\n");
             fprintf(stderr, "--en    Ken              end vector element for error calculation (default K-1)\n");
 	    fprintf(stderr, "--num   numToProcess     number of vectors to quantise (default to EOF)\n");
-	    fprintf(stderr, "-v                       Verbose\n");
+	    fprintf(stderr, "--vec_usage              Output a record of how many times each vector is used\n");
+ 	    fprintf(stderr, "-v                       Verbose\n");
             exit(1);
         }
     }
@@ -137,7 +143,8 @@ int main(int argc, char *argv[]) {
     if (st == -1) st = 0; 
     if (en == -1) en = k-1;
 
-    int   indexes[num_stages], nvecs = 0;
+    int   indexes[num_stages], nvecs = 0; int vec_usage[m[0]];
+    for(int i=0; i<m[0]; i++) vec_usage[i] = 0;
     float target[k], quantised[k];
     float sqe = 0.0;
     while(fread(&target, sizeof(float), k, stdin) && (nvecs < num)) {
@@ -161,8 +168,17 @@ int main(int argc, char *argv[]) {
 	}
 	fwrite(&quantised, sizeof(float), k, stdout);
 	nvecs++;
+	// count number f time each vector is used (just for first stage)
+	vec_usage[indexes[0]]++;
     }
+
     fprintf(stderr, "%4.2f\n", sqe/(nvecs*(en-st+1)));
+
+    if (output_vec_usage) {
+      for(int i=0; i<m[0]; i++)
+	fprintf(stderr, "%d\n", vec_usage[i]);
+    }
+
     return 0;
 }
 
@@ -200,7 +216,6 @@ void quant_pred_mbest(float vec_out[],
         index[i] = 0;
     }
 
-    
     for(i=0; i<st; i++)
         w[i] = 0.0;
     for(i=st; i<=en; i++)
