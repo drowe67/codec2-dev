@@ -438,12 +438,11 @@ void determine_autoc(C2CONST *c2const, float Rk[], int order, MODEL *model, int 
 
 /* update and optionally run "front eq" equaliser on before VQ */
 void newamp1_eq(float rate_K_vec_no_mean[], float eq[], int K, int eq_en) {
-    static const char ideal[] = {8,10,12,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,-20};
+    static const int8_t ideal[] = {8,10,12,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,-20};
     float gain = 0.02f;
-    float update;
     
     for(int k=0; k<K; k++) {
-        update = rate_K_vec_no_mean[k] - (float) ideal[k];
+        float update = rate_K_vec_no_mean[k] - (float) ideal[k];
         eq[k] = (1.0f-gain)*eq[k] + gain*update;
         if (eq[k] < 0.0f) eq[k] = 0.0f;
         if (eq_en)
