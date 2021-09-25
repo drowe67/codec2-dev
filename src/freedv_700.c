@@ -140,11 +140,6 @@ void freedv_ofdm_voice_open(struct freedv *f, char *mode) {
 
     f->tx_bits = NULL; /* not used for 700D */
 
-#ifdef __EMBEDDED__
-    if (strcmp(mode, "700E") != 0)
-        ofdm_set_tx_bpf(f->ofdm, 0);
-#endif
-
     f->speech_sample_rate = FREEDV_FS_8000;
     f->codec2 = codec2_create(CODEC2_MODE_700C); assert(f->codec2 != NULL);
     /* should be exactly an integer number of Codec 2 frames in a OFDM modem frame */
