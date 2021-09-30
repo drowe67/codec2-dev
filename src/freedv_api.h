@@ -33,6 +33,7 @@
 #ifndef __FREEDV_API__
 #define __FREEDV_API__
 
+#include <complex.h>
 #include <sys/types.h>
 // This declares a single-precision (float) complex number
 #include "comp.h"
