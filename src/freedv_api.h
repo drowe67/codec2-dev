@@ -145,7 +145,7 @@ struct freedv_advanced {
 
 // Called when text message char is decoded
 typedef void (*freedv_callback_rx)(void *, char);
-typedef void (*freedv_callback_rx_sym)(void *, _Complex float, float);
+typedef void (*freedv_callback_rx_sym)(void *, float _Complex, float);
 // Called when new text message char is needed
 typedef char (*freedv_callback_tx)(void *);
 typedef void (*freedv_calback_error_pattern)
