@@ -230,6 +230,10 @@ int freedv_rx_fsk_ldpc_data(struct freedv *f, COMP demod_in[]);
 
 int freedv_bits_to_speech(struct freedv *f, short speech_out[], short demod_in[], int rx_status);
 
+// for the reliable text protocol we need to pass symbols back rather than text
+typedef void (*freedv_callback_rx_sym)(void *, _Complex float, float);
+void freedv_set_callback_txt_sym (struct freedv *freedv, freedv_callback_rx_sym rx, void *callback_state);
+
 #ifdef __cplusplus
 }
 #endif
