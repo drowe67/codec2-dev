@@ -75,7 +75,7 @@ void mbest_destroy(struct MBEST *mbest) {
 \*---------------------------------------------------------------------------*/
 
 void mbest_insert(struct MBEST *mbest, int index[], float error) {
-    int                i, j, found;
+    int                i, found;
     struct MBEST_LIST *list    = mbest->list;
     int                entries = mbest->entries;
 
@@ -83,10 +83,8 @@ void mbest_insert(struct MBEST *mbest, int index[], float error) {
     for(i=0; i<entries && !found; i++)
 	if (error < list[i].error) {
 	    found = 1;
-	    for(j=entries-1; j>i; j--)
-		list[j] = list[j-1];
-	    for(j=0; j<MBEST_STAGES; j++)
-		list[i].index[j] = index[j];
+            memmove(&list[i+1], &list[i], sizeof(struct MBEST_LIST) * (entries - i - 1));
+            memcpy(&list[i].index[0], &index[0], sizeof(int) * MBEST_STAGES);
 	    list[i].error = error;
 	}
 }
@@ -124,17 +122,21 @@ void mbest_search(
 )
 {
    float   e;
-   int     i,j;
-   float   diff;
+   int     j;
 
    for(j=0; j<m; j++) {
+        float   diff;
+        int i;
+
 	e = 0.0;
 	for(i=0; i<k; i++) {
 	    diff = cb[j*k+i]-vec[i];
 	    e += diff*w[i]*diff*w[i];
 	}
+
 	index[0] = j;
-	mbest_insert(mbest, index, e);
+        if (e < mbest->list[mbest->entries - 1].error)
+	    mbest_insert(mbest, index, e);
    }
 }
 
