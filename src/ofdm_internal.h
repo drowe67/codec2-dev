@@ -236,6 +236,14 @@ struct OFDM {
     
     char *codename;
     char *state_machine;
+
+#ifndef STM32F40_41xxx
+    // On non-SM1000 platforms, we precompute c for dft and idft to make it easier
+    // to use SIMD instructions to optimize those functions. This isn't done on SM1000
+    // due to memory constraints. Each is (ofdm->m * (ofdm->nc + 2)) in size.
+    complex float* tx_c;
+    complex float* rx_c;
+#endif // STM32F40_41xxx
 };
 
 /* Prototypes */
