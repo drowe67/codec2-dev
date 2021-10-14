@@ -401,6 +401,36 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
         }
     }
 
+#ifndef STM32F40_41xxx   
+    // Precalculate "c" for use in dft() and idft().
+    ofdm->tx_c = (complex float*)calloc(ofdm->m * (ofdm->nc + 2), sizeof(complex float));
+    ofdm->rx_c = (complex float*)calloc(ofdm->m * (ofdm->nc + 2), sizeof(complex float));
+    assert(ofdm->tx_c != NULL && ofdm->rx_c != NULL);
+
+    complex float* c_ptr = ofdm->tx_c;
+    for (int row = 1; row < ofdm->m; row++) {
+        complex float c = cmplx(ofdm->tx_nlower * ofdm->doc * row);
+        complex float delta = cmplx(ofdm->doc * row);
+
+        for (int col = 0; col < (ofdm->nc + 2); col++) {
+            *c_ptr++ = c;
+            c *= delta;
+        }
+    }
+
+    c_ptr = ofdm->rx_c;
+    for (int col = 0; col < (ofdm->nc + 2); col++) {
+        float tval = (ofdm->rx_nlower + col) * ofdm->doc;
+        complex float c = cmplxconj(tval);
+        complex float delta = c;
+
+        for (int row = 1; row < ofdm->m; row++) {
+            *c_ptr++ = c;
+            c *= delta;
+        }
+    }
+#endif // STM32F40_41xxx
+
     /* default settings of options and states */
 
     ofdm->verbose = 0;
@@ -529,7 +559,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
         ofdm_generate_preamble(ofdm, ofdm->tx_postamble, 3);
     }
     ofdm->postambledetectoren = !strcmp(ofdm->data_mode,"burst");
-    
+
     return ofdm; /* Success */
 }
 
@@ -563,6 +593,11 @@ static void deallocate_tx_bpf(struct OFDM *ofdm) {
 
 void ofdm_destroy(struct OFDM *ofdm) {
     int i;
+
+#ifndef STM32F40_41xxx   
+    free(ofdm->tx_c);
+    free(ofdm->rx_c);
+#endif // STM32F40_41xxx
 
     if (strlen(ofdm->data_mode)) {
         free(ofdm->tx_preamble);
@@ -606,15 +641,25 @@ static void idft(struct OFDM *ofdm, complex float *result, complex float *vector
 
     result[0] *= ofdm->inv_m;
 
+#ifndef STM32F40_41xxx
+    complex float* c_ptr = ofdm->tx_c;
+#endif // STM32F40_41xxx
+
     for (row = 1; row < ofdm->m; row++) {
+#ifdef STM32F40_41xxx
         complex float c = cmplx(ofdm->tx_nlower * ofdm->doc *row);
         complex float delta = cmplx(ofdm->doc * row);
+#endif // STM32F40_41xxx
 
         result[row] = 0.0f;
 
         for (col = 0; col < (ofdm->nc + 2); col++) {
+#ifdef STM32F40_41xxx
             result[row] += (vector[col] * c);
             c *= delta;
+#else
+            result[row] += vector[col] * (*c_ptr++);
+#endif // STM32F40_41xxx
         }
 
         result[row] *= ofdm->inv_m;
@@ -633,14 +678,24 @@ static void dft(struct OFDM *ofdm, complex float *result, complex float *vector)
         result[col] = vector[0];                 // conj(cexp(j0)) == 1
     }
 
+#ifndef STM32F40_41xxx
+    complex float* c_ptr = ofdm->rx_c;
+#endif // STM32F40_41xxx
+
     for (col = 0; col < (ofdm->nc + 2); col++) {
+#ifdef STM32F40_41xxx
         float tval = (ofdm->rx_nlower + col) * ofdm->doc;
         complex float c = cmplxconj(tval);
         complex float delta = c;
+#endif // STM32F40_41xxx
 
         for (row = 1; row < ofdm->m; row++) {
+#ifdef STM32F40_41xxx
             result[col] += (vector[row] * c);
             c *= delta;
+#else
+            result[col] += vector[row] * (*c_ptr++);
+#endif // STM32F40_41xxx
         }
     }
 }
