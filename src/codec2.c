@@ -2287,7 +2287,7 @@ float codec2_get_var(struct CODEC2 *codec2_state) {
     if (codec2_state->nse)
         return codec2_state->se / (float) codec2_state->nse;
     else
-        return 0;
+        return 0.0f;
 }
 
 float *codec2_enable_user_ratek(struct CODEC2 *codec2_state, int *K) {
