@@ -495,8 +495,10 @@ void newamp1_model_to_indexes(C2CONST *c2const,
     rate_K_mbest_encode(indexes, rate_K_vec_no_mean, rate_K_vec_no_mean_, K, NEWAMP1_VQ_MBEST_DEPTH);
 
     /* running sum of squared error for variance calculation */
-    for(k=0; k<K; k++)
-        *se += (float)pow(rate_K_vec_no_mean[k]-rate_K_vec_no_mean_[k],2.0);
+    for(k=0; k<K; k++) {
+        float tmp = (rate_K_vec_no_mean[k] - rate_K_vec_no_mean_[k]);
+        *se += (tmp * tmp);
+    }
 
     /* scalar quantise mean (effectively the frame energy) */
     float w[1] = {1.0};
