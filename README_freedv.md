@@ -49,7 +49,7 @@ Notes:
 
 1. *Multipath* is the relative resilience of the mode to multipath fading, the biggest problem digital voice faces on HF radio channels.  Analog SSB would be rated as "good".
 
-1. *Text* is a side channel for low bit rate text such as your location and call sign.  It is generally unprotected by FEC, and encoded with varicode. The exception is if reliable_text support is turned on (see reliable_text.c/h); this results in text protected by LDPC(112,56) FEC.
+1. *Text* is a side channel for low bit rate text such as your location and call sign.  It is generally unprotected by FEC, and encoded with varicode. The exception is if reliable_text support is turned on (see reliable_text.c/h); this results in text protected by LDPC(112,56) FEC with interleaving.
 
 1. *SNR Min* is for an AWGN channel (no multipath/fading).
 
