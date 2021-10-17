@@ -122,21 +122,20 @@ void mbest_search(
 )
 {
    float   e;
-   int     j;
 
-   for(j=0; j<m; j++) {
+   for(int j=0; j<m; j++) {
         float   diff;
         int i;
 
-	e = 0.0;
-	for(i=0; i<k; i++) {
-	    diff = cb[j*k+i]-vec[i];
-	    e += diff*w[i]*diff*w[i];
-	}
+        e = 0.0;
+        for(int i = 0; i < k && e < mbest->list[mbest->entries - 1].error; i++) {
+            diff = cb[j*k+i]-vec[i];
+            e += diff*w[i]*diff*w[i];
+        }
 
-	index[0] = j;
+        index[0] = j;
         if (e < mbest->list[mbest->entries - 1].error)
-	    mbest_insert(mbest, index, e);
+            mbest_insert(mbest, index, e);
    }
 }
 
