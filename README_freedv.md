@@ -93,6 +93,143 @@ See also [freedv_api.h](src/freedv_api.h) and [freedv_api.c](src/freedv_api.c), 
 $ ./freedv_tx 1600 ../../raw/hts1.raw - | ./freedv_rx 1600 - - | aplay -f S16_LE
 $ cat freedv_rx_log.txt
 ```
+
+### Using the API
+
+Generally, the FreeDV API is used as follows:
+
+#### Creating FreeDV objects
+
+Call freedv\_open() or freedv\_advanced\_open() depending on the mode being used:
+
+```
+\#include "freedv\_api.h"
+
+struct freedv* dv;
+if ((mode == FREEDV\_MODE\_700D) || (mode == FREEDV\_MODE\_700E) || (mode == FREEDV\_MODE\_2020)) {
+    struct freedv_advanced adv;
+    dv = freedv\_open\_advanced(mode, &adv);
+} else {
+    dv = fredv\_open(mode);
+}
+
+if (dv == NULL) {
+    // handle error condition
+}
+```
+
+Available modes:
+
+* FREEDV\_MODE\_1600
+* FREEDV\_MODE\_2400A
+* FREEDV\_MODE\_2400B
+* FREEDV\_MODE\_800XA
+* FREEDV\_MODE\_700C
+* FREEDV\_MODE\_700D
+* FREEDV\_MODE\_2020
+* FREEDV\_MODE\_700E
+
+#### Enabling reliable receiving/sending of callsigns in the voice stream (e.g. for PSK Reporter)
+
+```
+\#include "reliable\_text.h"
+
+reliable\_text\_t rt = reliable\_text\_create();
+if (rt == NULL) { /* handle error */ }
+
+void* stateObject = NULL; /* can be a pointer to anything */
+reliable\_text\_use\_with\_freedv(rt, dv, &OnReliableTextRx, stateObject);
+
+char* callsign = "KA6ABC";
+reliable\_text\_set\_string(rt, callsign, strlen(callsign));
+
+...
+
+void OnReliableTextRx(reliable\_text\_t rt, const char* txt\_ptr, int length, void* state) 
+{
+    fprintf(stderr, "OnReliableTextRx: received %s\n", txt\_ptr);
+    ...
+    reliable\_text\_reset(rt);
+}
+```
+
+#### Enabling normal text (e.g. not callsigns)
+
+*Note: this is mutually exclusive with reliable\_text above.*
+
+```
+freedv\_set\_callback\_txt(dv, &TextRxFn, &TextTxFn, stateObject);
+
+...
+
+static char* text = "This is a test";
+static int currentIndex = 0;
+
+char TextTxFn(void *callback_state) 
+{
+    currentIndex = (currentIndex + 1) % strlen(text);
+    return text[currentIndex];
+}
+
+void TextRxFn(void *callback\_state, char c)
+{
+    fprintf(stderr, "Received character %c from stream\n", c);
+}
+```
+
+#### Decoding audio
+
+```
+int freedvRxModulatedSampleRate = freedv\_get\_modem\_sample\_rate(dv);
+int freedvRxSpeechSampleRate = freedv\_get\_speech\_sample\_rate(dv);
+
+/* Note that FreeDV expects int16 samples, not float. Input audio should be 
+   resampled to the rate expected by the current mode (e.g. inside freedvRxModulatedSampleRate
+   above). */
+short* resampledRxInput = malloc(/* size of resampled input buffer */);
+short* rxOutput = malloc(/* size of output buffer */);
+resample(rxInput, resampledRxInput, radioRate, freedvRxModulatedSampleRate);
+
+/* Loop through available samples until we run out. Each time, call freedv\_nin() to get
+   the current number of samples the mode needs followed by freedv\_rx() to actually feed
+   them in. 0 is perfectly okay for freedv\_nin() depending on the current internal state. */
+int nsamples = freedv\_nin(dv);
+short* currentBuf = resampledRxInput;
+while (currentBuf < sizeofBuffer)
+{
+    freedv\_rx(dv, rxOutput, currentBuf);
+    resample(rxOutput, radioOutput, freedvRxSpeechSampleRate, radioRate);
+    currentBuf += nsamples;
+    nsamples = freedv\_nin(dv);
+}
+```
+
+#### Transmitting audio
+
+```
+int freedvTxModulatedSampleRate = freedv\_get\_modem\_sample\_rate(dv);
+int freedvTxSpeechSampleRate = freedv\_get\_speech\_sample\_rate(dv);
+int requiredTxSpeechSamples = freedv\_get\_n\_speech\_samples(dv);
+
+short* txInput = malloc(/* size of resampled output buffer */);
+short* txOutput = malloc(/* size of output buffer */);
+
+while(speech samples available)
+{
+    memcpy(txInput, radioSamples, requiredTxSpeechSamples);
+    freedv\_tx(dv, txOutput, txInput);
+}
+
+#### Cleanup
+
+```
+/* if reliable\_text is enabled */
+reliable\_text\_unlink\_from\_freedv(rt);
+
+/* always required to free memory */
+freedv\_close(dv);
+```
+
 ## FreeDV 2400A and 2400B modes
 
 FreeDV 2400A and FreeDV 2400B are modes designed for VHF radio. FreeDV 2400A is designed for SDR radios (it has a 5 kHz RF bandwidth), however FreeDV 2400B is designed to pass through commodity FM radios.
