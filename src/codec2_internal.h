@@ -80,6 +80,7 @@ struct CODEC2 {
     codec2_fft_cfg phase_fft_inv_cfg;      
     float          se;                       /* running sum of squared error */
     unsigned int   nse;                      /* number of terms in sum       */
+    float          variance;                 /* pre-computed squared error   */
     float         *user_rate_K_vec_no_mean_; /* optional, user supplied vector for quantisation experiments */
     int            post_filter_en;
     float          eq[NEWAMP1_K];            /* optional equaliser */
