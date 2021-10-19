@@ -1583,7 +1583,7 @@ void codec2_encode_700c(struct CODEC2 *c2, unsigned char * bits, short speech[])
                              rate_K_vec_no_mean,
                              rate_K_vec_no_mean_, &c2->se, c2->eq, c2->eq_en);
     c2->nse += K;
-    c2->variance += (c2->se / (float) c2->nse);
+    c2->variance += (c2->se / (float) K);
 	
 #ifndef CORTEX_M4
     /* dump features for deep learning experiments */
