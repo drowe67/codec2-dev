@@ -2289,10 +2289,7 @@ void codec2_load_codebook(struct CODEC2 *codec2_state, int num, char *filename) 
 #endif
 
 float codec2_get_var(struct CODEC2 *codec2_state) {
-    if (codec2_state->variance != 0.0f)
-        return codec2_state->variance;
-    else
-        return 0.0f;
+    return codec2_state->variance;
 }
 
 float *codec2_enable_user_ratek(struct CODEC2 *codec2_state, int *K) {
