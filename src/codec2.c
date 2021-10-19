@@ -205,7 +205,11 @@ struct CODEC2 * codec2_create(int mode)
     c2->xq_dec[0] = c2->xq_dec[1] = 0.0;
 
     c2->smoothing = 0;
-    c2->se = 0.0; c2->nse = 0;
+
+    c2->se = 0.0f;
+    c2->variance = 0.0f;
+    c2->nse = 0;
+    
     c2->user_rate_K_vec_no_mean_ = NULL;
     c2->post_filter_en = 1;
     
@@ -1579,7 +1583,8 @@ void codec2_encode_700c(struct CODEC2 *c2, unsigned char * bits, short speech[])
                              rate_K_vec_no_mean,
                              rate_K_vec_no_mean_, &c2->se, c2->eq, c2->eq_en);
     c2->nse += K;
-
+    c2->variance += (c2->se / (float) c2->nse);
+	
 #ifndef CORTEX_M4
     /* dump features for deep learning experiments */
     if (c2->fmlfeat != NULL) {
@@ -2284,10 +2289,10 @@ void codec2_load_codebook(struct CODEC2 *codec2_state, int num, char *filename) 
 #endif
 
 float codec2_get_var(struct CODEC2 *codec2_state) {
-    if (codec2_state->nse)
-        return codec2_state->se/codec2_state->nse;
+    if (codec2_state->variance != 0.0f)
+        return codec2_state->variance;
     else
-        return 0;
+        return 0.0f;
 }
 
 float *codec2_enable_user_ratek(struct CODEC2 *codec2_state, int *K) {
@@ -2302,5 +2307,7 @@ void codec2_700c_post_filter(struct CODEC2 *codec2_state, int en) {
 
 void codec2_700c_eq(struct CODEC2 *codec2_state, int en) {
     codec2_state->eq_en = en;
-    codec2_state->se = 0.0; codec2_state->nse = 0;
+    codec2_state->variance = 0.0f;
+    codec2_state->se = 0.0f;
+    codec2_state->nse = 0;
 }
