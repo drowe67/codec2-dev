@@ -467,13 +467,9 @@ int main(int argc, char *argv[])
 
     float pre_mem = 0.0, de_mem = 0.0;
     float ak[1+order];
-    // COMP  Sw_[FFT_ENC];
-    // COMP  Ew[FFT_ENC];
-
     float ex_phase[MAX_AMP+1];
 
     float bg_est = 0.0;
-
 
     MODEL prev_model;
     float lsps[order];
@@ -496,7 +492,6 @@ int main(int argc, char *argv[])
 
     COMP Aw[FFT_ENC];
     COMP H[MAX_AMP];
-
 
     for(i=0; i<m_pitch; i++) {
 	Sn[i] = 1.0;
@@ -555,7 +550,9 @@ int main(int argc, char *argv[])
 
     /* mel resampling experiments */
 
-    float rate_K_sample_freqs_kHz[K]; float se = 0.0; int nse = 0;
+    float rate_K_sample_freqs_kHz[K];
+    float variance = 0.0;
+
     if (rateK) {
 	mel_sample_freqs_kHz(rate_K_sample_freqs_kHz, NEWAMP1_K, ftomel(200.0), ftomel(3700.0) );
     }
@@ -857,9 +854,11 @@ int main(int argc, char *argv[])
                     rate_K_vec_[k] = rate_K_vec_no_mean_[k] + mean;
 
                 /* running sum of squared error for variance calculation */
-                for(int k=0; k<K; k++)
-                    se += pow(rate_K_vec_no_mean[k]-rate_K_vec_no_mean_[k],2.0);
-                nse += K;
+                for(int k=0; k<K; k++) {
+		    float tmp = rate_K_vec_no_mean[k]-rate_K_vec_no_mean_[k];
+                    se += (tmp * tmp);
+		}
+                variance = se / (float) K;
             }
             else {
                 for(int k=0; k<K; k++)
@@ -1071,7 +1070,7 @@ int main(int argc, char *argv[])
     	fprintf(stderr, "SNR av = %5.2f dB\n", sum_snr/frames);
     }
     if (newamp1vq) {
-    	fprintf(stderr, "var: %3.2f dB*dB\n", se/nse);
+    	fprintf(stderr, "var: %3.2f dB*dB\n", variance);
     }
     #ifdef DUMP
     if (dump)
