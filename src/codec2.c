@@ -207,7 +207,7 @@ struct CODEC2 * codec2_create(int mode)
     c2->smoothing = 0;
 
     c2->variance = 0.0f;
-    
+    c2->se = 0.0;
     c2->user_rate_K_vec_no_mean_ = NULL;
     c2->post_filter_en = 1;
     
@@ -2302,5 +2302,6 @@ void codec2_700c_post_filter(struct CODEC2 *codec2_state, int en) {
 
 void codec2_700c_eq(struct CODEC2 *codec2_state, int en) {
     codec2_state->eq_en = en;
+    codec2_state->se = 0.0f;
     codec2_state->variance = 0.0f;
 }
