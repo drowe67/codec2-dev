@@ -551,6 +551,7 @@ int main(int argc, char *argv[])
     /* mel resampling experiments */
 
     float rate_K_sample_freqs_kHz[K];
+    float se = 0.0;
     float variance = 0.0;
 
     if (rateK) {
