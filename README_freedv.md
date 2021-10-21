@@ -132,7 +132,7 @@ Available modes:
 #### Enabling reliable receiving/sending of callsigns in the voice stream (e.g. for PSK Reporter)
 
 ```
-#include "reliable_text.h"
+\#include "reliable_text.h"
 
 reliable_text_t rt = reliable_text_create();
 if (rt == NULL) { /* handle error */ }
