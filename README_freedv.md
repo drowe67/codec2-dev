@@ -83,16 +83,29 @@ The FSK_LDPC mode is used for data, and has user defined bit rate and a variety 
 ## FreeDV API
 
 The `codec2/demo` directory provides simple FreeDV API demo programs written in C and Python to help you get started, for example:
+
 ```
 cd codec2/build_linux
 cat ../raw/ve9qrp_10s.raw | ./demo/freedv_700d_tx | ./demo/freedv_700d_rx | aplay -f S16_LE
 ```
 
+The current demo programs are as follows:
+
+| Program | Description |
+| --- | --- |
+| c2demo | Demonstrates usage of the codec2_* function calls. |
+| freedv_700d_rx | Demonstrates how to receive a FreeDV voice signal. |
+| freedv_700d_tx | Demonstrates how to transmit a FreeDV voice signal. |
+| freedv_datac1_rx | Demonstrates how to receive a FreeDV data signal. |
+| freedv_datac1_tx | Demonstrates how to transmit a FreeDV data signal. |
+
 See also [freedv_api.h](src/freedv_api.h) and [freedv_api.c](src/freedv_api.c), and the full featured command line demo programs [freedv_tx.c](src/freedv_tx.c) & [freedv_rx.c](src/freedv_rx.c):
+
 ```
 $ ./freedv_tx 1600 ../../raw/hts1.raw - | ./freedv_rx 1600 - - | aplay -f S16_LE
 $ cat freedv_rx_log.txt
 ```
+
 ## FreeDV 2400A and 2400B modes
 
 FreeDV 2400A and FreeDV 2400B are modes designed for VHF radio. FreeDV 2400A is designed for SDR radios (it has a 5 kHz RF bandwidth), however FreeDV 2400B is designed to pass through commodity FM radios.
