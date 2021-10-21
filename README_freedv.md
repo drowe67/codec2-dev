@@ -106,6 +106,8 @@ $ ./freedv_tx 1600 ../../raw/hts1.raw - | ./freedv_rx 1600 - - | aplay -f S16_LE
 $ cat freedv_rx_log.txt
 ```
 
+Note that FreeDV expects and outputs 16-bit integer samples at one of two rates: freedv_get_modem_sample_rate() for transmit output/receive input and freedv_get_speech_sample_rate() for transmit input/receive output. These are typically 8000 Hz but can vary depending on the current FreeDV mode.
+
 ## FreeDV 2400A and 2400B modes
 
 FreeDV 2400A and FreeDV 2400B are modes designed for VHF radio. FreeDV 2400A is designed for SDR radios (it has a 5 kHz RF bandwidth), however FreeDV 2400B is designed to pass through commodity FM radios.
