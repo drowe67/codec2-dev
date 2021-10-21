@@ -103,14 +103,14 @@ Generally, the FreeDV API is used as follows:
 Call freedv\_open() or freedv\_advanced\_open() depending on the mode being used:
 
 ```
-#include "freedv_api.h"
+\#include "freedv\_api.h"
 
 struct freedv* dv;
-if ((mode == FREEDV_MODE_700D) || (mode == FREEDV_MODE_700E) || (mode == FREEDV_MODE_2020)) {
+if ((mode == FREEDV\_MODE\_700D) || (mode == FREEDV\_MODE\_700E) || (mode == FREEDV\_MODE\_2020)) {
     struct freedv_advanced adv;
-    dv = freedv_open_advanced(mode, &adv);
+    dv = freedv\_open\_advanced(mode, &adv);
 } else {
-    dv = fredv_open(mode);
+    dv = fredv\_open(mode);
 }
 
 if (dv == NULL) {
@@ -120,36 +120,36 @@ if (dv == NULL) {
 
 Available modes:
 
-* FREEDV_MODE_1600
-* FREEDV_MODE_2400A
-* FREEDV_MODE_2400B
-* FREEDV_MODE_800XA
-* FREEDV_MODE_700C
-* FREEDV_MODE_700D
-* FREEDV_MODE_2020
-* FREEDV_MODE_700E
+* FREEDV\_MODE\_1600
+* FREEDV\_MODE\_2400A
+* FREEDV\_MODE\_2400B
+* FREEDV\_MODE\_800XA
+* FREEDV\_MODE\_700C
+* FREEDV\_MODE\_700D
+* FREEDV\_MODE\_2020
+* FREEDV\_MODE\_700E
 
 #### Enabling reliable receiving/sending of callsigns in the voice stream (e.g. for PSK Reporter)
 
 ```
-\#include "reliable_text.h"
+\#include "reliable\_text.h"
 
-reliable_text_t rt = reliable_text_create();
+reliable\_text\_t rt = reliable\_text\_create();
 if (rt == NULL) { /* handle error */ }
 
 void* stateObject = NULL; /* can be a pointer to anything */
-reliable_text_use_with_freedv(rt, dv, &OnReliableTextRx, stateObject);
+reliable\_text\_use\_with\_freedv(rt, dv, &OnReliableTextRx, stateObject);
 
 char* callsign = "KA6ABC";
-reliable_text_set_string(rt, callsign, strlen(callsign));
+reliable\_text\_set\_string(rt, callsign, strlen(callsign));
 
 ...
 
-void OnReliableTextRx(reliable_text_t rt, const char* txt_ptr, int length, void* state) 
+void OnReliableTextRx(reliable\_text\_t rt, const char* txt\_ptr, int length, void* state) 
 {
-    fprintf(stderr, "OnReliableTextRx: received %s\n", txt_ptr);
+    fprintf(stderr, "OnReliableTextRx: received %s\n", txt\_ptr);
     ...
-    reliable_text_reset(rt);
+    reliable\_text\_reset(rt);
 }
 ```
 
@@ -158,7 +158,7 @@ void OnReliableTextRx(reliable_text_t rt, const char* txt_ptr, int length, void*
 *Note: this is mutually exclusive with reliable\_text above.*
 
 ```
-freedv_set_callback_txt(dv, &TextRxFn, &TextTxFn, stateObject);
+freedv\_set\_callback\_txt(dv, &TextRxFn, &TextTxFn, stateObject);
 
 ...
 
@@ -171,7 +171,7 @@ char TextTxFn(void *callback_state)
     return text[currentIndex];
 }
 
-void TextRxFn(void *callback_state, char c)
+void TextRxFn(void *callback\_state, char c)
 {
     fprintf(stderr, "Received character %c from stream\n", c);
 }
@@ -180,8 +180,8 @@ void TextRxFn(void *callback_state, char c)
 #### Decoding audio
 
 ```
-int freedvRxModulatedSampleRate = freedv_get_modem_sample_rate(dv);
-int freedvRxSpeechSampleRate = freedv_get_speech_sample_rate(dv);
+int freedvRxModulatedSampleRate = freedv\_get\_modem\_sample\_rate(dv);
+int freedvRxSpeechSampleRate = freedv\_get\_speech\_sample\_rate(dv);
 
 /* Note that FreeDV expects int16 samples, not float. Input audio should be 
    resampled to the rate expected by the current mode (e.g. inside freedvRxModulatedSampleRate
@@ -190,26 +190,26 @@ short* resampledRxInput = malloc(/* size of resampled input buffer */);
 short* rxOutput = malloc(/* size of output buffer */);
 resample(rxInput, resampledRxInput, radioRate, freedvRxModulatedSampleRate);
 
-/* Loop through available samples until we run out. Each time, call freedv_nin() to get
-   the current number of samples the mode needs followed by freedv_rx() to actually feed
-   them in. 0 is perfectly okay for freedv_nin() depending on the current internal state. */
-int nsamples = freedv_nin(dv);
+/* Loop through available samples until we run out. Each time, call freedv\_nin() to get
+   the current number of samples the mode needs followed by freedv\_rx() to actually feed
+   them in. 0 is perfectly okay for freedv\_nin() depending on the current internal state. */
+int nsamples = freedv\_nin(dv);
 short* currentBuf = resampledRxInput;
 while (currentBuf < sizeofBuffer)
 {
-    freedv_rx(dv, rxOutput, currentBuf);
+    freedv\_rx(dv, rxOutput, currentBuf);
     resample(rxOutput, radioOutput, freedvRxSpeechSampleRate, radioRate);
     currentBuf += nsamples;
-    nsamples = freedv_nin(dv);
+    nsamples = freedv\_nin(dv);
 }
 ```
 
 #### Transmitting audio
 
 ```
-int freedvTxModulatedSampleRate = freedv_get_modem_sample_rate(dv);
-int freedvTxSpeechSampleRate = freedv_get_speech_sample_rate(dv);
-int requiredTxSpeechSamples = freedv_get_n_speech_samples(dv);
+int freedvTxModulatedSampleRate = freedv\_get\_modem\_sample\_rate(dv);
+int freedvTxSpeechSampleRate = freedv\_get\_speech\_sample\_rate(dv);
+int requiredTxSpeechSamples = freedv\_get\_n\_speech\_samples(dv);
 
 short* txInput = malloc(/* size of resampled output buffer */);
 short* txOutput = malloc(/* size of output buffer */);
@@ -217,18 +217,17 @@ short* txOutput = malloc(/* size of output buffer */);
 while(speech samples available)
 {
     memcpy(txInput, radioSamples, requiredTxSpeechSamples);
-    freedv_tx(dv, txOutput, txInput);
+    freedv\_tx(dv, txOutput, txInput);
 }
-```
 
 #### Cleanup
 
 ```
-/* if reliable_text is enabled */
-reliable_text_unlink_from_freedv(rt);
+/* if reliable\_text is enabled */
+reliable\_text\_unlink\_from\_freedv(rt);
 
 /* always required to free memory */
-freedv_close(dv);
+freedv\_close(dv);
 ```
 
 ## FreeDV 2400A and 2400B modes
