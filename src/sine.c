@@ -231,7 +231,7 @@ float hpf(float x, float states[])
 
 // TODO: we can either go for a faster FFT using fftr and some stack usage
 // or we can reduce stack usage to almost zero on STM32 by switching to fft_inplace
-#if 1
+#if defined(STM32F40_41xxx)
 void dft_speech(C2CONST *c2const, codec2_fft_cfg fft_fwd_cfg, COMP Sw[], float Sn[], float w[])
 {
     int  i;
@@ -259,10 +259,12 @@ void dft_speech(C2CONST *c2const, codec2_fft_cfg fft_fwd_cfg, COMP Sw[], float S
     codec2_fft_inplace(fft_fwd_cfg, Sw);
 }
 #else
-void dft_speech(codec2_fftr_cfg fftr_fwd_cfg, COMP Sw[], float Sn[], float w[])
+void dft_speech(C2CONST* c2const, codec2_fftr_cfg fftr_fwd_cfg, COMP Sw[], float Sn[], float w[])
 {
     int  i;
   float sw[FFT_ENC];
+    int  m_pitch = c2const->m_pitch;
+    int   nw      = c2const->nw;
 
   for(i=0; i<FFT_ENC; i++) {
     sw[i] = 0.0;
