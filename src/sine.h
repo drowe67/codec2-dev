@@ -36,11 +36,7 @@ C2CONST c2const_create(int Fs, float framelength_ms);
 
 void make_analysis_window(C2CONST *c2const, codec2_fft_cfg fft_fwd_cfg, float w[], float W[]);
 float hpf(float x, float states[]);
-#if defined(STM32F40_41xxx)
 void dft_speech(C2CONST *c2const, codec2_fft_cfg fft_fwd_cfg, COMP Sw[], float Sn[], float w[]);
-#else
-void dft_speech(C2CONST* c2const, codec2_fftr_cfg fftr_fwd_cfg, COMP Sw[], float Sn[], float w[]);
-#endif
 void two_stage_pitch_refinement(C2CONST *c2const, MODEL *model, COMP Sw[]);
 void estimate_amplitudes(MODEL *model, COMP Sw[], float W[], int est_phase);
 float est_voicing_mbe(C2CONST *c2const, MODEL *model, COMP Sw[], float W[]);
