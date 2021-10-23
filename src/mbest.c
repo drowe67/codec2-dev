@@ -140,6 +140,42 @@ void mbest_search(
    }
 }
 
+/*---------------------------------------------------------------------------*\
+
+  mbest_search_equalweight
+
+  Searches vec[] to a codebbook of vectors, and maintains a list of the mbest
+  closest matches. Similar to mbest_search() but with w[] = 1.
+
+\*---------------------------------------------------------------------------*/
+
+void mbest_search_equalweight(
+		  const float  *cb,     /* VQ codebook to search         */
+		  float         vec[],  /* target vector                 */
+		  int           k,      /* dimension of vector           */
+		  int           m,      /* number on entries in codebook */
+		  struct MBEST *mbest,  /* list of closest matches       */
+		  int           index[] /* indexes that lead us here     */
+)
+{
+   float   e;
+   
+   for(int j = 0; j < m; j++) {
+        int i;
+
+        e = 0.0;
+        for(int i = 0; i < k; i++) {
+            float diff = (*cb++) - vec[i];
+            float diff2 = diff * diff;
+            e += diff2;
+        }
+
+        index[0] = j;
+        if (e < mbest->list[mbest->entries - 1].error)
+            mbest_insert(mbest, index, e);
+   }
+}
+
 
 /*---------------------------------------------------------------------------*\
 
