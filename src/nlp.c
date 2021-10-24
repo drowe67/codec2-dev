@@ -126,7 +126,11 @@ typedef struct {
     float         sq[PMAX_M];	     /* squared speech samples       */
     float         mem_x,mem_y;       /* memory for notch filter      */
     float         mem_fir[NLP_NTAP]; /* decimation FIR filter memory */
+#if defined(STM32F40_41xxx)
     codec2_fft_cfg  fft_cfg;         /* kiss FFT config              */
+#else
+    codec2_fftr_cfg fft_cfg;
+#endif // defined(STM32F40_41xxx)
     float        *Sn16k;	     /* Fs=16kHz input speech vector */
     FILE         *f;
 } NLP;
@@ -190,7 +194,11 @@ void *nlp_create(C2CONST *c2const)
     for(i=0; i<NLP_NTAP; i++)
 	nlp->mem_fir[i] = 0.0;
 
+#if defined(STM32F40_41xxx)
     nlp->fft_cfg = codec2_fft_alloc (PE_FFT_SIZE, 0, NULL, NULL);
+#else
+    nlp->fft_cfg = codec2_fftr_alloc (PE_FFT_SIZE, 0, NULL, NULL);
+#endif // defined(STM32F40_41xxx)
     assert(nlp->fft_cfg != NULL);
 
     return (void*)nlp;
@@ -210,7 +218,11 @@ void nlp_destroy(void *nlp_state)
     assert(nlp_state != NULL);
     nlp = (NLP*)nlp_state;
 
+#if defined(STM32F40_41xxx)
     codec2_fft_free(nlp->fft_cfg);
+#else
+    codec2_fftr_free(nlp->fft_cfg);
+#endif // defined(STM32F40_41xxx)
     if (nlp->Fs == 16000) {
         free(nlp->Sn16k);
     }
@@ -351,15 +363,35 @@ float nlp(
     #ifdef DUMP
     dump_dec(Fw);
     #endif
-
+    
+#if defined(STM32F40_41xxx)
     // FIXME: check if this can be converted to a real fft
     // since all imag inputs are 0
     codec2_fft_inplace(nlp->fft_cfg, Fw);
     PROFILE_SAMPLE_AND_LOG(fft, window, "      fft");
 
     for(i=0; i<PE_FFT_SIZE; i++)
-	Fw[i].real = Fw[i].real*Fw[i].real + Fw[i].imag*Fw[i].imag;
-
+	    Fw[i].real = Fw[i].real*Fw[i].real + Fw[i].imag*Fw[i].imag;
+#else
+    float   Fw_input[PE_FFT_SIZE];
+    for (i = 0; i < PE_FFT_SIZE; i++)
+    {
+        Fw_input[i] = Fw[i].real;
+    }
+    codec2_fftr(nlp->fft_cfg, &Fw_input[0], &Fw[0]);
+    PROFILE_SAMPLE_AND_LOG(fft, window, "      fft");
+    
+    for(i=0; i<PE_FFT_SIZE/2; i++)
+    {
+	    Fw[i].real = Fw[i].real*Fw[i].real + Fw[i].imag*Fw[i].imag;
+        
+        // Set Fw[PE_FFT_SIZE - i - 1] to the same as Fw[i] due to the real FFT's symmetry
+        // (and to avoid having to change anything else further down).
+        Fw[PE_FFT_SIZE - i - 1].real = Fw[i].real;
+    }
+    
+#endif // defined(STM32F40_41xxx)
+    
     PROFILE_SAMPLE_AND_LOG(magsq, fft, "      mag sq");
     #ifdef DUMP
     dump_sq(m, nlp->sq);
