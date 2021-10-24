@@ -166,7 +166,6 @@ float rate_K_mbest_encode(int *indexes, float *x, float *xq, int ndim, int mbest
   const float *codebook2 = newamp1vq_cb[1].cb;
   struct MBEST *mbest_stage1, *mbest_stage2;
   float target[ndim];
-  float w[ndim];
   int   index[MBEST_STAGES];
   float mse, tmp;
 
@@ -174,10 +173,7 @@ float rate_K_mbest_encode(int *indexes, float *x, float *xq, int ndim, int mbest
 
   assert(ndim == newamp1vq_cb[0].k);
 
-  /* equal weights, could be argued mel freq axis gives freq dep weighting */
-
-  for(i=0; i<ndim; i++)
-      w[i] = 1.0;
+  /* note: using equal weights, could be argued mel freq axis gives freq dep weighting */
 
   mbest_stage1 = mbest_create(mbest_entries);
   mbest_stage2 = mbest_create(mbest_entries);
@@ -186,7 +182,7 @@ float rate_K_mbest_encode(int *indexes, float *x, float *xq, int ndim, int mbest
 
   /* Stage 1 */
 
-  mbest_search(codebook1, x, w, ndim, newamp1vq_cb[0].m, mbest_stage1, index);
+  mbest_search_equalweight(codebook1, x, ndim, newamp1vq_cb[0].m, mbest_stage1, index);
 
   /* Stage 2 */
 
@@ -194,7 +190,7 @@ float rate_K_mbest_encode(int *indexes, float *x, float *xq, int ndim, int mbest
       index[1] = n1 = mbest_stage1->list[j].index[0];
       for(i=0; i<ndim; i++)
 	  target[i] = x[i] - codebook1[ndim*n1+i];
-      mbest_search(codebook2, target, w, ndim, newamp1vq_cb[1].m, mbest_stage2, index);
+      mbest_search_equalweight(codebook2, target, ndim, newamp1vq_cb[1].m, mbest_stage2, index);
   }
 
   n1 = mbest_stage2->list[0].index[1];
