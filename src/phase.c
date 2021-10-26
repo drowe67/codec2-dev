@@ -251,12 +251,18 @@ void mag_to_phase(float phase[],             /* Nfft/2+1 output phase samples in
         Sdb[i].imag = Sdb[Nfft-i].imag = 0.0;
     }
 
+    /* Division takes far more cycles than multiplication on some
+       architectures (e.g. ARM), so we multiply by 1/Nfft instead. */
+    float Nfft_float = 1.0/((float)Nfft);
+    float* c_ptr = (float*)&c[0];
+    int numCFloats = Nfft*2;
+
     /* compute real cepstrum from log magnitude spectrum */
 
     codec2_fft(fft_inv_cfg, Sdb, c);
-    for(i=0; i<Nfft; i++) {
-        c[i].real /= (float)Nfft;
-        c[i].imag /= (float)Nfft;
+    for(i=0; i<numCFloats; i++) {
+        *c_ptr *= Nfft_float;
+        c_ptr++;
     }
 
     /* Fold cepstrum to reflect non-min-phase zeros inside unit circle */

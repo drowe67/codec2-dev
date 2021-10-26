@@ -1425,6 +1425,16 @@ static void ofdm_demod_core(struct OFDM *ofdm, int *rx_bits) {
      */
     float woff_est = TAU * ofdm->foff_est_hz / ofdm->fs;
 
+#ifndef STM32F40_41xxx   
+    // Precalculate cmplxconj() of X*woff_est as we use it several
+    // times in this function.
+    complex float woff_est_conj[ofdm->nrxbuf];
+    for (int i = 0; i < ofdm->nrxbuf; i++)
+    {
+        woff_est_conj[i] = cmplxconj(i*woff_est);
+    }
+#endif // STM32F40_41xxx
+
     /* update timing estimate ---------------------------------------------- */
 
     if (ofdm->timing_en == true) {
@@ -1440,7 +1450,11 @@ static void ofdm_demod_core(struct OFDM *ofdm, int *rx_bits) {
          * using a conjugate multiply
          */
         for (j = 0, i = st; i < en; j++, i++) {
+#ifndef STM32F40_41xxx   
+            work[j] = ofdm->rxbuf[i] * woff_est_conj[i];
+#else
             work[j] = ofdm->rxbuf[i] * cmplxconj(woff_est * i);
+#endif // STM32F40_41xxx
         }
 
         int ft_est = est_timing(ofdm, work, (en - st), 0.0f, &ofdm->timing_mx, &ofdm->timing_valid, 1);
@@ -1513,7 +1527,11 @@ static void ofdm_demod_core(struct OFDM *ofdm, int *rx_bits) {
     /* down-convert at current timing instant------------------------------- */
 
     for (k = 0, j = st; j < en; k++, j++) {
+#ifndef STM32F40_41xxx   
+        work[k] = ofdm->rxbuf[j] * woff_est_conj[j];
+#else
         work[k] = ofdm->rxbuf[j] * cmplxconj(woff_est * j);
+#endif // STM32F40_41xxx
     }
 
     /*
@@ -1549,7 +1567,11 @@ static void ofdm_demod_core(struct OFDM *ofdm, int *rx_bits) {
         /* down-convert at current timing instant---------------------------------- */
 
         for (k = 0, j = st; j < en; k++, j++) {
+#ifndef STM32F40_41xxx   
+            work[k] = ofdm->rxbuf[j] * woff_est_conj[j];
+#else
             work[k] = ofdm->rxbuf[j] * cmplxconj(woff_est * j);
+#endif // STM32F40_41xxx
         }
 
         /*
@@ -1594,7 +1616,11 @@ static void ofdm_demod_core(struct OFDM *ofdm, int *rx_bits) {
     /* down-convert at current timing instant------------------------------- */
 
     for (k = 0, j = st; j < en; k++, j++) {
+#ifndef STM32F40_41xxx   
+        work[k] = ofdm->rxbuf[j] * woff_est_conj[j];
+#else
         work[k] = ofdm->rxbuf[j] * cmplxconj(woff_est * j);
+#endif // STM32F40_41xxx
     }
 
     /*
@@ -1651,6 +1677,15 @@ static void ofdm_demod_core(struct OFDM *ofdm, int *rx_bits) {
         aamp_est_pilot[i] = 0.0f;
     }
 
+#ifndef STM32F40_41xxx   
+    // Precompute pilot conjugates as they're repeatedly used below.
+    complex float pilot_conjf[ofdm->nc + 2];
+    for (i = 0; i < (ofdm->nc + 2); i++)
+    {
+        pilot_conjf[i] = conjf(ofdm->pilots[i]);
+    }
+#endif // STM32F40_41xxx
+
     for (i = 1; i < (ofdm->nc + 1); i++) { /* ignore first and last carrier for count */
         if (ofdm->phase_est_bandwidth == low_bw) {
             complex float symbol[3];
@@ -1663,13 +1698,21 @@ static void ofdm_demod_core(struct OFDM *ofdm, int *rx_bits) {
              * Then average the phase surrounding each of the data symbols.
              */
             for (k = 0, j = (i - 1); k < 3; k++, j++) {
+#ifndef STM32F40_41xxx   
+                symbol[k] = ofdm->rx_sym[1][j] * pilot_conjf[j]; /* this pilot conjugate */
+#else
                 symbol[k] = ofdm->rx_sym[1][j] * conjf(ofdm->pilots[j]); /* this pilot conjugate */
+#endif // STM32F40_41xxx
             }
 
             aphase_est_pilot_rect = vector_sum(symbol, 3);
 
             for (k = 0, j = (i - 1); k < 3; k++, j++) {
+#ifndef STM32F40_41xxx   
+                symbol[k] = ofdm->rx_sym[ofdm->ns + 1][j] * pilot_conjf[j]; /* next pilot conjugate */
+#else
                 symbol[k] = ofdm->rx_sym[ofdm->ns + 1][j] * conjf(ofdm->pilots[j]); /* next pilot conjugate */
+#endif // STM32F40_41xxx
             }
 
             aphase_est_pilot_rect += vector_sum(symbol, 3);
@@ -1677,13 +1720,21 @@ static void ofdm_demod_core(struct OFDM *ofdm, int *rx_bits) {
             /* use pilots in past and future */
 
             for (k = 0, j = (i - 1); k < 3; k++, j++) {
+#ifndef STM32F40_41xxx   
+                symbol[k] = ofdm->rx_sym[0][j] * pilot_conjf[j]; /* previous pilot */
+#else
                 symbol[k] = ofdm->rx_sym[0][j] * conjf(ofdm->pilots[j]); /* previous pilot */
+#endif // STM32F40_41xxx
             }
 
             aphase_est_pilot_rect += vector_sum(symbol, 3);
 
             for (k = 0, j = (i - 1); k < 3; k++, j++) {
+#ifndef STM32F40_41xxx   
+                symbol[k] = ofdm->rx_sym[ofdm->ns + 2][j] * pilot_conjf[j]; /* future pilot */
+#else
                 symbol[k] = ofdm->rx_sym[ofdm->ns + 2][j] * conjf(ofdm->pilots[j]); /* future pilot */
+#endif // STM32F40_41xxx
             }
 
             aphase_est_pilot_rect += vector_sum(symbol, 3);
@@ -1702,8 +1753,13 @@ static void ofdm_demod_core(struct OFDM *ofdm, int *rx_bits) {
              *
              * As less pilots are averaged, low SNR performance will be poorer
              */
+#ifndef STM32F40_41xxx   
+            aphase_est_pilot_rect = ofdm->rx_sym[1][i] * pilot_conjf[i];             /* "this" pilot conjugate */
+            aphase_est_pilot_rect += ofdm->rx_sym[ofdm->ns + 1][i] * pilot_conjf[i]; /* "next" pilot conjugate */
+#else
             aphase_est_pilot_rect = ofdm->rx_sym[1][i] * conjf(ofdm->pilots[i]);             /* "this" pilot conjugate */
             aphase_est_pilot_rect += ofdm->rx_sym[ofdm->ns + 1][i] * conjf(ofdm->pilots[i]); /* "next" pilot conjugate */
+#endif // STM32F40_41xxx
 
             /* we estimate over 2 pilots */
             aphase_est_pilot_rect /= 2.0f;
