@@ -4,7 +4,7 @@
   AUTHOR......: David Rowe
   DATE CREATED: April 2021
 
-  Demo receive program for FreeDV API 700D mode, see freedv_700d_tx.c for
+  Demo receive program for FreeDV API (700D mode), see freedv_700d_tx.c for
   instructions.
  
 \*---------------------------------------------------------------------------*/

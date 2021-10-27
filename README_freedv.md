@@ -10,24 +10,41 @@ This document gives an overview of the technology inside FreeDV, and some additi
 
 ![FreeDV mode knob](http://www.rowetel.com/images/codec2/mode_dv.jpg)
 
-## Reading Further
+## FreeDV API
 
-1. [FreeDV web site](http://freedv.org)
-1. [FreeDV GUI User Manual](https://github.com/drowe67/freedv-gui/blob/master/USER_MANUAL.md)
-1. [Codec 2](http://rowetel.com/codec2.html)
-1. FreeDV can also be used for data [README_data](https://github.com/drowe67/codec2/blob/master/README_data.md)
-1. [FreeDV 1600 specification](https://freedv.org/freedv-specification)
-1. [FreeDV 700C blog post](http://www.rowetel.com/wordpress/?p=5456)
-1. [FreeDV 700D Released blog post](http://www.rowetel.com/wordpress/?p=6103)
-1. [FreeDV 2020 blog post](http://www.rowetel.com/wordpress/?p=6747)
-1. [FreeDV 2400A blog post](http://www.rowetel.com/?p=5119)
-1. [FreeDV 2400A & 2400B](http://www.rowetel.com/?p=5219)
-1. Technical information on various modem waveforms in the [modem codec frame design spreadsheet](https://github.com/drowe67/codec2/blob/master/doc/modem_codec_frame_design.ods)
-1. [Modems for HF Digital Voice Part 1](http://www.rowetel.com/wordpress/?p=5420)
-1. [Modems for HF Digital Voice Part 2](http://www.rowetel.com/wordpress/?p=5448)
-1. [FDMDV modem README](README_fdmdv.md)
-1. [OFDM modem README](README_ofdm.md)
-1. Many blog posts in the [rowetel.com blog archives](http://www.rowetel.com/?page_id=6172)
+The general programming model is:
+  ```
+  speech samples -> FreeDV encode -> modulated samples (send over radio) -> FreeDV decode -> speech samples
+  ```
+
+The `codec2/demo` directory provides simple FreeDV API demo programs written in C and Python to help you get started, for example:
+
+```
+cd codec2/build_linux
+cat ../raw/ve9qrp_10s.raw | ./demo/freedv_700d_tx | ./demo/freedv_700d_rx | aplay -f S16_LE
+```
+
+The current demo programs are as follows:
+
+| Program | Description |
+| --- | --- |
+| [c2demo.c](demo/c2demo.c) | Encode and decode speech with Codec 2 |
+| [freedv_700d_tx.c](demo/freedv_700d_tx.c) | Transmit a voice signal using the FreeDV API |
+| [freedv_700d_rx.c](demo/freedv_700d_rx.c) | Receive a voice signal using the FreeDV API |
+| [freedv_700d_rx.py](demo/freedv_700d_rx.py) | Receive a voice signal using the FreeDV API in Python |
+| [freedv_datac1_tx.c](demo/freedv_datac1_tx.c) | Transmit raw data frames using the FreeDV API |
+| [freedv_datac1_rx.c](demo/freedv_datac1_rx.c) | Receive raw data frames using the FreeDV API |
+
+So also [freedv_api.h](src/freedv_api.h) and [freedv_api.c](src/freedv_api.c) for the full list of API functions.  Only a small set of these functions are needed for basic FreeDV use, please see the demo programs for minimal examples.
+
+The full featured command line demo programs [freedv_tx.c](src/freedv_tx.c) & [freedv_rx.c](src/freedv_rx.c) demonstrate many features of the API:
+
+```
+$ ./freedv_tx 1600 ../../raw/hts1.raw - | ./freedv_rx 1600 - - | aplay -f S16_LE
+$ cat freedv_rx_log.txt
+```
+
+Speech samples are input to the API as 16 bit signed integers.  Modulated samples can be in real 16 bit signed integer or complex float. The expected sample rates can be found with `freedv_get_speech_sample_rate()` and `freedv_get_modem_sample_rate()`. These are typically 8000 Hz but can vary depending on the current FreeDV mode.
 
 ## FreeDV HF Modes
 
@@ -49,7 +66,7 @@ Notes:
 
 1. *Multipath* is the relative resilience of the mode to multipath fading, the biggest problem digital voice faces on HF radio channels.  Analog SSB would be rated as "good".
 
-1. *Text* is a side channel for low bit rate text such as your location and call sign.  It is generally unprotected by FEC, and encoded with varicode.
+1. *Text* is a side channel for low bit rate text such as your location and call sign.  It is generally unprotected by FEC, and encoded with varicode. The exception is if reliable_text support is turned on (see reliable_text.c/h); this results in text protected by LDPC(112,56) FEC with interleaving.
 
 1. *SNR Min* is for an AWGN channel (no multipath/fading).
 
@@ -80,19 +97,6 @@ These modes use constant amplitude modulation like FSK or FM, and are designed f
 
 The FSK_LDPC mode is used for data, and has user defined bit rate and a variety of LDPC codes available.  It is discussed in [README_data](README_data.md)
 
-## FreeDV API
-
-The `codec2/demo` directory provides simple FreeDV API demo programs written in C and Python to help you get started, for example:
-```
-cd codec2/build_linux
-cat ../raw/ve9qrp_10s.raw | ./demo/freedv_700d_tx | ./demo/freedv_700d_rx | aplay -f S16_LE
-```
-
-See also [freedv_api.h](src/freedv_api.h) and [freedv_api.c](src/freedv_api.c), and the full featured command line demo programs [freedv_tx.c](src/freedv_tx.c) & [freedv_rx.c](src/freedv_rx.c):
-```
-$ ./freedv_tx 1600 ../../raw/hts1.raw - | ./freedv_rx 1600 - - | aplay -f S16_LE
-$ cat freedv_rx_log.txt
-```
 ## FreeDV 2400A and 2400B modes
 
 FreeDV 2400A and FreeDV 2400B are modes designed for VHF radio. FreeDV 2400A is designed for SDR radios (it has a 5 kHz RF bandwidth), however FreeDV 2400B is designed to pass through commodity FM radios.
@@ -189,3 +193,23 @@ $ ./src/freedv_tx 700D ../raw/ve9qrp.raw - --clip 0 --testframes | ./src/cohpsk_
 ```
 
 Adjust `--clip [0|1]` and 3rd argument of `cohpsk_ch` to obtain a PER of just less than 0.1, and note the SNR and PAPR reported by `cohpsk_ch`.  The use of the `ve9qrp` samples makes the test run for a few minutes, in order to get reasonable multipath channel results.
+
+## Reading Further
+
+1. [FreeDV web site](http://freedv.org)
+1. [FreeDV GUI User Manual](https://github.com/drowe67/freedv-gui/blob/master/USER_MANUAL.md)
+1. [Codec 2](http://rowetel.com/codec2.html)
+1. FreeDV can also be used for data [README_data](https://github.com/drowe67/codec2/blob/master/README_data.md)
+1. [FreeDV 1600 specification](https://freedv.org/freedv-specification)
+1. [FreeDV 700C blog post](http://www.rowetel.com/wordpress/?p=5456)
+1. [FreeDV 700D Released blog post](http://www.rowetel.com/wordpress/?p=6103)
+1. [FreeDV 2020 blog post](http://www.rowetel.com/wordpress/?p=6747)
+1. [FreeDV 2400A blog post](http://www.rowetel.com/?p=5119)
+1. [FreeDV 2400A & 2400B](http://www.rowetel.com/?p=5219)
+1. Technical information on various modem waveforms in the [modem codec frame design spreadsheet](https://github.com/drowe67/codec2/blob/master/doc/modem_codec_frame_design.ods)
+1. [Modems for HF Digital Voice Part 1](http://www.rowetel.com/wordpress/?p=5420)
+1. [Modems for HF Digital Voice Part 2](http://www.rowetel.com/wordpress/?p=5448)
+1. [FDMDV modem README](README_fdmdv.md)
+1. [OFDM modem README](README_ofdm.md)
+1. Many blog posts in the [rowetel.com blog archives](http://www.rowetel.com/?page_id=6172)
+

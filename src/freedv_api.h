@@ -9,7 +9,8 @@
 
   1. README_freedv.md
   2. Notes on function use in freedv_api.c
-  3. The sample freedv_tx.c and freedv_rx.c programs
+  3. Simple demo programs in the "demo" directory
+  4. The full featured command line freedv_tx.c and freedv_rx.c programs
 
 \*---------------------------------------------------------------------------*/
 
