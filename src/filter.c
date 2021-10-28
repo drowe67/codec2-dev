@@ -20,10 +20,6 @@
 #include <math.h>
 #include <complex.h>
 
-#ifdef FDV_ARM_MATH
-#include "arm_math.h"
-#endif // FDV_ARM_MATH
-
 #include "filter.h"
 #include "filter_coef.h"
 #include "debug_alloc.h"
@@ -258,7 +254,6 @@ void quisk_cfTune(struct quisk_cfFilter * filter, float freq) {
 \*---------------------------------------------------------------------------*/
 
 void quisk_ccfFilter(complex float * inSamples, complex float * outSamples, int count, struct quisk_cfFilter * filter) {
-#if defined(FDV_ARM_MATH)
     complex float ptSample[filter->nTaps + count - 1];
     complex float *ptSamplePtr = &ptSample[0];
     complex float ptCoeff[filter->nTaps];
@@ -274,35 +269,14 @@ void quisk_ccfFilter(complex float * inSamples, complex float * outSamples, int 
     for (int i = 0; i < count; i++, ptSamplePtr++)
     {
         complex float accum = 0;
-        arm_cmplx_dot_prod_f32((float32_t*)ptSamplePtr, (float32_t*)&ptCoeff, filter->nTaps, (float32_t*)&accum, (float32_t*)&accum + 1);
+        
+        for (k = 0; k < filter->nTaps; k++) 
+        {
+            accum += *ptSamplePtr * ptCoeff[k];
+        }
         outSamples[i] = accum;
     }
 
     memcpy((float32_t*)filter->cSamples, (float32_t*)&ptSample[count - 1 - filter->nTaps], filter->nTaps * sizeof(complex float));
-#else
-    int i, k;
-    complex float * ptSample;
-    complex float * ptCoef;
-    complex float accum;
-
-    for (i = 0; i < count; i++) {
-        *filter->ptcSamp = inSamples[i];
-        accum = 0;
-        ptSample = filter->ptcSamp;
-        ptCoef = filter->cpxCoefs;
-
-        for (k = 0; k < filter->nTaps; k++, ptCoef++) {
-            accum += *ptSample  *  *ptCoef;
-
-            if (--ptSample < filter->cSamples)
-                ptSample = filter->cSamples + filter->nTaps - 1;
-        }
-
-        outSamples[i] = accum;
-
-        if (++filter->ptcSamp >= filter->cSamples + filter->nTaps)
-            filter->ptcSamp = filter->cSamples;
-    }
-#endif
 }
 
