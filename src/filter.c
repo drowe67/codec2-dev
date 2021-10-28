@@ -270,13 +270,13 @@ void quisk_ccfFilter(complex float * inSamples, complex float * outSamples, int 
     {
         complex float accum = 0;
         
-        for (k = 0; k < filter->nTaps; k++) 
+        for (int k = 0; k < filter->nTaps; k++) 
         {
             accum += *ptSamplePtr * ptCoeff[k];
         }
         outSamples[i] = accum;
     }
 
-    memcpy((float32_t*)filter->cSamples, (float32_t*)&ptSample[count - 1 - filter->nTaps], filter->nTaps * sizeof(complex float));
+    memcpy((float*)filter->cSamples, (float*)&ptSample[count - 1 - filter->nTaps], filter->nTaps * sizeof(complex float));
 }
 
