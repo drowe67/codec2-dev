@@ -161,8 +161,6 @@ void mbest_search_equalweight(
    float   e;
    
    for(int j = 0; j < m; j++) {
-        int i;
-
         e = 0.0;
         for(int i = 0; i < k; i++) {
             float diff = (*cb++) - vec[i];
