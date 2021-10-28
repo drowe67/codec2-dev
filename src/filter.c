@@ -238,6 +238,15 @@ void quisk_cfTune(struct quisk_cfFilter * filter, float freq) {
         float tval = tune * (i - D);
         filter->cpxCoefs[i] = cmplx(tval) * filter->dCoefs[i];
     }
+
+    // Reverse coefficients since we're going to go forwards over samples
+    // in quisk_ccfFilter.
+    complex float ptCoeff[filter->nTaps];
+    for (int i = 0, k = filter->nTaps - 1; i < filter->nTaps; i++, k--)
+    {
+        ptCoeff[i] = filter->cpxCoefs[k];
+    }
+    memcpy(filter->cpxCoefs, &ptCoeff[0], sizeof(complex float) * filter->nTaps);
 }
 
 /*---------------------------------------------------------------------------*\
@@ -256,15 +265,8 @@ void quisk_cfTune(struct quisk_cfFilter * filter, float freq) {
 void quisk_ccfFilter(complex float * inSamples, complex float * outSamples, int count, struct quisk_cfFilter * filter) {
     complex float ptSample[filter->nTaps + count - 1];
     complex float *ptSamplePtr = &ptSample[0];
-    complex float ptCoeff[filter->nTaps];
     memcpy(&ptSample, &filter->cSamples[1], (filter->nTaps - 1) * sizeof(complex float));
     memcpy(&ptSample[filter->nTaps - 1], inSamples, count * sizeof(complex float));
-
-    // Reverse coefficients since we're going to go forwards over samples.
-    for (int i = 0, k = filter->nTaps - 1; i < filter->nTaps; i++, k--)
-    {
-        ptCoeff[i] = filter->cpxCoefs[k];
-    }
 
     for (int i = 0; i < count; i++, ptSamplePtr++)
     {
@@ -272,7 +274,7 @@ void quisk_ccfFilter(complex float * inSamples, complex float * outSamples, int 
         
         for (int k = 0; k < filter->nTaps; k++) 
         {
-            accum += *ptSamplePtr * ptCoeff[k];
+            accum += *ptSamplePtr * filter->cpxCoefs[k];
         }
         outSamples[i] = accum;
     }
