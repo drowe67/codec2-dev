@@ -9,7 +9,8 @@
 
   1. README_freedv.md
   2. Notes on function use in freedv_api.c
-  3. The sample freedv_tx.c and freedv_rx.c programs
+  3. Simple demo programs in the "demo" directory
+  4. The full featured command line freedv_tx.c and freedv_rx.c programs
 
 \*---------------------------------------------------------------------------*/
 
@@ -145,7 +146,6 @@ struct freedv_advanced {
 
 // Called when text message char is decoded
 typedef void (*freedv_callback_rx)(void *, char);
-typedef void (*freedv_callback_rx_sym)(void *, _Complex float, float);
 // Called when new text message char is needed
 typedef char (*freedv_callback_tx)(void *);
 typedef void (*freedv_calback_error_pattern)
@@ -212,7 +212,6 @@ int freedv_check_crc16_unpacked(unsigned char *unpacked_bits, int nbits);
 // Set parameters ------------------------------------------------------------
 
 void freedv_set_callback_txt            (struct freedv *freedv, freedv_callback_rx rx, freedv_callback_tx tx, void *callback_state);
-void freedv_set_callback_txt_sym        (struct freedv *freedv, freedv_callback_rx_sym rx, void *callback_state);
 void freedv_set_callback_protocol       (struct freedv *freedv, freedv_callback_protorx rx, freedv_callback_prototx tx, void *callback_state);
 void freedv_set_callback_data           (struct freedv *freedv, freedv_callback_datarx datarx, freedv_callback_datatx datatx, void *callback_state);
 void freedv_set_test_frames		        (struct freedv *freedv, int test_frames);

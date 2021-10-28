@@ -71,7 +71,6 @@ function sim_out = run_simulation(sim_in)
 
     tx_bits = [];
     tx_symbols = [];
-    rx_symbols = [];
 
     % Encode a bunch of frames
 

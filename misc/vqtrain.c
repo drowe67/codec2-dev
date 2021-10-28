@@ -76,7 +76,7 @@ int main(int argc, char *argv[]) {
     long   J;		/* number of vectors in training set		*/
     long   i,j;
     long   ind;	     	/* index of current vector			*/
-    float  e;           /* sqaured error for current vector             */
+    float  e;           /* squared error for current vector             */
     float  se;		/* squared error for this iteration		*/
     float  var,var_1;	/* current and previous iterations distortion	*/
     float  delta;	/* improvement in distortion 			*/
@@ -131,12 +131,11 @@ int main(int argc, char *argv[]) {
     }
     int dx = optind;
 
-    //fprintf(stderr, "argc: %d dx: %d\n", argc, dx);
     if ((argc - dx) < 4) {
         fprintf(stderr, "Too few arguments\n");
     helpmsg:
         fprintf(stderr, "usage: %s [Options] TrainFile.f32 K(dimension) M(codebook size) VQFile.f32\n", argv[0]);
-        fprintf(stderr, "  -r --residual VQResidualErrorFile.f32usage\n");
+        fprintf(stderr, "  -r --residual VQResidualErrorFile.f32\n");
         fprintf(stderr, "  -s --stop StopDelta\n");
         fprintf(stderr, "     --st   Kst        start vector element for error calculation (default 0)\n");
         fprintf(stderr, "     --en   Ken        end vector element for error calculation (default K-1)\n");
@@ -164,7 +163,7 @@ int main(int argc, char *argv[]) {
     cb = (float*)malloc(sizeof(float)*k*m);
     cent = (float*)malloc(sizeof(float)*k*m);
     n = (long*)malloc(sizeof(long)*m);
-    if (cb == NULL || cb == NULL || cent == NULL || vec == NULL) {
+    if (vec == NULL || cb == NULL || cent == NULL || n == NULL) {
 	printf("Error in malloc.\n");
 	exit(1);
     }
@@ -187,7 +186,7 @@ int main(int argc, char *argv[]) {
         assert(ret == k);
         quantise(cb, vec, k, 1, st, en, &e, &se);
     }
-    var = se/(J*k);
+    var = se/(J*(en-st+1));
     printf("\r  It: 0, var: %f sd: %f\n", var, sqrt(var));
 
     /* set up initial codebook state from samples of training set */
@@ -222,13 +221,11 @@ int main(int argc, char *argv[]) {
 	    ind = quantise(cb, vec, k, m, st, en, &e, &se);
 	    n[ind]++;
 	    acc(&cent[ind*k], vec, k);
-            //if (i < 100)
-            //    printf("e: %f sqrt(e/k): %f sd: %f noutliers: %ld\n", e, sqrt(e/k), sd, noutliers[0]);
-            if (sqrt(e/k) > 1.0) noutliers[0]++;
-            if (sqrt(e/k) > 2.0) noutliers[1]++;
-            if (sqrt(e/k) > 3.0) noutliers[2]++;
+            if (sqrt(e/(en-st+1)) > 1.0) noutliers[0]++;
+            if (sqrt(e/(en-st+1)) > 2.0) noutliers[1]++;
+            if (sqrt(e/(en-st+1)) > 3.0) noutliers[2]++;
 	}
-	var = se/(J*k);
+	var = se/(J*(en-st+1));
 	delta = (var_1-var)/var;
         int n_min = J;
         int n_max = 0;
@@ -289,7 +286,7 @@ int main(int argc, char *argv[]) {
 
 \*-----------------------------------------------------------------------*/
 
-/*---------------------------------------------------------------------------*\
+/*-----------------------------------------------------------------------*\
 
 	FUNCTION....: zero()
 
@@ -298,7 +295,7 @@ int main(int argc, char *argv[]) {
 
 	Zeros a vector of length k.
 
-\*---------------------------------------------------------------------------*/
+\*-----------------------------------------------------------------------*/
 
 void zero(float v[], int k)
 /*  float  v[];		ptr to start of vector		*/
@@ -358,7 +355,6 @@ void norm(float v[], int k, long n)
 /*---------------------------------------------------------------------------*\
 
 	FUNCTION....: quantise()
-
 	AUTHOR......: David Rowe
 	DATE CREATED: 23/2/95
 

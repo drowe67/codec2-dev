@@ -4,7 +4,7 @@
   AUTHOR......: David Rowe
   DATE CREATED: April 2021
 
-  Demo transmit program for FreeDV API 700D functions.
+  Demo transmit program using the FreeDV API (700D mode).
  
   usage:
   
