@@ -168,7 +168,7 @@ void fmfsk_mod(struct FMFSK *fmfsk, float fmfsk_out[],uint8_t bits_in[]){
  * float fsk_in[] - nin samples of modualted FMFSK from an FM radio
  */
 void fmfsk_demod(struct FMFSK *fmfsk, uint8_t rx_bits[],float fmfsk_in[]){
-    int i,j;
+    int i,j,k;
     int Ts          = fmfsk->Ts;
     int Fs          = fmfsk->Fs;
     int Rs          = fmfsk->Rs;
@@ -187,6 +187,9 @@ void fmfsk_demod(struct FMFSK *fmfsk, uint8_t rx_bits[],float fmfsk_in[]){
     int next_nin;
     float apeven,apodd;     /* Approx. prob of even or odd stream being correct */
     float currv,mdiff,lastv;
+    int neyesamp;
+    int neyeoffset;
+    float eye_max;
     uint8_t mbit;
     float var_signal = 0, var_noise = 0, lastFabsV;
     
@@ -340,11 +343,6 @@ void fmfsk_demod(struct FMFSK *fmfsk, uint8_t rx_bits[],float fmfsk_in[]){
     fmfsk->stats->snr_est = fmfsk->snr_mean;
 
 #ifndef __EMBEDDED__
-    int neyesamp;
-    int neyeoffset;
-    float eye_max;
-    int k;
-
     /* Collect an eye diagram */
     /* Take a sample for the eye diagrams */
     neyesamp = fmfsk->stats->neyesamp = Ts*4;

@@ -640,7 +640,8 @@ void fsk_demod_core(struct FSK *fsk, uint8_t rx_bits[], float rx_filt[], COMP fs
     float rx_timing,norm_rx_timing,old_norm_rx_timing,d_norm_rx_timing,appm;
 
     float fc_avg,fc_tx;
-    float meanebno,stdebno;
+    float meanebno,stdebno,eye_max;
+    int neyesamp,neyeoffset;
     
     #ifdef MODEMPROBE_ENABLE
     #define NMP_NAME 26
@@ -878,8 +879,6 @@ void fsk_demod_core(struct FSK *fsk, uint8_t rx_bits[], float rx_filt[], COMP fs
        trace.  So lets output a decimated version.  We use 2P
        as we want two symbols worth of samples in trace  */
 #ifndef __EMBEDDED__
-    float eye_max;
-    int neyesamp,neyeoffset;
     int neyesamp_dec = ceil(((float)P*2)/MODEM_STATS_EYE_IND_MAX);
     neyesamp = (P*2)/neyesamp_dec;
     assert(neyesamp <= MODEM_STATS_EYE_IND_MAX);
@@ -958,6 +957,11 @@ void fsk_demod_sd(struct FSK *fsk, float rx_filt[], COMP fsk_in[]){
 
 /* make sure stats have known values in case monitoring process reads stats before they are set */
 static void stats_init(struct FSK *fsk) {
+    /* Take a sample for the eye diagrams */
+    int i,j,m;
+    int P = fsk->P;
+    int M = fsk->mode;
+
     /* due to oversample rate P, we have too many samples for eye
        trace.  So lets output a decimated version */
 
@@ -965,11 +969,6 @@ static void stats_init(struct FSK *fsk) {
     
     /* TODO: refactor eye tracing code here and in fsk_demod */
 #ifndef __EMBEDDED__    
-    /* Take a sample for the eye diagrams */
-    int i,j,m;
-    int P = fsk->P;
-    int M = fsk->mode;
-
     int neyesamp_dec = ceil(((float)P*2)/MODEM_STATS_EYE_IND_MAX);
     int neyesamp = (P*2)/neyesamp_dec;
     assert(neyesamp <= MODEM_STATS_EYE_IND_MAX);
