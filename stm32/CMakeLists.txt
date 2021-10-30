@@ -1,5 +1,5 @@
 #
-# stm32f4 Codec2 test programs
+# stm32f4 support for Codec2
 #
 # CMake configuration contributed by Richard Shaw (KF5OIM)
 # Please report questions, comments, problems, or patches to the freetel
@@ -81,15 +81,6 @@ if(VERIFY_OPT)
     add_definitions(-DDUMP)
 endif()
 
-#option(SEMIHOSTING "Enable for standard arm semihosting." OFF)
-#if(SEMIHOSTING)
-#    link_libraries(rdimon)
-#    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} --specs=rdimon.specs")
-#else()
-#    link_libraries(nosys)
-#    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -specs=nosys.specs")
-#endif()
-
 # Set default build type
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Debug")
@@ -107,12 +98,10 @@ set(CMAKE_EXECUTABLE_SUFFIX_CXX ".elf")
 set(CMAKE_EXECUTABLE_SUFFIX_ASM ".elf")
 set(CMAKE_ASM_FLAGS "${CMAKE_C_FLAGS} -x assembler-with-cpp")
 
-
 # Check build flags
 
 message(STATUS "CMAKE_C_FLAGS: " ${CMAKE_C_FLAGS})
 message(STATUS "CMAKE_ASM_FLAGS: " ${CMAKE_ASM_FLAGS})
-
 
 ###################################################
 
@@ -157,8 +146,6 @@ include(CTest)
 include_directories(../src ../unittest inc ${PROJECT_BINARY_DIR})
 
 add_subdirectory(unittest/src)
-
-
 
 # Codec 2
 
@@ -332,6 +319,3 @@ target_link_libraries(sm1000v5 stm32f4_adac stm32f4 CMSIS)
 target_compile_options(sm1000v5 PRIVATE "-O3")
 elf2bin(sm1000v5)
 elf2dfu(sm1000v5)
-
-
-
