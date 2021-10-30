@@ -223,7 +223,6 @@ src/stm32f4_dac.c
 ../src/codec2_fifo.c
 )
 add_library(stm32f4_adac STATIC ${STM32F4_ADAC_SRCS})
-
 add_library(codec2 STATIC ${CODEC2_SRCS})
 add_library(codec2_prof STATIC ${CODEC2_SRCS})
 target_compile_definitions(codec2_prof PRIVATE PROFILE)
@@ -231,7 +230,6 @@ target_compile_definitions(codec2_prof PRIVATE PROFILE)
 set(SYSTEM_SRCS
 src/system_stm32f4xx.c
 src/startup_stm32f4xx.s
-src/gdb_stdio.c
 )
 
 add_library(sm1000base STATIC src/sm1000_leds_switches.c src/debugblinky.c ${SYSTEM_SRCS})
@@ -242,120 +240,35 @@ src/stm32f4_machdep.c
 
 list(APPEND PROFILE_SYSTEM_SRCS ${SYSTEM_SRCS})
 
-set(FFT_TEST_SRCS 
-src/fft_test.c
-../src/kiss_fft.c
-)
-
-add_mapped_executable(fft_test ${FFT_TEST_SRCS} ${PROFILE_SYSTEM_SRCS})
-target_link_libraries(fft_test stm32f4 CMSIS)
-elf2bin(fft_test)
-
-
-# Rule for programming the SM1000
-#%.pgm: %.bin
-#	$(SUDO) dfu-util -d 0483:df11 -c 1 -i 0 -a 0 -s 0x08000000 -D $<
-####################################################
-
-set(CODEC2_PROFILE_SRCS
-src/codec2_profile.c
-)
-
-add_mapped_executable(codec2_profile ${CODEC2_PROFILE_SRCS} ${PROFILE_SYSTEM_SRCS})
-target_link_libraries(codec2_profile codec2_prof stm32f4 CMSIS)
-target_compile_definitions(codec2_profile PRIVATE PROFILE)
-elf2bin(codec2_profile)
+#----------------------------
 
 set(DAC_UT_SRCS
 src/dac_ut.c
 )
-
 add_mapped_executable(dac_ut ${DAC_UT_SRCS})
 target_link_libraries(dac_ut stm32f4_adac stm32f4 sm1000base)
 elf2bin(dac_ut)
 
-set(FAST_DAC_UT_SRCS
-src/fast_dac_ut.c
-../src/codec2_fifo.c
-src/iir_duc.c
-src/stm32f4_dacduc.c
-src/debugblinky.c
-)
-
-add_mapped_executable(fast_dac_ut ${FAST_DAC_UT_SRCS} ${SYSTEM_SRCS})
-target_link_libraries(fast_dac_ut stm32f4)
-target_compile_options(fast_dac_ut PRIVATE "-O3")
-elf2bin(fast_dac_ut)
-
-set(ADCDAC_UT_SRCS
-src/adcdac_ut.c
-)
-
-add_mapped_executable(adcdac_ut ${ADCDAC_UT_SRCS} ${STM32F4_ADAC_SRCS} ${SYSTEM_SRCS})
-target_link_libraries(adcdac_ut stm32f4 sm1000base)
-target_compile_options(adcdac_ut PRIVATE "-O0")
-elf2bin(adcdac_ut)
-
-
-set(DAC_PLAY_SRCS
-src/dac_play.c
-../src/codec2_fifo.c
-src/stm32f4_dac.c
-)
-
-add_mapped_executable(dac_play ${DAC_PLAY_SRCS} ${SYSTEM_SRCS})
-target_link_libraries(dac_play stm32f4 sm1000base)
-target_compile_options(dac_play PRIVATE "-O0")
-elf2bin(dac_play)
-
-set(ADC_REC_SRCS
-src/adc_rec.c
-)
-
-add_mapped_executable(adc_rec ${ADC_REC_SRCS})
-target_link_libraries(adc_rec stm32f4_adac stm32f4 sm1000base)
-elf2bin(adc_rec)
-
-set(ADC_SD_SRCS
-src/adc_sd.c
-)
-
-add_mapped_executable(adc_sd ${ADC_SD_SRCS})
-target_link_libraries(adc_sd stm32f4_adac stm32f4 sm1000base)
-elf2bin(adc_sd)
+#----------------------------
 
 set(PWM_UT_SRCS
 src/stm32f4_pwm.c
 )
-
 add_mapped_executable(pwm_ut ${PWM_UT_SRCS})
 target_link_libraries(pwm_ut stm32f4 sm1000base)
 elf2bin(pwm_ut)
 
-# ------------------------------------------------
+#----------------------------
 
 set(USART_UT_SRCS
 src/stm32f4_usart.c
 src/usart_ut.c
 )
-
 add_mapped_executable(usart_ut ${USART_UT_SRCS})
 target_link_libraries(usart_ut stm32f4 sm1000base)
 elf2bin(usart_ut)
 
-# ------------------------------------------------
-
-
-set(POWER_UT_SRCS
-src/power_ut.c
-)
-
-list(APPEND POWER_UT_SRCS ${CODEC2_SRCS})
-
-# stm32/src/power_ut.c:124:5: error: too few arguments to function 'adc_open'
-# stm32/src/power_ut.c:125:5: error: too few arguments to function 'dac_open'
-#add_mapped_executable(power_ut ${POWER_UT_SRCS})
-#target_link_libraries(power_ut stm32f4_adac stm32f4 sm1000base)
+#----------------------------
 
 set(USB_VCP
 usb_conf/usb_bsp.c
@@ -393,27 +306,17 @@ add_mapped_executable(adc_rec_usb ${ADC_REC_USB_SRCS} ${USB_VCP})
 target_link_libraries(adc_rec_usb stm32f4_adac stm32f4 sm1000base)
 elf2bin(adc_rec_usb)
 
-
-set(FDMDV_PROFILE_SRCS
-src/fdmdv_profile.c
-)
-
-list(APPEND FDMDV_PROFILE_SRCS ${CODEC2_SRCS} ${SYSTEM_SRCS})
-
-# Doesn't compile because M_PITCH is not defined but M_PITCH_S is.
-#add_mapped_executable(fdmdv_profile ${FDMDV_PROFILE_SRCS})
-#target_link_libraries(fdmdv_profile stm32f4)
-#target_compile_definitions(fdmdv_profile PRIVATE PROFILE)
+#----------------------------
 
 set(SM1000_LEDS_SWITCHES_UT_SRCS
 src/sm1000_leds_switches_ut.c
 src/sm1000_leds_switches.c
 )
-
 add_mapped_executable(sm1000_leds_switches_ut ${SM1000_LEDS_SWITCHES_UT_SRCS})
 target_link_libraries(sm1000_leds_switches_ut stm32f4 sm1000base)
 elf2bin(sm1000_leds_switches_ut)
 
+#----------------------------
 
 set(SM1000_SRCS
 src/sm1000_main.c
@@ -433,110 +336,11 @@ src/memtools.c
 
 list(APPEND SM1000_SRCS ${CODEC2_SRCS})
 
-
 add_mapped_executable(sm1000v5 ${SM1000_SRCS} ${SYSTEM_SRCS})
 target_link_libraries(sm1000v5 stm32f4_adac stm32f4 CMSIS)
 target_compile_options(sm1000v5 PRIVATE "-O3")
 elf2bin(sm1000v5)
 elf2dfu(sm1000v5)
 
-set(FREEDV_TX_PROFILE_SRCS
-src/freedv_tx_profile.c
-)
 
-add_mapped_executable(freedv_tx_profile ${FREEDV_TX_PROFILE_SRCS} ${PROFILE_SYSTEM_SRCS})
-target_link_libraries(freedv_tx_profile codec2_prof stm32f4 CMSIS)
-target_compile_definitions(freedv_tx_profile PRIVATE PROFILE)
-elf2bin(freedv_tx_profile)
-
-
-set(FREEDV_RX_PROFILE_SRCS
-src/freedv_rx_profile.c
-)
-
-add_mapped_executable(freedv_rx_profile ${FREEDV_RX_PROFILE_SRCS} ${PROFILE_SYSTEM_SRCS})
-target_link_libraries(freedv_rx_profile codec2_prof stm32f4 CMSIS)
-#target_link_libraries(freedv_rx_base "-Wl,-Map=$<TARGET_PROPERTY:NAME>.map")
-elf2bin(freedv_rx_profile)
-
-set(FDMDV_DUMP_RT_SRCS
-src/fdmdv_dump_rt.c
-)
-
-list(APPEND FDMDV_DUMP_RT_SRCS ${CODEC2_SRCS} ${SYSTEM_SRCS})
-
-# Doesn't build due to FREEDV_NSAMPLES not being defined.
-#add_mapped_executable(fdmdv_dump_rt ${FDMDV_DUMP_RT_SRCS})
-#target_link_libraries(fdmdv_dump_rt stm32f4_adac stm32f4 sm1000base)
-#target_compile_options(fdmdv_dump_rt PRIVATE "-O3")
-
-# ---------------------------------------------------------------------------
-
-set(TUNER_UT_SRCS
-src/tuner_ut.c
-src/iir_tuner.c
-../src/fm.c)
-
-# this needs to be compiled without the optimiser or ugly things happen
-# would be nice to work out why as ISRs need to run fast
-
-add_library(stm32f4_adc_tuner STATIC src/stm32f4_adc_tuner.c)
-add_mapped_executable(tuner_ut ${TUNER_UT_SRCS} ${SYSTEM_SRCS})
-target_compile_options(tuner_ut PRIVATE "-O3")
-target_link_libraries(tuner_ut stm32f4_adc_tuner stm32f4_adac stm32f4 sm1000base)
-elf2bin(tuner_ut)
-
-# -----------------------------------------------------------------------------
-
-set(ADC_SFDR_UT_SRCS
-src/adc_sfdr_ut.c
-src/iir_tuner.c
-)
-
-add_mapped_executable(adc_sfdr_ut ${ADC_SFDR_UT_SRCS})
-target_link_libraries(adc_sfdr_ut stm32f4_adc_tuner stm32f4_adac stm32f4 sm1000base CMSIS)
-elf2bin(adc_sfdr_ut)
-
-# -----------------------------------------------------------------------------
-
-#set(FM_LODUC_PLAY_SRCS
-#src/fm_loduc_play.c
-#gdb_stdio.c
-#../src/codec2_fifo.c
-#../src/fm.c
-#src/debugblinky.c
-#src/system_stm32f4xx.c
-#src/startup_stm32f4xx.s
-#)
-
-#add_library(stm32f4_dacloduc STATIC src/stm32f4_dacloduc.c)
-
-#add_mapped_executable(fm_loduc_play ${FM_LODUC_PLAY_SRCS})
-#target_link_libraries(fm_loduc_play stm32f4_dacloduc)
-
-# -----------------------------------------------------------------------------
-
-set(SI5351_UT_SRCS
-src/si5351_ut.c
-src/new_i2c.c
-src/si53xx.c
-)
-
-add_mapped_executable(si5351_ut ${SI5351_UT_SRCS})
-target_link_libraries(si5351_ut stm32f4 sm1000base)
-elf2bin(si5351_ut)
-
-# -----------------------------------------------------------------------------
-
-set(MCO_UT_SRCS
-src/mco_ut.c
-src/tm_stm32f4_mco_output.c
-src/tm_stm32f4_gpio.c
-)
-
-add_mapped_executable(mco_ut ${MCO_UT_SRCS})
-target_link_libraries(mco_ut stm32f4 sm1000base)
-elf2bin(mco_ut)
-
-# -----------------------------------------------------------------------------
 
