@@ -251,15 +251,6 @@ elf2bin(dac_ut)
 
 #----------------------------
 
-set(PWM_UT_SRCS
-src/stm32f4_pwm.c
-)
-add_mapped_executable(pwm_ut ${PWM_UT_SRCS})
-target_link_libraries(pwm_ut stm32f4 sm1000base)
-elf2bin(pwm_ut)
-
-#----------------------------
-
 set(USART_UT_SRCS
 src/stm32f4_usart.c
 src/usart_ut.c
