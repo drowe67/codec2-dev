@@ -1028,6 +1028,9 @@ int main(int argc, char *argv[])
                         determine_phase(&c2const, H, &model_dec[i], NEWAMP1_PHASE_NFFT, phase_fft_fwd_cfg, phase_fft_inv_cfg);
                     }
                     phase_synth_zero_order(n_samp, &model_dec[i], ex_phase, H);
+                    #ifdef DUMP
+                    dump_phase_(&model_dec[i].phi[0], model.L);
+                    #endif
                 }
 
                 if (postfilt)

@@ -4,6 +4,14 @@
 %
 % Plot phase modelling information from dump files.
 
+#{  
+  usage:
+
+  $ cd codec2/build_linux
+  $ ./src/c2sim ../raw/hts1a.raw --dump hts1a
+  octave:> plphase("../build_linux/hts1a", 20)
+#}
+
 function plphase(samname, f)
   
   sn_name = strcat(samname,"_sn.txt");
@@ -53,8 +61,7 @@ function plphase(samname, f)
 
   k = ' ';
   do 
-    figure(1);
-    clf;
+    figure(1); clf;
     s = [ Sn(2*f-1,:) Sn(2*f,:) ];
     plot(s);
     grid;
@@ -64,41 +71,20 @@ function plphase(samname, f)
        png(pngname);
     endif
 
-    figure(2);
+    figure(2); clf;
     Wo = model(f,1);
     L = model(f,2);
     Am = model(f,3:(L+2));
-    plot((1:L)*Wo*4000/pi, 20*log10(Am),"r;Am;");
+    plot((1:L)*Wo*4000/pi, 20*log10(Am),"r+-;Am;");
     axis([1 4000 -10 80]);
     hold on;
     plot((0:255)*4000/256, Sw(f,:),";Sw;");
     grid;
 
-    if (file_in_path(".",sw__name))
-      plot((0:255)*4000/256, Sw_(f,:),"g;Sw_;");
-    endif	
-
-    if (file_in_path(".",pw_name))
-       plot((0:255)*4000/256, 10*log10(Pw(f,:)),";Pw;");
-    endif	
-
-    if (file_in_path(".",snr_name))
-      snr_label = sprintf(";phase SNR %4.2f dB;",snr(f));
-      plot(1,1,snr_label);
-    endif
-
-    % phase model - determine SNR and error spectrum for phase model 1
-
-    if (file_in_path(".",phase_name_))
-      orig  = Am.*exp(j*phase(f,1:L));
-      synth = Am.*exp(j*phase_(f,1:L));
-      signal = orig * orig';
-      noise = (orig-synth) * (orig-synth)';
-      snr_phase = 10*log10(signal/noise);
-
-      phase_err_label = sprintf("g;phase_err SNR %4.2f dB;",snr_phase);
-      plot((1:L)*Wo*4000/pi, 20*log10(orig-synth), phase_err_label);
-    endif
+    phase_rect = exp(j*phase(f,1:L));
+    group_delay = [0 -(angle(phase_rect(2:L).*conj(phase_rect(1:L-1)))/Wo)*1000/8000];
+    x = (1:L)*Wo*4000/pi;
+    plotyy(x, zeros(1,L), x, group_delay);
 
     hold off;
     if (k == 'p')
@@ -108,14 +94,21 @@ function plphase(samname, f)
 
     if (file_in_path(".",phase_name))
       figure(3);
-      plot((1:L)*Wo*4000/pi, phase(f,1:L)*180/pi, "-o;phase;");
-      axis;
+      phase_unwrap = unwrap(phase(f,1:L));
+      subplot(211); plot((1:L/2)*Wo*4000/pi, phase_unwrap(1:L/2), "-o;phase;"); axis;
+      subplot(212);
+      group_delay = -([ 0 phase_unwrap(2:L)-phase_unwrap(1:L-1) ]/Wo)*1000/8000;
+      plot((1:L/2)*Wo*4000/pi, group_delay(1:L/2), "-o;group delay;");
+      
+      #{
       if (file_in_path(".", phase_name_))
-        hold on;
-        plot((1:L)*Wo*4000/pi, phase_(f,1:L)*180/pi, "g;phase after;");
-	grid
+        subplot(211);
+	hold on;
+        plot((1:L)*Wo*4000/pi, phase_(f,1:L)*180/pi, "-g;phase after;"); grid;
+        subplot(212);
 	hold off;
       endif
+      #}
       if (k == 'p')
         pngname = sprintf("%s_%d_phase",samname,f);
         png(pngname);

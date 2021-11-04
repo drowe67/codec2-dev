@@ -67,6 +67,7 @@ int main(int argc, char *argv[]) {
                     "[--secs Nsecs]       number of seconds to generate\n"
 	            "[--randf0]           choose a random F0 every second\n"
 	            "[--rande Ndiscrete]  choose a random frame energy every second, Ndiscrete values\n"
+	            "[--filter]           include second order filter\n"
 		    "\n", argv[0]);
 	    exit(1);      
 	break;
