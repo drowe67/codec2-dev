@@ -240,8 +240,15 @@ int main(int argc, char *argv[])
     \*---------------------------------------------------------*/
 
     frames = 0;
+
+    // equalise delay
+    int delay = HT_N/2;
+    if (ssbfilt_en) delay += SSBFILT_N/2;
+    short delaybuf[delay];
+    fread(delaybuf, sizeof(short), delay, fin);
+
     while(fread(buf, sizeof(short), BUF_N, fin) == BUF_N) {
-	      frames++;
+	frames++;
 
         /* Hilbert Transform to produce complex signal so we can do
            single sided freq shifts, HF channel modemsl, and analog compression.
@@ -391,6 +398,10 @@ int main(int argc, char *argv[])
 
         if (fout == stdout) fflush(stdout);
     }
+
+    // equalise delay
+    memset(delaybuf, 0, sizeof(short)*delay);
+    fwrite(delaybuf, sizeof(short), delay, fout);
 
     fclose(fin);
     fclose(fout);

@@ -22,6 +22,9 @@ add_executable(tlininterp tlininterp.c)
 
 add_executable(tdec tdec.c)
 
+add_executable(est_n0 est_n0.c)
+target_link_libraries(est_n0 m)
+
 add_executable(timpulse timpulse.c)
 target_link_libraries(timpulse m)
 

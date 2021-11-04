@@ -989,6 +989,11 @@ endif(NOT APPLE)
              WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/src
              )
 
+     configure_file(unittest/est_n0.sh.in unittest/est_n0.sh)
+     add_test(NAME test_est_n0
+             COMMAND ${CMAKE_CURRENT_BINARY_DIR}/unittest/est_n0.sh
+             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/unittest
+             )
      add_test(NAME test_vq_mbest
              COMMAND sh -c "./tvq_mbest; \
                             cat target.f32 | ../misc/vq_mbest -k 2 -q vq1.f32,vq2.f32 --mbest 2 -v > out.f32; \
