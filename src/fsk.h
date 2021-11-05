@@ -33,13 +33,15 @@
 
 #include <stdint.h>
 #include "comp.h"
-#include "kiss_fftr.h"
-#include "modem_stats.h"
 
 #ifdef FFTW3
 #include <complex.h>
 #include <fftw3.h>
+#else
+#include "kiss_fftr.h"
 #endif
+
+#include "modem_stats.h"
 
 #define MODE_2FSK 2
 #define MODE_4FSK 4
