@@ -29,10 +29,17 @@
 #ifndef __C2FSK_H
 #define __C2FSK_H
 
+#define FFTW3           // comment out to use KISS FFT
+
 #include <stdint.h>
 #include "comp.h"
 #include "kiss_fftr.h"
 #include "modem_stats.h"
+
+#ifdef FFTW3
+#include <complex.h>
+#include <fftw3.h>
+#endif
 
 #define MODE_2FSK 2
 #define MODE_4FSK 4
@@ -47,6 +54,12 @@
 #define FSK_NONE         -1      /* unused parameter */
 
 struct FSK {
+#ifdef FFTW3
+    fftwf_plan plan;
+    fftwf_complex *fftin;
+    fftwf_complex *fftout;
+#endif
+    
     /*  Static parameters set up by fsk_init */
     int Ndft;               /* freq offset est fft */
     int Fs;                 /* sample freq */
@@ -71,7 +84,10 @@ struct FSK {
     COMP phi_c[MODE_M_MAX]; /* phase of each demod local oscillator */
     COMP *f_dc;             /* down converted samples               */
         
+#ifndef FFTW3
     kiss_fft_cfg fft_cfg;   /* Config for KISS FFT, used in freq est */
+#endif
+
     float norm_rx_timing;   /* Normalized RX timing */
             
     /*  Parameters used by mod */

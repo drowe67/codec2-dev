@@ -31,6 +31,9 @@
 
 \*---------------------------------------------------------------------------*/
 
+/* Define this is you want to use FFTW3 instead of KISS */
+#define FFTW3
+
 /* Define this to enable EbNodB estimate */
 /* This needs square roots, may take more cpu time than it's worth */
 #define EST_EBNO
@@ -75,6 +78,10 @@
 #include "kiss_fftr.h"
 #include "modem_probe.h"
 
+#ifdef FFTW3
+static char const *Wisdomf_file = "/etc/fftw/wisdomf";
+#endif
+
 /*---------------------------------------------------------------------------*\
 
                                FUNCTIONS
@@ -95,6 +102,15 @@ static void fsk_generate_hann_table(struct FSK* fsk){
     for(i=0; i<Ndft; i++){
         fsk->hann_table[i] = 0.5 - 0.5 * cosf(2.0 * M_PI * (float)i / (float) (Ndft-1));
     }  
+}
+#endif
+
+#ifdef FFTW3
+static float cnormf(complex float val) {
+    float realf = crealf(val);
+    float imagf = cimagf(val);
+
+    return realf * realf + imagf * imagf;
 }
 #endif
 
@@ -128,7 +144,7 @@ struct FSK * fsk_create_core(int Fs, int Rs, int M, int P, int Nsym, int f1_tx, 
     /* If P is too low we don't have a good choice of timing offsets to choose from */
     assert( P >= 4 );
     assert( M==2 || M==4);
-    
+
     fsk = (struct FSK*) calloc(1, sizeof(struct FSK)); assert(fsk != NULL);
      
     // Need enough bins to within 10% of tone centre
@@ -158,6 +174,38 @@ struct FSK * fsk_create_core(int Fs, int Rs, int M, int P, int Nsym, int f1_tx, 
     fsk->est_space = 0.75*Rs;
     fsk->freq_est_type = 0;
     
+#ifdef FFTW3
+    /*
+     * Caution: if you compile FFTW for floats, then the file
+     * we are looking for here is called /etc/fftw/wisdomf
+     *
+     * and the header must be like:
+     * (fftw-3.3.10 fftwf_wisdom #xb8b78987 #x48270938 #xff2d15a5 #xefab3157)
+     *
+     * That is: PACKAGE "-" VERSION " " "fftwf_wisdom"
+     *
+     * Followed by four hashes and a /n
+     *
+     */
+    int r = fftwf_import_system_wisdom();
+    
+    if (r != 1) {
+        return NULL;
+    }
+    
+    r = fftwf_import_wisdom_from_filename(Wisdomf_file);
+    
+    if (r != 1) {
+        return NULL;
+    }
+    
+    fsk->fftin = fftwf_malloc(sizeof(fftwf_complex) * Ndft);
+    fsk->fftout = fftwf_malloc(sizeof(fftwf_complex) * Ndft);
+
+    fsk->plan = fftwf_plan_dft_1d(Ndft, fsk->fftin, fsk->fftout, FFTW_FORWARD, FFTW_ESTIMATE);
+
+#endif
+    
     //printf("C.....: M: %d Fs: %d Rs: %d Ts: %d nsym: %d nbit: %d N: %d Ndft: %d fmin: %d fmax: %d\n",
     //       M, fsk->Fs, fsk->Rs, fsk->Ts, fsk->Nsym, fsk->Nbits, fsk->N, fsk->Ndft, fsk->est_min, fsk->est_max);
     /* Set up rx state */
@@ -167,7 +215,10 @@ struct FSK * fsk_create_core(int Fs, int Rs, int M, int P, int Nsym, int f1_tx, 
     for(i=0; i<M*fsk->Nmem; i++)
         fsk->f_dc[i] = comp0();
         
+#ifndef FFTW3
     fsk->fft_cfg = kiss_fft_alloc(Ndft,0,NULL,NULL); assert(fsk->fft_cfg != NULL);    
+#endif
+
     fsk->Sf = (float*)malloc(sizeof(float)*fsk->Ndft); assert(fsk->Sf != NULL);
     for(i=0;i<Ndft;i++)fsk->Sf[i] = 0;
     
@@ -256,9 +307,17 @@ struct FSK * fsk_create_hbr(int Fs, int Rs, int M, int P, int Nsym, int f1_tx, i
 \*---------------------------------------------------------------------------*/
 
 void fsk_destroy(struct FSK *fsk){
+#ifdef FFTW3
+    fftwf_destroy_plan(fsk->plan);
+    fftwf_free(fsk->fftout);
+    fftwf_free(fsk->fftin);
+#endif
+    
     free(fsk->Sf);
     free(fsk->f_dc);
+#ifndef FFTW3
     free(fsk->fft_cfg);
+#endif
     free(fsk->stats);
     free(fsk->hann_table);
     free(fsk);
@@ -461,17 +520,24 @@ uint32_t fsk_nin(struct FSK *fsk){
  * M - number of frequency peaks to find
  */
 void fsk_demod_freq_est(struct FSK *fsk, COMP fsk_in[], float *freqs, int M) {
+#ifdef FFTW3
+    complex float *fskc_in = (complex float *) &fsk_in[0]; // complex has same memory layout
+
+    float fmask[fsk->Ndft];
+#endif
+
     int Ndft = fsk->Ndft;
     int Fs = fsk->Fs;
     int nin = fsk->nin;
     size_t i,j;
     float hann;
-    float max;
-    int imax;
+#ifndef FFTW3
     kiss_fft_cfg fft_cfg = fsk->fft_cfg;
+#endif
     int freqi[M];
     int st,en,f_zero;
     
+#ifndef FFTW3
     /* Array to do complex FFT from using kiss_fft */
     #ifdef DEMOD_ALLOC_STACK
     kiss_fft_cpx *fftin  = (kiss_fft_cpx*)alloca(sizeof(kiss_fft_cpx)*Ndft);
@@ -480,6 +546,7 @@ void fsk_demod_freq_est(struct FSK *fsk, COMP fsk_in[], float *freqs, int M) {
     kiss_fft_cpx *fftin  = (kiss_fft_cpx*)malloc(sizeof(kiss_fft_cpx)*Ndft);
     kiss_fft_cpx *fftout = (kiss_fft_cpx*)malloc(sizeof(kiss_fft_cpx)*Ndft);
     #endif
+#endif
     
     st = (fsk->est_min*Ndft)/Fs + Ndft/2; if (st < 0) st = 0;
     en = (fsk->est_max*Ndft)/Fs + Ndft/2; if (en > Ndft) en = Ndft;
@@ -491,34 +558,61 @@ void fsk_demod_freq_est(struct FSK *fsk, COMP fsk_in[], float *freqs, int M) {
     int numffts = floor((float)nin/(Ndft/2)) - 1;
     for(j=0; j<numffts; j++){
         int a = j*Ndft/2;
+
         //fprintf(stderr, "numffts: %d j: %d a: %d\n", numffts, (int)j, a);
         /* Copy FSK buffer into reals of FFT buffer and apply a hann window */
         for(i=0; i<Ndft; i++){
+            assert((i + a) < nin);
+
             #ifdef USE_HANN_TABLE
             hann = fsk->hann_table[i];
             #else
-            hann = 0.5 - 0.5 * cosf(2.0 * M_PI * (float)i / (float) (fft_samps-1));
+            hann = 0.5 - 0.5 * cosf(2.0 * M_PI * (float)i / (float) (Ndft-1));
             #endif
+#ifdef FFTW3
+            fsk->fftin[i] = fskc_in[i+a] * hann;
+#else
             fftin[i].r = hann*fsk_in[i+a].real;
             fftin[i].i = hann*fsk_in[i+a].imag;
+#endif
         }
 
-        /* Do the FFT */
+        /* Do the complex FFT */
+
+#ifdef FFTW3
+        fftwf_execute(fsk->plan);
+        fftwf_complex tmp;
+
+        for (int i = 0; i < fsk->Ndft / 2; i++) {
+            tmp = fsk->fftout[i];
+            fsk->fftout[i] = fsk->fftout[i + fsk->Ndft / 2];
+            fsk->fftout[i + fsk->Ndft / 2] = tmp;
+        }
+#else
         kiss_fft(fft_cfg,fftin,fftout);
+        kiss_fft_cpx tmp;
 
         /* FFT shift to put DC bin at Ndft/2 */
-        kiss_fft_cpx tmp;
+
         for(i=0; i<Ndft/2; i++) {
             tmp = fftout[i];
             fftout[i] = fftout[i+Ndft/2];
             fftout[i+Ndft/2] = tmp;
         }
-        
+#endif
+
         /* Find the magnitude^2 of each freq slot */
         for(i=0; i<Ndft; i++) {
+#ifdef FFTW3
+            float real_part = sqrtf(crealf(cnormf((complex float) fsk->fftout[i])));
+
+            fsk->Sf[i] = (fsk->Sf[i] * .9f) + (real_part * .1f);
+#else
             fftout[i].r = (fftout[i].r*fftout[i].r) + (fftout[i].i*fftout[i].i) ;
+#endif
         }
         
+#ifndef FFTW3
         /* Mix back in with the previous fft block */
         /* Copy new fft est into imag of fftout for frequency divination below */
         float tc = fsk->tc;
@@ -526,11 +620,64 @@ void fsk_demod_freq_est(struct FSK *fsk, COMP fsk_in[], float *freqs, int M) {
             fsk->Sf[i] = (fsk->Sf[i]*(1-tc)) + (sqrtf(fftout[i].r)*tc);
             fftout[i].i = fsk->Sf[i];
         }
+#endif
     }
     
     modem_probe_samp_f("t_Sf",fsk->Sf,Ndft);
     
-    max = 0;
+#ifdef FFTW3
+    /* Find the frequency peaks here */
+
+    for (int i = 0; i < fsk->mode; i++) {
+        int imax = 0;
+        float max = 0.0f;
+
+        // Search the mask for a max
+        // found peaks will be zeroed below
+        // to remove from list while searching
+
+        for (int j = st; j < en; j++) {
+            if (fmask[j] > max) {
+                max = fmask[j];
+                imax = j;
+            }
+        }
+
+        // Blank out magnitude value FMax +/- Fspace/2
+
+        int f_min = imax - f_zero;
+        f_min = (f_min < 0) ? 0 : f_min;
+
+        int f_max = imax + f_zero;
+        f_max = (f_max > fsk->Ndft) ? fsk->Ndft : f_max;
+
+        for (int j = f_min; j < f_max; j++) {
+            fmask[j] = 0.0f;
+        }
+
+        /* Stick the freq index on the list */
+        freqi[i] = imax - (fsk->Ndft / 2);
+    }
+
+    // Insertion sort
+
+    int ic = 1;
+    while (ic < fsk->mode) {
+        int x = freqi[ic];
+        int jc = ic - 1;
+
+        while (jc >= 0 && freqi[jc] > x) {
+            freqi[jc + 1] = freqi[jc];
+            jc--;
+        }
+
+        freqi[jc + 1] = x;
+        ic++;
+    }
+#else
+    float max;
+    int max = 0;
+    
     /* Find the M frequency peaks here */
     for(i=0; i<M; i++){
         imax = 0;
@@ -566,7 +713,8 @@ void fsk_demod_freq_est(struct FSK *fsk, COMP fsk_in[], float *freqs, int M) {
             if(i>1) i--;
         }
     }
-
+#endif
+    
     /* Convert freqs from indices to frequencies */
     for(i=0; i<M; i++){
         freqs[i] = (float)(freqi[i])*((float)Fs/(float)Ndft);
@@ -609,10 +757,12 @@ void fsk_demod_freq_est(struct FSK *fsk, COMP fsk_in[], float *freqs, int M) {
     modem_probe_samp_f("t_f2_est",fsk->f2_est,M);
     #endif
 
-    #ifndef DEMOD_ALLOC_STACK
+#ifndef FFTW3
+#ifndef DEMOD_ALLOC_STACK
     free(fftin);
     free(fftout);
-    #endif
+#endif
+#endif
 }
 
 /* core demodulator function */
