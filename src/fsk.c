@@ -78,6 +78,7 @@
 #include "comp_prim.h"
 
 #ifdef FFTW3
+#include <complex.h>
 #include <fftw3.h>
 
 static char const *Wisdomf_file = "/etc/fftw/wisdomf";
