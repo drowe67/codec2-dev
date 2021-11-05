@@ -991,7 +991,7 @@ endif(NOT APPLE)
 
      add_test(NAME test_est_n0
              COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/unittest;
-                            PATH=$PATH:${CMAKE_CURRENT_BINARY_DIR}/src;${CMAKE_CURRENT_BINARY_DIR}/misc;
+                            PATH=$PATH:${CMAKE_CURRENT_BINARY_DIR}/src:${CMAKE_CURRENT_BINARY_DIR}/misc;
 	                    ./est_n0.sh"
              )
      add_test(NAME test_vq_mbest

@@ -6,7 +6,7 @@ onerun=$(mktemp)
 results=$(mktemp)
 
 # generate an impulse with time offset 1
-timpulse --n0 1 | c2sim - --modelout - | est_n0 > $results
+timpulse --n0 1 --f0 100 | c2sim - --modelout - | est_n0 > $results
 
 python3 -c "
 import sys; import numpy as np
