@@ -34,6 +34,7 @@
 #include <stdio.h>
 
 /* Note: This is a dirty hack to force fsk.c to compile with modem probing enabled */
+#undef FFTW3
 #include "fsk.c"
 
 #define ST_BITS 10000
