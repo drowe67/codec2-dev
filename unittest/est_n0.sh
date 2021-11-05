@@ -2,12 +2,11 @@
 # David Dec 2019
 # Tests misc/est_n0
 
-PATH=$PATH:@CMAKE_CURRENT_BINARY_DIR@/src:@CMAKE_CURRENT_BINARY_DIR@/misc
 onerun=$(mktemp)
 results=$(mktemp)
 
 # generate an impulse with time offset 1
-timpulse 1 | c2sim - --modelout - | est_n0 > $results
+timpulse --n0 1 | c2sim - --modelout - | est_n0 > $results
 
 python3 -c "
 import sys; import numpy as np

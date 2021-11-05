@@ -989,10 +989,10 @@ endif(NOT APPLE)
              WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/src
              )
 
-     configure_file(unittest/est_n0.sh.in unittest/est_n0.sh)
      add_test(NAME test_est_n0
-             COMMAND ${CMAKE_CURRENT_BINARY_DIR}/unittest/est_n0.sh
-             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/unittest
+             COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/unittest;
+                            PATH=$PATH:${CMAKE_CURRENT_BINARY_DIR}/src;${CMAKE_CURRENT_BINARY_DIR}/misc;
+	                    ./est_n0.sh"
              )
      add_test(NAME test_vq_mbest
              COMMAND sh -c "./tvq_mbest; \
