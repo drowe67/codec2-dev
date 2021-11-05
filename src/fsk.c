@@ -75,12 +75,14 @@
 
 #include "fsk.h"
 #include "comp_prim.h"
-#include "kiss_fftr.h"
-#include "modem_probe.h"
 
 #ifdef FFTW3
 static char const *Wisdomf_file = "/etc/fftw/wisdomf";
+#else
+#include "kiss_fftr.h"
 #endif
+
+#include "modem_probe.h"
 
 /*---------------------------------------------------------------------------*\
 
