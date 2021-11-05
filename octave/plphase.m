@@ -49,9 +49,8 @@ function plphase(samname, f)
     phase_ = load(phase_name_);
   endif
 
-  k = ' ';
+  k = ' '; plot_group_delay=1; Pms = 6;
   do
-    Pms = 6;
     figure(1); clf;
     s = [ Sn(2*f-1,:) Sn(2*f,:) ];
     plot(s);
@@ -66,24 +65,35 @@ function plphase(samname, f)
     Wo = model(f,1);
     L = model(f,2);
     Am = model(f,3:(L+2));
-    plot((1:L)*Wo*4000/pi, 20*log10(Am),"r+-;Am;");
+    plot((1:L)*Wo*4000/pi, 20*log10(Am),"g+-;Am;");
     hold on;
  
-    % estimate group delay
+    % estimate group and phase delay
     
     phase_rect = exp(j*phase(f,1:L));
     phase_linear = exp(j*(1:L)*Wo*n0(f));
     phase_centred_rect = phase_rect .* conj(phase_linear);
     phase_centred = angle(phase_centred_rect);
     group_delay = [0 -(angle(phase_centred_rect(2:L).*conj(phase_centred_rect(1:L-1)))/Wo)*1000/Fs];
-    x = (0.5 + (1:L))*Wo*Fs2/pi;
-    ax = plotyy((0:255)*Fs2/256, Sw(f,:), x, group_delay);
+    phase_delay = ( -phase_centred ./ ((1:L)*Wo) )*1000/Fs;
+    x_group = (0.5 + (1:L))*Wo*Fs2/pi;
+    x_phase = (1:L)*Wo*Fs2/pi;
+    if plot_group_delay
+      ax = plotyy((0:255)*Fs2/256, Sw(f,:), x_group, group_delay);
+    else
+      ax = plotyy((0:255)*Fs2/256, Sw(f,:), x_phase, phase_delay);
+    end
     hold off;
     axis(ax(1), [1 Fs2 -10 80]);
+    Pms
     axis(ax(2), [1 Fs2 -Pms Pms]);
     xlabel('Frequency (Hz)');
     ylabel(ax(1),'Amplitude (dB)');
-    ylabel(ax(2),'Group Delay (ms)');
+    if plot_group_delay
+      ylabel(ax(2),'Group Delay (ms)');
+    else
+      ylabel(ax(2),'Phase Delay (ms)');
+    end
     grid;
     
     if (k == 'p')
@@ -99,7 +109,7 @@ function plphase(samname, f)
       plot((1:L)*Wo*Fs2/pi, phase_centred, "-og;phase centered;"); axis([0 Fs2 -pi pi]);
       hold off;
       subplot(212);
-      plot(x, group_delay, "-o;group delay;");
+      plotyy(x_group, group_delay, x_phase, phase_delay);
       
       if (k == 'p')
         pngname = sprintf("%s_%d_phase",samname,f);
@@ -109,7 +119,7 @@ function plphase(samname, f)
 
     % interactive menu
 
-    printf("\rframe: %d  menu: n-next  b-back  p-png  q-quit ", f);
+    printf("\rframe: %d  menu: n-next  b-back  g-group/phase p-png  q-quit ", f);
     fflush(stdout);
     k = kbhit();
     if (k == 'n')
@@ -118,9 +128,17 @@ function plphase(samname, f)
     if (k == 'b')
       f = f - 1;
     endif
+    if (k == 'g')
+      if plot_group_delay
+        plot_group_delay = 0;
+	Pms=1;
+      else
+        plot_group_delay = 1;
+	Pms=6;
+      end
+    endif
 
     % optional print to PNG
-
     if (k == 'p')
        pngname = sprintf("%s_%d",samname,f);
        png(pngname);
