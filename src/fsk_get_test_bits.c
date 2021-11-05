@@ -28,7 +28,9 @@
 
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+#include <alloca.h>
 #include "fsk.h"
 
 #define TEST_FRAME_SIZE 100  /* arbitrary choice, repeats after this
