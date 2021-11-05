@@ -188,22 +188,18 @@ struct FSK * fsk_create_core(int Fs, int Rs, int M, int P, int Nsym, int f1_tx, 
      *
      */
     int r = fftwf_import_system_wisdom();
-    
-    if (r != 1) {
-        return NULL;
-    }
+    assert(r == 1);
     
     r = fftwf_import_wisdom_from_filename(Wisdomf_file);
-    
-    if (r != 1) {
-        return NULL;
-    }
+    assert(r == 1);
     
     fsk->fftin = fftwf_malloc(sizeof(fftwf_complex) * Ndft);
+    assert(fsk->fftin != NULL);
+
     fsk->fftout = fftwf_malloc(sizeof(fftwf_complex) * Ndft);
-
+    assert(fsk->fftout != NULL);
+  
     fsk->plan = fftwf_plan_dft_1d(Ndft, fsk->fftin, fsk->fftout, FFTW_FORWARD, FFTW_ESTIMATE);
-
 #endif
     
     //printf("C.....: M: %d Fs: %d Rs: %d Ts: %d nsym: %d nbit: %d N: %d Ndft: %d fmin: %d fmax: %d\n",
