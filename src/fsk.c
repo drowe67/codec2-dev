@@ -71,12 +71,15 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <string.h>
 #include <math.h>
 
 #include "fsk.h"
 #include "comp_prim.h"
 
 #ifdef FFTW3
+#include <fftw3.h>
+
 static char const *Wisdomf_file = "/etc/fftw/wisdomf";
 #else
 #include "kiss_fftr.h"
