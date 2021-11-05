@@ -29,7 +29,7 @@
 #ifndef __C2FSK_H
 #define __C2FSK_H
 
-#define FFTW3           // comment out to use KISS FFT
+#define FFTW3 1           // comment out to use KISS FFT
 
 #include <stdint.h>
 #include "comp.h"
