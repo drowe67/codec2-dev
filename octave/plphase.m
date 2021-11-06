@@ -2,7 +2,7 @@
 % This program is distributed under the terms of the GNU General Public License 
 % Version 2
 %
-% Plot phase modelling information from dump files.
+% Plot phase modelling information from dump files
 
 #{  
   Usage:
@@ -25,8 +25,15 @@
   Generate "dump files":
   
     $ ./src/c2sim ../raw/hts1a.raw --rateK --phase0 --dump hts1a
-    
-  octave:> plphase("../build_linux/hts1a", 44)
+
+  Note: above steps have been automated in scripts/plphase.sh:
+  
+    $ cd codec2/build_linux
+    $ ../script/plphase.sh ../raw/hts1a.raw
+
+  3/ Then view with this script:
+
+    octave:> plphase("../build_linux/hts1a", 44)
 #}
 
 function plphase(samname, f)
