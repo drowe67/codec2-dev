@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 # (c) Alexander Belchenko, 2007, 2009
 
 """Benchmarking.

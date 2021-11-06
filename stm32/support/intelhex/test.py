@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 
 # Copyright (c) 2005-2013, Alexander Belchenko
 # All rights reserved.

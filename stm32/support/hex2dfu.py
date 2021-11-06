@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 #
 # Intel HEX to ST microelectronics DfuSe file converter
 # Copyright (C)2015 Thomas Kindler <mail@t-kindler.de>
