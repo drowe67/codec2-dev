@@ -319,12 +319,12 @@ class IntelHex(object):
         @return         array of unsigned char data.
         '''
         if not isinstance(pad, _DeprecatedParam):
-            print "IntelHex.tobinarray: 'pad' parameter is deprecated."
+            print("IntelHex.tobinarray: 'pad' parameter is deprecated.")
             if pad is not None:
-                print "Please, use IntelHex.padding attribute instead."
+                print("Please, use IntelHex.padding attribute instead.")
             else:
-                print "Please, don't pass it explicitly."
-                print "Use syntax like this: ih.tobinarray(start=xxx, end=yyy, size=zzz)"
+                print("Please, don't pass it explicitly.")
+                print("Use syntax like this: ih.tobinarray(start=xxx, end=yyy, size=zzz)")
         else:
             pad = None
         return self._tobinarray_really(start, end, pad, size)
@@ -359,12 +359,12 @@ class IntelHex(object):
         @return         string of binary data.
         '''
         if not isinstance(pad, _DeprecatedParam):
-            print "IntelHex.tobinstr: 'pad' parameter is deprecated."
+            print("IntelHex.tobinstr: 'pad' parameter is deprecated.")
             if pad is not None:
-                print "Please, use IntelHex.padding attribute instead."
+                print("Please, use IntelHex.padding attribute instead.")
             else:
-                print "Please, don't pass it explicitly."
-                print "Use syntax like this: ih.tobinstr(start=xxx, end=yyy, size=zzz)"
+                print("Please, don't pass it explicitly.")
+                print("Use syntax like this: ih.tobinstr(start=xxx, end=yyy, size=zzz)")
         else:
             pad = None
         return self._tobinstr_really(start, end, pad, size)
@@ -384,12 +384,12 @@ class IntelHex(object):
         @param  size    size of the block, used with start or end parameter.
         '''
         if not isinstance(pad, _DeprecatedParam):
-            print "IntelHex.tobinfile: 'pad' parameter is deprecated."
+            print("IntelHex.tobinfile: 'pad' parameter is deprecated.")
             if pad is not None:
-                print "Please, use IntelHex.padding attribute instead."
+                print("Please, use IntelHex.padding attribute instead.")
             else:
-                print "Please, don't pass it explicitly."
-                print "Use syntax like this: ih.tobinfile(start=xxx, end=yyy, size=zzz)"
+                print("Please, don't pass it explicitly.")
+                print("Use syntax like this: ih.tobinfile(start=xxx, end=yyy, size=zzz)")
         else:
             pad = None
         if getattr(fobj, "write", None) is None:
