@@ -29,7 +29,6 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <alloca.h>
 #include <string.h>
 #include <getopt.h>
 #include "fsk.h"
@@ -106,8 +105,8 @@ int main(int argc,char *argv[]){
     }
 
     /* allocate buffers for processing */
-    bitbuf_tx = (uint8_t*)alloca(sizeof(uint8_t)*framesize);
-    bitbuf_rx = (uint8_t*)alloca(sizeof(uint8_t)*framesize);
+    bitbuf_tx = (uint8_t*)malloc(sizeof(uint8_t)*framesize);
+    bitbuf_rx = (uint8_t*)malloc(sizeof(uint8_t)*framesize);
     
     /* Generate known tx frame from known seed */
     srand(158324);
@@ -154,6 +153,9 @@ int main(int argc,char *argv[]){
         }
     }
  
+    free(bitbuf_rx);
+    free(bitbuf_tx);
+
     fclose(fin);
 
     fprintf(stderr,"[%04d] BER %5.3f, bits tested %6d, bit errors %6d\n", packetcnt, ber, bitcnt, biterr);
