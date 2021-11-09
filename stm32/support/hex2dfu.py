@@ -39,7 +39,7 @@ def load_hex():
         else:
             ih.loadbin(args.source, args.start_addr)
 
-    except Exception, e:
+    except Exception as e:
         print(e)
         exit(1)
 
@@ -118,7 +118,7 @@ def save_dfu(ih):
     try:
         open(args.target, "wb").write(data)
 
-    except Exception, e:
+    except Exception as e:
         print(e)
         exit(1)
 

@@ -258,7 +258,7 @@ def main(argv=None):
 
         if args:
             raise getopt.GetoptError('Arguments are not used.')
-    except getopt.GetoptError, msg:
+    except getopt.GetoptError as msg:
         txt = str(msg)
         print(txt)
         return 1
