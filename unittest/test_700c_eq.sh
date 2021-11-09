@@ -4,9 +4,9 @@
 
 results=$(mktemp)
 
-../build_linux/src/c2enc 700C ../raw/kristoff.raw /dev/null --var 2> $results
+c2enc 700C ../raw/kristoff.raw /dev/null --var 2> $results
 var=$(cat $results | sed -n "s/.*var: \([0-9..]*\) .*/\1/p")
-../build_linux/src/c2enc 700C ../raw/kristoff.raw /dev/null --var --eq 2> $results
+c2enc 700C ../raw/kristoff.raw /dev/null --var --eq 2> $results
 var_eq=$(cat $results | sed -n "s/.*var: \([0-9..]*\) .*/\1/p")
 printf "var: %5.2f var_eq: %5.2f\n" $var $var_eq
 python -c "import sys; sys.exit(0) if $var_eq<=$var else sys.exit(1)"
