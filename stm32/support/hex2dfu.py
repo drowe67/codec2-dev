@@ -21,7 +21,7 @@ import struct
 import argparse
 from zlib import crc32
 from intelhex import IntelHex
-
+from numpy.compat.py3k import asbytes
 
 def load_hex():
     """
@@ -64,12 +64,12 @@ def save_dfu(ih):
 
     # Image element
     #
-    image_data = ih.tobinstr()
+    image_data = asbytes(ih.tobinstr())
 
     data = struct.pack(
         "<II",
         ih.minaddr(),       # dwElementAddress
-        len(image_data)     # dwElementSize
+        len(image_data),    # dwElementSize
     ) + image_data          # Data
 
     # Target prefix

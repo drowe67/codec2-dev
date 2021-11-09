@@ -47,7 +47,7 @@ from bisect import bisect_right
 import os
 import sys
 
-from compat import asbytes, asstr
+from numpy.compat.py3k import asbytes, asstr
 
 
 class _DeprecatedParam(object):
@@ -132,7 +132,7 @@ class IntelHex(object):
         if record_type == 0:
             # data record
             addr += self._offset
-            for i in xrange(4, 4+record_length):
+            for i in range(4, 4+record_length):
                 if not self._buf.get(addr, None) is None:
                     raise AddressOverlapError(address=addr, line=line)
                 self._buf[addr] = bin[i]
@@ -343,7 +343,7 @@ class IntelHex(object):
 
         start, end = self._get_start_end(start, end, size)
 
-        for i in xrange(start, end+1):
+        for i in range(start, end+1):
             bin.append(self._buf.get(i, pad))
 
         return bin
@@ -461,7 +461,7 @@ class IntelHex(object):
                 start = addr.start or addresses[0]
                 stop = addr.stop or (addresses[-1]+1)
                 step = addr.step or 1
-                for i in xrange(start, stop, step):
+                for i in range(start, stop, step):
                     x = self._buf.get(i)
                     if x is not None:
                         ih[i] = x
@@ -498,7 +498,7 @@ class IntelHex(object):
             if stop < 0:
                 raise TypeError('stop address cannot be negative')
             j = 0
-            for i in xrange(start, stop, step):
+            for i in range(start, stop, step):
                 self._buf[i] = byte[j]
                 j += 1
         else:
@@ -518,7 +518,7 @@ class IntelHex(object):
                 start = addr.start or addresses[0]
                 stop = addr.stop or (addresses[-1]+1)
                 step = addr.step or 1
-                for i in xrange(start, stop, step):
+                for i in range(start, stop, step):
                     x = self._buf.get(i)
                     if x is not None:
                         del self._buf[i]
@@ -706,7 +706,7 @@ class IntelHex(object):
         be raised. Padding is not used."""
         a = array('B', asbytes('\0'*length))
         try:
-            for i in xrange(length):
+            for i in range(length):
                 a[i] = self._buf[addr+i]
         except KeyError:
             raise NotEnoughDataError(address=addr, length=length)
@@ -717,7 +717,7 @@ class IntelHex(object):
         entries.
         """
         a = array('B', asbytes(s))
-        for i in xrange(len(a)):
+        for i in range(len(a)):
             self._buf[addr+i] = a[i]
 
     def getsz(self, addr):
@@ -772,7 +772,7 @@ class IntelHex(object):
             maxdigits = max(len(str(endaddr)), 4)
             templa = '%%0%dX' % maxdigits
             range16 = range(16)
-            for i in xrange(startaddr, endaddr, 16):
+            for i in range(startaddr, endaddr, 16):
                 tofile.write(templa % i)
                 tofile.write(' ')
                 s = []
@@ -941,7 +941,7 @@ class IntelHex16bit(IntelHex):
 
         start, end = self._get_start_end(start, end, size)
 
-        for addr in xrange(start, end+1):
+        for addr in range(start, end+1):
             bin.append(self[addr])
 
         return bin
@@ -1215,7 +1215,7 @@ class IntelHexError(Exception):
             return self.msg
         try:
             return self._fmt % self.__dict__
-        except (NameError, ValueError, KeyError), e:
+        except (NameError, ValueError, KeyError) as e:
             return 'Unprintable exception %s: %s' \
                 % (repr(e), str(e))
 
