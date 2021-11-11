@@ -68,11 +68,30 @@ function plphase(samname, f)
     phase_ = load(phase_name_);
   endif
 
-  k = ' '; plot_group_delay=0; Pms = 1; plot_orig=1;
+  k = ' '; plot_group_delay=0; Pms = 1; plot_orig=1; plot_synth_sn=1;
   do
+    Wo = model(f,1);
+    L = model(f,2);
+    Am = model(f,3:(L+2));
+    if plot_orig
+      phase_f = phase(f,1:L);
+      phase_linear = exp(j*(1:L)*Wo*n0(f));
+    else
+      phase_f = phase_(f,1:L);
+      phase_linear = exp(j*(1:L)*Wo*phase0_n0(f));
+    end
+
     figure(1); clf;
     s = [ Sn(2*f-1,:) Sn(2*f,:) ];
-    plot(s);
+    if plot_synth_sn
+      N=length(s);
+      s = zeros(1,N); t=0:N-1; f0 = Wo*Fs2/pi; P = Fs/f0;
+      for m=1:L
+        s += Am(m)*cos(Wo*m*t + phase_f(m));
+      end
+    end
+    papr_dB = 10*log10(max(abs(s.^2))/mean(s.^2));
+    plot(s,sprintf(";PAPR %3.1f dB;", papr_dB));
     grid;
     axis([1 length(s) -20000 20000]);
     if (k == 'p')
@@ -81,21 +100,11 @@ function plphase(samname, f)
     endif
 
     figure(2); clf;
-    Wo = model(f,1);
-    L = model(f,2);
-    Am = model(f,3:(L+2));
     plot((1:L)*Wo*4000/pi, 20*log10(Am),"g+-;Am;");
     hold on;
  
     % estimate group and phase delay
 
-    if plot_orig
-      phase_f = phase(f,1:L);
-      phase_linear = exp(j*(1:L)*Wo*n0(f));
-    else
-      phase_f = phase_(f,1:L);
-      phase_linear = exp(j*(1:L)*Wo*phase0_n0(f));
-    end
     phase_rect = exp(j*phase_f);
     phase_centred_rect = phase_rect .* conj(phase_linear);
     phase_centred = angle(phase_centred_rect);
