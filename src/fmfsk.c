@@ -196,7 +196,7 @@ void fmfsk_demod(struct FMFSK *fmfsk, uint8_t rx_bits[],float fmfsk_in[]){
     memcpy (&oldsamps[nold], &fmfsk_in[0]        , sizeof(float)*nin );
     
     /* Allocate memory for filtering */
-    float *rx_filt = alloca(sizeof(float)*(nsym+1)*Ts);
+    float *rx_filt = malloc(sizeof(float)*(nsym+1)*Ts);
     
     /* Integrate over Ts input symbols at every offset */
     for(i=0; i<(nsym+1)*Ts; i++){
@@ -364,4 +364,6 @@ void fmfsk_demod(struct FMFSK *fmfsk, uint8_t rx_bits[],float fmfsk_in[]){
     
     modem_probe_samp_f("t_norm_rx_timing",&norm_rx_timing,1);
     modem_probe_samp_f("t_rx_filt",rx_filt,(nsym+1)*Ts);
+
+    free(rx_filt);
 }

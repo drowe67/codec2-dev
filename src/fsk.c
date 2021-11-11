@@ -35,10 +35,6 @@
 /* This needs square roots, may take more cpu time than it's worth */
 #define EST_EBNO
 
-/* This is a flag to make the mod/demod allocate their memory on the stack instead of the heap */
-/* At large sample rates, there's not enough stack space to run the demod */
-#define DEMOD_ALLOC_STACK
-
 /* This is a flag for the freq. estimator to use a precomputed/rt computed hann window table
    On platforms with slow cosf, this will produce a substantial speedup at the cost of a small
     amount of memory 
@@ -472,14 +468,8 @@ void fsk_demod_freq_est(struct FSK *fsk, COMP fsk_in[], float *freqs, int M) {
     int freqi[M];
     int st,en,f_zero;
     
-    /* Array to do complex FFT from using kiss_fft */
-    #ifdef DEMOD_ALLOC_STACK
-    kiss_fft_cpx *fftin  = (kiss_fft_cpx*)alloca(sizeof(kiss_fft_cpx)*Ndft);
-    kiss_fft_cpx *fftout = (kiss_fft_cpx*)alloca(sizeof(kiss_fft_cpx)*Ndft);
-    #else
     kiss_fft_cpx *fftin  = (kiss_fft_cpx*)malloc(sizeof(kiss_fft_cpx)*Ndft);
     kiss_fft_cpx *fftout = (kiss_fft_cpx*)malloc(sizeof(kiss_fft_cpx)*Ndft);
-    #endif
     
     st = (fsk->est_min*Ndft)/Fs + Ndft/2; if (st < 0) st = 0;
     en = (fsk->est_max*Ndft)/Fs + Ndft/2; if (en > Ndft) en = Ndft;
@@ -605,14 +595,13 @@ void fsk_demod_freq_est(struct FSK *fsk, COMP fsk_in[], float *freqs, int M) {
     //fprintf(stderr, "fsk->tone_spacing: %d\n",fsk->tone_spacing);
     for (int m=0; m<M; m++)
         fsk->f2_est[m] = foff + m*fsk->tone_spacing;
+
     #ifdef MODEMPROBE_ENABLE
     modem_probe_samp_f("t_f2_est",fsk->f2_est,M);
     #endif
 
-    #ifndef DEMOD_ALLOC_STACK
     free(fftin);
     free(fftout);
-    #endif
 }
 
 /* core demodulator function */

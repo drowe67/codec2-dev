@@ -29,7 +29,6 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <alloca.h>
 #include <string.h>
 #include "fsk.h"
 
@@ -70,11 +69,11 @@ int main(int argc,char *argv[]){
     
     if(fout==NULL){
         fprintf(stderr,"Couldn't open output file: %s\n", argv[1]);
-        goto cleanup;
+        exit(1);
     }
     
     /* allocate buffers for processing */
-    bitbuf = (uint8_t*)alloca(sizeof(uint8_t)*framesize);
+    bitbuf = (uint8_t*)malloc(sizeof(uint8_t)*framesize);
     
     /* Generate buffer of test frame bits from known seed */
     srand(158324);
@@ -91,7 +90,7 @@ int main(int argc,char *argv[]){
 	}
     }
     
- cleanup:
+    free(bitbuf);
     fclose(fout);
 
     return 0;
