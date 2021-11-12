@@ -22,4 +22,4 @@ cohpsk_ch - - -40 --Fs 8000 -f 10 --ssbfilt 1 --mpd --raw_dir $RAW --multipath_d
 ofdm_demod --out /dev/null --testframes --mode 2020 --verbose 1 --ldpc -p 312 --dpsk 2> $results
 cat $results
 cber=$(cat $results | sed -n "s/^Coded BER.* \([0-9..]*\) Tbits.*/\1/p")
-python -c "import sys; sys.exit(0) if $cber<=0.05 else sys.exit(1)"
+python3 -c "import sys; sys.exit(0) if $cber<=0.05 else sys.exit(1)"
