@@ -240,7 +240,7 @@ Codec 2 can be added to the project in the following way.
 
 Codec 2 can be run on certain microcontrollers (such as the IMRT1052 used in Teensy 4/4.1). This requires the 
 MICROCONTROLLER_BUILD option to be set in CMake during configuration in order to properly set compiler arguments.
-Additionally, defines should be added for the FreeDV/Codec2 modes to enable. If on ARM, using __EMBEDDED__ and
+Additionally, defines should be added for the FreeDV/Codec2 modes to enable. If on ARM, using \_\_EMBEDDED\_\_ and
 also including the ARM CMSIS library will improve performance on ARM-based microcontrollers.
 
 A CMakeLists.txt example for a microcontroller is below:
