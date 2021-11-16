@@ -145,8 +145,8 @@ void freedv_fsk_ldpc_open(struct freedv *f, struct freedv_advanced *adv) {
 
     f->bits_per_modem_frame = f->ldpc->data_bits_per_frame;
     int bits_per_frame = f->ldpc->coded_bits_per_frame + sizeof(fsk_ldpc_uw);
-    f->tx_payload_bits = malloc(f->bits_per_modem_frame); assert(f->tx_payload_bits != NULL);
-    f->rx_payload_bits = malloc(f->bits_per_modem_frame); assert(f->rx_payload_bits != NULL);
+    f->tx_payload_bits = MALLOC(f->bits_per_modem_frame); assert(f->tx_payload_bits != NULL);
+    f->rx_payload_bits = MALLOC(f->bits_per_modem_frame); assert(f->rx_payload_bits != NULL);
 
     /* sample buffer size for tx modem samples, we modulate a full frame */
     f->n_nom_modem_samples = f->fsk->Ts*(bits_per_frame/(f->fsk->mode>>1));
@@ -163,12 +163,12 @@ void freedv_fsk_ldpc_open(struct freedv *f, struct freedv_advanced *adv) {
 
     /* deframer set up */
     f->frame_llr_size = 2*bits_per_frame;
-    f->frame_llr = (float*)malloc(f->frame_llr_size*sizeof(float)); assert(f->frame_llr != NULL);
+    f->frame_llr = (float*)MALLOC(f->frame_llr_size*sizeof(float)); assert(f->frame_llr != NULL);
     f->frame_llr_nbits = 0;
 
-    f->twoframes_hard = malloc(2*bits_per_frame); assert(f->twoframes_hard != NULL);
+    f->twoframes_hard = MALLOC(2*bits_per_frame); assert(f->twoframes_hard != NULL);
     memset(f->twoframes_hard, 0, 2*bits_per_frame);
-    f->twoframes_llr = (float*)malloc(2*bits_per_frame*sizeof(float)); assert(f->twoframes_llr != NULL);
+    f->twoframes_llr = (float*)MALLOC(2*bits_per_frame*sizeof(float)); assert(f->twoframes_llr != NULL);
     for(int i=0; i<2*bits_per_frame; i++) f->twoframes_llr[i] = 0.0;
 
     /* currently configured a simple frame-frame approach */
@@ -227,7 +227,7 @@ void freedv_tx_fsk_voice(struct freedv *f, short mod_out[]) {
     }
 
     /* Allocate floating point buffer for FSK mod */
-    tx_float = alloca(sizeof(float)*f->n_nom_modem_samples);
+    tx_float = MALLOC(sizeof(float)*f->n_nom_modem_samples);
 
     /* do 4fsk mod */
     if(FDV_MODE_ACTIVE( FREEDV_MODE_2400A, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_800XA, f->mode)){
@@ -252,6 +252,8 @@ void freedv_tx_fsk_voice(struct freedv *f, short mod_out[]) {
             mod_out[i] = (short)(tx_float[i]*FMFSK_SCALE);
         }
     }
+
+    FREE(tx_float);
 }
 
 /* TX routines for 2400 FSK modes, after codec2 encoding */
@@ -297,7 +299,7 @@ void freedv_comptx_fsk_voice(struct freedv *f, COMP mod_out[]) {
     }
 
     /* Allocate floating point buffer for FSK mod */
-    tx_float = alloca(sizeof(float)*f->n_nom_modem_samples);
+    tx_float = MALLOC(sizeof(float)*f->n_nom_modem_samples);
 
     /* do 4fsk mod */
     if(FDV_MODE_ACTIVE( FREEDV_MODE_2400A, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_800XA, f->mode)){
@@ -314,6 +316,8 @@ void freedv_comptx_fsk_voice(struct freedv *f, COMP mod_out[]) {
             mod_out[i].real = (tx_float[i]);
         }
     }
+
+    FREE(tx_float);
 }
 
 /* TX routines for 2400 FSK modes, data channel */
@@ -327,7 +331,7 @@ void freedv_tx_fsk_data(struct freedv *f, short mod_out[]) {
     	fvhff_frame_data_bits(f->deframer, FREEDV_VHF_FRAME_A,(uint8_t*)(f->tx_bits));
 
     /* Allocate floating point buffer for FSK mod */
-    tx_float = alloca(sizeof(float)*f->n_nom_modem_samples);
+    tx_float = MALLOC(sizeof(float)*f->n_nom_modem_samples);
 
     /* do 4fsk mod */
     if (FDV_MODE_ACTIVE( FREEDV_MODE_2400A, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_800XA, f->mode)){
@@ -344,6 +348,8 @@ void freedv_tx_fsk_data(struct freedv *f, short mod_out[]) {
             mod_out[i] = (short)(tx_float[i]*FMFSK_SCALE);
         }
     }
+
+    FREE(tx_float);
 }
 
 int freedv_tx_fsk_ldpc_bits_per_frame(struct freedv *f) {

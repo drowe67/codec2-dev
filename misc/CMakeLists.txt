@@ -28,5 +28,8 @@ target_link_libraries(timpulse m)
 add_executable(vq_mbest vq_mbest.c)
 target_link_libraries(vq_mbest codec2)
 
+add_executable(vq_binary_switch vq_binary_switch.c)
+target_link_libraries(vq_binary_switch m)
+
 add_executable(pre pre.c)
 target_link_libraries(pre codec2)

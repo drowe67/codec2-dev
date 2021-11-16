@@ -28,6 +28,7 @@
 */
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include "fmfsk.h"
 #include "modem_stats.h"
@@ -85,13 +86,13 @@ int main(int argc,char *argv[]){
     
     if(fin==NULL || fout==NULL || fmfsk==NULL){
         fprintf(stderr,"Couldn't open test vector files\n");
-        goto cleanup;
+        exit(1);
     }
     
     /* allocate buffers for processing */
-    bitbuf = (uint8_t*)alloca(sizeof(uint8_t)*fmfsk->nbit);
-    rawbuf = (int16_t*)alloca(sizeof(int16_t)*(fmfsk->N+fmfsk->Ts*2));
-    modbuf = (float*)alloca(sizeof(float)*(fmfsk->N+fmfsk->Ts*2));
+    bitbuf = (uint8_t*)malloc(sizeof(uint8_t)*fmfsk->nbit);
+    rawbuf = (int16_t*)malloc(sizeof(int16_t)*(fmfsk->N+fmfsk->Ts*2));
+    modbuf = (float*)malloc(sizeof(float)*(fmfsk->N+fmfsk->Ts*2));
     
     /* Demodulate! */
     while( fread(rawbuf,sizeof(int16_t),fmfsk_nin(fmfsk),fin) == fmfsk_nin(fmfsk) ){
@@ -135,10 +136,15 @@ int main(int argc,char *argv[]){
     }
     
     modem_probe_close();
-    cleanup:
+
+    free(modbuf);
+    free(rawbuf);
+    free(bitbuf);
+
     fclose(fin);
     fclose(fout);
     fmfsk_destroy(fmfsk);
+
     exit(0);
 }
 

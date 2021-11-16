@@ -397,16 +397,15 @@ endfunction
 % Simulations ---------------------------------------------------------------------
 
 % top level function to set up and run a test
-function results = test_trellis(nframes=100, dec=1, ntxcw=8, nstages=3, EbNodB=3, verbose=0)
+function [results target_] = test_trellis(target_fn, nframes=100, dec=1, ntxcw=8, nstages=3, EbNodB=3, verbose=0)
   K = 20; K_st=2+1; K_en=16+1;
-  vq_fn = "../build_linux/vq_stage1.f32";
+  vq_fn = "../build_linux/vq_stage1_bs004.f32";
   vq_output_fn = "../build_linux/all_speech_8k_test.f32";
-  target_fn = "../build_linux/all_speech_8k_lim.f32";
   
   % load VQ
   vq = load_f32(vq_fn, K);
   [vq_size tmp] = size(vq);
-  vq = vq(:,K_st:K_en);
+  vqsub = vq(:,K_st:K_en);
   
   % load file of VQ-ed vectors to train up SD PDF estimator
   [sd_table h_table] = vq_hist(vq_output_fn, dec);
@@ -415,16 +414,35 @@ function results = test_trellis(nframes=100, dec=1, ntxcw=8, nstages=3, EbNodB=3
   target = load_f32(target_fn, K);
 
   % limit test to the first nframes vectors
-  target = target(1:dec:dec*nframes,K_st:K_en);
+  if nframes != -1
+    last = nframes;
+  else
+    last = length(target);
+  end
+  target = target(1:dec:last,K_st:K_en);
   
   % run a test
   EbNo=10^(EbNodB/10);
-  results = run_test(target, vq, sd_table, h_table, ntxcw, nstages, EbNo, verbose);
+  results = run_test(target, vqsub, sd_table, h_table, ntxcw, nstages, EbNo, verbose);
   if verbose
     for f=2:nframes-1
       printf("f: %03d tx_index: %04d rx_index: %04d\n", f,  results.tx_indexes(f), results.rx_indexes(f));
     end
-  end  
+  end
+
+  % return full band vq-ed vectors
+  target_ = zeros(last,K);
+  target_(1:dec:last,:) = vq(results.rx_indexes+1,:);
+  
+  % use linear interpolation to restore original frame rate
+  for f=1:dec:last-dec
+    prev = f; next = f + dec;
+    for g=prev+1:next-1
+      cnext = (g-prev)/dec; cprev = 1 - cnext;
+      target_(g,:) = cprev*target_(prev,:) + cnext*target_(next,:);
+      %printf("f: %d g: %d cprev: %f cnext: %f\n", f, g, cprev, cnext);
+    end
+  end
 endfunction
 
 % Plot histograms of SD at different decimations in time
@@ -511,11 +529,13 @@ function test_bpsk_ber
 endfunction
 
 % generate sets of curves
-function run_curves(frames=100, dec=1)
+function [EbNodB rms_sd] = run_curves(frames=100, dec=1, nstages=5)
   results_log = [];
-  EbNodB = [1 2 3 4];
+  EbNodB = [0 1 2 3 4 5];
+  target_fn = "../build_linux/all_speech_8k_lim.f32";
+
   for i=1:length(EbNodB)
-    results = test_trellis(frames, dec, ntxcw=8, nstages=3, EbNodB(i), verbose=0);
+    results = test_trellis(target_fn, frames, dec, ntxcw=8, nstages, EbNodB(i), verbose=0);
     results_log = [results_log results];
   end
   for i=1:length(results_log)
@@ -523,46 +543,51 @@ function run_curves(frames=100, dec=1)
     ber_vanilla(i) = results_log(i).ber_vanilla;
     per(i) = results_log(i).per;
     per_vanilla(i) = results_log(i).per_vanilla;
-    mse_noerrors(i) = sqrt(results_log(i).mse_noerrors);
-    mse(i) = sqrt(results_log(i).mse);
-    mse_vanilla(i) = sqrt(results_log(i).mse_vanilla);
+    rms_sd_noerrors(i) = sqrt(results_log(i).mse_noerrors);
+    rms_sd(i) = sqrt(results_log(i).mse);
+    rms_sd_vanilla(i) = sqrt(results_log(i).mse_vanilla);
   end
 
   figure(1); clf; semilogy(EbNodB, ber_vanilla, "r+-;uncoded;"); hold on;
   semilogy(EbNodB, ber, "g+-;trellis;"); hold off;
-  grid; title(sprintf("BER dec=%d nstages=%d",dec,nstages));
+  grid('minor'); title(sprintf("BER dec=%d nstages=%d",dec,nstages));
   print("-dpng", sprintf("trellis_dec_%d_ber.png",dec));
   
   figure(2); clf; semilogy(EbNodB, per_vanilla, "r+-;uncoded;"); hold on;
   semilogy(EbNodB, per, "g+-;trellis;");
-  grid; title(sprintf("PER dec=%d nstages=%d",dec,nstages));
+  grid('minor'); title(sprintf("PER dec=%d nstages=%d",dec,nstages));
   print("-dpng", sprintf("trellis_dec_%d_per.png",dec));
 
-  figure(3); clf; plot(EbNodB, mse_noerrors, "b+-;no errors;"); hold on;
-  plot(EbNodB, mse_vanilla, "r+-;uncoded;");
-  plot(EbNodB, mse, "g+-;trellis;"); hold off;
-  grid; title(sprintf("RMS SD dec=%d nstages=%d",dec,nstages));
+  figure(3); clf; plot(EbNodB, rms_sd_noerrors, "b+-;no errors;"); hold on;
+  plot(EbNodB, rms_sd_vanilla, "r+-;uncoded;");
+  plot(EbNodB, rms_sd, "g+-;trellis;"); hold off;
+  grid('minor'); title(sprintf("RMS SD dec=%d nstages=%d",dec,nstages));
   print("-dpng", sprintf("trellis_dec_%d_rms_sd.png",dec));
+endfunction
+
+function vq_file(vq_fn, dec, EbNodB, in_fn, out_fn)
+  [results target_] = test_trellis(in_fn, nframes=-1, dec, ntxcw=8, nstages=3, EbNodB, verbose=0);
+  save_f32(out_fn, target_);
 endfunction
 
 % -------------------------------------------------------------------
 
-graphics_toolkit ("gnuplot");
 more off;
 randn('state',1);
 
 % uncomment one of the below to run a test or simulation
 
 % These two tests show where we are at:
-%test_trellis(nframes=600, dec=1, ntxcw=8, nstages=3, EbNodB=3, verbose=0);
-%test_trellis(nframes=600, dec=4, ntxcw=8, nstages=3, EbNodB=3, verbose=0);
+%test_trellis(target_fn, nframes=600, dec=1, ntxcw=8, nstages=3, EbNodB=3, verbose=0);
+%test_trellis(target_fn, nframes=600, dec=4, ntxcw=8, nstages=3, EbNodB=3, verbose=0);
 
-run_curves(600,1)
-run_curves(600,2)
-run_curves(600,4)
+%run_curves(600,1)
+%run_curves(600,2)
+%run_curves(600,4)
+%[EbNodB rms_sd] = run_curves(30*100,3,3)
 
-%test_trellis(nframes=200, dec=1, ntxcw=1, nstages=3, EbNodB=3, verbose=0);
-%test_trellis(nframes=100, dec=2, ntxcw=8, nstages=3, EbNodB=3, verbose=0);
+%test_trellis(target_fn, nframes=200, dec=1, ntxcw=1, nstages=3, EbNodB=3, verbose=0);
+%test_trellis(target_fn, nframes=100, dec=2, ntxcw=8, nstages=3, EbNodB=3, verbose=0);
 %test_vq("../build_linux/vq_stage1.f32");
 %vq_hist_dec("../build_linux/all_speech_8k_test.f32");
 %test_single

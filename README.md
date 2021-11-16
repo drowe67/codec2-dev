@@ -8,7 +8,7 @@ Also included:
   + APIs for raw and Ethernet packet data over radio [README_data](README_data.md)
   + High performance coherent OFDM modem for HF channels [README_ofdm](README_ofdm.md)
   + High performance non-coherent FSK modem [README_fsk](README_fsk.md)
-  + An STM32 embedded version of FreeDV 1600/700D for the [SM1000](stm32/README.md)
+  + An STM32 embedded version of FreeDV 1600/700D/700E for the [SM1000](stm32/README.md)
   + Coherent PSK modem [README_cohpsk](README_cohpsk.md) for HF channels
   + FDMDV DPSK modem [README_fdmdv](README_fdmdv.md) for HF channels
 

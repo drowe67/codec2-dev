@@ -164,14 +164,6 @@ function [eq1 eq2] = est_eq(vq, targets)
   eq2 /= (ntargets*nvq);
 endfunction
 
-function save_f32(fn, m)
-  f=fopen(fn,"wb");
-  [r c] = size(m);
-  mlinear = reshape(m', 1, r*c);
-  fwrite(f, mlinear, 'float32');
-  fclose(f);
-endfunction
-
 function [targets e] = load_targets(fn_target_f32)
   nb_features = 41;
   K = 20;

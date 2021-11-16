@@ -57,7 +57,8 @@ int main(int argc, char *argv[]) {
     int                       Nbursts = 1, sequence_numbers = 0;
     int                       inter_burst_delay_ms = 0;
     int                       postdelay_ms = 0;
-    
+    uint8_t                   source_byte = 0;
+
     if (argc < 4) {
     helpmsg:
         fprintf(stderr, "\nusage: %s [options] FSK_LDPC|DATAC0|DATAC1|DATAC3 InputBinaryDataFile OutputModemRawFile\n"
@@ -71,6 +72,7 @@ int main(int argc, char *argv[]) {
                "  --clip            0|1       clipping for reduced PAPR\n"
                "  --txbpf           0|1       bandpass filter\n"
                "  --seq                       send packet sequence numbers (breaks testframe BER counting)\n"
+               "  --source          Byte      insert a (non-zero) source address att byte[0]\n"
                "  --complexout                complex sample output (default real)\n"
                "  --quiet\n"
                "\n"
@@ -109,13 +111,14 @@ int main(int argc, char *argv[]) {
             {"delay",          required_argument,  0, 'j'},
             {"postdelay",      required_argument,  0, 'k'},
             {"seq",            no_argument,        0, 'd'},
+            {"source",         required_argument,  0, 'i'},
             {"amp",            required_argument,  0, 'a'},
             {"quiet",          no_argument,        0, 'q'},
             {"complexout",     no_argument,        0, 'c'},
             {0, 0, 0, 0}
         };
 
-        o = getopt_long(argc,argv,"a:cdt:hb:l:e:f:g:r:1:s:m:q",long_opts,&opt_idx);
+        o = getopt_long(argc,argv,"a:cdt:hb:l:e:f:g:r:1:s:m:qi:",long_opts,&opt_idx);
 
         switch(o) {
         case 'a':
@@ -130,6 +133,10 @@ int main(int argc, char *argv[]) {
             break;
         case 'd':
             sequence_numbers = 1;
+            break;
+        case 'i':
+            source_byte = strtol(optarg, NULL, 0);
+            fprintf(stderr,"source byte: 0x%02x\n", source_byte);
             break;
         case 'e':
             burst_mode = 1;
@@ -280,7 +287,8 @@ int main(int argc, char *argv[]) {
         while(fread(bytes_in, sizeof(uint8_t), payload_bytes_per_modem_frame, fin) == payload_bytes_per_modem_frame) {
             if (testframes) {
                 memcpy(bytes_in, testframe_bytes, bytes_per_modem_frame);
-                if (sequence_numbers) bytes_in[0] = (frames+1) & 0xff;
+                if (source_byte) bytes_in[0] = source_byte;
+                if (sequence_numbers) bytes_in[1] = (frames+1) & 0xff;
             }
 
             /* The raw data modes requires a CRC in the last two bytes. TODO: consider moving inside freedv_rawdatatx(),
