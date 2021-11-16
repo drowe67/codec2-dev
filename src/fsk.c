@@ -867,7 +867,7 @@ void fsk_demod_core(struct FSK *fsk, uint8_t rx_bits[], float rx_filt[], COMP fs
     /* due to oversample rate P, we have too many samples for eye
        trace.  So lets output a decimated version.  We use 2P
        as we want two symbols worth of samples in trace  */
-
+#ifndef __EMBEDDED__
     int neyesamp_dec = ceil(((float)P*2)/MODEM_STATS_EYE_IND_MAX);
     neyesamp = (P*2)/neyesamp_dec;
     assert(neyesamp <= MODEM_STATS_EYE_IND_MAX);
@@ -915,7 +915,8 @@ void fsk_demod_core(struct FSK *fsk, uint8_t rx_bits[], float rx_filt[], COMP fs
 
     for(i=0; i<M; i++)
         fsk->stats->f_est[i] = f_est[i];
-    
+#endif // !__EMBEDDED__
+ 
     /* Dump some internal samples */
     modem_probe_samp_f("t_EbNodB",&(fsk->EbNodB),1);
     modem_probe_samp_f("t_ppm",&(fsk->ppm),1);
@@ -956,7 +957,7 @@ static void stats_init(struct FSK *fsk) {
     /* asserts below as we found some problems over-running eye matrix */
     
     /* TODO: refactor eye tracing code here and in fsk_demod */
-    
+#ifndef __EMBEDDED__    
     int neyesamp_dec = ceil(((float)P*2)/MODEM_STATS_EYE_IND_MAX);
     int neyesamp = (P*2)/neyesamp_dec;
     assert(neyesamp <= MODEM_STATS_EYE_IND_MAX);
@@ -973,6 +974,7 @@ static void stats_init(struct FSK *fsk) {
            }
         }
     }
+#endif // !__EMBEDDED__
 
     fsk->stats->rx_timing = fsk->stats->snr_est = 0;
     
@@ -1006,12 +1008,13 @@ void fsk_get_demod_stats(struct FSK *fsk, struct MODEM_STATS *stats){
     stats->snr_est = fsk->stats->snr_est;           // TODO: make this SNR not Eb/No
     stats->rx_timing = fsk->stats->rx_timing;
     stats->foff = fsk->stats->foff;
-
+#ifndef __EMBEDDED__
     stats->neyesamp = fsk->stats->neyesamp;
     stats->neyetr = fsk->stats->neyetr;
     memcpy(stats->rx_eye, fsk->stats->rx_eye, sizeof(stats->rx_eye));
     memcpy(stats->f_est, fsk->stats->f_est, fsk->mode*sizeof(float));
-        
+#endif // !__EMBEDDED__
+ 
     /* these fields not used for FSK so set to something sensible */
 
     stats->sync = 0;

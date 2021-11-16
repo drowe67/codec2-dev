@@ -45,7 +45,7 @@
 
 #ifdef __EMBEDDED__
 #include "arm_math.h"
-#endif /* __EMBEDDED_ */
+#endif /* __EMBEDDED__ */
 
 /* Static Prototypes */
 
@@ -758,7 +758,7 @@ static int est_timing(struct OFDM *ofdm, complex float *rx, int length,
 	    corr_st = corr_st + (rx[ind                        ] * wvec_pilot[j]);
             corr_en = corr_en + (rx[ind + ofdm->samplesperframe] * wvec_pilot[j]);
         }
-#endif
+#endif // __EMBEDDED__
         corr[i] = (cabsf(corr_st) + cabsf(corr_en)) * av_level;
     }
 

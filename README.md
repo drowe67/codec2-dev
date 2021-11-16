@@ -236,6 +236,43 @@ Codec 2 can be added to the project in the following way.
      
 1. Add Codec 2 to the target_link_libraries in the same file.
 
+## Building Codec 2 for Microcontrollers
+
+Codec 2 requires a hardware Floating Point Unit (FPU) to run in real time.
+
+Two build options have been added to support building on microcontrollers:
+1. Setting the `cmake` variable MICROCONTROLLER_BUILD disables position independent code (-fPIC is not used).  This was required for the IMRT1052 used in Teensy 4/4.1).
+
+1. On ARM machines, setting the C Flag \_\_EMBEDDED\_\_ and linking with the ARM CMSIS library will improve performance on ARM-based microcontrollers. \_\_REAL\_\_ and FDV\_ARM\_MATH are additional ARM-specific options that can be set to improve performance if required, especially with OFDM modes.
+
+A CMakeLists.txt example for a microcontroller is below:
+
+```
+set(CMAKE_TRY_COMPILE_TARGET_TYPE STATIC_LIBRARY)
+set(MICROCONTROLLER_BUILD 1)
+
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mlittle-endian -ffunction-sections -fdata-sections -g -O3")
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -ffunction-sections -fdata-sections")
+
+add_definitions(-DCORTEX_M7 -D__EMBEDDED__)
+add_definitions(-DFREEDV_MODE_EN_DEFAULT=0 -DFREEDV_MODE_1600_EN=1 -DFREEDV_MODE_700D_EN=1 -DFREEDV_MODE_700E_EN=1 -DCODEC2_MODE_EN_DEFAULT=0 -DCODEC2_MODE_1300_EN=1 -DCODEC2_MODE_700C_EN=1)
+                    
+FetchContent_Declare(codec2
+    GIT_REPOSITORY https://github.com/drowe67/codec2.git
+    GIT_TAG origin/master
+    GIT_SHALLOW ON
+    GIT_PROGRESS ON
+)
+FetchContent_GetProperties(codec2)
+if(NOT ${codec2_POPULATED})
+    FetchContent_Populate(codec2)
+endif()
+set(CMAKE_REQUIRED_FLAGS "")
+
+set(LPCNET OFF CACHE BOOL "")
+add_subdirectory(${codec2_SOURCE_DIR} ${codec2_BINARY_DIR} EXCLUDE_FROM_ALL)
+```
+
 ## Building Debian packages
 
 To build Debian packages, simply run the "cpack" command after running "make". This will generate the following packages:

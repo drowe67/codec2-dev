@@ -112,7 +112,7 @@ else()
 endif()
 
 # -fPIC is implied on MinGW...
-if(NOT WIN32)
+if((NOT WIN32) AND (NOT MICROCONTROLLER_BUILD))
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC")
 endif()
 

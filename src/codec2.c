@@ -1751,7 +1751,7 @@ float codec2_get_energy(struct CODEC2 *c2, const unsigned char *bits)
     MODEL model;
     float xq_dec[2] = {};
     int e_index, WoE_index;
-    float e;
+    float e = 0.0f;
     unsigned int nbit;
 
     if ( CODEC2_MODE_ACTIVE(CODEC2_MODE_3200, c2->mode)) {
