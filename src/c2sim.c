@@ -56,6 +56,8 @@ void print_help(const struct option *long_options, int num_opts, char* argv[]);
 
 #define N_SAMP n_samp  /* quick fix for run time sample rate selection */
 
+extern int phase_dispersion;
+
 /*---------------------------------------------------------------------------*\
 
 				MAIN
@@ -102,7 +104,7 @@ int main(int argc, char *argv[])
     #endif
     char  out_file[MAX_STR];
     FILE *fout = NULL;	/* output speech file */
-    int   rateK = 0, newamp1vq = 0, rate_K_dec = 0, perframe=0;
+    int   rateK = 0, newamp1vq = 0, rate_K_dec = 0, perframe=0, postfilter_newamp1_en=0;
     int   bands = 0, bands_lower_en;
     float bands_lower = -1E32;
     int   K = 20;
@@ -126,6 +128,7 @@ int main(int argc, char *argv[])
         { "rateKdec", required_argument, &rate_K_dec, 1 },
         { "rateKout", required_argument, &rateKout, 1 },
         { "rateKin", required_argument, &rateKin, 1 },
+        { "postfilter_newamp1", no_argument, &postfilter_newamp1_en, 1 },
         { "bands",required_argument, &bands, 1 },
         { "bands_lower",required_argument, &bands_lower_en, 1 },
         { "bands_resample", no_argument, &bands_resample, 1 },
@@ -135,6 +138,7 @@ int main(int argc, char *argv[])
         { "lspvq", no_argument, &lspvq, 1 },
         { "lspjvm", no_argument, &lspjvm, 1 },
         { "phase0", no_argument, &phase0, 1 },
+        { "dispersion", required_argument, &phase_dispersion, 1 },
         { "postfilter", no_argument, &postfilt, 1 },
         { "hand_voicing", required_argument, &hand_voicing, 1 },
         { "dec", required_argument, &dec, 1 },
@@ -196,6 +200,8 @@ int main(int argc, char *argv[])
                 }
             } else if(strcmp(long_options[option_index].name, "lpc") == 0) {
                 order = atoi(optarg);
+            } else if(strcmp(long_options[option_index].name, "dispersion") == 0) {
+                phase_dispersion = atoi(optarg);
             #ifdef DUMP
             } else if(strcmp(long_options[option_index].name, "dump") == 0) {
                 if (dump)
@@ -824,34 +830,23 @@ int main(int argc, char *argv[])
 	    
 	    if (frateKin != NULL) {
 		assert(fread(rate_K_vec, sizeof(float), K, frateKin) == K);
-		/* apply newamp1 postfilter - this helped male samples with VQVAE work */
-                float sum = 0.0;
-                for(int k=0; k<K; k++)
-                    sum += rate_K_vec[k];
-                float mean = sum/K;
-                float rate_K_vec_no_mean[K];
-                for(int k=0; k<K; k++)
-                    rate_K_vec_no_mean[k] = rate_K_vec[k] - mean;
-		post_filter_newamp1(rate_K_vec_no_mean,  rate_K_sample_freqs_kHz, K, 1.5);
-                for(int k=0; k<K; k++)
-                    rate_K_vec[k] = rate_K_vec_no_mean[k] +  mean;
 	    }
+	    
+	    /* remove mean, as EQ and post filter work on mean removed vector */
+	    float sum = 0.0;
+	    for(int k=0; k<K; k++)
+	      sum += rate_K_vec[k];
+	    float mean = sum/K;
+	    float rate_K_vec_no_mean[K]; float rate_K_vec_no_mean_[K];
+	    for(int k=0; k<K; k++)
+	      rate_K_vec_no_mean[k] = rate_K_vec[k] - mean;
 	    
             float rate_K_vec_[K];
             if (newamp1vq) {
-                /* remove mean */
-                float sum = 0.0;
-                for(int k=0; k<K; k++)
-                    sum += rate_K_vec[k];
-                float mean = sum/K;
-                float rate_K_vec_no_mean[K];
-                for(int k=0; k<K; k++)
-                    rate_K_vec_no_mean[k] = rate_K_vec[k] - mean;
-
 		newamp1_eq(rate_K_vec_no_mean, eq, K, 1);
 
                 /* two stage VQ */
-                float rate_K_vec_no_mean_[K]; int indexes[2];
+                int indexes[2];
                 rate_K_mbest_encode(indexes, rate_K_vec_no_mean, rate_K_vec_no_mean_, K, NEWAMP1_VQ_MBEST_DEPTH);
                 for(int k=0; k<K; k++)
                     rate_K_vec_[k] = rate_K_vec_no_mean_[k] + mean;
@@ -863,9 +858,15 @@ int main(int argc, char *argv[])
             }
             else {
                 for(int k=0; k<K; k++)
-                    rate_K_vec_[k] = rate_K_vec[k];
+                    rate_K_vec_no_mean_[k] = rate_K_vec_no_mean[k];
             }
 
+	    if (postfilter_newamp1_en)
+	        post_filter_newamp1(rate_K_vec_no_mean_, rate_K_sample_freqs_kHz, K, 1.5);
+	    for(int k=0; k<K; k++)
+	        rate_K_vec_[k] = rate_K_vec_no_mean_[k] +  mean;
+
+	    // another optional feature file for ML expriments
 	    if (frateKWov != NULL) {
 		/* We use standard nb_features=55 feature records for compatability with train_lpcnet.py */
 		float features[55] = {0};
@@ -949,7 +950,7 @@ int main(int argc, char *argv[])
             }
 	    
             resample_rate_L(&c2const, &model, rate_K_vec_, rate_K_sample_freqs_kHz, K);
-        }
+        } // rateK
 
 	/*------------------------------------------------------------*\
 
