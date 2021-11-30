@@ -70,7 +70,7 @@ static FILE *fak_ = NULL;
 static FILE *fbg = NULL;
 static FILE *fE = NULL;
 static FILE *frk = NULL;
-static FILE *fhephase = NULL;
+static FILE *fH = NULL;
 
 static char  prefix[MAX_STR];
 
@@ -136,8 +136,8 @@ void dump_off(){
 	fclose(fE);
     if (frk != NULL)
 	fclose(frk);
-    if (fhephase != NULL)
-	fclose(fhephase);
+    if (fH != NULL)
+	fclose(fH);
 }
 
 void dump_Sn(int m_pitch, float Sn[]) {
@@ -334,21 +334,22 @@ void dump_phase_(float phase_[], int L) {
 }
 
 
-void dump_hephase(int ind[], int dim) {
-    int m;
-    char s[MAX_STR + 12];
-
+void dump_H(COMP H[], int L) {
+    int l;
     if (!dumpon) return;
 
-    if (fhephase == NULL) {
-	sprintf(s,"%s_hephase.txt", prefix);
-	fhephase = fopen(s, "wt");
-	assert(fhephase != NULL);
+    if (fH == NULL) {
+        char s[MAX_STR + 12];
+        sprintf(s,"%s_H.txt", prefix);
+        fH = fopen(s, "wt");
+        assert(fH != NULL);
     }
 
-    for(m=0; m<dim; m++)
-	fprintf(fhephase,"%d\t",ind[m]);
-    fprintf(fhephase,"\n");
+    for(l=1; l<=L; l++)
+        fprintf(fH,"%f\t",atan2(H[l].imag,H[l].real+1E-12));
+    for(l=L+1; l<MAX_AMP; l++)
+        fprintf(fH,"%f\t",0.0);
+    fprintf(fH,"\n");
 }
 
 

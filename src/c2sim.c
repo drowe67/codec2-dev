@@ -1000,7 +1000,6 @@ int main(int argc, char *argv[])
                     #ifdef DUMP
                     dump_lsp_(&lsps_dec[i][0]);
                     dump_ak_(&ak_dec[i][0], order);
-                    dump_quantised_model(&model_dec[i]);
                     #endif
                 }
 
@@ -1014,14 +1013,12 @@ int main(int argc, char *argv[])
 
                 if (phase0) {
                     /* optionally read in Aw, replacing values generated using LPC */
-
                     if (awread) {
                         int ret = fread(Aw, sizeof(COMP), FFT_ENC, faw);
                         assert(ret == FFT_ENC);
                     }
 
                     /* optionally read in Hm directly, bypassing sampling of Aw[] */
-
                     if (hmread) {
                         int ret = fread(H, sizeof(COMP), MAX_AMP, fhm);
                         assert(ret == MAX_AMP);
@@ -1030,6 +1027,7 @@ int main(int argc, char *argv[])
                     }
                     phase_synth_zero_order(n_samp, &model_dec[i], ex_phase, H);
                     #ifdef DUMP
+                    dump_H(H, model.L);
                     dump_phase_(&model_dec[i].phi[0], model.L);
                     #endif
                 }
@@ -1037,6 +1035,9 @@ int main(int argc, char *argv[])
                 if (postfilt)
                     postfilter(&model_dec[i], &bg_est);
                 synth_one_frame(n_samp, fftr_inv_cfg, buf, &model_dec[i], Sn_, Pn, prede, &de_mem, gain);
+                #ifdef DUMP
+                dump_quantised_model(&model_dec[i]);
+                #endif
                 if (fout != NULL)
                     fwrite(buf,sizeof(short),N_SAMP,fout);
                 if (modelout) {

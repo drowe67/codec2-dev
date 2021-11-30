@@ -2,7 +2,7 @@
 % This program is distributed under the terms of the GNU General Public License 
 % Version 2
 %
-% Plot phase modelling information from dump files
+% Plot phase modelling information from dump files, original and phase0 models with n0 adjustment
 
 #{  
   Usage:
