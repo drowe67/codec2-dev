@@ -32,24 +32,19 @@ function plphase2(samname, f)
   % H is the synthesised phase without linear component
   H_name = strcat(samname,"_H.txt");
   if (file_in_path(".",H_name))
-    phase = load(H_name);
+    phase = unwrap(load(H_name),pi,2);
   endif
   ratek_H_name = strcat(samname,"_ratek_H.txt");
   if (file_in_path(".",ratek_H_name))
-    phase_ratek = load(ratek_H_name);
+    phase_ratek = unwrap(load(ratek_H_name),pi,2);
   endif
   
-  k = ' '; plot_group_delay=0; Pms = 1; plot_orig=1; plot_synth_sn=1;
+  k = ' '; plot_group_delay=1; Pms = 6; plot_orig=1; plot_synth_sn=1;
   do
     Wo = model(f,1);
     L = model(f,2);
     Am = model(f,3:(L+2));
     Am_ = qmodel(f,3:(L+2));
-    if plot_orig
-      phase_f = phase(f,1:L);
-    else
-      phase_f = phase_ratek(f,1:L);
-    end
     
     figure(1); clf;
     s = [ Sn(2*f-1,:) Sn(2*f,:) ];
@@ -84,20 +79,21 @@ function plphase2(samname, f)
     x_phase = (1:L)*Wo*Fs2/pi;
     if plot_orig
        if plot_group_delay
-          ax = plotyy((0:255)*Fs2/256, Sw(f,:), x_group, group_delay);
+          [ax h1 h2] = plotyy((0:255)*Fs2/256, Sw(f,:), x_group, group_delay);
        else
-          ax = plotyy((0:255)*Fs2/256, Sw(f,:), x_phase, phase_delay);
+          [ax h1 h2] = plotyy((0:255)*Fs2/256, Sw(f,:), x_phase, phase_delay);
        end
     else
        if plot_group_delay
-          ax = plotyy((0:255)*Fs2/256, Sw(f,:), x_group, group_delay_ratek);
+          [ax h1 h2] = plotyy((0:255)*Fs2/256, Sw(f,:), x_group, group_delay_ratek);
        else
-          ax = plotyy((0:255)*Fs2/256, Sw(f,:), x_phase, phase_delay_ratek);
+          [ax h1 h2] = plotyy((0:255)*Fs2/256, Sw(f,:), x_phase, phase_delay_ratek);
        end
     end
     hold off;
     axis(ax(1), [1 Fs2 -10 80]);
     axis(ax(2), [1 Fs2 -Pms Pms]);
+    set(h2,'color','black');
     xlabel('Frequency (Hz)');
     ylabel(ax(1),'Amplitude (dB)');
     if plot_group_delay
@@ -117,7 +113,7 @@ function plphase2(samname, f)
     plot((1:L)*Wo*Fs2/pi, phase(f,1:L), "-og;phase;");
     hold on;
     plot((1:L)*Wo*Fs2/pi, phase_ratek(f,1:L), "-or;phase ratek;");
-    axis([0 Fs2 -pi pi]);
+    axis([0 Fs2 -2*pi 2*pi]);
     hold off;
     subplot(212);
     if plot_group_delay
