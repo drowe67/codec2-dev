@@ -110,9 +110,17 @@ function plphase2(samname, f)
 
     figure(3); clf;
     subplot(211);
-    plot((1:L)*Wo*Fs2/pi, phase(f,1:L), "-og;phase;");
+    adj = 0;
+    if mean(phase(f,1:L)) < -2*pi
+      adj = 2*pi;
+    end
+    adj_ratek = 0;
+    if mean(phase_ratek(f,1:L)) < -2*pi
+      adj_ratek = 2*pi;
+    end
+    plot((1:L)*Wo*Fs2/pi, phase(f,1:L)+adj, "-og;phase;");
     hold on;
-    plot((1:L)*Wo*Fs2/pi, phase_ratek(f,1:L), "-or;phase ratek;");
+    plot((1:L)*Wo*Fs2/pi, phase_ratek(f,1:L)+adj_ratek, "-or;phase ratek;");
     axis([0 Fs2 -2*pi 2*pi]);
     hold off;
     subplot(212);
