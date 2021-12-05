@@ -104,7 +104,7 @@ int main(int argc, char *argv[])
     #endif
     char  out_file[MAX_STR];
     FILE *fout = NULL;	/* output speech file */
-    int   rateK = 0, newamp1vq = 0, rate_K_dec = 0, perframe=0, postfilter_newamp1_en=0;
+    int   rateK = 0, newamp1vq = 0, rate_K_dec = 0, perframe=0, postfilter_newamp1_en=0, rateKlf=0, setK=0;
     int   bands = 0, bands_lower_en;
     float bands_lower = -1E32;
     int   K = 20;
@@ -123,12 +123,14 @@ int main(int argc, char *argv[])
     struct option long_options[] = {
         { "Fs", required_argument, &set_fs, 1 },
         { "rateK", no_argument, &rateK, 1 },
+        { "setK", required_argument, &setK, 1 },
         { "perframe", no_argument, &perframe, 1 },
         { "newamp1vq", no_argument, &newamp1vq, 1 },
         { "rateKdec", required_argument, &rate_K_dec, 1 },
         { "rateKout", required_argument, &rateKout, 1 },
         { "rateKin", required_argument, &rateKin, 1 },
         { "postfilter_newamp1", no_argument, &postfilter_newamp1_en, 1 },
+        { "rateKLF", no_argument, &rateKlf, 1 },
         { "bands",required_argument, &bands, 1 },
         { "bands_lower",required_argument, &bands_lower_en, 1 },
         { "bands_resample", no_argument, &bands_resample, 1 },
@@ -211,6 +213,9 @@ int main(int argc, char *argv[])
                   || strcmp(long_options[option_index].name, "lspd") == 0
                   || strcmp(long_options[option_index].name, "lspvq") == 0) {
 	        assert(order == LPC_ORD);
+            } else if(strcmp(long_options[option_index].name, "setK") == 0) {
+                K = atoi(optarg);
+                fprintf(stderr, "K: %d\n", K);
             } else if(strcmp(long_options[option_index].name, "rateKdec") == 0) {
                 rate_K_dec = atoi(optarg);
                 fprintf(stderr, "rate_K_dec: %d\n", rate_K_dec);
@@ -563,7 +568,7 @@ int main(int argc, char *argv[])
 
     float rate_K_sample_freqs_kHz[K]; float se = 0.0; int nse = 0;
     if (rateK) {
-	mel_sample_freqs_kHz(rate_K_sample_freqs_kHz, NEWAMP1_K, ftomel(200.0), ftomel(3700.0) );
+	mel_sample_freqs_kHz(rate_K_sample_freqs_kHz, K, ftomel(200.0), ftomel(3700.0) );
     }
     float rate_K_vec_delay[rate_K_dec+1][K];
     float rate_K_vec_delay_[rate_K_dec+1][K];
@@ -949,7 +954,17 @@ int main(int argc, char *argv[])
                     rate_K_vec_[k] = rate_K_vec_delay_[0][k];
             }
 	    
+            float A_backup[MAX_AMP];
+            for(int m=1; m<=model.L; m++)
+                A_backup[m] = model.A[m];
+            
             resample_rate_L(&c2const, &model, rate_K_vec_, rate_K_sample_freqs_kHz, K);
+            
+            if (rateKlf) {
+                for(int m=model.L/4; m<=model.L; m++)
+                    model.A[m] = A_backup[m];
+            }
+            
         } // rateK
 
 	/*------------------------------------------------------------*\
