@@ -215,6 +215,7 @@ codebookjvm.c
 codebookge.c
 codebooknewamp1_energy.c
 codebooknewamp1.c
+codebooknewamp1_sq.c
 )
 
 set(STM32F4_ADAC_SRCS

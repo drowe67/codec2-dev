@@ -48,6 +48,10 @@ set(CODEBOOKSNEWAMP1
     ${D}/train_120_2.txt
 )
 
+set(CODEBOOKSNEWAMP1_SQ
+    ${D}/train_120_1_sq.txt
+    ${D}/train_120_2_sq.txt
+)
 set(CODEBOOKSNEWAMP1_ENERGY
     ${D}/newamp1_energy_q.txt
 )
@@ -123,6 +127,13 @@ add_custom_command(
     DEPENDS generate_codebook ${CODEBOOKSNEWAMP1}
 )
 
+# codebooknewamp1_sq.c
+add_custom_command(
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/codebooknewamp1_sq.c
+    COMMAND generate_codebook newamp1vq_cbsq ${CODEBOOKSNEWAMP1_SQ} > ${CMAKE_CURRENT_BINARY_DIR}/codebooknewamp1_sq.c
+    DEPENDS generate_codebook ${CODEBOOKSNEWAMP1_SQ}
+)
+
 # codebooknewamp1_energy.c
 add_custom_command(
     OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/codebooknewamp1_energy.c
@@ -180,6 +191,7 @@ set(CODEC2_SRCS
     codebookjvm.c
     codebookge.c
     codebooknewamp1.c
+    codebooknewamp1_sq.c
     codebooknewamp1_energy.c
     codebooknewamp2.c
     codebooknewamp2_energy.c

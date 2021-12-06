@@ -122,14 +122,14 @@ void mbest_print(char title[], struct MBEST *mbest) {
 \*---------------------------------------------------------------------------*/
 
 void mbest_search(
-		  const float  *cb,     /* VQ codebook to search         */
-		  const float  *cbsq,   /* sum sq of each VQ entry       */
-		  float         vec[],  /* target vector                 */
-		  float         w[],    /* weighting vector              */
-		  int           k,      /* dimension of vector           */
-		  int           m,      /* number on entries in codebook */
-		  struct MBEST *mbest,  /* list of closest matches       */
-		  int           index[] /* indexes that lead us here     */
+		  const float  *cb,      /* VQ codebook to search         */
+		  const float  *cbsq,    /* sum sq of each VQ entry       */
+		  float         vec[],   /* target vector                 */
+                  float         w[],     /* weighting vector              */
+                  int           k,       /* dimension of vector           */
+		  int           m,       /* number on entries in codebook */
+		  struct MBEST *mbest,   /* list of closest matches       */
+		  int           index[]  /* indexes that lead us here     */
 )
 {
    int j;

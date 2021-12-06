@@ -228,7 +228,6 @@ void quant_mbest(float vec_out[],
         w[i] = 1.0;
     for(i=en+1; i<k; i++)
         w[i] = 0.0;
-
     se1 = 0.0;
     for(i=0; i<k; i++) {
         err[i] = vec_in[i];

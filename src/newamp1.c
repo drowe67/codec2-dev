@@ -169,22 +169,16 @@ float rate_K_mbest_encode(int *indexes, float *x, float *xq, int ndim, int mbest
   float w[ndim];
   int   index[MBEST_STAGES];
   float mse, tmp;
-  float codebook1sq[newamp1vq_cb[0].m];
-  float codebook2sq[newamp1vq_cb[1].m];
+  const float *codebook1sq = newamp1vq_cbsq[0].cb;
+  const float *codebook2sq = newamp1vq_cbsq[1].cb;
 
-  /* precompute tables for efficient search */
-  mbest_precompute_cbsq(codebook1sq, codebook1, newamp1vq_cb[0].k, newamp1vq_cb[0].m);
-  mbest_precompute_cbsq(codebook2sq, codebook2, newamp1vq_cb[1].k, newamp1vq_cb[1].m);
-  
   /* codebook is compiled for a fixed K */
 
   assert(ndim == newamp1vq_cb[0].k);
 
-  /* equal weights, could be argued mel freq axis gives freq dep weighting */
-
   for(i=0; i<ndim; i++)
       w[i] = 1.0;
-
+  
   mbest_stage1 = mbest_create(mbest_entries);
   mbest_stage2 = mbest_create(mbest_entries);
   for(i=0; i<MBEST_STAGES; i++)
