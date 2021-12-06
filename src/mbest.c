@@ -64,6 +64,16 @@ void mbest_destroy(struct MBEST *mbest) {
 }
 
 
+/* precompyte table for efficient VQ search */
+
+void mbest_precompute_cbsq(float cbsq[], float cb[], int k, int m) {
+    for (int j=0; j<m; j++) {
+        cbsq[j] = 0.0;
+        for(int i=0; i<k; i++)
+            cbsq[j] += cb[j*k+i]*cb[j*k+i];
+    }
+ }
+
 /*---------------------------------------------------------------------------*\
 
   mbest_insert
@@ -113,6 +123,7 @@ void mbest_print(char title[], struct MBEST *mbest) {
 
 void mbest_search(
 		  const float  *cb,     /* VQ codebook to search         */
+		  const float  *cbsq,   /* sum sq of each VQ entry       */
 		  float         vec[],  /* target vector                 */
 		  float         w[],    /* weighting vector              */
 		  int           k,      /* dimension of vector           */
@@ -128,12 +139,23 @@ void mbest_search(
         float   diff;
         int i;
 
+        /*
+        float cbsq = 0.0;
+        for(int i = 0; i < k; i++) {
+            cbsq += cb[j*k+i]*cb[j*k+i];
+        }
+        */
+        /*
 	e = 0.0;
 	for(i=0; i<k; i++) {
 	    diff = cb[j*k+i]-vec[i];
 	    e += diff*w[i]*diff*w[i];
 	}
-
+        */
+        float corr = 0.0;
+	for(i=0; i<k; i++)
+	    corr += cb[j*k+i]*vec[i];
+        float e = cbsq[j] - 2*corr;
 	index[0] = j;
         if (e < mbest->list[mbest->entries - 1].error)
 	    mbest_insert(mbest, index, e);
