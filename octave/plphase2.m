@@ -14,7 +14,8 @@
 #}
 
 function plphase2(samname, f)
-
+  [dir basename ext] = fileparts(samname);
+  
   Fs = 8000; Fs2 = Fs/2;
   
   sn_name = strcat(samname,"_sn.txt");
@@ -55,12 +56,13 @@ function plphase2(samname, f)
         s1 += Am(m)*cos(Wo*m*t + phase(f,m));
         s2 += Am_(m)*cos(Wo*m*t + phase_ratek(f,m));
       end
-      plot(s1,'g'); hold on; plot(s2,'r'); hold off;
+      maxy = max(abs([s1 s2]));
+      maxy = ceil(maxy/5000)*5000;
+      subplot(211); plot(s1,'g'); axis([1 length(s) -maxy maxy]); grid;
+      subplot(212); plot(s2,'r'); axis([1 length(s) -maxy maxy]); grid;
     end
-    grid;
-    axis([1 length(s) -20000 20000]);
     if (k == 'p')
-       pngname = sprintf("%s_%d_sn",samname,f);
+       pngname = sprintf("%s_%d_sn.png",basename,f);
        png(pngname);
     endif
 
@@ -94,6 +96,7 @@ function plphase2(samname, f)
     axis(ax(1), [1 Fs2 -10 80]);
     axis(ax(2), [1 Fs2 -Pms Pms]);
     set(h2,'color','black');
+    set(ax(2),'ycolor','black');
     xlabel('Frequency (Hz)');
     ylabel(ax(1),'Amplitude (dB)');
     if plot_group_delay
@@ -104,7 +107,7 @@ function plphase2(samname, f)
     grid;
     
     if (k == 'p')
-       pngname = sprintf("%s_%d_sw",samname,f);
+       pngname = sprintf("%s_%d_sw.png",basename,f);
        png(pngname);
     endif
 
@@ -127,7 +130,7 @@ function plphase2(samname, f)
     if plot_group_delay
       plot(x_group, group_delay, "-og;group;");
       hold on; plot(x_group, group_delay_ratek, "-or;group ratek;"); hold off;
-      axis([1 Fs2 -Pms Pms]);
+      axis([1 Fs2 -1 Pms]);
     else
       plot(x_phase, phase_delay, "-og;phase;");
       hold on; plot(x_group, phase_delay_ratek, "-or;phase ratek;"); hold off;
@@ -135,7 +138,7 @@ function plphase2(samname, f)
     end
     
     if (k == 'p')
-      pngname = sprintf("%s_%d_phase",samname,f);
+      pngname = sprintf("%s_%d_phase.png",basename,f);
       png(pngname);
     endif
  
@@ -167,12 +170,6 @@ function plphase2(samname, f)
       else
         plot_orig = 1;
       end
-    endif
-
-    % optional print to PNG
-    if (k == 'p')
-       pngname = sprintf("%s_%d",samname,f);
-       png(pngname);
     endif
 
   until (k == 'q')
