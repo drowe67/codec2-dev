@@ -23,7 +23,7 @@ void quant_mbest(float vec_out[],
                  int   indexes[],
                  float vec_in[],
                  int   num_stages,
-                 float vq[], float vqsq[],
+                 float vq[], 
                  int   m[], int k,
                  int   mbest_survivors, int st, int en);
 
@@ -31,7 +31,6 @@ int verbose = 0;
 
 int main(int argc, char *argv[]) {
     float vq[MAX_STAGES*MAX_K*MAX_ENTRIES];
-    float vqsq[MAX_STAGES*MAX_ENTRIES];
     int   m[MAX_STAGES];
     int   k=0, mbest_survivors=1, num_stages=0;
     char  fnames[256], fn[256], *comma, *p;
@@ -144,15 +143,25 @@ int main(int argc, char *argv[]) {
     if (st == -1) st = 0; 
     if (en == -1) en = k-1;
 
-    /* precompute vqsq table for efficient search */
+    float w[k];
+    for(int i=0; i<st; i++)
+        w[i] = 0.0;
+    for(int i=st; i<=en; i++)
+        w[i] = 1.0;
+    for(int i=en+1; i<k; i++)
+        w[i] = 0.0;
+
+    /* apply weighting to codebook (rather than in search) */
     for(int s=0; s<num_stages; s++)
-        mbest_precompute_cbsq(&vqsq[s*MAX_ENTRIES], &vq[s*k*MAX_ENTRIES], k, m[s]);
+        mbest_precompute_weight(&vq[s*k*MAX_ENTRIES], w, k, m[s]);
     
-    int   indexes[num_stages], nvecs = 0; int vec_usage[m[0]];
+    int indexes[num_stages], nvecs = 0; int vec_usage[m[0]];
     for(int i=0; i<m[0]; i++) vec_usage[i] = 0;
     float target[k], quantised[k];
     float sqe = 0.0;
     while(fread(&target, sizeof(float), k, stdin) && (nvecs < num)) {
+	for(int i=0; i<k; i++)
+            target[i] *= w[i];
 	int dont_count = 0;
 	/* optional clamping to lower limit or mean */
 	float mean = 0.0;
@@ -166,7 +175,7 @@ int main(int argc, char *argv[]) {
 		target[i] += -difference;
 	    dont_count = 1;
 	}
-	quant_mbest(quantised, indexes, target, num_stages, vq, vqsq, m, k, mbest_survivors, st, en);
+	quant_mbest(quantised, indexes, target, num_stages, vq, m, k, mbest_survivors, st, en);
 	if (dont_count == 0) {
 	    for(int i=st; i<=en; i++)
 		sqe += pow(target[i]-quantised[i], 2.0);
@@ -206,11 +215,10 @@ void quant_mbest(float vec_out[],
                  float vec_in[],
                  int   num_stages,
                  float vq[],
-                 float vqsq[],
                  int   m[], int k,
                  int   mbest_survivors, int st, int en)
 {
-    float err[k], w[k], se1;
+    float err[k], se1;
     int i,j,s,s1,ind;
     
     struct MBEST *mbest_stage[num_stages];
@@ -222,23 +230,17 @@ void quant_mbest(float vec_out[],
         index[i] = 0;
     }
 
-    for(i=0; i<st; i++)
-        w[i] = 0.0;
-    for(i=st; i<=en; i++)
-        w[i] = 1.0;
-    for(i=en+1; i<k; i++)
-        w[i] = 0.0;
     se1 = 0.0;
     for(i=0; i<k; i++) {
         err[i] = vec_in[i];
-        se1 += err[i]*err[i]*w[i]*w[i];
+        se1 += err[i]*err[i];
     }
     se1 /= k;
                 
     /* now quantise err[] using multi-stage mbest search, preserving
        mbest_survivors at each stage */
     
-    mbest_search(vq, vqsq, err, w, k, m[0], mbest_stage[0], index);
+    mbest_search(vq, err, k, m[0], mbest_stage[0], index);
     if (verbose) mbest_print("Stage 1:", mbest_stage[0]);
     
     for(s=1; s<num_stages; s++) {
@@ -260,7 +262,7 @@ void quant_mbest(float vec_out[],
                 }
             }
             pv("   target: ", target, k);
-            mbest_search(&vq[s*k*MAX_ENTRIES], &vqsq[s*MAX_ENTRIES], target, w, k, m[s], mbest_stage[s], index);
+            mbest_search(&vq[s*k*MAX_ENTRIES], target, k, m[s], mbest_stage[s], index);
         }
         char str[80]; sprintf(str,"Stage %d:", s+1);
         if (verbose) mbest_print(str, mbest_stage[s]);
@@ -279,7 +281,7 @@ void quant_mbest(float vec_out[],
         for(i=0; i<k; i++) {
             err[i] -= vq[s*k*MAX_ENTRIES+ind*k+i];
             vec_out[i] += vq[s*k*MAX_ENTRIES+ind*k+i];
-            se2 += err[i]*err[i]*w[i]*w[i];
+            se2 += err[i]*err[i];
         }
         se2 /= k;
         pv("    err: ", err, k);

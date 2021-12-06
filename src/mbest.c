@@ -64,15 +64,14 @@ void mbest_destroy(struct MBEST *mbest) {
 }
 
 
-/* precompyte table for efficient VQ search */
+/* apply weighting to VQ for efficient VQ search */
 
-void mbest_precompute_cbsq(float cbsq[], const float cb[], int k, int m) {
+void mbest_precompute_weight(float cb[], float w[], int k, int m) {
     for (int j=0; j<m; j++) {
-        cbsq[j] = 0.0;
         for(int i=0; i<k; i++)
-            cbsq[j] += cb[j*k+i]*cb[j*k+i];
+            cb[k*j+i] *= w[i];
     }
- }
+}
 
 /*---------------------------------------------------------------------------*\
 
@@ -123,59 +122,47 @@ void mbest_print(char title[], struct MBEST *mbest) {
 
 void mbest_search(
 		  const float  *cb,      /* VQ codebook to search         */
-		  const float  *cbsq,    /* sum sq of each VQ entry       */
 		  float         vec[],   /* target vector                 */
-                  float         w[],     /* weighting vector              */
                   int           k,       /* dimension of vector           */
 		  int           m,       /* number on entries in codebook */
 		  struct MBEST *mbest,   /* list of closest matches       */
 		  int           index[]  /* indexes that lead us here     */
 )
 {
-   int j;
+    int j;
 
-   float vecsq = 0.0;
-   for(int i=0; i<k; i++)
-       vecsq += vec[i]*vec[i];
-   
-   for(j=0; j<m; j++) {
+    /* note weighting can be applied externally by modifiying cb[] and vec:
 
-        /*
-          float e = 0.0;
-          for(i=0; i<k; i++)
-             e += (cb[j*k+i] - vec[i])*(cb[j*k+i] - vec[i]);
+      float e = 0.0;
+      for(i=0; i<k; i++)
+        e += pow(w[i]*(cb[j*k+i] - vec[i]),2.0)
+           
+       |
+      \|/
 
-           |
-          \|/
+      for(i=0; i<k; i++)
+         e += pow(w[i]*cb[j*k+i] - w[i]*vec[i]),2.0)
 
-          float e = 0.0;
-          for(i=0; i<k; i++)
-             e += cb[j*k+i]*cb[j*k+i] - 2*cb[j*k+i]*vec[i] + vec[i]*vec[i];
-          
-           |
-          \|/
+       |
+      \|/
 
-          float e = 0.0; float corr = 0.0;
-          for(i=0; i<k; i++)
-             e += cb[j*k+i]*cb[j*k+i];    .... (1)
-          for(i=0; i<k; i++)
-             e -= 2*cb[j*k+i]*vec[i];     .... (2)
-          for(i=0; i<k; i++)
-             e += vec[i]*vec[i];          .... (3)
-     
-          (1) can be precomputed, so we just need to compute (2) for each search, 
-          (3) can be computed outside the search loop
-        */
+      for(i=0; i<k; i++)
+         e += pow(cb1[j*k+i] - vec1[i]),2.0)
 
-        float corr = 0.0;
-	for(int i=0; i<k; i++)
-	    corr += cb[j*k+i]*vec[i];
-        float e = cbsq[j] - 2*corr + vecsq;
+      where cb1[j*k+i] = w[i]*cb[j*k+i], and vec1[i] = w[i]*vec[i]
+    */
+
+    for(j=0; j<m; j++) {
+        float e = 0.0;
+        for(int i=0; i<k; i++) {
+	    float diff = *cb++ - vec[i];
+            e += diff*diff;
+        }
         
-	index[0] = j;
+        index[0] = j;
         if (e < mbest->list[mbest->entries - 1].error)
-	    mbest_insert(mbest, index, e);
-   }
+            mbest_insert(mbest, index, e);
+    }
 }
 
 /*---------------------------------------------------------------------------*\
