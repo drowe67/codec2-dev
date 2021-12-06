@@ -17,7 +17,8 @@ void write_float_file(char fn[], float *values, int n) {
 }
 
 int main(void) {
-    float target[] = {1.0,1,0}; write_float_file("target.f32", target, 2);
+    float target[] = {1.0,1.0};
+    write_float_file("target.f32", target, 2);
     float vq1[] = {0.9,0.9,  /* this will be a better match on first stage */
 		   0.8,0.8}; /* but after second stage should choose this  */
     write_float_file("vq1.f32", vq1, 4);

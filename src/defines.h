@@ -104,7 +104,7 @@ struct lsp_codebook {
 extern const struct lsp_codebook lsp_cb[];
 extern const struct lsp_codebook lsp_cbd[];
 extern const struct lsp_codebook lsp_cbjvm[];
-extern const struct lsp_codebook lspmelvq_cb[];
+extern const struct lsp_codebook ge_cb[];
 extern const struct lsp_codebook newamp1vq_cb[];
 extern const struct lsp_codebook newamp1_energy_cb[];
 extern const struct lsp_codebook newamp2vq_cb[];
