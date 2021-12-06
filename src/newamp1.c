@@ -174,7 +174,7 @@ float rate_K_mbest_encode(int *indexes, float *x, float *xq, int ndim, int mbest
 
   /* precompute tables for efficient search */
   mbest_precompute_cbsq(codebook1sq, codebook1, newamp1vq_cb[0].k, newamp1vq_cb[0].m);
-  mbest_precompute_cbsq(codebook2sq, codebook2, newamp1vq_cb[0].k, newamp1vq_cb[0].m);
+  mbest_precompute_cbsq(codebook2sq, codebook2, newamp1vq_cb[1].k, newamp1vq_cb[1].m);
   
   /* codebook is compiled for a fixed K */
 
