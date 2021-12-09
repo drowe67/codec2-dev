@@ -59,52 +59,6 @@ diff -uNr cml.orig/mat/InitializeWiMaxLDPC.m cml/mat/InitializeWiMaxLDPC.m
      P=inv(circshift( eye(z),[0,floor(80*z/z0)]));
  end
  
-Binary files cml.orig/mex/Capacity.dll and cml/mex/Capacity.dll differ
-Binary files cml.orig/mex/Capacity.mex and cml/mex/Capacity.mex differ
-Binary files cml.orig/mex/CapacityTableLookup.dll and cml/mex/CapacityTableLookup.dll differ
-Binary files cml.orig/mex/CapacityTableLookup.mex and cml/mex/CapacityTableLookup.mex differ
-Binary files cml.orig/mex/ConvEncode.dll and cml/mex/ConvEncode.dll differ
-Binary files cml.orig/mex/ConvEncode.mex and cml/mex/ConvEncode.mex differ
-Binary files cml.orig/mex/CreateCcsdsInterleaver.dll and cml/mex/CreateCcsdsInterleaver.dll differ
-Binary files cml.orig/mex/CreateCcsdsInterleaver.mex and cml/mex/CreateCcsdsInterleaver.mex differ
-Binary files cml.orig/mex/CreateSRandomInterleaver.dll and cml/mex/CreateSRandomInterleaver.dll differ
-Binary files cml.orig/mex/CreateSRandomInterleaver.mex and cml/mex/CreateSRandomInterleaver.mex differ
-Binary files cml.orig/mex/CreateUmtsInterleaver.dll and cml/mex/CreateUmtsInterleaver.dll differ
-Binary files cml.orig/mex/CreateUmtsInterleaver.mex and cml/mex/CreateUmtsInterleaver.mex differ
-Binary files cml.orig/mex/Deinterleave.dll and cml/mex/Deinterleave.dll differ
-Binary files cml.orig/mex/Deinterleave.mex and cml/mex/Deinterleave.mex differ
-Binary files cml.orig/mex/Demod2D.dll and cml/mex/Demod2D.dll differ
-Binary files cml.orig/mex/Demod2D.mex and cml/mex/Demod2D.mex differ
-Binary files cml.orig/mex/DemodFSK.dll and cml/mex/DemodFSK.dll differ
-Binary files cml.orig/mex/DemodFSK.mex and cml/mex/DemodFSK.mex differ
-Binary files cml.orig/mex/Depuncture.dll and cml/mex/Depuncture.dll differ
-Binary files cml.orig/mex/Depuncture.mex and cml/mex/Depuncture.mex differ
-Binary files cml.orig/mex/DuobinaryCRSCDecode.dll and cml/mex/DuobinaryCRSCDecode.dll differ
-Binary files cml.orig/mex/DuobinaryCRSCEncode.dll and cml/mex/DuobinaryCRSCEncode.dll differ
-Binary files cml.orig/mex/InitializeDVBS2.dll and cml/mex/InitializeDVBS2.dll differ
-Binary files cml.orig/mex/InitializeDVBS2.mex and cml/mex/InitializeDVBS2.mex differ
-Binary files cml.orig/mex/Interleave.dll and cml/mex/Interleave.dll differ
-Binary files cml.orig/mex/Interleave.mex and cml/mex/Interleave.mex differ
-Binary files cml.orig/mex/LdpcEncode.dll and cml/mex/LdpcEncode.dll differ
-Binary files cml.orig/mex/LdpcEncode.mex and cml/mex/LdpcEncode.mex differ
-Binary files cml.orig/mex/Modulate.dll and cml/mex/Modulate.dll differ
-Binary files cml.orig/mex/Modulate.mex and cml/mex/Modulate.mex differ
-Binary files cml.orig/mex/MpDecode.dll and cml/mex/MpDecode.dll differ
-Binary files cml.orig/mex/MpDecode.mex and cml/mex/MpDecode.mex differ
-Binary files cml.orig/mex/Puncture.dll and cml/mex/Puncture.dll differ
-Binary files cml.orig/mex/Puncture.mex and cml/mex/Puncture.mex differ
-Binary files cml.orig/mex/RateDematch.dll and cml/mex/RateDematch.dll differ
-Binary files cml.orig/mex/RateDematch.mex and cml/mex/RateDematch.mex differ
-Binary files cml.orig/mex/RateMatch.dll and cml/mex/RateMatch.dll differ
-Binary files cml.orig/mex/RateMatch.mex and cml/mex/RateMatch.mex differ
-Binary files cml.orig/mex/SisoDecode.dll and cml/mex/SisoDecode.dll differ
-Binary files cml.orig/mex/SisoDecode.mex and cml/mex/SisoDecode.mex differ
-Binary files cml.orig/mex/Somap.dll and cml/mex/Somap.dll differ
-Binary files cml.orig/mex/Somap.mex and cml/mex/Somap.mex differ
-Binary files cml.orig/mex/ViterbiDecode.dll and cml/mex/ViterbiDecode.dll differ
-Binary files cml.orig/mex/ViterbiDecode.mex and cml/mex/ViterbiDecode.mex differ
-Binary files cml.orig/scenarios/CmlHome.mat and cml/scenarios/CmlHome.mat differ
-Binary files cml.orig/source/.ConvEncode.c.swp and cml/source/.ConvEncode.c.swp differ
 diff -uNr cml.orig/source/ConvEncode.c cml/source/ConvEncode.c
 --- cml.orig/source/ConvEncode.c	2008-05-20 23:35:50.000000000 -0700
 +++ cml/source/ConvEncode.c	2021-12-08 21:20:45.000000000 -0800
