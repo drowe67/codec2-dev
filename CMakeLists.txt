@@ -841,7 +841,7 @@ endif()
         COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/unittest; ./reliable_text_fade.sh 700D -19 8 1 '${CMAKE_CURRENT_BINARY_DIR}/src'")
                                       
   add_test(NAME test_freedv_reliable_text_fade_700E
-        COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/unittest; ./reliable_text_fade.sh 700E -22 9 1 '${CMAKE_CURRENT_BINARY_DIR}/src'")
+        COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/unittest; ./reliable_text_fade.sh 700E -22 8 1 '${CMAKE_CURRENT_BINARY_DIR}/src'")
                           
 if(LPCNET)
     add_test(NAME test_freedv_reliable_text_ideal_2020
