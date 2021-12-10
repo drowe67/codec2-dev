@@ -4,7 +4,7 @@
   AUTHOR......: Bruce Perens
   DATE CREATED: 29 Sep 2010
 
-  Generate header files containing LSP quantisers, runs at compile time.
+  Generate header files containing quantisers, runs at compile time.
 
 \*---------------------------------------------------------------------------*/
 
