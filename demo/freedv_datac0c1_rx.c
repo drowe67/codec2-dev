@@ -39,6 +39,8 @@
 
 #define NBUF 160
 
+int run_receiver(struct freedv *freedv, short buf[], short demod_in[], int *pn, uint8_t bytes_out[]);
+
 int main(int argc, char *argv[]) {
 
     // set up DATAC0 Rx
@@ -59,35 +61,52 @@ int main(int argc, char *argv[]) {
     uint8_t bytes_out_c1[bytes_per_modem_frame_c1];
     short  demod_in_c1[freedv_get_n_max_modem_samples(freedv_c1)];
 
-    size_t n_c0 = 0;
-    size_t n_c1 = 0;
-    size_t c0_frames = 0;
-    size_t c1_frames = 0;
+    // number of samples in demod_in buffer for each Rx
+    int n_c0 = 0;
+    int n_c1 = 0;
+    // number of frames received in each mode
+    int c0_frames = 0;
+    int c1_frames = 0;
+
     short buf[NBUF];
-    size_t nin;
     
     while(fread(buf, sizeof(short), NBUF, stdin) == NBUF) {
-
-        // NBUF new samples into DATAC1 Rx
-        memcpy(&demod_in_c1[n_c1], buf, sizeof(short)*NBUF);
-        n_c1 += NBUF; assert(n_c1 <= freedv_get_n_max_modem_samples(freedv_c1));
-        nin = freedv_nin(freedv_c1);
-        if (n_c1 > nin) {
-            size_t nbytes_out = freedv_rawdatarx(freedv_c1, bytes_out_c1, demod_in_c1);
-            if (nbytes_out) {
-                fprintf(stderr, "DATAC1 frame received!\n");
-                c1_frames++;
-            }
-            // nin samples were read
-            n_c1 -= nin; assert(n_c1 >= 0);
-            memmove(demod_in_c1, &demod_in_c1[nin], sizeof(short)*n_c1);
+        
+        if (run_receiver(freedv_c1, buf, demod_in_c1, &n_c1, bytes_out_c1)) {
+            fprintf(stderr, "DATAC1 frame received!\n");
+            c1_frames++;
+        }
+        
+        if (run_receiver(freedv_c0, buf, demod_in_c0, &n_c0, bytes_out_c0)) {
+            fprintf(stderr, "DATAC0 frame received!\n");
+            c1_frames++;
         }
     }
 
-    fprintf(stderr, "DATAC0 Frames: %ld\n", c0_frames);
-    fprintf(stderr, "DATAC1 Frames: %ld\n", c1_frames);
+    fprintf(stderr, "DATAC0 Frames: %d\n", c0_frames);
+    fprintf(stderr, "DATAC1 Frames: %d\n", c1_frames);
     freedv_close(freedv_c0);
     freedv_close(freedv_c1);
 
     return 0;
+}
+
+int run_receiver(struct freedv *freedv, short buf[], short demod_in[], int *pn, uint8_t bytes_out[]) {
+    int n = *pn;
+    int nbytes_out = 0;
+    int nin;
+    
+    // NBUF new samples into DATAC1 Rx
+    memcpy(&demod_in[n], buf, sizeof(short)*NBUF);
+    n += NBUF; assert(n <= freedv_get_n_max_modem_samples(freedv));
+    nin = freedv_nin(freedv);
+    if (n > nin) {
+        nbytes_out = freedv_rawdatarx(freedv, bytes_out, demod_in);
+        // nin samples were read
+        n -= nin; assert(n >= 0);
+        memmove(demod_in, &demod_in[nin], sizeof(short)*n);
+    }
+
+    *pn = n;
+    return nbytes_out;
 }
