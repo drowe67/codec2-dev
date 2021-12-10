@@ -24,7 +24,7 @@ BURSTS=$2
 MODE=DATAC0
 
 function tx1 {
-    freedv_data_raw_tx ${MODE} /dev/zero - --testframes 1 --bursts ${BURSTS} --delay ${DELAY} | aplay --device="plughw:CARD=CHAT2,DEV=1" -f S16_LE
+    freedv_data_raw_tx ${MODE} /dev/zero - --testframes ${BURSTS} --bursts ${BURSTS} --delay ${DELAY} | aplay --device="plughw:CARD=CHAT2,DEV=1" -f S16_LE
 }
 
 function rx2_background {
