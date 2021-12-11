@@ -1127,21 +1127,21 @@ endif(NOT APPLE)
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
                             head -c $((14*10)) </dev/urandom > binaryIn.bin;
                             ./freedv_data_raw_tx DATAC0 binaryIn.bin - --bursts 10 |
-                            ./freedv_data_raw_rx DATAC0 - binaryOut.bin --framesperburst 1 -v;
+                            ./freedv_data_raw_rx DATAC0 - binaryOut.bin  -v;
                             diff binaryIn.bin binaryOut.bin")
 
      add_test(NAME test_freedv_data_raw_ofdm_datac1_burst_file
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
                             head -c $((510*10)) </dev/urandom > binaryIn.bin;
                             ./freedv_data_raw_tx DATAC1 binaryIn.bin - --bursts 10 |
-                            ./freedv_data_raw_rx DATAC1 - binaryOut.bin --framesperburst 1 -v;
+                            ./freedv_data_raw_rx DATAC1 - binaryOut.bin -v;
                             diff binaryIn.bin binaryOut.bin")
 
      add_test(NAME test_freedv_data_raw_ofdm_datac3_burst_file
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
                             head -c $((126*10)) </dev/urandom > binaryIn.bin;
                             ./freedv_data_raw_tx DATAC3 binaryIn.bin - --bursts 10 |
-                            ./freedv_data_raw_rx DATAC3 - binaryOut.bin --framesperburst 1 -v;
+                            ./freedv_data_raw_rx DATAC3 - binaryOut.bin -v;
                             diff binaryIn.bin binaryOut.bin")
 
      # FSK LDPC default 100 bit/s 2FSK, enough noise for several % raw BER to give
