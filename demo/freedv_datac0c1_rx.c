@@ -4,11 +4,14 @@
   AUTHOR......: David Rowe
   DATE CREATED: Dec 2021
 
-  Demonstrates receiving frames of raw data bytes using the FreeDV API.  Two
-  parallel receivers are running, so we can receive either DATAC0 or DATAC1
-  frames.
+  Demonstrates receiving frames of raw data bytes using the FreeDV
+  API.  Two parallel receivers are running, so we can receive either
+  DATAC0 or DATAC1 frames.  Demonstrates a common use case for HF data
+  - the ability to receive signalling as well as payload data frames.
 
-  See freedv_datac0c1_tx.c for instructions.
+  usage: 
+  cd codec2/build_linux
+  ./demo/freedv_datacc01_tx | ./demo/freedv_datac0c1_rx
   
 \*---------------------------------------------------------------------------*/
 
@@ -69,18 +72,19 @@ int main(int argc, char *argv[]) {
     int c1_frames = 0;
 
     short buf[NBUF];
-    
+
+    // read a fixed buffer from stdin, use that to fill c0 and c1 demod_in buffers
     while(fread(buf, sizeof(short), NBUF, stdin) == NBUF) {
         
+        if (run_receiver(freedv_c0, buf, demod_in_c0, &n_c0, bytes_out_c0)) {
+            fprintf(stderr, "DATAC0 frame received!\n");
+            c0_frames++;
+        }
         if (run_receiver(freedv_c1, buf, demod_in_c1, &n_c1, bytes_out_c1)) {
             fprintf(stderr, "DATAC1 frame received!\n");
             c1_frames++;
         }
         
-        if (run_receiver(freedv_c0, buf, demod_in_c0, &n_c0, bytes_out_c0)) {
-            fprintf(stderr, "DATAC0 frame received!\n");
-            c1_frames++;
-        }
     }
 
     fprintf(stderr, "DATAC0 Frames: %d\n", c0_frames);
