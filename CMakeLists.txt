@@ -1206,6 +1206,14 @@ endif(NOT APPLE)
                             cat binaryIn.bin | ./demo/freedv_datac1_tx | 
                             ./demo/freedv_datac1_rx > binaryOut.bin;
                             diff binaryIn.bin binaryOut.bin")
- 
+
+      # test Rx of two modes in parallel, with AWGN noise and sample clock offsets
+      add_test(NAME test_demo_datac0c1
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR};
+                            ./demo/freedv_datac0c1_tx | 
+                            ./src/cohpsk_ch - - -24 -f 20 --Fs 8000 | 
+                            sox -t .s16 -c 1 -r 8000 - -t .s16 -c 1 -r 8008 - | 
+                            ./demo/freedv_datac0c1_rx")
+           set_tests_properties(test_demo_datac0c1 PROPERTIES PASS_REGULAR_EXPRESSION "DATAC0 Frames: 10 DATAC1 Frames: 10")
 
 endif(UNITTEST)

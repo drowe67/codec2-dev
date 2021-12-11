@@ -34,6 +34,8 @@
 #include "freedv_api.h"
 #include "ofdm_internal.h"
 
+#define FRAMES 10
+
 void send_burst(struct freedv *freedv);
 
 int main(void) {
@@ -42,9 +44,21 @@ int main(void) {
     freedv_c0 = freedv_open(FREEDV_MODE_DATAC0); assert(freedv_c0 != NULL);
     freedv_c1 = freedv_open(FREEDV_MODE_DATAC1); assert(freedv_c1 != NULL);
 
-    for(int b=0; b<10; b++) {
-        send_burst(freedv_c0);
-        send_burst(freedv_c1);
+    // send frames in different modes in random order
+    int c0_frames = 0;
+    int c1_frames = 0;
+    while ((c0_frames < FRAMES) || (c1_frames < FRAMES)) {
+        if (rand() & 1) {
+            if (c0_frames < FRAMES) {
+                send_burst(freedv_c0);
+                c0_frames++;
+            }
+        } else { 
+            if (c1_frames < FRAMES) {
+                send_burst(freedv_c1);
+                c1_frames++;
+            }
+        }
     }
 
     freedv_close(freedv_c0);

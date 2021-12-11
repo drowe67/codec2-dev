@@ -10,9 +10,20 @@
   - the ability to receive signalling as well as payload data frames.
 
   usage: 
+
   cd codec2/build_linux
   ./demo/freedv_datacc01_tx | ./demo/freedv_datac0c1_rx
-  
+
+  Give it a hard time with some channel noise, frequency offset, and sample 
+  clock offsets:
+
+  ./demo/freedv_datac0c1_tx | ./src/cohpsk_ch - - -24 -f 20 --Fs 8000 | 
+  sox -t .s16 -c 1 -r 8000 - -t .s16 -c 1 -r 8008 - | 
+  ./demo/freedv_datac0c1_rx
+
+  Replace the final line with "aplay -f S16" to listen to the
+  simulated Rx signal.
+
 \*---------------------------------------------------------------------------*/
 
 /*
@@ -87,8 +98,8 @@ int main(int argc, char *argv[]) {
         
     }
 
-    fprintf(stderr, "DATAC0 Frames: %d\n", c0_frames);
-    fprintf(stderr, "DATAC1 Frames: %d\n", c1_frames);
+    fprintf(stderr, "DATAC0 Frames: %d DATAC1 Frames: %d\n", c0_frames, c1_frames);
+
     freedv_close(freedv_c0);
     freedv_close(freedv_c1);
 
