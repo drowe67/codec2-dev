@@ -1,6 +1,6 @@
-diff -ruN -x '*~' -x -q cml-orig/CmlStartup.m cml/CmlStartup.m
---- cml-orig/CmlStartup.m	2007-09-08 23:12:26.000000000 +0930
-+++ cml/CmlStartup.m	2018-04-12 16:38:31.966825321 +0930
+diff -uNr cml.orig/CmlStartup.m cml/CmlStartup.m
+--- cml.orig/CmlStartup.m	2007-09-08 23:12:26.000000000 -0700
++++ cml/CmlStartup.m	2021-12-08 20:54:04.000000000 -0800
 @@ -20,7 +20,7 @@
      addpath( strcat( cml_home, '\mex'), ...
          strcat( cml_home, '\mat'), ...
@@ -26,9 +26,9 @@ diff -ruN -x '*~' -x -q cml-orig/CmlStartup.m cml/CmlStartup.m
 -save( save_directory, save_flag, 'cml_home' );
 \ No newline at end of file
 +save( save_directory, save_flag, 'cml_home' );
-diff -ruN -x '*~' -x -q cml-orig/mat/CreateConstellation.m cml/mat/CreateConstellation.m
---- cml-orig/mat/CreateConstellation.m	2007-12-27 21:36:24.000000000 +1030
-+++ cml/mat/CreateConstellation.m	2018-04-15 10:21:35.325168186 +0930
+diff -uNr cml.orig/mat/CreateConstellation.m cml/mat/CreateConstellation.m
+--- cml.orig/mat/CreateConstellation.m	2007-12-27 21:36:24.000000000 -0800
++++ cml/mat/CreateConstellation.m	2021-12-08 20:54:04.000000000 -0800
 @@ -58,7 +58,7 @@
  % Optional argument: Label Type
  if (length(varargin)>=2)
@@ -38,9 +38,9 @@ diff -ruN -x '*~' -x -q cml-orig/mat/CreateConstellation.m cml/mat/CreateConstel
          if (length( label_type ) ~= M )
              error( 'Length of label_type must be M' );
          elseif (sum( sort( label_type ) ~= [0:M-1] ) > 0)
-diff -ruN -x '*~' -x -q cml-orig/mat/InitializeWiMaxLDPC.m cml/mat/InitializeWiMaxLDPC.m
---- cml-orig/mat/InitializeWiMaxLDPC.m	2007-07-21 08:18:04.000000000 +0930
-+++ cml/mat/InitializeWiMaxLDPC.m	2018-04-15 10:19:59.487185664 +0930
+diff -uNr cml.orig/mat/InitializeWiMaxLDPC.m cml/mat/InitializeWiMaxLDPC.m
+--- cml.orig/mat/InitializeWiMaxLDPC.m	2007-07-21 08:18:04.000000000 -0700
++++ cml/mat/InitializeWiMaxLDPC.m	2021-12-08 20:54:04.000000000 -0800
 @@ -134,7 +134,7 @@
              H(cnt1:cnt1+z-1, cnt2:cnt2+z-1)= eye(z);                  
          end
@@ -59,14 +59,218 @@ diff -ruN -x '*~' -x -q cml-orig/mat/InitializeWiMaxLDPC.m cml/mat/InitializeWiM
      P=inv(circshift( eye(z),[0,floor(80*z/z0)]));
  end
  
-diff -ruN -x '*~' -x -q cml-orig/source/matrix.h cml/source/matrix.h
---- cml-orig/source/matrix.h	1970-01-01 09:30:00.000000000 +0930
-+++ cml/source/matrix.h	2018-04-12 16:38:31.966825321 +0930
-@@ -0,0 +1,1 @@
-+#include <mex.h>
-diff -ruN -x '*~' -x -q cml-orig/source/MpDecode.c cml/source/MpDecode.c
---- cml-orig/source/MpDecode.c	2007-08-06 14:44:24.000000000 +0930
-+++ cml/source/MpDecode.c	2018-04-15 07:28:51.092724038 +0930
+diff -uNr cml.orig/source/ConvEncode.c cml/source/ConvEncode.c
+--- cml.orig/source/ConvEncode.c	2008-05-20 23:35:50.000000000 -0700
++++ cml/source/ConvEncode.c	2021-12-08 21:20:45.000000000 -0800
+@@ -65,7 +65,7 @@
+ 	double	*input, *g_array;
+ 	double	*output_p;
+ 	int      DataLength, CodeLength, i, j, index;
+-	int      subs[] = {1,1};
++	long long      subs[] = {1,1};
+ 	int     *g_encoder;
+ 	int		 nn, KK, mm, code_type, max_states;
+ 	double   elm;
+@@ -83,7 +83,7 @@
+ 		DataLength = mxGetN(INPUT); /* number of data bits */
+ 
+ 		/* cast the input into a vector of integers */
+-		input_int = calloc( DataLength, sizeof(int) );
++		input_int = (int*)calloc( DataLength, sizeof(int) );
+ 		for (i=0;i<DataLength;i++)
+ 			input_int[i] = (int) input[i];
+ 
+@@ -106,7 +106,7 @@
+ 			CodeLength = nn*DataLength;
+ 			
+ 		/* Convert code polynomial to binary */
+-		g_encoder = calloc(nn, sizeof(int) );
++		g_encoder = (int*)calloc(nn, sizeof(int) );
+ 
+ 		for (i = 0;i<nn;i++) {
+ 			subs[0] = i;
+@@ -126,14 +126,14 @@
+ 	/* create the output vector */		
+ 	OUTPUT = mxCreateDoubleMatrix(1, CodeLength, mxREAL );
+ 	output_p = mxGetPr(OUTPUT);	
+-	output_int = calloc( CodeLength, sizeof( int ) );
++	output_int = (int*)calloc( CodeLength, sizeof( int ) );
+ 
+ 	/* create appropriate transition matrices */
+-	out0 = calloc( max_states, sizeof(int) );
+-	out1 = calloc( max_states, sizeof(int) );
+-	state0 = calloc( max_states, sizeof(int) );
+-	state1 = calloc( max_states, sizeof(int) );
+-	tail = calloc( max_states, sizeof(int) );
++	out0 = (int*)calloc( max_states, sizeof(int) );
++	out1 = (int*)calloc( max_states, sizeof(int) );
++	state0 = (int*)calloc( max_states, sizeof(int) );
++	state1 = (int*)calloc( max_states, sizeof(int) );
++	tail = (int*)calloc( max_states, sizeof(int) );
+ 
+ 	if ( code_type ) {
+ 		nsc_transit( out0, state0, 0, g_encoder, KK, nn );
+diff -uNr cml.orig/source/CreateCcsdsInterleaver.c cml/source/CreateCcsdsInterleaver.c
+--- cml.orig/source/CreateCcsdsInterleaver.c	2006-06-29 22:00:08.000000000 -0700
++++ cml/source/CreateCcsdsInterleaver.c	2021-12-08 21:22:39.000000000 -0800
+@@ -72,7 +72,7 @@
+ 
+ 	/* Create the interleaver */
+ 	/* printf( "\nMaking interleaver\n" ); */
+-	alpha_code = calloc( DataLength, sizeof(int) );
++	alpha_code = (int*)calloc( DataLength, sizeof(int) );
+ 
+ 	CreateCcsdsInterleaver( DataLength, alpha_code );
+ 	/* printf( "Done making the interleaver\n" );
+diff -uNr cml.orig/source/CreateSRandomInterleaver.c cml/source/CreateSRandomInterleaver.c
+--- cml.orig/source/CreateSRandomInterleaver.c	2006-06-29 22:00:18.000000000 -0700
++++ cml/source/CreateSRandomInterleaver.c	2021-12-08 21:21:11.000000000 -0800
+@@ -73,7 +73,7 @@
+ 
+ 	/* Create the interleaver */
+ 	/* printf( "\nMaking interleaver\n" ); */
+-	alpha_code = calloc( DataLength, sizeof(int) );
++	alpha_code = (int*)calloc( DataLength, sizeof(int) );
+ 
+ 	CreateSRandomInterleaver( DataLength, s_value, alpha_code );
+ 	/* printf( "Done making the interleaver\n" );
+diff -uNr cml.orig/source/CreateUmtsInterleaver.c cml/source/CreateUmtsInterleaver.c
+--- cml.orig/source/CreateUmtsInterleaver.c	2007-01-28 20:27:52.000000000 -0800
++++ cml/source/CreateUmtsInterleaver.c	2021-12-08 21:22:20.000000000 -0800
+@@ -72,8 +72,8 @@
+ 		mexErrMsgTxt("CreateUmtsInterleaver: Input must be between 40 and 5114");
+ 
+ 	/* Create the interleaver */
+-	alpha_code = calloc( DataLength, sizeof(int) );
+-	interleaver_input = calloc( DataLength, sizeof(int) );
++	alpha_code = (int*)calloc( DataLength, sizeof(int) );
++	interleaver_input = (int*)calloc( DataLength, sizeof(int) );
+ 	for (i=0;i<DataLength;i++)
+ 		interleaver_input[i] = i;
+ 	CreateUmtsInterleaver( DataLength, interleaver_input, alpha_code );
+diff -uNr cml.orig/source/Demod2D.c cml/source/Demod2D.c
+--- cml.orig/source/Demod2D.c	2006-08-14 17:31:16.000000000 -0700
++++ cml/source/Demod2D.c	2021-12-08 21:33:36.000000000 -0800
+@@ -70,7 +70,7 @@
+   number_symbols = mxGetN(prhs[0]);
+   yr = mxGetPr(prhs[0]);
+   if(!mxIsComplex(prhs[0]) )
+-	  yi = calloc( number_symbols, sizeof(double) );
++	  yi = (double*)calloc( number_symbols, sizeof(double) );
+   else
+ 	  yi = mxGetPi(prhs[0]);  
+ 
+@@ -83,7 +83,7 @@
+ 
+   Sr = mxGetPr(prhs[1]);
+   if (!mxIsComplex(prhs[1]) )
+-	  Si = calloc( M, sizeof(double) );
++	  Si = (double*)calloc( M, sizeof(double) );
+   else
+ 	  Si = mxGetPi(prhs[1]);
+ 
+@@ -95,14 +95,14 @@
+ 	  
+ 	  ar = mxGetPr(prhs[3]);
+ 	  if (!mxIsComplex(prhs[3]) ) 
+-		  ai = calloc( number_symbols, sizeof(double) );
++		  ai = (double*)calloc( number_symbols, sizeof(double) );
+ 	  else
+ 		  ai = mxGetPi(prhs[3]);
+   } else {
+-	  ar = calloc( number_symbols, sizeof(double) );
++	  ar = (double*)calloc( number_symbols, sizeof(double) );
+ 	  for (i=0;i<number_symbols;i++)
+ 		  ar[i] = 1; /* assume AWGN if no fading process specified */
+-	  ai = calloc( number_symbols, sizeof(double) );
++	  ai = (double*)calloc( number_symbols, sizeof(double) );
+   }
+ 
+   plhs[0]=mxCreateDoubleMatrix(M, number_symbols, mxREAL);
+diff -uNr cml.orig/source/DemodFSK.c cml/source/DemodFSK.c
+--- cml.orig/source/DemodFSK.c	2006-08-14 17:30:58.000000000 -0700
++++ cml/source/DemodFSK.c	2021-12-08 21:32:37.000000000 -0800
+@@ -139,7 +139,7 @@
+   M = mxGetM(prhs[0]);
+ 
+   /* real part of the received symbols */
+-  yr_float = calloc( number_symbols*M, sizeof(float) );
++  yr_float = (float*)calloc( number_symbols*M, sizeof(float) );
+   yr = mxGetPr(prhs[0]);
+ 
+   /* cast to float */
+@@ -150,7 +150,7 @@
+   }
+ 
+   /* imaginary part of the received symbols */
+-  yi_float = calloc( number_symbols*M, sizeof(float) );
++  yi_float = (float*)calloc( number_symbols*M, sizeof(float) );
+ 
+   if(mxIsComplex(prhs[0]) ) {
+ 	  yi = mxGetPi(prhs[0]);
+@@ -174,8 +174,8 @@
+ 	  csi_flag = 0;
+ 
+   /* initialize the fading amplitudes */ 
+-  ar_float = calloc( number_symbols, sizeof(float) );
+-  ai_float = calloc( number_symbols, sizeof(float) );
++  ar_float = (float*)calloc( number_symbols, sizeof(float) );
++  ai_float = (float*)calloc( number_symbols, sizeof(float) );
+ 
+   /* fourth input (optional) are the fading amplitudes */ 
+   if(nrhs>3) {
+@@ -204,7 +204,7 @@
+   }
+ 
+   /* intialize the output */
+-  output_float = calloc( number_symbols*M, sizeof(float) );
++  output_float = (float*)calloc( number_symbols*M, sizeof(float) );
+   plhs[0]=mxCreateDoubleMatrix(M, number_symbols, mxREAL);
+   output = mxGetPr( plhs[0] );
+ 
+diff -uNr cml.orig/source/LdpcEncode.c cml/source/LdpcEncode.c
+--- cml.orig/source/LdpcEncode.c	2007-07-10 22:32:54.000000000 -0700
++++ cml/source/LdpcEncode.c	2021-12-08 21:23:12.000000000 -0800
+@@ -147,7 +147,7 @@
+ 	
+    /* default values */
+    shift=0;
+-   P= (int*)calloc(shift,sizeof(int));
++   P= (double*)calloc(shift,sizeof(int));
+ 
+ 	/* Assign the variables to corresp. mlab pointers */
+ 	u=mxGetPr(prhs[0]);
+@@ -169,4 +169,4 @@
+ 	/* create output m array */
+ 	c_in=mxGetPr(plhs[0]);
+ 	encode(u,H_rows,c_in,nldpc,kldpc,mldpc, wid_Hrows,P,shift);
+-}
+\ No newline at end of file
++}
+diff -uNr cml.orig/source/Modulate.c cml/source/Modulate.c
+--- cml.orig/source/Modulate.c	2006-08-14 17:30:38.000000000 -0700
++++ cml/source/Modulate.c	2021-12-08 21:31:25.000000000 -0800
+@@ -86,7 +86,7 @@
+ 
+   /* if not complex, set imagainary part to zero */
+   if (!mxIsComplex(prhs[1]) )
+-	  Si = calloc( M*K, sizeof(double) );
++	  Si = (double*)calloc( M*K, sizeof(double) );
+   else
+ 	  Si = mxGetPi(prhs[1]);
+ 
+@@ -103,7 +103,7 @@
+   number_symbols = number_bits/bits_per_symbol + (number_bits%bits_per_symbol>0);
+ 
+   /* read in the input data and cast to int */
+-  data_int = calloc( number_symbols*bits_per_symbol, sizeof(int) );
++  data_int = (int*)calloc( number_symbols*bits_per_symbol, sizeof(int) );
+   for (i=0;i<number_bits;i++) 
+ 	  data_int[i] = input[i];
+ 
+diff -uNr cml.orig/source/MpDecode.c cml/source/MpDecode.c
+--- cml.orig/source/MpDecode.c	2007-08-06 14:44:24.000000000 -0700
++++ cml/source/MpDecode.c	2021-12-08 21:25:55.000000000 -0800
 @@ -53,6 +53,7 @@
  #include <mex.h>
  #include <matrix.h>
@@ -117,6 +321,98 @@ diff -ruN -x '*~' -x -q cml-orig/source/MpDecode.c cml/source/MpDecode.c
  }
  
  /* main function that interfaces with MATLAB */
+@@ -459,7 +470,7 @@
+ 	} 
+ 	
+ 	/* initialize c-node structures */
+-    c_nodes = calloc( NumberParityBits, sizeof( struct c_node ) );
++    c_nodes = (struct c_node*)calloc( NumberParityBits, sizeof( struct c_node ) );
+ 	
+ 	/* first determine the degree of each c-node */
+ 	
+@@ -509,9 +520,9 @@
+ 	   if (shift ==0){
+ 		for (i=0;i<NumberParityBits;i++) {
+ 		    /* now that we know the size, we can dynamically allocate memory */
+-			c_nodes[i].index =  calloc( c_nodes[i].degree, sizeof( int ) );
+-			c_nodes[i].message =calloc( c_nodes[i].degree, sizeof( float ) );
+-			c_nodes[i].socket = calloc( c_nodes[i].degree, sizeof( int ) );
++			c_nodes[i].index = (int*)calloc( c_nodes[i].degree, sizeof( int ) );
++			c_nodes[i].message = (float*)calloc( c_nodes[i].degree, sizeof( float ) );
++			c_nodes[i].socket = (int*)calloc( c_nodes[i].degree, sizeof( int ) );
+ 			
+ 			for (j=0;j<c_nodes[i].degree-2;j++) {
+ 			     c_nodes[i].index[j] = (int) (H_rows[i+j*NumberParityBits] - 1);
+@@ -535,9 +546,9 @@
+ 		   for (i=0;i<(NumberParityBits/shift);i++){		  
+ 		  
+ 		        for (k =0;k<shift;k++){
+-		            c_nodes[cnt].index =  calloc( c_nodes[cnt].degree, sizeof( int ) );
+-	 		        c_nodes[cnt].message =calloc( c_nodes[cnt].degree, sizeof( float ) );
+-			        c_nodes[cnt].socket = calloc( c_nodes[cnt].degree, sizeof( int ) );
++		            c_nodes[cnt].index = (int*)calloc( c_nodes[cnt].degree, sizeof( int ) );
++	 		    c_nodes[cnt].message = (float*)calloc( c_nodes[cnt].degree, sizeof( float ) );
++			    c_nodes[cnt].socket = (int*)calloc( c_nodes[cnt].degree, sizeof( int ) );
+ 			 		   
+ 			  	for (j=0;j<c_nodes[cnt].degree-2;j++) {
+ 			         c_nodes[cnt].index[j] = (int) (H_rows[cnt+j*NumberParityBits] - 1);
+@@ -563,9 +574,9 @@
+ 	} else {
+ 		for (i=0;i<NumberParityBits;i++) {
+ 			/* now that we know the size, we can dynamically allocate memory */
+-			c_nodes[i].index =  calloc( c_nodes[i].degree, sizeof( int ) );
+-			c_nodes[i].message =calloc( c_nodes[i].degree, sizeof( float ) );
+-			c_nodes[i].socket = calloc( c_nodes[i].degree, sizeof( int ) );
++			c_nodes[i].index = (int*)calloc( c_nodes[i].degree, sizeof( int ) );
++			c_nodes[i].message = (float*)calloc( c_nodes[i].degree, sizeof( float ) );
++			c_nodes[i].socket = (int*)calloc( c_nodes[i].degree, sizeof( int ) );
+ 			for (j=0;j<c_nodes[i].degree;j++){
+ 			    c_nodes[i].index[j] = (int) (H_rows[i+j*NumberParityBits] - 1);
+ 			}			
+@@ -573,7 +584,7 @@
+ 	}	
+ 
+ 	/* initialize v-node structures */
+-	v_nodes = calloc( CodeLength, sizeof( struct v_node));
++	v_nodes = (struct v_node*)calloc( CodeLength, sizeof( struct v_node));
+ 	
+ 	/* determine degree of each v-node */
+ 	for(i=0;i<(CodeLength-NumberParityBits+shift);i++){
+@@ -613,10 +624,10 @@
+ 
+ 	for (i=0;i<CodeLength;i++) {
+ 		/* allocate memory according to the degree of the v-node */
+-		v_nodes[i].index = calloc( v_nodes[i].degree, sizeof( int ) );
+-		v_nodes[i].message = calloc( v_nodes[i].degree, sizeof( float ) );
+-		v_nodes[i].sign = calloc( v_nodes[i].degree, sizeof( int ) );
+-		v_nodes[i].socket = calloc( v_nodes[i].degree, sizeof( int ) );
++		v_nodes[i].index = (int*)calloc( v_nodes[i].degree, sizeof( int ) );
++		v_nodes[i].message = (float*)calloc( v_nodes[i].degree, sizeof( float ) );
++		v_nodes[i].sign = (int*)calloc( v_nodes[i].degree, sizeof( int ) );
++		v_nodes[i].socket = (int*)calloc( v_nodes[i].degree, sizeof( int ) );
+ 		
+ 		/* index tells which c-nodes this v-node is connected to */
+ 	  	 v_nodes[i].initial_value = input[i];
+@@ -684,7 +695,7 @@
+ 	}  
+ 	
+ 	DataLength = CodeLength - NumberParityBits;
+-	data_int = calloc( DataLength, sizeof(int) );
++	data_int = (int*)calloc( DataLength, sizeof(int) );
+ 	
+ 	if (nrhs > 7 ) {
+ 		/* next input is the data */
+@@ -704,8 +715,8 @@
+ 	output_p = mxGetPr(OUTPUT);	
+ 
+ 	/* Decode */
+-	DecodedBits = calloc( max_iter*CodeLength, sizeof( int ) );
+-	BitErrors = calloc( max_iter, sizeof(int) );
++	DecodedBits = (int*)calloc( max_iter*CodeLength, sizeof( int ) );
++	BitErrors = (int*)calloc( max_iter, sizeof(int) );
+ 
+     /* Call function to do the actual decoding */
+ 	if ( dec_type == 1) {
 @@ -765,4 +776,4 @@
  	free( v_nodes );
  	
@@ -124,3 +420,270 @@ diff -ruN -x '*~' -x -q cml-orig/source/MpDecode.c cml/source/MpDecode.c
 -}
 \ No newline at end of file
 +}
+diff -uNr cml.orig/source/SisoDecode.c cml/source/SisoDecode.c
+--- cml.orig/source/SisoDecode.c	2006-01-11 20:44:04.000000000 -0800
++++ cml/source/SisoDecode.c	2021-12-08 21:28:14.000000000 -0800
+@@ -78,7 +78,7 @@
+ 	double	*input_u, *input_c, *g_array; /* input arrays */
+ 	double  *output_u_p, *output_c_p; /* output arrays */
+ 	int      DataLength, CodeLength, i, j, index;
+-	int      subs[] = {1,1};
++	long long      subs[] = {1,1};
+ 	int     *g_encoder;
+ 	int		 nn, KK, mm, max_states, code_type, dec_type;
+ 	double   elm;
+@@ -113,16 +113,16 @@
+ 			mexErrMsgTxt( "SisoDecode: Length of input_u and input_c don't agree" );
+ 
+ 		/* convert the inputs into float */			
+-		input_u_float = calloc( DataLength, sizeof(float) );
++		input_u_float = (float*)calloc( DataLength, sizeof(float) );
+ 		for (i=0;i<DataLength;i++)
+ 			input_u_float[i] = input_u[i];
+ 		
+-		input_c_float = calloc( CodeLength, sizeof(float) );
++		input_c_float = (float*)calloc( CodeLength, sizeof(float) );
+ 		for (i=0;i<CodeLength;i++)
+ 			input_c_float[i] = input_c[i];
+ 
+ 		/* Convert code polynomial to binary */
+-		g_encoder = calloc(nn, sizeof(int) );
++		g_encoder = (int*)calloc(nn, sizeof(int) );
+ 
+ 		for (i = 0;i<nn;i++) {
+ 			subs[0] = i;
+@@ -153,17 +153,17 @@
+ 	/* the outputs */		
+ 	OUTPUT_U = mxCreateDoubleMatrix(1, DataLength, mxREAL );
+ 	output_u_p = mxGetPr(OUTPUT_U);	
+-	output_u_float = calloc( DataLength, sizeof(float) );
++	output_u_float = (float*)calloc( DataLength, sizeof(float) );
+ 	
+ 	OUTPUT_C = mxCreateDoubleMatrix(1, CodeLength, mxREAL );
+ 	output_c_p = mxGetPr(OUTPUT_C);	
+-	output_c_float = calloc( CodeLength, sizeof(float) );
++	output_c_float = (float*)calloc( CodeLength, sizeof(float) );
+ 
+ 	/* create appropriate transition matrices */
+-	out0 = calloc( max_states, sizeof(int) );
+-	out1 = calloc( max_states, sizeof(int) );
+-	state0 = calloc( max_states, sizeof(int) );
+-	state1 = calloc( max_states, sizeof(int) );
++	out0 = (int*)calloc( max_states, sizeof(int) );
++	out1 = (int*)calloc( max_states, sizeof(int) );
++	state0 = (int*)calloc( max_states, sizeof(int) );
++	state1 = (int*)calloc( max_states, sizeof(int) );
+ 
+ 	if ( code_type ) {
+ 		nsc_transit( out0, state0, 0, g_encoder, KK, nn );
+diff -uNr cml.orig/source/Somap.c cml/source/Somap.c
+--- cml.orig/source/Somap.c	2006-08-14 17:30:22.000000000 -0700
++++ cml/source/Somap.c	2021-12-08 21:28:54.000000000 -0800
+@@ -114,9 +114,9 @@
+ 	DataLength = m*NumberSymbols; /* total number of bits */
+ 
+ 	/* allocate memory */
+-	den = calloc( m, sizeof(float) );
+-	num = calloc( m, sizeof(float) );
+-	llr = calloc( DataLength, sizeof(float) );  /* llr input defaults to all-zeros */
++	den = (float*)calloc( m, sizeof(float) );
++	num = (float*)calloc( m, sizeof(float) );
++	llr = (float*)calloc( DataLength, sizeof(float) );  /* llr input defaults to all-zeros */
+ 
+ 	if (nrhs > 2) {
+ 		/* third (optional) input is the llr
+diff -uNr cml.orig/source/ViterbiDecode.c cml/source/ViterbiDecode.c
+--- cml.orig/source/ViterbiDecode.c	2008-05-22 09:45:16.000000000 -0700
++++ cml/source/ViterbiDecode.c	2021-12-08 21:30:49.000000000 -0800
+@@ -69,7 +69,7 @@
+ 	double	*input_c, *g_array; /* input arrays */
+ 	double  *output_u_p; /* output arrays */
+ 	int      DataLength, CodeLength, i, j, index, depth;
+-	int      subs[] = {1,1};
++	long long      subs[] = {1,1};
+ 	int     *g_encoder;
+ 	int		 nn, KK, mm, max_states, code_type;
+ 	double   elm;
+@@ -120,12 +120,12 @@
+ 		}
+ 
+ 		/* convert the input into float */			
+-		input_c_float = calloc( CodeLength, sizeof(float) );
++		input_c_float = (float*)calloc( CodeLength, sizeof(float) );
+ 		for (i=0;i<CodeLength;i++)
+ 			input_c_float[i] = input_c[i];
+ 
+ 		/* Convert code polynomial to binary */
+-		g_encoder = calloc(nn, sizeof(int) );
++		g_encoder = (int*)calloc(nn, sizeof(int) );
+ 
+ 		for (i = 0;i<nn;i++) {
+ 			subs[0] = i;
+@@ -148,13 +148,13 @@
+ 	/* the outputs */		
+ 	OUTPUT_U = mxCreateDoubleMatrix(1, DataLength, mxREAL );
+ 	output_u_p = mxGetPr(OUTPUT_U);	
+-	output_u_int = calloc( DataLength, sizeof(int) );
++	output_u_int = (int*)calloc( DataLength, sizeof(int) );
+ 	
+ 	/* create appropriate transition matrices */
+-	out0 = calloc( max_states, sizeof(int) );
+-	out1 = calloc( max_states, sizeof(int) );
+-	state0 = calloc( max_states, sizeof(int) );
+-	state1 = calloc( max_states, sizeof(int) );
++	out0 = (int*)calloc( max_states, sizeof(int) );
++	out1 = (int*)calloc( max_states, sizeof(int) );
++	state0 = (int*)calloc( max_states, sizeof(int) );
++	state1 = (int*)calloc( max_states, sizeof(int) );
+ 
+ 	if ( code_type ) {
+ 		nsc_transit( out0, state0, 0, g_encoder, KK, nn );
+diff -uNr cml.orig/source/include/convolutional.h cml/source/include/convolutional.h
+--- cml.orig/source/include/convolutional.h	2008-05-22 09:39:54.000000000 -0700
++++ cml/source/include/convolutional.h	2021-12-08 21:19:37.000000000 -0800
+@@ -271,7 +271,7 @@
+ 	  }
+   }
+ 
+-  bin_vec = calloc( nn, sizeof(int) );
++  bin_vec = (int*)calloc( nn, sizeof(int) );
+ 
+   /* encode data bits one bit at a time */
+   for (i=0;i<LL;i++) {  
+@@ -409,12 +409,12 @@
+ 	number_symbols = 1 << nn;	    /* 2^nn */
+ 	
+ 	/* dynamically allocate memory */ 
+-	prev_section = calloc( states, sizeof(float) );
+-	next_section = calloc( states, sizeof(float) );
+-	prev_bit = calloc( states*(LL+mm), sizeof(int) );
+-	prev_state = calloc( states*(LL+mm), sizeof(int) );
+-	rec_array = calloc( nn, sizeof(float) );
+-	metric_c = calloc( number_symbols, sizeof(float) );
++	prev_section = (float*)calloc( states, sizeof(float) );
++	next_section = (float*)calloc( states, sizeof(float) );
++	prev_bit = (int*)calloc( states*(LL+mm), sizeof(int) );
++	prev_state = (int*)calloc( states*(LL+mm), sizeof(int) );
++	rec_array = (float*)calloc( nn, sizeof(float) );
++	metric_c = (float*)calloc( number_symbols, sizeof(float) );
+ 	
+ 	/* initialize trellis */
+ 	for (state=0;state<states;state++) {
+@@ -541,12 +541,12 @@
+ 	number_symbols = 1 << nn;	    /* 2^nn */
+ 	
+ 	/* dynamically allocate memory */ 
+-	prev_section = calloc( states, sizeof(float) );
+-	next_section = calloc( states, sizeof(float) );
+-	prev_bit = calloc( states*(LL+depth), sizeof(int) );
+-	prev_state = calloc( states*(LL+depth), sizeof(int) );
+-	rec_array = calloc( nn, sizeof(float) );
+-	metric_c = calloc( number_symbols, sizeof(float) );
++	prev_section = (float*)calloc( states, sizeof(float) );
++	next_section = (float*)calloc( states, sizeof(float) );
++	prev_bit = (int*)calloc( states*(LL+depth), sizeof(int) );
++	prev_state = (int*)calloc( states*(LL+depth), sizeof(int) );
++	rec_array = (float*)calloc( nn, sizeof(float) );
++	metric_c = (float*)calloc( number_symbols, sizeof(float) );
+ 	
+ 	/* initialize trellis */
+ 	for (state=0;state<states;state++) {
+@@ -634,4 +634,4 @@
+ 	free(rec_array);
+ 	free(metric_c); 
+ 	
+-}
+\ No newline at end of file
++}
+diff -uNr cml.orig/source/include/interleaver.h cml/source/include/interleaver.h
+--- cml.orig/source/include/interleaver.h	2008-04-15 16:53:44.000000000 -0700
++++ cml/source/include/interleaver.h	2021-12-08 21:21:55.000000000 -0800
+@@ -195,9 +195,9 @@
+ 	}
+ 
+ 	/* Step (3): Stuff the bits into a rectangular matrix */
+-	Matrix = calloc( RR*CC, sizeof( int ) );
+-	InterMatrix = calloc( RR*CC, sizeof( int ) );
+-	IntraMatrix = calloc( RR*CC, sizeof( int ) );
++	Matrix = (int*)calloc( RR*CC, sizeof( int ) );
++	InterMatrix = (int*)calloc( RR*CC, sizeof( int ) );
++	IntraMatrix = (int*)calloc( RR*CC, sizeof( int ) );
+ 
+ 	index = 0;
+ 	for( i=0; i<RR; i++ ) {
+@@ -213,7 +213,7 @@
+ 	}
+ 
+ 	/* Step (4): Construct base sequence for intra-row permutations */
+-	s = calloc( pValue-1, sizeof( int) );
++	s = (int*)calloc( pValue-1, sizeof( int) );
+ 	s[0] = 1;
+ 	
+ 	for (j=1;j<pValue-1;j++) {
+@@ -222,7 +222,7 @@
+ 	}
+ 
+ 	/* Step (5): Construct q-sequence --- this is a little confusing */
+-	q = calloc( RR, sizeof( int ) );
++	q = (int*)calloc( RR, sizeof( int ) );
+ 	q[0] = 1;
+ 
+ 	index = 0;
+@@ -237,7 +237,7 @@
+ 	}
+ 
+ 	/* Step (6): Permute the q-sequence to make the r-sequence */
+-	r = calloc( RR, sizeof( int ) );
++	r = (int*)calloc( RR, sizeof( int ) );
+ 	if ( RR == 5 ) {
+ 		for (i=0;i<RR;i++) {
+ 			r[ T5[i] ] = q[i];            
+@@ -325,4 +325,4 @@
+ 	free( r );
+ 
+ }
+-	
+\ No newline at end of file
++	
+diff -uNr cml.orig/source/include/siso.h cml/source/include/siso.h
+--- cml.orig/source/include/siso.h	2006-03-14 23:56:50.000000000 -0800
++++ cml/source/include/siso.h	2021-12-08 21:26:54.000000000 -0800
+@@ -98,15 +98,15 @@
+ 	number_symbols = 1 << nn;	    /* 2^nn */
+ 	
+ 	/* initialize internal arrays */
+-	alpha = calloc( max_states, sizeof(float) );
+-	alpha_prime = calloc( max_states, sizeof(float) );
+-	beta = calloc( max_states*(LL+KK), sizeof(float) );
++	alpha = (float*)calloc( max_states, sizeof(float) );
++	alpha_prime = (float*)calloc( max_states, sizeof(float) );
++	beta = (float*)calloc( max_states*(LL+KK), sizeof(float) );
+ 	/* following has been changed on 3-14-06 */
+-	/* metric_c = calloc( number_symbols, sizeof(int) ); */
+-	metric_c = calloc( number_symbols, sizeof(float) );
+-	rec_array = calloc( nn, sizeof(float) );
+-	num_llr_c = calloc( nn, sizeof(float) );
+-	den_llr_c = calloc( nn, sizeof(float) );
++	/* metric_c = (int*)calloc( number_symbols, sizeof(int) ); */
++	metric_c = (float*)calloc( number_symbols, sizeof(float) );
++	rec_array = (float*)calloc( nn, sizeof(float) );
++	num_llr_c = (float*)calloc( nn, sizeof(float) );
++	den_llr_c = (float*)calloc( nn, sizeof(float) );
+ 
+ 	/* initialize alphas */
+ 	for (state=1;state<max_states;state++)
+diff -uNr cml.orig/source/make.m cml/source/make.m
+--- cml.orig/source/make.m	2006-08-14 17:28:52.000000000 -0700
++++ cml/source/make.m	2021-12-08 21:12:14.000000000 -0800
+@@ -76,4 +76,4 @@
+     mex -output ../mex/Modulate Modulate.c
+     mex -output ../mex/DemodFSK DemodFSK.c
+     mex -output ../mex/Demod2D Demod2D.c
+-end
+\ No newline at end of file
++end
+diff -uNr cml.orig/source/matrix.h cml/source/matrix.h
+--- cml.orig/source/matrix.h	1969-12-31 16:00:00.000000000 -0800
++++ cml/source/matrix.h	2021-12-08 20:54:04.000000000 -0800
+@@ -0,0 +1 @@
++#include <mex.h>
