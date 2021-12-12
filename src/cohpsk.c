@@ -962,7 +962,7 @@ void rate_Fs_rx_processing(struct COHPSK *coh, COMP ch_symb[][COHPSK_NC*ND], COM
     int   r, c, i, ch_fdm_frame_index;
     COMP  rx_fdm_frame_bb[COHPSK_M+COHPSK_M/P];
     COMP  rx_baseband[COHPSK_NC*ND][COHPSK_M+COHPSK_M/P];
-    COMP  rx_filt[COHPSK_NC*ND][P+1];
+    COMP  rx_filt[COHPSK_NC*(ND+1)][P+1];
     float env[NT*P], rx_timing;
     COMP  rx_onesym[COHPSK_NC*ND];
     float beta, g;
