@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <getopt.h>
 #include <errno.h>
+#include <inttypes.h>
 
 /*  Declarations */
 
@@ -126,7 +127,7 @@ int main(int argc, char *argv[]) {
         uint64_t err = llabs(data1 - data2);
         if (err > tol) {
             errors ++;
-            printf("%d %lld %lld\n", count, data1, data2);
+            printf("%d %" PRId64 " %" PRId64 "\n", count, data1, data2);
 	    if (numerrorstoexit != -1)
 	        if (errors > numerrorstoexit) {
 		    printf("reached errors: %d, bailing!", numerrorstoexit);
