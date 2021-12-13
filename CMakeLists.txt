@@ -152,7 +152,6 @@ endif()
 #
 option(BUILD_SHARED_LIBS
     "Build shared library. Set to OFF for static library." ON)
-# Unittest should be on for dev builds and off for releases.
 option(UNITTEST "Build unittest binaries." OFF)
 option(INSTALL_EXAMPLES "Install example code." OFF)
 if(INSTALL_EXAMPLES)
@@ -513,15 +512,15 @@ if(UNITTEST)
 
     add_test(NAME test_OFDM_modem_fading_BER
              COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/unittest;
-                            PATH=$PATH:${CMAKE_CURRENT_BINARY_DIR}/src ./ofdm_fade.sh")
+                            PATH=$PATH:${CMAKE_CURRENT_BINARY_DIR}/src ./ofdm_fade.sh ${CMAKE_CURRENT_BINARY_DIR}/unittest")
 
     add_test(NAME test_OFDM_modem_phase_est_bw
              COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/unittest;
-                            PATH=$PATH:${CMAKE_CURRENT_BINARY_DIR}/src ./ofdm_phase_est_bw.sh")
+                            PATH=$PATH:${CMAKE_CURRENT_BINARY_DIR}/src ./ofdm_phase_est_bw.sh ${CMAKE_CURRENT_BINARY_DIR}/unittest")
 
     add_test(NAME test_OFDM_modem_fading_DPSK_BER
              COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/unittest;
-                            PATH=$PATH:${CMAKE_CURRENT_BINARY_DIR}/src ./ofdm_fade_dpsk.sh")
+                            PATH=$PATH:${CMAKE_CURRENT_BINARY_DIR}/src ./ofdm_fade_dpsk.sh ${CMAKE_CURRENT_BINARY_DIR}/unittest")
 
     add_test(NAME test_OFDM_modem_time_sync_700D
              COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/unittest;

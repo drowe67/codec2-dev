@@ -3,18 +3,8 @@
 # David Sep 2019
 # Tests 2020 OFDM modem fading channel performance in DPSK mode, using a simulated faster (2Hz) high SNR fading channel
 
-RAW=$PWD/../raw
+RAW=$1
 results=$(mktemp)
-
-# generate fading file
-if [ ! -f ../raw/faster_fading_samples.float ]; then
-    echo "Generating fading files ......"
-    cmd='cd ../octave; pkg load signal; cohpsk_ch_fading("../raw/faster_fading_samples.float", 8000, 2.0, 8000*60)'
-    octave --no-gui -qf --eval "$cmd"
-    [ ! $? -eq 0 ] && { echo "octave failed to run correctly .... exiting"; exit 1; }
-fi
-
-pwd
 
 # Coded BER should be < 1% for this test
 ofdm_mod --in /dev/zero --testframes 300 --mode 2020 --ldpc --verbose 1 -p 312 --dpsk | \

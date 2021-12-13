@@ -105,3 +105,14 @@ ExternalProject_Add(cml
    BUILD_COMMAND cd ${CMAKE_CURRENT_BINARY_DIR}/../cml/source && CC="${CMAKE_CXX_COMPILER}" CFLAGS="-std=c++11" ${OCTAVE_CMD} -qf --eval "make"
    INSTALL_COMMAND true # No installation required
 )
+
+# Create fading files (used for channel simulation) as part of unit test setup
+add_custom_target(fade_files ALL
+  DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/fast_fading_samples.float
+  DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/faster_fading_samples.float
+  )
+add_custom_command(
+  OUTPUT  ${CMAKE_CURRENT_BINARY_DIR}/fast_fading_samples.float
+  OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/faster_fading_samples.float
+  COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR} && ./fade_files.sh ${CMAKE_CURRENT_BINARY_DIR}
+)
