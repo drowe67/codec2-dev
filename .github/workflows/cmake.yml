@@ -53,7 +53,7 @@ jobs:
       shell: bash
       # Second pass build of codec2 with LPCNet 
       run: |
-           cmake -DLPCNET_BUILD_DIR=$HOME/LPCNet/build_linux -DUNITTEST=1$GITHUB_WORKSPACE
+           cmake -DLPCNET_BUILD_DIR=$HOME/LPCNet/build_linux -DUNITTEST=1 $GITHUB_WORKSPACE
            make -j4
       
     - name: Run ctests
