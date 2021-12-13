@@ -158,7 +158,7 @@ end
 
 % Choose simulation here ---------------------------------------------------
 
-init_cml('~/cml/');
+init_cml(getenv("CMAKE_CML_PATH"));
 load H_256_512_4.mat; HRA=H;
 more off;
 

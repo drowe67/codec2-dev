@@ -28,7 +28,7 @@ function ldpc_gen_c_h_file(varargin)
 
     % Assuming cml has been installed in the users' home folder, which is the
     % default install location
-    init_cml('~/cml/');
+    init_cml(getenv("CMAKE_CML_PATH"));
 
     if nargin == 0
         printf("Error - you must specify a file containing the LDPC codes (e.g. HRA_112_112.txt).\n");

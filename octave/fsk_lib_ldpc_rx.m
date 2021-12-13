@@ -6,7 +6,7 @@ function fsk_lib_ldpc_rx(filename, Rs=100, coderate=0.5)
   fsk_lib_ldpc;
   
   % set up LDPC code
-  init_cml('~/cml/');
+  init_cml(getenv("CMAKE_CML_PATH"));
   if coderate == 0.5
     load H_256_512_4.mat;
   elseif coderate == 0.75

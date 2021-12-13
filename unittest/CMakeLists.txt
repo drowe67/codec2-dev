@@ -90,3 +90,18 @@ target_link_libraries(t16_8 codec2)
 add_executable(t16_8_short t16_8_short.c ../src/fdmdv.c ../src/kiss_fft.c)
 target_link_libraries(t16_8_short codec2)
 
+# Build CML as part of unit test setup
+find_program(OCTAVE_CMD octave-cli REQUIRED)
+message("Octave command: ${OCTAVE_CMD}")
+
+include(ExternalProject)
+set(CMAKE_CML_PATH ${CMAKE_BINARY_DIR}/cml)
+ExternalProject_Add(cml
+   SOURCE_DIR ${CMAKE_CML_PATH}
+   URL ${CMAKE_SOURCE_DIR}/script/cml.1.10.zip
+   BUILD_IN_SOURCE 1
+   CONFIGURE_COMMAND true # No configuration required
+   PATCH_COMMAND patch -N -p1 < ${CMAKE_SOURCE_DIR}/octave/cml.patch || true
+   BUILD_COMMAND cd ${CMAKE_CURRENT_BINARY_DIR}/../cml/source && CC="${CMAKE_CXX_COMPILER}" CFLAGS="-std=c++11" ${OCTAVE_CMD} -qf --eval "make"
+   INSTALL_COMMAND true # No installation required
+)

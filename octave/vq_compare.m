@@ -149,7 +149,7 @@ function results = run_test_ldpc(target, vq, EbNo, verbose)
   modulation = 'QPSK';
   mapping = 'gray';
   max_iterations = 100; demod_type = 0; decoder_type = 0;
-  ldpc; init_cml('~/cml/');
+  ldpc; init_cml(getenv("CMAKE_CML_PATH"));
   tempStruct = load("HRA_56_56.txt");
   b = fieldnames(tempStruct);
   ldpcArrayName = b{1,1};

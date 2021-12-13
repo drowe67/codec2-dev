@@ -238,7 +238,7 @@ format;
 % Start CML library (see CML set up instructions in ldpc.m)
 % ---------------------------------------------------------------------------------
 
-init_cml('~/cml/');
+init_cml(getenv("CMAKE_CML_PATH"));
 
 if getenv("SHORT_VERSION_FOR_CTEST")
   test1_single

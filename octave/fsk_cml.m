@@ -12,7 +12,7 @@ ldpc;
 %randn('seed',1);
 format short g 
 more off
-init_cml('~/cml/');
+init_cml(getenv("CMAKE_CML_PATH"));
 
 if exist('Ncw')==0,    Ncw=100, end     %setup defaults 
 if exist('plt')==0,    plt=0;   end
