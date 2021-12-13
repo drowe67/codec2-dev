@@ -134,9 +134,17 @@ struct COHPSK *cohpsk_create(void)
 
     /* set up fdmdv states so we can use those modem functions */
 
-    fdmdv = fdmdv_create(COHPSK_NC*ND - 1);
+    /*
+     * NC*ND -1 Realize that the function creates a sync carrier (+1),
+     * or one more carrier than asked for. We ignore any initialization
+     * inside of fdmdv and take care of that here, using the whole
+     * NC*ND number of carriers to be used in cohpsk.
+     */
+    fdmdv = fdmdv_create((COHPSK_NC*COHPSK_ND) - 1);
+
     fdmdv->fsep = COHPSK_RS*(1.0 + COHPSK_EXCESS_BW);
-    for(c=0; c<COHPSK_NC*ND; c++) {
+
+    for(c=0; c<COHPSK_NC*COHPSK_ND; c++) {
 	fdmdv->phase_tx[c].real = 1.0;
  	fdmdv->phase_tx[c].imag = 0.0;
 
