@@ -14,6 +14,9 @@
 % $ octave --no-gui
 % octave:> make
 % (you'll see a few warnings but hopefully no errors)
+%
+% Optionally set an environment variable for CMAKE_CML_PATH in your shell or
+% in your codec2/octave/.octaverc file
 
 1;
 
@@ -21,9 +24,6 @@ function init_cml()
   currentdir = pwd;
   
   path_to_cml = getenv("CMAKE_CML_PATH")
-  if length(path_to_cml) == 0
-    path_to_cml = "~/cml/"
-  end
 
   if exist(path_to_cml, 'dir') == 7
     cd(path_to_cml)
