@@ -17,9 +17,14 @@
 
 1;
 
-function init_cml(path_to_cml)
+function init_cml()
   currentdir = pwd;
   
+  path_to_cml = getenv("CMAKE_CML_PATH")
+  if length(path_to_cml) == 0
+    path_to_cml = "~/cml/"
+  end
+
   if exist(path_to_cml, 'dir') == 7
     cd(path_to_cml)
     CmlStartup      
