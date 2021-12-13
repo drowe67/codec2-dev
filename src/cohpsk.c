@@ -809,7 +809,7 @@ typedef float float4 __attribute__ ((vector_size (16)));
 
 \*---------------------------------------------------------------------------*/
 
-inline void rx_filter_coh(COMP rx_filt[COHPSK_NC+1][P+1], int Nc, COMP rx_baseband[COHPSK_NC+1][COHPSK_M+COHPSK_M/P], COMP rx_filter_memory[COHPSK_NC+1][+COHPSK_NFILTER], int nin)
+inline void rx_filter_coh(COMP rx_filt[COHPSK_NC*COHPSK_ND][P+1], int Nc, COMP rx_baseband[COHPSK_NC*COHPSK_ND][COHPSK_M+COHPSK_M/P], COMP rx_filter_memory[COHPSK_NC*COHPSK_ND][COHPSK_NFILTER], int nin)
 {
     int c,i,j,k,l;
     int n=COHPSK_M/P;
@@ -961,8 +961,8 @@ void rate_Fs_rx_processing(struct COHPSK *coh, COMP ch_symb[][COHPSK_NC*ND], COM
     struct FDMDV *fdmdv = coh->fdmdv;
     int   r, c, i, ch_fdm_frame_index;
     COMP  rx_fdm_frame_bb[COHPSK_M+COHPSK_M/P];
-    COMP  rx_baseband[COHPSK_NC*ND][COHPSK_M+COHPSK_M/P];
-    COMP  rx_filt[COHPSK_NC*(ND+1)][P+1];
+    COMP  rx_baseband[COHPSK_NC*COHPSK_ND][COHPSK_M+COHPSK_M/P];
+    COMP  rx_filt[COHPSK_NC*COHPSK_ND][P+1];
     float env[NT*P], rx_timing;
     COMP  rx_onesym[COHPSK_NC*ND];
     float beta, g;
