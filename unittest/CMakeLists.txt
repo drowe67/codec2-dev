@@ -98,7 +98,7 @@ include(ExternalProject)
 set(CMAKE_CML_PATH ${CMAKE_CURRENT_BINARY_DIR}/../cml)
 ExternalProject_Add(cml
    SOURCE_DIR ${CMAKE_CML_PATH}
-   URL ${CMAKE_CURRENT_SOURCE_DIR}/../script/cml.1.10.zip
+   URL http://www.iterativesolutions.com/user/image/cml.1.10.zip
    BUILD_IN_SOURCE 1
    CONFIGURE_COMMAND true # No configuration required
    PATCH_COMMAND patch -N -p1 < ${CMAKE_CURRENT_SOURCE_DIR}/../octave/cml.patch || true
