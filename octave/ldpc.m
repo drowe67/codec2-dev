@@ -15,7 +15,7 @@
 % octave:> make
 % (you'll see a few warnings but hopefully no errors)
 %
-% Optionally set an environment variable for CMAKE_CML_PATH in your shell or
+% Optionally set an environment variable for CML_PATH in your shell or
 % in your codec2/octave/.octaverc file
 
 1;
@@ -23,7 +23,7 @@
 function init_cml()
   currentdir = pwd;
   
-  path_to_cml = getenv("CMAKE_CML_PATH")
+  path_to_cml = getenv("CML_PATH");
 
   if exist(path_to_cml, 'dir') == 7
     cd(path_to_cml)
@@ -32,7 +32,7 @@ function init_cml()
   else
     printf("\n---------------------------------------------------\n");
     printf("Can't start CML in path: %s\n", path_to_cml);
-    printf("See CML path instructions at top of this script (ldpc.m)\n");
+    printf("See CML_PATH instructions at top of this script (ldpc.m)\n");
     printf("-----------------------------------------------------\n\n");
     assert(0);
   end

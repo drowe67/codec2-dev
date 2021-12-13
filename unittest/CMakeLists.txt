@@ -95,9 +95,9 @@ find_program(OCTAVE_CMD octave-cli REQUIRED)
 message("Octave command: ${OCTAVE_CMD}")
 
 include(ExternalProject)
-set(CMAKE_CML_PATH ${CMAKE_CURRENT_BINARY_DIR}/../cml)
+set(CML_PATH ${CMAKE_CURRENT_BINARY_DIR}/../cml)
 ExternalProject_Add(cml
-   SOURCE_DIR ${CMAKE_CML_PATH}
+   SOURCE_DIR ${CML_PATH}
    URL http://www.iterativesolutions.com/user/image/cml.1.10.zip
    BUILD_IN_SOURCE 1
    CONFIGURE_COMMAND true # No configuration required

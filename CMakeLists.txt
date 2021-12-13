@@ -1226,6 +1226,6 @@ endif(NOT APPLE)
         test_OFDM_modem_datac3_octave
         test_fsk_lib_4fsk_ldpc
         PROPERTIES
-        ENVIRONMENT "CMAKE_CML_PATH=${CMAKE_CURRENT_BINARY_DIR}/cml"
+        ENVIRONMENT "CML_PATH=${CMAKE_CURRENT_BINARY_DIR}/cml"
     )
 endif(UNITTEST)

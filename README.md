@@ -153,10 +153,10 @@ CTest is used as a test framework, with support from [GNU Octave](https://www.gn
    ```
 
 1. Many Octave scripts rely on the CML LDPC library.  To run these from the Octave CLI, you need to set
-   the `CMAKE_CML_PATH` environment variable.  A convenient way to do this is using a `.octaverc` file
+   the `CML_PATH` environment variable.  A convenient way to do this is using a `.octaverc` file
    in your `codec/octave` directory.  For example on a Linux machine, create a `.octaverc` file:
    ```
-   setenv("CMAKE_CML_PATH","../build_linux/cml")
+   setenv("CML_PATH","../build_linux/cml")
    ```  
    
 ## Directories
