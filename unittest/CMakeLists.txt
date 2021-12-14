@@ -97,12 +97,11 @@ message("Octave command: ${OCTAVE_CMD}")
 include(ExternalProject)
 set(CML_PATH ${CMAKE_CURRENT_BINARY_DIR}/../cml)
 ExternalProject_Add(cml
+   GIT_REPOSITORY https://github.com/tmiw/cml.git
    SOURCE_DIR ${CML_PATH}
-   URL http://www.iterativesolutions.com/user/image/cml.1.10.zip
    BUILD_IN_SOURCE 1
    CONFIGURE_COMMAND true # No configuration required
-   PATCH_COMMAND patch -N -p1 < ${CMAKE_CURRENT_SOURCE_DIR}/../octave/cml.patch || true
-   BUILD_COMMAND cd ${CMAKE_CURRENT_BINARY_DIR}/../cml/source && CC="${CMAKE_CXX_COMPILER}" CFLAGS="-std=c++11" ${OCTAVE_CMD} -qf --eval "make"
+   BUILD_COMMAND cd ${CMAKE_CURRENT_BINARY_DIR}/../cml/source && ${OCTAVE_CMD} -qf --eval "make"
    INSTALL_COMMAND true # No installation required
 )
 
