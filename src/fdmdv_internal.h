@@ -184,7 +184,7 @@ void down_convert_and_rx_filter(COMP rx_filt[NC+1][P+1], int Nc, COMP rx_fdm[],
                                 COMP rx_fdm_mem[], COMP phase_rx[], COMP freq[],
                                 float freq_pol[], int nin, int dec_rate);
 float rx_est_timing(COMP  rx_symbols[], int Nc,
-		    COMP  rx_filt[NC+1][P+1],
+		    COMP  rx_filt[][P+1],
 		    COMP  rx_filter_mem_timing[NC+1][NT*P],
 		    float env[],
 		    int   nin,
