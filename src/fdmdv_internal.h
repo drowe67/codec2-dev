@@ -179,13 +179,13 @@ float rx_est_freq_offset(struct FDMDV *f, COMP rx_fdm[], int nin, int do_fft);
 void lpf_peak_pick(float *foff, float *max, COMP pilot_baseband[], COMP pilot_lpf[], codec2_fft_cfg fft_pilot_cfg, COMP S[], int nin, int do_fft);
 void fdm_downconvert(COMP rx_baseband[NC+1][M_FAC+M_FAC/P], int Nc, COMP rx_fdm[], COMP phase_rx[], COMP freq[], int nin);
 void rxdec_filter(COMP rx_fdm_filter[], COMP rx_fdm[], COMP rxdec_lpf_mem[], int nin);
-void rx_filter(COMP rx_filt[NC+1][P+1], int Nc, COMP rx_baseband[NC+1][M_FAC+M_FAC/P], COMP rx_filter_memory[NC+1][NFILTER], int nin);
+void rx_filter(COMP rx_filt[][P+1], int Nc, COMP rx_baseband[][M_FAC+M_FAC/P], COMP rx_filter_memory[][NFILTER], int nin);
 void down_convert_and_rx_filter(COMP rx_filt[NC+1][P+1], int Nc, COMP rx_fdm[],
                                 COMP rx_fdm_mem[], COMP phase_rx[], COMP freq[],
                                 float freq_pol[], int nin, int dec_rate);
 float rx_est_timing(COMP  rx_symbols[], int Nc,
 		    COMP  rx_filt[][P+1],
-		    COMP  rx_filter_mem_timing[NC+1][NT*P],
+		    COMP  rx_filter_mem_timing[][NT*P],
 		    float env[],
 		    int   nin,
                     int   m);
