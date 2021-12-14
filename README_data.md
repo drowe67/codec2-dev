@@ -336,7 +336,7 @@ Clipping works by introducing controlled distortion, which affects the SNR estim
 
 This command line demonstrates the effect:
 ```
-/src/freedv_data_raw_tx datac3 /dev/zero - --testframes 10 --bursts 10 --clip 1 | ./src/cohpsk_ch - - -100 --raw_dir ../raw  --Fs 8000 | ./src/freedv_data_raw_rx datac3 - /dev/null --testframes --framesperburst 1 -v
+./src/freedv_data_raw_tx datac3 /dev/zero - --testframes 10 --bursts 10 --clip 1 | ./src/cohpsk_ch - - -100 --fading_dir unittest  --Fs 8000 | ./src/freedv_data_raw_rx datac3 - /dev/null --testframes --framesperburst 1 -v
 ```
 Try adjusting `--clip` and third argument of `cohpsk_ch` (noise level) for different modes.  Note the SNR estimates returned from `freedv_data_raw_rx` compared to the SNR from the channel simulator `cohpsh_ch`. You will notice clipping also increases the RMS power and reduces the PER for a given noise level.
 
