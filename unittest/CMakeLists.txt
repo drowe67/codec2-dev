@@ -97,7 +97,7 @@ message("Octave command: ${OCTAVE_CMD}")
 include(ExternalProject)
 set(CML_PATH ${CMAKE_CURRENT_BINARY_DIR}/../cml)
 ExternalProject_Add(cml
-   GIT_REPOSITORY https://github.com/tmiw/cml.git
+   GIT_REPOSITORY https://github.com/drowe67/cml.git
    SOURCE_DIR ${CML_PATH}
    BUILD_IN_SOURCE 1
    CONFIGURE_COMMAND true # No configuration required
