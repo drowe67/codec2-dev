@@ -752,7 +752,7 @@ void cohpsk_clip(COMP tx_fdm[], float clip_thresh, int n)
 
 \*---------------------------------------------------------------------------*/
 
-void fdm_downconvert_coh(COMP rx_baseband[COHPSK_NC][COHPSK_M+COHPSK_M/P], int Nc, COMP rx_fdm[], COMP phase_rx[], COMP freq[], int nin)
+void fdm_downconvert_coh(COMP rx_baseband[][COHPSK_M+COHPSK_M/P], int Nc, COMP rx_fdm[], COMP phase_rx[], COMP freq[], int nin)
 {
     int   i,c;
     float mag;
