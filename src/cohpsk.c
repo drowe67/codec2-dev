@@ -437,7 +437,7 @@ void qpsk_symbols_to_bits(struct COHPSK *coh, float rx_bits[], COMP ct_symb_buf[
 \*---------------------------------------------------------------------------*/
 
 void tx_filter_and_upconvert_coh(COMP tx_fdm[], int Nc, const COMP tx_symbols[],
-                                 COMP tx_filter_memory[COHPSK_NC*COHPSK_ND][COHPSK_NSYM],
+                                 COMP tx_filter_memory[][COHPSK_NSYM],
                                  COMP phase_tx[], COMP freq[],
                                  COMP *fbb_phase, COMP fbb_rect)
 {
