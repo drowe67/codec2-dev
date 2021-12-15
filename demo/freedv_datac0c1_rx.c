@@ -115,11 +115,12 @@ int run_receiver(struct freedv *freedv, short buf[], short demod_in[], int *pn, 
     memcpy(&demod_in[n], buf, sizeof(short)*NBUF);
     n += NBUF; assert(n <= freedv_get_n_max_modem_samples(freedv));
     nin = freedv_nin(freedv);
-    if (n > nin) {
+    while (n > nin) {
         nbytes_out = freedv_rawdatarx(freedv, bytes_out, demod_in);
         // nin samples were read
         n -= nin; assert(n >= 0);
         memmove(demod_in, &demod_in[nin], sizeof(short)*n);
+        nin = freedv_nin(freedv);
     }
 
     *pn = n;
