@@ -1922,9 +1922,8 @@ void fdmdv_8_to_48_short(short out48k[], short in8k[], int n)
 	for(j=0; j<FDMDV_OS_48; j++) {
 	    acc = 0.0;
 	    for(k=0,l=0; k<FDMDV_OS_TAPS_48K; k+=FDMDV_OS_48,l++)
-		out48k[i*FDMDV_OS_48+j] += fdmdv_os_filter48[k+j]*in8k[i-l];
-	    out48k[i*FDMDV_OS_48+j] = acc*FDMDV_OS_48;
-	    
+		acc += fdmdv_os_filter48[k+j]*in8k[i-l];
+	    out48k[i*FDMDV_OS_48+j] = acc*FDMDV_OS_48;	    
 	}
     }	
 

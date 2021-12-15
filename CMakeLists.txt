@@ -379,6 +379,14 @@ if(UNITTEST)
              set_tests_properties(test_fdmdv_16to8_short PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
 
     # 48<->8 kHz float resamplers
+    add_test(NAME test_fdmdv_48to8_short
+             COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/octave;
+                            ${CMAKE_CURRENT_BINARY_DIR}/unittest/t48_8_short;
+                            DISPLAY=\"\" echo \"diff_fft_mag('in8.raw','out8.raw'); quit;\" | octave-cli -qf
+                            ")
+             set_tests_properties(test_fdmdv_48to8_short PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
+
+    # 48<->8 kHz short resamplers
     add_test(NAME test_fdmdv_48to8
              COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/octave;
                             ${CMAKE_CURRENT_BINARY_DIR}/unittest/t48_8;
