@@ -1887,11 +1887,6 @@ void fdmdv_8_to_48(float out48k[], float in8k[], int n)
 {
     int i,j,k,l;
 
-    /* make sure n is an integer multiple of the oversampling rate, ow
-       this function breaks */
-
-    assert((n % FDMDV_OS_48) == 0);
-
     for(i=0; i<n; i++) {
 	for(j=0; j<FDMDV_OS_48; j++) {
 	    out48k[i*FDMDV_OS_48+j] = 0.0;
@@ -1913,11 +1908,6 @@ void fdmdv_8_to_48_short(short out48k[], short in8k[], int n)
     int i,j,k,l;
     float acc;
     
-    /* make sure n is an integer multiple of the oversampling rate, ow
-       this function breaks */
-
-    assert((n % FDMDV_OS_48) == 0);
-
     for(i=0; i<n; i++) {
 	for(j=0; j<FDMDV_OS_48; j++) {
 	    acc = 0.0;
