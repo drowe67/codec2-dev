@@ -29,10 +29,9 @@
 #define __COHPSK_INTERNAL__
 
 #define NCT_SYMB_BUF      (2*NSYMROWPILOT+2)
-#define ND                2                           /* diversity factor ND 1 is no diveristy, ND we have orginal plus
+#define COHPSK_ND         2                           /* diversity factor ND 1 is no diveristy, ND we have orginal plus
                                                          one copy */
 #define NSW               4                           /* number of sync window frames */
-#define COHPSK_ND         2                           /* diversity factor   */
 #define COHPSK_M          100                         /* oversampling rate */
 #define COHPSK_NSYM       6
 #define COHPSK_NFILTER    (COHPSK_NSYM*COHPSK_M)
@@ -45,19 +44,19 @@
 struct COHPSK {
     COMP         ch_fdm_frame_buf[NSW*NSYMROWPILOT*COHPSK_M];  /* buffer of several frames of symbols from channel      */
     float        pilot2[2*NPILOTSFRAME][COHPSK_NC];
-    float        phi_[NSYMROWPILOT][COHPSK_NC*ND];      /* phase estimates for this frame of rx data symbols     */
-    float        amp_[NSYMROW][COHPSK_NC*ND];           /* amplitude estimates for this frame of rx data symbols */
-    COMP         rx_symb[NSYMROWPILOT][COHPSK_NC*ND];   /* demodulated symbols                                   */
+    float        phi_[NSYMROWPILOT][COHPSK_NC*COHPSK_ND];      /* phase estimates for this frame of rx data symbols     */
+    float        amp_[NSYMROW][COHPSK_NC*COHPSK_ND];           /* amplitude estimates for this frame of rx data symbols */
+    COMP         rx_symb[NSYMROWPILOT][COHPSK_NC*COHPSK_ND];   /* demodulated symbols                                   */
     float        f_est;
-    COMP         rx_filter_memory[COHPSK_NC*ND][COHPSK_NFILTER];
-    COMP         ct_symb_buf[NCT_SYMB_BUF][COHPSK_NC*ND];
+    COMP         rx_filter_memory[COHPSK_NC*COHPSK_ND][COHPSK_NFILTER];
+    COMP         ct_symb_buf[NCT_SYMB_BUF][COHPSK_NC*COHPSK_ND];
     int          ct;                                    /* coarse timing offset in symbols                       */
     float        rx_timing;                             /* fine timing for last symbol in frame                  */
     int          nin;                                   /* number of samples to input for next symbol            */
     float        f_fine_est;
     COMP         ff_rect;
     COMP         ff_phase;
-    COMP         ct_symb_ff_buf[NSYMROWPILOT+2][COHPSK_NC*ND];
+    COMP         ct_symb_ff_buf[NSYMROWPILOT+2][COHPSK_NC*COHPSK_ND];
     int          sync;
     int          sync_timer;
 
@@ -104,7 +103,7 @@ struct COHPSK {
 
     /* tx amplitude weights for each carrier for test/instrumentation */
 
-    float          carrier_ampl[COHPSK_NC*ND];
+    float          carrier_ampl[COHPSK_NC*COHPSK_ND];
 
     /* Flag enabling simple freq est mode */
     int            freq_est_mode_reduced;
@@ -113,10 +112,10 @@ struct COHPSK {
 void bits_to_qpsk_symbols(COMP tx_symb[][COHPSK_NC*COHPSK_ND], int tx_bits[], int nbits);
 void qpsk_symbols_to_bits(struct COHPSK *coh, float rx_bits[], COMP ct_symb_buf[][COHPSK_NC*COHPSK_ND]);
 void tx_filter_and_upconvert_coh(COMP tx_fdm[], int Nc, const COMP tx_symbols[],
-                                 COMP tx_filter_memory[COHPSK_NC][COHPSK_NSYM],
+                                 COMP tx_filter_memory[][COHPSK_NSYM],
                                  COMP phase_tx[], COMP freq[],
                                  COMP *fbb_phase, COMP fbb_rect);
-void fdm_downconvert_coh(COMP rx_baseband[COHPSK_NC][COHPSK_M+COHPSK_M/P], int Nc, COMP rx_fdm[], COMP phase_rx[], COMP freq[], int nin);
+void fdm_downconvert_coh(COMP rx_baseband[][COHPSK_M+COHPSK_M/P], int Nc, COMP rx_fdm[], COMP phase_rx[], COMP freq[], int nin);
 void frame_sync_fine_freq_est(struct COHPSK *coh, COMP ch_symb[][COHPSK_NC*COHPSK_ND], int sync, int *next_sync);
 void fine_freq_correct(struct COHPSK *coh, int sync, int next_sync);
 int sync_state_machine(struct COHPSK *coh, int sync, int next_sync);

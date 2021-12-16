@@ -126,7 +126,7 @@ int main(int argc, char *argv[])
         fprintf(stderr, "\n");
         fprintf(stderr, "                    Default output file format is one byte per bit\n");
         fprintf(stderr, "  -o OctaveLogFile  Octave log file for testing\n");
-        fprintf(stderr, "  --nd              non-diversity mode, output frames of %d bits\n", ND*COHPSK_BITS_PER_FRAME);
+        fprintf(stderr, "  --nd              non-diversity mode, output frames of %d bits\n", COHPSK_ND*COHPSK_BITS_PER_FRAME);
         fprintf(stderr, "  --sd              soft decision output, one double per symbol\n");
         fprintf(stderr, "  -v                verbose mode\n");
         fprintf(stderr, "\n");
@@ -152,11 +152,11 @@ int main(int argc, char *argv[])
 
     if (oct) {
         logframes = LOG_FRAMES;
-        rx_amp_log = (float *)MALLOC(sizeof(float)*logframes*NSYMROW*COHPSK_NC*ND);
+        rx_amp_log = (float *)MALLOC(sizeof(float)*logframes*NSYMROW*COHPSK_NC*COHPSK_ND);
         assert(rx_amp_log != NULL);
-        rx_phi_log = (float *)MALLOC(sizeof(float)*logframes*NSYMROW*COHPSK_NC*ND);
+        rx_phi_log = (float *)MALLOC(sizeof(float)*logframes*NSYMROW*COHPSK_NC*COHPSK_ND);
         assert(rx_phi_log != NULL);
-        rx_symb_log = (COMP *)MALLOC(sizeof(COMP)*logframes*NSYMROW*COHPSK_NC*ND);
+        rx_symb_log = (COMP *)MALLOC(sizeof(COMP)*logframes*NSYMROW*COHPSK_NC*COHPSK_ND);
         assert(rx_symb_log != NULL);
         cohpsk->rx_timing_log = (float*)MALLOC(sizeof(float)*SYNC_FRAMES*logframes*NSYMROWPILOT);
         assert(cohpsk->rx_timing_log != NULL);
@@ -213,10 +213,10 @@ int main(int argc, char *argv[])
 
             if (oct) {
                 for(r=0; r<NSYMROW; r++, log_data_r++) {
-                    for(c=0; c<COHPSK_NC*ND; c++) {
-                        rx_amp_log[log_data_r*COHPSK_NC*ND+c] = cohpsk->amp_[r][c];
-                        rx_phi_log[log_data_r*COHPSK_NC*ND+c] = cohpsk->phi_[r][c];
-                        rx_symb_log[log_data_r*COHPSK_NC*ND+c] = cohpsk->rx_symb[r][c];
+                    for(c=0; c<COHPSK_NC*COHPSK_ND; c++) {
+                        rx_amp_log[log_data_r*COHPSK_NC*COHPSK_ND+c] = cohpsk->amp_[r][c];
+                        rx_phi_log[log_data_r*COHPSK_NC*COHPSK_ND+c] = cohpsk->phi_[r][c];
+                        rx_symb_log[log_data_r*COHPSK_NC*COHPSK_ND+c] = cohpsk->rx_symb[r][c];
                     }
                 }
 
@@ -242,9 +242,9 @@ int main(int argc, char *argv[])
     /* optionally dump Octave files */
 
     if (foct != NULL) {
-        octave_save_float(foct, "rx_amp_log_c", (float*)rx_amp_log, log_data_r, COHPSK_NC*ND, COHPSK_NC*ND);
-        octave_save_float(foct, "rx_phi_log_c", (float*)rx_phi_log, log_data_r, COHPSK_NC*ND, COHPSK_NC*ND);
-        octave_save_complex(foct, "rx_symb_log_c", (COMP*)rx_symb_log, log_data_r, COHPSK_NC*ND, COHPSK_NC*ND);
+        octave_save_float(foct, "rx_amp_log_c", (float*)rx_amp_log, log_data_r, COHPSK_NC*COHPSK_ND, COHPSK_NC*COHPSK_ND);
+        octave_save_float(foct, "rx_phi_log_c", (float*)rx_phi_log, log_data_r, COHPSK_NC*COHPSK_ND, COHPSK_NC*COHPSK_ND);
+        octave_save_complex(foct, "rx_symb_log_c", (COMP*)rx_symb_log, log_data_r, COHPSK_NC*COHPSK_ND, COHPSK_NC*COHPSK_ND);
         octave_save_float(foct, "rx_timing_log_c", (float*)cohpsk->rx_timing_log, 1, cohpsk->rx_timing_log_index, cohpsk->rx_timing_log_index);
         octave_save_float(foct, "f_est_log_c", f_est_log, 1, logframes, logframes);
         octave_save_float(foct, "ratio_log_c", ratio_log, 1, logframes, logframes);

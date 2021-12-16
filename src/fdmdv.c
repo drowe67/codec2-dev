@@ -943,7 +943,7 @@ void fdm_downconvert(COMP rx_baseband[NC+1][M_FAC+M_FAC/P], int Nc, COMP rx_fdm[
 
 \*---------------------------------------------------------------------------*/
 
-void rx_filter(COMP rx_filt[NC+1][P+1], int Nc, COMP rx_baseband[NC+1][M_FAC+M_FAC/P], COMP rx_filter_memory[NC+1][NFILTER], int nin)
+void rx_filter(COMP rx_filt[][P+1], int Nc, COMP rx_baseband[][M_FAC+M_FAC/P], COMP rx_filter_memory[][NFILTER], int nin)
 {
     int c, i,j,k,l;
     int n=M_FAC/P;
@@ -1234,8 +1234,8 @@ void down_convert_and_rx_filter(COMP rx_filt[NC+1][P+1], int Nc, COMP rx_fdm[],
 
 float rx_est_timing(COMP rx_symbols[],
                     int  Nc,
-		    COMP rx_filt[NC+1][P+1],
-		    COMP rx_filter_mem_timing[NC+1][NT*P],
+		    COMP rx_filt[][P+1],
+		    COMP rx_filter_mem_timing[][NT*P],
 		    float env[],
 		    int nin,
                     int m)
