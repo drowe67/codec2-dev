@@ -34,6 +34,8 @@ The current demo programs are as follows:
 | [freedv_700d_rx.py](demo/freedv_700d_rx.py) | Receive a voice signal using the FreeDV API in Python |
 | [freedv_datac1_tx.c](demo/freedv_datac1_tx.c) | Transmit raw data frames using the FreeDV API |
 | [freedv_datac1_rx.c](demo/freedv_datac1_rx.c) | Receive raw data frames using the FreeDV API |
+| [freedv_datac0c1_tx.c](demo/freedv_datac0c1_tx.c) | Transmit two types of raw data frames using the FreeDV API |
+| [freedv_datac0c1_rx.c](demo/freedv_datac0c1_rx.c) | Receive two types of raw data frames using the FreeDV API |
 
 So also [freedv_api.h](src/freedv_api.h) and [freedv_api.c](src/freedv_api.c) for the full list of API functions.  Only a small set of these functions are needed for basic FreeDV use, please see the demo programs for minimal examples.
 

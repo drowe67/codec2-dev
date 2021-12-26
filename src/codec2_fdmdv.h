@@ -67,11 +67,17 @@ extern "C" {
 #define FDMDV_SCALE                  750   /* suggested scaling for 16 bit shorts                            */
 #define FDMDV_FCENTRE               1500  /* Centre frequency, Nc/2 carriers below this, Nc/2 carriers above (Hz) */
 
-/* 8 to 48 kHz sample rate conversion */
+/* 8 to 18 kHz sample rate conversion */
 
 #define FDMDV_OS                 2                            /* oversampling rate                   */
 #define FDMDV_OS_TAPS_16K       48                            /* number of OS filter taps at 16kHz   */
 #define FDMDV_OS_TAPS_8K        (FDMDV_OS_TAPS_16K/FDMDV_OS)  /* number of OS filter taps at 8kHz    */
+
+/* 8 to 48 kHz sample rate conversion */
+
+#define FDMDV_OS_48             6                               /* oversampling rate                   */
+#define FDMDV_OS_TAPS_48K       48                              /* number of OS filter taps at 48kHz   */
+#define FDMDV_OS_TAPS_48_8K     (FDMDV_OS_TAPS_48K/FDMDV_OS_48) /* number of OS filter taps at 8kHz    */
 
 /* FDMDV states and stats structures */
 
@@ -97,6 +103,10 @@ void           fdmdv_8_to_16(float out16k[], float in8k[], int n);
 void           fdmdv_8_to_16_short(short out16k[], short in8k[], int n);
 void           fdmdv_16_to_8(float out8k[], float in16k[], int n);
 void           fdmdv_16_to_8_short(short out8k[], short in16k[], int n);
+void           fdmdv_8_to_48(float out48k[], float in8k[], int n);
+void           fdmdv_48_to_8(float out8k[], float in48k[], int n);
+void           fdmdv_8_to_48_short(short out48k[], short in8k[], int n);
+void           fdmdv_48_to_8_short(short out8k[], short in48k[], int n);
 
 void           fdmdv_freq_shift(COMP rx_fdm_fcorr[], COMP rx_fdm[], float foff, COMP *foff_phase_rect, int nin);
 

@@ -373,6 +373,22 @@ if(UNITTEST)
                             ")
              set_tests_properties(test_fdmdv_16to8_short PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
 
+    # 48<->8 kHz float resamplers
+    add_test(NAME test_fdmdv_48to8_short
+             COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/octave;
+                            ${CMAKE_CURRENT_BINARY_DIR}/unittest/t48_8_short;
+                            DISPLAY=\"\" echo \"diff_fft_mag('in8.raw','out8.raw'); quit;\" | octave-cli -qf
+                            ")
+             set_tests_properties(test_fdmdv_48to8_short PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
+
+    # 48<->8 kHz short resamplers
+    add_test(NAME test_fdmdv_48to8
+             COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/octave;
+                            ${CMAKE_CURRENT_BINARY_DIR}/unittest/t48_8;
+                            DISPLAY=\"\" echo \"diff_fft_mag('in8.raw','out8.raw'); quit;\" | octave-cli -qf
+                            ")
+             set_tests_properties(test_fdmdv_48to8 PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
+
     add_test(NAME test_CML_ldpcut
              COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/octave; SHORT_VERSION_FOR_CTEST=1 octave-cli -qf ldpcut.m")
              set_tests_properties(test_CML_ldpcut PROPERTIES PASS_REGULAR_EXPRESSION "Nerr: 0")
@@ -1118,35 +1134,20 @@ endif(NOT APPLE)
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
                             head -c $((14*10)) </dev/urandom > binaryIn.bin;
                             ./freedv_data_raw_tx DATAC0 binaryIn.bin - --bursts 10 |
-                            ./freedv_data_raw_rx DATAC0 - binaryOut.bin --framesperburst 1 --vv;
+                            ./freedv_data_raw_rx DATAC0 - binaryOut.bin  -v;
                             diff binaryIn.bin binaryOut.bin")
 
      add_test(NAME test_freedv_data_raw_ofdm_datac1_burst_file
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
                             head -c $((510*10)) </dev/urandom > binaryIn.bin;
-                            ./freedv_data_raw_tx DATAC1 binaryIn.bin - --framesperburst 2 --bursts 5 |
-                            ./freedv_data_raw_rx DATAC1 - binaryOut.bin --framesperburst 2 --vv;
-                            diff binaryIn.bin binaryOut.bin")
-
-     # Streaming mode tests, with data file I/O
-     add_test(NAME test_freedv_data_raw_ofdm_datac0
-             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
-                            head -c $((14*10)) </dev/urandom > binaryIn.bin;
-                            ./freedv_data_raw_tx DATAC0 binaryIn.bin - |
-                            ./freedv_data_raw_rx DATAC0 - binaryOut.bin -v;
-                            diff binaryIn.bin binaryOut.bin")
-
-     add_test(NAME test_freedv_data_raw_ofdm_datac1
-             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
-                            head -c $((510*10)) </dev/urandom > binaryIn.bin;
-                            ./freedv_data_raw_tx DATAC1 binaryIn.bin - |
+                            ./freedv_data_raw_tx DATAC1 binaryIn.bin - --bursts 10 |
                             ./freedv_data_raw_rx DATAC1 - binaryOut.bin -v;
                             diff binaryIn.bin binaryOut.bin")
 
-     add_test(NAME test_freedv_data_raw_ofdm_datac3
+     add_test(NAME test_freedv_data_raw_ofdm_datac3_burst_file
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
                             head -c $((126*10)) </dev/urandom > binaryIn.bin;
-                            ./freedv_data_raw_tx DATAC3 binaryIn.bin - |
+                            ./freedv_data_raw_tx DATAC3 binaryIn.bin - --bursts 10 |
                             ./freedv_data_raw_rx DATAC3 - binaryOut.bin -v;
                             diff binaryIn.bin binaryOut.bin")
 
@@ -1213,7 +1214,15 @@ endif(NOT APPLE)
                             cat binaryIn.bin | ./demo/freedv_datac1_tx | 
                             ./demo/freedv_datac1_rx > binaryOut.bin;
                             diff binaryIn.bin binaryOut.bin")
- 
+
+      # test Rx of two modes in parallel, with AWGN noise and sample clock offsets
+      add_test(NAME test_demo_datac0c1
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR};
+                            ./demo/freedv_datac0c1_tx | 
+                            ./src/cohpsk_ch - - -24 -f 20 --Fs 8000 | 
+                            sox -t .s16 -c 1 -r 8000 - -t .s16 -c 1 -r 8008 - | 
+                            ./demo/freedv_datac0c1_rx")
+           set_tests_properties(test_demo_datac0c1 PROPERTIES PASS_REGULAR_EXPRESSION "DATAC0 Frames: 10 DATAC1 Frames: 10")
 
     # Set common properties for tests that need Octave/CML
     set_tests_properties(

@@ -90,6 +90,13 @@ target_link_libraries(t16_8 codec2)
 add_executable(t16_8_short t16_8_short.c ../src/fdmdv.c ../src/kiss_fft.c)
 target_link_libraries(t16_8_short codec2)
 
+
+add_executable(t48_8 t48_8.c ../src/fdmdv.c ../src/kiss_fft.c)
+target_link_libraries(t48_8 codec2)
+
+add_executable(t48_8_short t48_8_short.c ../src/fdmdv.c ../src/kiss_fft.c)
+target_link_libraries(t48_8_short codec2)
+
 # Build CML as part of unit test setup
 find_program(OCTAVE_CMD octave-cli REQUIRED)
 message("Octave command: ${OCTAVE_CMD}")
