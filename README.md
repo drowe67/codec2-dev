@@ -123,15 +123,13 @@ CTest is used as a test framework, with support from [GNU Octave](https://www.gn
    ```
    sudo apt install octave octave-common octave-signal liboctave-dev gnuplot python3-numpy sox valgrind
    ```
-1. Install CML library with instructions at the top of [```octave/ldpc.m```](octave/ldpc.m)
-
 1. To build and run the tests:
    ```
    cd ~/codec2
    rm -Rf build_linux && mkdir build_linux
    cd build_linux
-   cmake -DCMAKE_BUILD_TYPE=Debug ..
-   make all test
+   cmake -DUNITTEST=1 ..
+   make
    ```
 
 1. To just run tests without rebuilding:
@@ -154,6 +152,13 @@ CTest is used as a test framework, with support from [GNU Octave](https://www.gn
    ctest -N
    ```
 
+1. Many Octave scripts rely on the CML LDPC library.  To run these from the Octave CLI, you need to set
+   the `CML_PATH` environment variable.  A convenient way to do this is using a `.octaverc` file
+   in your `codec/octave` directory.  For example on a Linux machine, create a `.octaverc` file:
+   ```
+   setenv("CML_PATH","../build_linux/cml")
+   ```  
+   
 ## Directories
 ```
 cmake       - cmake support files

@@ -385,7 +385,7 @@ int main(int argc, char *argv[]) {
             fprintf(stderr, " euw: %2d %1d f: %5.1f eraw: %3d ecdd: %3d iter: %3d pcc: %3d\n",
                 ofdm->uw_errors, ofdm->sync_counter,
                 (double)ofdm->foff_est_hz,
-                Nerrs_raw, Nerrs_coded, iter, parityCheckCount);
+                Nerrs, Nerrs_coded, iter, parityCheckCount);
         }
 
         if (config_log_payload_syms) {

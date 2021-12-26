@@ -136,6 +136,6 @@ more off;
 format;
 
 % Start CML library (see CML set up instructions in ldpc.m)
-init_cml('~/cml/');
+init_cml();
 
 test_qam16(1)

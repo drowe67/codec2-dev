@@ -7,7 +7,7 @@
 #
 set(CMAKE_OSX_DEPLOYMENT_TARGET "10.9" CACHE STRING "Minimum OS X deployment version")
 
-project(codec2 C)
+project(codec2)
 
 cmake_minimum_required(VERSION 3.0)
 
@@ -152,12 +152,7 @@ endif()
 #
 option(BUILD_SHARED_LIBS
     "Build shared library. Set to OFF for static library." ON)
-# Unittest should be on for dev builds and off for releases.
-if(CMAKE_BUILD_TYPE MATCHES "Release")
-    option(UNITTEST "Build unittest binaries." OFF)
-else()
-    option(UNITTEST "Build unittest binaries." ON)
-endif()
+option(UNITTEST "Build unittest binaries." OFF)
 option(INSTALL_EXAMPLES "Install example code." OFF)
 if(INSTALL_EXAMPLES)
     install(DIRECTORY octave raw script wav
@@ -415,14 +410,12 @@ if(UNITTEST)
     add_test(NAME test_FDMDV_modem_octave_port
              COMMAND sh -c "$<TARGET_FILE:tfdmdv> && DISPLAY=\"\" octave-cli --no-gui -qf ${CMAKE_CURRENT_SOURCE_DIR}/octave/tfdmdv.m"
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/octave)
-             set_tests_properties(test_FDMDV_modem_octave_port PROPERTIES
-             PASS_REGULAR_EXPRESSION "fails: 0")
+             set_tests_properties(PROPERTIES PASS_REGULAR_EXPRESSION "fails: 0")
 
     add_test(NAME test_COHPSK_modem_octave_port
              COMMAND sh -c "$<TARGET_FILE:tcohpsk> && DISPLAY=\"\" octave-cli --no-gui -qf ${CMAKE_CURRENT_SOURCE_DIR}/octave/tcohpsk.m"
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/octave)
-             set_tests_properties(test_COHPSK_modem_octave_port PROPERTIES
-             PASS_REGULAR_EXPRESSION "fails: 0")
+             set_tests_properties(test_COHPSK_modem_octave_port PROPERTIES PASS_REGULAR_EXPRESSION "fails: 0")
 
     add_test(NAME test_COHPSK_modem_AWGN_BER
              COMMAND sh -c "$<TARGET_FILE:cohpsk_get_test_bits> - 5600 | $<TARGET_FILE:cohpsk_mod> - - | $<TARGET_FILE:cohpsk_ch> - - -30  | $<TARGET_FILE:cohpsk_demod> - - | $<TARGET_FILE:cohpsk_put_test_bits> -"
@@ -442,14 +435,12 @@ if(UNITTEST)
     add_test(NAME test_OFDM_modem_octave_port
              COMMAND sh -c "PATH_TO_TOFDM=${CMAKE_CURRENT_BINARY_DIR}/unittest/tofdm DISPLAY=\"\" octave-cli --no-gui -qf ${CMAKE_CURRENT_SOURCE_DIR}/octave/tofdm.m"
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/octave)
-             set_tests_properties(test_OFDM_modem_octave_port PROPERTIES
-             PASS_REGULAR_EXPRESSION "fails: 0")
+             set_tests_properties(test_OFDM_modem_octave_port PROPERTIES PASS_REGULAR_EXPRESSION "fails: 0")
 
     add_test(NAME test_OFDM_modem_octave_port_Nc_31
              COMMAND sh -c "NC=31 PATH_TO_TOFDM=${CMAKE_CURRENT_BINARY_DIR}/unittest/tofdm DISPLAY=\"\" octave-cli --no-gui -qf ${CMAKE_CURRENT_SOURCE_DIR}/octave/tofdm.m"
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/octave)
-             set_tests_properties(test_OFDM_modem_octave_port_Nc_31 PROPERTIES
-             PASS_REGULAR_EXPRESSION "fails: 0")
+             set_tests_properties(test_OFDM_modem_octave_port_Nc_31 PROPERTIES PASS_REGULAR_EXPRESSION "fails: 0")
 
     add_test(NAME test_OFDM_modem_octave_qam16_uncoded
              COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/octave;
@@ -537,15 +528,15 @@ if(UNITTEST)
 
     add_test(NAME test_OFDM_modem_fading_BER
              COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/unittest;
-                            PATH=$PATH:${CMAKE_CURRENT_BINARY_DIR}/src ./ofdm_fade.sh")
+                            PATH=$PATH:${CMAKE_CURRENT_BINARY_DIR}/src ./ofdm_fade.sh ${CMAKE_CURRENT_BINARY_DIR}/unittest")
 
     add_test(NAME test_OFDM_modem_phase_est_bw
              COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/unittest;
-                            PATH=$PATH:${CMAKE_CURRENT_BINARY_DIR}/src ./ofdm_phase_est_bw.sh")
+                            PATH=$PATH:${CMAKE_CURRENT_BINARY_DIR}/src ./ofdm_phase_est_bw.sh ${CMAKE_CURRENT_BINARY_DIR}/unittest")
 
     add_test(NAME test_OFDM_modem_fading_DPSK_BER
              COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/unittest;
-                            PATH=$PATH:${CMAKE_CURRENT_BINARY_DIR}/src ./ofdm_fade_dpsk.sh")
+                            PATH=$PATH:${CMAKE_CURRENT_BINARY_DIR}/src ./ofdm_fade_dpsk.sh ${CMAKE_CURRENT_BINARY_DIR}/unittest")
 
     add_test(NAME test_OFDM_modem_time_sync_700D
              COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/unittest;
@@ -1233,4 +1224,17 @@ endif(NOT APPLE)
                             ./demo/freedv_datac0c1_rx")
            set_tests_properties(test_demo_datac0c1 PROPERTIES PASS_REGULAR_EXPRESSION "DATAC0 Frames: 10 DATAC1 Frames: 10")
 
+    # Set common properties for tests that need Octave/CML
+    set_tests_properties(
+        test_CML_ldpcut
+        test_OFDM_modem_octave_port
+        test_OFDM_modem_octave_port_Nc_31
+        test_OFDM_modem_octave_datac0_mpp_coded
+        test_OFDM_modem_datac0_octave_burst
+        test_OFDM_modem_datac1_octave
+        test_OFDM_modem_datac3_octave
+        test_fsk_lib_4fsk_ldpc
+        PROPERTIES
+        ENVIRONMENT "CML_PATH=${CMAKE_CURRENT_BINARY_DIR}/cml"
+    )
 endif(UNITTEST)

@@ -330,7 +330,7 @@ endfunction
 
 format short
 more off
-init_cml('~/cml/');
+init_cml();
 
 if exist('Ctype')==0, Ctype=1, end
 

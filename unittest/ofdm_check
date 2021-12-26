@@ -31,7 +31,7 @@ if [[ $p1 -eq 1 && $p2 -eq 1 ]]; then echo "OK"; else echo "BAD"; PASS=0; fi
 echo
 echo "Simple test, plain, AWGN"
 OFDM_MOD --in /dev/zero --testframes 100 |
-    cohpsk_ch - - -20 -Fs 8000 -f -5 --raw_dir ../../raw |
+    cohpsk_ch - - -20 -Fs 8000 -f -5  |
     OFDM_DEMOD --out /dev/null --testframes --verbose 1 2>tmp
 cat tmp
 n=$(grep '^BER\.*:' tmp | cut -d ' ' -f 2)
@@ -54,7 +54,7 @@ if [[ $p1 -eq 1 && $p2 -eq 1 ]]; then echo "OK"; else echo "BAD"; PASS=0; fi
 echo
 echo "Simple test, LDPC, AWGN"
 OFDM_MOD --in /dev/zero --ldpc --testframes 100 |
-    cohpsk_ch - - -20 -Fs 8000 -f -5 --raw_dir ../../raw |
+    cohpsk_ch - - -20 -Fs 8000 -f -5 --fading_dir ../../build_linux/unittest |
     OFDM_DEMOD --out /dev/null --ldpc --testframes --verbose 1 2>tmp
 cat tmp
 n=$(grep '^BER\.*:' tmp | cut -d ' ' -f 2)
