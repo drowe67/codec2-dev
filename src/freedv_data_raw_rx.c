@@ -55,7 +55,7 @@ int main(int argc, char *argv[]) {
     int                        mode;
     int                        verbose = 0, use_testframes = 0;
     int                        mask = 0;
-    int                        framesperburst = 0;
+    int                        framesperburst = 1;
     FILE                      *foct = NULL;
     int                        quiet = 0;
     int                        single_line_summary = 0;
@@ -66,7 +66,7 @@ int main(int argc, char *argv[]) {
       	fprintf(stderr, "\nusage: %s [options] FSK_LDPC|DATAC0|DATAC1|DATAC3 InputModemSpeechFile BinaryDataFile\n"
                "  -v or --vv              verbose options\n"
                "  --testframes            count raw and coded errors in testframes sent by tx\n"
-               "  --framesperburst  N     selects burst mode, N frames per burst (must match Tx)\n"
+               "  --framesperburst  N     N frames per burst (default 1, must match Tx)\n"
                "  --scatter         file  write scatter diagram symbols to file (Octave text file format)\n"
                "  --singleline            single line summary at end of test, used for logging\n"
                "  --quiet\n"

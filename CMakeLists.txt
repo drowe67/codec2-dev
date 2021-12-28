@@ -7,7 +7,7 @@
 #
 set(CMAKE_OSX_DEPLOYMENT_TARGET "10.9" CACHE STRING "Minimum OS X deployment version")
 
-project(codec2 C)
+project(codec2)
 
 cmake_minimum_required(VERSION 3.0)
 
@@ -47,7 +47,7 @@ set(CODEC2_VERSION_MAJOR 1)
 set(CODEC2_VERSION_MINOR 0)
 # Set to patch level if needed, otherwise leave FALSE.
 # Must be positive (non-zero) if set, since 0 == FALSE in CMake.
-set(CODEC2_VERSION_PATCH 0)
+set(CODEC2_VERSION_PATCH 3)
 set(CODEC2_VERSION "${CODEC2_VERSION_MAJOR}.${CODEC2_VERSION_MINOR}")
 # Patch level version bumps should not change API/ABI.
 set(SOVERSION "${CODEC2_VERSION_MAJOR}.${CODEC2_VERSION_MINOR}")
@@ -112,7 +112,7 @@ else()
 endif()
 
 # -fPIC is implied on MinGW...
-if(NOT WIN32)
+if((NOT WIN32) AND (NOT MICROCONTROLLER_BUILD))
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC")
 endif()
 
@@ -152,12 +152,7 @@ endif()
 #
 option(BUILD_SHARED_LIBS
     "Build shared library. Set to OFF for static library." ON)
-# Unittest should be on for dev builds and off for releases.
-if(CMAKE_BUILD_TYPE MATCHES "Release")
-    option(UNITTEST "Build unittest binaries." OFF)
-else()
-    option(UNITTEST "Build unittest binaries." ON)
-endif()
+option(UNITTEST "Build unittest binaries." OFF)
 option(INSTALL_EXAMPLES "Install example code." OFF)
 if(INSTALL_EXAMPLES)
     install(DIRECTORY octave raw script wav
@@ -378,6 +373,22 @@ if(UNITTEST)
                             ")
              set_tests_properties(test_fdmdv_16to8_short PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
 
+    # 48<->8 kHz float resamplers
+    add_test(NAME test_fdmdv_48to8_short
+             COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/octave;
+                            ${CMAKE_CURRENT_BINARY_DIR}/unittest/t48_8_short;
+                            DISPLAY=\"\" echo \"diff_fft_mag('in8.raw','out8.raw'); quit;\" | octave-cli -qf
+                            ")
+             set_tests_properties(test_fdmdv_48to8_short PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
+
+    # 48<->8 kHz short resamplers
+    add_test(NAME test_fdmdv_48to8
+             COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/octave;
+                            ${CMAKE_CURRENT_BINARY_DIR}/unittest/t48_8;
+                            DISPLAY=\"\" echo \"diff_fft_mag('in8.raw','out8.raw'); quit;\" | octave-cli -qf
+                            ")
+             set_tests_properties(test_fdmdv_48to8 PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
+
     add_test(NAME test_CML_ldpcut
              COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/octave; SHORT_VERSION_FOR_CTEST=1 octave-cli -qf ldpcut.m")
              set_tests_properties(test_CML_ldpcut PROPERTIES PASS_REGULAR_EXPRESSION "Nerr: 0")
@@ -399,14 +410,12 @@ if(UNITTEST)
     add_test(NAME test_FDMDV_modem_octave_port
              COMMAND sh -c "$<TARGET_FILE:tfdmdv> && DISPLAY=\"\" octave-cli --no-gui -qf ${CMAKE_CURRENT_SOURCE_DIR}/octave/tfdmdv.m"
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/octave)
-             set_tests_properties(test_FDMDV_modem_octave_port PROPERTIES
-             PASS_REGULAR_EXPRESSION "fails: 0")
+             set_tests_properties(PROPERTIES PASS_REGULAR_EXPRESSION "fails: 0")
 
     add_test(NAME test_COHPSK_modem_octave_port
              COMMAND sh -c "$<TARGET_FILE:tcohpsk> && DISPLAY=\"\" octave-cli --no-gui -qf ${CMAKE_CURRENT_SOURCE_DIR}/octave/tcohpsk.m"
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/octave)
-             set_tests_properties(test_COHPSK_modem_octave_port PROPERTIES
-             PASS_REGULAR_EXPRESSION "fails: 0")
+             set_tests_properties(test_COHPSK_modem_octave_port PROPERTIES PASS_REGULAR_EXPRESSION "fails: 0")
 
     add_test(NAME test_COHPSK_modem_AWGN_BER
              COMMAND sh -c "$<TARGET_FILE:cohpsk_get_test_bits> - 5600 | $<TARGET_FILE:cohpsk_mod> - - | $<TARGET_FILE:cohpsk_ch> - - -30  | $<TARGET_FILE:cohpsk_demod> - - | $<TARGET_FILE:cohpsk_put_test_bits> -"
@@ -426,14 +435,12 @@ if(UNITTEST)
     add_test(NAME test_OFDM_modem_octave_port
              COMMAND sh -c "PATH_TO_TOFDM=${CMAKE_CURRENT_BINARY_DIR}/unittest/tofdm DISPLAY=\"\" octave-cli --no-gui -qf ${CMAKE_CURRENT_SOURCE_DIR}/octave/tofdm.m"
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/octave)
-             set_tests_properties(test_OFDM_modem_octave_port PROPERTIES
-             PASS_REGULAR_EXPRESSION "fails: 0")
+             set_tests_properties(test_OFDM_modem_octave_port PROPERTIES PASS_REGULAR_EXPRESSION "fails: 0")
 
     add_test(NAME test_OFDM_modem_octave_port_Nc_31
              COMMAND sh -c "NC=31 PATH_TO_TOFDM=${CMAKE_CURRENT_BINARY_DIR}/unittest/tofdm DISPLAY=\"\" octave-cli --no-gui -qf ${CMAKE_CURRENT_SOURCE_DIR}/octave/tofdm.m"
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/octave)
-             set_tests_properties(test_OFDM_modem_octave_port_Nc_31 PROPERTIES
-             PASS_REGULAR_EXPRESSION "fails: 0")
+             set_tests_properties(test_OFDM_modem_octave_port_Nc_31 PROPERTIES PASS_REGULAR_EXPRESSION "fails: 0")
 
     add_test(NAME test_OFDM_modem_octave_qam16_uncoded
              COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/octave;
@@ -521,15 +528,15 @@ if(UNITTEST)
 
     add_test(NAME test_OFDM_modem_fading_BER
              COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/unittest;
-                            PATH=$PATH:${CMAKE_CURRENT_BINARY_DIR}/src ./ofdm_fade.sh")
+                            PATH=$PATH:${CMAKE_CURRENT_BINARY_DIR}/src ./ofdm_fade.sh ${CMAKE_CURRENT_BINARY_DIR}/unittest")
 
     add_test(NAME test_OFDM_modem_phase_est_bw
              COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/unittest;
-                            PATH=$PATH:${CMAKE_CURRENT_BINARY_DIR}/src ./ofdm_phase_est_bw.sh")
+                            PATH=$PATH:${CMAKE_CURRENT_BINARY_DIR}/src ./ofdm_phase_est_bw.sh ${CMAKE_CURRENT_BINARY_DIR}/unittest")
 
     add_test(NAME test_OFDM_modem_fading_DPSK_BER
              COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/unittest;
-                            PATH=$PATH:${CMAKE_CURRENT_BINARY_DIR}/src ./ofdm_fade_dpsk.sh")
+                            PATH=$PATH:${CMAKE_CURRENT_BINARY_DIR}/src ./ofdm_fade_dpsk.sh ${CMAKE_CURRENT_BINARY_DIR}/unittest")
 
     add_test(NAME test_OFDM_modem_time_sync_700D
              COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/unittest;
@@ -841,7 +848,7 @@ endif()
         COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/unittest; ./reliable_text_fade.sh 700D -19 8 1 '${CMAKE_CURRENT_BINARY_DIR}/src'")
                                       
   add_test(NAME test_freedv_reliable_text_fade_700E
-        COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/unittest; ./reliable_text_fade.sh 700E -22 9 1 '${CMAKE_CURRENT_BINARY_DIR}/src'")
+        COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/unittest; ./reliable_text_fade.sh 700E -22 8 1 '${CMAKE_CURRENT_BINARY_DIR}/src'")
                           
 if(LPCNET)
     add_test(NAME test_freedv_reliable_text_ideal_2020
@@ -991,10 +998,11 @@ endif(NOT APPLE)
 
      add_test(NAME test_vq_mbest
              COMMAND sh -c "./tvq_mbest; \
-                            cat target.f32 | ../misc/vq_mbest -k 2 -q vq1.f32,vq2.f32 --mbest 2 -v > out.f32; \
-                            diff target.f32 out.f32"
+                            cat target.f32 | \
+                            ../misc/vq_mbest -k 4 -q vq1.f32,vq2.f32 --st 1 --en 2 --mbest 2 -v > /dev/null;"
              WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/unittest
              )
+             set_tests_properties(test_vq_mbest PROPERTIES PASS_REGULAR_EXPRESSION "MSE: 0.00")
 
      add_test(NAME test_700c_eq
              COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/unittest;
@@ -1126,35 +1134,20 @@ endif(NOT APPLE)
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
                             head -c $((14*10)) </dev/urandom > binaryIn.bin;
                             ./freedv_data_raw_tx DATAC0 binaryIn.bin - --bursts 10 |
-                            ./freedv_data_raw_rx DATAC0 - binaryOut.bin --framesperburst 1 --vv;
+                            ./freedv_data_raw_rx DATAC0 - binaryOut.bin  -v;
                             diff binaryIn.bin binaryOut.bin")
 
      add_test(NAME test_freedv_data_raw_ofdm_datac1_burst_file
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
                             head -c $((510*10)) </dev/urandom > binaryIn.bin;
-                            ./freedv_data_raw_tx DATAC1 binaryIn.bin - --framesperburst 2 --bursts 5 |
-                            ./freedv_data_raw_rx DATAC1 - binaryOut.bin --framesperburst 2 --vv;
-                            diff binaryIn.bin binaryOut.bin")
-
-     # Streaming mode tests, with data file I/O
-     add_test(NAME test_freedv_data_raw_ofdm_datac0
-             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
-                            head -c $((14*10)) </dev/urandom > binaryIn.bin;
-                            ./freedv_data_raw_tx DATAC0 binaryIn.bin - |
-                            ./freedv_data_raw_rx DATAC0 - binaryOut.bin -v;
-                            diff binaryIn.bin binaryOut.bin")
-
-     add_test(NAME test_freedv_data_raw_ofdm_datac1
-             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
-                            head -c $((510*10)) </dev/urandom > binaryIn.bin;
-                            ./freedv_data_raw_tx DATAC1 binaryIn.bin - |
+                            ./freedv_data_raw_tx DATAC1 binaryIn.bin - --bursts 10 |
                             ./freedv_data_raw_rx DATAC1 - binaryOut.bin -v;
                             diff binaryIn.bin binaryOut.bin")
 
-     add_test(NAME test_freedv_data_raw_ofdm_datac3
+     add_test(NAME test_freedv_data_raw_ofdm_datac3_burst_file
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
                             head -c $((126*10)) </dev/urandom > binaryIn.bin;
-                            ./freedv_data_raw_tx DATAC3 binaryIn.bin - |
+                            ./freedv_data_raw_tx DATAC3 binaryIn.bin - --bursts 10 |
                             ./freedv_data_raw_rx DATAC3 - binaryOut.bin -v;
                             diff binaryIn.bin binaryOut.bin")
 
@@ -1221,6 +1214,27 @@ endif(NOT APPLE)
                             cat binaryIn.bin | ./demo/freedv_datac1_tx | 
                             ./demo/freedv_datac1_rx > binaryOut.bin;
                             diff binaryIn.bin binaryOut.bin")
- 
 
+      # test Rx of two modes in parallel, with AWGN noise and sample clock offsets
+      add_test(NAME test_demo_datac0c1
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR};
+                            ./demo/freedv_datac0c1_tx | 
+                            ./src/cohpsk_ch - - -24 -f 20 --Fs 8000 | 
+                            sox -t .s16 -c 1 -r 8000 - -t .s16 -c 1 -r 8008 - | 
+                            ./demo/freedv_datac0c1_rx")
+           set_tests_properties(test_demo_datac0c1 PROPERTIES PASS_REGULAR_EXPRESSION "DATAC0 Frames: 10 DATAC1 Frames: 10")
+
+    # Set common properties for tests that need Octave/CML
+    set_tests_properties(
+        test_CML_ldpcut
+        test_OFDM_modem_octave_port
+        test_OFDM_modem_octave_port_Nc_31
+        test_OFDM_modem_octave_datac0_mpp_coded
+        test_OFDM_modem_datac0_octave_burst
+        test_OFDM_modem_datac1_octave
+        test_OFDM_modem_datac3_octave
+        test_fsk_lib_4fsk_ldpc
+        PROPERTIES
+        ENVIRONMENT "CML_PATH=${CMAKE_CURRENT_BINARY_DIR}/cml"
+    )
 endif(UNITTEST)

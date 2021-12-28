@@ -64,6 +64,15 @@ void mbest_destroy(struct MBEST *mbest) {
 }
 
 
+/* apply weighting to VQ for efficient VQ search */
+
+void mbest_precompute_weight(float cb[], float w[], int k, int m) {
+    for (int j=0; j<m; j++) {
+        for(int i=0; i<k; i++)
+            cb[k*j+i] *= w[i];
+    }
+}
+
 /*---------------------------------------------------------------------------*\
 
   mbest_insert
@@ -75,7 +84,7 @@ void mbest_destroy(struct MBEST *mbest) {
 \*---------------------------------------------------------------------------*/
 
 void mbest_insert(struct MBEST *mbest, int index[], float error) {
-    int                i, j, found;
+    int                i, found;
     struct MBEST_LIST *list    = mbest->list;
     int                entries = mbest->entries;
 
@@ -83,10 +92,8 @@ void mbest_insert(struct MBEST *mbest, int index[], float error) {
     for(i=0; i<entries && !found; i++)
 	if (error < list[i].error) {
 	    found = 1;
-	    for(j=entries-1; j>i; j--)
-		list[j] = list[j-1];
-	    for(j=0; j<MBEST_STAGES; j++)
-		list[i].index[j] = index[j];
+            memmove(&list[i+1], &list[i], sizeof(struct MBEST_LIST) * (entries - i - 1));
+            memcpy(&list[i].index[0], &index[0], sizeof(int) * MBEST_STAGES);
 	    list[i].error = error;
 	}
 }
@@ -114,30 +121,49 @@ void mbest_print(char title[], struct MBEST *mbest) {
 \*---------------------------------------------------------------------------*/
 
 void mbest_search(
-		  const float  *cb,     /* VQ codebook to search         */
-		  float         vec[],  /* target vector                 */
-		  float         w[],    /* weighting vector              */
-		  int           k,      /* dimension of vector           */
-		  int           m,      /* number on entries in codebook */
-		  struct MBEST *mbest,  /* list of closest matches       */
-		  int           index[] /* indexes that lead us here     */
+		  const float  *cb,      /* VQ codebook to search         */
+		  float         vec[],   /* target vector                 */
+                  int           k,       /* dimension of vector           */
+		  int           m,       /* number on entries in codebook */
+		  struct MBEST *mbest,   /* list of closest matches       */
+		  int           index[]  /* indexes that lead us here     */
 )
 {
-   float   e;
-   int     i,j;
-   float   diff;
+    int j;
 
-   for(j=0; j<m; j++) {
-	e = 0.0;
-	for(i=0; i<k; i++) {
-	    diff = cb[j*k+i]-vec[i];
-	    e += diff*w[i]*diff*w[i];
-	}
-	index[0] = j;
-	mbest_insert(mbest, index, e);
-   }
+    /* note weighting can be applied externally by modifiying cb[] and vec:
+
+      float e = 0.0;
+      for(i=0; i<k; i++)
+        e += pow(w[i]*(cb[j*k+i] - vec[i]),2.0)
+           
+       |
+      \|/
+
+      for(i=0; i<k; i++)
+         e += pow(w[i]*cb[j*k+i] - w[i]*vec[i]),2.0)
+
+       |
+      \|/
+
+      for(i=0; i<k; i++)
+         e += pow(cb1[j*k+i] - vec1[i]),2.0)
+
+      where cb1[j*k+i] = w[i]*cb[j*k+i], and vec1[i] = w[i]*vec[i]
+    */
+
+    for(j=0; j<m; j++) {
+        float e = 0.0;
+        for(int i=0; i<k; i++) {
+	    float diff = *cb++ - vec[i];
+            e += diff*diff;
+        }
+        
+        index[0] = j;
+        if (e < mbest->list[mbest->entries - 1].error)
+            mbest_insert(mbest, index, e);
+    }
 }
-
 
 /*---------------------------------------------------------------------------*\
 
@@ -146,7 +172,7 @@ void mbest_search(
   Searches vec[] to a codebbook of vectors, and maintains a list of the mbest
   closest matches. Only searches the first NewAmp2_K Vectors
 
-  \*---------------------------------------------------------------------------*/
+\*---------------------------------------------------------------------------*/
 
 void mbest_search450(const float  *cb, float vec[], float w[], int k,int shorterK, int m, struct MBEST *mbest, int index[])
 

@@ -123,15 +123,13 @@ CTest is used as a test framework, with support from [GNU Octave](https://www.gn
    ```
    sudo apt install octave octave-common octave-signal liboctave-dev gnuplot python3-numpy sox valgrind
    ```
-1. Install CML library with instructions at the top of [```octave/ldpc.m```](octave/ldpc.m)
-
 1. To build and run the tests:
    ```
    cd ~/codec2
    rm -Rf build_linux && mkdir build_linux
    cd build_linux
-   cmake -DCMAKE_BUILD_TYPE=Debug ..
-   make all test
+   cmake -DUNITTEST=1 ..
+   make
    ```
 
 1. To just run tests without rebuilding:
@@ -154,6 +152,13 @@ CTest is used as a test framework, with support from [GNU Octave](https://www.gn
    ctest -N
    ```
 
+1. Many Octave scripts rely on the CML LDPC library.  To run these from the Octave CLI, you need to set
+   the `CML_PATH` environment variable.  A convenient way to do this is using a `.octaverc` file
+   in your `codec/octave` directory.  For example on a Linux machine, create a `.octaverc` file:
+   ```
+   setenv("CML_PATH","../build_linux/cml")
+   ```  
+   
 ## Directories
 ```
 cmake       - cmake support files
@@ -235,6 +240,43 @@ Codec 2 can be added to the project in the following way.
     ```
      
 1. Add Codec 2 to the target_link_libraries in the same file.
+
+## Building Codec 2 for Microcontrollers
+
+Codec 2 requires a hardware Floating Point Unit (FPU) to run in real time.
+
+Two build options have been added to support building on microcontrollers:
+1. Setting the `cmake` variable MICROCONTROLLER_BUILD disables position independent code (-fPIC is not used).  This was required for the IMRT1052 used in Teensy 4/4.1).
+
+1. On ARM machines, setting the C Flag \_\_EMBEDDED\_\_ and linking with the ARM CMSIS library will improve performance on ARM-based microcontrollers. \_\_REAL\_\_ and FDV\_ARM\_MATH are additional ARM-specific options that can be set to improve performance if required, especially with OFDM modes.
+
+A CMakeLists.txt example for a microcontroller is below:
+
+```
+set(CMAKE_TRY_COMPILE_TARGET_TYPE STATIC_LIBRARY)
+set(MICROCONTROLLER_BUILD 1)
+
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mlittle-endian -ffunction-sections -fdata-sections -g -O3")
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -ffunction-sections -fdata-sections")
+
+add_definitions(-DCORTEX_M7 -D__EMBEDDED__)
+add_definitions(-DFREEDV_MODE_EN_DEFAULT=0 -DFREEDV_MODE_1600_EN=1 -DFREEDV_MODE_700D_EN=1 -DFREEDV_MODE_700E_EN=1 -DCODEC2_MODE_EN_DEFAULT=0 -DCODEC2_MODE_1300_EN=1 -DCODEC2_MODE_700C_EN=1)
+                    
+FetchContent_Declare(codec2
+    GIT_REPOSITORY https://github.com/drowe67/codec2.git
+    GIT_TAG origin/master
+    GIT_SHALLOW ON
+    GIT_PROGRESS ON
+)
+FetchContent_GetProperties(codec2)
+if(NOT ${codec2_POPULATED})
+    FetchContent_Populate(codec2)
+endif()
+set(CMAKE_REQUIRED_FLAGS "")
+
+set(LPCNET OFF CACHE BOOL "")
+add_subdirectory(${codec2_SOURCE_DIR} ${codec2_BINARY_DIR} EXCLUDE_FROM_ALL)
+```
 
 ## Building Debian packages
 

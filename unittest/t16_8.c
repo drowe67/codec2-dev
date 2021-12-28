@@ -68,7 +68,7 @@ int main() {
 #endif
 #ifdef SINE
 	for(i=0; i<N8; i++,t++)
-	    in8k[FDMDV_OS_TAPS_8K+i] = 16000.0*cos(TWO_PI*t*freq/FS);
+	    in8k[FDMDV_OS_TAPS_8K+i] = 16000.0*cos(TWO_PI*t*freq/(FS/FDMDV_OS));
 #endif
 	for(i=0; i<N8; i++)
 	    in8k_short[i] = (short)in8k[i];

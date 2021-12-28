@@ -19,18 +19,19 @@
 #define MAX_ENTRIES 4096
 #define MAX_STAGES  5
 
-void quant_pred_mbest(float vec_out[],
-                      int   indexes[],
-                      float vec_in[],
-                      int   num_stages,
-                      float vq[],
-                      int   m[], int k,
-                      int   mbest_survivors, int st, int en);
+void quant_mbest(float vec_out[],
+                 int   indexes[],
+                 float vec_in[],
+                 int   num_stages,
+                 float vqw[], float vq[], 
+                 int   m[], int k,
+                 int   mbest_survivors);
 
 int verbose = 0;
 
 int main(int argc, char *argv[]) {
     float vq[MAX_STAGES*MAX_K*MAX_ENTRIES];
+    float vqw[MAX_STAGES*MAX_K*MAX_ENTRIES];
     int   m[MAX_STAGES];
     int   k=0, mbest_survivors=1, num_stages=0;
     char  fnames[256], fn[256], *comma, *p;
@@ -143,11 +144,27 @@ int main(int argc, char *argv[]) {
     if (st == -1) st = 0; 
     if (en == -1) en = k-1;
 
-    int   indexes[num_stages], nvecs = 0; int vec_usage[m[0]];
+    float w[k];
+    for(int i=0; i<st; i++)
+        w[i] = 0.0;
+    for(int i=st; i<=en; i++)
+        w[i] = 1.0;
+    for(int i=en+1; i<k; i++)
+        w[i] = 0.0;
+
+    /* apply weighting to codebook (rather than in search) */
+    memcpy(vqw, vq, sizeof(vq));
+    for(int s=0; s<num_stages; s++) {
+        mbest_precompute_weight(&vqw[s*k*MAX_ENTRIES], w, k, m[s]);
+    }
+    
+    int indexes[num_stages], nvecs = 0; int vec_usage[m[0]];
     for(int i=0; i<m[0]; i++) vec_usage[i] = 0;
     float target[k], quantised[k];
     float sqe = 0.0;
     while(fread(&target, sizeof(float), k, stdin) && (nvecs < num)) {
+	for(int i=0; i<k; i++)
+            target[i] *= w[i];
 	int dont_count = 0;
 	/* optional clamping to lower limit or mean */
 	float mean = 0.0;
@@ -161,7 +178,7 @@ int main(int argc, char *argv[]) {
 		target[i] += -difference;
 	    dont_count = 1;
 	}
-	quant_pred_mbest(quantised, indexes, target, num_stages, vq, m, k, mbest_survivors, st, en);
+	quant_mbest(quantised, indexes, target, num_stages, vqw, vq, m, k, mbest_survivors);
 	if (dont_count == 0) {
 	    for(int i=st; i<=en; i++)
 		sqe += pow(target[i]-quantised[i], 2.0);
@@ -172,7 +189,7 @@ int main(int argc, char *argv[]) {
 	vec_usage[indexes[0]]++;
     }
 
-    fprintf(stderr, "%4.2f\n", sqe/(nvecs*(en-st+1)));
+    fprintf(stderr, "MSE: %4.2f\n", sqe/(nvecs*(en-st+1)));
 
     if (output_vec_usage) {
       for(int i=0; i<m[0]; i++)
@@ -196,15 +213,15 @@ void pv(char s[], float v[], int k) {
 
 // mbest algorithm version, backported from LPCNet/src
 
-void quant_pred_mbest(float vec_out[],
-                      int   indexes[],
-                      float vec_in[],
-                      int   num_stages,
-                      float vq[],
-                      int   m[], int k,
-                      int   mbest_survivors, int st, int en)
+void quant_mbest(float vec_out[],
+                 int   indexes[],
+                 float vec_in[],
+                 int   num_stages,
+                 float vqw[], float vq[],
+                 int   m[], int k,
+                 int   mbest_survivors)
 {
-    float err[k], w[k], se1;
+    float err[k], se1;
     int i,j,s,s1,ind;
     
     struct MBEST *mbest_stage[num_stages];
@@ -216,24 +233,17 @@ void quant_pred_mbest(float vec_out[],
         index[i] = 0;
     }
 
-    for(i=0; i<st; i++)
-        w[i] = 0.0;
-    for(i=st; i<=en; i++)
-        w[i] = 1.0;
-    for(i=en+1; i<k; i++)
-        w[i] = 0.0;
-
     se1 = 0.0;
     for(i=0; i<k; i++) {
         err[i] = vec_in[i];
-        se1 += err[i]*err[i]*w[i]*w[i];
+        se1 += err[i]*err[i];
     }
     se1 /= k;
                 
     /* now quantise err[] using multi-stage mbest search, preserving
        mbest_survivors at each stage */
     
-    mbest_search(vq, err, w, k, m[0], mbest_stage[0], index);
+    mbest_search(vqw, err, k, m[0], mbest_stage[0], index);
     if (verbose) mbest_print("Stage 1:", mbest_stage[0]);
     
     for(s=1; s<num_stages; s++) {
@@ -251,11 +261,11 @@ void quant_pred_mbest(float vec_out[],
                 ind = index[s-s1];
                 if (verbose) fprintf(stderr, "   s: %d s1: %d s-s1: %d ind: %d\n", s,s1,s-s1,ind);
                 for(i=0; i<k; i++) {
-                    target[i] -= vq[s1*k*MAX_ENTRIES+ind*k+i];
+                    target[i] -= vqw[s1*k*MAX_ENTRIES+ind*k+i];
                 }
             }
             pv("   target: ", target, k);
-            mbest_search(&vq[s*k*MAX_ENTRIES], target, w, k, m[s], mbest_stage[s], index);
+            mbest_search(&vqw[s*k*MAX_ENTRIES], target, k, m[s], mbest_stage[s], index);
         }
         char str[80]; sprintf(str,"Stage %d:", s+1);
         if (verbose) mbest_print(str, mbest_stage[s]);
@@ -272,9 +282,9 @@ void quant_pred_mbest(float vec_out[],
         int ind = indexes[s];
         float se2 = 0.0;
         for(i=0; i<k; i++) {
-            err[i] -= vq[s*k*MAX_ENTRIES+ind*k+i];
+            err[i] -= vqw[s*k*MAX_ENTRIES+ind*k+i];
             vec_out[i] += vq[s*k*MAX_ENTRIES+ind*k+i];
-            se2 += err[i]*err[i]*w[i]*w[i];
+            se2 += err[i]*err[i];
         }
         se2 /= k;
         pv("    err: ", err, k);

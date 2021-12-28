@@ -943,7 +943,7 @@ void fdm_downconvert(COMP rx_baseband[NC+1][M_FAC+M_FAC/P], int Nc, COMP rx_fdm[
 
 \*---------------------------------------------------------------------------*/
 
-void rx_filter(COMP rx_filt[NC+1][P+1], int Nc, COMP rx_baseband[NC+1][M_FAC+M_FAC/P], COMP rx_filter_memory[NC+1][NFILTER], int nin)
+void rx_filter(COMP rx_filt[][P+1], int Nc, COMP rx_baseband[][M_FAC+M_FAC/P], COMP rx_filter_memory[][NFILTER], int nin)
 {
     int c, i,j,k,l;
     int n=M_FAC/P;
@@ -1234,8 +1234,8 @@ void down_convert_and_rx_filter(COMP rx_filt[NC+1][P+1], int Nc, COMP rx_fdm[],
 
 float rx_est_timing(COMP rx_symbols[],
                     int  Nc,
-		    COMP rx_filt[NC+1][P+1],
-		    COMP rx_filter_mem_timing[NC+1][NT*P],
+		    COMP rx_filt[][P+1],
+		    COMP rx_filter_mem_timing[][NT*P],
 		    float env[],
 		    int nin,
                     int m)
@@ -1868,6 +1868,108 @@ void fdmdv_16_to_8_short(short out8k[], short in16k[], int n)
 	in16k[i] = in16k[i + n*FDMDV_OS];
 }
 
+
+/*---------------------------------------------------------------------------*\
+                                                       
+  FUNCTION....: fdmdv_8_to_48()	     
+  AUTHOR......: David Rowe			      
+  DATE CREATED: 9 May 2012
+
+  Changes the sample rate of a signal from 8 to 48 kHz.
+
+  n is the number of samples at the 8 kHz rate, there are FDMDV_OS*n samples
+  at the 48 kHz rate.  A memory of FDMDV_OS_TAPS_48/FDMDV_OS samples is reqd for
+  in8k[] (see t48_8.c unit test as example).
+
+\*---------------------------------------------------------------------------*/
+
+void fdmdv_8_to_48(float out48k[], float in8k[], int n)
+{
+    int i,j,k,l;
+
+    for(i=0; i<n; i++) {
+	for(j=0; j<FDMDV_OS_48; j++) {
+	    out48k[i*FDMDV_OS_48+j] = 0.0;
+	    for(k=0,l=0; k<FDMDV_OS_TAPS_48K; k+=FDMDV_OS_48,l++)
+		out48k[i*FDMDV_OS_48+j] += fdmdv_os_filter48[k+j]*in8k[i-l];
+	    out48k[i*FDMDV_OS_48+j] *= FDMDV_OS_48;
+	    
+	}
+    }	
+
+    /* update filter memory */
+
+    for(i=-FDMDV_OS_TAPS_48_8K; i<0; i++)
+	in8k[i] = in8k[i + n];
+}
+
+void fdmdv_8_to_48_short(short out48k[], short in8k[], int n)
+{
+    int i,j,k,l;
+    float acc;
+    
+    for(i=0; i<n; i++) {
+	for(j=0; j<FDMDV_OS_48; j++) {
+	    acc = 0.0;
+	    for(k=0,l=0; k<FDMDV_OS_TAPS_48K; k+=FDMDV_OS_48,l++)
+		acc += fdmdv_os_filter48[k+j]*in8k[i-l];
+	    out48k[i*FDMDV_OS_48+j] = acc*FDMDV_OS_48;	    
+	}
+    }	
+
+    /* update filter memory */
+
+    for(i=-FDMDV_OS_TAPS_48_8K; i<0; i++)
+	in8k[i] = in8k[i + n];
+}
+
+/*---------------------------------------------------------------------------*\
+                                                       
+  FUNCTION....: fdmdv_48_to_8()	     
+  AUTHOR......: David Rowe			      
+  DATE CREATED: 9 May 2012
+
+  Changes the sample rate of a signal from 48 to 8 kHz.
+ 
+  n is the number of samples at the 8 kHz rate, there are FDMDV_OS_48*n
+  samples at the 48 kHz rate.  As above however a memory of
+  FDMDV_OS_TAPS_48 samples is reqd for in48k[] (see t48_8.c unit test as example).
+
+\*---------------------------------------------------------------------------*/
+
+void fdmdv_48_to_8(float out8k[], float in48k[], int n)
+{
+    int i,j;
+
+    for(i=0; i<n; i++) {
+	out8k[i] = 0.0;
+	for(j=0; j<FDMDV_OS_TAPS_48K; j++)
+	    out8k[i] += fdmdv_os_filter48[j]*in48k[i*FDMDV_OS_48-j];
+    }
+
+    /* update filter memory */
+
+    for(i=-FDMDV_OS_TAPS_48K; i<0; i++)
+	in48k[i] = in48k[i + n*FDMDV_OS_48];
+}
+
+void fdmdv_48_to_8_short(short out8k[], short in48k[], int n)
+{
+    int i,j;
+    float acc;
+    
+    for(i=0; i<n; i++) {
+	acc = 0.0;
+	for(j=0; j<FDMDV_OS_TAPS_48K; j++)
+	    acc += fdmdv_os_filter48[j]*in48k[i*FDMDV_OS_48-j];
+        out8k[i] = acc;
+    }
+
+    /* update filter memory */
+
+    for(i=-FDMDV_OS_TAPS_48K; i<0; i++)
+	in48k[i] = in48k[i + n*FDMDV_OS_48];
+}
 
 /*---------------------------------------------------------------------------*\
 

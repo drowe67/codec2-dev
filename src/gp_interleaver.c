@@ -65,6 +65,7 @@ int choose_interleaver_b(int Nbits)
 
     fprintf(stderr, "gp_interleaver: Nbits: %d, b not found!\n", Nbits);
     assert(0);
+    return -1;
 }
 
 

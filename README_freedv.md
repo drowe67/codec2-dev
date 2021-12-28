@@ -34,6 +34,8 @@ The current demo programs are as follows:
 | [freedv_700d_rx.py](demo/freedv_700d_rx.py) | Receive a voice signal using the FreeDV API in Python |
 | [freedv_datac1_tx.c](demo/freedv_datac1_tx.c) | Transmit raw data frames using the FreeDV API |
 | [freedv_datac1_rx.c](demo/freedv_datac1_rx.c) | Receive raw data frames using the FreeDV API |
+| [freedv_datac0c1_tx.c](demo/freedv_datac0c1_tx.c) | Transmit two types of raw data frames using the FreeDV API |
+| [freedv_datac0c1_rx.c](demo/freedv_datac0c1_rx.c) | Receive two types of raw data frames using the FreeDV API |
 
 So also [freedv_api.h](src/freedv_api.h) and [freedv_api.c](src/freedv_api.c) for the full list of API functions.  Only a small set of these functions are needed for basic FreeDV use, please see the demo programs for minimal examples.
 
@@ -185,11 +187,11 @@ $ ./freedv_tx 2020 ~/LPCNet/wav/all.wav - | ./cohpsk_ch - - -22 --Fs 8000 | ./fr
 
 AWGN:
 ```
-$ ./src/freedv_tx 700D ../raw/ve9qrp.raw - --clip 0 --testframes | ./src/cohpsk_ch - - -16 --raw_dir ../raw/ --Fs 8000 | ./src/freedv_rx 700D - /dev/null --testframes
+$ ./src/freedv_tx 700D ../raw/ve9qrp.raw - --clip 0 --testframes | ./src/cohpsk_ch - - -16 --Fs 8000 | ./src/freedv_rx 700D - /dev/null --testframes
 ```
 MultiPath Poor (MPP):
 ```
-$ ./src/freedv_tx 700D ../raw/ve9qrp.raw - --clip 0 --testframes | ./src/cohpsk_ch - - -24 --fast --raw_dir ../raw/ --Fs 8000 | ./src/freedv_rx 700D - /dev/null --testframes
+$ ./src/freedv_tx 700D ../raw/ve9qrp.raw - --clip 0 --testframes | ./src/cohpsk_ch - - -24 --mpp --fading_dir unittest --Fs 8000 | ./src/freedv_rx 700D - /dev/null --testframes
 ```
 
 Adjust `--clip [0|1]` and 3rd argument of `cohpsk_ch` to obtain a PER of just less than 0.1, and note the SNR and PAPR reported by `cohpsk_ch`.  The use of the `ve9qrp` samples makes the test run for a few minutes, in order to get reasonable multipath channel results.

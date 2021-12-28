@@ -48,7 +48,7 @@
 
 /* see instructions below for how to generate thsese files */
 
-#define DEFAULT_RAW_DIR       "../../raw"
+#define DEFAULT_FADING_DIR    ""
 #define MPG_FADING_FILE_NAME  "slow_fading_samples.float"
 #define MPP_FADING_FILE_NAME  "fast_fading_samples.float"
 #define MPD_FADING_FILE_NAME  "faster_fading_samples.float"
@@ -80,7 +80,7 @@ COMP noise(void) {
 int main(int argc, char *argv[])
 {
     FILE          *fin, *ffading, *fout;
-    char	        *raw_dir;
+    char	        *fading_dir;
     float          NodB, foff_hz;
     int            fading_en, nhfdelay;
 
@@ -119,7 +119,7 @@ int main(int argc, char *argv[])
         Fs = COHPSK_FS; foff_hz = 0.0; fading_en = 0; ctest = 0;
         clip =32767; gain = 1.0;
         ssbfilt_en = 1; complex_out = 0;
-        raw_dir = strdup(DEFAULT_RAW_DIR); user_multipath_delay = -1.0;
+        fading_dir = strdup(DEFAULT_FADING_DIR); user_multipath_delay = -1.0;
 
         for(int i=4; i<argc; i++) {
             if (!strcmp(argv[i],"--Fs")) { Fs = atoi(argv[i+1]); i++; }
@@ -133,8 +133,8 @@ int main(int argc, char *argv[])
             else if (!strcmp(argv[i], "--complexout")) complex_out = 1;
             else if (!strcmp(argv[i], "--ctest")) ctest = 1;
             else if (!strcmp(argv[i], "--multipath_delay")) { user_multipath_delay = atof(argv[i+1]); i++; }
-            else if (!strcmp(argv[i], "--raw_dir")) {
-                FREE(raw_dir); raw_dir = strdup(argv[i+1]); i++;
+            else if (!strcmp(argv[i], "--fading_dir")) {
+                FREE(fading_dir); fading_dir = strdup(argv[i+1]); i++;
             } else {
                 fprintf(stderr, "Unknown argument: %s\n", argv[i]);
                 exit(1);
@@ -143,7 +143,7 @@ int main(int argc, char *argv[])
     }
     else {
         fprintf(stderr, "usage: %s InputRealModemRawFile OutputRealModemRawFile No(dB/Hz) [--Fs SampleRateHz]"
-                        " [-f FoffHz] [--mpg] [--mpp] [--mpd] [--clip 0to1] [--ssbfilt 0|1] [--raw_dir Path]"
+                        " [-f FoffHz] [--mpg] [--mpp] [--mpd] [--clip 0to1] [--ssbfilt 0|1] [--fading_dir Path]"
                         " [--complexout] [--mulipath_delay ms]\n", argv[0]);
         exit(1);
     }
@@ -152,7 +152,7 @@ int main(int argc, char *argv[])
 
     /*  N = var = NoFs */
 
-    // arbitrary nise scaling, to maintain backwards compatability with many tests.  TODO make the No
+    // arbitrary noise scaling, to maintain backwards compatability with many tests.  TODO make the No
     // units more sensible, and fix all the tests that depend on this scaling
     No = pow(10.0, NodB/10.0)*1000*1000;
     variance = Fs*No;
@@ -169,20 +169,20 @@ int main(int argc, char *argv[])
         char fname[256];
 
         if (fading_en == 1) {
-	          sprintf(fname, "%s/%s", raw_dir, MPG_FADING_FILE_NAME);
+            sprintf(fname, "%s/%s", fading_dir, MPG_FADING_FILE_NAME);
             ffading = fopen(fname, "rb");
             if (ffading == NULL) {
             cant_load_fading_file:
                 fprintf(stderr, "-----------------------------------------------------\n");
                 fprintf(stderr, "cohpsk_ch ERROR: Can't find fading file: %s\n", fname);
-                fprintf(stderr, "\nAdjust path --raw_dir or use GNU Octave to generate:\n\n");
+                fprintf(stderr, "\nAdjust path --fading_dir or use GNU Octave to generate:\n\n");
             gen_fading_file:
                 fprintf(stderr, "$ octave --no-gui\n");
                 fprintf(stderr, "octave:24> pkg load signal\n");
                 fprintf(stderr, "octave:24> time_secs=60\n");
-                fprintf(stderr, "octave:25> cohpsk_ch_fading(\"../raw/faster_fading_samples.float\", 8000, 2.0, 8000*time_secs)\n");
-                fprintf(stderr, "octave:26> cohpsk_ch_fading(\"../raw/fast_fading_samples.float\", 8000, 1.0, 8000*time_secs)\n");
-                fprintf(stderr, "octave:27> cohpsk_ch_fading(\"../raw/slow_fading_samples.float\", 8000, 0.1, 8000*time_secs)\n");
+                fprintf(stderr, "octave:25> cohpsk_ch_fading(\"faster_fading_samples.float\", 8000, 2.0, 8000*time_secs)\n");
+                fprintf(stderr, "octave:26> cohpsk_ch_fading(\"fast_fading_samples.float\", 8000, 1.0, 8000*time_secs)\n");
+                fprintf(stderr, "octave:27> cohpsk_ch_fading(\"slow_fading_samples.float\", 8000, 0.1, 8000*time_secs)\n");
                 fprintf(stderr, "-----------------------------------------------------\n");
                 exit(1);
             }
@@ -190,14 +190,14 @@ int main(int argc, char *argv[])
         }
 
         if (fading_en == 2) {
-	          sprintf(fname, "%s/%s", raw_dir, MPP_FADING_FILE_NAME);
+            sprintf(fname, "%s/%s", fading_dir, MPP_FADING_FILE_NAME);
             ffading = fopen(fname, "rb");
             if (ffading == NULL) goto cant_load_fading_file;
             nhfdelay = floor(MPP_DELAY_MS*Fs/1000);
         }
 
         if (fading_en == 3) {
-	          sprintf(fname, "%s/%s", raw_dir, MPD_FADING_FILE_NAME);
+	          sprintf(fname, "%s/%s", fading_dir, MPD_FADING_FILE_NAME);
             ffading = fopen(fname, "rb");
             if (ffading == NULL) goto cant_load_fading_file;
             nhfdelay = floor(MPD_DELAY_MS*Fs/1000);
