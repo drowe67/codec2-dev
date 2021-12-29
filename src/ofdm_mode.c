@@ -61,6 +61,11 @@ void ofdm_init_mode(char mode[], struct OFDM_CONFIG *config) {
     } else if (strcmp(mode,"2020") == 0) {
          config->ts = 0.0205;  config->nc = 31; config->codename = "HRAb_396_504";
          config->tx_bpf_en = false; config->amp_scale = 167E3;
+    } else if (strcmp(mode,"2020A") == 0) {
+         config->ts = 0.014;  config->tcp = 0.004; config->nc = 22; config->ns=5; config->codename = NULL;
+           config->edge_pilots = 0; config->state_machine = "voice2";
+         config->txtbits = 4; config->nuwbits = 8*2;
+         config->tx_bpf_en = false; config->amp_scale = 167E3;
     } else if (strcmp(mode,"qam16") == 0) {
         config->ns=5; config->np=5; config->tcp = 0.004; config->ts = 0.016; config->nc = 33;
         config->bps=4; config->txtbits = 0; config->nuwbits = 15*4; config->bad_uw_errors = 5;

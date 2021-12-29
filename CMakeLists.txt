@@ -555,6 +555,13 @@ endif()
                             ./cohpsk_ch - - -22 --Fs 8000 |
                             ./ofdm_demod --mode 700E --ldpc --testframes -v 2 > /dev/null")
 
+    # 2020A AWGN test 
+    add_test(NAME test_OFDM_modem_2020A_AWGN
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            ./ofdm_mod --in /dev/zero --testframes 10 --mode 2020A |
+                            ./cohpsk_ch - - -22 --Fs 8000 |
+                            ./ofdm_demod --mode 2020A --testframes -v 2 > /dev/null")
+           
     # -------------------------------------------------------------------------
     #                                OFDM Data modes
     # -------------------------------------------------------------------------
@@ -870,7 +877,7 @@ if(LPCNET)
 endif(LPCNET)
                                                      
     # -------------------------------------------------------------------------
-    #                                FreeDv API memory leaks
+    #                                FreeDV API memory leaks
     # -------------------------------------------------------------------------
 
 if (NOT APPLE)
