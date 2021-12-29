@@ -105,10 +105,11 @@ include(ExternalProject)
 set(CML_PATH ${CMAKE_CURRENT_BINARY_DIR}/../cml)
 ExternalProject_Add(cml
    GIT_REPOSITORY https://github.com/drowe67/cml.git
+   GIT_TAG dr-makefile
    SOURCE_DIR ${CML_PATH}
    BUILD_IN_SOURCE 1
    CONFIGURE_COMMAND true # No configuration required
-   BUILD_COMMAND cd ${CMAKE_CURRENT_BINARY_DIR}/../cml/source && ${OCTAVE_CMD} -qf --eval "make"
+   BUILD_COMMAND cd ${CMAKE_CURRENT_BINARY_DIR}/../cml && make
    INSTALL_COMMAND true # No installation required
 )
 
