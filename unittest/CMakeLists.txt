@@ -108,7 +108,7 @@ ExternalProject_Add(cml
    SOURCE_DIR ${CML_PATH}
    BUILD_IN_SOURCE 1
    CONFIGURE_COMMAND true # No configuration required
-   BUILD_COMMAND cd ${CMAKE_CURRENT_BINARY_DIR}/../cml/source && ${OCTAVE_CMD} -qf --eval "make"
+   BUILD_COMMAND cd ${CMAKE_CURRENT_BINARY_DIR}/../cml && make
    INSTALL_COMMAND true # No installation required
 )
 
