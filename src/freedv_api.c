@@ -1245,11 +1245,11 @@ void freedv_passthrough_gain              (struct freedv *f, float g) {f->passth
 
 void freedv_set_clip(struct freedv *f, int val) {
     f->clip_en = val;
-    if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_700E, f->mode)
-        || FDV_MODE_ACTIVE( FREEDV_MODE_DATAC0, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_DATAC3, f->mode)) {
+    if (is_ofdm_mode(f)) {
       f->ofdm->clip_en = val;
       /* really should have BPF if we clip */
-      if (val) ofdm_set_tx_bpf(f->ofdm, true);
+      if (val && !FDV_MODE_ACTIVE( FREEDV_MODE_2020, f->mode))
+          ofdm_set_tx_bpf(f->ofdm, true);
     }
 }
 
