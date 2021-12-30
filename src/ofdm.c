@@ -938,7 +938,7 @@ void ofdm_hilbert_clipper(struct OFDM *ofdm, complex float *tx, size_t n) {
         ofdm_clip(tx, OFDM_PEAK, n);
     }
 
-   /* BPF to remove out of band energy clipper introduces */
+    /* BPF to remove out of band energy clipper introduces */
     if (ofdm->tx_bpf_en) {
         assert(!strcmp(ofdm->mode, "700D") || !strcmp(ofdm->mode, "700E") 
                || !strcmp(ofdm->mode, "datac0") || !strcmp(ofdm->mode, "datac3"));

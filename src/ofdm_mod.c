@@ -61,7 +61,8 @@ void opt_help() {
     fprintf(stderr, "  --tx_freq     freq    Set an optional modulation TX centre frequency (1500.0 default)\n");
     fprintf(stderr, "  --rx_freq     freq    Set an optional modulation RX centre frequency (1500.0 default)\n\n");
     fprintf(stderr, "  --verbose  [1|2|3]    Verbose output level to stderr (default off)\n");
-    fprintf(stderr, "  --txbpf               Transmit band pass filter boolean (default off)\n");
+    fprintf(stderr, "  --txbpf               Transmit band pass filter on (default off)\n");
+    fprintf(stderr, "  --clip                Transmit clipper (default off)\n");
     fprintf(stderr, "  --text                Include a standard text message boolean (default off)\n");
     fprintf(stderr, "  -i --ldpc    [1|2]    Run LDPC decoder (1 -> (224,112) 700D code, 2 -> (504,396) 2020 code).\n"
                     "                        In testframe mode raw and coded errors will be counted.\n");
@@ -98,6 +99,7 @@ int main(int argc, char *argv[]) {
     int input_specified = 0;
     int output_specified = 0;
     int verbose = 0;
+    int clip_en = 0;
     int txbpf_en = 0;
     int testframes = 0;
     int use_text = 0;
@@ -129,6 +131,7 @@ int main(int argc, char *argv[]) {
         {"rx_freq", 'i', OPTPARSE_REQUIRED},
         {"ldpc", 'j', OPTPARSE_NONE},
         {"txbpf", 'k', OPTPARSE_NONE},
+        {"clip", 'r', OPTPARSE_NONE},
         {"text", 'l', OPTPARSE_NONE},
         {"verbose", 'v', OPTPARSE_REQUIRED},
         {"databits", 'p', OPTPARSE_REQUIRED},
@@ -206,6 +209,9 @@ int main(int argc, char *argv[]) {
                 break;
             case 'q':
                 dpsk = 1;
+                break;
+            case 'r':
+                clip_en = 1;
                 break;
             case 'v':
                 verbose = atoi(options.optarg);
@@ -293,12 +299,9 @@ int main(int argc, char *argv[]) {
             fprintf(stderr, "Npackets: %d\n", Npackets);
     }
 
-    if (txbpf_en) {
-        ofdm_set_tx_bpf(ofdm, 1);
-    }
-    if (dpsk) {
-        ofdm_set_dpsk(ofdm, 1);
-    }
+    if (clip_en) { ofdm->clip_en = true; }
+    if (txbpf_en) { ofdm_set_tx_bpf(ofdm, 1); }
+    if (dpsk) { ofdm_set_dpsk(ofdm, 1); }
 
     uint8_t txt_bits[ofdm->ntxtbits];
     memset(txt_bits, 0, ofdm->ntxtbits);

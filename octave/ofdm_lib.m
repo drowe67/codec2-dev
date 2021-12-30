@@ -322,12 +322,14 @@ function config = ofdm_init_mode(mode="700D")
     config.amp_scale = 155E3; config.clip_gain1 = 3; config.clip_gain2 = 0.8;
     config.foff_limiter = 1;
   elseif strcmp(mode,"2020")
-    Ts = 0.0205; Nc = 31; config.amp_scale = 167E3;
+    Ts = 0.0205; Nc = 31;
+    config.amp_scale = 167E3; config.clip_gain1 = 2.5; config.clip_gain2 = 0.8;
   elseif strcmp(mode,"2020A")
     Ts = 0.014; Tcp = 0.004; Nc = 22; Ns=5;
+    config.Ntxtbits = 4; config.Nuwbits = 8*2; config.bad_uw_errors = 5;
+    config.amp_scale = 167E3; config.clip_gain1 = 2.5; config.clip_gain2 = 0.8;
     config.edge_pilots = 0; config.state_machine = "voice2";
-    config.Ntxtbits = 4; config.Nuwbits = 8*2;
-    config.amp_scale = 167E3;
+    config.foff_limiter = 1; config.ftwindow_width = 64; 
   elseif strcmp(mode,"qam16c1")
     Ns=5; config.Np=5; Tcp = 0.004; Ts = 0.016; Nc = 33; config.data_mode = "streaming";
     config.bps=4; config.Ntxtbits = 0; config.Nuwbits = 15*4; config.bad_uw_errors = 5;
