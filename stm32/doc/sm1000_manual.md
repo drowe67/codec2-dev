@@ -115,13 +115,14 @@ You can program the flash memory on your SM1000 via USB using a Windows or Linux
 Find and install the **STM32CubeProgrammer** software by searching on the [ST web site](http://www.st.com).
 
 1. Connect the SM1000 USB to a Windows PC.
-1. Run the ```STM32CubeProgrammer``` application and navigate to the "Erasing & Programming" section..
 1. Apply power with PTT held down, then release PTT.
-1. Seelct "USB" from the drop-down list on the upper right and push the Refresh button next to the Port drop-down in the "USB configuration" area. The SM1000 will appear as "USB1" or similar in the list; select that entry.
+1. Run the `STM32CubeProgrammer` application and select the down arrow on the left side, and navigate to the "Erasing & Programming" section.
+1. Select the `Verify programming` option.
+1. In the "File path" on the left-hand side, select Open file and navigate to the .bin file you'd like to flash.
+1. Select "USB" from the drop-down list on the upper right and push the Refresh button next to the Port drop-down in the "USB configuration" area. The SM1000 will appear as "USB1" or similar in the list; select that entry.
+1. Click on the Connect button.
 1. Ensure that "PID" displays as DF11 and "VID" as 0483.
-1. In the "File path" on the left-hand side, navigate to the .bin file you'd like to flash.
-1. Select the ```Verify programming``` option.
-1. Select ```Start Programming``` and the firmware procedure will commence.
+1. Select `Start Programming` and the firmware procedure will commence.
 1. A message in the log at the bottom of the window will display once complete.
 
 Power cycle the SM1000 and the new firmware will run.
