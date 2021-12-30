@@ -250,7 +250,7 @@ int main(int argc, char *argv[]) {
     /* Get a copy of the completed modem config (ofdm_create() fills in more parameters) */
     ofdm_config = ofdm_get_config_param(ofdm);
 
-    /* ste up some useful constants */
+    /* set up some useful constants */
 
     int Nbitsperpacket = ofdm_get_bits_per_packet(ofdm);
     int Npayloadbitsperpacket = Nbitsperpacket - ofdm->nuwbits - ofdm->ntxtbits;

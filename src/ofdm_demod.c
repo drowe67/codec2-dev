@@ -520,13 +520,17 @@ int main(int argc, char *argv[]) {
 
                     fwrite(out_char, sizeof (char), Ndatabitsperpacket, fout);
                 } else {
-                    /* simple hard decision output for uncoded testing, all bits in frame dumped including UW and txt */
-
-                    for (i = 0; i < Nbitsperpacket; i++) {
-                        rx_bits_char[i] = rx_bits[i];
+                    /* simple hard decision output of payload data bits */
+                    assert(Npayloadsymsperpacket*ofdm_config->bps == Npayloadbitsperpacket);
+                    for (i = 0; i < Npayloadsymsperpacket; i++) {
+                        int bits[2];
+                        complex float s = payload_syms[i].real + I * payload_syms[i].imag;
+                        qpsk_demod(s, bits);
+                        rx_bits_char[ofdm_config->bps * i] = bits[1];
+                        rx_bits_char[ofdm_config->bps * i + 1] = bits[0];
                     }
 
-                    fwrite(rx_bits_char, sizeof (uint8_t), Nbitsperpacket, fout);
+                    fwrite(rx_bits_char, sizeof (uint8_t), Npayloadbitsperpacket, fout);
                 }
 
                 /* optional error counting on uncoded data in non-LDPC testframe mode */
@@ -685,7 +689,7 @@ int main(int argc, char *argv[]) {
     }
 
     if ((strlen(ofdm->data_mode) == 0) && (verbose == 2))
-        printf("time_to_sync: %f\n", time_to_sync);
+        fprintf(stderr, "time_to_sync: %f\n", time_to_sync);
 
     int ret = 0;
     if (testframes == true) {
