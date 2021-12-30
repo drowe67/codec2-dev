@@ -102,14 +102,14 @@ Settings are saved when you hold down BACK to leave the root menu.
 
 You can program the flash memory on your SM1000 via USB using a Windows or Linux PC. Download the latest SM1000 firmware here:
 
-   Version | Date | Download .bin | Release Notes
-   :---: | --- | --- | --- | --- |
-   1   | May 2015 | [sm1000.bin](http://www.rowetel.com/downloads/codec2/smartmic/sm1000.bin) | Original release with FreeDV 1600
-   2   | July 2019 | [sm1000v2.bin](http://www.rowetel.com/downloads/codec2/smartmic/sm1000v2.bin) | FreeDV 700D and morse menus
-   3   | March 2020 | [sm1000v3.bin](http://www.rowetel.com/downloads/codec2/smartmic/sm1000v3.bin) | Menu bug fixes, 700D modem improvements & automatic Mic EQ
-   4   | May 2020 | [sm1000v4.bin](http://www.rowetel.com/downloads/codec2/smartmic/sm1000v4.bin) | 700D sync logic to reduce stop burbling with no signal
-   5   | August 2021 | [sm1000v5.bin](http://www.rowetel.com/downloads/codec2/smartmic/sm1000v5.bin) | FreeDV 700E and Tx band pass filter for 700D & E
-   
+| Version | Date | Download .bin | Release Notes |
+|:---:|---|---|---|
+| 1 | May 2015 | [sm1000.bin](http://www.rowetel.com/downloads/codec2/smartmic/sm1000.bin) | Original release with FreeDV 1600 |
+| 2 | July 2019 | [sm1000v2.bin](http://www.rowetel.com/downloads/codec2/smartmic/sm1000v2.bin) | FreeDV 700D and morse menus |
+| 3 | March 2020 | [sm1000v3.bin](http://www.rowetel.com/downloads/codec2/smartmic/sm1000v3.bin) | Menu bug fixes, 700D modem improvements & automatic Mic EQ |
+| 4 | May 2020 | [sm1000v4.bin](http://www.rowetel.com/downloads/codec2/smartmic/sm1000v4.bin) | 700D sync logic to reduce stop burbling with no signal |
+| 5 | August 2021 | [sm1000v5.bin](http://www.rowetel.com/downloads/codec2/smartmic/sm1000v5.bin) | FreeDV 700E and Tx band pass filter for 700D & E |
+
 ## Windows
 
 Find and install the **STM32CubeProgrammer** software by searching on the [ST web site](http://www.st.com).
