@@ -59,7 +59,7 @@ void hs_pitch_refinement(MODEL *model, COMP Sw[], float pmin, float pmax,
 C2CONST c2const_create(int Fs, float framelength_s) {
     C2CONST c2const;
 
-    assert((Fs == 8000) || (Fs = 16000));
+    assert((Fs == 8000) || (Fs == 16000));
     c2const.Fs = Fs;
     c2const.n_samp = round(Fs*framelength_s);
     c2const.max_amp = floor(Fs*P_MAX_S/2);
