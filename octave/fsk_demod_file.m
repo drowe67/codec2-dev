@@ -14,7 +14,7 @@
 
    Same thing but complex (single sided):
    
-   $ ./fsk_get_test_bits - 1000 | ./fsk_mod 2 8000 100 1000 1000 - - | ./cohpsk_ch - fsk.cs16 -100 --Fs 8000 --complexout
+   $ ./fsk_get_test_bits - 1000 | ./fsk_mod 2 8000 100 1000 1000 - - | ./ch - fsk.cs16 --complexout
    octave:2> fsk_demod_file("fsk.cs16",format="cs16",8000,100,2)
 #}
 

@@ -1,22 +1,25 @@
 % ldpc.m
 %
-% David Rowe 2013
-% Octave functions to help us use the CML LDPC code.
-%
-% Installing CML library
-% ----------------------
-%
-% $ sudo apt-get install liboctave-dev
-% $ wget http://www.iterativesolutions.com/user/image/cml.1.10.zip
-% $ unzip cml.1.10.zip
-% $ patch -p0 < ~/codec2/octave/cml.patch
-% $ cd cml/source
-% $ octave --no-gui
-% octave:> make
-% (you'll see a few warnings but hopefully no errors)
-%
-% Optionally set an environment variable for CML_PATH in your shell or
-% in your codec2/octave/.octaverc file
+#{
+  David Rowe 2013
+  Octave functions for the CML LDPC library.
+
+  To install and compile CML support:
+  
+  $ sudo apt-get install liboctave-dev
+  $ git clone git@github.com:drowe67/cml.git
+  $ cd cml
+  $ make
+
+  If you have configured codec2 with cmake -DUNITTEST=1, then you will
+  already have CML (e.g. under build_linux/cml), as it is used to run unit tests.
+
+  To use CML when running Octave simulations from the Octave CLI, set an
+  environment variable for CML_PATH in your shell or in your
+  codec2/octave/.octaverc file:
+
+    setenv("CML_PATH","../build_linux/cml")
+#}
 
 1;
 

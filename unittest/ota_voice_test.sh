@@ -52,10 +52,10 @@ function analog_compressor {
     input_file=$1
     output_file=$2
     gain=$3
-    cat $input_file | cohpsk_ch - - -100 --Fs 8000 2>/dev/null | \
-    cohpsk_ch - - -100 --Fs 8000 --clip 16384 --gain $gain 2>/dev/null | \
+    cat $input_file | ch - - 2>/dev/null | \
+    ch - - --No -100 --clip 16384 --gain $gain 2>/dev/null | \
     # final line prints peak and CPAPR for SSB
-    cohpsk_ch - - -100 --Fs 8000 --clip 16384 |
+    ch - - --clip 16384 |
     # manually adjusted to get similar peak levels for SSB and FreeDV
     sox -t .s16 -r 8000 -c 1 -v 0.85 - -t .s16 $output_file
 }
@@ -201,8 +201,8 @@ cat $speech_comp $speech_freedv > tx.raw
 sox -t .s16 -r 8000 -c 1 tx.raw tx.wav
 
 if [ $txstats -eq 1 ]; then
-    # cohpsk_ch just used to monitor observe peak and RMS level
-    cohpsk_ch $speech_freedv /dev/null -100
+    # ch just used to monitor observe peak and RMS level
+    ch $speech_freedv /dev/null
     # time domain plot of tx signal
     echo "pkg load signal; warning('off', 'all'); \
           s=load_raw('tx.raw'); plot(s); \

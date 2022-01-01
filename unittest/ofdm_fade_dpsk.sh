@@ -8,7 +8,7 @@ results=$(mktemp)
 
 # Coded BER should be < 1% for this test
 ofdm_mod --in /dev/zero --testframes 300 --mode 2020 --ldpc --verbose 1 -p 312 --dpsk | \
-cohpsk_ch - - -40 --Fs 8000 -f 10 --ssbfilt 1 --mpd --fading_dir $fading_dir --multipath_delay 2 | \
+ch - - --No -40 -f 10 --ssbfilt 1 --mpd --fading_dir $fading_dir --multipath_delay 2 | \
 ofdm_demod --out /dev/null --testframes --mode 2020 --verbose 1 --ldpc -p 312 --dpsk 2> $results
 cat $results
 cber=$(cat $results | sed -n "s/^Coded BER.* \([0-9..]*\) Tbits.*/\1/p")
