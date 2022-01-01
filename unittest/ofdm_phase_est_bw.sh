@@ -17,7 +17,7 @@ results=$(mktemp)
 fading_dir=$1
 # BER should be < 5% for this test
 ofdm_mod --in /dev/zero --testframes 300 --mode 2020 --ldpc -p 312 --verbose 0 | \
-cohpsk_ch - - -40 --Fs 8000 -f 10 --ssbfilt 1 --mpp --fading_dir $fading_dir | \
+ch - - --No -40 -f 10 --ssbfilt 1 --mpp --fading_dir $fading_dir | \
 ofdm_demod --out /dev/null --testframes --mode 2020 --verbose 2 --ldpc -p 312 --bandwidth 1 2> $results
 cat $results
 cber=$(cat $results | sed -n "s/^Coded BER.* \([0-9..]*\) Tbits.*/\1/p")
