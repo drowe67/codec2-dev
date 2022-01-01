@@ -191,7 +191,7 @@ $ ./src/freedv_tx 700D ../raw/ve9qrp.raw - --clip 0 --testframes | ./src/ch - - 
 ```
 MultiPath Poor (MPP):
 ```
-$ ./src/freedv_tx 700D ../raw/ve9qrp.raw - --clip 0 --testframes | ./src/ch - - --No -24 --mpp --fading_dir unittest| ./src/freedv_rx 700D - /dev/null --testframes
+$ ./src/freedv_tx 700D ../raw/ve9qrp.raw - --clip 0 --testframes | ./src/ch - - --No -24 --mpp --fading_dir unittest | ./src/freedv_rx 700D - /dev/null --testframes
 ```
 
 Adjust `--clip [0|1]` and `No` argument of `ch` to obtain a PER of just less than 0.1, and note the SNR and PAPR reported by `ch`.  The use of the `ve9qrp` samples makes the test run for a few minutes, in order to get reasonable multipath channel results.

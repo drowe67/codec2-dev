@@ -77,7 +77,7 @@ The Octave version of the modem was developed by David Rowe.  Brady O'Brien port
    $ cd ~/codec2/build_linux/src
    $ ./ldpc_enc /dev/zero - --code H_256_512_4 --testframes 200 |
      ./framer - - 512 5186 | ./fsk_mod 4 8000 100 1000 100 - - |
-     ./ch - - --No -24  |
+     ./ch - - --No -24 |
      ./fsk_demod -s 4 8000 100 - - |
      ./deframer - - 512 5186  |
      ./ldpc_dec - /dev/null --code H_256_512_4 --testframes
