@@ -49,13 +49,13 @@ The Octave version of the modem was developed by David Rowe.  Brady O'Brien port
 
 1. Lets add some channel noise:
    ```
-   $ ./fsk_get_test_bits - 10000 | ./fsk_mod 2 8000 100 1200 100 - - | ./cohpsk_ch - - -26 --Fs 8000 | ./fsk_demod 2 8000 100 - - | ./fsk_put_test_bits -b 0.015 -
+   $ ./fsk_get_test_bits - 10000 | ./fsk_mod 2 8000 100 1200 100 - - | ./ch - - --No -26 | ./fsk_demod 2 8000 100 - - | ./fsk_put_test_bits -b 0.015 -
    <snip>
    SNR3k(dB): -5.76 C/No: 29.0 PAPR:  3.0 
    [0099] BER 0.010, bits tested   9900, bit errors  103
    PASS
    ```
-   The cohpsk_ch utility takes the FSK modulator signal, and adds calibrated noise to it (the -26 value specifies the noise).  Try changing the noise level, and note how the Bit Error Rate (BER) changes.  The BER is 0.01, which is right on theory for this sort of FSK demodulator at this SNR (2FSK non-coherent demodulator Eb/No=9dB).  
+   The `ch` utility takes the FSK modulator signal, and adds calibrated noise to it (the `--No -26` value specifies the noise).  Try changing the noise level, and note how the Bit Error Rate (BER) changes.  The BER is 0.01, which is right on theory for this sort of FSK demodulator at this SNR (2FSK non-coherent demodulator Eb/No=9dB).  
 
    The SNR is calculated using the signal power divided by the noise power in 3000 Hz.  The C/No value is the same thing, but uses a noise bandwidth of 1 Hz.  There is less noise power when you look at just 1Hz, so C/No is higher. Peak to Average Power ratio (PAPR) is 3dB as a FSK signal is just a single sine wave, and a sine wave peak is 3dB higher than it's average.
 
@@ -77,7 +77,7 @@ The Octave version of the modem was developed by David Rowe.  Brady O'Brien port
    $ cd ~/codec2/build_linux/src
    $ ./ldpc_enc /dev/zero - --code H_256_512_4 --testframes 200 |
      ./framer - - 512 5186 | ./fsk_mod 4 8000 100 1000 100 - - |
-     ./cohpsk_ch - - -24 --Fs 8000  |
+     ./ch - - --No -24  |
      ./fsk_demod -s 4 8000 100 - - |
      ./deframer - - 512 5186  |
      ./ldpc_dec - /dev/null --code H_256_512_4 --testframes

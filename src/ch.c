@@ -237,9 +237,9 @@ int main(int argc, char *argv[])
                 fprintf(stderr, "$ octave --no-gui\n");
                 fprintf(stderr, "octave:24> pkg load signal\n");
                 fprintf(stderr, "octave:24> time_secs=60\n");
-                fprintf(stderr, "octave:25> cohpsk_ch_fading(\"faster_fading_samples.float\", 8000, 2.0, 8000*time_secs)\n");
-                fprintf(stderr, "octave:26> cohpsk_ch_fading(\"fast_fading_samples.float\", 8000, 1.0, 8000*time_secs)\n");
-                fprintf(stderr, "octave:27> cohpsk_ch_fading(\"slow_fading_samples.float\", 8000, 0.1, 8000*time_secs)\n");
+                fprintf(stderr, "octave:25> ch_fading(\"faster_fading_samples.float\", 8000, 2.0, 8000*time_secs)\n");
+                fprintf(stderr, "octave:26> ch_fading(\"fast_fading_samples.float\", 8000, 1.0, 8000*time_secs)\n");
+                fprintf(stderr, "octave:27> ch_fading(\"slow_fading_samples.float\", 8000, 0.1, 8000*time_secs)\n");
                 fprintf(stderr, "-----------------------------------------------------\n");
                 exit(1);
             }
@@ -289,7 +289,7 @@ int main(int argc, char *argv[])
     lo_freq.real = cos(2.0*M_PI*SSBFILT_CENTRE/Fs);
     lo_freq.imag = sin(2.0*M_PI*SSBFILT_CENTRE/Fs);
 
-    fprintf(stderr, "cohpsk_ch: Fs: %d NodB: %4.2f foff: %4.2f Hz fading: %d nhfdelay: %d clip: %4.2f ssbfilt: %d complexout: %d\n",
+    fprintf(stderr, "ch: Fs: %d NodB: %4.2f foff: %4.2f Hz fading: %d nhfdelay: %d clip: %4.2f ssbfilt: %d complexout: %d\n",
             Fs, NodB, foff_hz, fading_en, nhfdelay, clip, ssbfilt_en, complex_out);
 
     /* --------------------------------------------------------*\
@@ -368,12 +368,12 @@ int main(int argc, char *argv[])
             for(i=0; i<BUF_N; i++) {
                 ret = fread(&aspread, sizeof(COMP), 1, ffading);
                 if (ret == 0) {
-                    fprintf(stderr, "cohpsk_ch: Fading file finished - simulation stopping.  You may need more samples:\n");
+                    fprintf(stderr, "ch: Fading file finished - simulation stopping.  You may need more samples:\n");
                     goto gen_fading_file;
                     }
                 ret = fread(&aspread_2ms, sizeof(COMP), 1, ffading);
                 if (ret == 0) {
-                    fprintf(stderr, "cohpsk_ch: Fading file finished - simulation stopping.  You may need more samples:\n");
+                    fprintf(stderr, "ch: Fading file finished - simulation stopping.  You may need more samples:\n");
                     goto gen_fading_file;
                 }
                 //printf("%f %f %f %f\n", aspread.real, aspread.imag, aspread_2ms.real, aspread_2ms.imag);
@@ -456,11 +456,11 @@ int main(int argc, char *argv[])
     CNo = 10*log10(tx_pwr/(noise_pwr/(Fs)));
     snr3k = CNo - 10*log10(3000);
     float outclipped_percent = noutclipped*100.0/nsamples;
-    fprintf(stderr, "cohpsk_ch: SNR3k(dB): %8.2f  C/No....: %8.2f\n", snr3k, CNo);
-    fprintf(stderr, "cohpsk_ch: peak.....: %8.2f  RMS.....: %8.2f   CPAPR.....: %5.2f \n", peak, sqrt(tx_pwr/nsamples), papr);
-    fprintf(stderr, "cohpsk_ch: Nsamples.: %8d  clipped.: %8.2f%%  OutClipped: %5.2f%%\n",
+    fprintf(stderr, "ch: SNR3k(dB): %8.2f  C/No....: %8.2f\n", snr3k, CNo);
+    fprintf(stderr, "ch: peak.....: %8.2f  RMS.....: %8.2f   CPAPR.....: %5.2f \n", peak, sqrt(tx_pwr/nsamples), papr);
+    fprintf(stderr, "ch: Nsamples.: %8d  clipped.: %8.2f%%  OutClipped: %5.2f%%\n",
                     nsamples, nclipped*100.0/nsamples, outclipped_percent);
-    if (outclipped_percent > 0.1) fprintf(stderr, "cohpsk_ch: WARNING output clipping\n");
+    if (outclipped_percent > 0.1) fprintf(stderr, "ch: WARNING output clipping\n");
 
     if (ffading != NULL) fclose(ffading);
     if (ch_fdm_delay != NULL) FREE(ch_fdm_delay);
