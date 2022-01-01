@@ -1,11 +1,10 @@
 /*---------------------------------------------------------------------------*\
 
-  FILE........: cohpsk_ch.c
+  FILE........: ch.c
   AUTHOR......: David Rowe
   DATE CREATED: May 2015
 
-  Channel impairment program for testing command line versions of
-  cohpsk (and other) modems.
+  Channel impairment program for testing command line versions of modems.
 
 \*---------------------------------------------------------------------------*/
 
@@ -46,9 +45,9 @@
 #define MPP_DELAY_MS     2.0
 #define MPD_DELAY_MS     4.0
 
-/* see instructions below for how to generate thsese files */
+/* see instructions below for how to generate these files */
 
-#define DEFAULT_FADING_DIR    ""
+#define DEFAULT_FADING_DIR    "unittest"
 #define MPG_FADING_FILE_NAME  "slow_fading_samples.float"
 #define MPP_FADING_FILE_NAME  "fast_fading_samples.float"
 #define MPD_FADING_FILE_NAME  "faster_fading_samples.float"
@@ -65,10 +64,10 @@ int opt_exists(char *argv[], int argc, char opt[]) {
 
 // Gaussian from uniform:
 float gaussian(void) {
-	  double x = (double)rand() / RAND_MAX;
+    double x = (double)rand() / RAND_MAX;
     double y = (double)rand() / RAND_MAX;
     double z = sqrt(-2 * log(x)) * cos(2 * M_PI * y);
-	  return sqrt(1./2.) * z;
+    return sqrt(1./2.) * z;
 }
 
 // complex noise sample
@@ -116,7 +115,7 @@ int main(int argc, char *argv[])
         }
 
         NodB = atof(argv[3]);
-        Fs = COHPSK_FS; foff_hz = 0.0; fading_en = 0; ctest = 0;
+        Fs = 8000; foff_hz = 0.0; fading_en = 0; ctest = 0;
         clip =32767; gain = 1.0;
         ssbfilt_en = 1; complex_out = 0;
         fading_dir = strdup(DEFAULT_FADING_DIR); user_multipath_delay = -1.0;
@@ -241,7 +240,7 @@ int main(int argc, char *argv[])
 
     frames = 0;
     while(fread(buf, sizeof(short), BUF_N, fin) == BUF_N) {
-	      frames++;
+        frames++;
 
         /* Hilbert Transform to produce complex signal so we can do
            single sided freq shifts, HF channel modemsl, and analog compression.
@@ -273,25 +272,24 @@ int main(int argc, char *argv[])
 
         /* --------------------------------------------------------*\
    	                    Clipping  mag of complex signal
-   	    \*---------------------------------------------------------*/
+        \*---------------------------------------------------------*/
 
         for(i=0; i<BUF_N; i++) {
             float mag = sqrt(ch_in[i].real*ch_in[i].real + ch_in[i].imag*ch_in[i].imag);
-            //fprintf(stdout, "%f\n",mag);
             float angle = atan2(ch_in[i].imag, ch_in[i].real);
             if (mag > clip) {
               mag = clip;
               nclipped++;
             }
             tx_pwr += mag*mag;
-            if (mag > peak) peak = mag;
+            if (mag > peak) { peak = mag; /*fprintf(stderr, "%f\n",mag);*/ }
             ch_in[i].real = mag*cos(angle);
             ch_in[i].imag = mag*sin(angle);
         }
 
-	      /* --------------------------------------------------------*\
-	                               Channel
-	      \*---------------------------------------------------------*/
+	/* --------------------------------------------------------*\
+	                         Channel
+	\*---------------------------------------------------------*/
 
         fdmdv_freq_shift_coh(ch_fdm, ch_in, foff_hz, Fs, &phase_ch, BUF_N);
 
@@ -371,11 +369,11 @@ int main(int argc, char *argv[])
 
         int nout = (complex_out+1)*BUF_N;
         short bufout[nout], *pout=bufout;
-	      for(i=0; i<BUF_N; i++) {
+        for(i=0; i<BUF_N; i++) {
             sam = ssbfiltout[i].real;
             if (sam >  32767.0) { noutclipped++; sam = 32767.0; }
             if (sam < -32767.0) { noutclipped++; sam = -32767.0; }
-	          *pout++ = sam;
+            *pout++ = sam;
             if (complex_out) {
                 sam = ssbfiltout[i].imag;
                 if (sam >  32767.0) { noutclipped++; sam = 32767.0; }
@@ -384,10 +382,10 @@ int main(int argc, char *argv[])
             }
         }
 
- 	      fwrite(bufout, sizeof(short), nout, fout);
+        fwrite(bufout, sizeof(short), nout, fout);
 
-	      /* if this is in a pipeline, we probably don't want the usual
-	         buffering to occur */
+        /* if this is in a pipeline, we probably don't want the usual
+           buffering to occur */
 
         if (fout == stdout) fflush(stdout);
     }
