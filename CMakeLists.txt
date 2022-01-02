@@ -357,6 +357,12 @@ if(UNITTEST)
     add_test(NAME test_freedv_get_hash
              COMMAND sh -c "${CMAKE_CURRENT_BINARY_DIR}/unittest/thash")
 
+if(UNIX) # Uses pthreads
+     add_test(NAME test_fifo
+             COMMAND $<TARGET_FILE:tfifo>
+             )
+endif()
+
     # 16<->8 kHz float resamplers
     add_test(NAME test_fdmdv_16to8
              COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/octave;
@@ -559,7 +565,7 @@ endif()
     add_test(NAME test_OFDM_modem_2020A_AWGN
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
                             ./ofdm_mod --in /dev/zero --testframes 10 --mode 2020A |
-                            ./cohpsk_ch - - -22 --Fs 8000 |
+                            ./ch - - --No -22 |
                             ./ofdm_demod --mode 2020A --testframes -v 2 > /dev/null")
            
     # -------------------------------------------------------------------------
@@ -789,12 +795,6 @@ endif()
              COMMAND sh -c "./tfreedv_2400B_rawdata"
              WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/unittest
              )
-
-if(UNIX) # Uses pthreads
-     add_test(NAME test_fifo
-             COMMAND $<TARGET_FILE:tfifo>
-             )
-endif()
 
     # -------------------------------------------------------------------------
     #                                Reliable Text

@@ -293,7 +293,6 @@ function config = ofdm_init_mode(mode="700D")
   Ts = 0.018; 
   Nc = 17;
   config.bps = 2; 
-  config.txbpf_width_Hz = 1500;
   config.Np = 1;
   config.Ntxtbits = 4;
   config.Nuwbits = 5*config.bps;

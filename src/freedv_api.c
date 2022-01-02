@@ -1248,7 +1248,7 @@ void freedv_set_clip(struct freedv *f, int val) {
     if (is_ofdm_mode(f)) {
       f->ofdm->clip_en = val;
       /* really should have BPF if we clip */
-      if (val && !FDV_MODE_ACTIVE( FREEDV_MODE_2020, f->mode))
+      if (val)
           ofdm_set_tx_bpf(f->ofdm, true);
     }
 }

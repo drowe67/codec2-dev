@@ -20,10 +20,10 @@
   Multiple filters can use these coefficients because they are read-only.
 
   Although a sample rate is specified, the filters may be used at other sample rates. For example, if
-  filtP750S1040 is used at 48000 sps, the pass and stop frequencies are 4500 and 6240 hz.
+  filtP750S1040 is used at 48000 sps, the pass and stop frequencies are 4500 and 6240 Hz.
 */
 
-// Low pass filter, sample rate 8000 hz, 0.2 dB ripple, 100 dB atten, pass 550 hz, stop 750 hz.
+// Low pass filter, sample rate 8000 hz, 0.2 dB ripple, 100 dB atten, pass 550 Hz, stop 750 Hz.
 // Used to build 700D BPF
 float filtP550S750[160]={
  0.000001500540125945, 0.000020553368071006, 0.000052842049763802, 0.000112071233638701,
