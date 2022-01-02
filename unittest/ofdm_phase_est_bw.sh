@@ -1,4 +1,4 @@
-#!/bin/bash -x
+#!/usr/bin/env bash
 #
 # ofdm_phase_est_bw.sh
 # David August 2019

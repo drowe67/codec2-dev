@@ -1,4 +1,4 @@
-#!/bin/bash -x
+#!/usr/bin/env bash
 # ota_voice_auto.sh
 #
 # Run a single automated voice test, files are put in a time stamped directory, and summarised in single line

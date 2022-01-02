@@ -1,4 +1,4 @@
-#!/bin/bash -x
+#!/usr/bin/env bash
 # ota_auto.sh
 #
 # Run a single automated test and log results

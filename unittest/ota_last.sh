@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
 # Present summary info from the n-th latest OTA HF data test
 

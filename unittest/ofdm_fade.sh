@@ -1,4 +1,4 @@
-#!/bin/bash -x
+#!/usr/bin/env bash
 #
 # David June 2019
 # Tests 700D OFDM modem fading channel performance, using a simulated channel

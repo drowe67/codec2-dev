@@ -1,4 +1,4 @@
-#!/bin/bash -x
+#!/usr/bin/env bash
 #
 # Tests reliable_text fading channel performance, using a simulated channel
 

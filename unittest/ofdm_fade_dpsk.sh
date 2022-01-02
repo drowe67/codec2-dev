@@ -1,4 +1,4 @@
-#!/bin/bash -x
+#!/usr/bin/env bash
 #
 # David Sep 2019
 # Tests 2020 OFDM modem fading channel performance in DPSK mode, using a simulated faster (2Hz) high SNR fading channel
