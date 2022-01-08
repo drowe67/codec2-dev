@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # test_700c_eq.sh
 # make sure 700C EQ is reducing VQ distortion
 

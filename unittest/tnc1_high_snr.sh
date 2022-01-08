@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # tnc1_high_snr.sh
 #
 #  HF TNC use case test 1

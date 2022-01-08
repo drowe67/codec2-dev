@@ -1,4 +1,4 @@
-#!/bin/bash -x
+#!/usr/bin/env bash
 # tnc4_high_snr_ping.sh
 #
 #  HF TNC use case test 4

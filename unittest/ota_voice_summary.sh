@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
 # Summarise tests to date into one directory to allow easy browsing
 
