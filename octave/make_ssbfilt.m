@@ -1,7 +1,7 @@
 % make_ssbfilt.m
 % David Rowe May 2015
 %
-% Creates low pass filter coeff used to implement a SSB filter in cohpsk_ch
+% Creates low pass filter coeff used to implement a SSB filter in ch
 
 graphics_toolkit ("gnuplot");
 

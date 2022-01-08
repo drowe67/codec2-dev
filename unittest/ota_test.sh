@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # ota_test.sh
 #
 # Automated Over The Air (OTA) data test for FreeDV OFDM HF data modems

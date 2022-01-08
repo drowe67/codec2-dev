@@ -174,27 +174,27 @@ $ ./freedv_tx 2020 ~/LPCNet/wav/all.wav - --testframes | ./freedv_rx 2020 - /dev
 
 Simulated HF slow fading channel, 10.8dB SNR:
 ```
-$ ./freedv_tx 2020 ~/LPCNet/wav/all.wav - | ./cohpsk_ch - - -30 --Fs 8000 --slow | ./freedv_rx 2020 - - | aplay -f S16_LE -r 16000
+$ ./freedv_tx 2020 ~/LPCNet/wav/all.wav - | ./ch - - --No -30 --slow | ./freedv_rx 2020 - - | aplay -f S16_LE -r 16000
 ```
 It falls down quite a bit with fast fading (--fast):
 
 AWGN (noise but no fading) channel, 2.8dB SNR:
 ```
-$ ./freedv_tx 2020 ~/LPCNet/wav/all.wav - | ./cohpsk_ch - - -22 --Fs 8000 | ./freedv_rx 2020 - - | aplay -f S16_LE -r 16000
+$ ./freedv_tx 2020 ~/LPCNet/wav/all.wav - | ./ch - - --No -22 | ./freedv_rx 2020 - - | aplay -f S16_LE -r 16000
 ```
 
 ## Command lines for PER testing 700D/700E PER with clipper
 
 AWGN:
 ```
-$ ./src/freedv_tx 700D ../raw/ve9qrp.raw - --clip 0 --testframes | ./src/cohpsk_ch - - -16 --Fs 8000 | ./src/freedv_rx 700D - /dev/null --testframes
+$ ./src/freedv_tx 700D ../raw/ve9qrp.raw - --clip 0 --testframes | ./src/ch - - --No -16 | ./src/freedv_rx 700D - /dev/null --testframes
 ```
 MultiPath Poor (MPP):
 ```
-$ ./src/freedv_tx 700D ../raw/ve9qrp.raw - --clip 0 --testframes | ./src/cohpsk_ch - - -24 --mpp --fading_dir unittest --Fs 8000 | ./src/freedv_rx 700D - /dev/null --testframes
+$ ./src/freedv_tx 700D ../raw/ve9qrp.raw - --clip 0 --testframes | ./src/ch - - --No -24 --mpp --fading_dir unittest | ./src/freedv_rx 700D - /dev/null --testframes
 ```
 
-Adjust `--clip [0|1]` and 3rd argument of `cohpsk_ch` to obtain a PER of just less than 0.1, and note the SNR and PAPR reported by `cohpsk_ch`.  The use of the `ve9qrp` samples makes the test run for a few minutes, in order to get reasonable multipath channel results.
+Adjust `--clip [0|1]` and `No` argument of `ch` to obtain a PER of just less than 0.1, and note the SNR and PAPR reported by `ch`.  The use of the `ve9qrp` samples makes the test run for a few minutes, in order to get reasonable multipath channel results.
 
 ## Reading Further
 

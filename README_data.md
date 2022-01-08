@@ -213,10 +213,10 @@ The default is 100 bits/s 2FSK. The (512,256) code sends 256 data bits (32 bytes
 
 In real world operation, 16 of the data bits are reserved for a CRC, leaving 240 payload data bits per frame. Taking into account the overhead of the UW, CRC, and parity bits, we send 240 payload data bits for every out of 544, so the payload data rate in this example is (240/512)*(100 bits/s) = 44.1 bits/s.
 
-We can add some channel noise using the `cohpsk_ch` tool and see how it performs:
+We can add some channel noise using the `ch` tool and see how it performs:
 ```
 $ ./freedv_data_raw_tx --testframes 1 --bursts 10 FSK_LDPC /dev/zero - |
-  ./cohpsk_ch - - -5 --Fs 8000 --ssbfilt 0 |
+  ./ch - - --No -5 --ssbfilt 0 |
   ./freedv_data_raw_rx --testframes -v FSK_LDPC - /dev/null
 <snip>
 frames processed: 336  output bytes: 320 output_packets: 10
@@ -224,12 +224,12 @@ BER......: 0.0778 Tbits:  5440 Terrs:   423
 SNR3k(dB): -13.00 C/No: 21.8 PAPR:  7.5
 Coded BER: 0.0000 Tbits:  2560 Terrs:     0
 ```
-The `cohpsk_ch` stderr reporting is mixed up with the testframes results but we can see that over a channel with a -13dB SNR, we obtained a raw bit error rate of 0.0778 (nearly 8%).  However the LDPC code cleaned that up nicely and still received all 10 packets with no errors.
+The `ch` stderr reporting is mixed up with the testframes results but we can see that over a channel with a -13dB SNR, we obtained a raw bit error rate of 0.0778 (nearly 8%).  However the LDPC code cleaned that up nicely and still received all 10 packets with no errors.
 
 Here is an example running 4FSK at 20000 bits/s (10000 symbols/s), at a sample rate of 200 kHz:
 ```
 $./freedv_data_raw_tx -m 4 --Fs 200000 --Rs 10000 --tone1 10000 --shift 10000 --testframes 100 --bursts 10 FSK_LDPC /dev/zero - |
- ./cohpsk_ch - - -12 --Fs 8000 --ssbfilt 0 |
+ ./ch - - --No -12 --ssbfilt 0 |
  ./freedv_data_raw_rx -m 4 --testframes -v --Fs 200000 --Rs 10000 FSK_LDPC --mask 10000 - /dev/null
  <snip>
  frames processed: 5568  output bytes: 30144 output_packets: 942
@@ -240,7 +240,7 @@ Some notes on this example:
 1. We transmit 10 bursts, each of 100 frames in length, 1000 packets total.  There are a couple of frames silence between each burst.  This gives the acquisition algorithms a good work out.
 1. Only 942 packets make it though this rather noisy channel, a 6% Packet Error Rate (PER).  In a real world application, a higher protocol layer would need to detect this, and arrange for re-transmission of missing packets.  If the SNR was a few dB better, all 1000 packets would likely make it through.  If it was 1dB worse, nothing would get through; LDPC codes have a very sharp "knee" in the PER versus SNR curve.
 1. Our first tone `--tone` is at 10kHz, and each tone is spaced `--shift` by 10kHz, so we have FSK tones at 10,20,30, and 40 kHz.  For good performance, FSK tones must be spaced by at least the symbol rate Rs.
-1. Although the `cohpsk_ch` utility is designed for 8kHz sample rate operation, it just operates on sampled signals, so it's OK to use at higher sample rates.  It does have some internal filtering so best to keep your signal well away from 0 and (sample rate)/2.  The SNR measurement is calibrated to a 3000 Hz noise bandwidth, so won't make much sense at other sample rates.  The third argument `-12` sets the noise level of the channel.
+1. Although the `ch` utility is designed for 8kHz sample rate operation, it just operates on sampled signals, so it's OK to use at higher sample rates.  It does have some internal filtering so best to keep your signal well away from 0 and (sample rate)/2.  The SNR measurement is calibrated to a 3000 Hz noise bandwidth, so won't make much sense at other sample rates.  The third argument `-12` sets the noise level of the channel.
 1. The `--mask` frequency offset algorithm is used, which gives better results on noisy channels, especially for 4FSK.
 
 ### Reading Further
@@ -287,17 +287,17 @@ Coded PER: 0.0000 Tpkts:     6 Tpers:     0
 Lets add some noise and a 20 Hz frequency offset:
 ```
 ./src/freedv_data_raw_tx --framesperburst 2 --bursts 3 --testframes 6 DATAC0 /dev/zero - |
-./src/cohpsk_ch - - -20 --Fs 8000 -f 20 |
+./src/ch - - --No -20 -f 20 |
 ./src/freedv_data_raw_rx --framesperburst 2 --testframes DATAC0 - /dev/null --vv
 <snip>
 marks:space: 0.83 SNR offset: -0.79
-cohpsk_ch: SNR3k(dB):    -0.36  C/No....:    34.42
+ch: SNR3k(dB):    -0.36  C/No....:    34.42
 <snip>
 BER......: 0.0195 Tbits:  1536 Terrs:    30
 Coded BER: 0.0000 Tbits:   768 Terrs:     0
 Coded PER: 0.0000 Tpkts:     6 Tpers:     0
 ```
-We still received 6 frames OK (Tpkts field), but in this case there was a raw BER of about 2% which the FEC cleaned up nicely (Coded BER 0.0).  Just above that we can see the "SNR offset" and "cohpsk_ch: SNR3k" fields.  In the silence between bursts the modem signal has zero power, which biases the SNR measured by the `conhpsk_ch` channels simulation tool.  This bias is the "SNR offset".  So the true SNR for this test is actually:
+We still received 6 frames OK (Tpkts field), but in this case there was a raw BER of about 2% which the FEC cleaned up nicely (Coded BER 0.0).  Just above that we can see the "SNR offset" and "ch: SNR3k" fields.  In the silence between bursts the modem signal has zero power, which biases the SNR measured by the `ch` channels simulation tool.  This bias is the "SNR offset".  So the true SNR for this test is actually:
 ```
 SNR = -0.36 - (-0.79) = 0.43 dB
 ```
@@ -336,9 +336,9 @@ Clipping works by introducing controlled distortion, which affects the SNR estim
 
 This command line demonstrates the effect:
 ```
-./src/freedv_data_raw_tx datac3 /dev/zero - --testframes 10 --bursts 10 --clip 1 | ./src/cohpsk_ch - - -100 --fading_dir unittest  --Fs 8000 | ./src/freedv_data_raw_rx datac3 - /dev/null --testframes --framesperburst 1 -v
+./src/freedv_data_raw_tx datac3 /dev/zero - --testframes 10 --bursts 10 --clip 1 | ./src/ch - - --No -100 --fading_dir unittest | ./src/freedv_data_raw_rx datac3 - /dev/null --testframes --framesperburst 1 -v
 ```
-Try adjusting `--clip` and third argument of `cohpsk_ch` (noise level) for different modes.  Note the SNR estimates returned from `freedv_data_raw_rx` compared to the SNR from the channel simulator `cohpsh_ch`. You will notice clipping also increases the RMS power and reduces the PER for a given noise level.
+Try adjusting `--clip` and `No` argument of `ch` (noise level) for different modes.  Note the SNR estimates returned from `freedv_data_raw_rx` compared to the SNR from the channel simulator `ch`. You will notice clipping also increases the RMS power and reduces the PER for a given noise level.
 
 ## Reading Further
 
