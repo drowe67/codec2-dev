@@ -28,9 +28,9 @@ cd "${RUN_DIR}"
 #    plain )
 #    	# Config is <unused>, <unused>, <ldpc_en>, <unused> <profile>
 #    	echo "00000000" > stm_cfg.txt
-	ofdm_get_test_bits --out stm_in.raw --frames 6 --verbose \
+	ofdm_get_test_bits --out stm_in.raw --frames 6 --length 2064 --verbose \
 	    > setup.log 2>&1
-    	ldpc_enc stm_in.raw ref_out.raw --code HRA_112_112 \
+    	ldpc_enc stm_in.raw ref_out.raw --code H_2064_516_sparse \
 	    > ref_gen.log 2>&1
 #	;;
 #

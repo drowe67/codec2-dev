@@ -181,6 +181,7 @@ ${CODEC2_SRC}/newamp1.c
 ${CODEC2_SRC}/mbest.c
 ${CODEC2_SRC}/HRA_112_112.c
 ${CODEC2_SRC}/HRA_56_56.c
+${CODEC2_SRC}/H_2064_516_sparse.c
 ${CODEC2_SRC}/linreg.c
 ${CODEC2_SRC}/mpdecode_core.c
 ${CODEC2_SRC}/ldpc_codes.c

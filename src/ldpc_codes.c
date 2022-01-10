@@ -55,9 +55,8 @@ struct LDPC ldpc_codes[] = {
         (uint16_t *)HRA_56_56_H_rows,
         (uint16_t *)HRA_56_56_H_cols
     },
-    #ifndef __EMBEDDED__
 
-    /* default Wenet High Alitiude Balloon rate 0.8 code */
+    /* default Wenet High Altitude Balloon rate 0.8 code */
     {
         "H_2064_516_sparse",
         MAX_ITER,
@@ -73,6 +72,7 @@ struct LDPC ldpc_codes[] = {
         (uint16_t *)H_2064_516_sparse_H_cols
     },
 
+    #ifndef __EMBEDDED__
     /* rate 0.8 code used for FreeDV 2020 */
     {
         "HRAb_396_504",
