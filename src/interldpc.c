@@ -73,9 +73,27 @@ void ldpc_encode_frame(struct LDPC *ldpc, int codeword[], unsigned char tx_bits_
     } else {
         unsigned char tx_bits_char_padded[ldpc->ldpc_data_bits_per_frame];
         /* some unused data bits, set these to known values to strengthen code */
+#define UNEQUAL_2020
+#ifdef UNEQUAL_2020
+        /* We only want to keep 1 stage VQ data bits, 0..10 in each 52 bit codec 
+           frame. There are 6 codec frames 6x52=312 bits, 396 data bits in codeword.
+           So we want to protect 11*6 = 66 bits total, the rest set to 1s.  Hmm, however
+           that's just for parity generation.  We still want to send all of the bits
+           unmodified.
+         */
+        memcpy(tx_bits_char_padded, tx_bits_char, ldpc->data_bits_per_frame);
+        int codec_frame;
+        for(codec_frame=0; codec_frame<6; codec_frame++)
+            for(i=11; i<52; i++)
+                tx_bits_char_padded[codec_frame*52+i] = 1;
+        assert(codec_frame*52 == ldpc->data_bits_per_frame);
+        for (i = ldpc->data_bits_per_frame; i < ldpc->ldpc_data_bits_per_frame; i++)
+            tx_bits_char_padded[i] = 1;
+#else
         memcpy(tx_bits_char_padded, tx_bits_char, ldpc->data_bits_per_frame);
         for (i = ldpc->data_bits_per_frame; i < ldpc->ldpc_data_bits_per_frame; i++)
             tx_bits_char_padded[i] = 1;
+#endif
         encode(ldpc, tx_bits_char_padded, pbits);
     }
 
