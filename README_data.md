@@ -268,7 +268,7 @@ From the callers point of view, the frame format of each burst is:
 | Preamble | payload data | CRC | payload data | CRC | ........... | Postamble | 
            | frame 1 -----------| frame 2 -----------| ... frame N |
 ```
-In the next layer down, each frame is comprised of several OFDM "modem frames", that contain pilot, unique word, and FEC symbols to handle syncronisation and error correction over the challenging HF channel.  The preamble and postamble are used to locate the burst and estimate it's frequency offset.  Having both a pre and postamble increases the probability of successful detection of the burst in a fading channel. Here are some single frame bursts a MPP channel at 5dB SNR:
+In the next layer down, each frame is comprised of several OFDM "modem frames", that contain pilot, unique word, and FEC symbols to handle syncronisation and error correction over the challenging HF channel.  The preamble and postamble are used to locate the burst and estimate it's frequency offset.  Having both a pre and postamble increases the probability of successful detection of the burst in a fading channel. Here are some single frame bursts on a MPP channel at 5dB SNR:
 
 ![](doc/pre_post_amble_mpp.png)
 
