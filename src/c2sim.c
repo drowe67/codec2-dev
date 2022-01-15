@@ -1078,9 +1078,9 @@ int main(int argc, char *argv[])
 	fclose(fout);
 
     if (lpc_model) {
-    	fprintf(stderr, "LPC->{Am} SNR av: %5.2f dB\n", sum_snr/frames);
+    	fprintf(stderr, "LPC->{Am} SNR av: %5.2f dB over %d frames\n", sum_snr/frames, frames);
         if (lsp || lspd || lspjvm)
-            fprintf(stderr, "LSP quantiser SD: %5.2f dB*dB\n", sd_sum/sd_frames);     
+            fprintf(stderr, "LSP quantiser SD: %5.2f dB*dB over %d frames\n", sd_sum/sd_frames, sd_frames);     
     }
     if (newamp1vq) {
     	fprintf(stderr, "var: %3.2f dB*dB\n", se/nse);
