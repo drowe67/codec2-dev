@@ -50,6 +50,7 @@
 #include "bpfb.h"
 #include "newamp1.h"
 #include "lpcnet_freq.h"
+#include "sd.h"
 
 void synth_one_frame(int n_samp, codec2_fftr_cfg fftr_inv_cfg, short buf[], MODEL *model, float Sn_[], float Pn[], int prede, float *de_mem, float gain);
 void print_help(const struct option *long_options, int num_opts, char* argv[]);
@@ -497,7 +498,8 @@ int main(int argc, char *argv[])
     COMP Aw[FFT_ENC];
     COMP H[MAX_AMP];
 
-
+    float sd_sum = 0.0; int sd_frames = 0;
+    
     for(i=0; i<m_pitch; i++) {
 	Sn[i] = 1.0;
 	Sn_pre[i] = 1.0;
@@ -701,6 +703,7 @@ int main(int argc, char *argv[])
 	\*------------------------------------------------------------*/
 
 	if (lpc_model) {
+            float ak_[LPC_ORD+1];
 
             e = speech_to_uq_lsps(lsps, ak, Sn, w, m_pitch, order);
             for(i=0; i<order; i++)
@@ -724,13 +727,13 @@ int main(int argc, char *argv[])
 		encode_lsps_scalar(lsp_indexes, lsps, LPC_ORD);
 		decode_lsps_scalar(lsps_, lsp_indexes, LPC_ORD);
 		bw_expand_lsps(lsps_, LPC_ORD, 50.0, 100.0);
-		lsp_to_lpc(lsps_, ak, LPC_ORD);
+		lsp_to_lpc(lsps_, ak_, LPC_ORD);
 	    }
 
 	    if (lspd) {
 		encode_lspds_scalar(lsp_indexes, lsps, LPC_ORD);
 		decode_lspds_scalar(lsps_, lsp_indexes, LPC_ORD);
-		lsp_to_lpc(lsps_, ak, LPC_ORD);
+		lsp_to_lpc(lsps_, ak_, LPC_ORD);
 	    }
 
 	    if (lspjvm) {
@@ -740,9 +743,16 @@ int main(int argc, char *argv[])
 		    float lsps_bw[LPC_ORD];
 		    memcpy(lsps_bw, lsps_, sizeof(float)*order);
 		    bw_expand_lsps(lsps_bw, LPC_ORD, 50.0, 100.0);
-		    lsp_to_lpc(lsps_bw, ak, LPC_ORD);
+		    lsp_to_lpc(lsps_bw, ak_, LPC_ORD);
 		}
 	    }
+
+            if (lsp || lspd || lspjvm) {
+                sd_sum += spectral_dist(ak, ak_, LPC_ORD, fft_fwd_cfg, FFT_ENC);
+                sd_frames ++;
+            }
+
+            memcpy(ak, ak_, (LPC_ORD+1)*sizeof(float));
 
 	    if (scalar_quant_Wo_e) {
 		e = decode_energy(encode_energy(e, E_BITS), E_BITS);
@@ -1068,7 +1078,9 @@ int main(int argc, char *argv[])
 	fclose(fout);
 
     if (lpc_model) {
-    	fprintf(stderr, "SNR av = %5.2f dB\n", sum_snr/frames);
+    	fprintf(stderr, "LPC->{Am} SNR av: %5.2f dB\n", sum_snr/frames);
+        if (lsp || lspd || lspjvm)
+            fprintf(stderr, "LSP quantiser SD: %5.2f dB*dB\n", sd_sum/sd_frames);     
     }
     if (newamp1vq) {
     	fprintf(stderr, "var: %3.2f dB*dB\n", se/nse);
