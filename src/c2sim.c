@@ -71,7 +71,7 @@ int main(int argc, char *argv[])
 
     int lpc_model = 0, order = LPC_ORD;
     int lsp = 0, lspd = 0, lspvq = 0;
-    int lspjvm = 0;
+    int lspjmv = 0;
     int prede = 0;
     int   postfilt;
     int   hand_voicing = 0, hi = 0, simlpcpf = 0, modelin=0, modelout=0;
@@ -93,7 +93,7 @@ int main(int argc, char *argv[])
     FILE *fam = NULL, *fWo = NULL;
     FILE *faw = NULL;
     FILE *fhm = NULL;
-    FILE *fjvm = NULL;
+    FILE *fjmv = NULL;
     FILE *flspEWov = NULL;
     FILE *ften_ms_centre = NULL;
     FILE *fmodelout = NULL;
@@ -134,7 +134,7 @@ int main(int argc, char *argv[])
         { "lsp", no_argument, &lsp, 1 },
         { "lspd", no_argument, &lspd, 1 },
         { "lspvq", no_argument, &lspvq, 1 },
-        { "lspjvm", no_argument, &lspjvm, 1 },
+        { "lspjmv", no_argument, &lspjmv, 1 },
         { "phase0", no_argument, &phase0, 1 },
         { "postfilter", no_argument, &postfilt, 1 },
         { "hand_voicing", required_argument, &hand_voicing, 1 },
@@ -283,7 +283,7 @@ int main(int argc, char *argv[])
                     exit(1);
                 }
 	    } else if(strcmp(long_options[option_index].name, "dump_pitch_e") == 0) {
-	        if ((fjvm = fopen(optarg,"wt")) == NULL) {
+	        if ((fjmv = fopen(optarg,"wt")) == NULL) {
 	            fprintf(stderr, "Error opening pitch & energy dump file: %s: %s.\n",
 		        optarg, strerror(errno));
                     exit(1);
@@ -400,7 +400,7 @@ int main(int argc, char *argv[])
                } else if(strcmp(optarg,"1200") == 0) {
 	            lpc_model = 1;
 		    scalar_quant_Wo_e = 1;
-	            lspjvm = 1;
+	            lspjmv = 1;
 	            phase0 = 1;
 	            postfilt = 1;
 	            decimate = 4;
@@ -679,7 +679,7 @@ int main(int argc, char *argv[])
             #endif
 
 	    if (dump_pitch_e)
-		fprintf(fjvm, "%f %f %d ", model.Wo, snr, model.voiced);
+		fprintf(fjmv, "%f %f %d ", model.Wo, snr, model.voiced);
 
             #ifdef DUMP
 	    dump_snr(snr);
@@ -715,7 +715,7 @@ int main(int argc, char *argv[])
             #endif
 
 	    if (dump_pitch_e)
-		fprintf(fjvm, "%f\n", e);
+		fprintf(fjmv, "%f\n", e);
 
             #ifdef DUMP
             dump_lsp(lsps);
@@ -736,9 +736,9 @@ int main(int argc, char *argv[])
 		lsp_to_lpc(lsps_, ak_, LPC_ORD);
 	    }
 
-	    if (lspjvm) {
+	    if (lspjmv) {
 		/* Jean-Marc's multi-stage, split VQ */
-		lspjvm_quantise(lsps, lsps_, LPC_ORD);
+		lspjmv_quantise(lsps, lsps_, LPC_ORD);
 		{
 		    float lsps_bw[LPC_ORD];
 		    memcpy(lsps_bw, lsps_, sizeof(float)*order);
@@ -747,7 +747,7 @@ int main(int argc, char *argv[])
 		}
 	    }
 
-            if (lsp || lspd || lspjvm) {
+            if (lsp || lspd || lspjmv) {
                 sd_sum += spectral_dist(ak, ak_, LPC_ORD, fft_fwd_cfg, FFT_ENC);
                 sd_frames ++;
             }
@@ -1079,7 +1079,7 @@ int main(int argc, char *argv[])
 
     if (lpc_model) {
     	fprintf(stderr, "LPC->{Am} SNR av: %5.2f dB over %d frames\n", sum_snr/frames, frames);
-        if (lsp || lspd || lspjvm)
+        if (lsp || lspd || lspjmv)
             fprintf(stderr, "LSP quantiser SD: %5.2f dB*dB over %d frames\n", sd_sum/sd_frames, sd_frames);     
     }
     if (newamp1vq) {
@@ -1099,7 +1099,7 @@ int main(int argc, char *argv[])
     if (fWo     != NULL) fclose(fWo);
     if (faw     != NULL) fclose(faw);
     if (fhm     != NULL) fclose(fhm);
-    if (fjvm    != NULL) fclose(fjvm);
+    if (fjmv    != NULL) fclose(fjmv);
     if (flspEWov != NULL) fclose(flspEWov);
     if (fphasenn != NULL) fclose(fphasenn);
     if (frateK != NULL) fclose(frateK);
