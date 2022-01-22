@@ -28,20 +28,20 @@ case "${TEST_OPT}" in
     ideal )
 #    	# Config is <unused>, <unused>, <ldpc_en>, <unused> <profile>
 #    	echo "00000000" > stm_cfg.txt
-	ldpc_enc /dev/zero stm_in.raw --sd --code HRA_112_112 --testframes 6 \
+	ldpc_enc /dev/zero stm_in.raw --sd --code HRAb_396_504 --testframes 6 \
 	    > setup.log 2>&1
-        ldpc_dec stm_in.raw ref_out.raw --sd --code HRA_112_112 --testframes \
+        ldpc_dec stm_in.raw ref_out.raw --sd --code HRAb_396_504 --testframes \
 	    > ref_gen.log 2>&1
 	;;
 
     noise )
 #    	# Config is <unused>, <unused>, <ldpc_en>, <unused> <profile>
 #    	echo "00000000" > stm_cfg.txt
-	ldpc_enc /dev/zero enc_out.raw --sd --code HRA_112_112 --testframes 24 \
+	ldpc_enc /dev/zero enc_out.raw --sd --code HRAb_396_504 --testframes 24 \
 	    > setup.log 2>&1
-	ldpc_noise enc_out.raw stm_in.raw 1 \
+	ldpc_noise enc_out.raw stm_in.raw -2.0 \
 	    >> setup.log 2>&1
-        ldpc_dec stm_in.raw ref_out.raw --sd --code HRA_112_112 --testframes \
+        ldpc_dec stm_in.raw ref_out.raw --sd --code HRAb_396_504 --testframes \
 	    > ref_gen.log 2>&1
 	;;
 

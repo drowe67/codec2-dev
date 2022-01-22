@@ -39,16 +39,6 @@
 static __attribute__ ((section (".ccm"))) char fin_buffer[8*8192];
 char fout_buffer[1024];
 
-int opt_exists(char *argv[], int argc, char opt[]) {
-    int i;
-    for (i=0; i<argc; i++) {
-        if (strcmp(argv[i], opt) == 0) {
-            return i;
-        }
-    }
-    return 0;
-}
-
 int main(int argc, char *argv[])
 {
     semihosting_init();
