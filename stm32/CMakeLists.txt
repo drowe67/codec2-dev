@@ -188,7 +188,7 @@ ${CODEC2_SRC}/phi0.c
 ${CODEC2_SRC}/HRAb_396_504.c
 codebook.c
 codebookd.c
-codebookjvm.c
+codebookjmv.c
 codebookge.c
 codebooknewamp1_energy.c
 codebooknewamp1.c
