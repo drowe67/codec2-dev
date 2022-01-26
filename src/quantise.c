@@ -766,8 +766,8 @@ float speech_to_uq_lsps(float lsp[],
   AUTHOR......: David Rowe
   DATE CREATED: 22/8/2010
 
-  Thirty-six bit sclar LSP quantiser. From a vector of unquantised
-  (floating point) LSPs finds the quantised LSP indexes.
+  Scalar LSP quantiser. From a vector of unquantised (floating point)
+  LSPs finds the quantised LSP indexes.
 
 \*---------------------------------------------------------------------------*/
 
