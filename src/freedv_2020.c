@@ -244,14 +244,39 @@ int freedv_comprx_2020(struct freedv *f, COMP demod_in[]) {
 
         symbols_to_llrs(llr, codeword_symbols_de, codeword_amps_de,
                 EsNo, ofdm->mean_amp, coded_syms_per_frame);
-        /* LDPC decoder */
-        if (ldpc->data_bits_per_frame == ldpc->ldpc_data_bits_per_frame) {
-            /* all data bits in code word used */
+
+        /* LDPC decoder TODO: move to function */
+        float llr_full_codeword[ldpc->ldpc_coded_bits_per_frame];
+        int unused_data_bits = ldpc->ldpc_data_bits_per_frame - ldpc->data_bits_per_frame;
+        uint8_t out_char_ldpc[coded_bits_per_frame];
+
+        switch (ldpc->protection_mode) {
+        case LDPC_PROT_EQUAL:
+            /* Equal protection all data bits in codeword
+               (e.g. 700D/700E), works well with rate 0.5 codes */
+            assert(ldpc->data_bits_per_frame == ldpc->ldpc_data_bits_per_frame);
             iter = run_ldpc_decoder(ldpc, out_char, llr, &parityCheckCount);
-        } else {
-            /* some unused data bits, set these to known values to strengthen code */
-            float llr_full_codeword[ldpc->ldpc_coded_bits_per_frame];
-            int unused_data_bits = ldpc->ldpc_data_bits_per_frame - ldpc->data_bits_per_frame;
+            break;
+        case LDPC_PROT_2020:
+            /* some data bits in codeword unused, effectively
+               decreasing code rate and making FEC more powerful
+               (without having to design a new code) */
+            for (i = 0; i < ldpc->data_bits_per_frame; i++)
+                 llr_full_codeword[i] = llr[i];
+            // known bits ... so really likely
+            for (i = ldpc->data_bits_per_frame; i < ldpc->ldpc_data_bits_per_frame; i++)
+                 llr_full_codeword[i] = -100.0f;
+            // parity bits at end
+            for (i = ldpc->ldpc_data_bits_per_frame; i < ldpc->ldpc_coded_bits_per_frame; i++)
+                llr_full_codeword[i] = llr[i - unused_data_bits];
+            iter = run_ldpc_decoder(ldpc, out_char, llr_full_codeword, &parityCheckCount);
+            break;
+        case LDPC_PROT_2020A:
+            /* 2020A: 2020 waveform, but unequal error protection.
+               Only the stage1 VQ index of each LPCNet vocoder frames
+               is protected.  This means the code rate is quite low,
+               and protection quite high for these important bits.
+               The rest of the codec frame is unprotected. */
 
             // received data bits
             for (i = 0; i < ldpc->data_bits_per_frame; i++) {
@@ -273,14 +298,15 @@ int freedv_comprx_2020(struct freedv *f, COMP demod_in[]) {
             // parity bits at end
             for (i = ldpc->ldpc_data_bits_per_frame; i < ldpc->ldpc_coded_bits_per_frame; i++)
                 llr_full_codeword[i] = llr[i - unused_data_bits];
-            uint8_t out_char_ldpc[coded_bits_per_frame];
             iter = run_ldpc_decoder(ldpc, out_char_ldpc, llr_full_codeword, &parityCheckCount);
 
             // replace our_char[] bits with decoded bits            
             for(codec_frame=0; codec_frame<6; codec_frame++)
                 for(i=0; i<11; i++)
                     out_char[codec_frame*52+i] = out_char_ldpc[codec_frame*52+i];
-            
+            break;
+        default:
+            assert(0);
         }
 
         if (parityCheckCount != ldpc->NumberParityBits) rx_status |= FREEDV_RX_BIT_ERRORS;
@@ -288,6 +314,7 @@ int freedv_comprx_2020(struct freedv *f, COMP demod_in[]) {
         if (f->test_frames) {
             uint8_t payload_data_bits[data_bits_per_frame];
             ofdm_generate_payload_data_bits(payload_data_bits, data_bits_per_frame);
+            // TODO: modify to count only protected bits
             Nerrs_coded = count_errors(payload_data_bits, out_char, data_bits_per_frame);
             f->total_bit_errors_coded += Nerrs_coded;
             f->total_bits_coded += data_bits_per_frame;
@@ -304,7 +331,9 @@ int freedv_comprx_2020(struct freedv *f, COMP demod_in[]) {
         for(k=0; k<f->ofdm_ntxtbits; k++)  {
             if (k % 2 == 0 && (f->freedv_put_next_rx_symbol != NULL))
             {
-                (*f->freedv_put_next_rx_symbol)(f->callback_state_sym, ofdm->rx_np[txt_sym_index], ofdm->rx_amp[txt_sym_index]);
+                (*f->freedv_put_next_rx_symbol)(f->callback_state_sym,
+                                                ofdm->rx_np[txt_sym_index],
+                                                ofdm->rx_amp[txt_sym_index]);
                 txt_sym_index++;
             }
             

@@ -56,6 +56,7 @@ void set_up_ldpc_constants(struct LDPC *ldpc, int code_length, int parity_bits) 
 
     ldpc->data_bits_per_frame = ldpc->ldpc_data_bits_per_frame;
     ldpc->coded_bits_per_frame = ldpc->ldpc_coded_bits_per_frame;
+    ldpc->protection_mode = LDPC_PROT_2020;
 }
 
 void set_data_bits_per_frame(struct LDPC *ldpc, int new_data_bits_per_frame) {
@@ -67,14 +68,23 @@ void ldpc_encode_frame(struct LDPC *ldpc, int codeword[], unsigned char tx_bits_
     unsigned char pbits[ldpc->NumberParityBits];
     int i, j;
 
-    if (ldpc->data_bits_per_frame == ldpc->ldpc_data_bits_per_frame) {
+    unsigned char tx_bits_char_padded[ldpc->ldpc_data_bits_per_frame];
+
+    switch (ldpc->protection_mode) {
+    case LDPC_PROT_EQUAL:
+        assert(ldpc->data_bits_per_frame == ldpc->ldpc_data_bits_per_frame);
         /* we have enough data bits to fill the codeword */
         encode(ldpc, tx_bits_char, pbits);
-    } else {
-        unsigned char tx_bits_char_padded[ldpc->ldpc_data_bits_per_frame];
-        /* some unused data bits, set these to known values to strengthen code */
-#define UNEQUAL_2020
-#ifdef UNEQUAL_2020
+        break;
+        
+    case LDPC_PROT_2020:
+        memcpy(tx_bits_char_padded, tx_bits_char, ldpc->data_bits_per_frame);
+        for (i = ldpc->data_bits_per_frame; i < ldpc->ldpc_data_bits_per_frame; i++)
+            tx_bits_char_padded[i] = 1;
+        encode(ldpc, tx_bits_char_padded, pbits);
+        break;
+        
+    case LDPC_PROT_2020A:
         /* We only want to keep 1 stage VQ data bits, 0..10 in each 52 bit codec 
            frame. There are 6 codec frames 6x52=312 bits, 396 data bits in codeword.
            So we want to protect 11*6 = 66 bits total, the rest set to 1s.  Hmm, however
@@ -89,12 +99,10 @@ void ldpc_encode_frame(struct LDPC *ldpc, int codeword[], unsigned char tx_bits_
         assert(codec_frame*52 == ldpc->data_bits_per_frame);
         for (i = ldpc->data_bits_per_frame; i < ldpc->ldpc_data_bits_per_frame; i++)
             tx_bits_char_padded[i] = 1;
-#else
-        memcpy(tx_bits_char_padded, tx_bits_char, ldpc->data_bits_per_frame);
-        for (i = ldpc->data_bits_per_frame; i < ldpc->ldpc_data_bits_per_frame; i++)
-            tx_bits_char_padded[i] = 1;
-#endif
         encode(ldpc, tx_bits_char_padded, pbits);
+        break;
+    default:
+        assert(0);            
     }
 
     /* output codeword is concatenation of (used) data bits and parity
