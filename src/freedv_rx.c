@@ -71,11 +71,11 @@ int main(int argc, char *argv[]) {
     if (argc < 4) {
         char f2020[80] = {0};
         #ifdef __LPCNET__
-        sprintf(f2020,"|2020");
+        sprintf(f2020,"|2020|2020A");
         #endif
 	printf("usage: %s 1600|700C|700D|700E|2400A|2400B|800XA%s InputModemSpeechFile OutputSpeechRawFile\n"
                " [--testframes] [-v] [--discard] [--usecomplex] [--dpsk] [--squelch leveldB] [--txtrx filename] [--reliabletext]\n"
-	       " [--highpassthroughgain]\n", argv[0],f2020);
+	       " [--highpassthroughgain]\n", argv[0], f2020);
 	printf("e.g    %s 1600 hts1a_fdmdv.raw hts1a_out.raw\n", argv[0]);
 	exit(1);
     }
@@ -90,6 +90,7 @@ int main(int argc, char *argv[]) {
     if (!strcmp(argv[1],"800XA")) mode = FREEDV_MODE_800XA;
     #ifdef __LPCNET__
     if (!strcmp(argv[1],"2020"))  mode = FREEDV_MODE_2020;
+    if (!strcmp(argv[1],"2020A"))  mode = FREEDV_MODE_2020A;
     #endif
     if (mode == -1) {
         fprintf(stderr, "Error in mode: %s\n", argv[1]);

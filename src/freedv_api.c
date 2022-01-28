@@ -130,7 +130,7 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
          FDV_MODE_ACTIVE( FREEDV_MODE_2400B,  mode)   ||
          FDV_MODE_ACTIVE( FREEDV_MODE_800XA,  mode)   ||
          FDV_MODE_ACTIVE( FREEDV_MODE_2020,   mode)   ||
-         FDV_MODE_ACTIVE( FREEDV_MODE_2020A,   mode)   ||
+         FDV_MODE_ACTIVE( FREEDV_MODE_2020A,   mode)  ||
          FDV_MODE_ACTIVE( FREEDV_MODE_FSK_LDPC, mode) ||
          FDV_MODE_ACTIVE( FREEDV_MODE_DATAC0, mode)   ||
          FDV_MODE_ACTIVE( FREEDV_MODE_DATAC1, mode)   ||
@@ -203,7 +203,8 @@ void freedv_close(struct freedv *freedv) {
         ofdm_destroy(freedv->ofdm);
     }
 
-    if (FDV_MODE_ACTIVE( FREEDV_MODE_2020, freedv->mode)) {
+    if (FDV_MODE_ACTIVE( FREEDV_MODE_2020, freedv->mode) ||
+        FDV_MODE_ACTIVE( FREEDV_MODE_2020A, freedv->mode)) {
         FREE(freedv->codeword_symbols);
         FREE(freedv->codeword_amps);
         FREE(freedv->ldpc);
@@ -258,6 +259,7 @@ static void codec2_encode_upacked(struct freedv *f, uint8_t unpacked_bits[], sho
 
 static int is_ofdm_mode(struct freedv *f) {
     return FDV_MODE_ACTIVE( FREEDV_MODE_2020, f->mode)   ||
+           FDV_MODE_ACTIVE( FREEDV_MODE_2020A, f->mode)  ||
            FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode)   ||
            FDV_MODE_ACTIVE( FREEDV_MODE_700E, f->mode)   ||
            FDV_MODE_ACTIVE( FREEDV_MODE_DATAC0, f->mode) ||
@@ -341,10 +343,10 @@ void freedv_tx(struct freedv *f, short mod_out[], short speech_in[]) {
 void freedv_comptx(struct freedv *f, COMP mod_out[], short speech_in[]) {
     assert(f != NULL);
 
-    assert((FDV_MODE_ACTIVE( FREEDV_MODE_1600, f->mode)) || (FDV_MODE_ACTIVE( FREEDV_MODE_700C, f->mode)) ||
-           (FDV_MODE_ACTIVE( FREEDV_MODE_2400A, f->mode)) || (FDV_MODE_ACTIVE( FREEDV_MODE_2400B, f->mode)) ||
-           (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode))  || (FDV_MODE_ACTIVE( FREEDV_MODE_2020, f->mode)) ||
-           (FDV_MODE_ACTIVE( FREEDV_MODE_700E, f->mode)));
+    assert( FDV_MODE_ACTIVE( FREEDV_MODE_1600, f->mode)  || FDV_MODE_ACTIVE( FREEDV_MODE_700C, f->mode)  ||
+            FDV_MODE_ACTIVE( FREEDV_MODE_2400A, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_2400B, f->mode) ||
+            FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode)  || FDV_MODE_ACTIVE( FREEDV_MODE_700E, f->mode)  ||
+            FDV_MODE_ACTIVE( FREEDV_MODE_2020, f->mode)  || FDV_MODE_ACTIVE( FREEDV_MODE_2020A, f->mode) );
 
     if (FDV_MODE_ACTIVE( FREEDV_MODE_1600, f->mode)) {
         codec2_encode_upacked(f, f->tx_payload_bits, speech_in);
@@ -375,7 +377,7 @@ void freedv_comptx(struct freedv *f, COMP mod_out[], short speech_in[]) {
     }
 
 #ifdef __LPCNET__
-    if (FDV_MODE_ACTIVE( FREEDV_MODE_2020, f->mode)) {
+    if (FDV_MODE_ACTIVE( FREEDV_MODE_2020, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_2020A, f->mode)) {
 
         /* buffer up bits until we get enough encoded bits for interleaver */
 
@@ -728,7 +730,8 @@ int freedv_rx(struct freedv *f, short speech_out[], short demod_in[]) {
     assert(nin <= f->n_max_modem_samples);
 
     /* FSK RX happens in real floats, so convert to those and call their demod here */
-    if( (FDV_MODE_ACTIVE( FREEDV_MODE_2400A, f->mode)) || (FDV_MODE_ACTIVE( FREEDV_MODE_2400B, f->mode)) || (FDV_MODE_ACTIVE( FREEDV_MODE_800XA, f->mode)) ){
+    if( FDV_MODE_ACTIVE( FREEDV_MODE_2400A, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_2400B, f->mode) ||
+        FDV_MODE_ACTIVE( FREEDV_MODE_800XA, f->mode) ){
         float rx_float[f->n_max_modem_samples];
         for(i=0; i<nin; i++) {
             rx_float[i] = ((float)demod_in[i]);
@@ -736,8 +739,8 @@ int freedv_rx(struct freedv *f, short speech_out[], short demod_in[]) {
         return freedv_floatrx(f,speech_out,rx_float);
     }
 
-    if ( (FDV_MODE_ACTIVE( FREEDV_MODE_1600, f->mode)) || (FDV_MODE_ACTIVE( FREEDV_MODE_700C, f->mode))
-         || (FDV_MODE_ACTIVE( FREEDV_MODE_2020, f->mode))) {
+    if ( FDV_MODE_ACTIVE( FREEDV_MODE_1600, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_700C, f->mode) ||
+         FDV_MODE_ACTIVE( FREEDV_MODE_2020, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_2020A, f->mode)) {
 
         float gain = 1.0f;
 
@@ -784,7 +787,7 @@ int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]) {
         rx_status = freedv_comp_short_rx_ofdm(f, (void*)demod_in, 0, 2.0f); // was 1.0 ??
     }
 
-    if (FDV_MODE_ACTIVE( FREEDV_MODE_2020, f->mode)) {
+    if (FDV_MODE_ACTIVE( FREEDV_MODE_2020, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_2020A, f->mode)) {
 #ifdef __LPCNET__
         rx_status = freedv_comprx_2020(f, demod_in);
 #endif
@@ -867,7 +870,7 @@ int freedv_bits_to_speech(struct freedv *f, short speech_out[], short demod_in[]
 
             /* pass through received samples so we can hear what's going on, e.g. during tuning */
 
-            if (f->mode == FREEDV_MODE_2020) {
+            if ((f->mode == FREEDV_MODE_2020) || (f->mode == FREEDV_MODE_2020A)) {
                 /* 8kHz modem sample rate but 16 kHz speech sample
                    rate, so we need to resample */
                 nout = 2*f->nin_prev;
@@ -913,7 +916,7 @@ int freedv_bits_to_speech(struct freedv *f, short speech_out[], short demod_in[]
     }
 
     if (decode_speech) {
-        if(FDV_MODE_ACTIVE( FREEDV_MODE_2020, f->mode)) {
+        if(FDV_MODE_ACTIVE( FREEDV_MODE_2020, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_2020A, f->mode)) {
 #ifdef __LPCNET__
             /* LPCNet decoder */
 
@@ -1106,7 +1109,8 @@ void freedv_set_callback_txt_sym(struct freedv *f, freedv_callback_rx_sym rx, vo
 {
     if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode ) ||
         FDV_MODE_ACTIVE( FREEDV_MODE_700E, f->mode ) ||
-        FDV_MODE_ACTIVE( FREEDV_MODE_2020, f->mode ) ) {
+        FDV_MODE_ACTIVE( FREEDV_MODE_2020, f->mode ) ||
+        FDV_MODE_ACTIVE( FREEDV_MODE_2020A, f->mode)) {
         f->freedv_put_next_rx_symbol = rx;
         f->callback_state_sym = state;
     }
@@ -1381,7 +1385,7 @@ int freedv_get_n_max_speech_samples(struct freedv *f) {
        freedv_get_n_max_modem_samples() via the speech_output[]
        array */
     int max_output_passthrough_samples;
-    if (FDV_MODE_ACTIVE(FREEDV_MODE_2020, f->mode))
+    if (FDV_MODE_ACTIVE(FREEDV_MODE_2020, f->mode) || FDV_MODE_ACTIVE(FREEDV_MODE_2020A, f->mode))
        // In 2020 we oversample the input modem samples from 8->16 kHz
        max_output_passthrough_samples = 2*freedv_get_n_max_modem_samples(f);
     else
