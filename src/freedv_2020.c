@@ -249,71 +249,7 @@ int freedv_comprx_2020(struct freedv *f, COMP demod_in[]) {
 
         symbols_to_llrs(llr, codeword_symbols_de, codeword_amps_de,
                 EsNo, ofdm->mean_amp, coded_syms_per_frame);
-
-        /* LDPC decoder TODO: move to function */
-        float llr_full_codeword[ldpc->ldpc_coded_bits_per_frame];
-        int unused_data_bits = ldpc->ldpc_data_bits_per_frame - ldpc->data_bits_per_frame;
-        uint8_t out_char_ldpc[coded_bits_per_frame];
-
-        switch (ldpc->protection_mode) {
-        case LDPC_PROT_EQUAL:
-            /* Equal protection all data bits in codeword
-               (e.g. 700D/700E), works well with rate 0.5 codes */
-            assert(ldpc->data_bits_per_frame == ldpc->ldpc_data_bits_per_frame);
-            iter = run_ldpc_decoder(ldpc, out_char, llr, &parityCheckCount);
-            break;
-        case LDPC_PROT_2020:
-            /* some data bits in codeword unused, effectively
-               decreasing code rate and making FEC more powerful
-               (without having to design a new code) */
-            for (i = 0; i < ldpc->data_bits_per_frame; i++)
-                 llr_full_codeword[i] = llr[i];
-            // known bits ... so really likely
-            for (i = ldpc->data_bits_per_frame; i < ldpc->ldpc_data_bits_per_frame; i++)
-                 llr_full_codeword[i] = -100.0f;
-            // parity bits at end
-            for (i = ldpc->ldpc_data_bits_per_frame; i < ldpc->ldpc_coded_bits_per_frame; i++)
-                llr_full_codeword[i] = llr[i - unused_data_bits];
-            iter = run_ldpc_decoder(ldpc, out_char, llr_full_codeword, &parityCheckCount);
-            break;
-        case LDPC_PROT_2020A:
-            /* 2020A: 2020 waveform, but unequal error protection.
-               Only the stage1 VQ index of each LPCNet vocoder frames
-               is protected.  This means the code rate is quite low,
-               and protection quite high for these important bits.
-               The rest of the codec frame is unprotected. */
-
-            // received data bits
-            for (i = 0; i < ldpc->data_bits_per_frame; i++) {
-                llr_full_codeword[i] = llr[i];
-                // uncoded bits pass through
-                out_char[i] = llr[i] < 0;
-            }
-
-            // set up known bits
-            int codec_frame;
-            for(codec_frame=0; codec_frame<6; codec_frame++)
-                for(i=11; i<52; i++)
-                    llr_full_codeword[codec_frame*52+i] = -100.0f;
-            assert(codec_frame*52 == ldpc->data_bits_per_frame);
-
-            // known bits ... so really likely
-            for (i = ldpc->data_bits_per_frame; i < ldpc->ldpc_data_bits_per_frame; i++)
-                llr_full_codeword[i] = -100.0f;
-            // parity bits at end
-            for (i = ldpc->ldpc_data_bits_per_frame; i < ldpc->ldpc_coded_bits_per_frame; i++)
-                llr_full_codeword[i] = llr[i - unused_data_bits];
-            iter = run_ldpc_decoder(ldpc, out_char_ldpc, llr_full_codeword, &parityCheckCount);
-
-            // replace our_char[] bits with decoded bits            
-            for(codec_frame=0; codec_frame<6; codec_frame++)
-                for(i=0; i<11; i++)
-                    out_char[codec_frame*52+i] = out_char_ldpc[codec_frame*52+i];
-            break;
-        default:
-            assert(0);
-        }
-
+        ldpc_decode_frame(ldpc, &parityCheckCount, &iter, out_char, llr);
         if (parityCheckCount != ldpc->NumberParityBits) rx_status |= FREEDV_RX_BIT_ERRORS;
 
         if (f->test_frames) {
