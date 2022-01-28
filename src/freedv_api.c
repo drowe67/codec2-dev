@@ -130,6 +130,7 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
          FDV_MODE_ACTIVE( FREEDV_MODE_2400B,  mode)   ||
          FDV_MODE_ACTIVE( FREEDV_MODE_800XA,  mode)   ||
          FDV_MODE_ACTIVE( FREEDV_MODE_2020,   mode)   ||
+         FDV_MODE_ACTIVE( FREEDV_MODE_2020A,   mode)   ||
          FDV_MODE_ACTIVE( FREEDV_MODE_FSK_LDPC, mode) ||
          FDV_MODE_ACTIVE( FREEDV_MODE_DATAC0, mode)   ||
          FDV_MODE_ACTIVE( FREEDV_MODE_DATAC1, mode)   ||
@@ -147,6 +148,7 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
     if (FDV_MODE_ACTIVE( FREEDV_MODE_700E, mode)) freedv_ofdm_voice_open(f, "700E");
 #ifdef __LPCNET__
     if (FDV_MODE_ACTIVE( FREEDV_MODE_2020, mode)) freedv_2020_open(f);
+    if (FDV_MODE_ACTIVE( FREEDV_MODE_2020A, mode)) freedv_2020a_open(f);
 #endif
     if (FDV_MODE_ACTIVE( FREEDV_MODE_2400A, mode)) freedv_2400a_open(f);
     if (FDV_MODE_ACTIVE( FREEDV_MODE_2400B, mode)) freedv_2400b_open(f);

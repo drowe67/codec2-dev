@@ -36,7 +36,7 @@
 extern char *ofdm_statemode[];
 
 #ifdef __LPCNET__
-void freedv_2020_open(struct freedv *f) {
+void freedv_2020_open(struct freedv *f, ) {
     f->speech_sample_rate = FREEDV_FS_16000;
     f->snr_squelch_thresh = 4.0;
     f->squelch_en = 0;
@@ -116,6 +116,11 @@ void freedv_2020_open(struct freedv *f) {
     
     /* attenuate audio 12dB as channel noise isn't that pleasant */
     f->passthrough_gain = 0.25;
+}
+
+void freedv_2020a_open(struct freedv *f) {
+    freedv_2020_open(f);
+    f->ldpc_protetction_mode = LDPC_PROT_2020A;
 }
 
 void freedv_comptx_2020(struct freedv *f, COMP mod_out[]) {
