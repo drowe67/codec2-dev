@@ -260,6 +260,7 @@ int main(int argc, char *argv[]) {
         if (!strcmp(mode,"2020") || !strcmp(mode,"2020A")) {
             set_data_bits_per_frame(&ldpc, 312);
         }
+        if (!strcmp(mode,"2020A")) ldpc.protection_mode = LDPC_PROT_2020A;
         Ndatabitsperpacket = ldpc.data_bits_per_frame;
 
         assert(Ndatabitsperpacket <= ldpc.ldpc_data_bits_per_frame);

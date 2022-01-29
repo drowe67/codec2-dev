@@ -346,6 +346,7 @@ int main(int argc, char *argv[]) {
         if (!strcmp(mode,"2020") || !strcmp(mode,"2020A")) {
             set_data_bits_per_frame(&ldpc, 312);
         }
+        if (!strcmp(mode,"2020A")) ldpc.protection_mode = LDPC_PROT_2020A;
         Ndatabitsperpacket = ldpc.data_bits_per_frame;
 
         assert(Ndatabitsperpacket <= ldpc.ldpc_data_bits_per_frame);
@@ -380,6 +381,7 @@ int main(int argc, char *argv[]) {
     Terrs = Tbits = Terrs2 = Tbits2 = Terrs_coded = Tbits_coded = frame_count = packet_count = 0;
     int Nerrs_raw = 0;
     int Nerrs_coded = 0;
+    int Ncoded;
     int Tper = 0;
     int iter = 0;
     int parityCheckCount = 0;
@@ -483,11 +485,10 @@ int main(int argc, char *argv[]) {
                         /* construct payload data bits */
                         uint8_t payload_data_bits[Ndatabitsperpacket];
                         ofdm_generate_payload_data_bits(payload_data_bits, Ndatabitsperpacket);
-
-                        Nerrs_coded = count_errors(payload_data_bits, out_char, Ndatabitsperpacket);
+                        count_errors_protection_mode(ldpc.protection_mode, &Nerrs_coded, &Ncoded,
+                                                     payload_data_bits, out_char, Ndatabitsperpacket);
                         Terrs_coded += Nerrs_coded;
-                        Tbits_coded += Ndatabitsperpacket;
-
+                        Tbits_coded += Ncoded;
                         if (Nerrs_coded) Tper++;
                     }
 

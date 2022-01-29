@@ -250,13 +250,46 @@ int count_errors(uint8_t tx_bits[], uint8_t rx_bits[], int n) {
     int i;
     int Nerrs = 0;
 
-    for (i = 0; i < n; i++) {
-        if (tx_bits[i] != rx_bits[i]) {
-            Nerrs++;
-        }
-    }
+    for (i = 0; i < n; i++)
+        if (tx_bits[i] != rx_bits[i]) Nerrs++;
 
     return Nerrs;
+}
+
+
+/* for unequal protection modes, count coded errors only in those bits that have been protected */
+void count_errors_protection_mode(int protection_mode, int *pNerrs, int *pNcoded, uint8_t tx_bits[],
+                                  uint8_t rx_bits[], int n) {
+    int i;
+    int Nerrs = 0;
+    int Ncoded = 0;
+
+    switch (protection_mode) {
+    case LDPC_PROT_EQUAL:
+    case LDPC_PROT_2020:
+        for (i = 0; i < n; i++) {
+            if (tx_bits[i] != rx_bits[i]) Nerrs++;
+            Ncoded++;
+        }
+        break;
+    case LDPC_PROT_2020A:
+        /* We only protect bits 0..10 in each 52 bit LPCNet codec
+           frame. There are 6 codec frames 6x52=312 data bits, of
+           which only 11*6 = 66 bits are protected.
+         */
+        for(int codec_frame=0; codec_frame<6; codec_frame++) {
+            for(i=0; i<11; i++) {
+                if (tx_bits[i] != rx_bits[i]) Nerrs++;
+                Ncoded++;
+            }
+        }
+        break;
+    default:
+        assert(0);            
+    }
+
+    *pNerrs = Nerrs;
+    *pNcoded = Ncoded;
 }
 
 /*

@@ -520,7 +520,8 @@ endif()
                             ./ofdm_mod --ldpc |
                             ./ofdm_demod --ldpc --testframes > /dev/null")
 
-    # noise free 2020 test, including reading and writing payload bits.  fsk_*_test_bits used as it does it's own frame sync
+    # noise free 2020 test, including reading and writing payload bits.  fsk_*_test_bits
+    # used as it does it's own frame sync
     add_test(NAME test_OFDM_modem_2020_ldpc
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
                             ./fsk_get_test_bits - 5000 |
@@ -529,7 +530,10 @@ endif()
                             ./fsk_put_test_bits - -q")
 
     add_test(NAME test_OFDM_modem_AWGN_BER
-             COMMAND sh -c "$<TARGET_FILE:ofdm_mod> --in /dev/zero --ldpc --testframes 60 --txbpf | $<TARGET_FILE:ch> - - --No -20  -f -50 | $<TARGET_FILE:ofdm_demod> --out /dev/null --testframes --ldpc --verbose 1"
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            ./ofdm_mod --in /dev/zero --ldpc --testframes 60 --txbpf | 
+                            ./ch - - --No -20 -f -50 | 
+                            ./ofdm_demod --out /dev/null --testframes --ldpc --verbose 1"
              )
 
     add_test(NAME test_OFDM_modem_fading_BER
@@ -560,6 +564,13 @@ endif()
                             ./ofdm_mod --in /dev/zero --testframes 10 --ldpc --mode 700E |
                             ./ch - - --No -22 |
                             ./ofdm_demod --mode 700E --ldpc --testframes -v 2 > /dev/null")
+
+    # 2020A MPP test, quite strong FEC on protected bits 
+    add_test(NAME test_OFDM_modem_2020A_mpp
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                           ./ofdm_mod --in /dev/zero --mode 2020A --verbose 1 --ldpc --testframes 60 --clip 1 |
+                           ./ch - - --No -22 --mpp --fading_dir ../unittest |
+                           ./ofdm_demod --mode 2020A --testframes --ldpc --verbose 1 > /dev/null")
 
     # 2020B AWGN test 
     add_test(NAME test_OFDM_modem_2020B_AWGN
@@ -765,6 +776,15 @@ if(LPCNET)
                             ./freedv_tx 2020 - - --testframes |
                             ./ch - - --No -24 |
                             ./freedv_rx 2020 - /dev/null --testframes"
+             )
+
+    # quite strong protection of just protected bits (note compression (tx clipping) on)
+    add_test(NAME test_freedv_api_2020A_mpp
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            dd bs=32000 count=60 if=/dev/zero |
+                            ./freedv_tx 2020A - - --testframes --clip 1 |
+                            ./ch - - --No -24 --mpp --fading_dir ../unittest |
+                            ./freedv_rx 2020A - /dev/null --testframes"
              )
 endif()
 

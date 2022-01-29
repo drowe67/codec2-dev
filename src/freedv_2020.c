@@ -190,6 +190,7 @@ int freedv_comprx_2020(struct freedv *f, COMP demod_in[]) {
 
     int Nerrs_raw = 0;
     int Nerrs_coded = 0;
+    int Ncoded;
     int iter = 0;
     int parityCheckCount = 0;
     uint8_t rx_uw[f->ofdm_nuwbits];
@@ -255,10 +256,9 @@ int freedv_comprx_2020(struct freedv *f, COMP demod_in[]) {
         if (f->test_frames) {
             uint8_t payload_data_bits[data_bits_per_frame];
             ofdm_generate_payload_data_bits(payload_data_bits, data_bits_per_frame);
-            // TODO: modify to count only protected bits
-            Nerrs_coded = count_errors(payload_data_bits, out_char, data_bits_per_frame);
+            count_errors_protection_mode(ldpc->protection_mode, &Nerrs_coded, &Ncoded, payload_data_bits, out_char, data_bits_per_frame);
             f->total_bit_errors_coded += Nerrs_coded;
-            f->total_bits_coded += data_bits_per_frame;
+            f->total_bits_coded += Ncoded;
             if (Nerrs_coded) f->total_packet_errors++;
             f->total_packets++;
         } else {
