@@ -149,11 +149,11 @@ $  ./freedv_tx 2400B ../../raw/ve9qrp_10s.raw - | sox -t .s16 -r 48000 - -t .s16
 ## FreeDV 2020 tests with FreeDV API
 
 ```
-$ cat ~/LPCNet/wav/wia.wav | ~/LPCNet/build_linux/src/lpcnet_enc -s | ./ofdm_mod --mode 2020 --ldpc --verbose 1 -p 312 | ./ofdm_demod --mode 2020 --verbose 1 --ldpc -p 312 | ~/LPCNet/build_linux/src/lpcnet_dec -s | aplay -f S16_LE -r 16000
+$ cat ~/LPCNet/wav/wia.wav | ~/LPCNet/build_linux/src/lpcnet_enc -s | ./ofdm_mod --mode 2020 --ldpc --verbose 1 | ./ofdm_demod --mode 2020 --verbose 1 --ldpc | ~/LPCNet/build_linux/src/lpcnet_dec -s | aplay -f S16_LE -r 16000
 ```
 Listen the reference tx:
 ```
-$ cat ~/LPCNet/wav/wia.wav | ~/LPCNet/build_linux/src/lpcnet_enc -s | ./ofdm_mod --mode 2020 --ldpc --verbose 1 -p 312 | aplay -f S16_LE
+$ cat ~/LPCNet/wav/wia.wav | ~/LPCNet/build_linux/src/lpcnet_enc -s | ./ofdm_mod --mode 2020 --ldpc --verbose 1 | aplay -f S16_LE
 ```
 
 Listen the freedv_tx:
@@ -163,7 +163,7 @@ $ ./freedv_tx 2020 ~/LPCNet/wav/wia.wav - | aplay -f S16_LE
 
 FreeDV API tx, with reference rx from above:
 ```
-$ ./freedv_tx 2020 ~/LPCNet/wav/wia.wav - | ./ofdm_demod --mode 2020 --verbose 1 --ldpc -p 312 | ~/LPCNet/build_linux/src/lpcnet_dec -s | aplay -f S16_LE -r 16000
+$ ./freedv_tx 2020 ~/LPCNet/wav/wia.wav - | ./ofdm_demod --mode 2020 --verbose 1 --ldpc | ~/LPCNet/build_linux/src/lpcnet_dec -s | aplay -f S16_LE -r 16000
 ```
 
 FreeDV API tx and rx:

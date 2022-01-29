@@ -133,7 +133,7 @@ void qpsk_modulate_frame(COMP tx_symbols[], int codeword[], int n) {
 }
 
 /* run LDPC decoder, taking into account the FEC protection scheme */
-void ldpc_decode_frame(struct LDPC *ldpc, int *parityCheckCount, int *iter, uint8_t  out_char[], float llr[]) {
+void ldpc_decode_frame(struct LDPC *ldpc, int *parityCheckCount, int *iter, uint8_t out_char[], float llr[]) {
     float llr_full_codeword[ldpc->ldpc_coded_bits_per_frame];
     int unused_data_bits = ldpc->ldpc_data_bits_per_frame - ldpc->data_bits_per_frame;
     uint8_t out_char_ldpc[ldpc->coded_bits_per_frame];

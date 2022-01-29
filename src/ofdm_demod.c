@@ -80,7 +80,6 @@ void opt_help() {
     fprintf(stderr, "  --verbose      [1|2|3]   Verbose output level to stderr (default off)\n");
     fprintf(stderr, "  --testframes             Receive test frames and count errors\n");
     fprintf(stderr, "  --ldpc                   Run LDPC decoder\n");
-    fprintf(stderr, "  --databits     numBits   Number of data bits used in LDPC codeword.\n");
     fprintf(stderr, "\n");
     fprintf(stderr, "  --start_secs      secs   Number of seconds delay before we start to demod\n");
     fprintf(stderr, "  --len_secs        secs   Number of seconds to run demod\n");
@@ -156,7 +155,6 @@ int main(int argc, char *argv[]) {
         {"ts", 'l', OPTPARSE_REQUIRED},
         {"ns", 'm', OPTPARSE_REQUIRED},
         {"np", 'n', OPTPARSE_REQUIRED},
-        {"databits", 'p', OPTPARSE_REQUIRED},
         {"start_secs", 'x', OPTPARSE_REQUIRED},
         {"len_secs", 'y', OPTPARSE_REQUIRED},
         {"skip_secs", 'z', OPTPARSE_REQUIRED},
@@ -225,9 +223,6 @@ int main(int argc, char *argv[]) {
                 break;
             case 'o':
                 phase_est_bandwidth_mode = atoi(options.optarg);
-                break;
-            case 'p':
-                Ndatabitsperpacket = atoi(options.optarg);
                 break;
             case 'q':
                 dpsk = true;
@@ -348,12 +343,9 @@ int main(int argc, char *argv[]) {
     if (ldpc_en) {
         ldpc_codes_setup(&ldpc, ofdm->codename);
         if (verbose > 1) { fprintf(stderr, "using: %s\n", ofdm->codename); }
-
-        /* here is where we can change data bits per frame to a number smaller than LDPC code input data bits_per_frame */
-        if (Ndatabitsperpacket) {
-            set_data_bits_per_frame(&ldpc, Ndatabitsperpacket);
+        if (!strcmp(mode,"2020") || !strcmp(mode,"2020A")) {
+            set_data_bits_per_frame(&ldpc, 312);
         }
-
         Ndatabitsperpacket = ldpc.data_bits_per_frame;
 
         assert(Ndatabitsperpacket <= ldpc.ldpc_data_bits_per_frame);
@@ -485,26 +477,7 @@ int main(int argc, char *argv[]) {
                                     EsNo, ofdm->mean_amp, Npayloadsymsperpacket);
 
                     assert(Ndatabitsperpacket == ldpc.data_bits_per_frame);
-                    if (ldpc.data_bits_per_frame == ldpc.ldpc_data_bits_per_frame) {
-                        /* all data bits in code word used */
-                        iter = run_ldpc_decoder(&ldpc, out_char, llr, &parityCheckCount);
-                    } else {
-                        /* some unused data bits, set these to known values to strengthen code */
-                        float llr_full_codeword[ldpc.ldpc_coded_bits_per_frame];
-                        int unused_data_bits = ldpc.ldpc_data_bits_per_frame - ldpc.data_bits_per_frame;
-
-                        // received data bits
-                        for (i = 0; i < ldpc.data_bits_per_frame; i++)
-                            llr_full_codeword[i] = llr[i];
-                        // known bits ... so really likely
-                        for (i = ldpc.data_bits_per_frame; i < ldpc.ldpc_data_bits_per_frame; i++)
-                            llr_full_codeword[i] = -100.0;
-                        // parity bits at end
-                        for (i = ldpc.ldpc_data_bits_per_frame; i < ldpc.ldpc_coded_bits_per_frame; i++)
-                            llr_full_codeword[i] = llr[i - unused_data_bits];
-
-                        iter = run_ldpc_decoder(&ldpc, out_char, llr_full_codeword, &parityCheckCount);
-                    }
+                    ldpc_decode_frame(&ldpc, &parityCheckCount, &iter, out_char, llr);
 
                     if (testframes == true) {
                         /* construct payload data bits */

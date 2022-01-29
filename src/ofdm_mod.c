@@ -52,7 +52,7 @@ void opt_help() {
     fprintf(stderr, "\nusage: %s [options]\n\n", progname);
     fprintf(stderr, "  --in      filename    Name of InputOneCharPerBitFile\n");
     fprintf(stderr, "  --out     filename    Name of OutputModemRawFile\n");
-    fprintf(stderr, "  --mode    modeName    Predefined mode 700D|700E|2020|datac0|datac1|datac3\n");
+    fprintf(stderr, "  --mode    modeName    Predefined mode 700D|700E|2020|2020B|datac0|datac1|datac3\n");
     fprintf(stderr, "  --nc      [17..62]    Number of Carriers (17 default, 62 max)\n");
     fprintf(stderr, "  --ns       symbols    One pilot every ns symbols (8 default)\n");
     fprintf(stderr, "  --tcp        Nsecs    Cyclic Prefix Duration (.002 default)\n");
@@ -66,7 +66,6 @@ void opt_help() {
     fprintf(stderr, "  --text                Include a standard text message boolean (default off)\n");
     fprintf(stderr, "  -i --ldpc    [1|2]    Run LDPC decoder (1 -> (224,112) 700D code, 2 -> (504,396) 2020 code).\n"
                     "                        In testframe mode raw and coded errors will be counted.\n");
-    fprintf(stderr, "  -p --databits numBits Number of data bits used in LDPC codeword.\n");
     fprintf(stderr, "  --dpsk                Differential PSK.\n");
     fprintf(stderr, "  --bursts   nBursts    Burst mode: Send nBursts of testframes each\n");
     fprintf(stderr, "\n");
@@ -134,7 +133,6 @@ int main(int argc, char *argv[]) {
         {"clip", 'r', OPTPARSE_NONE},
         {"text", 'l', OPTPARSE_NONE},
         {"verbose", 'v', OPTPARSE_REQUIRED},
-        {"databits", 'p', OPTPARSE_REQUIRED},
         {"dpsk", 'q', OPTPARSE_NONE},
         {"mode", 'g', OPTPARSE_REQUIRED},
         {"help", 'h', OPTPARSE_NONE},
@@ -204,9 +202,6 @@ int main(int argc, char *argv[]) {
             case 'l':
                 use_text = 1;
                 break;
-            case 'p':
-                Ndatabitsperpacket = atoi(options.optarg);
-                break;
             case 'q':
                 dpsk = 1;
                 break;
@@ -262,12 +257,9 @@ int main(int argc, char *argv[]) {
     if (ldpc_en) {
         ldpc_codes_setup(&ldpc, ofdm->codename);
         if (verbose > 1) { fprintf(stderr, "using: %s\n", ofdm->codename); }
-
-        /* here is where we can change data bits per frame to a number smaller than LDPC code input data bits_per_frame */
-        if (Ndatabitsperpacket) {
-            set_data_bits_per_frame(&ldpc, Ndatabitsperpacket);
+        if (!strcmp(mode,"2020") || !strcmp(mode,"2020A")) {
+            set_data_bits_per_frame(&ldpc, 312);
         }
-
         Ndatabitsperpacket = ldpc.data_bits_per_frame;
 
         assert(Ndatabitsperpacket <= ldpc.ldpc_data_bits_per_frame);

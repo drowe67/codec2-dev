@@ -524,8 +524,8 @@ endif()
     add_test(NAME test_OFDM_modem_2020_ldpc
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
                             ./fsk_get_test_bits - 5000 |
-                            ./ofdm_mod --ldpc --mode 2020 -p 312 |
-                            ./ofdm_demod  --ldpc --mode 2020 -p 312 |
+                            ./ofdm_mod --ldpc --mode 2020 |
+                            ./ofdm_demod  --ldpc --mode 2020 |
                             ./fsk_put_test_bits - -q")
 
     add_test(NAME test_OFDM_modem_AWGN_BER
@@ -561,12 +561,12 @@ endif()
                             ./ch - - --No -22 |
                             ./ofdm_demod --mode 700E --ldpc --testframes -v 2 > /dev/null")
 
-    # 2020A AWGN test 
-    add_test(NAME test_OFDM_modem_2020A_AWGN
+    # 2020B AWGN test 
+    add_test(NAME test_OFDM_modem_2020B_AWGN
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
-                            ./ofdm_mod --in /dev/zero --testframes 10 --mode 2020A |
+                            ./ofdm_mod --in /dev/zero --testframes 10 --mode 2020B |
                             ./ch - - --No -22 |
-                            ./ofdm_demod --mode 2020A --testframes -v 2 > /dev/null")
+                            ./ofdm_demod --mode 2020B --testframes -v 2 > /dev/null")
            
     # -------------------------------------------------------------------------
     #                                OFDM Data modes
@@ -750,12 +750,12 @@ if(LPCNET)
     add_test(NAME test_freedv_api_2020_to_ofdm_demod
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
                                ./freedv_tx 2020 ../../wav/wia_16kHz.wav - --testframes |
-                               ./ofdm_demod --mode 2020 --verbose 1 --ldpc -p 312 --testframes > /dev/null"
+                               ./ofdm_demod --mode 2020 --verbose 1 --ldpc --testframes > /dev/null"
              )
 
     add_test(NAME test_freedv_api_2020_from_ofdm_mod
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
-                            ./ofdm_mod --in /dev/zero --mode 2020 --verbose 1 --ldpc -p 312 --testframes 10 |
+                            ./ofdm_mod --in /dev/zero --mode 2020 --verbose 1 --ldpc --testframes 10 |
                             ./freedv_rx 2020 - /dev/null --testframes"
              )
 
