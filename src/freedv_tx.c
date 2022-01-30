@@ -30,6 +30,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
+#include <getopt.h>
 
 #include "reliable_text.h"
 #include "freedv_api.h"
@@ -60,32 +61,86 @@ int main(int argc, char *argv[]) {
     struct freedv            *freedv;
     int                       mode;
     int                       use_testframes, use_clip, use_txbpf, use_dpsk, use_reliabletext;
-    int                       i;
-    char*                     callsign;
+    char                      callsign[256] = "";
     reliable_text_t           reliable_text_obj;
-    
+    char f2020[80] = {0};
+#ifdef __LPCNET__
+    sprintf(f2020,"|2020|2020A");
+#endif
+   
     if (argc < 4) {
-        char f2020[80] = {0};
-        #ifdef __LPCNET__
-        sprintf(f2020,"|2020|2020A");
-        #endif
-        printf("usage: %s 1600|700C|700D|700E|2400A|2400B|800XA%s InputRawSpeechFile OutputModemRawFile\n"
-               " [--testframes] [--clip 0|1] [--txbpf 0|1] [--dpsk] [--reliabletext txt]\n", argv[0], f2020);
-        printf("e.g    %s 1600 hts1a.raw hts1a_fdmdv.raw\n", argv[0]);
+    helpmsg:
+        fprintf(stderr, "usage: %s [options] 1600|700C|700D|700E|2400A|2400B|800XA%s InputRawSpeechFile OutputModemRawFile\n"
+                "\n",
+                "  --clip         0|1  Clipping (compression) of modem output samples for reduced PAPR\n"
+                "                      and higher average power\n"
+                "  --dpsk              Use differential PSK rather than coherent PSK\n"
+                "  --reliabletext txt  Send 'txt' using reiable text protocol\n"
+                "  --testframes        Send testframe instead of coded speech. Number of testsfrems depends on\n"
+                "                      length of speech input file\n"
+                "  --txbpf        0|1  Bandpass filter\n"
+                "\n", f2020);
+        fprintf(stderr, "example: $ %s 1600 hts1a.raw hts1a_fdmdv.raw\n", argv[0]);
         exit(1);
     }
 
+    use_testframes = 0; use_clip = 0; use_txbpf = 1; use_dpsk = 0; use_reliabletext = 0;
+
+    int o = 0;
+    int opt_idx = 0;
+    while( o != -1 ){
+        static struct option long_opts[] = {
+            {"clip",           required_argument,  0, 'l'},
+            {"dpsk",           no_argument,        0, 'd'},
+            {"help",           no_argument,        0, 'h'},
+            {"reliabletext",   required_argument,  0, 'r'},
+            {"testframes",     no_argument,        0, 't'},
+            {"txbpf",          required_argument,  0, 'b'},
+            {0, 0, 0, 0}
+        };
+
+        o = getopt_long(argc,argv,"l:dhr:tb:",long_opts,&opt_idx);
+
+        switch(o) {
+        case 'b':
+            use_txbpf = atoi(optarg);
+            break;
+        case 'd':
+            use_dpsk = 1;
+            break;
+        case 'l':
+            use_clip = atoi(optarg);
+            break;
+        case 'r':
+            use_reliabletext = 1;
+            strcpy(callsign, optarg);
+        case 't':
+            use_testframes = 1;
+            break;
+        case 'h':
+        case '?':
+            goto helpmsg;
+            break;
+        }
+    }
+    int dx = optind;
+
+    if( (argc - dx) < 3) {
+        fprintf(stderr, "too few arguments.\n");
+        goto helpmsg;
+    }
+
     mode = -1;
-    if (!strcmp(argv[1],"1600")) mode = FREEDV_MODE_1600;
-    if (!strcmp(argv[1],"700C")) mode = FREEDV_MODE_700C;
-    if (!strcmp(argv[1],"700D")) mode = FREEDV_MODE_700D;
-    if (!strcmp(argv[1],"700E")) mode = FREEDV_MODE_700E;
-    if (!strcmp(argv[1],"2400A")) mode = FREEDV_MODE_2400A;
-    if (!strcmp(argv[1],"2400B")) mode = FREEDV_MODE_2400B;
-    if (!strcmp(argv[1],"800XA")) mode = FREEDV_MODE_800XA;
+    if (!strcmp(argv[dx],"1600")) mode = FREEDV_MODE_1600;
+    if (!strcmp(argv[dx],"700C")) mode = FREEDV_MODE_700C;
+    if (!strcmp(argv[dx],"700D")) mode = FREEDV_MODE_700D;
+    if (!strcmp(argv[dx],"700E")) mode = FREEDV_MODE_700E;
+    if (!strcmp(argv[dx],"2400A")) mode = FREEDV_MODE_2400A;
+    if (!strcmp(argv[dx],"2400B")) mode = FREEDV_MODE_2400B;
+    if (!strcmp(argv[dx],"800XA")) mode = FREEDV_MODE_800XA;
     #ifdef __LPCNET__
-    if (!strcmp(argv[1],"2020"))  mode = FREEDV_MODE_2020;
-    if (!strcmp(argv[1],"2020A")) mode = FREEDV_MODE_2020A;
+    if (!strcmp(argv[dx],"2020"))  mode = FREEDV_MODE_2020;
+    if (!strcmp(argv[dx],"2020A")) mode = FREEDV_MODE_2020A;
     
     #endif
     if (mode == -1) {
@@ -93,37 +148,16 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
-    if (strcmp(argv[2], "-")  == 0) fin = stdin;
-    else if ( (fin = fopen(argv[2],"rb")) == NULL ) {
-        fprintf(stderr, "Error opening input raw speech sample file: %s: %s.\n", argv[2], strerror(errno));
+    if (strcmp(argv[dx+1], "-")  == 0) fin = stdin;
+    else if ( (fin = fopen(argv[dx+1],"rb")) == NULL ) {
+        fprintf(stderr, "Error opening input raw speech sample file: %s: %s.\n", argv[dx+1], strerror(errno));
         exit(1);
     }
 
-    if (strcmp(argv[3], "-") == 0) fout = stdout;
-    else if ( (fout = fopen(argv[3],"wb")) == NULL ) {
-        fprintf(stderr, "Error opening output modem sample file: %s: %s.\n", argv[3], strerror(errno));
+    if (strcmp(argv[dx+2], "-") == 0) fout = stdout;
+    else if ( (fout = fopen(argv[dx+2],"wb")) == NULL ) {
+        fprintf(stderr, "Error opening output modem sample file: %s: %s.\n", argv[dx+2], strerror(errno));
         exit(1);
-    }
-
-    use_testframes = 0; use_clip = 0; use_txbpf = 1; use_dpsk = 0; use_reliabletext = 0;
-
-    if (argc > 4) {
-        for (i = 4; i < argc; i++) {
-            if (strcmp(argv[i], "--testframes") == 0) use_testframes = 1;
-            else if (strcmp(argv[i], "--clip") == 0) { use_clip = atoi(argv[i+1]); i++; }
-            else if (strcmp(argv[i], "--txbpf") == 0) { use_txbpf = atoi(argv[i+1]); i++; }
-            else if (strcmp(argv[i], "--dpsk") == 0) use_dpsk = 1;
-            else if (strcmp(argv[i], "--reliabletext") == 0)
-            {
-                use_reliabletext = 1;
-                callsign = argv[i+1];
-                i++;
-            }
-            else {
-                fprintf(stderr, "unknown option: %s\n", argv[i]);
-                exit(1);
-            }
-        }
     }
 
     freedv = freedv_open(mode);
@@ -136,16 +170,15 @@ int main(int argc, char *argv[]) {
     freedv_set_dpsk(freedv, use_dpsk);
     freedv_set_verbose(freedv, 1);
     freedv_set_eq(freedv, 1); /* for 700C/D/E & 800XA */
-    
-    if (use_reliabletext)
-    {
+
+    fprintf(stderr, "use_reliabletext: %d callsign: %s\n", use_reliabletext, callsign);
+    if (use_reliabletext) {
         reliable_text_obj = reliable_text_create();
         assert(reliable_text_obj != NULL);
         reliable_text_set_string(reliable_text_obj, callsign, strlen(callsign));
         reliable_text_use_with_freedv(reliable_text_obj, freedv, on_reliable_text_rx, NULL);
     }
-    else
-    {
+    else {
         /* set up callback for txt msg chars */
         struct my_callback_state  my_cb_state;
         sprintf(my_cb_state.tx_str, "cq cq cq hello world\r");
@@ -172,10 +205,7 @@ int main(int argc, char *argv[]) {
     }
 
     freedv_close(freedv);
-    if (use_reliabletext)
-    {
-        reliable_text_destroy(reliable_text_obj);
-    }
+    if (use_reliabletext) reliable_text_destroy(reliable_text_obj);
     fclose(fin);
     fclose(fout);
 
