@@ -108,12 +108,9 @@ char *rx_sync_flags_to_text[] = {
 \*---------------------------------------------------------------------------*/
 
 struct freedv *freedv_open(int mode) {
-    struct freedv_advanced adv = {0,2,100,8000,1000,200, "H_256_512_4"};
-    if (mode == FREEDV_MODE_FSK_LDPC)
-        return freedv_open_advanced(mode, &adv);
-    else
-        return freedv_open_advanced(mode, NULL);
-
+    // defaults for those modes that support the use of adv
+    struct freedv_advanced adv = {1,2,100,8000,1000,200, "H_256_512_4"};
+    return freedv_open_advanced(mode, &adv);
 }
 
 struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
@@ -147,8 +144,8 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
     if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, mode)) freedv_ofdm_voice_open(f, "700D");
     if (FDV_MODE_ACTIVE( FREEDV_MODE_700E, mode)) freedv_ofdm_voice_open(f, "700E");
 #ifdef __LPCNET__
-    if (FDV_MODE_ACTIVE( FREEDV_MODE_2020, mode)) freedv_2020_open(f);
-    if (FDV_MODE_ACTIVE( FREEDV_MODE_2020A, mode)) freedv_2020a_open(f);
+    if (FDV_MODE_ACTIVE( FREEDV_MODE_2020, mode)) freedv_2020_open(f, adv->lpcnet_vq_type);
+    if (FDV_MODE_ACTIVE( FREEDV_MODE_2020A, mode)) freedv_2020a_open(f, adv->lpcnet_vq_type);
 #endif
     if (FDV_MODE_ACTIVE( FREEDV_MODE_2400A, mode)) freedv_2400a_open(f);
     if (FDV_MODE_ACTIVE( FREEDV_MODE_2400B, mode)) freedv_2400b_open(f);

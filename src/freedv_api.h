@@ -137,7 +137,7 @@ struct freedv;
 
 // Some modes allow extra configuration parameters
 struct freedv_advanced {
-    int interleave_frames;                   // currently ignored, was previously used to configure 700D interleaver
+    int lpcnet_vq_type;                      // see lpcnet_freedv.h
 
     // parameters for FREEDV_MODE_FSK_LDPC
     int M;                                   // 2 or 4 FSK

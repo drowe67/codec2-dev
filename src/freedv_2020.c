@@ -36,7 +36,7 @@
 extern char *ofdm_statemode[];
 
 #ifdef __LPCNET__
-void freedv_2020_open(struct freedv *f) {
+void freedv_2020_open(struct freedv *f, int vq_type) {
     f->speech_sample_rate = FREEDV_FS_16000;
     f->snr_squelch_thresh = 4.0;
     f->squelch_en = 0;
@@ -98,7 +98,7 @@ void freedv_2020_open(struct freedv *f) {
     int nout_max = 2*freedv_get_n_max_modem_samples(f);
     assert(nout_max <= freedv_get_n_max_speech_samples(f));
 
-    f->lpcnet = lpcnet_freedv_create(1); assert(f->lpcnet != NULL);
+    f->lpcnet = lpcnet_freedv_create(vq_type); assert(f->lpcnet != NULL);
     f->codec2 = NULL;
 
     /* should be exactly an integer number of Codec frames in a OFDM modem frame */
@@ -118,8 +118,8 @@ void freedv_2020_open(struct freedv *f) {
     f->passthrough_gain = 0.25;
 }
 
-void freedv_2020a_open(struct freedv *f) {
-    freedv_2020_open(f);
+void freedv_2020a_open(struct freedv *f, int vq_type) {
+    freedv_2020_open(f, vq_type);
     f->ldpc->protection_mode = LDPC_PROT_2020A;
 }
 
