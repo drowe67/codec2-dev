@@ -61,7 +61,7 @@ int main(int argc, char *argv[]) {
     struct freedv            *freedv;
     int                       mode;
     int                       use_testframes, use_clip, use_txbpf, use_dpsk, use_reliabletext;
-    char                      callsign[256] = "";
+    char                     *callsign = "";
     reliable_text_t           reliable_text_obj;
     char f2020[80] = {0};
 #ifdef __LPCNET__
@@ -71,15 +71,15 @@ int main(int argc, char *argv[]) {
     if (argc < 4) {
     helpmsg:
         fprintf(stderr, "usage: %s [options] 1600|700C|700D|700E|2400A|2400B|800XA%s InputRawSpeechFile OutputModemRawFile\n"
-                "\n",
+                "\n"
                 "  --clip         0|1  Clipping (compression) of modem output samples for reduced PAPR\n"
                 "                      and higher average power\n"
                 "  --dpsk              Use differential PSK rather than coherent PSK\n"
-                "  --reliabletext txt  Send 'txt' using reiable text protocol\n"
-                "  --testframes        Send testframe instead of coded speech. Number of testsfrems depends on\n"
+                "  --reliabletext txt  Send 'txt' using reliable text protocol\n"
+                "  --testframes        Send testframe instead of coded speech. Number of testsframes depends on\n"
                 "                      length of speech input file\n"
                 "  --txbpf        0|1  Bandpass filter\n"
-                "\n", f2020);
+                "\n", argv[0], f2020);
         fprintf(stderr, "example: $ %s 1600 hts1a.raw hts1a_fdmdv.raw\n", argv[0]);
         exit(1);
     }
@@ -113,7 +113,8 @@ int main(int argc, char *argv[]) {
             break;
         case 'r':
             use_reliabletext = 1;
-            strcpy(callsign, optarg);
+            callsign = optarg;
+            break;
         case 't':
             use_testframes = 1;
             break;
@@ -144,7 +145,7 @@ int main(int argc, char *argv[]) {
     
     #endif
     if (mode == -1) {
-        fprintf(stderr, "Error in mode: %s\n", argv[1]);
+        fprintf(stderr, "Error in mode: %s\n", argv[dx]);
         exit(1);
     }
 
@@ -171,7 +172,6 @@ int main(int argc, char *argv[]) {
     freedv_set_verbose(freedv, 1);
     freedv_set_eq(freedv, 1); /* for 700C/D/E & 800XA */
 
-    fprintf(stderr, "use_reliabletext: %d callsign: %s\n", use_reliabletext, callsign);
     if (use_reliabletext) {
         reliable_text_obj = reliable_text_create();
         assert(reliable_text_obj != NULL);
