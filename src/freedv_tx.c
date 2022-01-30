@@ -61,6 +61,7 @@ int main(int argc, char *argv[]) {
     struct freedv            *freedv;
     int                       mode;
     int                       use_testframes, use_clip, use_txbpf, use_dpsk, use_reliabletext;
+    int                       vq_type;
     char                     *callsign = "";
     reliable_text_t           reliable_text_obj;
     char f2020[80] = {0};
@@ -75,6 +76,7 @@ int main(int argc, char *argv[]) {
                 "  --clip         0|1  Clipping (compression) of modem output samples for reduced PAPR\n"
                 "                      and higher average power\n"
                 "  --dpsk              Use differential PSK rather than coherent PSK\n"
+                "  --indopt            Use index optimised VQs for 2020/2020A, no effect other modes\n"
                 "  --reliabletext txt  Send 'txt' using reliable text protocol\n"
                 "  --testframes        Send testframe instead of coded speech. Number of testsframes depends on\n"
                 "                      length of speech input file\n"
@@ -85,6 +87,7 @@ int main(int argc, char *argv[]) {
     }
 
     use_testframes = 0; use_clip = 0; use_txbpf = 1; use_dpsk = 0; use_reliabletext = 0;
+    vq_type = 1;
 
     int o = 0;
     int opt_idx = 0;
@@ -96,6 +99,7 @@ int main(int argc, char *argv[]) {
             {"reliabletext",   required_argument,  0, 'r'},
             {"testframes",     no_argument,        0, 't'},
             {"txbpf",          required_argument,  0, 'b'},
+            {"indopt",         no_argument,        0, 'n'},
             {0, 0, 0, 0}
         };
 
@@ -110,6 +114,9 @@ int main(int argc, char *argv[]) {
             break;
         case 'l':
             use_clip = atoi(optarg);
+            break;
+        case 'n':
+            vq_type = 2;
             break;
         case 'r':
             use_reliabletext = 1;
@@ -161,7 +168,9 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
-    freedv = freedv_open(mode);
+    // the vanilla freedv_open() could be used for all modes except 2020/2020A
+    struct freedv_advanced adv; adv.lpcnet_vq_type = vq_type;
+    freedv = freedv_open_advanced(mode, &adv);
     assert(freedv != NULL);
 
     /* these are all optional ------------------ */

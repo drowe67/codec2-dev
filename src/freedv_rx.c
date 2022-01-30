@@ -64,7 +64,7 @@ int main(int argc, char *argv[]) {
     float                      snr_est;
     float                      clock_offset;
     int                        use_testframes, verbose, discard, use_complex, use_dpsk, use_reliabletext;
-    int                        use_squelch;
+    int                        use_squelch, vq_type;
     float                      squelch = 0;
     struct freedv             *freedv;
     char f2020[80] = {0};
@@ -78,6 +78,7 @@ int main(int argc, char *argv[]) {
                 "\n"
                 "  --discard               Reset BER stats on loss of sync, helps us get sensible BER results\n"
                 "  --dpsk                  Use differential PSK rather than coherent PSK\n"
+                "  --indopt                Use index optimised VQs for 2020/2020A, no effect other modes\n"
                 "  --reliabletext txt      Send 'txt' using reliable text protocol\n"
                 "  --txtrx        filename Store reliable text output to filename\n"
                 "  --squelch      leveldB  Set squelch level\n"
@@ -91,7 +92,8 @@ int main(int argc, char *argv[]) {
     }
 
     use_testframes = verbose = discard = use_complex = use_dpsk = use_squelch = 0; use_reliabletext = 0;
-
+    vq_type = 1;
+    
     int o = 0;
     int opt_idx = 0;
     while( o != -1 ){
@@ -106,6 +108,7 @@ int main(int argc, char *argv[]) {
             {"usecomplex",     no_argument,        0, 'c'},
             {"verbose1",       no_argument,        0, 'v'},
             {"vv",             no_argument,        0, 'w'},
+            {"indopt",         no_argument,        0, 'n'},
             {0, 0, 0, 0}
         };
 
@@ -118,8 +121,11 @@ int main(int argc, char *argv[]) {
         case 'c':
             use_complex = 1;
             break;
-       case 'd':
+        case 'd':
             use_dpsk = 1;
+            break;
+        case 'n':
+            vq_type = 2;
             break;
         case 'r':
             use_reliabletext = 1;
@@ -185,7 +191,9 @@ int main(int argc, char *argv[]) {
 	exit(1);
     }
 
-    freedv = freedv_open(mode);
+    // the vanilla freedv_open() could be used for all modes except 2020/2020A
+    struct freedv_advanced adv; adv.lpcnet_vq_type = vq_type;
+    freedv = freedv_open_advanced(mode, &adv);
     assert(freedv != NULL);
 
     /* set up a few options, calling these is optional -------------------------*/
