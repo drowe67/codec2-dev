@@ -816,7 +816,7 @@ typedef float float4 __attribute__ ((vector_size (16)));
 
 \*---------------------------------------------------------------------------*/
 
-inline void rx_filter_coh(COMP rx_filt[COHPSK_NC*COHPSK_ND][P+1], int Nc, COMP rx_baseband[COHPSK_NC*COHPSK_ND][COHPSK_M+COHPSK_M/P], COMP rx_filter_memory[COHPSK_NC*COHPSK_ND][COHPSK_NFILTER], int nin)
+inline extern void rx_filter_coh(COMP rx_filt[COHPSK_NC*COHPSK_ND][P+1], int Nc, COMP rx_baseband[COHPSK_NC*COHPSK_ND][COHPSK_M+COHPSK_M/P], COMP rx_filter_memory[COHPSK_NC*COHPSK_ND][COHPSK_NFILTER], int nin)
 {
     int c,i,j,k,l;
     int n=COHPSK_M/P;
