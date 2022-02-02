@@ -575,9 +575,9 @@ endif()
     # 2020B AWGN test 
     add_test(NAME test_OFDM_modem_2020B_AWGN
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
-                            ./ofdm_mod --in /dev/zero --testframes 10 --mode 2020B |
-                            ./ch - - --No -22 |
-                            ./ofdm_demod --mode 2020B --testframes -v 2 > /dev/null")
+                            ./ofdm_mod --in /dev/zero --testframes 10 --mode 2020B --ldpc |
+                            ./ch - - --No -19 |
+                            ./ofdm_demod --mode 2020B --testframes --ldpc -v 2 > /dev/null")
            
     # -------------------------------------------------------------------------
     #                                OFDM Data modes

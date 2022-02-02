@@ -68,6 +68,7 @@ void set_data_bits_per_frame(struct LDPC *ldpc, int new_data_bits_per_frame) {
    FEC protection scheme */ 
 void ldpc_encode_frame(struct LDPC *ldpc, int codeword[], unsigned char tx_bits_char[]) {
     unsigned char pbits[ldpc->NumberParityBits];
+    int codec_frame;
     int i, j;
 
     unsigned char tx_bits_char_padded[ldpc->ldpc_data_bits_per_frame];
@@ -95,7 +96,6 @@ void ldpc_encode_frame(struct LDPC *ldpc, int codeword[], unsigned char tx_bits_
            unmodified.
          */
         memcpy(tx_bits_char_padded, tx_bits_char, ldpc->data_bits_per_frame);
-        int codec_frame;
         for(codec_frame=0; codec_frame<6; codec_frame++)
             for(i=11; i<52; i++)
                 tx_bits_char_padded[codec_frame*52+i] = 1;
@@ -103,19 +103,34 @@ void ldpc_encode_frame(struct LDPC *ldpc, int codeword[], unsigned char tx_bits_
         for (i = ldpc->data_bits_per_frame; i < ldpc->ldpc_data_bits_per_frame; i++)
             tx_bits_char_padded[i] = 1;
         encode(ldpc, tx_bits_char_padded, pbits);
+        
         break;
+
+    case LDPC_PROT_2020B:
+        /* We only want to protect the stage 1 VQ data bits, 0..10 in
+           each 52 bit codec frame. There are 3 codec frames 3x52=156
+           bits, and 56 parity bits.  We only use 11*3 = 33 bits of
+           the LDPC codeword data bits, the rest are set to known
+           values.
+         */
+        for(j=0,codec_frame=0; codec_frame<3; codec_frame++) 
+            for(i=0; i<11; i++,j++)
+                tx_bits_char_padded[j] = tx_bits_char[codec_frame*52+i];
+        assert(j == 33);
+        for (i = 33; i < ldpc->ldpc_data_bits_per_frame; i++)
+            tx_bits_char_padded[i] = 1;
+        encode(ldpc, tx_bits_char_padded, pbits);
+ 
+        break;
+
     default:
         assert(0);            
     }
 
     /* output codeword is concatenation of (used) data bits and parity
        bits, we don't bother sending unused (known) data bits */
-    for (i = 0; i < ldpc->data_bits_per_frame; i++) {
-        codeword[i] = tx_bits_char[i];
-    }
-    for (j = 0; j < ldpc->NumberParityBits; i++, j++) {
-        codeword[i] = pbits[j];
-    }
+    for (i = 0; i < ldpc->data_bits_per_frame; i++) codeword[i] = tx_bits_char[i];
+    for (j = 0; j < ldpc->NumberParityBits; i++, j++) codeword[i] = pbits[j];
 }
 
 void qpsk_modulate_frame(COMP tx_symbols[], int codeword[], int n) {
@@ -137,7 +152,8 @@ void ldpc_decode_frame(struct LDPC *ldpc, int *parityCheckCount, int *iter, uint
     float llr_full_codeword[ldpc->ldpc_coded_bits_per_frame];
     int unused_data_bits = ldpc->ldpc_data_bits_per_frame - ldpc->data_bits_per_frame;
     uint8_t out_char_ldpc[ldpc->coded_bits_per_frame];
-    int i;
+    int i,j;
+    int codec_frame;
     
     switch (ldpc->protection_mode) {
     case LDPC_PROT_EQUAL:
@@ -175,7 +191,6 @@ void ldpc_decode_frame(struct LDPC *ldpc, int *parityCheckCount, int *iter, uint
         }
 
         // set up known bits
-        int codec_frame;
         for(codec_frame=0; codec_frame<6; codec_frame++)
             for(i=11; i<52; i++)
                 llr_full_codeword[codec_frame*52+i] = -100.0f;
@@ -193,6 +208,33 @@ void ldpc_decode_frame(struct LDPC *ldpc, int *parityCheckCount, int *iter, uint
         for(codec_frame=0; codec_frame<6; codec_frame++)
             for(i=0; i<11; i++)
                 out_char[codec_frame*52+i] = out_char_ldpc[codec_frame*52+i];
+        break;
+    case LDPC_PROT_2020B:
+        /* 2020B waveform, with unequal error protection.  As per
+           2020A, only the stage1 VQ index of each LPCNet vocoder
+           frames is protected. In this case the FEC codeword is much
+           smaller than the payload data. */
+
+        // set up LDPC codeword
+        for(j=0,codec_frame=0; codec_frame<3; codec_frame++) 
+            for(i=0; i<11; i++,j++)
+                llr_full_codeword[j] = llr[codec_frame*52+i];
+        // set known LDPC codeword data bits
+        for (i = 33; i < ldpc->ldpc_data_bits_per_frame; i++)
+            llr_full_codeword[i] = -100;
+        // parity bits at end
+        for (i=0; i<ldpc->NumberParityBits; i++)
+            llr_full_codeword[ldpc->ldpc_data_bits_per_frame+i] = llr[ldpc->data_bits_per_frame+i];
+        *iter = run_ldpc_decoder(ldpc, out_char_ldpc, llr_full_codeword, parityCheckCount);
+        
+        // pass through received data bits, replacing only decoded bits
+        for (i = 0; i < ldpc->data_bits_per_frame; i++) {
+            out_char[i] = llr[i] < 0;
+        }
+        for(j=0,codec_frame=0; codec_frame<3; codec_frame++) 
+            for(i=0; i<11; i++,j++)
+                out_char[codec_frame*52+i] = out_char_ldpc[j];
+        
         break;
     default:
         assert(0);
@@ -279,7 +321,19 @@ void count_errors_protection_mode(int protection_mode, int *pNerrs, int *pNcoded
          */
         for(int codec_frame=0; codec_frame<6; codec_frame++) {
             for(i=0; i<11; i++) {
-                if (tx_bits[i] != rx_bits[i]) Nerrs++;
+                if (tx_bits[codec_frame*52+i] != rx_bits[codec_frame*52+i]) Nerrs++;
+                Ncoded++;
+            }
+        }
+        break;
+    case LDPC_PROT_2020B:
+       /* We only protect bits 0..10 in each 52 bit LPCNet codec
+           frame. There are 3 codec frames 3x52=156 data bits, of
+           which only 11*3 = 33 bits are protected.
+         */
+        for(int codec_frame=0; codec_frame<3; codec_frame++) {
+            for(i=0; i<11; i++) {
+                if (tx_bits[codec_frame*52+i] != rx_bits[codec_frame*52+i]) Nerrs++;
                 Ncoded++;
             }
         }

@@ -38,6 +38,7 @@
 #define LDPC_PROT_EQUAL 0    /* all bits in LDPC codeword used, e.g. 700D/700E */
 #define LDPC_PROT_2020  1    /* (504,396) but some data bits unused */
 #define LDPC_PROT_2020A 2    /* (504,396) but we only protect stage1 VQ in each LPCNet frame */
+#define LDPC_PROT_2020B 3    /* (112,56) but we only protect stage1 VQ in each LPCNet frame */
 
 void set_up_ldpc_constants(struct LDPC *ldpc, int code_length, int parity_bits);
 void set_data_bits_per_frame(struct LDPC *ldpc, int new_data_bits_per_frame);

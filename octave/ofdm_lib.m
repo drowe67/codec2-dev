@@ -324,7 +324,7 @@ function config = ofdm_init_mode(mode="700D")
     Ts = 0.0205; Nc = 31;
     config.amp_scale = 167E3; config.clip_gain1 = 2.5; config.clip_gain2 = 0.8;
   elseif strcmp(mode,"2020B")
-    Ts = 0.014; Tcp = 0.004; Nc = 22; Ns=5;
+    Ts = 0.014; Tcp = 0.004; Nc = 29; Ns=5;
     config.Ntxtbits = 4; config.Nuwbits = 8*2; config.bad_uw_errors = 5;
     config.amp_scale = 167E3; config.clip_gain1 = 2.5; config.clip_gain2 = 0.8;
     config.edge_pilots = 0; config.state_machine = "voice2";
