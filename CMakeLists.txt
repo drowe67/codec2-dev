@@ -786,6 +786,14 @@ if(LPCNET)
                             ./ch - - --No -24 --mpp --fading_dir ../unittest |
                             ./freedv_rx 2020A - /dev/null --testframes"
              )
+
+     add_test(NAME test_freedv_api_2020B_mpp
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            dd bs=32000 count=60 if=/dev/zero |
+                            ./freedv_tx 2020B - - --testframes --clip 1 |
+                            ./ch - - --No -25 --mpp --fading_dir ../unittest |
+                            ./freedv_rx 2020B - /dev/null --testframes"
+             )
 endif()
 
      add_test(NAME test_freedv_api_2400A
@@ -967,16 +975,33 @@ if (NOT APPLE)
 if(LPCNET)
      add_test(NAME test_memory_leak_FreeDV_2020_tx
              COMMAND sh -c "cd  ${CMAKE_CURRENT_BINARY_DIR}/src;
-                            valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./freedv_tx 2020 ../../wav/wia_16kHz.wav /dev/null"
+                            valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes \
+                            ./freedv_tx 2020 ../../wav/wia_16kHz.wav /dev/null"
              )
              set_tests_properties(test_memory_leak_FreeDV_2020_tx PROPERTIES PASS_REGULAR_EXPRESSION "ERROR SUMMARY: 0 errors")
 
      add_test(NAME test_memory_leak_FreeDV_2020_rx
              COMMAND sh -c "cd  ${CMAKE_CURRENT_BINARY_DIR}/src;
                             ./freedv_tx 2020 ../../wav/wia_16kHz.wav t.raw; \
-                            valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./freedv_rx 2020 t.raw /dev/null"
+                            valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes \
+                            ./freedv_rx 2020 t.raw /dev/null"
              )
              set_tests_properties(test_memory_leak_FreeDV_2020_rx PROPERTIES PASS_REGULAR_EXPRESSION "ERROR SUMMARY: 0 errors")
+
+     add_test(NAME test_memory_leak_FreeDV_2020B_tx
+             COMMAND sh -c "cd  ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes \
+                            ./freedv_tx 2020B ../../wav/wia_16kHz.wav /dev/null"
+             )
+             set_tests_properties(test_memory_leak_FreeDV_2020B_tx PROPERTIES PASS_REGULAR_EXPRESSION "ERROR SUMMARY: 0 errors")
+
+     add_test(NAME test_memory_leak_FreeDV_2020B_rx
+             COMMAND sh -c "cd  ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            ./freedv_tx 2020B ../../wav/wia_16kHz.wav t.raw; \
+                            valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes \
+                            ./freedv_rx 2020B t.raw /dev/null"
+             )
+             set_tests_properties(test_memory_leak_FreeDV_2020B_rx PROPERTIES PASS_REGULAR_EXPRESSION "ERROR SUMMARY: 0 errors")
 endif(LPCNET)
 endif(NOT APPLE)
 

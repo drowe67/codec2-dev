@@ -308,8 +308,9 @@ int main(int argc, char *argv[]) {
         float uncoded_ber = (float)Terrs/Tbits;
         fprintf(stderr, "BER......: %5.4f  Tbits: %8d  Terrs: %8d\n",
 		                    (double)uncoded_ber, Tbits, Terrs);
-        if ((mode == FREEDV_MODE_700D) || (mode == FREEDV_MODE_700E) ||
-            (mode == FREEDV_MODE_2020) || (mode == FREEDV_MODE_2020A)) {
+        if ((mode == FREEDV_MODE_700D) || (mode == FREEDV_MODE_700E)  ||
+            (mode == FREEDV_MODE_2020) || (mode == FREEDV_MODE_2020A) ||
+            (mode == FREEDV_MODE_2020B) ) {
             int Tbits_coded = freedv_get_total_bits_coded(freedv);
             int Terrs_coded = freedv_get_total_bit_errors_coded(freedv);
             float coded_ber = (float)Terrs_coded/Tbits_coded;

@@ -84,7 +84,7 @@ void freedv_2020x_open(struct freedv *f, int vq_type) {
     f->ofdm_nuwbits = f->ofdm->config.nuwbits;
     f->ofdm_ntxtbits = f->ofdm->config.txtbits;
     assert(f->ofdm_ntxtbits == 4);
-    f->verbose=1;
+    
     if (f->verbose) {
         fprintf(stderr, "f->mode = %d\n", f->mode);
         fprintf(stderr, "vq_type = %d\n", vq_type);
