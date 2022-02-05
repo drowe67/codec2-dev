@@ -69,7 +69,7 @@ int main(int argc, char *argv[]) {
     struct freedv             *freedv;
     char f2020[80] = {0};
 #ifdef __LPCNET__
-    sprintf(f2020,"|2020|2020A");
+    sprintf(f2020,"|2020|2020A|2020B");
 #endif
     
     if (argc < 4) {
@@ -78,7 +78,8 @@ int main(int argc, char *argv[]) {
                 "\n"
                 "  --discard               Reset BER stats on loss of sync, helps us get sensible BER results\n"
                 "  --dpsk                  Use differential PSK rather than coherent PSK\n"
-                "  --indopt                Use index optimised VQs for 2020/2020A, no effect other modes\n"
+                "  --indopt       0|1      Choose index optimised VQ for 2020/2020A/2020B, no effect other modes\n"
+                "                          default for 2020/2020A/2020B 0/1/1 (off/on/on)\n"
                 "  --reliabletext txt      Send 'txt' using reliable text protocol\n"
                 "  --txtrx        filename Store reliable text output to filename\n"
                 "  --squelch      leveldB  Set squelch level\n"
@@ -92,7 +93,7 @@ int main(int argc, char *argv[]) {
     }
 
     use_testframes = verbose = discard = use_complex = use_dpsk = use_squelch = 0; use_reliabletext = 0;
-    vq_type = 1;
+    vq_type = -1;
     
     int o = 0;
     int opt_idx = 0;
@@ -108,11 +109,11 @@ int main(int argc, char *argv[]) {
             {"usecomplex",     no_argument,        0, 'c'},
             {"verbose1",       no_argument,        0, 'v'},
             {"vv",             no_argument,        0, 'w'},
-            {"indopt",         no_argument,        0, 'n'},
+            {"indopt",         required_argument,  0, 'n'},
             {0, 0, 0, 0}
         };
 
-        o = getopt_long(argc,argv,"idhr:s:x:tcvw",long_opts,&opt_idx);
+        o = getopt_long(argc,argv,"idhr:s:x:tcvwn:",long_opts,&opt_idx);
 
         switch(o) {
         case 'i':
@@ -125,7 +126,10 @@ int main(int argc, char *argv[]) {
             use_dpsk = 1;
             break;
         case 'n':
-            vq_type = 2;
+            if (atoi(optarg) == 0)
+                vq_type = 1;
+            else
+                vq_type = 2;
             break;
         case 'r':
             use_reliabletext = 1;
@@ -171,6 +175,7 @@ int main(int argc, char *argv[]) {
     #ifdef __LPCNET__
     if (!strcmp(argv[dx],"2020"))  mode = FREEDV_MODE_2020;
     if (!strcmp(argv[dx],"2020A"))  mode = FREEDV_MODE_2020A;
+    if (!strcmp(argv[dx],"2020B"))  mode = FREEDV_MODE_2020B;
     #endif
     if (mode == -1) {
         fprintf(stderr, "Error in mode: %s\n", argv[dx]);
@@ -191,9 +196,14 @@ int main(int argc, char *argv[]) {
 	exit(1);
     }
 
-    // the vanilla freedv_open() could be used for all modes except 2020/2020A
-    struct freedv_advanced adv; adv.lpcnet_vq_type = vq_type;
-    freedv = freedv_open_advanced(mode, &adv);
+    if (vq_type == -1)
+        freedv = freedv_open(mode);
+    else {
+        // 2020x: specify VQ type
+        struct freedv_advanced adv;
+        adv.lpcnet_vq_type = vq_type;
+        freedv = freedv_open_advanced(mode, &adv);
+    }
     assert(freedv != NULL);
 
     /* set up a few options, calling these is optional -------------------------*/

@@ -36,36 +36,66 @@
 extern char *ofdm_statemode[];
 
 #ifdef __LPCNET__
-void freedv_2020_open(struct freedv *f, int vq_type) {
+void freedv_2020x_open(struct freedv *f, int vq_type) {
     f->speech_sample_rate = FREEDV_FS_16000;
     f->snr_squelch_thresh = 4.0;
     f->squelch_en = 0;
 
     struct OFDM_CONFIG ofdm_config;
-    ofdm_init_mode("2020", &ofdm_config);
+    switch (f->mode) {
+    case FREEDV_MODE_2020:
+    case FREEDV_MODE_2020A:
+        ofdm_init_mode("2020", &ofdm_config);
+        break;
+    case FREEDV_MODE_2020B:
+        ofdm_init_mode("2020B", &ofdm_config);
+        break;
+    default:
+        assert(0);
+    }
+    
     f->ofdm = ofdm_create(&ofdm_config);
 
     f->ldpc = (struct LDPC*)MALLOC(sizeof(struct LDPC));
     assert(f->ldpc != NULL);
 
     ldpc_codes_setup(f->ldpc, f->ofdm->codename);
-    int data_bits_per_frame = 312;
+    int data_bits_per_frame;
+    switch (f->mode) {
+    case FREEDV_MODE_2020:
+        data_bits_per_frame = 312;
+        break;
+    case FREEDV_MODE_2020A:
+        data_bits_per_frame = 312;
+        f->ldpc->protection_mode = LDPC_PROT_2020A;
+        break;
+    case FREEDV_MODE_2020B:
+        f->ldpc->protection_mode = LDPC_PROT_2020B;
+        data_bits_per_frame = 156;
+        break;
+    default:
+        assert(0);
+    }
+
     set_data_bits_per_frame(f->ldpc, data_bits_per_frame);
     int coded_syms_per_frame = f->ldpc->coded_bits_per_frame/f->ofdm->bps;
 
     f->ofdm_bitsperframe = ofdm_get_bits_per_frame(f->ofdm);
-    f->ofdm_nuwbits = (f->ofdm->config.ns - 1) * f->ofdm->config.bps - f->ofdm->config.txtbits;
+    f->ofdm_nuwbits = f->ofdm->config.nuwbits;
     f->ofdm_ntxtbits = f->ofdm->config.txtbits;
-    assert(f->ofdm_nuwbits == 10);
     assert(f->ofdm_ntxtbits == 4);
-
+    f->verbose=1;
     if (f->verbose) {
+        fprintf(stderr, "f->mode = %d\n", f->mode);
+        fprintf(stderr, "vq_type = %d\n", vq_type);
         fprintf(stderr, "ldpc_data_bits_per_frame = %d\n", f->ldpc->ldpc_data_bits_per_frame);
         fprintf(stderr, "ldpc_coded_bits_per_frame  = %d\n", f->ldpc->ldpc_coded_bits_per_frame);
         fprintf(stderr, "data_bits_per_frame = %d\n", data_bits_per_frame);
         fprintf(stderr, "coded_bits_per_frame  = %d\n", f->ldpc->coded_bits_per_frame);
         fprintf(stderr, "coded_syms_per_frame  = %d\n", f->ldpc->coded_bits_per_frame/f->ofdm->bps);
         fprintf(stderr, "ofdm_bits_per_frame  = %d\n", f->ofdm_bitsperframe);
+        fprintf(stderr, "ofdm_nuwbits = %d\n", f->ofdm_nuwbits);
+        fprintf(stderr, "ofdm_ntxtbits = %d\n", f->ofdm_ntxtbits);
     }
 
     f->codeword_symbols = (COMP*)MALLOC(sizeof(COMP) * coded_syms_per_frame);
@@ -116,11 +146,6 @@ void freedv_2020_open(struct freedv *f, int vq_type) {
     
     /* attenuate audio 12dB as channel noise isn't that pleasant */
     f->passthrough_gain = 0.25;
-}
-
-void freedv_2020a_open(struct freedv *f, int vq_type) {
-    freedv_2020_open(f, vq_type);
-    f->ldpc->protection_mode = LDPC_PROT_2020A;
 }
 
 void freedv_comptx_2020(struct freedv *f, COMP mod_out[]) {
