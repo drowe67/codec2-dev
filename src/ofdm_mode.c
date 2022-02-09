@@ -10,6 +10,7 @@
 
 #include <assert.h>
 #include <string.h>
+#include <stdio.h>
 #include "codec2_ofdm.h"
 #include "ofdm_internal.h"
 
@@ -61,6 +62,11 @@ void ofdm_init_mode(char mode[], struct OFDM_CONFIG *config) {
     } else if ((strcmp(mode,"2020") == 0) || (strcmp(mode,"2020A") == 0)) {
          config->ts = 0.0205;  config->nc = 31; config->codename = "HRAb_396_504";
          config->tx_bpf_en = false; config->amp_scale = 167E3; config->clip_gain1 = 2.5; config->clip_gain2 = 0.8;
+         if (!strcmp(mode,"2020A")) {
+             uint8_t uw[] = {1,1,0,0,1,0,1,0,1,1};
+             memcpy(config->tx_uw, uw, sizeof(uw));
+             fprintf(stderr,"new UW ...\n");
+         }
     } else if (strcmp(mode,"2020B") == 0) {
          config->ts = 0.014;  config->tcp = 0.004; config->nc = 29; config->ns=5; config->codename = "HRA_56_56";
          config->txtbits = 4; config->nuwbits = 8*2; config->bad_uw_errors = 5;

@@ -44,8 +44,10 @@ void freedv_2020x_open(struct freedv *f, int vq_type) {
     struct OFDM_CONFIG ofdm_config;
     switch (f->mode) {
     case FREEDV_MODE_2020:
-    case FREEDV_MODE_2020A:
         ofdm_init_mode("2020", &ofdm_config);
+        break;
+    case FREEDV_MODE_2020A:
+        ofdm_init_mode("2020A", &ofdm_config);
         break;
     case FREEDV_MODE_2020B:
         ofdm_init_mode("2020B", &ofdm_config);
