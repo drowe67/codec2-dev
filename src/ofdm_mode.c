@@ -10,7 +10,6 @@
 
 #include <assert.h>
 #include <string.h>
-#include <stdio.h>
 #include "codec2_ofdm.h"
 #include "ofdm_internal.h"
 
@@ -65,7 +64,6 @@ void ofdm_init_mode(char mode[], struct OFDM_CONFIG *config) {
          if (!strcmp(mode,"2020A")) {
              uint8_t uw[] = {1,1,0,0,1,0,1,0,1,1};
              memcpy(config->tx_uw, uw, sizeof(uw));
-             fprintf(stderr,"new UW ...\n");
          }
     } else if (strcmp(mode,"2020B") == 0) {
          config->ts = 0.014;  config->tcp = 0.004; config->nc = 29; config->ns=5; config->codename = "HRA_56_56";
