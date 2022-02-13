@@ -90,6 +90,24 @@ int main(int argc, char *argv[])
     float gain = 1.0;
     int   bpf_en = 0;
     int   bpfb_en = 0;
+    int   cnw = 0, custom_nw = 0;
+    int   dmp = 0;
+    int   framecounter = 0;
+    int   minmax = 0;
+    int   statt = 1;
+    int	  sqd = 0;
+    int   sqdd = 255;
+    int   sqddopt = 0;
+    int   lspvt = 0;
+    int   opti = 0;
+    int   cat = 0;
+    long  vtl = 0L;
+    long  sqerr = 0L, sqermn = 0L, bstix = 0L;
+    int   maxoc = 0;
+    long  frmcntl = 0L;
+    int   vq10 = 0;
+    int   cdb = 0, cdbsz = 0;
+    int   wgt = 0;
     FILE *fam = NULL, *fWo = NULL;
     FILE *faw = NULL;
     FILE *fhm = NULL;
@@ -98,6 +116,9 @@ int main(int argc, char *argv[])
     FILE *ften_ms_centre = NULL;
     FILE *fmodelout = NULL;
     FILE *fmodelin = NULL;
+    FILE *fdmp = NULL;
+    FILE *faux = NULL;
+    FILE *fwght = NULL;
     #ifdef DUMP
     int   dump;
     #endif
@@ -131,12 +152,23 @@ int main(int argc, char *argv[])
         { "bands_lower",required_argument, &bands_lower_en, 1 },
         { "bands_resample", no_argument, &bands_resample, 1 },
         { "lpc", required_argument, &lpc_model, 1 },
+        { "nw", required_argument, &cnw, 1 },
+        { "minmax", required_argument, &minmax, 1},
+        { "sqd", required_argument, &sqd, 1},
+        { "sqdd", required_argument, &sqddopt, 1},
+        { "lspvt", required_argument, &lspvt, 1},
+        { "opti", required_argument, &opti, 1},
+        { "cat", no_argument, &cat, 1},
+        { "vq10", required_argument, &vq10, 1},
+        { "cdb", required_argument, &cdb, 1},
+        { "weight", no_argument, &wgt, 1},
         { "lsp", no_argument, &lsp, 1 },
         { "lspd", no_argument, &lspd, 1 },
         { "lspvq", no_argument, &lspvq, 1 },
         { "lspjmv", no_argument, &lspjmv, 1 },
         { "phase0", no_argument, &phase0, 1 },
         { "postfilter", no_argument, &postfilt, 1 },
+        { "dmp", required_argument, &dmp, 1 },
         { "hand_voicing", required_argument, &hand_voicing, 1 },
         { "dec", required_argument, &dec, 1 },
         { "hi", no_argument, &hi, 1 },
@@ -197,6 +229,16 @@ int main(int argc, char *argv[])
                 }
             } else if(strcmp(long_options[option_index].name, "lpc") == 0) {
                 order = atoi(optarg);
+            } else if(strcmp(long_options[option_index].name, "nw") == 0) {
+                custom_nw = atoi(optarg);
+            } else if(strcmp(long_options[option_index].name, "sqd") == 0) {
+                statt = atoi(optarg);
+            } else if(strcmp(long_options[option_index].name, "sqdd") == 0) {
+                sqdd = atoi(optarg);
+            } else if(strcmp(long_options[option_index].name, "cdb") == 0) {
+                cdbsz = atoi(optarg);
+            } else if(strcmp(long_options[option_index].name, "minmax") == 0) {
+                statt = atoi(optarg);
             #ifdef DUMP
             } else if(strcmp(long_options[option_index].name, "dump") == 0) {
                 if (dump)
@@ -258,6 +300,31 @@ int main(int argc, char *argv[])
 		        optarg, strerror(errno));
                     exit(1);
                 }
+            } else if(strcmp(long_options[option_index].name, "dmp") == 0) {
+                if ((fdmp = fopen(optarg,"at")) == NULL) {
+                    fprintf(stderr, "Error opening my dump file: %s: %s. \n", optarg, strerror(errno));
+                    exit(1);
+                }
+            } else if(strcmp(long_options[option_index].name, "lspvt") == 0) {
+                statt = atoi(optarg);
+                if ((fdmp = fopen("lspvt.csv","wt")) == NULL) {
+                    fprintf(stderr, "Error opening lspvt.csv %s. \n", strerror(errno));
+                    exit(1);
+                }
+            } else if(strcmp(long_options[option_index].name, "opti") == 0) {
+                statt = atoi(optarg);
+                if ((fdmp = fopen("lspvt.csv","rt")) == NULL) {
+                    fprintf(stderr, "Error opening lspvt.csv %s. \n", strerror(errno));
+                    exit(1);
+                }
+                fscanf(fdmp, "%ld\n", &vtl);
+            } else if(strcmp(long_options[option_index].name, "vq10") == 0) {
+                statt = atoi(optarg);
+                if ((fdmp = fopen("lspvtopt.csv","rt")) == NULL) {
+                    fprintf(stderr, "Error opening lspvtopt.csv %s. \n", strerror(errno));
+                    exit(1);
+                }
+                vtl = 4096L;
             } else if(strcmp(long_options[option_index].name, "Woread") == 0) {
 	        if ((fWo = fopen(optarg,"rb")) == NULL) {
 	            fprintf(stderr, "Error opening float Wo file: %s: %s.\n",
@@ -432,6 +499,32 @@ int main(int argc, char *argv[])
         }
     }
 
+    int i,m,n;
+
+    float lspmin[order];
+    float lspmax[order];
+
+    if (sqd || lspvt || opti || vq10) {
+        if ((faux = fopen("minmax.csv","rt")) == NULL) {
+	    fprintf(stderr, "Error opening minmax.csv file: %s.\n",strerror(errno));
+            exit(1);
+        }
+        fscanf(faux, "%d\n", &i);
+        if (!sqddopt) sqdd = i;
+        for(i=0; i<order; i++) fscanf(faux, "%f;%f\n", &lspmin[i], &lspmax[i]);
+        fclose(faux);
+        faux = NULL;
+    } else {
+        for(i=0; i<order; i++) {
+            lspmin[i] = 100.0;
+            lspmax[i] = 0.0;
+        }
+    }
+
+
+
+    if (cdb) vtl = cdbsz;
+
     /* Input file */
 
     FILE *fin;		/* input speech file                     */
@@ -446,6 +539,8 @@ int main(int argc, char *argv[])
     int   n_samp = c2const.n_samp;
     int   m_pitch = c2const.m_pitch;
 
+    if (cnw) c2const.nw = custom_nw;
+
     short buf[N_SAMP];	/* input/output buffer                   */
     float buf_float[N_SAMP];
     float Sn[m_pitch];	/* float input speech samples            */
@@ -459,7 +554,8 @@ int main(int argc, char *argv[])
     MODEL model;
     float Pn[2*N_SAMP];	/* trapezoidal synthesis window          */
     float Sn_[2*N_SAMP];	/* synthesised speech */
-    int   i,m;		/* loop variable                         */
+    long  l;
+    float f;
     int   frames;
     float prev_f0;
     float pitch;
@@ -499,7 +595,51 @@ int main(int argc, char *argv[])
     COMP H[MAX_AMP];
 
     float sd_sum = 0.0; int sd_frames = 0;
-    
+
+    int vtraw[vtl][order+1];
+
+    int lspsqd[order][sqdd];
+
+    float wght[order];
+
+    if (wgt) {
+        if ((fwght = fopen("weights.csv","rt")) == NULL) {
+           fprintf(stderr, "Error opening input weight.csv file: %s\n", strerror(errno));
+           exit(1);
+        }
+        for(i=0;i<order;i++) fscanf(fwght, "%f;", &wght[i]);
+        fclose(fwght);
+    } else {
+        for(i=0;i<order;i++) wght[i] = 1.0;
+    }
+       
+
+    for(i=0; i<order; i++) for(m=0; m<sqdd; m++) lspsqd[i][m] = 0;
+
+
+    if (vq10) {
+        for(l=0L; l<vtl; l++) {
+            n = fscanf(fdmp, "%d;", &vtraw[l][order]);
+            for(i=0; i<order; i++) n = fscanf(fdmp, "%d;", &vtraw[l][i]);
+            n = fscanf(fdmp, "\n");
+        }
+        fclose(fdmp);
+        fdmp = NULL;
+        fprintf(stderr, "\n");
+    }
+
+    if (opti) {
+        for(l=0L; l<vtl; l++) {
+            if (cat) n = fscanf(fdmp, "%d;", &m);
+            for(i=0; i<order; i++) n = fscanf(fdmp, "%d;", &vtraw[l][i]);
+            vtraw[l][order] = 0;
+            fscanf(fdmp, "\n");
+        }
+        fclose(fdmp);
+        fdmp = NULL;
+        fprintf(stderr, "\n");
+    }
+
     for(i=0; i<m_pitch; i++) {
 	Sn[i] = 1.0;
 	Sn_pre[i] = 1.0;
@@ -709,6 +849,225 @@ int main(int argc, char *argv[])
             for(i=0; i<order; i++)
                 lsps_[i] = lsps[i];
 
+
+/*******************************************************************************************************
+            THIS IS MY PART WHERE WHOLE PARAMETER SET FOR A FRAME IS CALCULATED
+            SO HERE MOST OF THE ADDITIONS WORK
+********************************************************************************************************/
+
+            if (dmp) {
+                framecounter++;
+                fprintf(fdmp, "%d;%d;%f;%f;%f", framecounter, model.voiced, snr, model.Wo, e);
+                for(i=0; i<order; i++) fprintf(fdmp, ";%f", lsps[i]);
+                fprintf(fdmp, "\n");
+            }
+
+            if (minmax) {
+                if (statt == 1) {
+                    for (i=0; i<order; i++) {
+                        if (lsps[i]<lspmin[i]) lspmin[i]=lsps[i];
+                        if (lsps[i]>lspmax[i]) lspmax[i]=lsps[i];
+                    }
+                } else if (statt == 2) {
+                    for(i=0; i<order; i+=2) {
+                        f = (lsps[i+1]-lsps[i])/2.0+lsps[i];
+                        if (f < lspmin[i]) lspmin[i]=f;
+                        if (f > lspmax[i]) lspmax[i]=f;
+                        f = (lsps[i+1]-lsps[i])/2.0;
+                        if (f < lspmin[i+1]) lspmin[i+1]=f;
+                        if (f > lspmax[i+1]) lspmax[i+1]=f;
+                    }
+                } else if (statt == 3) {
+                    for (i=0; i<order; i+=2) {
+                        if (i==0) f = (lsps[1]-lsps[0])/2.0+lsps[0];
+                        else f = ((lsps[i+1]-lsps[i])/2.0+lsps[i])-((lsps[i-1]-lsps[i-2])/2.0+lsps[i-2]);
+                        if (f < lspmin[i/2]) lspmin[i/2]=f;
+                        if (f > lspmax[i/2]) lspmax[i/2]=f;
+                    }
+                    for (i=0; i<order; i+=2) {
+                        if (i==0) f = (lsps[1]-lsps[0])/2.0;
+                        else f = ((lsps[i+1]-lsps[i])/2.0-((lsps[i-1]-lsps[i-2])/2.0));
+                        if (f < lspmin[i/2+order/2]) lspmin[i/2+order/2] = f;
+                        if (f > lspmax[i/2+order/2]) lspmax[i/2+order/2] = f;
+                    }
+                }
+            }
+
+            if (sqd) {
+                if (statt == 1) {
+                    for(i=0; i<order; i++) lspsqd[i][(int)floor((lsps[i]-lspmin[i])/(lspmax[i]-lspmin[i])*sqdd)]++;
+                } else if (statt == 2) {
+                    for(i=0; i<order; i+=2) {
+                        f = (lsps[i+1]-lsps[i])/2.0+lsps[i];
+                        m = (int)floor((f-lspmin[i])/(lspmax[i]-lspmin[i])*sqdd);
+                        lspsqd[i][m]++;
+                        f = (lsps[i+1]-lsps[i])/2.0;
+                        m = (int)floor((f-lspmin[i+1])/(lspmax[i+1]-lspmin[i+1])*sqdd);
+                        lspsqd[i+1][m]++;
+                    }
+                } else if (statt == 3) {
+                    for(i=0; i<order; i+=2) {
+                        if (i==0) f = (lsps[1]-lsps[0])/2.0+lsps[0];
+                        else f = ((lsps[i+1]-lsps[i])/2.0+lsps[i])-((lsps[i-1]-lsps[i-2])/2.0+lsps[i-2]);
+                        m = (int)floor((f-lspmin[i/2])/(lspmax[i/2]-lspmin[i/2])*sqdd);
+                        lspsqd[i/2][m]++;
+                        if (i==0) f = (lsps[1]-lsps[0])/2.0;
+                        else f = ((lsps[i+1]-lsps[i])/2.0-((lsps[i-1]-lsps[i-2])/2.0));
+                        m = (int)floor((f-lspmin[i/2+order/2])/(lspmax[i/2+order/2]-lspmin[i/2+order/2])*sqdd);
+                        lspsqd[i/2+order/2][m]++;
+                    }
+                }
+            }
+
+            if (lspvt) {
+                if (statt == 1) {
+                    for(i=0; i<order; i++) fprintf(fdmp, "%d;", (int)floor((lsps[i]-lspmin[i])/(lspmax[i]-lspmin[i])*sqdd));
+                    fprintf(fdmp, "\n");
+                } else if (statt == 2) {
+
+                } else if (statt == 3) {
+                    for(i=0; i<order/2; i++) {
+                        if (i==0) f = (lsps[1]-lsps[0])/2.0+lsps[0];
+                        else f = ((lsps[i*2+1]-lsps[i*2])/2.0+lsps[i*2])-((lsps[i*2-1]-lsps[i*2-2])/2.0+lsps[i*2-2]);
+                        m = (int)floor((f-lspmin[i])/(lspmax[i]-lspmin[i])*sqdd);
+                        fprintf(fdmp, "%d;", m);
+                    }
+                    for(i=0; i<order/2; i++) {
+                        if (i==0) f = (lsps[1]-lsps[0])/2.0;
+                        else f = ((lsps[i*2+1]-lsps[i*2])/2.0-((lsps[i*2-1]-lsps[i*2-2])/2.0));
+                        m = (int)floor((f-lspmin[i+order/2])/(lspmax[i+order/2]-lspmin[i+order/2])*sqdd);
+                        fprintf(fdmp, "%d;", m);
+                    }
+                    fprintf(fdmp, "\n");
+                }
+            }
+
+            if (opti) {
+                if (statt == 1) {
+                    framecounter++;
+                    sqermn = 2147483647L;
+                    bstix = 0L;
+                    sqerr = 0L;
+                    for(l=0L; l<vtl; l++) {
+                        sqerr = 0L;
+                        for(i=0; i<order; i++) {                        
+                            m = (vtraw[l][i]-(int)floor((lsps[i]-lspmin[i])/(lspmax[i]-lspmin[i])*sqdd));
+                            sqerr += (m * m) * wght[i];
+                            if (sqerr >= sqermn) break;
+                        }
+                        if(sqerr < sqermn) {
+                            sqermn = sqerr;
+                            bstix = l;
+                        }
+                    }
+                    vtraw[bstix][order]++;
+                    if (vtraw[bstix][order] > maxoc) maxoc = vtraw[bstix][order];
+                    fprintf(stderr, "\r%d", framecounter);
+                } else if (statt == 3) {
+                    framecounter++;
+                    sqermn = 2147483647L;
+                    bstix = 0L;
+                    sqerr = 0L;
+                    for(l=0L; l<vtl; l++) {
+                        sqerr = 0L;
+                        for(i=0; i<order/2; i++) {
+                            if (i==0) f = (lsps[1]-lsps[0])/2.0+lsps[0];
+                            else f = ((lsps[i*2+1]-lsps[i*2])/2.0+lsps[i*2])-((lsps[i*2-1]-lsps[i*2-2])/2.0+lsps[i*2-2]);
+                            m = vtraw[l][i]-(int)floor((f-lspmin[i])/(lspmax[i]-lspmin[i])*sqdd);
+                            sqerr += (m * m);
+                            if (sqerr >= sqermn) break;
+                        }
+                        for(i=0; i<order/2; i++) {
+                            if (i==0) f = (lsps[1]-lsps[0])/2.0;
+                            else f = ((lsps[i*2+1]-lsps[i*2])/2.0-((lsps[i*2-1]-lsps[i*2-2])/2.0));
+                            m = vtraw[l][i+order/2]-(int)floor((f-lspmin[i+order/2])/(lspmax[i+order/2]-lspmin[i+order/2])*sqdd);
+                            sqerr += (m * m);
+                            if (sqerr >= sqermn) break;
+                        }
+                        if(sqerr < sqermn) {
+                            sqermn = sqerr;
+                            bstix = l;
+                        }
+                    }
+                    vtraw[bstix][order]++;
+                    if (vtraw[bstix][order] > maxoc) maxoc = vtraw[bstix][order];
+                    fprintf(stderr, "\r%d", framecounter);
+                } else if (statt == 4) {
+                    framecounter++;
+                    sqermn = 2147483647L;
+                    bstix = 0L;
+                    sqerr = 0L;
+                    for(l=0L; l<vtl; l++) {
+                        sqerr = 0L;
+                        for(i=0; i<order/2; i++) {                        
+                            m = (int)floor((lsps[i*2]-lspmin[i*2])/(lspmax[i*2]-lspmin[i*2])*sqdd);
+                            n = (int)floor((lsps[i*2+1]-lspmin[i*2+1])/(lspmax[i*2+1]-lspmin[i*2+1])*sqdd);
+                            m = ((n-m)/2+m) - ((vtraw[l][i*2+1]-vtraw[l][i*2])/2+vtraw[l][i*2]);
+                            sqerr += (m * m);
+                            m = (int)floor((lsps[i*2]-lspmin[i*2])/(lspmax[i*2]-lspmin[i*2])*sqdd);
+                            n = (int)floor((lsps[i*2+1]-lspmin[i*2+1])/(lspmax[i*2+1]-lspmin[i*2+1])*sqdd);
+                            m = ((n-m)/2) - ((vtraw[l][i*2+1]-vtraw[l][i*2])/2);
+                            sqerr += (m * m);
+                            if (sqerr >= sqermn) break;
+                        }
+                        if(sqerr < sqermn) {
+                            sqermn = sqerr;
+                            bstix = l;
+                        }
+                    }
+                    vtraw[bstix][order]++;
+                    if (vtraw[bstix][order] > maxoc) maxoc = vtraw[bstix][order];
+                    fprintf(stderr, "\r%d", framecounter);
+                }
+            }
+
+            if (vq10) {
+                if (statt == 1) {
+                    sqermn = 2147483647L;
+                    bstix = 0L;
+                    sqerr = 0L;
+                    for(l=0L; l<vtl; l++) {
+                        sqerr = 0L;
+                        for(i=0; i<order; i++) {                        
+                            m = (vtraw[l][i]-(int)floor((lsps[i]-lspmin[i])/(lspmax[i]-lspmin[i])*sqdd));
+                            sqerr += (m * m) * wght[i];
+                            if (sqerr >= sqermn) break;
+                        }
+                        if(sqerr < sqermn) {
+                            sqermn = sqerr;
+                            bstix = l;
+                        }
+                    }
+                    for (i=0; i<order; i++) lsps_[i] = ((float)vtraw[bstix][i]/sqdd)*(lspmax[i]-lspmin[i])+lspmin[i];
+		    lsp_to_lpc(lsps_, ak_, LPC_ORD);
+                } else if (statt == 4) {
+                    sqermn = 2147483647L;
+                    bstix = 0L;
+                    sqerr = 0L;
+                    for(l=0L; l<vtl; l++) {
+                        sqerr = 0L;
+                        for(i=0; i<order/2; i++) {                        
+                            m = (int)floor((lsps[i*2]-lspmin[i*2])/(lspmax[i*2]-lspmin[i*2])*sqdd);
+                            n = (int)floor((lsps[i*2+1]-lspmin[i*2+1])/(lspmax[i*2+1]-lspmin[i*2+1])*sqdd);
+                            m = ((n-m)/2+m) - ((vtraw[l][i*2+1]-vtraw[l][i*2])/2+vtraw[l][i*2]);
+                            sqerr += (m * m);
+                            m = (int)floor((lsps[i*2]-lspmin[i*2])/(lspmax[i*2]-lspmin[i*2])*sqdd);
+                            n = (int)floor((lsps[i*2+1]-lspmin[i*2+1])/(lspmax[i*2+1]-lspmin[i*2+1])*sqdd);
+                            m = ((n-m)/2) - ((vtraw[l][i*2+1]-vtraw[l][i*2])/2);
+                            sqerr += (m * m);
+                            if (sqerr >= sqermn) break;
+                        }
+                        if(sqerr < sqermn) {
+                            sqermn = sqerr;
+                            bstix = l;
+                        }
+                    }
+                    for (i=0; i<order; i++) lsps_[i] = ((float)vtraw[bstix][i]/sqdd)*(lspmax[i]-lspmin[i])+lspmin[i];
+		    lsp_to_lpc(lsps_, ak_, LPC_ORD);
+                }
+            }
+
+
             #ifdef DUMP
 	    dump_ak(ak, order);
             dump_E(e);
@@ -747,7 +1106,7 @@ int main(int argc, char *argv[])
 		}
 	    }
 
-            if (lsp || lspd || lspjmv) {
+            if (lsp || lspd || lspjmv || vq10) {
                 sd_sum += spectral_dist(ak, ak_, LPC_ORD, fft_fwd_cfg, FFT_ENC);
                 sd_frames ++;
             }
@@ -1072,14 +1431,59 @@ int main(int argc, char *argv[])
 
     \*----------------------------------------------------------------*/
 
+
     fclose(fin);
 
-    if (fout != NULL)
-	fclose(fout);
+    if (fout != NULL) fclose(fout);
+
+    if (minmax) {
+        if (fdmp == NULL) fdmp = fopen("minmax.csv", "wt");
+        fprintf(fdmp, "%d\n", sqdd);
+        for(i=0; i<order; i++) fprintf(fdmp, "%f;%f\n", lspmin[i], lspmax[i]);
+    }
+
+    if (fdmp != NULL) fclose(fdmp);
+
+    if (sqd) {
+        if ((faux = fopen("lspsqd.csv","wt")) == NULL) {
+	    fprintf(stderr, "Error opening lspsqd.csv file: %s.\n",strerror(errno));
+            exit(1);
+        }
+        for(i=0; i<sqdd; i++) {
+            for(m=0; m<order; m++) fprintf(faux, "%d;", lspsqd[m][i]);
+            fprintf(faux, "\n");
+        }
+        fclose(faux);
+    }
+
+    if (opti) {
+        frmcntl = 0L;
+        if (faux != NULL) fclose(faux);
+        if ((faux = fopen("lspvtopt.csv","wt")) == NULL) {
+	    fprintf(stderr, "Error opening lspvtopt.csv file: %s.\n",strerror(errno));
+            exit(1);
+        }
+
+        fprintf(stderr, "\nmaxoc=%d vtl=%ld  order=%d\n", maxoc, vtl, order);
+
+        for(m=maxoc; m>0; m--) {
+            for(l=0L; l<vtl; l++) {
+                if (vtraw[l][order] == m) {
+                    frmcntl++;
+                    fprintf(faux, "%d;", m);
+                    for(i=0; i<order; i++) fprintf(faux, "%d;", vtraw[l][i]);
+                    fprintf(faux, "\n");
+                }
+            }
+            fprintf(stderr, "\r%d", m);
+        }
+        fclose(faux);
+        fprintf(stderr, "\r%ld meaningfull frames\n", frmcntl);
+    }
 
     if (lpc_model) {
     	fprintf(stderr, "LPC->{Am} SNR av: %5.2f dB over %d frames\n", sum_snr/frames, frames);
-        if (lsp || lspd || lspjmv)
+        if (lsp || lspd || lspjmv || vq10)
             fprintf(stderr, "LSP quantiser SD: %5.2f dB*dB over %d frames\n", sd_sum/sd_frames, sd_frames);     
     }
     if (newamp1vq) {
