@@ -195,13 +195,23 @@ wav         - speech files in wave file format
 
 ## Building for Windows on a Linux machine
 
-On Ubuntu 17 and above:
+On Ubuntu 20.04 LTS( 32bit ):
    ```
-   sudo apt-get install mingw-w64
+   sudo apt install mingw-w64 g++-mingw-w64
    mkdir build_windows && cd build_windows
-   cmake .. -DCMAKE_TOOLCHAIN_FILE=/home/david/freedv-dev/cmake/Toolchain-Ubuntu-mingw32.cmake -DUNITTEST=FALSE -DGENERATE_CODEBOOK=/home/david/codec2/build_linux/src/generate_codebook 
+   cmake -DCMAKE_TOOLCHAIN_FILE=~/Toolchain-Ubuntu-mingw32.cmake .. 
    make
    ```
+
+On Ubuntu 20.04 LTS ( 64bit ):
+   ```
+   sudo apt install mingw-w64 g++-mingw-w64
+   mkdir build_windows && cd build_windows
+   cmake -DCMAKE_TOOLCHAIN_FILE=~/Toolchain-Ubuntu-mingw64.cmake .. 
+   make
+   ```   
+   
+   
    
 ## Building for Windows on a Windows machine
 
