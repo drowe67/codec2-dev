@@ -23,3 +23,6 @@ set(CMAKE_FIND_ROOT_PATH /usr/${TOOLCHAIN_PREFIX})
 set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
 set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
 set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
+
+# add static libgcc libraries so there are no additional dependencies
+set(CMAKE_SHARED_LINKER_FLAGS "-static-libgcc -static-libstdc++ -static")
