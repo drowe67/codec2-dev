@@ -240,6 +240,7 @@ void freedv_set_phase_est_bandwidth_mode(struct freedv *f, int val);
 void freedv_set_eq                      (struct freedv *f, int val);
 void freedv_set_frames_per_burst        (struct freedv *f, int framesperburst);
 void freedv_passthrough_gain            (struct freedv *f, float g);
+void freedv_set_fmin_fmax               (struct freedv *freedv, float val_fmin, float val_fmax);
 
 // Get parameters -------------------------------------------------------------------------
 
