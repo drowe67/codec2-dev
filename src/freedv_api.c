@@ -1382,13 +1382,16 @@ void freedv_get_fsk_S_and_N               (struct freedv *f, float *S, float *N)
   Set fmin / fmax for ofdm modem
 
 \*---------------------------------------------------------------------------*/
-void freedv_set_fmin_fmax(struct freedv *freedv, float val_fmin, float val_fmax) {
-    freedv->ofdm->fmin = val_fmin;
-    freedv->ofdm->fmax = val_fmax;
+int freedv_set_fmin_fmax(struct freedv *freedv, float val_fmin, float val_fmax) {
+
+    if (is_ofdm_data_mode(freedv)) {
+        freedv->ofdm->fmin = val_fmin;
+        freedv->ofdm->fmax = val_fmax;
+        return 1;
+    } else {
+        return 0;
+    }
 }
-
-
-  
 
 
 int freedv_get_n_max_speech_samples(struct freedv *f) {
