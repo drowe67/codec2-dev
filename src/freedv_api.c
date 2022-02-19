@@ -1378,13 +1378,18 @@ void freedv_get_fsk_S_and_N               (struct freedv *f, float *S, float *N)
   FUNCTIONS...: freedv_set_fmin_fmax
   AUTHOR......: Simon Lang - DJ2LS
   DATE CREATED: 18 feb 2022
-
-  Set fmin / fmax for ofdm modem
-
+  DEFAULT.....: fmin: -50.0Hz fmax: 50.0Hz
+  DESCRIPTION.:
+  
+  |<---fmin - | rx centre frequency | + fmax--->|
+  
+  Useful for handling frequency offsets, 
+  e.g. caused by an imprecise VFO, the trade off is more CPU power is required.  
+  
 \*---------------------------------------------------------------------------*/
-int freedv_set_fmin_fmax(struct freedv *freedv, float val_fmin, float val_fmax) {
+int freedv_set_tuning_range(struct freedv *freedv, float val_fmin, float val_fmax) {
 
-    if (is_ofdm_data_mode(freedv)) {
+    if (is_ofdm_mode(freedv)) {
         freedv->ofdm->fmin = val_fmin;
         freedv->ofdm->fmax = val_fmax;
         return 1;

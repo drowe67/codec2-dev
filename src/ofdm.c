@@ -219,8 +219,8 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
         ofdm->clip_en = false;
         ofdm->foff_limiter = false;
         ofdm->data_mode = "";
-        ofdm->fmin = -50.0;
-        ofdm->fmax = 50.0;
+        ofdm->fmin = -50.0;                       /* frequency minimum for ofdm acquisition range */
+        ofdm->fmax = 50.0;                        /* frequency maximum for ofdm acquisition range */
         memset(ofdm->tx_uw, 0, ofdm->nuwbits);
     } else {
         /* Use the users values */
@@ -254,8 +254,8 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
         ofdm->clip_en = config->clip_en;
         memcpy(ofdm->tx_uw, config->tx_uw, ofdm->nuwbits);
         ofdm->data_mode = config->data_mode;
-        ofdm->fmin = config->fmin;
-        ofdm->fmax = config->fmax;
+        ofdm->fmin = config->fmin;              /* frequency minimum for ofdm acquisition range */
+        ofdm->fmax = config->fmax;              /* frequency maximum for ofdm acquisition range */
 
     }
 
