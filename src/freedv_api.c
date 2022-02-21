@@ -1375,7 +1375,7 @@ void freedv_get_fsk_S_and_N               (struct freedv *f, float *S, float *N)
 
 /*---------------------------------------------------------------------------*\
 
-  FUNCTIONS...: freedv_set_fmin_fmax
+  FUNCTIONS...: freedv_set_tuning_range
   AUTHOR......: Simon Lang - DJ2LS
   DATE CREATED: 18 feb 2022
   DEFAULT.....: fmin: -50.0Hz fmax: 50.0Hz
