@@ -8,6 +8,7 @@
 #    cd ~ && git clone git@github.com:jks-prv/kiwiclient.git
 # 3. Install Hamlib cli tools
 
+set -x
 MY_PATH=`dirname $0`
 BUILD_PATH=`echo $MY_PATH/../build_*/src`
 PATH=${PATH}:${BUILD_PATH}:${HOME}/kiwiclient
@@ -25,24 +26,27 @@ serialPort="/dev/ttyUSB0"
 rxwavefile=0
 soundDevice="plughw:CARD=CODEC,DEV=0"
 txstats=0
+stationid=""
 
 function print_help {
     echo
     echo "Automated Over The Air (OTA) voice test for FreeDV HF voice modes"
     echo
-    echo "  usage ./ota_voice_test.sh [options] SpeechFile [kiwi_url]"
+    echo "  usage ./ota_voice_test.sh [options] SpeechWaveFile [kiwi_url]"
     echo "  or:"
     echo "  usage ./ota_voice_test.sh -r rxWaveFile"
     echo
-    echo "    -c dev    The sound device (in ALSA format on Linux, CoreAudio for macOS)"
-    echo "    -d        debug mode; trace script execution"
-    echo "    -g        SSB (analog) compressor gain"
+    echo "    -c dev                    The sound device (in ALSA format on Linux, CoreAudio for macOS)"
+    echo "    -d                        debug mode; trace script execution"
+    echo "    -g                        SSB (analog) compressor gain"
+    echo "    -i StationIDWaveFile      Prepend this file to identify transmission (should be 8KHz mono)"
     echo "    -m mode   700c|700d|700e"
-    echo "    -o model  select radio model number ('rigctl -l' to list)"
-    echo "    -r        Rx wave file mode: Rx process supplied rx wave file"
-    echo "    -s port   The serial port (or hostname:port) to connect to for TX, default /dev/ttyUSB0"
-    echo "    -t        Tx only, useful for manually observing SDRs"
-    echo "    -x        Generate tx.wav file and exit"
+    echo "    -o model                  select radio model number ('rigctl -l' to list)"
+    echo "    -r                        Rx wave file mode: Rx process supplied rx wave file"
+    echo "    -s port                   The serial port (or hostname:port) to control SSB radio,"
+    echo "                              default /dev/ttyUSB0"
+    echo "    -t                        Tx only, useful for manually observing SDRs"
+    echo "    -x                        Generate tx.wav file and exit"
     echo
     exit
 }
@@ -86,7 +90,7 @@ function process_rx {
           plot_specgram(s, 8000, 200, 3000); print('spec.jpg', '-djpg'); \
           quit" | octave-cli -p ${CODEC2}/octave -qf > /dev/null
     # attempt to decode
-    freedv_rx ${mode} ${rx} - -v --highpassthroughgain 2>rx_stats.txt | sox -t .s16 -r 8000 -c 1 - rx_freedv.wav
+    freedv_rx ${mode} ${rx} - -v --highpassthroughgain 2>rx_stats.txt | sox -t .s16 -r $speechFs -c 1 - rx_freedv.wav
     cat rx_stats.txt | tr -s ' ' | cut -f5 -d' ' | awk '$0==($0+0)' > sync.txt
     cat rx_stats.txt | tr -s ' ' | cut -f10 -d' ' | awk '$0==($0+0)' > snr.txt
     # time domain plot of output speech, SNR, and sync
@@ -117,6 +121,11 @@ case $key in
     ;;
     -g)
         gain="$2"	
+        shift
+        shift
+    ;;
+    -i)
+        stationid="$2"	
         shift
         shift
     ;;
@@ -175,7 +184,7 @@ fi
 
 speechfile="$1"
 if [ ! -f $speechfile ]; then
-    echo "Can't find ${speechfile}!"
+    echo "Can't find input speech wave file: ${speechfile}!"
     exit 1
 fi
 
@@ -191,12 +200,30 @@ fi
 echo $mode
 
 # create compressed analog
+speechfile_raw_8k=$(mktemp)
+comp_in=$(mktemp)
 speech_comp=$(mktemp)
 speech_freedv=$(mktemp)
-analog_compressor $speechfile $speech_comp $gain
+# If 16kHz input files for 2020x, we need an 8kHz version for SSB
+sox $speechfile -r 8000 -t .s16 -c 1 $speechfile_raw_8k
+if [ -z $stationid ]; then
+    cp $speechfile_raw_8k $comp_in
+else
+    # append station ID and apply analog compression
+    stationid_raw_8k=$(mktemp)
+    sox $stationid -r 8000 -t .s16 -c 1 $stationid_raw_8k
+    cat  $stationid_raw_8k $speechfile_raw_8k> $comp_in
+fi
+analog_compressor $comp_in $speech_comp $gain
+
+# determine sample rate of input file we require for freedv_tx
+speechFs=8000
+if [ "$mode" == "2020" ] || [ "$mode" == "2020A" ] || [ "$mode$" == "2020B" ]; then
+   speechFs=16000
+fi
 
 # create modulated FreeDV, with compressor enabled
-freedv_tx $mode $speechfile $speech_freedv --clip 1 
+sox $speechfile -t .s16 -r $speechFs - | freedv_tx $mode - $speech_freedv --clip 1
 cat $speech_comp $speech_freedv > tx.raw
 sox -t .s16 -r 8000 -c 1 tx.raw tx.wav
 
