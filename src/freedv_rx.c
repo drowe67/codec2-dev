@@ -67,6 +67,9 @@ int main(int argc, char *argv[]) {
     int                        use_squelch, vq_type;
     float                      squelch = 0;
     struct freedv             *freedv;
+    int                        use_passthroughgain;
+    float                      passthroughgain = 0.0;
+      
     char f2020[80] = {0};
 #ifdef __LPCNET__
     sprintf(f2020,"|2020|2020A|2020B");
@@ -93,27 +96,28 @@ int main(int argc, char *argv[]) {
     }
 
     use_testframes = verbose = discard = use_complex = use_dpsk = use_squelch = 0; use_reliabletext = 0;
-    vq_type = -1;
+    vq_type = -1; use_passthroughgain = 0;
     
     int o = 0;
     int opt_idx = 0;
     while( o != -1 ){
         static struct option long_opts[] = {
-            {"discard",        no_argument,        0, 'i'},
-            {"dpsk",           no_argument,        0, 'd'},
-            {"help",           no_argument,        0, 'h'},
-            {"reliabletext",   no_argument,        0, 'r'},
-            {"squelch",        required_argument,  0, 's'},
-            {"txtrx",          required_argument,  0, 'x'},
-            {"testframes",     no_argument,        0, 't'},
-            {"usecomplex",     no_argument,        0, 'c'},
-            {"verbose1",       no_argument,        0, 'v'},
-            {"vv",             no_argument,        0, 'w'},
-            {"indopt",         required_argument,  0, 'n'},
+            {"discard",         no_argument,        0, 'i'},
+            {"dpsk",            no_argument,        0, 'd'},
+            {"help",            no_argument,        0, 'h'},
+            {"reliabletext",    no_argument,        0, 'r'},
+            {"squelch",         required_argument,  0, 's'},
+            {"txtrx",           required_argument,  0, 'x'},
+            {"testframes",      no_argument,        0, 't'},
+            {"usecomplex",      no_argument,        0, 'c'},
+            {"verbose1",        no_argument,        0, 'v'},
+            {"vv",              no_argument,        0, 'w'},
+            {"indopt",          required_argument,  0, 'n'},
+            {"passthroughgain", required_argument,  0, 'p'},
             {0, 0, 0, 0}
         };
 
-        o = getopt_long(argc,argv,"idhr:s:x:tcvwn:",long_opts,&opt_idx);
+        o = getopt_long(argc,argv,"idhr:s:x:tcvwn:p:",long_opts,&opt_idx);
 
         switch(o) {
         case 'i':
@@ -131,7 +135,11 @@ int main(int argc, char *argv[]) {
             else
                 vq_type = 2;
             break;
-        case 'r':
+	case 'p':
+	    use_passthroughgain = 1;
+	    passthroughgain = atof(optarg);
+            break;
+	case 'r':
             use_reliabletext = 1;
             break;
         case 's':
@@ -216,7 +224,8 @@ int main(int argc, char *argv[]) {
         freedv_set_squelch_en(freedv, 1);
     }
     freedv_set_dpsk(freedv, use_dpsk);
-
+    if (use_passthroughgain) freedv_passthrough_gain(freedv, passthroughgain);
+    
     /* install optional handler for recevied txt characters */
     if (ftxt_rx != NULL)
     {

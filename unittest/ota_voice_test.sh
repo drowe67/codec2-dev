@@ -6,7 +6,12 @@
 # 1. Build codec2
 # 2. Install kiwclient:
 #    cd ~ && git clone git@github.com:jks-prv/kiwiclient.git
-# 3. Install Hamlib cli tools
+# 3. Install Hamlib cli tools, and add user to dialout group:
+#      sudo adduser david dialout
+# 4. To test rigctl:
+#      echo "m" | rigctl -m 361 -r /dev/ttyUSB0
+# 5. Sample command line:
+#      ./ota_voice_test.sh ~/Downloads/speech_orig_16k.wav -m 700E -i ~/Downloads/vk5dgr_testing_8k.wav sdr.ironstonerange.com -p 8074
 
 set -x
 MY_PATH=`dirname $0`
@@ -15,7 +20,7 @@ PATH=${PATH}:${BUILD_PATH}:${HOME}/kiwiclient
 CODEC2=${MY_PATH}/..
 
 kiwi_url=""
-port=8073
+port=8074
 freq_kHz="7177"
 tx_only=0
 Nbursts=5
@@ -42,8 +47,9 @@ function print_help {
     echo "    -i StationIDWaveFile      Prepend this file to identify transmission (should be 8KHz mono)"
     echo "    -m mode   700c|700d|700e"
     echo "    -o model                  select radio model number ('rigctl -l' to list)"
+    echo "    -p port                   kiwi_url port to use (default 8073)."
     echo "    -r                        Rx wave file mode: Rx process supplied rx wave file"
-    echo "    -s port                   The serial port (or hostname:port) to control SSB radio,"
+    echo "    -s SerialPort             The serial port (or hostname:port) to control SSB radio,"
     echo "                              default /dev/ttyUSB0"
     echo "    -t                        Tx only, useful for manually observing SDRs"
     echo "    -x                        Generate tx.wav file and exit"
@@ -90,7 +96,7 @@ function process_rx {
           plot_specgram(s, 8000, 200, 3000); print('spec.jpg', '-djpg'); \
           quit" | octave-cli -p ${CODEC2}/octave -qf > /dev/null
     # attempt to decode
-    freedv_rx ${mode} ${rx} - -v --highpassthroughgain 2>rx_stats.txt | sox -t .s16 -r $speechFs -c 1 - rx_freedv.wav
+    freedv_rx ${mode} ${rx} - -v --passthroughgain 1.0 2>rx_stats.txt | sox -t .s16 -r $speechFs -c 1 - rx_freedv.wav
     cat rx_stats.txt | tr -s ' ' | cut -f5 -d' ' | awk '$0==($0+0)' > sync.txt
     cat rx_stats.txt | tr -s ' ' | cut -f10 -d' ' | awk '$0==($0+0)' > snr.txt
     # time domain plot of output speech, SNR, and sync
@@ -177,6 +183,12 @@ esac
 done
 set -- "${POSITIONAL[@]}" # restore positional parameters
 
+# determine sample rate of freedv_tx/freedv_rx
+speechFs=8000
+if [ "$mode" == "2020" ] || [ "$mode" == "2020A" ] || [ "$mode" == "2020B" ]; then
+   speechFs=16000
+fi
+
 if [ $rxwavefile -eq 1 ]; then
     process_rx $1
     exit 0
@@ -215,12 +227,6 @@ else
     cat  $stationid_raw_8k $speechfile_raw_8k> $comp_in
 fi
 analog_compressor $comp_in $speech_comp $gain
-
-# determine sample rate of input file we require for freedv_tx
-speechFs=8000
-if [ "$mode" == "2020" ] || [ "$mode" == "2020A" ] || [ "$mode$" == "2020B" ]; then
-   speechFs=16000
-fi
 
 # create modulated FreeDV, with compressor enabled
 sox $speechfile -t .s16 -r $speechFs - | freedv_tx $mode - $speech_freedv --clip 1
