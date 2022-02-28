@@ -165,7 +165,7 @@ void phase_synth_zero_order(
 
 )
 {
-    int   m;
+    int   m, n;
     float new_phi;
     COMP  Ex[MAX_AMP+1];	  /* excitation samples */
     COMP  A_[MAX_AMP+1];	  /* synthesised harmonic samples */
@@ -182,11 +182,13 @@ void phase_synth_zero_order(
     ex_phase[0] += (model->Wo)*n_samp;
     ex_phase[0] -= TWO_PI*floorf(ex_phase[0]/TWO_PI + 0.5);
 
+    n = (model->L)/2;
+
     for(m=1; m<=model->L; m++) {
 
         /* generate excitation */
 
-        if (model->voiced) {
+        if ((!model->transcient && model->voiced) || (model->transcient && (m < n))) {
 
             Ex[m].real = cosf(ex_phase[0]*m);
             Ex[m].imag = sinf(ex_phase[0]*m);

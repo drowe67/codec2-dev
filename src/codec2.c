@@ -2104,7 +2104,7 @@ void analyse_one_frame(struct CODEC2 *c2, MODEL *model, short speech[])
 	estimate_amplitudes(model, Sw, c2->W, 1);
     else
 	estimate_amplitudes(model, Sw, c2->W, 0);
-    est_voicing_mbe(&c2->c2const, model, Sw, c2->W);
+    est_voicing_mbe(&c2->c2const, model, Sw, c2->W, V_THRESH);
     #ifdef DUMP
     dump_model(model);
     #endif

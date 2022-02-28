@@ -451,7 +451,8 @@ float est_voicing_mbe(
                       C2CONST *c2const,
                       MODEL *model,
                       COMP   Sw[],
-                      float  W[]
+                      float  W[],
+                      float  v_thresh
                       )
 {
     int   l,al,bl,m;    /* loop variables */
@@ -508,7 +509,7 @@ float est_voicing_mbe(
     }
 
     snr = 10.0*log10f(sig/error);
-    if (snr > V_THRESH)
+    if (snr > v_thresh)
 	model->voiced = 1;
     else
 	model->voiced = 0;

@@ -86,6 +86,7 @@ typedef struct {
     float A[MAX_AMP+1];	  /* amplitiude of each harmonic                */
     float phi[MAX_AMP+1]; /* phase of each harmonic                     */
     int   voiced;	  /* non-zero if this frame is voiced           */
+    int   transcient;
 } MODEL;
 
 /* describes each codebook  */
