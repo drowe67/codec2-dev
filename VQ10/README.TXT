@@ -19,7 +19,7 @@ make c2sim
 
 than you will need to compile embsd
 
-gcc -o embsd embsd.c -lm
+gcc -o embsd ../embsd/embsd.c -lm
 
 you should have codec2/VQ10 directory and there the raw speech samples for this branch are stored. we will use them
 to start new version of VQ10 you will perform a build of it using c2sim.
@@ -32,9 +32,13 @@ please prepare csv directory
 mkdir csv
 
 than you can run script which will perform all steps for building the vq10 codebook
-I suggest to run it in background as it will take some time (for me it is about 1-2 hrs.)
+I suggest to run it in background as it will take some time (for me it is between 1-2 hrs.)
 
-sudo ./lbg.sh &> out.txt &
+sudo ../VQ10/lbg.sh &> out.txt &
+
+optionally if you prefere verbose version and have some visual control on progress please type
+
+sudo ../VQ10/lbgv.sh
 
 to have and idea what is going on you can inspect script,  it is damn simple and comments show the idea
 finally you can listen to the test sample. it is better now because thaere are a lot of short frazes of many speakers in a short file
@@ -63,6 +67,7 @@ and finally try VQ10 quantization (without decimation as well):
 ./src/c2sim ../VQ10/test.raw --lpc 10 --vq10 1 --cdb 32768 -o - | aplay -f S16_LE
 
 this version of VQ10 needs 15 bits to code the LSPs for the frame.
+after optimisation the codebook size should rather be fixed
 for --vq10 1 option to run properly there are two files needed:
 minmax.csv (minimum and maximum values for LSP rescaling)
 lspvtopt.csv (the codebook)
