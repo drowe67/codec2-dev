@@ -1372,6 +1372,33 @@ int freedv_get_bits_per_modem_frame       (struct freedv *f) {return f->bits_per
 int freedv_get_rx_status                  (struct freedv *f) {return f->rx_status;}
 void freedv_get_fsk_S_and_N               (struct freedv *f, float *S, float *N) { *S = f->fsk_S[0]; *N = f->fsk_N[0]; }
 
+
+/*---------------------------------------------------------------------------*\
+
+  FUNCTIONS...: freedv_set_tuning_range
+  AUTHOR......: Simon Lang - DJ2LS
+  DATE CREATED: 18 feb 2022
+  DEFAULT.....: fmin: -50.0Hz fmax: 50.0Hz
+  DESCRIPTION.:
+  
+  |<---fmin - | rx centre frequency | + fmax--->|
+  
+  Useful for handling frequency offsets, 
+  e.g. caused by an imprecise VFO, the trade off is more CPU power is required.  
+  
+\*---------------------------------------------------------------------------*/
+int freedv_set_tuning_range(struct freedv *freedv, float val_fmin, float val_fmax) {
+
+    if (is_ofdm_data_mode(freedv) && (strcmp(freedv->ofdm->data_mode, "burst") == 0)) {
+        freedv->ofdm->fmin = val_fmin;
+        freedv->ofdm->fmax = val_fmax;
+        return 1;
+    } else {
+        return 0;
+    }
+}
+
+
 int freedv_get_n_max_speech_samples(struct freedv *f) {
     /* When "passing through" demod samples to the speech output
        (e.g. no sync and squelch off) f->nin bounces around with
