@@ -43,9 +43,9 @@
 #include "debug_alloc.h"
 #include "machdep.h"
 
-#ifdef __EMBEDDED__
+#if defined(__EMBEDDED__) && defined(__ARM_ARCH)
 #include "arm_math.h"
-#endif /* __EMBEDDED__ */
+#endif /* __EMBEDDED__ && __ARM_ARCH */
 
 /* Static Prototypes */
 
@@ -742,34 +742,32 @@ static int est_timing(struct OFDM *ofdm, complex float *rx, int length,
         corr_st = 0.0f;
         corr_en = 0.0f;
 
-#ifdef __EMBEDDED__
-#ifdef __REAL__
-	float re,im;
+#if defined(__EMBEDDED__) && defined(__REAL__)
+        float re,im;
 
-	arm_dot_prod_f32(&rx_real[i], wvec_pilot_real, ofdm->samplespersymbol, &re);
-	arm_dot_prod_f32(&rx_real[i], wvec_pilot_imag, ofdm->samplespersymbol, &im);
-	corr_st = re + im * I;
+        arm_dot_prod_f32(&rx_real[i], wvec_pilot_real, ofdm->samplespersymbol, &re);
+        arm_dot_prod_f32(&rx_real[i], wvec_pilot_imag, ofdm->samplespersymbol, &im);
+        corr_st = re + im * I;
 
-	arm_dot_prod_f32(&rx_real[i+ ofdm->samplesperframe], wvec_pilot_real, ofdm->samplespersymbol, &re);
-	arm_dot_prod_f32(&rx_real[i+ ofdm->samplesperframe], wvec_pilot_imag, ofdm->samplespersymbol, &im);
-	corr_en = re + im * I;
+        arm_dot_prod_f32(&rx_real[i+ ofdm->samplesperframe], wvec_pilot_real, ofdm->samplespersymbol, &re);
+        arm_dot_prod_f32(&rx_real[i+ ofdm->samplesperframe], wvec_pilot_imag, ofdm->samplespersymbol, &im);
+        corr_en = re + im * I;
+#elif defined(__EMBEDDED__) && defined(__ARM_ARCH)
+        float re,im;
+
+        arm_cmplx_dot_prod_f32((float*)&rx[i], (float*)wvec_pilot, ofdm->samplespersymbol, &re, &im);
+        corr_st = re + im * I;
+
+        arm_cmplx_dot_prod_f32((float*)&rx[i+ ofdm->samplesperframe], (float*)wvec_pilot, ofdm->samplespersymbol, &re, &im);
+        corr_en = re + im * I;
 #else
-	float re,im;
-
-	arm_cmplx_dot_prod_f32((float*)&rx[i], (float*)wvec_pilot, ofdm->samplespersymbol, &re, &im);
-	corr_st = re + im * I;
-
-	arm_cmplx_dot_prod_f32((float*)&rx[i+ ofdm->samplesperframe], (float*)wvec_pilot, ofdm->samplespersymbol, &re, &im);
-	corr_en = re + im * I;
-#endif
-#else
-	for (j = 0; j < ofdm->samplespersymbol; j++) {
+        for (j = 0; j < ofdm->samplespersymbol; j++) {
             int ind = i + j;
 
-	    corr_st = corr_st + (rx[ind                        ] * wvec_pilot[j]);
+            corr_st = corr_st + (rx[ind                        ] * wvec_pilot[j]);
             corr_en = corr_en + (rx[ind + ofdm->samplesperframe] * wvec_pilot[j]);
         }
-#endif // __EMBEDDED__
+#endif // __EMBEDDED__ && (__REAL__ || __ARM_ARCH)
         corr[i] = (cabsf(corr_st) + cabsf(corr_en)) * av_level;
     }
 
