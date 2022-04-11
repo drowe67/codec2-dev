@@ -8,6 +8,7 @@ CODEC2_PATH=$HOME/codec2
 PATH=$PATH:$CODEC2_PATH/build_linux/src:$CODEC2_PATH/build_linux/misc
 FADING_DIR=$CODEC2_PATH/build_linux/unittest
 No_AWGN=-20
+No_AWGN_LOW=-17
 No_Multipath=-25
 serial=0
 compressor_gain=6
@@ -35,6 +36,10 @@ function run_sim_ssb() {
     if [ "$channel" == "awgn" ]; then
         channel_opt=""
         No=$No_AWGN
+    fi
+    if [ "$channel" == "awgnlow" ]; then
+        channel_opt=""
+        No=$No_AWGN_LOW
     fi
     if [ "$channel" == "mpp" ] || [ "$channel" == "mpd" ]; then
         channel_opt='--'${channel}
@@ -77,6 +82,10 @@ function run_sim() {
     if [ "$channel" == "awgn" ]; then
         channel_opt=""
         No=$No_AWGN
+    fi
+    if [ "$channel" == "awgnlow" ]; then
+        channel_opt=""
+        No=$No_AWGN_LOW
     fi
     if [ "$channel" == "mpp" ] || [ "$channel" == "mpd" ]; then
         channel_opt='--'${channel}
@@ -154,5 +163,10 @@ run_sim $SPEECH_IN_8k_RAW 700E clip awgn
 run_sim $SPEECH_IN_8k_RAW 700E clip mpp
 run_sim $SPEECH_IN_8k_RAW 700E clip mpd
 
+# Low SNR samples
+run_sim_ssb $SPEECH_IN_8k_RAW awgnlow
+run_sim $SPEECH_IN_8k_RAW 700E clip awgnlow
+run_sim $SPEECH_IN_16k_RAW 2020 clip awgnlow
+run_sim $SPEECH_IN_16k_RAW 2020A clip awgnlow indopt
 
 exit

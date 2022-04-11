@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# ota_test.sh
+# ota_voice_test.sh
 #
 # Automated Over The Air (OTA) voice test for FreeDV HF voice modes
 #
@@ -10,10 +10,11 @@
 #      sudo adduser david dialout
 # 4. To test rigctl:
 #      echo "m" | rigctl -m 361 -r /dev/ttyUSB0
-# 5. Sample command line:
+# 5. Adjust Tx drive so ALC is just being tickled, set desired RF power:
+# ../build_linux/src/freedv_tx 2020 ~/Downloads/speech_orig_16k.wav - | aplay -f S16_LE --device="plughw:CARD=CODEC,DEV=0"
+# 6. Sample command line:
 #      ./ota_voice_test.sh ~/Downloads/speech_orig_16k.wav -m 700E -i ~/Downloads/vk5dgr_testing_8k.wav sdr.ironstonerange.com -p 8074
 
-set -x
 MY_PATH=`dirname $0`
 BUILD_PATH=`echo $MY_PATH/../build_*/src`
 PATH=${PATH}:${BUILD_PATH}:${HOME}/kiwiclient
@@ -76,6 +77,7 @@ function run_rigctl {
     echo $command | rigctl -m $model -r $serialPort > /dev/null
     if [ $? -ne 0 ]; then
         echo "Can't talk to Tx"
+        clean_up
         exit 1
     fi
 }
@@ -285,6 +287,13 @@ if [ `uname` == "Darwin" ]; then
     AUDIODEV="${soundDevice}" play -t raw -b 16 -c 1 -r 8000 -e signed-integer --endian little tx.raw 
 else
     aplay --device="${soundDevice}" -f S16_LE tx.raw 2>/dev/null
+fi
+if [ $? -ne 0 ]; then
+    run_rigctl "\\set_ptt 0" $model
+    clean_up
+    echo "Problem running aplay!"
+    echo "Is ${soundDevice} configured as the default sound device in Settings-Sound?"
+    exit 1
 fi
 run_rigctl "\\set_ptt 0" $model
 
