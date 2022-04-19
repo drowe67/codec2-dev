@@ -147,12 +147,6 @@ run_sim $SPEECH_IN_16k_RAW 2020 clip awgn
 run_sim $SPEECH_IN_16k_RAW 2020 clip mpp
 run_sim $SPEECH_IN_16k_RAW 2020 clip mpd
 
-run_sim $SPEECH_IN_16k_RAW 2020A clip awgn indopt
-run_sim $SPEECH_IN_16k_RAW 2020A clip mpp  indopt
-run_sim $SPEECH_IN_16k_RAW 2020A clip mpp  no_indopt
-run_sim $SPEECH_IN_16k_RAW 2020A clip mpd  indopt
-run_sim $SPEECH_IN_16k_RAW 2020A clip mpd  no_indopt
-
 run_sim $SPEECH_IN_16k_RAW 2020B clip awgn indopt
 run_sim $SPEECH_IN_16k_RAW 2020B clip mpp  indopt
 run_sim $SPEECH_IN_16k_RAW 2020B clip mpp  no_indopt

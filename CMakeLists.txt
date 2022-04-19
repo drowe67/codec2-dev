@@ -565,13 +565,6 @@ endif()
                             ./ch - - --No -22 |
                             ./ofdm_demod --mode 700E --ldpc --testframes -v 2 > /dev/null")
 
-    # 2020A MPP test, quite strong FEC on protected bits 
-    add_test(NAME test_OFDM_modem_2020A_mpp
-             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
-                           ./ofdm_mod --in /dev/zero --mode 2020A --verbose 1 --ldpc --testframes 60 --clip 1 |
-                           ./ch - - --No -22 --mpp --fading_dir ../unittest |
-                           ./ofdm_demod --mode 2020A --testframes --ldpc --verbose 1 > /dev/null")
-
     # 2020B AWGN test 
     add_test(NAME test_OFDM_modem_2020B_AWGN
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
@@ -770,25 +763,16 @@ if(LPCNET)
                             ./freedv_rx 2020 - /dev/null --testframes"
              )
 
-    add_test(NAME test_freedv_api_2020_awgn
-             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+     add_test(NAME test_freedv_api_2020_awgn
+              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
                             dd bs=32000 count=10 if=/dev/zero |
                             ./freedv_tx 2020 - - --testframes |
                             ./ch - - --No -24 |
                             ./freedv_rx 2020 - /dev/null --testframes"
              )
 
-    # quite strong protection of just protected bits (note compression (tx clipping) on)
-    add_test(NAME test_freedv_api_2020A_mpp
-             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
-                            dd bs=32000 count=60 if=/dev/zero |
-                            ./freedv_tx 2020A - - --testframes --clip 1 |
-                            ./ch - - --No -24.5 --mpp --fading_dir ../unittest |
-                            ./freedv_rx 2020A - /dev/null --testframes"
-             )
-
      add_test(NAME test_freedv_api_2020B_mpp
-             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
                             dd bs=32000 count=60 if=/dev/zero |
                             ./freedv_tx 2020B - - --testframes --clip 1 |
                             ./ch - - --No -25 --mpp --fading_dir ../unittest |

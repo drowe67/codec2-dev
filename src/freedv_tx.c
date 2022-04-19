@@ -66,7 +66,7 @@ int main(int argc, char *argv[]) {
     reliable_text_t           reliable_text_obj;
     char f2020[80] = {0};
 #ifdef __LPCNET__
-    sprintf(f2020,"|2020|2020A|2020");
+    sprintf(f2020,"|2020|2020");
 #endif
    
     if (argc < 4) {
@@ -76,8 +76,8 @@ int main(int argc, char *argv[]) {
                 "  --clip         0|1  Clipping (compression) of modem output samples for reduced PAPR\n"
                 "                      and higher average power\n"
                 "  --dpsk              Use differential PSK rather than coherent PSK\n"
-                "  --indopt       0|1  Choose index optimised VQ for 2020/2020A/2020B, no effect other modes\n"
-                "                      default for 2020/2020A/2020B 0/1/1 (off/on/on)\n"
+                "  --indopt       0|1  Choose index optimised VQ for 2020/2020B, no effect other modes\n"
+                "                      default for 2020/2020B 0/1/1 (off/on/on)\n"
                 "  --reliabletext txt  Send 'txt' using reliable text protocol\n"
                 "  --testframes        Send testframe instead of coded speech. Number of testsframes depends on\n"
                 "                      length of speech input file\n"
@@ -152,7 +152,6 @@ int main(int argc, char *argv[]) {
     if (!strcmp(argv[dx],"800XA")) mode = FREEDV_MODE_800XA;
     #ifdef __LPCNET__
     if (!strcmp(argv[dx],"2020"))  mode = FREEDV_MODE_2020;
-    if (!strcmp(argv[dx],"2020A")) mode = FREEDV_MODE_2020A;    
     if (!strcmp(argv[dx],"2020B")) mode = FREEDV_MODE_2020B;    
     #endif
     if (mode == -1) {

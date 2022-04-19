@@ -72,7 +72,7 @@ int main(int argc, char *argv[]) {
       
     char f2020[80] = {0};
 #ifdef __LPCNET__
-    sprintf(f2020,"|2020|2020A|2020B");
+    sprintf(f2020,"|2020|2020B");
 #endif
     
     if (argc < 4) {
@@ -81,8 +81,8 @@ int main(int argc, char *argv[]) {
                 "\n"
                 "  --discard               Reset BER stats on loss of sync, helps us get sensible BER results\n"
                 "  --dpsk                  Use differential PSK rather than coherent PSK\n"
-                "  --indopt       0|1      Choose index optimised VQ for 2020/2020A/2020B, no effect other modes\n"
-                "                          default for 2020/2020A/2020B 0/1/1 (off/on/on)\n"
+                "  --indopt       0|1      Choose index optimised VQ for 2020/2020B, no effect other modes\n"
+                "                          default for 2020/2020B 0/1/1 (off/on/on)\n"
                 "  --reliabletext txt      Send 'txt' using reliable text protocol\n"
                 "  --txtrx        filename Store reliable text output to filename\n"
                 "  --squelch      leveldB  Set squelch level\n"
@@ -182,7 +182,6 @@ int main(int argc, char *argv[]) {
     if (!strcmp(argv[dx],"800XA")) mode = FREEDV_MODE_800XA;
     #ifdef __LPCNET__
     if (!strcmp(argv[dx],"2020"))  mode = FREEDV_MODE_2020;
-    if (!strcmp(argv[dx],"2020A"))  mode = FREEDV_MODE_2020A;
     if (!strcmp(argv[dx],"2020B"))  mode = FREEDV_MODE_2020B;
     #endif
     if (mode == -1) {
@@ -318,8 +317,7 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "BER......: %5.4f  Tbits: %8d  Terrs: %8d\n",
 		                    (double)uncoded_ber, Tbits, Terrs);
         if ((mode == FREEDV_MODE_700D) || (mode == FREEDV_MODE_700E)  ||
-            (mode == FREEDV_MODE_2020) || (mode == FREEDV_MODE_2020A) ||
-            (mode == FREEDV_MODE_2020B) ) {
+            (mode == FREEDV_MODE_2020) || (mode == FREEDV_MODE_2020B) ) {
             int Tbits_coded = freedv_get_total_bits_coded(freedv);
             int Terrs_coded = freedv_get_total_bit_errors_coded(freedv);
             float coded_ber = (float)Terrs_coded/Tbits_coded;

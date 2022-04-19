@@ -187,7 +187,7 @@ set -- "${POSITIONAL[@]}" # restore positional parameters
 
 # determine sample rate of freedv_tx/freedv_rx
 speechFs=8000
-if [ "$mode" == "2020" ] || [ "$mode" == "2020A" ] || [ "$mode" == "2020B" ]; then
+if [ "$mode" == "2020" ] || [ "$mode" == "2020B" ]; then
    speechFs=16000
 fi
 
