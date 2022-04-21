@@ -108,7 +108,7 @@ Built as part of codec2-dev, see [README](README.md) for build instructions.
 
 1.  20.5ms symbol period, 31 carrier waveform, (504,396) code, but only 312 data bits used, so we don't send unused data bits.  This means we need less carriers (so more power per carrier), and code rate is increased slightly:
     ```
-    build_linux/src$ ./ofdm_mod --in /dev/zero --testframes 300 --mode 2020 --ldpc 1 --verbose 1 -p 312 | ./ch - - --No -22 -f 10 --ssbfilt 1 | ./ofdm_demod --out /dev/null --testframes --mode 2020 --verbose 1 --ldpc -p 312
+    build_linux/src$ ./ofdm_mod --in /dev/zero --testframes 300 --mode 2020 --ldpc 1 --verbose 1 | ./ch - - --No -22 -f 10 --ssbfilt 1 | ./ofdm_demod --out /dev/null --testframes --mode 2020 --verbose 1 --ldpc
 
     SNR3k(dB):  2.21 C/No: 37.0 PAPR:  9.6
     BER......: 0.0505 Tbits: 874020 Terrs: 44148

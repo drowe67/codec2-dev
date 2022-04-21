@@ -50,6 +50,7 @@
 #define FREEDV_MODE_700C        6
 #define FREEDV_MODE_700D        7
 #define FREEDV_MODE_2020        8
+#define FREEDV_MODE_2020B      16
 #define FREEDV_MODE_700E       13
 
 // available data modes
@@ -113,6 +114,9 @@
 #if !defined(FREEDV_MODE_2020_EN)
         #define FREEDV_MODE_2020_EN FREEDV_MODE_EN_DEFAULT
 #endif
+#if !defined(FREEDV_MODE_2020B_EN)
+        #define FREEDV_MODE_2020B_EN FREEDV_MODE_EN_DEFAULT
+#endif
 #if !defined(FREEDV_MODE_FSK_LDPC_EN)
         #define FREEDV_MODE_FSK_LDPC_EN FREEDV_MODE_EN_DEFAULT
 #endif
@@ -133,7 +137,7 @@ struct freedv;
 
 // Some modes allow extra configuration parameters
 struct freedv_advanced {
-    int interleave_frames;                   // currently ignored, was previously used to configure 700D interleaver
+    int lpcnet_vq_type;                      // see lpcnet_freedv.h
 
     // parameters for FREEDV_MODE_FSK_LDPC
     int M;                                   // 2 or 4 FSK

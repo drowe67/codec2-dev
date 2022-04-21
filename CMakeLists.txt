@@ -357,6 +357,12 @@ if(UNITTEST)
     add_test(NAME test_freedv_get_hash
              COMMAND sh -c "${CMAKE_CURRENT_BINARY_DIR}/unittest/thash")
 
+if(UNIX) # Uses pthreads
+     add_test(NAME test_fifo
+             COMMAND $<TARGET_FILE:tfifo>
+             )
+endif()
+
     # 16<->8 kHz float resamplers
     add_test(NAME test_fdmdv_16to8
              COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/octave;
@@ -514,16 +520,20 @@ if(UNITTEST)
                             ./ofdm_mod --ldpc |
                             ./ofdm_demod --ldpc --testframes > /dev/null")
 
-    # noise free 2020 test, including reading and writing payload bits.  fsk_*_test_bits used as it does it's own frame sync
+    # noise free 2020 test, including reading and writing payload bits.  fsk_*_test_bits
+    # used as it does it's own frame sync
     add_test(NAME test_OFDM_modem_2020_ldpc
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
                             ./fsk_get_test_bits - 5000 |
-                            ./ofdm_mod --ldpc --mode 2020 -p 312 |
-                            ./ofdm_demod  --ldpc --mode 2020 -p 312 |
+                            ./ofdm_mod --ldpc --mode 2020 |
+                            ./ofdm_demod  --ldpc --mode 2020 |
                             ./fsk_put_test_bits - -q")
 
     add_test(NAME test_OFDM_modem_AWGN_BER
-             COMMAND sh -c "$<TARGET_FILE:ofdm_mod> --in /dev/zero --ldpc --testframes 60 --txbpf | $<TARGET_FILE:ch> - - --No -20  -f -50 | $<TARGET_FILE:ofdm_demod> --out /dev/null --testframes --ldpc --verbose 1"
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            ./ofdm_mod --in /dev/zero --ldpc --testframes 60 --txbpf | 
+                            ./ch - - --No -20 -f -50 | 
+                            ./ofdm_demod --out /dev/null --testframes --ldpc --verbose 1"
              )
 
     add_test(NAME test_OFDM_modem_fading_BER
@@ -555,6 +565,13 @@ endif()
                             ./ch - - --No -22 |
                             ./ofdm_demod --mode 700E --ldpc --testframes -v 2 > /dev/null")
 
+    # 2020B AWGN test 
+    add_test(NAME test_OFDM_modem_2020B_AWGN
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            ./ofdm_mod --in /dev/zero --testframes 10 --mode 2020B --ldpc --clip --txbpf |
+                            ./ch - - --No -19 |
+                            ./ofdm_demod --mode 2020B --testframes --ldpc -v 2 > /dev/null")
+           
     # -------------------------------------------------------------------------
     #                                OFDM Data modes
     # -------------------------------------------------------------------------
@@ -737,21 +754,29 @@ if(LPCNET)
     add_test(NAME test_freedv_api_2020_to_ofdm_demod
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
                                ./freedv_tx 2020 ../../wav/wia_16kHz.wav - --testframes |
-                               ./ofdm_demod --mode 2020 --verbose 1 --ldpc -p 312 --testframes > /dev/null"
+                               ./ofdm_demod --mode 2020 --verbose 1 --ldpc --testframes > /dev/null"
              )
 
     add_test(NAME test_freedv_api_2020_from_ofdm_mod
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
-                            ./ofdm_mod --in /dev/zero --mode 2020 --verbose 1 --ldpc -p 312 --testframes 10 |
+                            ./ofdm_mod --in /dev/zero --mode 2020 --verbose 1 --ldpc --testframes 10 |
                             ./freedv_rx 2020 - /dev/null --testframes"
              )
 
-    add_test(NAME test_freedv_api_2020_awgn
-             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+     add_test(NAME test_freedv_api_2020_awgn
+              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
                             dd bs=32000 count=10 if=/dev/zero |
                             ./freedv_tx 2020 - - --testframes |
                             ./ch - - --No -24 |
                             ./freedv_rx 2020 - /dev/null --testframes"
+             )
+
+     add_test(NAME test_freedv_api_2020B_mpp
+              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            dd bs=32000 count=60 if=/dev/zero |
+                            ./freedv_tx 2020B - - --testframes --clip 1 |
+                            ./ch - - --No -25 --mpp --fading_dir ../unittest |
+                            ./freedv_rx 2020B - /dev/null --testframes"
              )
 endif()
 
@@ -782,12 +807,6 @@ endif()
              COMMAND sh -c "./tfreedv_2400B_rawdata"
              WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/unittest
              )
-
-if(UNIX) # Uses pthreads
-     add_test(NAME test_fifo
-             COMMAND $<TARGET_FILE:tfifo>
-             )
-endif()
 
     # -------------------------------------------------------------------------
     #                                Reliable Text
@@ -870,7 +889,7 @@ if(LPCNET)
 endif(LPCNET)
                                                      
     # -------------------------------------------------------------------------
-    #                                FreeDv API memory leaks
+    #                                FreeDV API memory leaks
     # -------------------------------------------------------------------------
 
 if (NOT APPLE)
@@ -940,16 +959,33 @@ if (NOT APPLE)
 if(LPCNET)
      add_test(NAME test_memory_leak_FreeDV_2020_tx
              COMMAND sh -c "cd  ${CMAKE_CURRENT_BINARY_DIR}/src;
-                            valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./freedv_tx 2020 ../../wav/wia_16kHz.wav /dev/null"
+                            valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes \
+                            ./freedv_tx 2020 ../../wav/wia_16kHz.wav /dev/null"
              )
              set_tests_properties(test_memory_leak_FreeDV_2020_tx PROPERTIES PASS_REGULAR_EXPRESSION "ERROR SUMMARY: 0 errors")
 
      add_test(NAME test_memory_leak_FreeDV_2020_rx
              COMMAND sh -c "cd  ${CMAKE_CURRENT_BINARY_DIR}/src;
                             ./freedv_tx 2020 ../../wav/wia_16kHz.wav t.raw; \
-                            valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./freedv_rx 2020 t.raw /dev/null"
+                            valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes \
+                            ./freedv_rx 2020 t.raw /dev/null"
              )
              set_tests_properties(test_memory_leak_FreeDV_2020_rx PROPERTIES PASS_REGULAR_EXPRESSION "ERROR SUMMARY: 0 errors")
+
+     add_test(NAME test_memory_leak_FreeDV_2020B_tx
+             COMMAND sh -c "cd  ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes \
+                            ./freedv_tx 2020B ../../wav/wia_16kHz.wav /dev/null"
+             )
+             set_tests_properties(test_memory_leak_FreeDV_2020B_tx PROPERTIES PASS_REGULAR_EXPRESSION "ERROR SUMMARY: 0 errors")
+
+     add_test(NAME test_memory_leak_FreeDV_2020B_rx
+             COMMAND sh -c "cd  ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            ./freedv_tx 2020B ../../wav/wia_16kHz.wav t.raw; \
+                            valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes \
+                            ./freedv_rx 2020B t.raw /dev/null"
+             )
+             set_tests_properties(test_memory_leak_FreeDV_2020B_rx PROPERTIES PASS_REGULAR_EXPRESSION "ERROR SUMMARY: 0 errors")
 endif(LPCNET)
 endif(NOT APPLE)
 
