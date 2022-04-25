@@ -219,6 +219,8 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
         ofdm->clip_en = false;
         ofdm->foff_limiter = false;
         ofdm->data_mode = "";
+        ofdm->fmin = -50.0;                       /* frequency minimum for ofdm acquisition range */
+        ofdm->fmax = 50.0;                        /* frequency maximum for ofdm acquisition range */
         memset(ofdm->tx_uw, 0, ofdm->nuwbits);
     } else {
         /* Use the users values */
@@ -252,6 +254,8 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
         ofdm->clip_en = config->clip_en;
         memcpy(ofdm->tx_uw, config->tx_uw, ofdm->nuwbits);
         ofdm->data_mode = config->data_mode;
+        ofdm->fmin = config->fmin;              /* frequency minimum for ofdm acquisition range */
+        ofdm->fmax = config->fmax;              /* frequency maximum for ofdm acquisition range */
 
     }
 
@@ -297,6 +301,9 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     ofdm->config.clip_en = ofdm->clip_en;
     memcpy(ofdm->config.tx_uw, ofdm->tx_uw, ofdm->nuwbits);
     ofdm->config.data_mode = ofdm->data_mode;
+    ofdm->config.fmin = ofdm->fmin;
+    ofdm->config.fmax = ofdm->fmax;
+    
 
     /* Calculate sizes from config param */
 
@@ -421,6 +428,10 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     ofdm->nin = ofdm->samplesperframe;
     ofdm->mean_amp = 0.0f;
     ofdm->foff_metric = 0.0f;
+    
+    ofdm->fmin = -50.0f;
+    ofdm->fmax = 50.0f;
+    
     /*
      * Unique Word symbol placement.  Note we need to group the UW
      * bits so they fit into symbols.  The LDPC decoder works on
@@ -543,8 +554,12 @@ static void allocate_tx_bpf(struct OFDM *ofdm) {
         quisk_filt_cfInit(ofdm->tx_bpf, filtP650S900, sizeof (filtP650S900) / sizeof (float));
         quisk_cfTune(ofdm->tx_bpf, ofdm->tx_centre / ofdm->fs);
     }
-    else if (!strcmp(ofdm->mode, "700E")) {
+    else if (!strcmp(ofdm->mode, "700E") || !strcmp(ofdm->mode, "2020")) {
         quisk_filt_cfInit(ofdm->tx_bpf, filtP900S1100, sizeof (filtP900S1100) / sizeof (float));
+        quisk_cfTune(ofdm->tx_bpf, ofdm->tx_centre / ofdm->fs);
+    }
+    else if (!strcmp(ofdm->mode, "2020B")) {
+        quisk_filt_cfInit(ofdm->tx_bpf, filtP1100S1300, sizeof (filtP1100S1300) / sizeof (float));
         quisk_cfTune(ofdm->tx_bpf, ofdm->tx_centre / ofdm->fs);
     }
     else if  (!strcmp(ofdm->mode, "datac0") || !strcmp(ofdm->mode, "datac3")) {
@@ -938,9 +953,10 @@ void ofdm_hilbert_clipper(struct OFDM *ofdm, complex float *tx, size_t n) {
         ofdm_clip(tx, OFDM_PEAK, n);
     }
 
-   /* BPF to remove out of band energy clipper introduces */
+    /* BPF to remove out of band energy clipper introduces */
     if (ofdm->tx_bpf_en) {
-        assert(!strcmp(ofdm->mode, "700D") || !strcmp(ofdm->mode, "700E") 
+        assert(!strcmp(ofdm->mode, "700D") || !strcmp(ofdm->mode, "700E")
+               || !strcmp(ofdm->mode, "2020") || !strcmp(ofdm->mode, "2020B")
                || !strcmp(ofdm->mode, "datac0") || !strcmp(ofdm->mode, "datac3"));
         assert(ofdm->tx_bpf != NULL);
         complex float tx_filt[n];
@@ -1158,9 +1174,9 @@ static void burst_acquisition_detector(struct OFDM *ofdm,
     
     float fmin, fmax, fstep;
     int tstep;
-    
+
     // initial search over coarse grid
-    tstep = 4; fstep = 5; fmin = -50.0; fmax = 50.0;
+    tstep = 4; fstep = 5; fmin = ofdm->fmin; fmax = ofdm->fmax;
     *timing_mx = est_timing_and_freq(ofdm, ct_est, foff_est,
                                  &rx[n], 2*ofdm->samplesperframe, 
                                  known_sequence, ofdm->samplesperframe,

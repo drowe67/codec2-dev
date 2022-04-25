@@ -106,6 +106,8 @@ struct OFDM_CONFIG {
     bool  clip_en;
     char mode[16];        /* OFDM mode in string form */
     char *data_mode;
+    float fmin;
+    float fmax;
 };
 
 struct OFDM {
@@ -165,6 +167,9 @@ struct OFDM {
     float tx_nlower;      /* TX lowest carrier freq */
     float rx_nlower;      /* RX lowest carrier freq */
     float doc;            /* division of radian circle */
+    
+    float fmin;
+    float fmax;
 
     // Pointers
 
