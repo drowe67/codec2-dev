@@ -33,10 +33,10 @@ set(CODEBOOKSD
 )
 
 # LSP VQ (1200 mode)
-set(CODEBOOKSJVM
-    ${D}/lspjvm1.txt
-    ${D}/lspjvm2.txt
-    ${D}/lspjvm3.txt
+set(CODEBOOKSJMV
+    ${D}/lspjmv1.txt
+    ${D}/lspjmv2.txt
+    ${D}/lspjmv3.txt
 )
 
 # Joint Wo-energy VQ (1200 mode)
@@ -102,11 +102,11 @@ add_custom_command(
     DEPENDS generate_codebook ${CODEBOOKSD}
 )
 
-# codebookjvm.c
+# codebookjmv.c
 add_custom_command(
-    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/codebookjvm.c
-    COMMAND generate_codebook lsp_cbjvm ${CODEBOOKSJVM} > ${CMAKE_CURRENT_BINARY_DIR}/codebookjvm.c
-    DEPENDS generate_codebook ${CODEBOOKSJVM}
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/codebookjmv.c
+    COMMAND generate_codebook lsp_cbjmv ${CODEBOOKSJMV} > ${CMAKE_CURRENT_BINARY_DIR}/codebookjmv.c
+    DEPENDS generate_codebook ${CODEBOOKSJMV}
 )
 
 # codebookge.c
@@ -177,7 +177,7 @@ set(CODEC2_SRCS
     pack.c
     codebook.c
     codebookd.c
-    codebookjvm.c
+    codebookjmv.c
     codebookge.c
     codebooknewamp1.c
     codebooknewamp1_energy.c

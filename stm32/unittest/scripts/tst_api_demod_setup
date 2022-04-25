@@ -49,7 +49,7 @@ case "${TEST_OPT}" in
 		> setup.log 2>&1
 	freedv_tx 700D spch_in.raw mod_bits.raw --testframes --txbpf 0 \
 		  >> setup.log 2>&1
-	cohpsk_ch mod_bits.raw stm_in.raw -20 --Fs 8000 -f -5  2>&1 | tee setup.log
+	ch mod_bits.raw stm_in.raw --No -20 -f -5 2>&1 | tee setup.log
 	
         # Reference: - When the OFDM modem initially syncs, it often
 	#              has residual freq offset that causes abnormally
@@ -80,7 +80,7 @@ case "${TEST_OPT}" in
 		>> setup.log 2>&1
 	#
         # Reference - give it a hard time with some noise to exercise the LDPC codec and get us to max CPU
-	cohpsk_ch mod_bits.raw stm_in.raw -20 --Fs 8000 -f -5  2>&1 | tee setup.log
+	ch mod_bits.raw stm_in.raw -20 -f -5 2>&1 | tee setup.log
         freedv_rx 700D stm_in.raw ref_demod.raw -v \
 		> ref_gen.log 2>&1
 	;;
@@ -109,7 +109,7 @@ case "${TEST_OPT}" in
 		> setup.log 2>&1
 	freedv_tx 700E spch_in.raw mod_bits.raw --testframes --txbpf 1 \
 		  >> setup.log 2>&1
-	cohpsk_ch mod_bits.raw stm_in.raw -22 --Fs 8000 -f -5  2>&1 | tee setup.log
+	ch mod_bits.raw stm_in.raw --No -22 -f -5  2>&1 | tee setup.log
 	
         freedv_rx 700E stm_in.raw ref_demod.raw -v --testframes  2>&1 --discard | tee ref_gen.log
 	;;
@@ -125,7 +125,7 @@ case "${TEST_OPT}" in
 		>> setup.log 2>&1
 	#
         # Reference - give it a hard time with some noise to exercise the LDPC codec and get us to max CPU
-	cohpsk_ch mod_bits.raw stm_in.raw -20 --Fs 8000 -f -5  2>&1 | tee setup.log
+	ch mod_bits.raw stm_in.raw --No -20 -f -5  2>&1 | tee setup.log
         freedv_rx 700E stm_in.raw ref_demod.raw -v \
 		> ref_gen.log 2>&1
 	;;
