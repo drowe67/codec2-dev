@@ -50,6 +50,7 @@
 #include "bpfb.h"
 #include "newamp1.h"
 #include "lpcnet_freq.h"
+#include "sd.h"
 
 void synth_one_frame(int n_samp, codec2_fftr_cfg fftr_inv_cfg, short buf[], MODEL *model, float Sn_[], float Pn[], int prede, float *de_mem, float gain);
 void print_help(const struct option *long_options, int num_opts, char* argv[]);
@@ -72,7 +73,7 @@ int main(int argc, char *argv[])
 
     int lpc_model = 0, order = LPC_ORD;
     int lsp = 0, lspd = 0, lspvq = 0;
-    int lspjvm = 0;
+    int lspjmv = 0;
     int prede = 0;
     int   postfilt;
     int   hand_voicing = 0, hi = 0, simlpcpf = 0, modelin=0, modelout=0;
@@ -94,7 +95,7 @@ int main(int argc, char *argv[])
     FILE *fam = NULL, *fWo = NULL;
     FILE *faw = NULL;
     FILE *fhm = NULL;
-    FILE *fjvm = NULL;
+    FILE *fjmv = NULL;
     FILE *flspEWov = NULL;
     FILE *ften_ms_centre = NULL;
     FILE *fmodelout = NULL;
@@ -138,7 +139,7 @@ int main(int argc, char *argv[])
         { "lsp", no_argument, &lsp, 1 },
         { "lspd", no_argument, &lspd, 1 },
         { "lspvq", no_argument, &lspvq, 1 },
-        { "lspjvm", no_argument, &lspjvm, 1 },
+        { "lspjmv", no_argument, &lspjmv, 1 },
         { "phase0", no_argument, &phase0, 1 },
         { "dispersion", required_argument, &phase_dispersion, 1 },
         { "postfilter", no_argument, &postfilt, 1 },
@@ -293,7 +294,7 @@ int main(int argc, char *argv[])
                     exit(1);
                 }
 	    } else if(strcmp(long_options[option_index].name, "dump_pitch_e") == 0) {
-	        if ((fjvm = fopen(optarg,"wt")) == NULL) {
+	        if ((fjmv = fopen(optarg,"wt")) == NULL) {
 	            fprintf(stderr, "Error opening pitch & energy dump file: %s: %s.\n",
 		        optarg, strerror(errno));
                     exit(1);
@@ -410,7 +411,7 @@ int main(int argc, char *argv[])
                } else if(strcmp(optarg,"1200") == 0) {
 	            lpc_model = 1;
 		    scalar_quant_Wo_e = 1;
-	            lspjvm = 1;
+	            lspjmv = 1;
 	            phase0 = 1;
 	            postfilt = 1;
 	            decimate = 4;
@@ -508,7 +509,8 @@ int main(int argc, char *argv[])
     COMP Aw[FFT_ENC];
     COMP H[MAX_AMP];
 
-
+    float sd_sum = 0.0; int sd_frames = 0;
+    
     for(i=0; i<m_pitch; i++) {
 	Sn[i] = 1.0;
 	Sn_pre[i] = 1.0;
@@ -688,7 +690,7 @@ int main(int argc, char *argv[])
             #endif
 
 	    if (dump_pitch_e)
-		fprintf(fjvm, "%f %f %d ", model.Wo, snr, model.voiced);
+		fprintf(fjmv, "%f %f %d ", model.Wo, snr, model.voiced);
 
             #ifdef DUMP
 	    dump_snr(snr);
@@ -712,6 +714,7 @@ int main(int argc, char *argv[])
 	\*------------------------------------------------------------*/
 
 	if (lpc_model) {
+            float ak_[LPC_ORD+1];
 
             e = speech_to_uq_lsps(lsps, ak, Sn, w, m_pitch, order);
             for(i=0; i<order; i++)
@@ -723,7 +726,7 @@ int main(int argc, char *argv[])
             #endif
 
 	    if (dump_pitch_e)
-		fprintf(fjvm, "%f\n", e);
+		fprintf(fjmv, "%f\n", e);
 
             #ifdef DUMP
             dump_lsp(lsps);
@@ -735,25 +738,32 @@ int main(int argc, char *argv[])
 		encode_lsps_scalar(lsp_indexes, lsps, LPC_ORD);
 		decode_lsps_scalar(lsps_, lsp_indexes, LPC_ORD);
 		bw_expand_lsps(lsps_, LPC_ORD, 50.0, 100.0);
-		lsp_to_lpc(lsps_, ak, LPC_ORD);
+		lsp_to_lpc(lsps_, ak_, LPC_ORD);
 	    }
 
 	    if (lspd) {
 		encode_lspds_scalar(lsp_indexes, lsps, LPC_ORD);
 		decode_lspds_scalar(lsps_, lsp_indexes, LPC_ORD);
-		lsp_to_lpc(lsps_, ak, LPC_ORD);
+		lsp_to_lpc(lsps_, ak_, LPC_ORD);
 	    }
 
-	    if (lspjvm) {
+	    if (lspjmv) {
 		/* Jean-Marc's multi-stage, split VQ */
-		lspjvm_quantise(lsps, lsps_, LPC_ORD);
+		lspjmv_quantise(lsps, lsps_, LPC_ORD);
 		{
 		    float lsps_bw[LPC_ORD];
 		    memcpy(lsps_bw, lsps_, sizeof(float)*order);
 		    bw_expand_lsps(lsps_bw, LPC_ORD, 50.0, 100.0);
-		    lsp_to_lpc(lsps_bw, ak, LPC_ORD);
+		    lsp_to_lpc(lsps_bw, ak_, LPC_ORD);
 		}
 	    }
+
+            if (lsp || lspd || lspjmv) {
+                sd_sum += spectral_dist(ak, ak_, LPC_ORD, fft_fwd_cfg, FFT_ENC);
+                sd_frames ++;
+            }
+
+            memcpy(ak, ak_, (LPC_ORD+1)*sizeof(float));
 
 	    if (scalar_quant_Wo_e) {
 		e = decode_energy(encode_energy(e, E_BITS), E_BITS);
@@ -1088,7 +1098,9 @@ int main(int argc, char *argv[])
 	fclose(fout);
 
     if (lpc_model) {
-    	fprintf(stderr, "SNR av = %5.2f dB\n", sum_snr/frames);
+    	fprintf(stderr, "LPC->{Am} SNR av: %5.2f dB over %d frames\n", sum_snr/frames, frames);
+        if (lsp || lspd || lspjmv)
+            fprintf(stderr, "LSP quantiser SD: %5.2f dB*dB over %d frames\n", sd_sum/sd_frames, sd_frames);     
     }
     if (newamp1vq) {
     	fprintf(stderr, "var: %3.2f dB*dB\n", se/nse);
@@ -1107,7 +1119,7 @@ int main(int argc, char *argv[])
     if (fWo     != NULL) fclose(fWo);
     if (faw     != NULL) fclose(faw);
     if (fhm     != NULL) fclose(fhm);
-    if (fjvm    != NULL) fclose(fjvm);
+    if (fjmv    != NULL) fclose(fjmv);
     if (flspEWov != NULL) fclose(flspEWov);
     if (fphasenn != NULL) fclose(fphasenn);
     if (frateK != NULL) fclose(frateK);

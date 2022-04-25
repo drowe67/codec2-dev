@@ -1,8 +1,9 @@
-#!/bin/bash -x
+#!/usr/bin/env bash
 # ota_voice_auto.sh
 #
-# Run a single automated voice test, files are put in a time stamped directory, and summarised in single line
-# in the log file log_voice.txt.  Designed to be from cron.
+# Run a single automated voice test, files are put in a time stamped
+# directory, and summarised in single line in the log file
+# log_voice.txt.  Designed to be used from cron.
 
 # use crontab -e to edit cron for currrent user, sample entry:
 

@@ -79,36 +79,36 @@ Built as part of codec2-dev, see [README](README.md) for build instructions.
 
 1. Listen to signal through simulated fading channel in C:
    ```
-   build_linux/src$ ./c2enc 700C ../../raw/ve9qrp_10s.raw - --bitperchar | ./ofdm_mod --ldpc | ./cohpsk_ch - - -20 --Fs 8000 --slow -f -5 | aplay -f S16
+   build_linux/src$ ./c2enc 700C ../../raw/ve9qrp_10s.raw - --bitperchar | ./ofdm_mod --ldpc | ./ch - - --No -20 --mpg -f -5 | aplay -f S16
    ```
 
 1. Run test frames through simulated channel in C:
    ```
-   build_linux/src$ ./ofdm_mod --in /dev/zero --ldpc --testframes 20 | ./cohpsk_ch - - -24 --Fs 8000 -f -10 --fast | ./ofdm_demod --out /dev/null --testframes --verbose 1 --ldpc
+   build_linux/src$ ./ofdm_mod --in /dev/zero --ldpc --testframes 20 | ./ch - - --No -24 -f -10 --mpp | ./ofdm_demod --out /dev/null --testframes --verbose 1 --ldpc
    ```
 
 1. Run codec voice through simulated fast fading channel, just where it starts to fall over:
    ```
-   build_linux/src$ ./c2enc 700C ../../raw/ve9qrp.raw - --bitperchar | ./ofdm_mod --ldpc | ./cohpsk_ch - - -24 --Fs 8000 -f -10 --fast | ./ofdm_demod --ldpc --verbose 1 | ./c2dec 700C - - --bitperchar | aplay -f S16
+   build_linux/src$ ./c2enc 700C ../../raw/ve9qrp.raw - --bitperchar | ./ofdm_mod --ldpc | ./ch - - --No -24 -f -10 --mpp | ./ofdm_demod --ldpc --verbose 1 | ./c2dec 700C - - --bitperchar | aplay -f S16
    ```
 
 1. FreeDV 1600 on the same channel conditions, roughly same quality at 8dB higher SNR:
    ```
-   build_linux/src$ ./freedv_tx 1600 ../../raw/ve9qrp_10s.raw - | ./cohpsk_ch - - -30 --Fs 8000 -f -10 --fast | ./freedv_rx 1600 - - | aplay -f S16
+   build_linux/src$ ./freedv_tx 1600 ../../raw/ve9qrp_10s.raw - | ./ch - - --No -30 -f -10 --mpp | ./freedv_rx 1600 - - | aplay -f S16
    ```
 
 1. Using FreeDV API test programs:
    ```
    build_linux/src$ ./freedv_tx 700D ../../raw/hts1a.raw - --testframes | ./freedv_rx 700D - /dev/null --testframes
    build_linux/src$ ./freedv_tx 700D ../../raw/hts1a.raw - | ./freedv_rx 700D - - | aplay -f S16
-   build_linux/src$ ./freedv_tx 700D ../../raw/ve9qrp.raw - | ./cohpsk_ch - - -26 --Fs 8000 -f -10 --fast | ./freedv_rx 700D - - | aplay -f S16
+   build_linux/src$ ./freedv_tx 700D ../../raw/ve9qrp.raw - | ./ch - - --No -26 -f -10 --mpp | ./freedv_rx 700D - - | aplay -f S16
    ```
 
 ## FreeDV 2020 extensions
 
 1.  20.5ms symbol period, 31 carrier waveform, (504,396) code, but only 312 data bits used, so we don't send unused data bits.  This means we need less carriers (so more power per carrier), and code rate is increased slightly:
     ```
-    build_linux/src$ ./ofdm_mod --in /dev/zero --testframes 300 --mode 2020 --ldpc 1 --verbose 1 -p 312 | ./cohpsk_ch - - -22 --Fs 8000 -f 10 --ssbfilt 1 | ./ofdm_demod --out /dev/null --testframes --mode 2020 --verbose 1 --ldpc -p 312
+    build_linux/src$ ./ofdm_mod --in /dev/zero --testframes 300 --mode 2020 --ldpc 1 --verbose 1 | ./ch - - --No -22 -f 10 --ssbfilt 1 | ./ofdm_demod --out /dev/null --testframes --mode 2020 --verbose 1 --ldpc
 
     SNR3k(dB):  2.21 C/No: 37.0 PAPR:  9.6
     BER......: 0.0505 Tbits: 874020 Terrs: 44148
@@ -156,7 +156,7 @@ Here are some useful tests for the LDPC coded C version of the modem, useful to 
 
 1. AWGN channel, -2dB:
    ```
-   ./ofdm_mod --in /dev/zero --ldpc --testframes 60 --txbpf | ./cohpsk_ch - - -20 --Fs 8000 -f -10 | ./ofdm_demod --out /dev/null --testframes --verbose 1 --ldpc
+   ./ofdm_mod --in /dev/zero --ldpc --testframes 60 --txbpf | ./ch - - --No -20 -f -10 | ./ofdm_demod --out /dev/null --testframes --verbose 1 --ldpc
 
    SNR3k(dB): -1.85 C/No: 32.9 PAPR:  9.8
    BER......: 0.0815 Tbits: 98532 Terrs:  8031
@@ -165,7 +165,7 @@ Here are some useful tests for the LDPC coded C version of the modem, useful to 
 
 1. Fading HF channel:
    ```
-   ./ofdm_mod --in /dev/zero --ldpc --testframes 60 --txbpf | ./cohpsk_ch - - -24 --Fs 8000 -f -10 --fast | ./ofdm_demod --out /dev/null --testframes --verbose 1 --ldpc
+   ./ofdm_mod --in /dev/zero --ldpc --testframes 60 --txbpf | ./ch - - --No -24 -f -10 --fast | ./ofdm_demod --out /dev/null --testframes --verbose 1 --ldpc
 
    SNR3k(dB):  2.15 C/No: 36.9 PAPR:  9.8
    BER......: 0.1015 Tbits: 88774 Terrs:  9012
@@ -181,7 +181,7 @@ The OFDM modem can also support datac1/datac2/datac3 modes for packet data.  The
 Here is an example of running the datac3 mode in a low SNR AWGN channel:
 
 ```
-./src/ofdm_mod --mode datac3 --ldpc --in  /dev/zero --testframes 60 --verbose 1 | ./src/cohpsk_ch - - -20 --Fs 8000 | ./src/ofdm_demod --mode datac3 --ldpc --out /dev/null --testframes -v 1
+./src/ofdm_mod --mode datac3 --ldpc --in  /dev/zero --testframes 60 --verbose 1 | ./src/ch - - --No -20 | ./src/ofdm_demod --mode datac3 --ldpc --out /dev/null --testframes -v 1
 <snip>
 SNR3k(dB): -3.54 C/No: 31.2 PAPR: 10.4
 BER......: 0.1082 Tbits: 36096 Terrs:  3905 Tpackets:    47
@@ -200,7 +200,7 @@ Note despite the raw BER of 10%, 47/50 packets are received error free.
 | ofdm_demod | OFDM demodulator command line program, supports uncoded (raw) and LDPC coded test frames, LDPC decoding of codec data, and can output LLRs to external LDPC decoder |
 | ofdm_put_test_bits | Measure BER in OFDM test frames |
 | unittest/tofdm | Run C port of modem to compare with octave version (see octave/tofdm) |
-| cohpsk_ch | From COHPSK modem development, useful C channel simulator |
+| ch | C channel simulator |
 
 # Octave Scripts
 

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Shell script version of ofdm_time_sync()
 # David June 2019
 # Tests ofdm modem sync time, using real, off air files
@@ -14,7 +14,7 @@ do
                    --start_secs $start_secs --len_secs 5 2>/dev/null > $onerun
     fi;
     if [ "$1" = "2020" ]; then
-        ofdm_demod --mode 2020 --in ../wav/david4.wav --out /dev/null --verbose 2 --ldpc -p 312 \
+        ofdm_demod --mode 2020 --in ../wav/david4.wav --out /dev/null --verbose 2 --ldpc \
                    --start_secs $start_secs  --len_secs 5 2>/dev/null > $onerun
     fi;
     [ ! $? -eq 0 ] && { echo "error running ofdm_demod"; exit 1; }

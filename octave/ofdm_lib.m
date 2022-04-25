@@ -293,7 +293,6 @@ function config = ofdm_init_mode(mode="700D")
   Ts = 0.018; 
   Nc = 17;
   config.bps = 2; 
-  config.txbpf_width_Hz = 1500;
   config.Np = 1;
   config.Ntxtbits = 4;
   config.Nuwbits = 5*config.bps;
@@ -322,7 +321,15 @@ function config = ofdm_init_mode(mode="700D")
     config.amp_scale = 155E3; config.clip_gain1 = 3; config.clip_gain2 = 0.8;
     config.foff_limiter = 1;
   elseif strcmp(mode,"2020")
-    Ts = 0.0205; Nc = 31; config.amp_scale = 167E3;
+    Ts = 0.0205; Nc = 31;
+    config.amp_scale = 167E3; config.clip_gain1 = 2.5; config.clip_gain2 = 0.8;
+  elseif strcmp(mode,"2020B")
+    Ts = 0.014; Tcp = 0.004; Nc = 29; Ns=5;
+    config.Ntxtbits = 4; config.Nuwbits = 8*2; config.bad_uw_errors = 5;
+    config.amp_scale = 130E3; config.clip_gain1 = 2.5; config.clip_gain2 = 0.8;
+    config.edge_pilots = 0; config.state_machine = "voice2";
+    config.foff_limiter = 1; config.ftwindow_width = 64;
+    config.txbpf_width_Hz = 2200;
   elseif strcmp(mode,"qam16c1")
     Ns=5; config.Np=5; Tcp = 0.004; Ts = 0.016; Nc = 33; config.data_mode = "streaming";
     config.bps=4; config.Ntxtbits = 0; config.Nuwbits = 15*4; config.bad_uw_errors = 5;
@@ -1301,7 +1308,7 @@ function [tx_bits payload_data_bits codeword] = create_ldpc_test_frame(states, c
 
     mod_order = 4; bps = 2; modulation = 'QPSK'; mapping = 'gray';
 
-    init_cml('~/cml/'); % TODO: make this path sensible and portable
+    init_cml(); % TODO: make this path sensible and portable
     load HRA_112_112.txt
     [code_param framesize rate] = ldpc_init_user(HRA_112_112, modulation, mod_order, mapping);
     assert(Nbitsperframe == (code_param.coded_bits_per_frame + Nuwbits + Ntxtbits));
@@ -1643,7 +1650,7 @@ function [code_param Nbitspercodecframe Ncodecframespermodemframe] = codec_to_fr
   ofdm_load_const;
   mod_order = 4; bps = 2; modulation = 'QPSK'; mapping = 'gray';
 
-  init_cml('~/cml/');
+  init_cml();
   if strcmp(mode, "700D")
     load HRA_112_112.txt
     code_param = ldpc_init_user(HRA_112_112, modulation, mod_order, mapping);
@@ -1890,8 +1897,8 @@ endfunction
 function [rx_real rx] = ofdm_channel(states, tx, SNR3kdB, channel, freq_offset_Hz)
   [rx_real rx sigma] = channel_simulate(states.Fs, SNR3kdB, freq_offset_Hz, channel, tx, states.verbose);
     
-  % add a few seconds of no signal either side
-  rx_real = [sigma*randn(1,states.Fs) rx_real sigma*randn(1,states.Fs/2)];
+  % add a few seconds of no-signal at the start
+  rx_real = [sigma*randn(1,states.Fs) rx_real];
   
   % multipath models can lead to clipping of int16 samples
   num_clipped = length(find(abs(rx_real>32767)));

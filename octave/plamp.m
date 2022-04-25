@@ -82,7 +82,7 @@ function plamp(samname, f, samname2)
     clf;
     s = [ Sn(2*f-1,:) Sn(2*f,:) ];
     plot(s,'b');
-    if (file_in_path(".",model2_name))
+    if (nargin == 3)
       s2 = [ Sn2(2*f-1,:) Sn2(2*f,:) ];
       hold on; plot(s2,'r'); hold off;
     end
@@ -97,7 +97,7 @@ function plamp(samname, f, samname2)
     hold on;
     if plot_sw; plot((0:255)*4000/256, Sw(f,:),";Sw;b"); end
 
-    if (file_in_path(".",model2_name))
+    if (nargin == 3)
       Wo2 = model2(f,1);
       L2 = model2(f,2);
       Am2 = model2(f,3:(L2+2));

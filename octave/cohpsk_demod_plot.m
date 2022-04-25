@@ -5,7 +5,7 @@
 % when errors hit the system
 
 #{
-   $ ./cohpsk_get_test_bits - 5600 | ./cohpsk_mod - - | ./cohpsk_ch - - -40 | ./cohpsk_demod - - -o cohpsk_demod.txt | ./cohpsk_put_test_bits -
+   $ ./cohpsk_get_test_bits - 5600 | ./cohpsk_mod - - | ./ch - - --No -40 | ./cohpsk_demod - - -o cohpsk_demod.txt | ./cohpsk_put_test_bits -
    octave> cohpsk_demod_plot("../build_linux/src/cohpsk_demod.txt")
 #}
    

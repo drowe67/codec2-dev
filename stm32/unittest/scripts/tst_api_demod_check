@@ -22,11 +22,11 @@ cd "${RUN_DIR}"
 # way of performing a rough comparsion of two output speech files that are not exactly the same
 
 function compare_energy() {
-    energy_ref=$(python -c "import numpy as np; x=np.fromfile(\"ref_demod.raw\",dtype=\"int16\").astype(float); print(10*np.log10(np.dot(x,x)))")
-    energy_target=$(python -c "import numpy as np; x=np.fromfile(\"stm_out.raw\",dtype=\"int16\").astype(float); print(10*np.log10(np.dot(x,x)))")
+    energy_ref=$(python3 -c "import numpy as np; x=np.fromfile(\"ref_demod.raw\",dtype=\"int16\").astype(float); print(10*np.log10(np.dot(x,x)))")
+    energy_target=$(python3 -c "import numpy as np; x=np.fromfile(\"stm_out.raw\",dtype=\"int16\").astype(float); print(10*np.log10(np.dot(x,x)))")
     printf "ref energy: %f target energy: %f\n" $energy_ref $energy_target
 	
-    python -c "import sys; sys.exit(1) if abs($energy_ref-$energy_target) < 1 else sys.exit(0)"
+    python3 -c "import sys; sys.exit(1) if abs($energy_ref-$energy_target) < 1 else sys.exit(0)"
     if [[ $? -eq 1 ]]; then echo "energy compare OK"; 
     else echo "energy compare BAD"; 
      	 let Fails=($Fails + 1)
@@ -68,7 +68,7 @@ case "${TEST_OPT}" in
 	# for such a short test, so we'll just sanity check the
 	# reference uncoded BER here. Bash can't compare floats
 	# .... so use return code of some python script
-	python -c "import sys; sys.exit(1) if $uber_ref < 0.1 else sys.exit(0)"
+	python3 -c "import sys; sys.exit(1) if $uber_ref < 0.1 else sys.exit(0)"
 	if [[ $? -eq 1 ]]; then echo "OK"; 
 	else echo "BAD"; 
      	    let Fails=($Fails + 1)
@@ -78,7 +78,7 @@ case "${TEST_OPT}" in
 	uber_target=$(cat stderr.log | sed -n "s/^BER.*: \([0-9..]*\).*Tbits.*/\1/p")
 	cber_target=$(cat stderr.log | sed -n "s/^Coded BER.*: \([0-9..]*\).*Tbits.*/\1/p")
 	printf "TARGET uncoded BER: %f coded BER: %f\n" $uber_target $cber_target
-	python -c "import sys; sys.exit(1) if $uber_target < 0.1 and abs($cber_ref-$cber_target) < 0.01 else sys.exit(0)"
+	python3 -c "import sys; sys.exit(1) if $uber_target < 0.1 and abs($cber_ref-$cber_target) < 0.01 else sys.exit(0)"
 	if [[ $? -eq 1 ]]; then echo "OK"; 
 	else echo "BAD"; 
      	    let Fails=($Fails + 1)
@@ -109,7 +109,7 @@ case "${TEST_OPT}" in
 	# make sure execution time stays within bounds
 	execution_time=mktmp
 	cat stdout.log | sed  -n "s/.*freedv_rx \([0-9..]*\) msecs/\1/p" > $execution_time
-	python -c "import sys; import numpy as np;  x=np.loadtxt(\"$execution_time\"); print(\"execution time max:: %5.2f mean: %5.2f ms\" % (np.max(x), np.mean(x))); sys.exit(1) if np.max(x) < 80.0 else sys.exit(0)"
+	python3 -c "import sys; import numpy as np;  x=np.loadtxt(\"$execution_time\"); print(\"execution time max:: %5.2f mean: %5.2f ms\" % (np.max(x), np.mean(x))); sys.exit(1) if np.max(x) < 80.0 else sys.exit(0)"
 	if [[ $? -eq 1 ]]; then echo "execution time OK"; 
         else echo "BAD"; 
      	   let Fails=($Fails + 1)
@@ -145,7 +145,7 @@ case "${TEST_OPT}" in
 	# for such a short test, so we'll just sanity check the
 	# reference uncoded BER here. Bash can't compare floats
 	# .... so use return code of some python script
-	python -c "import sys; sys.exit(1) if $uber_ref < 0.1 else sys.exit(0)"
+	python3 -c "import sys; sys.exit(1) if $uber_ref < 0.1 else sys.exit(0)"
 	if [[ $? -eq 1 ]]; then echo "OK"; 
 	else echo "BAD"; 
      	    let Fails=($Fails + 1)
@@ -155,7 +155,7 @@ case "${TEST_OPT}" in
 	uber_target=$(cat stderr.log | sed -n "s/^BER.*: \([0-9..]*\).*Tbits.*/\1/p")
 	cber_target=$(cat stderr.log | sed -n "s/^Coded BER.*: \([0-9..]*\).*Tbits.*/\1/p")
 	printf "TARGET uncoded BER: %f coded BER: %f\n" $uber_target $cber_target
-	python -c "import sys; sys.exit(1) if $uber_target < 0.1 and abs($cber_ref-$cber_target) < 0.01 else sys.exit(0)"
+	python3 -c "import sys; sys.exit(1) if $uber_target < 0.1 and abs($cber_ref-$cber_target) < 0.01 else sys.exit(0)"
 	if [[ $? -eq 1 ]]; then echo "OK"; 
 	else echo "BAD"; 
      	    let Fails=($Fails + 1)
@@ -186,7 +186,7 @@ case "${TEST_OPT}" in
 	# make sure execution time stays within bounds
 	execution_time=mktmp
 	cat stdout.log | sed  -n "s/.*freedv_rx \([0-9..]*\) msecs/\1/p" > $execution_time
-	python -c "import sys; import numpy as np;  x=np.loadtxt(\"$execution_time\"); print(\"execution time max:: %5.2f mean: %5.2f ms\" % (np.max(x), np.mean(x))); sys.exit(1) if np.max(x) < 80.0 else sys.exit(0)"
+	python3 -c "import sys; import numpy as np;  x=np.loadtxt(\"$execution_time\"); print(\"execution time max:: %5.2f mean: %5.2f ms\" % (np.max(x), np.mean(x))); sys.exit(1) if np.max(x) < 80.0 else sys.exit(0)"
 	if [[ $? -eq 1 ]]; then echo "execution time OK"; 
         else echo "BAD"; 
      	   let Fails=($Fails + 1)

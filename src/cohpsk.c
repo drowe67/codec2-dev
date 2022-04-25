@@ -60,7 +60,7 @@ static COMP qpsk_mod[] = {
 static int sampling_points[] = {0, 1, 6, 7};
 
 void corr_with_pilots(float *corr_out, float *mag_out, struct COHPSK *coh, int t, float f_fine);
-void update_ct_symb_buf(COMP ct_symb_buf[][COHPSK_NC*ND], COMP ch_symb[][COHPSK_NC*ND]);
+void update_ct_symb_buf(COMP ct_symb_buf[][COHPSK_NC*COHPSK_ND], COMP ch_symb[][COHPSK_NC*COHPSK_ND]);
 
 /*---------------------------------------------------------------------------*\
 
@@ -92,7 +92,6 @@ struct COHPSK *cohpsk_create(void)
     assert(COHPSK_NC == PILOTS_NC);
     assert(COHPSK_NOM_SAMPLES_PER_FRAME == (COHPSK_M*NSYMROWPILOT));
     assert(COHPSK_MAX_SAMPLES_PER_FRAME == (COHPSK_M*NSYMROWPILOT+COHPSK_M/P));
-    assert(COHPSK_ND == ND);
     assert(COHPSK_NSYM == NSYM);  /* as we want to use the tx sym mem on fdmdv */
     assert(COHPSK_NT == NT);
 
@@ -113,7 +112,7 @@ struct COHPSK *cohpsk_create(void)
     /* Clear symbol buffer memory */
 
     for (r=0; r<NCT_SYMB_BUF; r++) {
-        for(c=0; c<COHPSK_NC*ND; c++) {
+        for(c=0; c<COHPSK_NC*COHPSK_ND; c++) {
             coh->ct_symb_buf[r][c].real = 0.0;
             coh->ct_symb_buf[r][c].imag = 0.0;
         }
@@ -134,15 +133,23 @@ struct COHPSK *cohpsk_create(void)
 
     /* set up fdmdv states so we can use those modem functions */
 
-    fdmdv = fdmdv_create(COHPSK_NC*ND - 1);
+    /*
+     * NC*ND -1 Realize that the function creates a sync carrier (+1),
+     * or one more carrier than asked for. We ignore any initialization
+     * inside of fdmdv and take care of that here, using the whole
+     * NC*ND number of carriers to be used in cohpsk.
+     */
+    fdmdv = fdmdv_create((COHPSK_NC*COHPSK_ND) - 1);
+
     fdmdv->fsep = COHPSK_RS*(1.0 + COHPSK_EXCESS_BW);
-    for(c=0; c<COHPSK_NC*ND; c++) {
+
+    for(c=0; c<COHPSK_NC*COHPSK_ND; c++) {
 	fdmdv->phase_tx[c].real = 1.0;
  	fdmdv->phase_tx[c].imag = 0.0;
 
         /* note non-linear carrier spacing to help PAPR, works v well in conjunction with CLIP */
 
-        freq_hz = fdmdv->fsep*( -(COHPSK_NC*ND)/2 - 0.5f + powf(c + 1.0f, 0.98f) );
+        freq_hz = fdmdv->fsep*( -(COHPSK_NC*COHPSK_ND)/2 - 0.5f + powf(c + 1.0f, 0.98f) );
         result = tau * freq_hz/COHPSK_FS;
 
 	fdmdv->freq[c].real = cosf(result);
@@ -169,7 +176,7 @@ struct COHPSK *cohpsk_create(void)
 
     coh->sig_rms = coh->noise_rms = 0.0;
 
-    for(c=0; c<COHPSK_NC*ND; c++) {
+    for(c=0; c<COHPSK_NC*COHPSK_ND; c++) {
         for (r=0; r<NSYMROW; r++) {
             coh->rx_symb[r][c].real = 0.0;
             coh->rx_symb[r][c].imag = 0.0;
@@ -226,7 +233,7 @@ void cohpsk_destroy(struct COHPSK *coh)
 
 \*---------------------------------------------------------------------------*/
 
-void bits_to_qpsk_symbols(COMP tx_symb[][COHPSK_NC*ND], int tx_bits[], int nbits)
+void bits_to_qpsk_symbols(COMP tx_symb[][COHPSK_NC*COHPSK_ND], int tx_bits[], int nbits)
 {
     int   i, r, c, p_r, data_r, d, diversity;
     short bits;
@@ -234,7 +241,7 @@ void bits_to_qpsk_symbols(COMP tx_symb[][COHPSK_NC*ND], int tx_bits[], int nbits
     /* check allowed number of bits supplied matches number of QPSK
        symbols in the frame */
 
-    assert( (NSYMROW*COHPSK_NC*2 == nbits) || (NSYMROW*COHPSK_NC*2*ND == nbits));
+    assert( (NSYMROW*COHPSK_NC*2 == nbits) || (NSYMROW*COHPSK_NC*2*COHPSK_ND == nbits));
 
     /* if we input twice as many bits we don't do diversity */
 
@@ -260,8 +267,8 @@ void bits_to_qpsk_symbols(COMP tx_symb[][COHPSK_NC*ND], int tx_bits[], int nbits
 
     r = 0;
     for(p_r=0; p_r<2; p_r++) {
-        for(c=0; c<COHPSK_NC*ND; c++) {
-            tx_symb[r][c].real = pilots_coh[p_r][c % COHPSK_NC]/sqrtf(ND);
+        for(c=0; c<COHPSK_NC*COHPSK_ND; c++) {
+            tx_symb[r][c].real = pilots_coh[p_r][c % COHPSK_NC]/sqrtf(COHPSK_ND);
             tx_symb[r][c].imag = 0.0;
         }
         r++;
@@ -270,7 +277,7 @@ void bits_to_qpsk_symbols(COMP tx_symb[][COHPSK_NC*ND], int tx_bits[], int nbits
         for(c=0; c<COHPSK_NC*diversity; c++) {
             i = c*NSYMROW + data_r;
             bits = (tx_bits[2*i]&0x1)<<1 | (tx_bits[2*i+1]&0x1);
-            tx_symb[r][c] = fcmult(1.0/sqrtf(ND),qpsk_mod[bits]);
+            tx_symb[r][c] = fcmult(1.0/sqrtf(COHPSK_ND),qpsk_mod[bits]);
         }
     }
 
@@ -279,7 +286,7 @@ void bits_to_qpsk_symbols(COMP tx_symb[][COHPSK_NC*ND], int tx_bits[], int nbits
 
     /* if in diversity mode, copy symbols to upper carriers */
 
-    for(d=1; d<1+ND-diversity; d++) {
+    for(d=1; d<1+COHPSK_ND-diversity; d++) {
         for(r=0; r<NSYMROWPILOT; r++) {
             for(c=0; c<COHPSK_NC; c++) {
                 tx_symb[r][c+COHPSK_NC*d] = tx_symb[r][c];
@@ -303,12 +310,12 @@ void bits_to_qpsk_symbols(COMP tx_symb[][COHPSK_NC*ND], int tx_bits[], int nbits
 
 \*---------------------------------------------------------------------------*/
 
-void qpsk_symbols_to_bits(struct COHPSK *coh, float rx_bits[], COMP ct_symb_buf[][COHPSK_NC*ND])
+void qpsk_symbols_to_bits(struct COHPSK *coh, float rx_bits[], COMP ct_symb_buf[][COHPSK_NC*COHPSK_ND])
 {
     int   p, r, c, i, pc, d, n;
     float x[NPILOTSFRAME+2], x1;
     COMP  y[NPILOTSFRAME+2], yfit;
-    COMP  rx_symb_linear[NSYMROW*COHPSK_NC*ND];
+    COMP  rx_symb_linear[NSYMROW*COHPSK_NC*COHPSK_ND];
     COMP  m, b;
     COMP   __attribute__((unused)) corr, rot, pi_on_4, phi_rect, div_symb;
     float mag,  __attribute__((unused)) phi_,  __attribute__((unused)) amp_;
@@ -318,7 +325,7 @@ void qpsk_symbols_to_bits(struct COHPSK *coh, float rx_bits[], COMP ct_symb_buf[
 
     pi_on_4.real = cosf(spi_4); pi_on_4.imag = sinf(spi_4);
 
-    for(c=0; c<COHPSK_NC*ND; c++) {
+    for(c=0; c<COHPSK_NC*COHPSK_ND; c++) {
 
         /* Set up lin reg model and interpolate phase.  Works better than average for channels with
            quickly changing phase, like HF. */
@@ -350,7 +357,7 @@ void qpsk_symbols_to_bits(struct COHPSK *coh, float rx_bits[], COMP ct_symb_buf[
 
     /* now correct phase of data symbols */
 
-    for(c=0; c<COHPSK_NC*ND; c++) {
+    for(c=0; c<COHPSK_NC*COHPSK_ND; c++) {
         for (r=0; r<NSYMROW; r++) {
             phi_rect.real = cosf(coh->phi_[r][c]); phi_rect.imag = -sinf(coh->phi_[r][c]);
             coh->rx_symb[r][c] = cmult(ct_symb_buf[NPILOTSFRAME + r][c], phi_rect);
@@ -364,7 +371,7 @@ void qpsk_symbols_to_bits(struct COHPSK *coh, float rx_bits[], COMP ct_symb_buf[
     for(c=0; c<COHPSK_NC; c++) {
         for(r=0; r<NSYMROW; r++) {
             div_symb = coh->rx_symb[r][c];
-            for (d=1; d<ND; d++) {
+            for (d=1; d<COHPSK_ND; d++) {
                 div_symb = cadd(div_symb, coh->rx_symb[r][c + COHPSK_NC*d]);
             }
             rot = cmult(div_symb, pi_on_4);
@@ -374,7 +381,7 @@ void qpsk_symbols_to_bits(struct COHPSK *coh, float rx_bits[], COMP ct_symb_buf[
 
             /* demodulate bits from upper and lower carriers separately for test purposes */
 
-            assert(ND == 2);
+            assert(COHPSK_ND == 2);
 
             i = c*NSYMROW + r;
             rot = cmult(coh->rx_symb[r][c], pi_on_4);
@@ -390,14 +397,14 @@ void qpsk_symbols_to_bits(struct COHPSK *coh, float rx_bits[], COMP ct_symb_buf[
     /* estimate RMS signal and noise */
 
     mag = 0.0f;
-    for(i=0; i<NSYMROW*COHPSK_NC*ND; i++)
+    for(i=0; i<NSYMROW*COHPSK_NC*COHPSK_ND; i++)
         mag += cabsolute(rx_symb_linear[i]);
-    coh->sig_rms = mag/(NSYMROW*COHPSK_NC*ND);
+    coh->sig_rms = mag/(NSYMROW*COHPSK_NC*COHPSK_ND);
 
     sum_x = 0.0f;
     sum_xx = 0.0f;
     n = 0;
-    for (i=0; i<NSYMROW*COHPSK_NC*ND; i++) {
+    for (i=0; i<NSYMROW*COHPSK_NC*COHPSK_ND; i++) {
       s = rx_symb_linear[i];
       if (fabsf(s.real) > coh->sig_rms) {
         sum_x  += s.imag;
@@ -430,7 +437,7 @@ void qpsk_symbols_to_bits(struct COHPSK *coh, float rx_bits[], COMP ct_symb_buf[
 \*---------------------------------------------------------------------------*/
 
 void tx_filter_and_upconvert_coh(COMP tx_fdm[], int Nc, const COMP tx_symbols[],
-                                 COMP tx_filter_memory[COHPSK_NC*ND][COHPSK_NSYM],
+                                 COMP tx_filter_memory[][COHPSK_NSYM],
                                  COMP phase_tx[], COMP freq[],
                                  COMP *fbb_phase, COMP fbb_rect)
 {
@@ -544,7 +551,7 @@ void corr_with_pilots(float *corr_out, float *mag_out, struct COHPSK *coh, int t
     }
 
     corr = 0.0; mag = 1E-12;
-    for (c=0; c<COHPSK_NC*ND; c++) {
+    for (c=0; c<COHPSK_NC*COHPSK_ND; c++) {
         acorr.real = 0.0f; acorr.imag = 0.0f; pc = c % COHPSK_NC;
         for (p=0; p<NPILOTSFRAME+2; p++) {
             f_corr = cmult(f_fine_rect[p], coh->ct_symb_buf[t+sampling_points[p]][c]);
@@ -571,7 +578,7 @@ void corr_with_pilots(float *corr_out, float *mag_out, struct COHPSK *coh, int t
 
 \*---------------------------------------------------------------------------*/
 
-void frame_sync_fine_freq_est(struct COHPSK *coh, COMP ch_symb[][COHPSK_NC*ND], int sync, int *next_sync)
+void frame_sync_fine_freq_est(struct COHPSK *coh, COMP ch_symb[][COHPSK_NC*COHPSK_ND], int sync, int *next_sync)
 {
     int   t;
     float f_fine, mag, max_corr, max_mag, corr, result;
@@ -621,19 +628,19 @@ void frame_sync_fine_freq_est(struct COHPSK *coh, COMP ch_symb[][COHPSK_NC*ND], 
 }
 
 
-void update_ct_symb_buf(COMP ct_symb_buf[][COHPSK_NC*ND], COMP ch_symb[][COHPSK_NC*ND])
+void update_ct_symb_buf(COMP ct_symb_buf[][COHPSK_NC*COHPSK_ND], COMP ch_symb[][COHPSK_NC*COHPSK_ND])
 {
     int r, c, i;
 
     /* update memory in symbol buffer */
 
     for(r=0; r<NCT_SYMB_BUF-NSYMROWPILOT; r++) {
-        for(c=0; c<COHPSK_NC*ND; c++)
+        for(c=0; c<COHPSK_NC*COHPSK_ND; c++)
             ct_symb_buf[r][c] = ct_symb_buf[r+NSYMROWPILOT][c];
     }
 
     for(r=NCT_SYMB_BUF-NSYMROWPILOT, i=0; r<NCT_SYMB_BUF; r++, i++) {
-        for(c=0; c<COHPSK_NC*ND; c++)
+        for(c=0; c<COHPSK_NC*COHPSK_ND; c++)
             ct_symb_buf[r][c] = ch_symb[i][c];
     }
 }
@@ -692,16 +699,16 @@ int sync_state_machine(struct COHPSK *coh, int sync, int next_sync)
 void cohpsk_mod(struct COHPSK *coh, COMP tx_fdm[], int tx_bits[], int nbits)
 {
     struct FDMDV *fdmdv = coh->fdmdv;
-    COMP  tx_symb[NSYMROWPILOT][COHPSK_NC*ND];
-    COMP  tx_onesym[COHPSK_NC*ND];
+    COMP  tx_symb[NSYMROWPILOT][COHPSK_NC*COHPSK_ND];
+    COMP  tx_onesym[COHPSK_NC*COHPSK_ND];
     int  r,c;
 
     bits_to_qpsk_symbols(tx_symb, tx_bits, nbits);
 
     for(r=0; r<NSYMROWPILOT; r++) {
-        for(c=0; c<COHPSK_NC*ND; c++)
+        for(c=0; c<COHPSK_NC*COHPSK_ND; c++)
             tx_onesym[c] = fcmult(coh->carrier_ampl[c], tx_symb[r][c]);
-        tx_filter_and_upconvert_coh(&tx_fdm[r*COHPSK_M], COHPSK_NC*ND , tx_onesym, fdmdv->tx_filter_memory,
+        tx_filter_and_upconvert_coh(&tx_fdm[r*COHPSK_M], COHPSK_NC*COHPSK_ND , tx_onesym, fdmdv->tx_filter_memory,
                                     fdmdv->phase_tx, fdmdv->freq, &fdmdv->fbb_phase_tx, fdmdv->fbb_rect);
     }
 }
@@ -745,7 +752,7 @@ void cohpsk_clip(COMP tx_fdm[], float clip_thresh, int n)
 
 \*---------------------------------------------------------------------------*/
 
-void fdm_downconvert_coh(COMP rx_baseband[COHPSK_NC][COHPSK_M+COHPSK_M/P], int Nc, COMP rx_fdm[], COMP phase_rx[], COMP freq[], int nin)
+void fdm_downconvert_coh(COMP rx_baseband[][COHPSK_M+COHPSK_M/P], int Nc, COMP rx_fdm[], COMP phase_rx[], COMP freq[], int nin)
 {
     int   i,c;
     float mag;
@@ -809,7 +816,7 @@ typedef float float4 __attribute__ ((vector_size (16)));
 
 \*---------------------------------------------------------------------------*/
 
-inline void rx_filter_coh(COMP rx_filt[COHPSK_NC+1][P+1], int Nc, COMP rx_baseband[COHPSK_NC+1][COHPSK_M+COHPSK_M/P], COMP rx_filter_memory[COHPSK_NC+1][+COHPSK_NFILTER], int nin)
+inline extern void rx_filter_coh(COMP rx_filt[COHPSK_NC*COHPSK_ND][P+1], int Nc, COMP rx_baseband[COHPSK_NC*COHPSK_ND][COHPSK_M+COHPSK_M/P], COMP rx_filter_memory[COHPSK_NC*COHPSK_ND][COHPSK_NFILTER], int nin)
 {
     int c,i,j,k,l;
     int n=COHPSK_M/P;
@@ -956,15 +963,15 @@ void fdmdv_freq_shift_coh(COMP rx_fdm_fcorr[], COMP rx_fdm[], float foff, float 
 }
 
 
-void rate_Fs_rx_processing(struct COHPSK *coh, COMP ch_symb[][COHPSK_NC*ND], COMP ch_fdm_frame[], float *f_est, int nsymb, int nin, int freq_track)
+void rate_Fs_rx_processing(struct COHPSK *coh, COMP ch_symb[][COHPSK_NC*COHPSK_ND], COMP ch_fdm_frame[], float *f_est, int nsymb, int nin, int freq_track)
 {
     struct FDMDV *fdmdv = coh->fdmdv;
     int   r, c, i, ch_fdm_frame_index;
     COMP  rx_fdm_frame_bb[COHPSK_M+COHPSK_M/P];
-    COMP  rx_baseband[COHPSK_NC*ND][COHPSK_M+COHPSK_M/P];
-    COMP  rx_filt[COHPSK_NC*ND][P+1];
+    COMP  rx_baseband[COHPSK_NC*COHPSK_ND][COHPSK_M+COHPSK_M/P];
+    COMP  rx_filt[COHPSK_NC*COHPSK_ND][P+1];
     float env[NT*P], rx_timing;
-    COMP  rx_onesym[COHPSK_NC*ND];
+    COMP  rx_onesym[COHPSK_NC*COHPSK_ND];
     float beta, g;
     COMP  adiff, amod_strip, mod_strip;
 
@@ -974,11 +981,11 @@ void rate_Fs_rx_processing(struct COHPSK *coh, COMP ch_symb[][COHPSK_NC*ND], COM
     for (r=0; r<nsymb; r++) {
         fdmdv_freq_shift_coh(rx_fdm_frame_bb, &ch_fdm_frame[ch_fdm_frame_index], -(*f_est), COHPSK_FS, &fdmdv->fbb_phase_rx, nin);
         ch_fdm_frame_index += nin;
-        fdm_downconvert_coh(rx_baseband, COHPSK_NC*ND, rx_fdm_frame_bb, fdmdv->phase_rx, fdmdv->freq, nin);
-        rx_filter_coh(rx_filt, COHPSK_NC*ND, rx_baseband, coh->rx_filter_memory, nin);
+        fdm_downconvert_coh(rx_baseband, COHPSK_NC*COHPSK_ND, rx_fdm_frame_bb, fdmdv->phase_rx, fdmdv->freq, nin);
+        rx_filter_coh(rx_filt, COHPSK_NC*COHPSK_ND, rx_baseband, coh->rx_filter_memory, nin);
         rx_timing = rx_est_timing(rx_onesym, fdmdv->Nc, rx_filt, fdmdv->rx_filter_mem_timing, env, nin, COHPSK_M);
 
-        for(c=0; c<COHPSK_NC*ND; c++) {
+        for(c=0; c<COHPSK_NC*COHPSK_ND; c++) {
             ch_symb[r][c] = rx_onesym[c];
         }
 
@@ -1024,7 +1031,7 @@ void rate_Fs_rx_processing(struct COHPSK *coh, COMP ch_symb[][COHPSK_NC*ND], COM
 
         if (coh->rx_baseband_log) {
             assert(nin <= (COHPSK_M+COHPSK_M/P));
-            for(c=0; c<COHPSK_NC*ND; c++) {
+            for(c=0; c<COHPSK_NC*COHPSK_ND; c++) {
                 for(i=0; i<nin; i++) {
                     coh->rx_baseband_log[c*coh->rx_baseband_log_col_sz + coh->rx_baseband_log_col_index + i] = rx_baseband[c][i];
                 }
@@ -1034,7 +1041,7 @@ void rate_Fs_rx_processing(struct COHPSK *coh, COMP ch_symb[][COHPSK_NC*ND], COM
         }
 
         if (coh->rx_filt_log) {
- 	  for(c=0; c<COHPSK_NC*ND; c++) {
+ 	  for(c=0; c<COHPSK_NC*COHPSK_ND; c++) {
             for(i=0; i<nin/(COHPSK_M/P); i++) {
               coh->rx_filt_log[c*coh->rx_filt_log_col_sz + coh->rx_filt_log_col_index + i] = rx_filt[c][i];
             }
@@ -1043,8 +1050,8 @@ void rate_Fs_rx_processing(struct COHPSK *coh, COMP ch_symb[][COHPSK_NC*ND], COM
         }
 
         if (coh->ch_symb_log) {
-            for(c=0; c<COHPSK_NC*ND; c++) {
-		coh->ch_symb_log[coh->ch_symb_log_r*COHPSK_NC*ND + c] = ch_symb[r][c];
+            for(c=0; c<COHPSK_NC*COHPSK_ND; c++) {
+		coh->ch_symb_log[coh->ch_symb_log_r*COHPSK_NC*COHPSK_ND + c] = ch_symb[r][c];
             }
             coh->ch_symb_log_r++;
         }
@@ -1082,7 +1089,7 @@ void rate_Fs_rx_processing(struct COHPSK *coh, COMP ch_symb[][COHPSK_NC*ND], COM
 
 void cohpsk_demod(struct COHPSK *coh, float rx_bits[], int *sync_good, COMP rx_fdm[], int *nin_frame)
 {
-    COMP  ch_symb[NSW*NSYMROWPILOT][COHPSK_NC*ND];
+    COMP  ch_symb[NSW*NSYMROWPILOT][COHPSK_NC*COHPSK_ND];
     int   i, j, sync, anext_sync, next_sync, nin, r, c;
     float max_ratio, f_est;
 
@@ -1168,7 +1175,7 @@ void cohpsk_demod(struct COHPSK *coh, float rx_bits[], int *sync_good, COMP rx_f
             if (coh->verbose)
                 fprintf(stderr, "  [%d] in sync! f_est: %f ratio: %f \n", coh->frame, (double)coh->f_est, (double)coh->ratio);
             for(r=0; r<NSYMROWPILOT+2; r++)
-                for(c=0; c<COHPSK_NC*ND; c++)
+                for(c=0; c<COHPSK_NC*COHPSK_ND; c++)
                     coh->ct_symb_ff_buf[r][c] = coh->ct_symb_buf[coh->ct+r][c];
         }
     }
@@ -1180,10 +1187,10 @@ void cohpsk_demod(struct COHPSK *coh, float rx_bits[], int *sync_good, COMP rx_f
         frame_sync_fine_freq_est(coh, ch_symb, sync, &next_sync);
 
         for(r=0; r<2; r++)
-            for(c=0; c<COHPSK_NC*ND; c++)
+            for(c=0; c<COHPSK_NC*COHPSK_ND; c++)
                 coh->ct_symb_ff_buf[r][c] = coh->ct_symb_ff_buf[r+NSYMROWPILOT][c];
         for(; r<NSYMROWPILOT+2; r++)
-            for(c=0; c<COHPSK_NC*ND; c++)
+            for(c=0; c<COHPSK_NC*COHPSK_ND; c++)
                 coh->ct_symb_ff_buf[r][c] = coh->ct_symb_buf[coh->ct+r][c];
     }
 
@@ -1271,7 +1278,7 @@ void cohpsk_get_demod_stats(struct COHPSK *coh, struct MODEM_STATS *stats)
     pi_4.imag = sinf(spi_4);
 #endif
 
-    stats->Nc = COHPSK_NC*ND;
+    stats->Nc = COHPSK_NC*COHPSK_ND;
     assert(stats->Nc <= MODEM_STATS_NC_MAX);
     new_snr_est = 20.0f * log10f((coh->sig_rms+1E-6f)/(coh->noise_rms+1E-6f)) - 10.0f*log10f(3000.0f/700.0f);
     stats->snr_est = 0.9f*stats->snr_est + 0.1f*new_snr_est;
@@ -1285,7 +1292,7 @@ void cohpsk_get_demod_stats(struct COHPSK *coh, struct MODEM_STATS *stats)
 #ifndef __EMBEDDED__
     assert(NSYMROW <= MODEM_STATS_NR_MAX);
     stats->nr = NSYMROW;
-    for(int c=0; c<COHPSK_NC*ND; c++) {
+    for(int c=0; c<COHPSK_NC*COHPSK_ND; c++) {
         for (int r=0; r<NSYMROW; r++) {
             stats->rx_symbols[r][c] = cmult(coh->rx_symb[r][c], pi_4);
         }
@@ -1420,7 +1427,7 @@ float *cohpsk_get_rx_bits_upper(struct COHPSK *coh) {
 }
 
 void cohpsk_set_carrier_ampl(struct COHPSK *coh, int c, float ampl) {
-    assert(c < COHPSK_NC*ND);
+    assert(c < COHPSK_NC*COHPSK_ND);
     coh->carrier_ampl[c] = ampl;
     fprintf(stderr, "cohpsk_set_carrier_ampl: %d %f\n", c, (double)ampl);
 }

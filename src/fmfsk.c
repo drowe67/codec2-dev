@@ -116,9 +116,11 @@ void fmfsk_get_demod_stats(struct FMFSK *fmfsk,struct MODEM_STATS *stats){
     stats->rx_timing = fmfsk->stats->rx_timing;
     stats->foff = fmfsk->stats->foff;
 
+#ifndef __EMBEDDED__
     stats->neyesamp = fmfsk->stats->neyesamp;
     stats->neyetr = fmfsk->stats->neyetr;
     memcpy(stats->rx_eye, fmfsk->stats->rx_eye, sizeof(stats->rx_eye));
+#endif // !__EMBEDDED__
 
     /* these fields not used for FSK so set to something sensible */
 
@@ -196,7 +198,7 @@ void fmfsk_demod(struct FMFSK *fmfsk, uint8_t rx_bits[],float fmfsk_in[]){
     memcpy (&oldsamps[nold], &fmfsk_in[0]        , sizeof(float)*nin );
     
     /* Allocate memory for filtering */
-    float *rx_filt = alloca(sizeof(float)*(nsym+1)*Ts);
+    float *rx_filt = malloc(sizeof(float)*(nsym+1)*Ts);
     
     /* Integrate over Ts input symbols at every offset */
     for(i=0; i<(nsym+1)*Ts; i++){
@@ -340,6 +342,7 @@ void fmfsk_demod(struct FMFSK *fmfsk, uint8_t rx_bits[],float fmfsk_in[]){
         fmfsk->snr_mean = 0.9 * fmfsk->snr_mean + 0.1 * (10.0 * log10f(var_signal / var_noise));
     fmfsk->stats->snr_est = fmfsk->snr_mean;
 
+#ifndef __EMBEDDED__
     /* Collect an eye diagram */
     /* Take a sample for the eye diagrams */
     neyesamp = fmfsk->stats->neyesamp = Ts*4;
@@ -361,7 +364,10 @@ void fmfsk_demod(struct FMFSK *fmfsk, uint8_t rx_bits[],float fmfsk_in[]){
     for(i=0; i<fmfsk->stats->neyetr; i++)
         for(j=0; j<neyesamp; j++)
             fmfsk->stats->rx_eye[i][j] = (fmfsk->stats->rx_eye[i][j]/(2*eye_max))+.5;
-    
+#endif // !__EMBEDDED__
+ 
     modem_probe_samp_f("t_norm_rx_timing",&norm_rx_timing,1);
     modem_probe_samp_f("t_rx_filt",rx_filt,(nsym+1)*Ts);
+
+    free(rx_filt);
 }

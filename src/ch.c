@@ -1,16 +1,15 @@
 /*---------------------------------------------------------------------------*\
 
-  FILE........: cohpsk_ch.c
+  FILE........: ch.c
   AUTHOR......: David Rowe
   DATE CREATED: May 2015
 
-  Channel impairment program for testing command line versions of
-  cohpsk (and other) modems.
+  Channel simulation program for testing command line versions of modems.
 
 \*---------------------------------------------------------------------------*/
 
 /*
-  Copyright (C) 2015 David Rowe
+  Copyright (C) 2015-2022 David Rowe
 
   All rights reserved.
 
@@ -32,6 +31,7 @@
 #include <string.h>
 #include <math.h>
 #include <errno.h>
+#include <getopt.h>
 
 #include "freedv_api.h"
 #include "codec2_cohpsk.h"
@@ -46,29 +46,19 @@
 #define MPP_DELAY_MS     2.0
 #define MPD_DELAY_MS     4.0
 
-/* see instructions below for how to generate thsese files */
+/* see instructions below for how to generate these files */
 
-#define DEFAULT_RAW_DIR       "../../raw"
+#define DEFAULT_FADING_DIR    "unittest"
 #define MPG_FADING_FILE_NAME  "slow_fading_samples.float"
 #define MPP_FADING_FILE_NAME  "fast_fading_samples.float"
 #define MPD_FADING_FILE_NAME  "faster_fading_samples.float"
 
-int opt_exists(char *argv[], int argc, char opt[]) {
-    int i;
-    for (i=0; i<argc; i++) {
-        if (strcmp(argv[i], opt) == 0) {
-            return i;
-        }
-    }
-    return 0;
-}
-
 // Gaussian from uniform:
 float gaussian(void) {
-	  double x = (double)rand() / RAND_MAX;
+    double x = (double)rand() / RAND_MAX;
     double y = (double)rand() / RAND_MAX;
     double z = sqrt(-2 * log(x)) * cos(2 * M_PI * y);
-	  return sqrt(1./2.) * z;
+    return sqrt(1./2.) * z;
 }
 
 // complex noise sample
@@ -80,7 +70,7 @@ COMP noise(void) {
 int main(int argc, char *argv[])
 {
     FILE          *fin, *ffading, *fout;
-    char	        *raw_dir;
+    char	        *fading_dir;
     float          NodB, foff_hz;
     int            fading_en, nhfdelay;
 
@@ -100,59 +90,128 @@ int main(int argc, char *argv[])
     int            frames, i, j, k, Fs, ret, nclipped, noutclipped, ssbfilt_en, complex_out, ctest;
     float          sam, peak, clip, papr, CNo, snr3k, gain;
 
-    if (argc > 3) {
-        if (strcmp(argv[1], "-")  == 0) fin = stdin;
-        else if ( (fin = fopen(argv[1],"rb")) == NULL ) {
-            fprintf(stderr, "cohpsk_ch: Error opening input modem raw file: %s: %s.\n",
-                    argv[1], strerror(errno));
-            exit(1);
-        }
-
-        if (strcmp(argv[2], "-") == 0) fout = stdout;
-        else if ( (fout = fopen(argv[2],"wb")) == NULL ) {
-            fprintf(stderr, "cohpsk_ch: Error opening output modem raw file: %s: %s.\n",
-                    argv[2], strerror(errno));
-            exit(1);
-        }
-
-        NodB = atof(argv[3]);
-        Fs = COHPSK_FS; foff_hz = 0.0; fading_en = 0; ctest = 0;
-        clip =32767; gain = 1.0;
-        ssbfilt_en = 1; complex_out = 0;
-        raw_dir = strdup(DEFAULT_RAW_DIR); user_multipath_delay = -1.0;
-
-        for(int i=4; i<argc; i++) {
-            if (!strcmp(argv[i],"--Fs")) { Fs = atoi(argv[i+1]); i++; }
-            else if (!strcmp(argv[i], "-f")) { foff_hz = atoi(argv[i+1]); i++; }
-            else if (!strcmp(argv[i], "--mpg")) fading_en = 1;
-            else if (!strcmp(argv[i], "--mpp")) fading_en = 2;
-            else if (!strcmp(argv[i], "--mpd")) fading_en = 3;
-            else if (!strcmp(argv[i], "--gain")) { gain = atof(argv[i+1]); i++; }
-            else if (!strcmp(argv[i], "--clip")) { clip = atof(argv[i+1]); i++; }
-            else if (!strcmp(argv[i], "--ssbfilt")) { ssbfilt_en = atof(argv[i+1]); i++; }
-            else if (!strcmp(argv[i], "--complexout")) complex_out = 1;
-            else if (!strcmp(argv[i], "--ctest")) ctest = 1;
-            else if (!strcmp(argv[i], "--multipath_delay")) { user_multipath_delay = atof(argv[i+1]); i++; }
-            else if (!strcmp(argv[i], "--raw_dir")) {
-                FREE(raw_dir); raw_dir = strdup(argv[i+1]); i++;
-            } else {
-                fprintf(stderr, "Unknown argument: %s\n", argv[i]);
-                exit(1);
-            }
-        }
-    }
-    else {
-        fprintf(stderr, "usage: %s InputRealModemRawFile OutputRealModemRawFile No(dB/Hz) [--Fs SampleRateHz]"
-                        " [-f FoffHz] [--mpg] [--mpp] [--mpd] [--clip 0to1] [--ssbfilt 0|1] [--raw_dir Path]"
-                        " [--complexout] [--mulipath_delay ms]\n", argv[0]);
+    if (argc < 3) {
+    helpmsg:
+        fprintf(stderr, "Command line channel simulation tool.\n"
+                        "\n"
+                        "usage: %s InputRealModemRawFile OutputRealModemRawFile [Options]\n"
+                        "\n"
+                        "  real int16 input -> Gain -> Hilbert Transform -> clipper -> freq shift ->\n"
+                        "  Multipath -> AWGN noise -> SSB filter -> real int16 output\n"
+                        "\n"
+                        "[--clip int16]         Hilbert clipper (clip complex signal magnitude, default 32767)\n"
+                        "[--complexout]         Optional int16 IQ complex output (default real int16)\n"
+                        "[--ctest]              Check PAPR is around 0dB, used to support ctests\n"
+                        "[--freq FoffHz]        Frequency offset (default 0Hz)\n"
+                        "[--fading_dir Path]    path to multipath fading files (default 'unittest')\n"
+                        "[--Fs SampleRateHz]    Sample rate of simulation (default 8000 Hz)\n"
+                        "[--gain G]             Linear gain (default 1.0)\n"
+                        "[--mpg]                Multipath good 0.1Hz Doppler, 0.5ms delay\n"
+                        "[--mpp]                Multipath poor 1.0Hz Doppler, 1.0ms delay\n"
+                        "[--mpd]                Multipath disturbed 2.0Hz Doppler, 2.0ms delay\n"
+                        "[--ssbfilt 0|1]        SSB bandwidth filter (default 1 on)\n"
+                        "[--mulipath_delay ms]  Optionally adjust multipath delay\n"
+                        "[--No dBHz]            AWGN Noise density dB/Hz (default -100)"
+                        "\n"
+                , argv[0]);
         exit(1);
+    }
+
+    if (strcmp(argv[1], "-")  == 0) fin = stdin;
+    else if ( (fin = fopen(argv[1],"rb")) == NULL ) {
+        fprintf(stderr, "ch: Error opening input modem raw file: %s: %s.\n",
+                argv[1], strerror(errno));
+        exit(1);
+    }
+
+    if (strcmp(argv[2], "-") == 0) fout = stdout;
+    else if ( (fout = fopen(argv[2],"wb")) == NULL ) {
+        fprintf(stderr, "ch: Error opening output modem raw file: %s: %s.\n",
+                argv[2], strerror(errno));
+        exit(1);
+    }
+
+    NodB = -100;
+    Fs = 8000; foff_hz = 0.0; fading_en = 0; ctest = 0;
+    clip =32767; gain = 1.0;
+    ssbfilt_en = 1; complex_out = 0;
+    fading_dir = strdup(DEFAULT_FADING_DIR); user_multipath_delay = -1.0;
+
+    int o = 0;
+    int opt_idx = 0;
+    while( o != -1 ){
+        static struct option long_opts[] = {
+            {"complexout",      no_argument,        0, 'o'},
+            {"ctest",           no_argument,        0, 't'},
+            {"clip",            required_argument,  0, 'c'},
+            {"fading_dir",      required_argument,  0, 'u'},
+            {"freq",            required_argument,  0, 'f'},
+            {"Fs",              required_argument,  0, 'r'},
+            {"gain",            required_argument,  0, 'g'},
+            {"ssbfilt",         required_argument,  0, 's'},
+            {"help",            no_argument,        0, 'h'},
+            {"mpg",             no_argument,        0, 'i'},
+            {"mpp",             no_argument,        0, 'p'},
+            {"mpd",             no_argument,        0, 'd'},
+            {"multipath_delay", required_argument,  0, 'm'},
+            {"No",              required_argument,  0, 'n'},
+            {0, 0, 0, 0}
+        };
+
+        o = getopt_long(argc,argv,"c:df:g:im:n:opr:s:tu:h",long_opts,&opt_idx);
+        
+        switch(o) {
+        case 'c':
+            clip = atof(optarg);
+            break;
+        case 'd':
+            fading_en = 3;
+            break;
+        case 'f':
+            foff_hz = atof(optarg);
+            break;
+        case 'g':
+            gain = atof(optarg);
+            break;
+        case 'i':
+            fading_en = 1;
+            break;
+        case 'm':
+            user_multipath_delay = atof(optarg);
+            break;
+        case 'n':
+            NodB = atof(optarg);
+            break;
+        case 'o':
+            complex_out = 1;
+            break;
+        case 'p':
+            fading_en = 2;
+            break;
+        case 'r':
+            Fs = atoi(optarg);
+            break;
+        case 's':
+            ssbfilt_en = atoi(optarg);
+            break;
+        case 't':
+            ctest = 1;
+            break;
+        case 'u':
+            fading_dir = strdup(optarg);
+            break;
+        case 'h':
+        case '?':
+            goto helpmsg;
+            break;
+        }
     }
 
     phase_ch.real = 1.0; phase_ch.imag = 0.0;
 
     /*  N = var = NoFs */
 
-    // arbitrary nise scaling, to maintain backwards compatability with many tests.  TODO make the No
+    // arbitrary noise scaling, to maintain backwards compatability with many tests.  TODO make the No
     // units more sensible, and fix all the tests that depend on this scaling
     No = pow(10.0, NodB/10.0)*1000*1000;
     variance = Fs*No;
@@ -169,20 +228,20 @@ int main(int argc, char *argv[])
         char fname[256];
 
         if (fading_en == 1) {
-	          sprintf(fname, "%s/%s", raw_dir, MPG_FADING_FILE_NAME);
+            sprintf(fname, "%s/%s", fading_dir, MPG_FADING_FILE_NAME);
             ffading = fopen(fname, "rb");
             if (ffading == NULL) {
             cant_load_fading_file:
                 fprintf(stderr, "-----------------------------------------------------\n");
-                fprintf(stderr, "cohpsk_ch ERROR: Can't find fading file: %s\n", fname);
-                fprintf(stderr, "\nAdjust path --raw_dir or use GNU Octave to generate:\n\n");
+                fprintf(stderr, "ch ERROR: Can't find fading file: %s\n", fname);
+                fprintf(stderr, "\nAdjust path --fading_dir or use GNU Octave to generate:\n\n");
             gen_fading_file:
                 fprintf(stderr, "$ octave --no-gui\n");
                 fprintf(stderr, "octave:24> pkg load signal\n");
                 fprintf(stderr, "octave:24> time_secs=60\n");
-                fprintf(stderr, "octave:25> cohpsk_ch_fading(\"../raw/faster_fading_samples.float\", 8000, 2.0, 8000*time_secs)\n");
-                fprintf(stderr, "octave:26> cohpsk_ch_fading(\"../raw/fast_fading_samples.float\", 8000, 1.0, 8000*time_secs)\n");
-                fprintf(stderr, "octave:27> cohpsk_ch_fading(\"../raw/slow_fading_samples.float\", 8000, 0.1, 8000*time_secs)\n");
+                fprintf(stderr, "octave:25> ch_fading(\"faster_fading_samples.float\", 8000, 2.0, 8000*time_secs)\n");
+                fprintf(stderr, "octave:26> ch_fading(\"fast_fading_samples.float\", 8000, 1.0, 8000*time_secs)\n");
+                fprintf(stderr, "octave:27> ch_fading(\"slow_fading_samples.float\", 8000, 0.1, 8000*time_secs)\n");
                 fprintf(stderr, "-----------------------------------------------------\n");
                 exit(1);
             }
@@ -190,14 +249,14 @@ int main(int argc, char *argv[])
         }
 
         if (fading_en == 2) {
-	          sprintf(fname, "%s/%s", raw_dir, MPP_FADING_FILE_NAME);
+            sprintf(fname, "%s/%s", fading_dir, MPP_FADING_FILE_NAME);
             ffading = fopen(fname, "rb");
             if (ffading == NULL) goto cant_load_fading_file;
             nhfdelay = floor(MPP_DELAY_MS*Fs/1000);
         }
 
         if (fading_en == 3) {
-	          sprintf(fname, "%s/%s", raw_dir, MPD_FADING_FILE_NAME);
+	          sprintf(fname, "%s/%s", fading_dir, MPD_FADING_FILE_NAME);
             ffading = fopen(fname, "rb");
             if (ffading == NULL) goto cant_load_fading_file;
             nhfdelay = floor(MPD_DELAY_MS*Fs/1000);
@@ -232,7 +291,7 @@ int main(int argc, char *argv[])
     lo_freq.real = cos(2.0*M_PI*SSBFILT_CENTRE/Fs);
     lo_freq.imag = sin(2.0*M_PI*SSBFILT_CENTRE/Fs);
 
-    fprintf(stderr, "cohpsk_ch: Fs: %d NodB: %4.2f foff: %4.2f Hz fading: %d nhfdelay: %d clip: %4.2f ssbfilt: %d complexout: %d\n",
+    fprintf(stderr, "ch: Fs: %d NodB: %4.2f foff: %4.2f Hz fading: %d nhfdelay: %d clip: %4.2f ssbfilt: %d complexout: %d\n",
             Fs, NodB, foff_hz, fading_en, nhfdelay, clip, ssbfilt_en, complex_out);
 
     /* --------------------------------------------------------*\
@@ -241,14 +300,14 @@ int main(int argc, char *argv[])
 
     frames = 0;
     while(fread(buf, sizeof(short), BUF_N, fin) == BUF_N) {
-	      frames++;
+        frames++;
 
         /* Hilbert Transform to produce complex signal so we can do
-           single sided freq shifts, HF channel modemsl, and analog compression.
-           Allows us to use real signal I/O which is handy.
+           single sided freq shifts, HF channel models, and analog
+           compression.  Allows us to use real signal I/O.
 
-           As the real and imag filters both have unity gain, ch_in[] has twice
-           the power of the real input signal buf[].
+           As the real and imag filters both have unity gain, ch_in[]
+           has twice the power of the real input signal buf[].
         */
 
         for(i=0, j=HT_N; i<BUF_N; i++,j++) {
@@ -273,25 +332,24 @@ int main(int argc, char *argv[])
 
         /* --------------------------------------------------------*\
    	                    Clipping  mag of complex signal
-   	    \*---------------------------------------------------------*/
+        \*---------------------------------------------------------*/
 
         for(i=0; i<BUF_N; i++) {
             float mag = sqrt(ch_in[i].real*ch_in[i].real + ch_in[i].imag*ch_in[i].imag);
-            //fprintf(stdout, "%f\n",mag);
             float angle = atan2(ch_in[i].imag, ch_in[i].real);
             if (mag > clip) {
               mag = clip;
               nclipped++;
             }
             tx_pwr += mag*mag;
-            if (mag > peak) peak = mag;
+            if (mag > peak) { peak = mag; /*fprintf(stderr, "%f\n",mag);*/ }
             ch_in[i].real = mag*cos(angle);
             ch_in[i].imag = mag*sin(angle);
         }
 
-	      /* --------------------------------------------------------*\
-	                               Channel
-	      \*---------------------------------------------------------*/
+	/* --------------------------------------------------------*\
+	                         Channel
+	\*---------------------------------------------------------*/
 
         fdmdv_freq_shift_coh(ch_fdm, ch_in, foff_hz, Fs, &phase_ch, BUF_N);
 
@@ -307,17 +365,17 @@ int main(int argc, char *argv[])
                 ch_fdm_delay[i] = ch_fdm[j];
 
             /* combine direct and delayed paths, both multiplied by
-               "spreading" (doppler) functions */
+               "spreading" (Doppler) functions */
 
             for(i=0; i<BUF_N; i++) {
                 ret = fread(&aspread, sizeof(COMP), 1, ffading);
                 if (ret == 0) {
-                    fprintf(stderr, "cohpsk_ch: Fading file finished - simulation stopping.  You may need more samples:\n");
+                    fprintf(stderr, "ch: Fading file finished - simulation stopping.  You may need more samples:\n");
                     goto gen_fading_file;
                     }
                 ret = fread(&aspread_2ms, sizeof(COMP), 1, ffading);
                 if (ret == 0) {
-                    fprintf(stderr, "cohpsk_ch: Fading file finished - simulation stopping.  You may need more samples:\n");
+                    fprintf(stderr, "ch: Fading file finished - simulation stopping.  You may need more samples:\n");
                     goto gen_fading_file;
                 }
                 //printf("%f %f %f %f\n", aspread.real, aspread.imag, aspread_2ms.real, aspread_2ms.imag);
@@ -371,11 +429,11 @@ int main(int argc, char *argv[])
 
         int nout = (complex_out+1)*BUF_N;
         short bufout[nout], *pout=bufout;
-	      for(i=0; i<BUF_N; i++) {
+        for(i=0; i<BUF_N; i++) {
             sam = ssbfiltout[i].real;
             if (sam >  32767.0) { noutclipped++; sam = 32767.0; }
             if (sam < -32767.0) { noutclipped++; sam = -32767.0; }
-	          *pout++ = sam;
+            *pout++ = sam;
             if (complex_out) {
                 sam = ssbfiltout[i].imag;
                 if (sam >  32767.0) { noutclipped++; sam = 32767.0; }
@@ -384,10 +442,10 @@ int main(int argc, char *argv[])
             }
         }
 
- 	      fwrite(bufout, sizeof(short), nout, fout);
+        fwrite(bufout, sizeof(short), nout, fout);
 
-	      /* if this is in a pipeline, we probably don't want the usual
-	         buffering to occur */
+        /* if this is in a pipeline, we probably don't want the usual
+           buffering to occur */
 
         if (fout == stdout) fflush(stdout);
     }
@@ -400,16 +458,16 @@ int main(int argc, char *argv[])
     CNo = 10*log10(tx_pwr/(noise_pwr/(Fs)));
     snr3k = CNo - 10*log10(3000);
     float outclipped_percent = noutclipped*100.0/nsamples;
-    fprintf(stderr, "cohpsk_ch: SNR3k(dB): %8.2f  C/No....: %8.2f\n", snr3k, CNo);
-    fprintf(stderr, "cohpsk_ch: peak.....: %8.2f  RMS.....: %8.2f   CPAPR.....: %5.2f \n", peak, sqrt(tx_pwr/nsamples), papr);
-    fprintf(stderr, "cohpsk_ch: Nsamples.: %8d  clipped.: %8.2f%%  OutClipped: %5.2f%%\n",
+    fprintf(stderr, "ch: SNR3k(dB): %8.2f  C/No....: %8.2f\n", snr3k, CNo);
+    fprintf(stderr, "ch: peak.....: %8.2f  RMS.....: %8.2f   CPAPR.....: %5.2f \n", peak, sqrt(tx_pwr/nsamples), papr);
+    fprintf(stderr, "ch: Nsamples.: %8d  clipped.: %8.2f%%  OutClipped: %5.2f%%\n",
                     nsamples, nclipped*100.0/nsamples, outclipped_percent);
-    if (outclipped_percent > 0.1) fprintf(stderr, "cohpsk_ch: WARNING output clipping\n");
+    if (outclipped_percent > 0.1) fprintf(stderr, "ch: WARNING output clipping\n");
 
     if (ffading != NULL) fclose(ffading);
     if (ch_fdm_delay != NULL) FREE(ch_fdm_delay);
     if (ctest) {
-        /* special ctest modes, check CPAPR is around 0dB */
+        /* special ctest mode: check CPAPR is around 0dB */
         if (fabs(papr) < 0.7) return 0; else return 1;
     }
     else return 0;

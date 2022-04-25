@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 #
 #	fsk_demod Statistics GUI
 #	Accepts the stats output from fsk_demod on stdin, and plots it.

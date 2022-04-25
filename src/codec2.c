@@ -511,18 +511,19 @@ void codec2_decode_ber(struct CODEC2 *c2, short speech[], const unsigned char *b
   The codec2 algorithm actually operates internally on 10ms (80
   sample) frames, so we run the encoding algorithm twice.  On the
   first frame we just send the voicing bits.  On the second frame we
-  send all model parameters.  Compared to 2400 we use a larger number
-  of bits for the LSPs and non-VQ pitch and energy.
+  send all model parameters.  Compared to 2400 we encode the LSP
+  differences, a larger number of bits for the LSP(d)s and scalar
+  (non-VQ) quantisation for pitch and energy.
 
   The bit allocation is:
 
-    Parameter                      bits/frame
-    --------------------------------------
-    Harmonic magnitudes (LSPs)     50
-    Pitch (Wo)                      7
-    Energy                          5
-    Voicing (10ms update)           2
-    TOTAL                          64
+    Parameter                                   bits/frame
+    ------------------------------------------------------
+    Harmonic magnitudes (LSP differerences)     50
+    Pitch (Wo)                                   7
+    Energy                                       5
+    Voicing (10ms update)                        2
+    TOTAL                                       64
 
 \*---------------------------------------------------------------------------*/
 
@@ -1751,7 +1752,7 @@ float codec2_get_energy(struct CODEC2 *c2, const unsigned char *bits)
     MODEL model;
     float xq_dec[2] = {};
     int e_index, WoE_index;
-    float e;
+    float e = 0.0f;
     unsigned int nbit;
 
     if ( CODEC2_MODE_ACTIVE(CODEC2_MODE_3200, c2->mode)) {

@@ -1,12 +1,19 @@
-#!/bin/bash
-# ota_test.sh
+#!/usr/bin/env bash
+# ota_voice_test.sh
 #
 # Automated Over The Air (OTA) voice test for FreeDV HF voice modes
 #
 # 1. Build codec2
 # 2. Install kiwclient:
 #    cd ~ && git clone git@github.com:jks-prv/kiwiclient.git
-# 3. Install Hamlib cli tools
+# 3. Install Hamlib cli tools, and add user to dialout group:
+#      sudo adduser david dialout
+# 4. To test rigctl:
+#      echo "m" | rigctl -m 361 -r /dev/ttyUSB0
+# 5. Adjust Tx drive so ALC is just being tickled, set desired RF power:
+# ../build_linux/src/freedv_tx 2020 ~/Downloads/speech_orig_16k.wav - | aplay -f S16_LE --device="plughw:CARD=CODEC,DEV=0"
+# 6. Sample command line:
+#      ./ota_voice_test.sh ~/Downloads/speech_orig_16k.wav -m 700E -i ~/Downloads/vk5dgr_testing_8k.wav sdr.ironstonerange.com -p 8074
 
 MY_PATH=`dirname $0`
 BUILD_PATH=`echo $MY_PATH/../build_*/src`
@@ -14,7 +21,7 @@ PATH=${PATH}:${BUILD_PATH}:${HOME}/kiwiclient
 CODEC2=${MY_PATH}/..
 
 kiwi_url=""
-port=8073
+port=8074
 freq_kHz="7177"
 tx_only=0
 Nbursts=5
@@ -25,24 +32,28 @@ serialPort="/dev/ttyUSB0"
 rxwavefile=0
 soundDevice="plughw:CARD=CODEC,DEV=0"
 txstats=0
+stationid=""
 
 function print_help {
     echo
     echo "Automated Over The Air (OTA) voice test for FreeDV HF voice modes"
     echo
-    echo "  usage ./ota_voice_test.sh [options] SpeechFile [kiwi_url]"
+    echo "  usage ./ota_voice_test.sh [options] SpeechWaveFile [kiwi_url]"
     echo "  or:"
     echo "  usage ./ota_voice_test.sh -r rxWaveFile"
     echo
-    echo "    -c dev    The sound device (in ALSA format on Linux, CoreAudio for macOS)"
-    echo "    -d        debug mode; trace script execution"
-    echo "    -g        SSB (analog) compressor gain"
+    echo "    -c dev                    The sound device (in ALSA format on Linux, CoreAudio for macOS)"
+    echo "    -d                        debug mode; trace script execution"
+    echo "    -g                        SSB (analog) compressor gain"
+    echo "    -i StationIDWaveFile      Prepend this file to identify transmission (should be 8KHz mono)"
     echo "    -m mode   700c|700d|700e"
-    echo "    -o model  select radio model number ('rigctl -l' to list)"
-    echo "    -r        Rx wave file mode: Rx process supplied rx wave file"
-    echo "    -s port   The serial port (or hostname:port) to connect to for TX, default /dev/ttyUSB0"
-    echo "    -t        Tx only, useful for manually observing SDRs"
-    echo "    -x        Generate tx.wav file and exit"
+    echo "    -o model                  select radio model number ('rigctl -l' to list)"
+    echo "    -p port                   kiwi_url port to use (default 8073)."
+    echo "    -r                        Rx wave file mode: Rx process supplied rx wave file"
+    echo "    -s SerialPort             The serial port (or hostname:port) to control SSB radio,"
+    echo "                              default /dev/ttyUSB0"
+    echo "    -t                        Tx only, useful for manually observing SDRs"
+    echo "    -x                        Generate tx.wav file and exit"
     echo
     exit
 }
@@ -52,10 +63,10 @@ function analog_compressor {
     input_file=$1
     output_file=$2
     gain=$3
-    cat $input_file | cohpsk_ch - - -100 --Fs 8000 2>/dev/null | \
-    cohpsk_ch - - -100 --Fs 8000 --clip 16384 --gain $gain 2>/dev/null | \
+    cat $input_file | ch - - 2>/dev/null | \
+    ch - - --No -100 --clip 16384 --gain $gain 2>/dev/null | \
     # final line prints peak and CPAPR for SSB
-    cohpsk_ch - - -100 --Fs 8000 --clip 16384 |
+    ch - - --clip 16384 |
     # manually adjusted to get similar peak levels for SSB and FreeDV
     sox -t .s16 -r 8000 -c 1 -v 0.85 - -t .s16 $output_file
 }
@@ -66,6 +77,7 @@ function run_rigctl {
     echo $command | rigctl -m $model -r $serialPort > /dev/null
     if [ $? -ne 0 ]; then
         echo "Can't talk to Tx"
+        clean_up
         exit 1
     fi
 }
@@ -86,7 +98,7 @@ function process_rx {
           plot_specgram(s, 8000, 200, 3000); print('spec.jpg', '-djpg'); \
           quit" | octave-cli -p ${CODEC2}/octave -qf > /dev/null
     # attempt to decode
-    freedv_rx ${mode} ${rx} - -v --highpassthroughgain 2>rx_stats.txt | sox -t .s16 -r 8000 -c 1 - rx_freedv.wav
+    freedv_rx ${mode} ${rx} - -v --passthroughgain 1.0 2>rx_stats.txt | sox -t .s16 -r $speechFs -c 1 - rx_freedv.wav
     cat rx_stats.txt | tr -s ' ' | cut -f5 -d' ' | awk '$0==($0+0)' > sync.txt
     cat rx_stats.txt | tr -s ' ' | cut -f10 -d' ' | awk '$0==($0+0)' > snr.txt
     # time domain plot of output speech, SNR, and sync
@@ -117,6 +129,11 @@ case $key in
     ;;
     -g)
         gain="$2"	
+        shift
+        shift
+    ;;
+    -i)
+        stationid="$2"	
         shift
         shift
     ;;
@@ -168,6 +185,12 @@ esac
 done
 set -- "${POSITIONAL[@]}" # restore positional parameters
 
+# determine sample rate of freedv_tx/freedv_rx
+speechFs=8000
+if [ "$mode" == "2020" ] || [ "$mode" == "2020B" ]; then
+   speechFs=16000
+fi
+
 if [ $rxwavefile -eq 1 ]; then
     process_rx $1
     exit 0
@@ -175,7 +198,7 @@ fi
 
 speechfile="$1"
 if [ ! -f $speechfile ]; then
-    echo "Can't find ${speechfile}!"
+    echo "Can't find input speech wave file: ${speechfile}!"
     exit 1
 fi
 
@@ -191,18 +214,30 @@ fi
 echo $mode
 
 # create compressed analog
+speechfile_raw_8k=$(mktemp)
+comp_in=$(mktemp)
 speech_comp=$(mktemp)
 speech_freedv=$(mktemp)
-analog_compressor $speechfile $speech_comp $gain
+# If 16kHz input files for 2020x, we need an 8kHz version for SSB
+sox $speechfile -r 8000 -t .s16 -c 1 $speechfile_raw_8k
+if [ -z $stationid ]; then
+    cp $speechfile_raw_8k $comp_in
+else
+    # append station ID and apply analog compression
+    stationid_raw_8k=$(mktemp)
+    sox $stationid -r 8000 -t .s16 -c 1 $stationid_raw_8k
+    cat  $stationid_raw_8k $speechfile_raw_8k> $comp_in
+fi
+analog_compressor $comp_in $speech_comp $gain
 
 # create modulated FreeDV, with compressor enabled
-freedv_tx $mode $speechfile $speech_freedv --clip 1 
+sox $speechfile -t .s16 -r $speechFs - | freedv_tx $mode - $speech_freedv --clip 1
 cat $speech_comp $speech_freedv > tx.raw
 sox -t .s16 -r 8000 -c 1 tx.raw tx.wav
 
 if [ $txstats -eq 1 ]; then
-    # cohpsk_ch just used to monitor observe peak and RMS level
-    cohpsk_ch $speech_freedv /dev/null -100
+    # ch just used to monitor observe peak and RMS level
+    ch $speech_freedv /dev/null
     # time domain plot of tx signal
     echo "pkg load signal; warning('off', 'all'); \
           s=load_raw('tx.raw'); plot(s); \
@@ -252,6 +287,13 @@ if [ `uname` == "Darwin" ]; then
     AUDIODEV="${soundDevice}" play -t raw -b 16 -c 1 -r 8000 -e signed-integer --endian little tx.raw 
 else
     aplay --device="${soundDevice}" -f S16_LE tx.raw 2>/dev/null
+fi
+if [ $? -ne 0 ]; then
+    run_rigctl "\\set_ptt 0" $model
+    clean_up
+    echo "Problem running aplay!"
+    echo "Is ${soundDevice} configured as the default sound device in Settings-Sound?"
+    exit 1
 fi
 run_rigctl "\\set_ptt 0" $model
 

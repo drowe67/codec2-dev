@@ -102,29 +102,28 @@ Settings are saved when you hold down BACK to leave the root menu.
 
 You can program the flash memory on your SM1000 via USB using a Windows or Linux PC. Download the latest SM1000 firmware here:
 
-   Version | Date | Download .bin | Download .dfu | Release Notes
-   :---: | --- | --- | --- | --- |
-   1   | May 2015 | [sm1000.bin](http://www.rowetel.com/downloads/codec2/smartmic/sm1000.bin) | | Original release with FreeDV 1600
-   2   | July 2019 | [sm1000v2.bin](http://www.rowetel.com/downloads/codec2/smartmic/sm1000v2.bin) |  [sm1000v2.dfu](http://www.rowetel.com/downloads/codec2/smartmic/sm1000v2.dfu) | FreeDV 700D and morse menus
-   3   | March 2020 | [sm1000v3.bin](http://www.rowetel.com/downloads/codec2/smartmic/sm1000v3.bin) |  [sm1000v3.dfu](http://www.rowetel.com/downloads/codec2/smartmic/sm1000v3.dfu) | Menu bug fixes, 700D modem improvements & automatic Mic EQ
-   4   | May 2020 | [sm1000v4.bin](http://www.rowetel.com/downloads/codec2/smartmic/sm1000v4.bin) |  [sm1000v4.dfu](http://www.rowetel.com/downloads/codec2/smartmic/sm1000v4.dfu) | 700D sync logic to reduce stop burbling with no signal
-   5   | August 2021 | [sm1000v5.bin](http://www.rowetel.com/downloads/codec2/smartmic/sm1000v5.bin) |  [sm1000v5.dfu](http://www.rowetel.com/downloads/codec2/smartmic/sm1000v5.dfu) | FreeDV 700E and Tx band pass filter for 700D & E
-   
+| Version | Date | Download .bin | Release Notes |
+|:---:|---|---|---|
+| 1 | May 2015 | [sm1000.bin](http://www.rowetel.com/downloads/codec2/smartmic/sm1000.bin) | Original release with FreeDV 1600 |
+| 2 | July 2019 | [sm1000v2.bin](http://www.rowetel.com/downloads/codec2/smartmic/sm1000v2.bin) | FreeDV 700D and morse menus |
+| 3 | March 2020 | [sm1000v3.bin](http://www.rowetel.com/downloads/codec2/smartmic/sm1000v3.bin) | Menu bug fixes, 700D modem improvements & automatic Mic EQ |
+| 4 | May 2020 | [sm1000v4.bin](http://www.rowetel.com/downloads/codec2/smartmic/sm1000v4.bin) | 700D sync logic to reduce stop burbling with no signal |
+| 5 | August 2021 | [sm1000v5.bin](http://www.rowetel.com/downloads/codec2/smartmic/sm1000v5.bin) | FreeDV 700E and Tx band pass filter for 700D & E |
+
 ## Windows
 
-Find and install the **DfuSeDemo** software by searching on the [ST web site](http://www.st.com).
-
-For Windows use the ```.dfu``` firmware file provided above:
+Find and install the **STM32CubeProgrammer** software by searching on the [ST web site](http://www.st.com).
 
 1. Connect the SM1000 USB to a Windows PC.
-1. Run the ```DfuSeDemo``` Application.
 1. Apply power with PTT held down, then release PTT.
-1. The ```Available DFU Devices``` window should show ```STM Device in DFU Mode```. If not, use the arrow to select that option. Verify it shows a ```Vender ID``` of 0483, and a ```Product ID``` of DF11.
-1. In the lower right quadrant of the screen, under ```Upgrade or Verify Action``` select ```Choose```.
-1. Locate your DFU file you want to program into the SM1000, and press ```Open```.
-1. Select ```Verify after download``` option.
-1. Select ```Upgrade``` and confirm ```Yes``` when asked, and the firmware procedure will commence.
-1. A message when complete that it was successful. If the message returns that it was unsuccessful, then first try the ```Upgrade``` again. If the upgrade fails twice, you may have to start this complete procedure again.
+1. Run the `STM32CubeProgrammer` application and select the down arrow on the left side, and navigate to the "Erasing & Programming" section.
+1. Select the `Verify programming` option.
+1. In the "File path" on the left-hand side, select Open file and navigate to the .bin file you'd like to flash.
+1. Select "USB" from the drop-down list on the upper right and push the Refresh button next to the Port drop-down in the "USB configuration" area. The SM1000 will appear as "USB1" or similar in the list; select that entry.
+1. Click on the Connect button.
+1. Ensure that "PID" displays as DF11 and "VID" as 0483.
+1. Select `Start Programming` and the firmware procedure will commence.
+1. A message in the log at the bottom of the window will display once complete.
 
 Power cycle the SM1000 and the new firmware will run.
 

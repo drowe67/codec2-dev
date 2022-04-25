@@ -52,7 +52,7 @@ void opt_help() {
     fprintf(stderr, "\nusage: %s [options]\n\n", progname);
     fprintf(stderr, "  --in      filename    Name of InputOneCharPerBitFile\n");
     fprintf(stderr, "  --out     filename    Name of OutputModemRawFile\n");
-    fprintf(stderr, "  --mode    modeName    Predefined mode 700D|700E|2020|datac0|datac1|datac3\n");
+    fprintf(stderr, "  --mode    modeName    Predefined mode 700D|700E|2020|2020B|datac0|datac1|datac3\n");
     fprintf(stderr, "  --nc      [17..62]    Number of Carriers (17 default, 62 max)\n");
     fprintf(stderr, "  --ns       symbols    One pilot every ns symbols (8 default)\n");
     fprintf(stderr, "  --tcp        Nsecs    Cyclic Prefix Duration (.002 default)\n");
@@ -61,11 +61,11 @@ void opt_help() {
     fprintf(stderr, "  --tx_freq     freq    Set an optional modulation TX centre frequency (1500.0 default)\n");
     fprintf(stderr, "  --rx_freq     freq    Set an optional modulation RX centre frequency (1500.0 default)\n\n");
     fprintf(stderr, "  --verbose  [1|2|3]    Verbose output level to stderr (default off)\n");
-    fprintf(stderr, "  --txbpf               Transmit band pass filter boolean (default off)\n");
+    fprintf(stderr, "  --txbpf               Transmit band pass filter on (default off)\n");
+    fprintf(stderr, "  --clip                Transmit clipper (default off)\n");
     fprintf(stderr, "  --text                Include a standard text message boolean (default off)\n");
     fprintf(stderr, "  -i --ldpc    [1|2]    Run LDPC decoder (1 -> (224,112) 700D code, 2 -> (504,396) 2020 code).\n"
                     "                        In testframe mode raw and coded errors will be counted.\n");
-    fprintf(stderr, "  -p --databits numBits Number of data bits used in LDPC codeword.\n");
     fprintf(stderr, "  --dpsk                Differential PSK.\n");
     fprintf(stderr, "  --bursts   nBursts    Burst mode: Send nBursts of testframes each\n");
     fprintf(stderr, "\n");
@@ -98,6 +98,7 @@ int main(int argc, char *argv[]) {
     int input_specified = 0;
     int output_specified = 0;
     int verbose = 0;
+    int clip_en = 0;
     int txbpf_en = 0;
     int testframes = 0;
     int use_text = 0;
@@ -129,9 +130,9 @@ int main(int argc, char *argv[]) {
         {"rx_freq", 'i', OPTPARSE_REQUIRED},
         {"ldpc", 'j', OPTPARSE_NONE},
         {"txbpf", 'k', OPTPARSE_NONE},
+        {"clip", 'r', OPTPARSE_NONE},
         {"text", 'l', OPTPARSE_NONE},
         {"verbose", 'v', OPTPARSE_REQUIRED},
-        {"databits", 'p', OPTPARSE_REQUIRED},
         {"dpsk", 'q', OPTPARSE_NONE},
         {"mode", 'g', OPTPARSE_REQUIRED},
         {"help", 'h', OPTPARSE_NONE},
@@ -201,11 +202,11 @@ int main(int argc, char *argv[]) {
             case 'l':
                 use_text = 1;
                 break;
-            case 'p':
-                Ndatabitsperpacket = atoi(options.optarg);
-                break;
             case 'q':
                 dpsk = 1;
+                break;
+            case 'r':
+                clip_en = 1;
                 break;
             case 'v':
                 verbose = atoi(options.optarg);
@@ -244,7 +245,7 @@ int main(int argc, char *argv[]) {
     /* Get a copy of the completed modem config (ofdm_create() fills in more parameters) */
     ofdm_config = ofdm_get_config_param(ofdm);
 
-    /* ste up some useful constants */
+    /* set up some useful constants */
 
     int Nbitsperpacket = ofdm_get_bits_per_packet(ofdm);
     int Npayloadbitsperpacket = Nbitsperpacket - ofdm->nuwbits - ofdm->ntxtbits;
@@ -257,15 +258,13 @@ int main(int argc, char *argv[]) {
         ldpc_codes_setup(&ldpc, ofdm->codename);
         if (verbose > 1) { fprintf(stderr, "using: %s\n", ofdm->codename); }
 
-        /* here is where we can change data bits per frame to a number smaller than LDPC code input data bits_per_frame */
-        if (Ndatabitsperpacket) {
-            set_data_bits_per_frame(&ldpc, Ndatabitsperpacket);
+        /* mode specific set up */
+        if (!strcmp(mode,"2020")) set_data_bits_per_frame(&ldpc, 312);
+        if (!strcmp(mode,"2020B")) {
+            set_data_bits_per_frame(&ldpc, 156);
+            ldpc.protection_mode = LDPC_PROT_2020B;
         }
-
         Ndatabitsperpacket = ldpc.data_bits_per_frame;
-
-        assert(Ndatabitsperpacket <= ldpc.ldpc_data_bits_per_frame);
-        assert(Npayloadbitsperpacket <= ldpc.ldpc_coded_bits_per_frame);
 
         if (verbose > 1) {
             fprintf(stderr, "LDPC codeword data bits = %d\n", ldpc.ldpc_data_bits_per_frame);
@@ -293,12 +292,9 @@ int main(int argc, char *argv[]) {
             fprintf(stderr, "Npackets: %d\n", Npackets);
     }
 
-    if (txbpf_en) {
-        ofdm_set_tx_bpf(ofdm, 1);
-    }
-    if (dpsk) {
-        ofdm_set_dpsk(ofdm, 1);
-    }
+    if (clip_en) { ofdm->clip_en = true; }
+    if (txbpf_en) { ofdm_set_tx_bpf(ofdm, 1); }
+    if (dpsk) { ofdm_set_dpsk(ofdm, 1); }
 
     uint8_t txt_bits[ofdm->ntxtbits];
     memset(txt_bits, 0, ofdm->ntxtbits);

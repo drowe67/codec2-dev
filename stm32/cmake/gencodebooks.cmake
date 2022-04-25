@@ -34,10 +34,10 @@ set(CODEBOOKSD
     ${D}/dlsp10.txt
 )
 
-set(CODEBOOKSJVM
-    ${D}/lspjvm1.txt
-    ${D}/lspjvm2.txt
-    ${D}/lspjvm3.txt
+set(CODEBOOKSJMV
+    ${D}/lspjmv1.txt
+    ${D}/lspjmv2.txt
+    ${D}/lspjmv3.txt
 )
 
 set(CODEBOOKSMEL
@@ -114,11 +114,11 @@ add_custom_command(
     DEPENDS generate_codebook ${CODEBOOKSD}
 )
 
-# codebookjvm.c
+# codebookjmv.c
 add_custom_command(
-    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/codebookjvm.c
-    COMMAND generate_codebook lsp_cbjvm ${CODEBOOKSJVM} > ${CMAKE_CURRENT_BINARY_DIR}/codebookjvm.c
-    DEPENDS generate_codebook ${CODEBOOKSJVM}
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/codebookjmv.c
+    COMMAND generate_codebook lsp_cbjmv ${CODEBOOKSJMV} > ${CMAKE_CURRENT_BINARY_DIR}/codebookjmv.c
+    DEPENDS generate_codebook ${CODEBOOKSJMV}
 )
 
 

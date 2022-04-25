@@ -252,7 +252,7 @@ endfunction
 %randn('seed',1);
 format short
 more off
-init_cml('~/cml/');
+init_cml();
 
 % store results in array "res" and plot afterwards
 % comment the following line if you want to retain prev sims 
