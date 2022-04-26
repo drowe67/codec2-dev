@@ -90,6 +90,9 @@ int main(int argc, char *argv[])
     int   vector_quant_Wo_e = 0;
     int   dump_pitch_e = 0;
     float gain = 1.0;
+    float comp_gain_lin = 1.0;
+    float comp_limit_lin = 32767.0;
+    int   comp_en = 0;
     int   bpf_en = 0;
     int   bpfb_en = 0;
     FILE *fam = NULL, *fWo = NULL;
@@ -155,6 +158,8 @@ int main(int argc, char *argv[])
         { "vq_pitch_e", no_argument, &vector_quant_Wo_e, 1 },
         { "rate", required_argument, NULL, 0 },
         { "gain", required_argument, NULL, 0 },
+        { "comp_gain", required_argument, NULL, 0 },
+        { "comp_limit", required_argument, NULL, 0 },
         { "bpf", no_argument, &bpf_en, 1 },
         { "bpfb", no_argument, &bpfb_en, 1 },
         { "amread", required_argument, &amread, 1 },
@@ -301,6 +306,12 @@ int main(int argc, char *argv[])
                 }
 	    } else if(strcmp(long_options[option_index].name, "gain") == 0) {
 		gain = atof(optarg);
+	    } else if(strcmp(long_options[option_index].name, "comp_gain") == 0) {
+		comp_gain_lin = atof(optarg);
+                comp_en = 1;
+	    } else if(strcmp(long_options[option_index].name, "comp_limit") == 0) {
+		comp_limit_lin = atof(optarg);
+                comp_en = 1;
 	    } else if(strcmp(long_options[option_index].name, "framelength_s") == 0) {
 		framelength_s = atof(optarg);
 	    } else if(strcmp(long_options[option_index].name, "pahw") == 0) {
@@ -650,6 +661,19 @@ int main(int argc, char *argv[])
 	two_stage_pitch_refinement(&c2const, &model, Sw);
 	estimate_amplitudes(&model, Sw, W, 1);
 
+	/*------------------------------------------------------------*\
+
+                               Compression
+
+	\*------------------------------------------------------------*/
+
+        if (comp_en) {
+            for(m=1; m<model.L; m++) {
+                model.A[m] *= comp_gain_lin;
+                if (model.A[m] > comp_limit_lin) model.A[m] = comp_limit_lin;
+            }
+        }
+        
         #ifdef DUMP
         dump_Sn(m_pitch, Sn); dump_Sw(Sw); dump_model(&model);
         #endif
