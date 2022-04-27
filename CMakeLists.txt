@@ -642,6 +642,13 @@ endif()
                             ./ldpc_dec - /dev/null --code HRA_56_56 --sd --testframes"
              )
 
+    add_test(NAME test_ldpc_enc_dec_H_212_158
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            ./ldpc_enc /dev/zero - --sd --code H_212_158 --testframes 200 |
+                            ./ldpc_noise - - -2.0 |
+                            ./ldpc_dec - /dev/null --code H_212_158 --sd --testframes"
+             )
+
     add_test(NAME test_ldpc_enc_dec_HRAb_396_504
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
                             ./ldpc_enc /dev/zero - --sd --code HRAb_396_504 --testframes 200 |

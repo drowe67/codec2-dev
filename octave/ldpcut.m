@@ -254,3 +254,4 @@ end
 %test3_curves("H2064_516_sparse.mat",2)
 %test3_curves("H_256_768_22.txt",2)
 %test3_curves("H_4096_8192_3d.mat")
+%test3_curves("H_212_158.mat")

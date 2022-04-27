@@ -210,6 +210,7 @@ set(CODEC2_SRCS
     H_4096_8192_3d.c
     H_16200_9720.c
     H_1024_2048_4f.c
+    H_212_158.c
     ldpc_codes.c
     lpcnet_freq.c
     reliable_text.c
