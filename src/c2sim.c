@@ -109,6 +109,8 @@ int main(int argc, char *argv[])
     char  out_file[MAX_STR];
     FILE *fout = NULL;	/* output speech file */
     int   rateK = 0, newamp1vq = 0, rate_K_dec = 0, perframe=0, postfilter_newamp1_en=0, rateKlf=0, setK=0;
+    float rateK_mean_min = -1E32, rateK_mean_max = 1E32;
+    int   rateK_mean_min_en, rateK_mean_max_en;
     int   bands = 0, bands_lower_en;
     float bands_lower = -1E32;
     int   K = 20;
@@ -133,6 +135,8 @@ int main(int argc, char *argv[])
         { "rateKdec", required_argument, &rate_K_dec, 1 },
         { "rateKout", required_argument, &rateKout, 1 },
         { "rateKin", required_argument, &rateKin, 1 },
+        { "rateK_mean_min", required_argument, &rateK_mean_min_en, 1 },
+        { "rateK_mean_max", required_argument, &rateK_mean_max_en, 1 },
         { "postfilter_newamp1", no_argument, &postfilter_newamp1_en, 1 },
         { "rateKLF", no_argument, &rateKlf, 1 },
         { "bands",required_argument, &bands, 1 },
@@ -241,6 +245,12 @@ int main(int argc, char *argv[])
                     exit(1);
                 }
                 fprintf(stderr, "each record is %d bytes\n", (int)(K*sizeof(float)));
+            } else if(strcmp(long_options[option_index].name, "rateK_mean_min") == 0) {
+                rateK_mean_min = atof(optarg);
+                fprintf(stderr, "rateK_mean_min: %f\n", rateK_mean_min);
+            } else if(strcmp(long_options[option_index].name, "rateK_mean_max") == 0) {
+                rateK_mean_max = atof(optarg);
+                fprintf(stderr, "rateK_mean_max: %f\n", rateK_mean_max);
 	    } else if(strcmp(long_options[option_index].name, "bands") == 0) {
                 /* write mel spaced band energies to file or stdout */
                 if ((fbands = fopen(optarg,"wb")) == NULL) {
@@ -879,7 +889,9 @@ int main(int argc, char *argv[])
 	    float rate_K_vec_no_mean[K]; float rate_K_vec_no_mean_[K];
 	    for(int k=0; k<K; k++)
 	      rate_K_vec_no_mean[k] = rate_K_vec[k] - mean;
-	    
+	    if (mean < rateK_mean_min) mean = rateK_mean_min;
+	    if (mean > rateK_mean_max) mean = rateK_mean_max;
+            
             float rate_K_vec_[K];
             if (newamp1vq) {
 		newamp1_eq(rate_K_vec_no_mean, eq, K, 1);
