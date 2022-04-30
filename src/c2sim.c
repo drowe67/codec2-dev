@@ -874,14 +874,11 @@ int main(int argc, char *argv[])
             float rate_K_vec[K];
             resample_const_rate_f(&c2const, &model, rate_K_vec, rate_K_sample_freqs_kHz, K);
 
-	    if (frateK != NULL)
-		assert(fwrite(rate_K_vec, sizeof(float), K, frateK) == K);
-	    
 	    if (frateKin != NULL) {
 		assert(fread(rate_K_vec, sizeof(float), K, frateKin) == K);
 	    }
-	    
-	    /* remove mean, as EQ and post filter work on mean removed vector */
+
+            /* remove mean, as EQ and post filter work on mean removed vector */
 	    float sum = 0.0;
 	    for(int k=0; k<K; k++)
 	      sum += rate_K_vec[k];
@@ -891,7 +888,15 @@ int main(int argc, char *argv[])
 	      rate_K_vec_no_mean[k] = rate_K_vec[k] - mean;
 	    if (mean < rateK_mean_min) mean = rateK_mean_min;
 	    if (mean > rateK_mean_max) mean = rateK_mean_max;
-            
+
+            // dump output after clipping mean for VQ training
+	    if (frateK != NULL) {
+                float rate_K_vec[K];
+                for(int k=0; k<K; k++)
+                    rate_K_vec[k] = rate_K_vec_no_mean[k] + mean;
+		assert(fwrite(rate_K_vec, sizeof(float), K, frateK) == K);
+            }
+	    
             float rate_K_vec_[K];
             if (newamp1vq) {
 		newamp1_eq(rate_K_vec_no_mean, eq, K, 1);
