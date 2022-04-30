@@ -187,7 +187,7 @@ int main(int argc, char *argv[]) {
         quantise(cb, vec, k, 1, st, en, &e, &se);
     }
     var = se/(J*(en-st+1));
-    printf("\r  It: 0, var: %f sd: %f\n", var, sqrt(var));
+    printf("\r  It:  0, var: %f sd: %f\n", var, sqrt(var));
 
     /* set up initial codebook state from samples of training set */
     if (init_rand) srand(time(NULL));
