@@ -8,7 +8,7 @@
 TRAIN=~/Downloads/train.spc
 CODEC2_PATH=$HOME/codec2
 PATH=$PATH:$CODEC2_PATH/build_linux/src:$CODEC2_PATH/build_linux/misc
-K=30
+K=20
 Kst=2
 Ken=16
 
@@ -34,11 +34,10 @@ function train() {
   filename=$(basename -- "$fullfile")
   extension="${filename##*.}"
   filename="${filename%.*}"
-  
-  c2sim $fullfile --rateK --rateKout ${filename}.f32
-  echo "ratek=load_f32('../build_linux/${filename}.f32',20); vq_700c_eq; ratek_lim=limit_vec(ratek, 0, 40); save_f32('../build_linux/${filename}_lim.f32', ratek_lim); quit" | \
-  octave -p ${CODEC2_PATH}/octave -qf
-  vqtrain ${filename}_lim.f32 $K 4096 vq_stage1.f32 -s 1e-3 --st $Kst --en $Ken
+
+  ch ~/Downloads/train.spc ${filename}_comp.s16 --clip 16384 --clipmin 10 --gain 1.2
+  c2sim ${filename}_comp.s16 --rateK --rateK_mean_min 10 --rateK_mean_max 40 --rateKout ${filename}.f32
+  vqtrain ${filename}.f32 $K 4096 vq_stage1.f32 -s 1e-3 --st $Kst --en $Ken
 }
 
 function listen() {
@@ -47,12 +46,14 @@ function listen() {
   extension="${filename##*.}"
   filename="${filename%.*}"
   
-  c2sim $fullfile --rateK --rateKout ${filename}.f32
-  echo "ratek=load_f32('../build_linux/${filename}.f32',20); vq_700c_eq; ratek_lim=limit_vec(ratek, 0, 40); save_f32('../build_linux/${filename}_lim.f32', ratek_lim); quit" | \
-  octave -p ${CODEC2_PATH}/octave -qf
-  cat ${filename}_lim.f32 | vq_mbest --st $Kst --en $Ken -k $K -q vq_stage1.f32 > ${filename}_test.f32
-  c2sim $fullfile --rateK --rateKin ${filename}_test.f32 -o - | sox -t .s16 -r 8000 -c 1 - ${filename}_sub.wav
-  c2sim $fullfile --rateK --newamp1vq -o - | sox -t .s16 -r 8000 -c 1 - ${filename}_newamp1.wav
+  ch $fullfile ${filename}_comp.s16 --clip 16384 --clipmin 10 --gain 1.2
+  c2sim ${filename}_comp.s16 --rateK --rateK_mean_min 10 --rateK_mean_max 40 --rateKout ${filename}.f32 \
+        --phase0 --postfilter -o - | sox -t .s16 -r 8000 -c 1 - ${filename}_ratek.wav
+  cat ${filename}.f32 | vq_mbest --st $Kst --en $Ken -k $K -q vq_stage1.f32 > ${filename}_test.f32
+  c2sim ${filename}_comp.s16 --rateK --rateKin ${filename}_test.f32 --rateK_mean_min 10 --rateK_mean_max 40 \
+        --phase0 --postfilter -o - | sox -t .s16 -r 8000 -c 1 - ${filename}_vq.wav
+  c2sim $fullfile --rateK --newamp1vq \
+         --postfilter_newamp1 --phase0 --postfilter -o - | sox -t .s16 -r 8000 -c 1 - ${filename}_newamp1.wav
 }
 
 function run() {
@@ -69,7 +70,30 @@ function run() {
     listen ~/Downloads/cap_8k_lp.sw
 }
 
-compress $CODEC2_PATH/raw/big_dog.raw
-compress $CODEC2_PATH/raw/hts2.raw
-compress ~/Downloads/fish.s16
-compress ~/Downloads/pencil.s16
+
+function comp_test() {
+    compress $CODEC2_PATH/raw/vk5qi.raw
+    compress $CODEC2_PATH/raw/kristoff.raw
+    compress $CODEC2_PATH/raw/big_dog.raw
+    compress $CODEC2_PATH/raw/hts2a.raw
+    compress ~/Downloads/fish.s16
+    compress ~/Downloads/pencil.s16
+}
+
+function listen_test() {
+    listen $CODEC2_PATH/raw/vk5qi.raw
+    compress $CODEC2_PATH/raw/kristoff.raw
+    compress $CODEC2_PATH/raw/big_dog.raw
+    compress $CODEC2_PATH/raw/hts2a.raw
+    compress ~/Downloads/fish.s16
+    compress ~/Downloads/pencil.s16
+}
+
+#comp_test
+#train
+listen $CODEC2_PATH/raw/vk5qi.raw
+listen $CODEC2_PATH/raw/big_dog.raw
+listen $CODEC2_PATH/raw/kristoff.raw
+listen $CODEC2_PATH/raw/hts2a.raw
+listen ~/Downloads/fish.s16
+listen ~/Downloads/pencil.s16
