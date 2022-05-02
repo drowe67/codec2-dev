@@ -187,7 +187,7 @@ int main(int argc, char *argv[]) {
         quantise(cb, vec, k, 1, st, en, &e, &se);
     }
     var = se/(J*(en-st+1));
-    printf("\r  It:  0, var: %f sd: %f\n", var, sqrt(var));
+    printf("\r  It:  0, var: %6.2f sd: %6.2f\n", var, sqrt(var));
 
     /* set up initial codebook state from samples of training set */
     if (init_rand) srand(time(NULL));
@@ -233,7 +233,7 @@ int main(int argc, char *argv[]) {
             if (n[i] < n_min) n_min = n[i];
             if (n[i] > n_max) n_max = n[i];
         }
-	printf("\r  It: %2ld, var: %5f sd: %f outliers > 1/2/3 dB = %3.2f/%3.2f/%3.2f Delta = %5.4f %d %d\n", j, var, sqrt(var),
+	printf("\r  It: %2ld, var: %6.2f sd: %6.2f outliers > 1/2/3 dB = %3.2f/%3.2f/%3.2f Delta = %5.4f %d %d\n", j, var, sqrt(var),
                (float)noutliers[0]/J, (float)noutliers[1]/J, (float)noutliers[2]/J, delta, n_min, n_max);
 	j++;
 
