@@ -73,23 +73,48 @@ function listen_compressed() {
   extension="${filename##*.}"
   filename="${filename%.*}"
 
+  o=agc_ssb_comp
+  mkdir -p $o
   compress ${fullfile}
   c2sim ${filename}_comp.s16 --rateK --rateK_mean_min 10 --rateK_mean_max 40 --rateKout ${filename}.f32 \
-        --phase0 --postfilter -o - | sox -t .s16 -r 8000 -c 1 - ${filename}_ratek.wav
+        --phase0 --postfilter -o - | sox -t .s16 -r 8000 -c 1 - ${o}/${filename}_ratek.wav
   cat ${filename}.f32 | vq_mbest --st $Kst --en $Ken -k $K -q vq_stage1.f32 > ${filename}_test.f32
   c2sim ${filename}_comp.s16 --rateK --rateK_mean_min 10 --rateK_mean_max 40 --rateKin ${filename}_test.f32  \
-        --phase0 --postfilter -o - | sox -t .s16 -r 8000 -c 1 - ${filename}_comp_vq.wav
+        --phase0 --postfilter -o - | sox -t .s16 -r 8000 -c 1 - ${o}/${filename}_comp_vq.wav
   cat ${filename}.f32 | vq_mbest --st $Kst --en $Ken -k $K -q vq_stage1.f32,vq_stage2.f32 --mbest 5 \
       > ${filename}_test.f32
   c2sim ${filename}_comp.s16 --rateK --rateK_mean_min 10 --rateK_mean_max 40 --rateKin ${filename}_test.f32  \
-        --phase0 --postfilter -o - | sox -t .s16 -r 8000 -c 1 - ${filename}_comp_vq2.wav
+        --phase0 --postfilter -o - | sox -t .s16 -r 8000 -c 1 - ${o}/${filename}_comp_vq2.wav
   cat ${filename}.f32 | \
       vq_mbest --st $Kst --en $Ken -k $K -q vq_stage1.f32,vq_stage2.f32,vq_stage3.f32 --mbest 5 \
       > ${filename}_test.f32
   c2sim ${filename}_comp.s16 --rateK --rateK_mean_min 10 --rateK_mean_max 40 --rateKin ${filename}_test.f32  \
-        --phase0 --postfilter -o - | sox -t .s16 -r 8000 -c 1 - ${filename}_comp_vq3.wav
+        --phase0 --postfilter -o - | sox -t .s16 -r 8000 -c 1 - ${o}/${filename}_comp_vq3.wav
   c2sim $fullfile --rateK --newamp1vq \
-         --postfilter_newamp1 --phase0 --postfilter -o - | sox -t .s16 -r 8000 -c 1 - ${filename}_newamp1.wav
+         --postfilter_newamp1 --phase0 --postfilter -o - | sox -t .s16 -r 8000 -c 1 - ${o}/${filename}_newamp1.wav
+}
+
+# Exploring the effect of the postfilter with newamp1 and phase0
+#  + listened with headphones
+#  + PF improves muffled/clicky but adds tonal artefact and AM modulation
+function listen_newamp1() {
+  fullfile=$1
+  filename=$(basename -- "$fullfile")
+  extension="${filename##*.}"
+  filename="${filename%.*}"
+
+  o=newamp1_pf
+  mkdir -p $o
+  c2sim $fullfile --rateK -o - | sox -t .s16 -r 8000 -c 1 - ${o}/${filename}_ratek.wav
+  c2sim $fullfile --rateK --phase0 --postfilter -o - \
+        | sox -t .s16 -r 8000 -c 1 - ${o}/${filename}_ratek_p0.wav
+  c2sim $fullfile --rateK --phase0 --postfilter --postfilter_newamp1 -o - \
+        | sox -t .s16 -r 8000 -c 1 - ${o}/${filename}_ratek_p0_pf.wav
+  c2sim $fullfile --rateK --newamp1vq -o - | sox -t .s16 -r 8000 -c 1 - ${o}/${filename}_newamp1.wav
+  c2sim $fullfile --rateK --newamp1vq --phase0 --postfilter -o - \
+        | sox -t .s16 -r 8000 -c 1 - ${o}/${filename}_newamp1_p0.wav
+  c2sim $fullfile --rateK --newamp1vq --postfilter_newamp1 --phase0 --postfilter -o - \
+        | sox -t .s16 -r 8000 -c 1 - ${o}/${filename}_newamp1_p0_pf.wav
 }
 
 function listen_2stage() {
@@ -156,6 +181,15 @@ function listen_test_compressed() {
     listen_compressed $CODEC2_PATH/raw/kristoff.raw
     listen_compressed $CODEC2_PATH/raw/vk5qi.raw
 }
+function listen_test_newamp1() {
+    listen_newamp1 $CODEC2_PATH/raw/big_dog.raw
+    listen_newamp1 $CODEC2_PATH/raw/hts2a.raw
+    listen_newamp1 ~/Downloads/fish.s16
+    listen_newamp1 ~/Downloads/pencil.s16
+    listen_newamp1 $CODEC2_PATH/raw/kristoff.raw
+    listen_newamp1 $CODEC2_PATH/raw/vk5qi.raw
+}
 
 #train_compressed
-listen_test_compressed
+#listen_test_compressed
+listen_test_newamp1
