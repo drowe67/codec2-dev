@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -x
 # train_comp.sh
 # David Rowe April 2022
 #
@@ -28,30 +28,83 @@ function compress() {
   printf "PAPR: %5.2f\n" $papr
 }
 
-# train a new VQ
-function train() {
+# train vanilla, M=4096 single stage
+function train_vanilla() {
   fullfile=$TRAIN
   filename=$(basename -- "$fullfile")
   extension="${filename##*.}"
   filename="${filename%.*}"
 
-  ch ~/Downloads/train.spc ${filename}_comp.s16 --clip 16384 --clipmin 10 --gain 1.2
-  c2sim ${filename}_comp.s16 --rateK --rateK_mean_min 10 --rateK_mean_max 40 --rateKout ${filename}.f32
+  c2sim ${fullfile} --rateK --rateK_mean_min 0 --rateK_mean_max 40 --rateKout ${filename}.f32
   vqtrain ${filename}.f32 $K 4096 vq_stage1.f32 -s 1e-3 --st $Kst --en $Ken
 }
 
-function listen() {
+# train compressed, M=4096 single stage
+function train_compressed() {
+  fullfile=$TRAIN
+  filename=$(basename -- "$fullfile")
+  extension="${filename##*.}"
+  filename="${filename%.*}"
+
+  # initial step applies SSB filter
+  ch ${fullfile} - | ch - ${filename}_comp.s16 --clip 16384 --clipmin 10 --gain 2.0
+  c2sim ${filename}_comp.s16 --rateK --rateK_mean_min 10 --rateK_mean_max 40 --rateKout ${filename}_comp.f32
+  vqtrain ${filename}_comp.f32 $K 512 vq_stage1.f32 -s 1e-3 --st $Kst --en $Ken -r stage2_in.f32
+  vqtrain stage2_in.f32 $K 512 vq_stage2.f32 -s 1e-3 --st $Kst --en $Ken -r stage3_in.f32
+  vqtrain stage3_in.f32 $K 512 vq_stage3.f32 -s 1e-3 --st $Kst --en $Ken
+}
+
+# train 2 stage, M=512, mean removed
+function train_2stage() {
+  fullfile=$TRAIN
+  filename=$(basename -- "$fullfile")
+  extension="${filename##*.}"
+  filename="${filename%.*}"
+
+  c2sim ${fullfile} --rateK --rateK_mean_min 0 --rateK_mean_max 40--rateKout ${filename}.f32
+  vqtrain ${filename}.f32 $K 512 vq_stage1.f32 -s 1e-3 --st $Kst --en $Ken -r stage2_in.f32
+  vqtrain stage2_in.f32 $K 512 vq_stage2.f32 -s 1e-3 --st $Kst --en $Ken -r stage3_in.f32
+  cat ${filename}.f32 | vq_mbest --st $Kst --en $Ken -k $K -q vq_stage1.f32,vq_stage2.f32 --mbest 5 > /dev/null
+}
+
+function listen_compressed() {
   fullfile=$1
   filename=$(basename -- "$fullfile")
   extension="${filename##*.}"
   filename="${filename%.*}"
-  
-  ch $fullfile ${filename}_comp.s16 --clip 16384 --clipmin 10 --gain 1.2
+
+  compress ${fullfile}
   c2sim ${filename}_comp.s16 --rateK --rateK_mean_min 10 --rateK_mean_max 40 --rateKout ${filename}.f32 \
         --phase0 --postfilter -o - | sox -t .s16 -r 8000 -c 1 - ${filename}_ratek.wav
   cat ${filename}.f32 | vq_mbest --st $Kst --en $Ken -k $K -q vq_stage1.f32 > ${filename}_test.f32
-  c2sim ${filename}_comp.s16 --rateK --rateKin ${filename}_test.f32 --rateK_mean_min 10 --rateK_mean_max 40 \
+  c2sim ${filename}_comp.s16 --rateK --rateK_mean_min 10 --rateK_mean_max 40 --rateKin ${filename}_test.f32  \
+        --phase0 --postfilter -o - | sox -t .s16 -r 8000 -c 1 - ${filename}_comp_vq.wav
+  cat ${filename}.f32 | vq_mbest --st $Kst --en $Ken -k $K -q vq_stage1.f32,vq_stage2.f32 --mbest 5 \
+      > ${filename}_test.f32
+  c2sim ${filename}_comp.s16 --rateK --rateK_mean_min 10 --rateK_mean_max 40 --rateKin ${filename}_test.f32  \
+        --phase0 --postfilter -o - | sox -t .s16 -r 8000 -c 1 - ${filename}_comp_vq2.wav
+  cat ${filename}.f32 | \
+      vq_mbest --st $Kst --en $Ken -k $K -q vq_stage1.f32,vq_stage2.f32,vq_stage3.f32 --mbest 5 \
+      > ${filename}_test.f32
+  c2sim ${filename}_comp.s16 --rateK --rateK_mean_min 10 --rateK_mean_max 40 --rateKin ${filename}_test.f32  \
+        --phase0 --postfilter -o - | sox -t .s16 -r 8000 -c 1 - ${filename}_comp_vq3.wav
+  c2sim $fullfile --rateK --newamp1vq \
+         --postfilter_newamp1 --phase0 --postfilter -o - | sox -t .s16 -r 8000 -c 1 - ${filename}_newamp1.wav
+}
+
+function listen_2stage() {
+  fullfile=$1
+  filename=$(basename -- "$fullfile")
+  extension="${filename##*.}"
+  filename="${filename%.*}"
+
+  c2sim ${fullfile} --rateK --rateK_mean_min 0 --rateK_mean_max 40 --rateKout ${filename}.f32 \
+        --phase0 --postfilter -o - | sox -t .s16 -r 8000 -c 1 - ${filename}_ratek.wav
+  cat ${filename}.f32 | vq_mbest --st $Kst --en $Ken -k $K -q vq_stage1.f32 > ${filename}_test.f32
+  c2sim ${fullfile} --rateK --rateK_mean_min 0 --rateK_mean_max 40 --rateKin ${filename}_test.f32  \
         --phase0 --postfilter -o - | sox -t .s16 -r 8000 -c 1 - ${filename}_vq.wav
+  c2sim ${fullfile} --rateK --rateK_mean_min 0 --rateK_mean_max 40 --rateKin ${filename}_test.f32  \
+        --phase0 --postfilter --postfilter_newamp1 -o - | sox -t .s16 -r 8000 -c 1 - ${filename}_vq1.wav
   c2sim $fullfile --rateK --newamp1vq \
          --postfilter_newamp1 --phase0 --postfilter -o - | sox -t .s16 -r 8000 -c 1 - ${filename}_newamp1.wav
 }
@@ -82,18 +135,27 @@ function comp_test() {
 
 function listen_test() {
     listen $CODEC2_PATH/raw/vk5qi.raw
-    compress $CODEC2_PATH/raw/kristoff.raw
-    compress $CODEC2_PATH/raw/big_dog.raw
-    compress $CODEC2_PATH/raw/hts2a.raw
-    compress ~/Downloads/fish.s16
-    compress ~/Downloads/pencil.s16
+    listen $CODEC2_PATH/raw/big_dog.raw
+    listen $CODEC2_PATH/raw/kristoff.raw
+    listen $CODEC2_PATH/raw/hts2a.raw
+    listen ~/Downloads/fish.s16
+    listen ~/Downloads/pencil.s16
 }
 
-#comp_test
-#train
-listen $CODEC2_PATH/raw/vk5qi.raw
-listen $CODEC2_PATH/raw/big_dog.raw
-listen $CODEC2_PATH/raw/kristoff.raw
-listen $CODEC2_PATH/raw/hts2a.raw
-listen ~/Downloads/fish.s16
-listen ~/Downloads/pencil.s16
+function listen_test_2stage() {
+    listen_2stage $CODEC2_PATH/raw/big_dog.raw
+    #listen_2stage $CODEC2_PATH/raw/hts2a.raw
+    #listen_2stage ~/Downloads/fish.s16
+    #listen_2stage ~/Downloads/pencil.s16
+}
+function listen_test_compressed() {
+    listen_compressed $CODEC2_PATH/raw/big_dog.raw
+    listen_compressed $CODEC2_PATH/raw/hts2a.raw
+    listen_compressed ~/Downloads/fish.s16
+    listen_compressed ~/Downloads/pencil.s16
+    listen_compressed $CODEC2_PATH/raw/kristoff.raw
+    listen_compressed $CODEC2_PATH/raw/vk5qi.raw
+}
+
+#train_compressed
+listen_test_compressed
