@@ -120,8 +120,10 @@ int main(int argc, char *argv[])
     int   ten_ms_centre = 0;
     FILE  *fphasenn = NULL;
     FILE  *frateK = NULL;
+    FILE  *frateKnomean = NULL;
     FILE  *frateKin = NULL;
-    int   rateKout, rateKin;
+    FILE  *frateKnomeanin = NULL;
+    int   rateKout, rateKnomeanout, rateKin, rateKnomeanin;
     FILE *fbands = NULL;
     int   bands_resample = 0;
     
@@ -134,7 +136,9 @@ int main(int argc, char *argv[])
         { "newamp1vq", no_argument, &newamp1vq, 1 },
         { "rateKdec", required_argument, &rate_K_dec, 1 },
         { "rateKout", required_argument, &rateKout, 1 },
+        { "rateKnomeanout", required_argument, &rateKnomeanout, 1 },
         { "rateKin", required_argument, &rateKin, 1 },
+        { "rateKnomeanin", required_argument, &rateKnomeanin, 1 },
         { "rateK_mean_min", required_argument, &rateK_mean_min_en, 1 },
         { "rateK_mean_max", required_argument, &rateK_mean_max_en, 1 },
         { "postfilter_newamp1", no_argument, &postfilter_newamp1_en, 1 },
@@ -237,9 +241,25 @@ int main(int argc, char *argv[])
                     exit(1);
                 }
                 fprintf(stderr, "each record is %d bytes\n", (int)(K*sizeof(float)));
+	    } else if(strcmp(long_options[option_index].name, "rateKnomeanout") == 0) {
+                /* read model records from file or stdin */
+                if ((frateKnomean = fopen(optarg,"wb")) == NULL) {
+	            fprintf(stderr, "Error opening output rateKnomean file: %s: %s\n",
+		        optarg, strerror(errno));
+                    exit(1);
+                }
+                fprintf(stderr, "each record is %d bytes\n", (int)(K*sizeof(float)));
 	    } else if(strcmp(long_options[option_index].name, "rateKin") == 0) {
                 /* read model records from file or stdin */
                 if ((frateKin = fopen(optarg,"rb")) == NULL) {
+	            fprintf(stderr, "Error opening input rateK file: %s: %s\n",
+		        optarg, strerror(errno));
+                    exit(1);
+                }
+                fprintf(stderr, "each record is %d bytes\n", (int)(K*sizeof(float)));
+	    } else if(strcmp(long_options[option_index].name, "rateKnomeanin") == 0) {
+                /* read model records from file or stdin */
+                if ((frateKnomeanin = fopen(optarg,"rb")) == NULL) {
 	            fprintf(stderr, "Error opening input rateK file: %s: %s\n",
 		        optarg, strerror(errno));
                     exit(1);
@@ -877,7 +897,7 @@ int main(int argc, char *argv[])
 	    if (frateKin != NULL) {
 		assert(fread(rate_K_vec, sizeof(float), K, frateKin) == K);
 	    }
-
+        
             /* remove mean, as EQ and post filter work on mean removed vector */
 	    float sum = 0.0;
 	    for(int k=0; k<K; k++)
@@ -896,6 +916,12 @@ int main(int argc, char *argv[])
                     rate_K_vec[k] = rate_K_vec_no_mean[k] + mean;
 		assert(fwrite(rate_K_vec, sizeof(float), K, frateK) == K);
             }
+	    if (frateKnomean != NULL) {
+                assert(fwrite(rate_K_vec_no_mean, sizeof(float), K, frateKnomean) == K);
+            }
+	    if (frateKnomeanin != NULL) {
+		assert(fread(rate_K_vec_no_mean, sizeof(float), K, frateKnomeanin) == K);
+	    }
 	    
             float rate_K_vec_[K];
             if (newamp1vq) {
@@ -1164,7 +1190,9 @@ int main(int argc, char *argv[])
     if (flspEWov != NULL) fclose(flspEWov);
     if (fphasenn != NULL) fclose(fphasenn);
     if (frateK != NULL) fclose(frateK);
+    if (frateKnomean != NULL) fclose(frateKnomean);
     if (frateKin != NULL) fclose(frateKin);
+    if (frateKnomeanin != NULL) fclose(frateKnomeanin);
     if (ften_ms_centre != NULL) fclose(ften_ms_centre);
     if (fmodelout != NULL) fclose(fmodelout);
     if (fbands != NULL) fclose(fbands);

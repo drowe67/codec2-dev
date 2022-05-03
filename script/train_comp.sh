@@ -2,8 +2,8 @@
 # train_comp.sh
 # David Rowe April 2022
 #
-# Training and testing Vector Quantisers (VQ) for Codec 2 newamp1, using
-# audio compression
+# Training and testing rateK Vector Quantisers (VQ) for Codec 2, using
+# audio compression and AGC.
 
 TRAIN=~/Downloads/train.spc
 CODEC2_PATH=$HOME/codec2
@@ -28,7 +28,7 @@ function compress() {
   printf "PAPR: %5.2f\n" $papr
 }
 
-# compressor with AGC
+# Just AGC - normalise peak levels
 function agc() {
   fullfile=$1
   filename=$(basename -- "$fullfile")
@@ -43,18 +43,7 @@ function agc() {
   printf "PAPR: %5.2f\n" $papr
 }
 
-# train vanilla, M=4096 single stage
-function train_vanilla() {
-  fullfile=$TRAIN
-  filename=$(basename -- "$fullfile")
-  extension="${filename##*.}"
-  filename="${filename%.*}"
-
-  c2sim ${fullfile} --rateK --rateK_mean_min 0 --rateK_mean_max 40 --rateKout ${filename}.f32
-  vqtrain ${filename}.f32 $K 4096 vq_stage1.f32 -s 1e-3 --st $Kst --en $Ken
-}
-
-# train AGC, SSB filter, Hilbert clipper compressed
+# train - AGC, SSB filter, Hilbert clipper compressed, subset VQ
 function train_compressed() {
   fullfile=$TRAIN
   filename=$(basename -- "$fullfile")
@@ -69,7 +58,7 @@ function train_compressed() {
   vqtrain stage3_in.f32 $K 512 vq_stage3.f32 -s 1e-3 --st $Kst --en $Ken
 }
 
-# train AGC
+# train - AGC and no SSB filter, subset VQ
 function train_agc() {
   fullfile=$TRAIN
   filename=$(basename -- "$fullfile")
@@ -83,19 +72,6 @@ function train_agc() {
   vqtrain stage3_in.f32 $K 512 vq_stage3.f32 -s 1e-3 --st $Kst --en $Ken
 }
 
-# train 2 stage, M=512, mean removed
-function train_2stage() {
-  fullfile=$TRAIN
-  filename=$(basename -- "$fullfile")
-  extension="${filename##*.}"
-  filename="${filename%.*}"
-
-  c2sim ${fullfile} --rateK --rateK_mean_min 0 --rateK_mean_max 40--rateKout ${filename}.f32
-  vqtrain ${filename}.f32 $K 512 vq_stage1.f32 -s 1e-3 --st $Kst --en $Ken -r stage2_in.f32
-  vqtrain stage2_in.f32 $K 512 vq_stage2.f32 -s 1e-3 --st $Kst --en $Ken -r stage3_in.f32
-  cat ${filename}.f32 | vq_mbest --st $Kst --en $Ken -k $K -q vq_stage1.f32,vq_stage2.f32 --mbest 5 > /dev/null
-}
-
 function listen_compressed() {
   fullfile=$1
   filename=$(basename -- "$fullfile")
@@ -104,6 +80,7 @@ function listen_compressed() {
 
   o=agc_ssb_comp
   mkdir -p $o
+  compress ${fullfile}
   c2sim ${filename}_comp.s16 --rateK --rateK_mean_min 10 --rateK_mean_max 40 --rateKout ${filename}.f32 \
         --phase0 --postfilter -o - | sox -t .s16 -r 8000 -c 1 - ${o}/${filename}_ratek.wav
   cat ${filename}.f32 | vq_mbest --st $Kst --en $Ken -k $K -q vq_stage1.f32 > ${filename}_test.f32
@@ -174,38 +151,6 @@ function listen_newamp1() {
         | sox -t .s16 -r 8000 -c 1 - ${o}/${filename}_newamp1_p0_pf.wav
 }
 
-function listen_2stage() {
-  fullfile=$1
-  filename=$(basename -- "$fullfile")
-  extension="${filename##*.}"
-  filename="${filename%.*}"
-
-  c2sim ${fullfile} --rateK --rateK_mean_min 0 --rateK_mean_max 40 --rateKout ${filename}.f32 \
-        --phase0 --postfilter -o - | sox -t .s16 -r 8000 -c 1 - ${filename}_ratek.wav
-  cat ${filename}.f32 | vq_mbest --st $Kst --en $Ken -k $K -q vq_stage1.f32 > ${filename}_test.f32
-  c2sim ${fullfile} --rateK --rateK_mean_min 0 --rateK_mean_max 40 --rateKin ${filename}_test.f32  \
-        --phase0 --postfilter -o - | sox -t .s16 -r 8000 -c 1 - ${filename}_vq.wav
-  c2sim ${fullfile} --rateK --rateK_mean_min 0 --rateK_mean_max 40 --rateKin ${filename}_test.f32  \
-        --phase0 --postfilter --postfilter_newamp1 -o - | sox -t .s16 -r 8000 -c 1 - ${filename}_vq1.wav
-  c2sim $fullfile --rateK --newamp1vq \
-         --postfilter_newamp1 --phase0 --postfilter -o - | sox -t .s16 -r 8000 -c 1 - ${filename}_newamp1.wav
-}
-
-function run() {
-    # choose which function to run here
-    train
-    # these two samples are inside training database
-    listen ~/Downloads/fish_8k.sw
-    listen ~/Downloads/cap_8k.sw
-    # two samples from outside training database
-    listen $CODEC2_PATH/raw/big_dog.raw
-    listen $CODEC2_PATH/raw/hts2a.raw
-    # these two samples are inside training database, but with LPF at 3400 Hz outside of subset
-    listen ~/Downloads/fish_8k_lp.sw
-    listen ~/Downloads/cap_8k_lp.sw
-}
-
-
 function comp_test() {
     compress $CODEC2_PATH/raw/vk5qi.raw
     compress $CODEC2_PATH/raw/kristoff.raw
@@ -215,21 +160,6 @@ function comp_test() {
     compress ~/Downloads/pencil.s16
 }
 
-function listen_test() {
-    listen $CODEC2_PATH/raw/vk5qi.raw
-    listen $CODEC2_PATH/raw/big_dog.raw
-    listen $CODEC2_PATH/raw/kristoff.raw
-    listen $CODEC2_PATH/raw/hts2a.raw
-    listen ~/Downloads/fish.s16
-    listen ~/Downloads/pencil.s16
-}
-
-function listen_test_2stage() {
-    listen_2stage $CODEC2_PATH/raw/big_dog.raw
-    #listen_2stage $CODEC2_PATH/raw/hts2a.raw
-    #listen_2stage ~/Downloads/fish.s16
-    #listen_2stage ~/Downloads/pencil.s16
-}
 function listen_test_compressed() {
     listen_compressed $CODEC2_PATH/raw/big_dog.raw
     listen_compressed $CODEC2_PATH/raw/hts2a.raw
@@ -237,6 +167,7 @@ function listen_test_compressed() {
     listen_compressed ~/Downloads/pencil.s16
     listen_compressed $CODEC2_PATH/raw/kristoff.raw
     listen_compressed $CODEC2_PATH/raw/vk5qi.raw
+    listen_compressed ~/Downloads/vk5dgr_testing_8k.wav
 }
 function listen_test_newamp1() {
     listen_newamp1 $CODEC2_PATH/raw/big_dog.raw
@@ -253,10 +184,10 @@ function listen_test_agc() {
     listen_agc ~/Downloads/pencil.s16
     listen_agc $CODEC2_PATH/raw/kristoff.raw
     listen_agc $CODEC2_PATH/raw/vk5qi.raw
+    listen_agc ~/Downloads/vk5dgr_testing_8k.wav
 }
 
-#train_compressed
-#listen_test_compressed
-#listen_test_newamp1
-#train_agc
+train_compressed
+listen_test_compressed
+train_agc
 listen_test_agc
