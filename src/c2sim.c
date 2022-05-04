@@ -95,6 +95,7 @@ int main(int argc, char *argv[])
     int   comp_en = 0;
     int   bpf_en = 0;
     int   bpfb_en = 0;
+    int   hpf200_en = 0;
     FILE *fam = NULL, *fWo = NULL;
     FILE *faw = NULL;
     FILE *fhm = NULL;
@@ -170,6 +171,7 @@ int main(int argc, char *argv[])
         { "comp_limit", required_argument, NULL, 0 },
         { "bpf", no_argument, &bpf_en, 1 },
         { "bpfb", no_argument, &bpfb_en, 1 },
+        { "hpf200", no_argument, &hpf200_en, 1 },
         { "amread", required_argument, &amread, 1 },
         { "hmread", required_argument, &hmread, 1 },
         { "awread", required_argument, &awread, 1 },
@@ -590,12 +592,9 @@ int main(int argc, char *argv[])
     make_analysis_window(&c2const, fft_fwd_cfg, w, W);
     make_synthesis_window(&c2const, Pn);
 
-    if (bpfb_en)
-        bpf_en = 1;
-    if (bpf_en) {
-        for(i=0; i<BPF_N; i++)
-            bpf_buf[i] = 0.0;
-    }
+    assert(BPF_N == BPFB_N); assert(BPF_N == HPF200_N);
+    for(i=0; i<BPF_N; i++)
+        bpf_buf[i] = 0.0;
 
     for(i=0; i<LPC_ORD; i++) {
         prev_lsps_dec[i] = i*PI/(LPC_ORD+1);
@@ -652,7 +651,7 @@ int main(int argc, char *argv[])
                 buf_float[i] = Sn_pre[i];
         }
 
-        if (bpf_en) {
+        if (bpf_en || bpfb_en || hpf200_en) {
             /* filter input speech to create buf_float_bpf[], this is fed to the
                LPC modelling.  Unfiltered speech in in buf_float[], which is
                delayed to match that of the BPF */
@@ -663,10 +662,12 @@ int main(int argc, char *argv[])
                 bpf_buf[i] =  bpf_buf[N_SAMP+i];
             for(i=0; i<N_SAMP; i++)
                 bpf_buf[BPF_N+i] = buf_float[i];
-            if (bpfb_en)
-                inverse_filter(&bpf_buf[BPF_N], bpfb, N_SAMP, buf_float, BPF_N);
-            else
+            if (bpf_en)
                 inverse_filter(&bpf_buf[BPF_N], bpf, N_SAMP, buf_float, BPF_N);
+            if (bpfb_en)
+                inverse_filter(&bpf_buf[BPF_N], bpfb, N_SAMP, buf_float, BPFB_N);
+            if (hpf200_en)
+                inverse_filter(&bpf_buf[BPF_N], hpf200, N_SAMP, buf_float, HPF200_N);
         }
 
         /* shift buffer of input samples, and insert new samples */
