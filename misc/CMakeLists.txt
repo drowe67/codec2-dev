@@ -36,3 +36,6 @@ target_link_libraries(vq_binary_switch m)
 
 add_executable(pre pre.c)
 target_link_libraries(pre codec2)
+
+add_executable(hpf hpf.c)
+target_link_libraries(hpf codec2)
