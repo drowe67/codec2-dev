@@ -529,7 +529,6 @@ int main(int argc, char *argv[])
 
     float bg_est = 0.0;
 
-
     MODEL prev_model;
     float lsps[order];
     float e, prev_e;
@@ -542,11 +541,6 @@ int main(int argc, char *argv[])
     float prev_lsps_dec[order], prev_e_dec;
 
     void *nlp_states;
-    float hpf_states[2];
-    #if 0
-    struct PEXP *pexp = NULL;
-    struct AEXP *aexp = NULL;
-    #endif
     float bpf_buf[BPF_N+N_SAMP];
 
     COMP Aw[FFT_ENC];
@@ -574,7 +568,6 @@ int main(int argc, char *argv[])
 	ex_phase[i] = 0.0;
     }
     e = prev_e = 1;
-    hpf_states[0] = hpf_states[1] = 0.0;
 
     nlp_states = nlp_create(&c2const);
 
