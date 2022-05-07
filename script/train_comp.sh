@@ -109,18 +109,18 @@ function listen_agc() {
   mkdir -p $o
   agc ${fullfile}
   c2sim ${filename}_agc.s16 --rateK --rateK_mean_min 0 --rateK_mean_max 60 --rateKout ${filename}.f32 \
-        --phase0 --postfilter -o - | sox -t .s16 -r 8000 -c 1 - ${o}/${filename}_ratek.wav
-  cat ${filename}.f32 | vq_mbest --st $Kst --en $Ken -k $K -q vq_stage1.f32 > ${filename}_test.f32
-  c2sim ${filename}_agc.s16 --rateK --rateK_mean_min 0 --rateK_mean_max 60 --rateKin ${filename}_test.f32  \
+        --phase0 --postfilter --dump ${filename} -o - | sox -t .s16 -r 8000 -c 1 - ${o}/${filename}_ratek.wav
+  cat ${filename}.f32 | vq_mbest --st $Kst --en $Ken -k $K -q vq_stage1.f32 > ${filename}_vq.f32
+  c2sim ${filename}_agc.s16 --rateK --rateK_mean_min 0 --rateK_mean_max 60 --rateKin ${filename}_vq.f32  \
         --phase0 --postfilter -o - | sox -t .s16 -r 8000 -c 1 - ${o}/${filename}_agc_vq.wav
   cat ${filename}.f32 | vq_mbest --st $Kst --en $Ken -k $K -q vq_stage1.f32,vq_stage2.f32 --mbest 5 \
-      > ${filename}_test.f32
-  c2sim ${filename}_agc.s16 --rateK --rateK_mean_min 0 --rateK_mean_max 60 --rateKin ${filename}_test.f32  \
+      > ${filename}_vq2.f32
+  c2sim ${filename}_agc.s16 --rateK --rateK_mean_min 0 --rateK_mean_max 60 --rateKin ${filename}_vq2.f32  \
         --phase0 --postfilter -o - | sox -t .s16 -r 8000 -c 1 - ${o}/${filename}_agc_vq2.wav
   cat ${filename}.f32 | \
       vq_mbest --st $Kst --en $Ken -k $K -q vq_stage1.f32,vq_stage2.f32,vq_stage3.f32 --mbest 5 \
-      > ${filename}_test.f32
-  c2sim ${filename}_agc.s16 --rateK --rateK_mean_min 0 --rateK_mean_max 60 --rateKin ${filename}_test.f32  \
+      > ${filename}_vq3.f32
+  c2sim ${filename}_agc.s16 --rateK --rateK_mean_min 0 --rateK_mean_max 60 --rateKin ${filename}_vq3.f32  \
         --phase0 --postfilter -o - | sox -t .s16 -r 8000 -c 1 - ${o}/${filename}_agc_vq3.wav
   c2sim ${filename}_agc.s16 --rateK --rateK_mean_min 0 --rateK_mean_max 60 --rateKin ${filename}_test.f32  \
          -o - | sox -t .s16 -r 8000 -c 1 - ${o}/${filename}_agc_vq3_op.wav
@@ -189,5 +189,5 @@ function listen_test_agc() {
 
 #train_compressed
 #listen_test_compressed
-train_agc
+#train_agc
 listen_test_agc
