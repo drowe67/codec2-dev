@@ -89,9 +89,9 @@ int main(int argc, char *argv[])
     int   scalar_quant_Wo_e_low = 0;
     int   vector_quant_Wo_e = 0;
     int   dump_pitch_e = 0;
-    float gain = 1.0;
-    float comp_gain_lin = 1.0;
-    float comp_limit_lin = 32767.0;
+    float gainoutlin = 1.0;
+    float comp_limit_dB = 100.0;
+    float comp_gain_dB = 0.0;
     int   comp_en = 0;
     int   bpf_en = 0;
     int   bpfb_en = 0;
@@ -124,7 +124,8 @@ int main(int argc, char *argv[])
     FILE  *frateKnomean = NULL;
     FILE  *frateKin = NULL;
     FILE  *frateKnomeanin = NULL;
-    int   rateKout, rateKnomeanout, rateKin, rateKnomeanin;
+    int   rateKout, rateKnomeanout, rateKin, rateKnomeanin, rateK_peak_max_en;
+    float rateK_peak_max = 1E32;
     FILE *fbands = NULL;
     int   bands_resample = 0;
     
@@ -142,6 +143,7 @@ int main(int argc, char *argv[])
         { "rateKnomeanin", required_argument, &rateKnomeanin, 1 },
         { "rateK_mean_min", required_argument, &rateK_mean_min_en, 1 },
         { "rateK_mean_max", required_argument, &rateK_mean_max_en, 1 },
+        { "rateK_peak_max", required_argument, &rateK_peak_max_en, 1 },
         { "postfilter_newamp1", no_argument, &postfilter_newamp1_en, 1 },
         { "rateKLF", no_argument, &rateKlf, 1 },
         { "bands",required_argument, &bands, 1 },
@@ -166,9 +168,9 @@ int main(int argc, char *argv[])
         { "sq_pitch_e_low", no_argument, &scalar_quant_Wo_e_low, 1 },
         { "vq_pitch_e", no_argument, &vector_quant_Wo_e, 1 },
         { "rate", required_argument, NULL, 0 },
-        { "gain", required_argument, NULL, 0 },
+        { "gainoutlin", required_argument, NULL, 0 },
+        { "comp", required_argument, NULL, 0 },
         { "comp_gain", required_argument, NULL, 0 },
-        { "comp_limit", required_argument, NULL, 0 },
         { "bpf", no_argument, &bpf_en, 1 },
         { "bpfb", no_argument, &bpfb_en, 1 },
         { "hpf200", no_argument, &hpf200_en, 1 },
@@ -273,6 +275,9 @@ int main(int argc, char *argv[])
             } else if(strcmp(long_options[option_index].name, "rateK_mean_max") == 0) {
                 rateK_mean_max = atof(optarg);
                 fprintf(stderr, "rateK_mean_max: %f\n", rateK_mean_max);
+            } else if(strcmp(long_options[option_index].name, "rateK_peak_max") == 0) {
+                rateK_peak_max = atof(optarg);
+                fprintf(stderr, "rateK_peak_max: %f\n", rateK_peak_max);
 	    } else if(strcmp(long_options[option_index].name, "bands") == 0) {
                 /* write mel spaced band energies to file or stdout */
                 if ((fbands = fopen(optarg,"wb")) == NULL) {
@@ -336,13 +341,13 @@ int main(int argc, char *argv[])
 		        optarg, strerror(errno));
                     exit(1);
                 }
-	    } else if(strcmp(long_options[option_index].name, "gain") == 0) {
-		gain = atof(optarg);
-	    } else if(strcmp(long_options[option_index].name, "comp_gain") == 0) {
-		comp_gain_lin = atof(optarg);
+	    } else if(strcmp(long_options[option_index].name, "gainoutlin") == 0) {
+		gainoutlin = atof(optarg);
+	    } else if(strcmp(long_options[option_index].name, "comp") == 0) {
+		comp_limit_dB = atof(optarg);
                 comp_en = 1;
-	    } else if(strcmp(long_options[option_index].name, "comp_limit") == 0) {
-		comp_limit_lin = atof(optarg);
+	    } else if(strcmp(long_options[option_index].name, "comp_gain") == 0) {
+		comp_gain_dB = atof(optarg);
                 comp_en = 1;
 	    } else if(strcmp(long_options[option_index].name, "framelength_s") == 0) {
 		framelength_s = atof(optarg);
@@ -687,14 +692,45 @@ int main(int argc, char *argv[])
 
 	/*------------------------------------------------------------*\
 
-                               Compression
+                            Two Band Hilbert Compressor
 
 	\*------------------------------------------------------------*/
 
         if (comp_en) {
-            for(m=1; m<model.L; m++) {
-                model.A[m] *= comp_gain_lin;
-                if (model.A[m] > comp_limit_lin) model.A[m] = comp_limit_lin;
+            float pre[MAX_AMP+1];
+            float AmdB[MAX_AMP+1];
+            float AmdB_pre[MAX_AMP+1];
+            float max_band1 = 0.0, max_band2 = 0.0;
+            float Fs2 = Fs/2;
+            
+            for(int m=1; m<=model.L; m++) {
+                float sample_freq_Hz = m*model.Wo*Fs2/PI;
+                pre[m] = 20.0*log10(sample_freq_Hz/300.0);
+                AmdB[m] = 20.0*log10(model.A[m]) + comp_gain_dB;
+                AmdB_pre[m] = AmdB[m] + pre[m];
+                if (sample_freq_Hz < 1000.0) {
+                    if (AmdB_pre[m] > max_band1)
+                        max_band1 = AmdB_pre[m];
+                } else {
+                    if (AmdB_pre[m] > max_band2)
+                        max_band2 = AmdB_pre[m];
+                }
+            }
+
+            float gain_band1 = 0.0;
+            if (comp_limit_dB-max_band1 < 0.0)
+                gain_band1 = comp_limit_dB-max_band1;
+            float gain_band2 = 0.0;
+            if (comp_limit_dB-max_band2 < 0.0)
+                gain_band2 = comp_limit_dB-max_band2;
+            float AmdB_comp[MAX_AMP+1];
+            for(int m=1; m<=model.L; m++) {
+                float sample_freq_Hz = m*model.Wo*Fs2/PI;
+                if (sample_freq_Hz < 1000.0)
+                    AmdB_comp[m] = AmdB[m] + gain_band1;
+                else
+                    AmdB_comp[m] = AmdB[m] + gain_band2;
+                model.A[m] = pow(10.0, AmdB_comp[m]/20.0);
             }
         }
         
@@ -721,7 +757,7 @@ int main(int argc, char *argv[])
 	    for(m=3*model.L/4; m<=model.L; m++)
 		model.A[m] = 0.0;
 	}
-
+        
 	/*------------------------------------------------------------*\
 
                             Zero-phase modelling
@@ -888,6 +924,21 @@ int main(int argc, char *argv[])
             float rate_K_vec[K];
             resample_const_rate_f(&c2const, &model, rate_K_vec, rate_K_sample_freqs_kHz, K);
 
+            /* optional energy limit */
+            if (rateK_peak_max_en) {
+                int k;
+                float e = 0.0;
+                for(k=2; k<18; k++)
+                    e += POW10F(rate_K_vec[k]/10.0);
+                e = 10*log10(e/(18-2));
+                //fprintf(stderr, "e: %f\n", e);
+                float gain = rateK_peak_max - e;
+                if (gain < 0.0) {
+                     for(k=0; k<K; k++)
+                        rate_K_vec[k] += gain;
+                }
+            }
+            
 	    if (frateKin != NULL) {
 		assert(fread(rate_K_vec, sizeof(float), K, frateKin) == K);
 	    }
@@ -924,8 +975,6 @@ int main(int argc, char *argv[])
                 /* two stage VQ */
                 int indexes[2];
                 rate_K_mbest_encode(indexes, rate_K_vec_no_mean, rate_K_vec_no_mean_, K, NEWAMP1_VQ_MBEST_DEPTH);
-                for(int k=0; k<K; k++)
-                    rate_K_vec_[k] = rate_K_vec_no_mean_[k] + mean;
 
                 /* running sum of squared error for variance calculation */
                 for(int k=0; k<K; k++)
@@ -1120,7 +1169,7 @@ int main(int argc, char *argv[])
 
                 if (postfilt)
                     postfilter(&model_dec[i], &bg_est);
-                synth_one_frame(n_samp, fftr_inv_cfg, buf, &model_dec[i], Sn_, Pn, prede, &de_mem, gain);
+                synth_one_frame(n_samp, fftr_inv_cfg, buf, &model_dec[i], Sn_, Pn, prede, &de_mem, gainoutlin);
                 #ifdef DUMP
                 dump_quantised_model(&model_dec[i]);
                 #endif
