@@ -7,6 +7,7 @@
 
 #include <assert.h>
 #include <stdlib.h>
+#include <math.h>
 #include <stdio.h>
 #include <getopt.h>
 
@@ -22,6 +23,7 @@ int main(int argc, char *argv[]) {
     float pred = 0.0;
     int removemean = 0;
     float lower = -1E32;
+    int writeall = 0;
     
     static struct option long_options[] = {
         {"startcol",   required_argument, 0, 's'},
@@ -32,6 +34,7 @@ int main(int argc, char *argv[]) {
         {"delay",      required_argument, 0, 'd'},
         {"removemean", no_argument, 0, 'm'},
         {"lower",      required_argument, 0, 'l'},
+        {"writeall", no_argument, 0, 'w'},
         {0, 0, 0, 0}
     };
 
@@ -64,9 +67,13 @@ int main(int argc, char *argv[]) {
         case 'l':
             lower = atof(optarg);
             break;
+        case 'w':
+            writeall = 1;
+            break;
         default:
         helpmsg:
-            fprintf(stderr, "usage: %s  -s startCol -e endCol [-t strideCol -g gain -p predCoeff -d framesDelay --removemean --lower] input.f32 output.f32\n", argv[0]);
+            fprintf(stderr, "usage: %s  -s startCol -e endCol [-t strideCol -g gain -p predCoeff -d "
+                            "framesDelay --removemean --lower --writeall] input.f32 output.f32\n", argv[0]);
             exit(1);
         }
     }
@@ -92,15 +99,18 @@ int main(int argc, char *argv[]) {
 	for(i=st; i<=en; i++)
 	    mean += features[i];
 	mean /= (en-st+1);
-	if (removemean) {
-	    for(i=st; i<=en; i++)
+ 	if (removemean) {
+	    for(i=0; i<stride; i++)
 		features[i] -= mean;
 	}
 	for(i=st; i<=en; i++) {
 	    delta[i] = gain*(features[i] - pred*features_prev[frame_delay-1][i]);
 	}
 	if (mean > lower) {
-	    fwrite(&delta[st], sizeof(float), en-st+1, fout);
+	    if (writeall)
+                fwrite(delta, sizeof(float), stride, fout);
+            else
+                fwrite(&delta[st], sizeof(float), en-st+1, fout);
 	    wr++;
 	}
 	for (f=frame_delay-1; f>0; f--)
