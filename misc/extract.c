@@ -90,6 +90,8 @@ int main(int argc, char *argv[]) {
     float features[stride], features_prev[frame_delay][stride], delta[stride];
     int i,f,wr=0;
     
+    for(i=0; i<stride; i++)
+        delta[i] = 0.0;
     for (f=0; f<frame_delay; f++)
         for(i=0; i<stride; i++)
             features_prev[f][i] = 0.0;
