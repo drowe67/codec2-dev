@@ -135,7 +135,7 @@ function listen_agc_nm() {
   extension="${filename##*.}"
   filename="${filename%.*}"
 
-  o=agc_nm
+  o=agc_nm2
   mkdir -p $o
   agc ${fullfile}
   c2sim ${filename}_agc.s16 --rateK --rateK_mean_min 0 --rateK_mean_max 60 --rateKnomeanout ${filename}.f32 \
@@ -185,6 +185,63 @@ function train_agc_nm2() {
   vqtrain ${filename}_agc_nm.f32 $K 2048 vq_stage1.f32 -s 1e-3 --st $Kst --en $Ken -r stage2_in.f32
   vqtrain stage2_in.f32 $K 512 vq_stage2.f32 -s 1e-3 --st $Kst --en $Ken -r stage3_in.f32
   vqtrain stage3_in.f32 $K 512 vq_stage3.f32 -s 1e-3 --st $Kst --en $Ken
+}
+
+# listen with agc, two band compressed
+function listen_agc_nm_comp() {
+  fullfile=$1
+  filename=$(basename -- "$fullfile")
+  extension="${filename##*.}"
+  filename="${filename%.*}"
+
+  o=agc_nm_comp
+  mkdir -p $o
+  agc ${fullfile}
+  c2sim ${filename}_agc.s16 --rateK --comp 75 --comp_gain 10 --rateKnomeanout ${filename}.f32 \
+        --phase0 --postfilter --dump ${filename} -o - | sox -t .s16 -r 8000 -c 1 - ${o}/${filename}_ratek.wav
+  cat ${filename}.f32 | vq_mbest --st $Kst --en $Ken -k $K -q vq_stage1.f32 > ${filename}_vq.f32
+  c2sim ${filename}_agc.s16 --rateK --comp 75 --comp_gain 10 --rateKnomeanin ${filename}_vq.f32  \
+        --phase0 --postfilter --postfilter_newamp1 -o - | sox -t .s16 -r 8000 -c 1 - ${o}/${filename}_agc_vq.wav
+  cat ${filename}.f32 | vq_mbest --st $Kst --en $Ken -k $K -q vq_stage1.f32,vq_stage2.f32 --mbest 5 \
+      > ${filename}_vq2.f32
+  c2sim ${filename}_agc.s16 --rateK --comp 75 --comp_gain 10 --rateKnomeanin ${filename}_vq2.f32  \
+        --phase0 --postfilter --postfilter_newamp1 -o - | sox -t .s16 -r 8000 -c 1 - ${o}/${filename}_agc_vq2.wav
+  cat ${filename}.f32 | \
+      vq_mbest --st $Kst --en $Ken -k $K -q vq_stage1.f32,vq_stage2.f32,vq_stage3.f32 --mbest 5 \
+      > ${filename}_vq3.f32
+  c2sim ${filename}_agc.s16 --rateK --comp 75 --comp_gain 10 --rateKnomeanin ${filename}_vq3.f32  \
+        --phase0 --postfilter --postfilter_newamp1 -o - | sox -t .s16 -r 8000 -c 1 - ${o}/${filename}_agc_vq3.wav
+  c2sim ${filename}_agc.s16 --rateK --comp 75 --comp_gain 10 --rateKnomeanin ${filename}_vq3.f32  \
+         -o - | sox -t .s16 -r 8000 -c 1 - ${o}/${filename}_agc_vq3_op.wav
+  c2sim $fullfile --rateK --newamp1vq \
+         --phase0 --postfilter --postfilter_newamp1 -o - | sox -t .s16 -r 8000 -c 1 - ${o}/${filename}_newamp1.wav
+}
+
+# train - two band freq domain Hilbert compressor
+function train_compressed_two_band() {
+  fullfile=$TRAIN
+  filename=$(basename -- "$fullfile")
+  extension="${filename##*.}"
+  filename="${filename%.*}"
+
+  agc ${fullfile}
+  c2sim ${filename}_agc.s16 --rateK --rateKnomeanout ${filename}_comp.f32 --comp 75 --comp_gain 10
+  #extract ${filename}_comp.f32 ${filename}_comp_nm.f32 -t $K -s $Kst -e $Ken --writeall --lower 20 --removemean
+  vqtrain ${filename}_comp.f32 $K 2048 vq_stage1.f32 -s 1e-3 --st $Kst --en $Ken -r stage2_in.f32
+  vqtrain stage2_in.f32 $K 512 vq_stage2.f32 -s 1e-3 --st $Kst --en $Ken -r stage3_in.f32
+  vqtrain stage3_in.f32 $K 512 vq_stage3.f32 -s 1e-3 --st $Kst --en $Ken
+}
+
+# Look at some stats when running two band freq domain Hilbert compressor
+function stats_compressed_two_band() {
+  fullfile=$TRAIN
+  filename=$(basename -- "$fullfile")
+  extension="${filename##*.}"
+  filename="${filename%.*}"
+
+  # initial step applies SSB filter
+  cat ${fullfile} | hpf | c2sim - --rateK --rateKout ${filename}.f32
+  cat ${fullfile} | hpf | c2sim - --rateK --rateKout ${filename}_comp.f32 --comp 75 --comp_gain 10
 }
 
 function test_agc_nm2() {
@@ -265,13 +322,26 @@ function listen_test_agc_nm() {
     listen_agc_nm ~/Downloads/vk5dgr_testing_8k.wav
 }
 
+function listen_test_agc_nm_comp() {
+    listen_agc_nm_comp $CODEC2_PATH/raw/big_dog.raw
+    listen_agc_nm_comp $CODEC2_PATH/raw/hts2a.raw
+    listen_agc_nm_comp ~/Downloads/fish.s16
+    listen_agc_nm_comp ~/Downloads/pencil.s16
+    listen_agc_nm_comp $CODEC2_PATH/raw/kristoff.raw
+    listen_agc_nm_comp $CODEC2_PATH/raw/vk5qi.raw
+    listen_agc_nm_comp ~/Downloads/vk5dgr_testing_8k.wav
+}
+
 #train_compressed
 #listen_test_compressed
 #train_agc
 #listen_test_agc
 #train_agc_nm
-#listen_test_agc_nm
 #train_agc_nm
 train_agc_nm2
+listen_test_agc_nm
 #test_agc_nm2
-
+#stats_compressed_two_band
+#train_compressed_two_band
+#listen_test_agc_nm_comp
+#listen_agc_nm_comp ~/Downloads/fish.s16
