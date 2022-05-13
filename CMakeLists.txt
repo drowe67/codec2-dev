@@ -1043,7 +1043,7 @@ endif(NOT APPLE)
                             ../misc/vq_mbest -k 4 -q vq1.f32,vq2.f32 --st 1 --en 2 --mbest 2 -v > /dev/null;"
              WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/unittest
              )
-             set_tests_properties(test_vq_mbest PROPERTIES PASS_REGULAR_EXPRESSION "MSE: 0.00")
+             set_tests_properties(test_vq_mbest PROPERTIES PASS_REGULAR_EXPRESSION "var: 0.00")
 
      add_test(NAME test_700c_eq
              COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/unittest;
