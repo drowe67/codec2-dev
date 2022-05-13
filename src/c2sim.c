@@ -690,50 +690,6 @@ int main(int argc, char *argv[])
 	two_stage_pitch_refinement(&c2const, &model, Sw);
 	estimate_amplitudes(&model, Sw, W, 1);
 
-	/*------------------------------------------------------------*\
-
-                            Two Band Hilbert Compressor
-
-	\*------------------------------------------------------------*/
-
-        if (comp_en) {
-            float pre[MAX_AMP+1];
-            float AmdB[MAX_AMP+1];
-            float AmdB_pre[MAX_AMP+1];
-            float max_band1 = 0.0, max_band2 = 0.0;
-            float Fs2 = Fs/2;
-            
-            for(int m=1; m<=model.L; m++) {
-                float sample_freq_Hz = m*model.Wo*Fs2/PI;
-                pre[m] = 20.0*log10(sample_freq_Hz/300.0);
-                AmdB[m] = 20.0*log10(model.A[m]) + comp_gain_dB;
-                AmdB_pre[m] = AmdB[m] + pre[m];
-                if (sample_freq_Hz < 1000.0) {
-                    if (AmdB_pre[m] > max_band1)
-                        max_band1 = AmdB_pre[m];
-                } else {
-                    if (AmdB_pre[m] > max_band2)
-                        max_band2 = AmdB_pre[m];
-                }
-            }
-
-            float gain_band1 = 0.0;
-            if (comp_limit_dB-max_band1 < 0.0)
-                gain_band1 = comp_limit_dB-max_band1;
-            float gain_band2 = 0.0;
-            if (comp_limit_dB-max_band2 < 0.0)
-                gain_band2 = comp_limit_dB-max_band2;
-            float AmdB_comp[MAX_AMP+1];
-            for(int m=1; m<=model.L; m++) {
-                float sample_freq_Hz = m*model.Wo*Fs2/PI;
-                if (sample_freq_Hz < 1000.0)
-                    AmdB_comp[m] = AmdB[m] + gain_band1;
-                else
-                    AmdB_comp[m] = AmdB[m] + gain_band2;
-                model.A[m] = pow(10.0, AmdB_comp[m]/20.0);
-            }
-        }
-        
         #ifdef DUMP
         dump_Sn(m_pitch, Sn); dump_Sw(Sw); dump_model(&model);
         #endif
@@ -791,6 +747,50 @@ int main(int argc, char *argv[])
 	    }
 	}
 
+	/*------------------------------------------------------------*\
+
+                            Two Band Hilbert Compressor
+
+	\*------------------------------------------------------------*/
+
+        if (comp_en) {
+            float pre[MAX_AMP+1];
+            float AmdB[MAX_AMP+1];
+            float AmdB_pre[MAX_AMP+1];
+            float max_band1 = 0.0, max_band2 = 0.0;
+            float Fs2 = Fs/2;
+            
+            for(int m=1; m<=model.L; m++) {
+                float sample_freq_Hz = m*model.Wo*Fs2/PI;
+                pre[m] = 20.0*log10(sample_freq_Hz/300.0);
+                AmdB[m] = 20.0*log10(model.A[m]) + comp_gain_dB;
+                AmdB_pre[m] = AmdB[m] + pre[m];
+                if (sample_freq_Hz < 1000.0) {
+                    if (AmdB_pre[m] > max_band1)
+                        max_band1 = AmdB_pre[m];
+                } else {
+                    if (AmdB_pre[m] > max_band2)
+                        max_band2 = AmdB_pre[m];
+                }
+            }
+
+            float gain_band1 = 0.0;
+            if (comp_limit_dB-max_band1 < 0.0)
+                gain_band1 = comp_limit_dB-max_band1;
+            float gain_band2 = 0.0;
+            if (comp_limit_dB-max_band2 < 0.0)
+                gain_band2 = comp_limit_dB-max_band2;
+            float AmdB_comp[MAX_AMP+1];
+            for(int m=1; m<=model.L; m++) {
+                float sample_freq_Hz = m*model.Wo*Fs2/PI;
+                if (sample_freq_Hz < 1000.0)
+                    AmdB_comp[m] = AmdB[m] + gain_band1;
+                else
+                    AmdB_comp[m] = AmdB[m] + gain_band2;
+                model.A[m] = pow(10.0, AmdB_comp[m]/20.0);
+            }
+        }
+        
 	/*------------------------------------------------------------*\
 
 	        LPC model amplitudes and LSP quantisation
