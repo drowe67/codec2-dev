@@ -114,7 +114,8 @@ int main(int argc, char *argv[])
     int   rateK_mean_min_en, rateK_mean_max_en;
     int   bands = 0, bands_lower_en;
     float bands_lower = -1E32;
-    int   K = 20;
+    int   K = 20, K_st=0;
+    int   K_en=K-1;
     float framelength_s = N_S;
     int   lspEWov = 0, rateKWov = 0, first = 0;
     FILE  *frateKWov = NULL;
@@ -134,6 +135,8 @@ int main(int argc, char *argv[])
         { "Fs", required_argument, &set_fs, 1 },
         { "rateK", no_argument, &rateK, 1 },
         { "setK", required_argument, &setK, 1 },
+        { "K_st", required_argument, NULL, 0 },
+        { "K_en", required_argument, NULL, 0 },
         { "perframe", no_argument, &perframe, 1 },
         { "newamp1vq", no_argument, &newamp1vq, 1 },
         { "rateKdec", required_argument, &rate_K_dec, 1 },
@@ -234,6 +237,13 @@ int main(int argc, char *argv[])
             } else if(strcmp(long_options[option_index].name, "setK") == 0) {
                 K = atoi(optarg);
                 fprintf(stderr, "K: %d\n", K);
+                K_en = K-1;
+            } else if(strcmp(long_options[option_index].name, "K_st") == 0) {
+                K_st = atoi(optarg);
+                fprintf(stderr, "K_st: %d\n", K_st);
+            } else if(strcmp(long_options[option_index].name, "K_en") == 0) {
+                K_en = atoi(optarg);
+                fprintf(stderr, "K_en: %d\n", K_en);
             } else if(strcmp(long_options[option_index].name, "rateKdec") == 0) {
                 rate_K_dec = atoi(optarg);
                 fprintf(stderr, "rate_K_dec: %d\n", rate_K_dec);
@@ -945,9 +955,9 @@ int main(int argc, char *argv[])
         
             /* remove mean, as EQ and post filter work on mean removed vector */
 	    float sum = 0.0;
-	    for(int k=0; k<K; k++)
+	    for(int k=K_st; k<=K_en; k++)
 	      sum += rate_K_vec[k];
-	    float mean = sum/K;
+	    float mean = sum/(K_en-K_st+1);
 	    float rate_K_vec_no_mean[K]; float rate_K_vec_no_mean_[K];
 	    for(int k=0; k<K; k++)
 	      rate_K_vec_no_mean[k] = rate_K_vec[k] - mean;
