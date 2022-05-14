@@ -742,7 +742,7 @@ static int est_timing(struct OFDM *ofdm, complex float *rx, int length,
         corr_st = 0.0f;
         corr_en = 0.0f;
 
-#if defined(__EMBEDDED__) && defined(__REAL__)
+#if defined(__EMBEDDED__) && defined(__REAL__) && defined(__ARM_ARCH)
         float re,im;
 
         arm_dot_prod_f32(&rx_real[i], wvec_pilot_real, ofdm->samplespersymbol, &re);
@@ -752,6 +752,17 @@ static int est_timing(struct OFDM *ofdm, complex float *rx, int length,
         arm_dot_prod_f32(&rx_real[i+ ofdm->samplesperframe], wvec_pilot_real, ofdm->samplespersymbol, &re);
         arm_dot_prod_f32(&rx_real[i+ ofdm->samplesperframe], wvec_pilot_imag, ofdm->samplespersymbol, &im);
         corr_en = re + im * I;
+#elif defined(__EMBEDDED__) && defined(__REAL__)
+        float re = 0, im = 0, re_shifted = 0, im_shifted = 0;
+        for (j = 0; j < ofdm->samplespersymbol; j++) {
+            re = re + rx_real[i + j] * wvec_pilot_real[j];
+            im = im + rx_real[i + j] * wvec_pilot_imag[j];
+            re_shifted = re_shifted + rx_real[i + j + ofdm->samplesperframe] * wvec_pilot_real[j];
+            im_shifted = im_shifted * rx_real[i + j + ofdm->samplesperframe] * wvec_pilot_imag[j];
+        }
+        
+        corr_st = re + im * I;
+        corr_en = re_shifted + im_shifted * I;
 #elif defined(__EMBEDDED__) && defined(__ARM_ARCH)
         float re,im;
 
