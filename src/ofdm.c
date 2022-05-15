@@ -43,9 +43,9 @@
 #include "debug_alloc.h"
 #include "machdep.h"
 
-#if defined(__EMBEDDED__) && defined(__ARM_ARCH)
-#include "arm_math.h"
-#endif /* __EMBEDDED__ && __ARM_ARCH */
+#if defined(__EMBEDDED__)
+#include "codec2_math.h"
+#endif /* __EMBEDDED__ */
 
 /* Static Prototypes */
 
@@ -742,34 +742,23 @@ static int est_timing(struct OFDM *ofdm, complex float *rx, int length,
         corr_st = 0.0f;
         corr_en = 0.0f;
 
-#if defined(__EMBEDDED__) && defined(__REAL__) && defined(__ARM_ARCH)
+#if defined(__EMBEDDED__) && defined(__REAL__)
         float re,im;
 
-        arm_dot_prod_f32(&rx_real[i], wvec_pilot_real, ofdm->samplespersymbol, &re);
-        arm_dot_prod_f32(&rx_real[i], wvec_pilot_imag, ofdm->samplespersymbol, &im);
+        codec2_dot_product_f32(&rx_real[i], wvec_pilot_real, ofdm->samplespersymbol, &re);
+        codec2_dot_product_f32(&rx_real[i], wvec_pilot_imag, ofdm->samplespersymbol, &im);
         corr_st = re + im * I;
 
-        arm_dot_prod_f32(&rx_real[i+ ofdm->samplesperframe], wvec_pilot_real, ofdm->samplespersymbol, &re);
-        arm_dot_prod_f32(&rx_real[i+ ofdm->samplesperframe], wvec_pilot_imag, ofdm->samplespersymbol, &im);
+        codec2_dot_product_f32(&rx_real[i+ ofdm->samplesperframe], wvec_pilot_real, ofdm->samplespersymbol, &re);
+        codec2_dot_product_f32(&rx_real[i+ ofdm->samplesperframe], wvec_pilot_imag, ofdm->samplespersymbol, &im);
         corr_en = re + im * I;
-#elif defined(__EMBEDDED__) && defined(__REAL__)
-        float re = 0, im = 0, re_shifted = 0, im_shifted = 0;
-        for (j = 0; j < ofdm->samplespersymbol; j++) {
-            re = re + rx_real[i + j] * wvec_pilot_real[j];
-            im = im + rx_real[i + j] * wvec_pilot_imag[j];
-            re_shifted = re_shifted + rx_real[i + j + ofdm->samplesperframe] * wvec_pilot_real[j];
-            im_shifted = im_shifted * rx_real[i + j + ofdm->samplesperframe] * wvec_pilot_imag[j];
-        }
-        
-        corr_st = re + im * I;
-        corr_en = re_shifted + im_shifted * I;
-#elif defined(__EMBEDDED__) && defined(__ARM_ARCH)
+#elif defined(__EMBEDDED__)
         float re,im;
 
-        arm_cmplx_dot_prod_f32((float*)&rx[i], (float*)wvec_pilot, ofdm->samplespersymbol, &re, &im);
+        codec2_complex_dot_product_f32((float*)&rx[i], (float*)wvec_pilot, ofdm->samplespersymbol, &re, &im);
         corr_st = re + im * I;
 
-        arm_cmplx_dot_prod_f32((float*)&rx[i+ ofdm->samplesperframe], (float*)wvec_pilot, ofdm->samplespersymbol, &re, &im);
+        codec2_complex_dot_product_f32((float*)&rx[i+ ofdm->samplesperframe], (float*)wvec_pilot, ofdm->samplespersymbol, &re, &im);
         corr_en = re + im * I;
 #else
         for (j = 0; j < ofdm->samplespersymbol; j++) {
@@ -778,7 +767,7 @@ static int est_timing(struct OFDM *ofdm, complex float *rx, int length,
             corr_st = corr_st + (rx[ind                        ] * wvec_pilot[j]);
             corr_en = corr_en + (rx[ind + ofdm->samplesperframe] * wvec_pilot[j]);
         }
-#endif // __EMBEDDED__ && (__REAL__ || __ARM_ARCH)
+#endif // __EMBEDDED__
         corr[i] = (cabsf(corr_st) + cabsf(corr_en)) * av_level;
     }
 
