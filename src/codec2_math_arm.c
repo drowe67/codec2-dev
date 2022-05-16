@@ -1,11 +1,8 @@
-#ifndef CODEC2_MATH_H
-#define CODEC2_MATH_H
-
 //==========================================================================
-// Name:            codec2_math.h
+// Name:            codec2_math_arm.c
 //
 // Purpose:         A wrapper around architecture specific math libraries 
-//                  used on embedded devices to improve Codec2 performance.
+//                  used on ARM embedded devices to improve Codec2 performance.
 // Created:         May 15, 2022
 // Authors:         Mooneer Salem
 //
@@ -24,18 +21,11 @@
 //
 //==========================================================================
 
-#ifdef __cplusplus
-extern "C"
-{
-#endif // __cplusplus
+#include "codec2_math.h"
 
-//==========================================================================
-// Note: the functions in this file must be implemented in your code if you 
-// intend on using Codec2 in a non-ARM based embedded device. Otherwise, 
-// linker errors will occur. For ARM, a default implementation of these 
-// functions exists in codec2_math_arm.c.
-//==========================================================================
-    
+#if defined(__EMBEDDED__) && defined(__ARM_ARCH)
+#include "arm_math.h"
+
 //==========================================================================
 /// Calculates the dot product of two real-valued float vectors.
 ///
@@ -45,7 +35,10 @@ extern "C"
 /// @param resultReal A pointer to the variable in which to store the scalar result.
 ///
 //==========================================================================
-extern void codec2_dot_product_f32(float* leftHandSideComplexVector, float* rightHandSideComplexVector, size_t vectorLength, float* resultReal, float* resultImag) __attribute__((weak));
+void codec2_dot_product_f32(float* leftHandSideRealVector, float* rightHandSideRealVector, size_t vectorLength, float* resultReal) 
+{
+    arm_dot_prod_f32(leftHandSideRealVector, rightHandSideRealVector, vectorLength, resultReal);
+}
 
 //==========================================================================
 /// Calculates the dot product of two complex-valued float vectors.
@@ -57,10 +50,9 @@ extern void codec2_dot_product_f32(float* leftHandSideComplexVector, float* righ
 /// @param resultImag A pointer to the variable in which to store the imaginary component of the result.
 ///
 //==========================================================================
-extern void codec2_complex_dot_product_f32(float* leftHandSideComplexVector, float* rightHandSideComplexVector, size_t vectorLength, float* resultReal, float* resultImag) __attribute__((weak));
-
-#ifdef __cplusplus
+void codec2_complex_dot_product_f32(float* leftHandSideComplexVector, float* rightHandSideComplexVector, size_t vectorLength, float* resultReal, float* resultImag)
+{
+    arm_cmplx_dot_prod_f32(leftHandSideComplexVector, rightHandSideComplexVector, vectorLength, resultReal, resultImag);
 }
-#endif // __cplusplus
 
-#endif // CODEC2_MATH_H
+#endif // defined(__EMBEDDED__) && defined(__ARM_ARCH)

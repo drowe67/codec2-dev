@@ -213,6 +213,7 @@ set(CODEC2_SRCS
     ldpc_codes.c
     lpcnet_freq.c
     reliable_text.c
+    codec2_math_arm.c
 )
 
 set(CODEC2_PUBLIC_HEADERS
@@ -227,6 +228,7 @@ set(CODEC2_PUBLIC_HEADERS
     modem_stats.h
     freedv_api.h
     reliable_text.h
+    codec2_math.h
     ${CODEC2_VERSION_PATH}/version.h
 )
 
