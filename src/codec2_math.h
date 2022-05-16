@@ -47,7 +47,7 @@ extern "C"
 /// @param resultReal A pointer to the variable in which to store the scalar result.
 ///
 //==========================================================================
-extern void codec2_dot_product_f32(float* leftHandSideComplexVector, float* rightHandSideComplexVector, size_t vectorLength, float* resultReal, float* resultImag) __attribute__((weak));
+extern void codec2_dot_product_f32(float* leftHandSideComplexVector, float* rightHandSideComplexVector, size_t vectorLength, float* resultReal) __attribute__((weak));
 
 //==========================================================================
 /// Calculates the dot product of two complex-valued float vectors.
