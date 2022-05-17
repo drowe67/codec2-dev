@@ -33,7 +33,6 @@
 /// @param rightHandSideRealVector A pointer to the second vector to use for the dot product.
 /// @param vectorLength The length of the vector. Both vectors should be at least this long.
 /// @param resultReal A pointer to the variable in which to store the scalar result.
-///
 //==========================================================================
 void codec2_dot_product_f32(float* leftHandSideRealVector, float* rightHandSideRealVector, size_t vectorLength, float* resultReal) 
 {
@@ -49,6 +48,7 @@ void codec2_dot_product_f32(float* leftHandSideRealVector, float* rightHandSideR
 /// @param resultReal A pointer to the variable in which to store the real component of the result.
 /// @param resultImag A pointer to the variable in which to store the imaginary component of the result.
 ///
+/// @note Each array of floats is organized with even elements being real and odd elements imaginary.
 //==========================================================================
 void codec2_complex_dot_product_f32(float* leftHandSideComplexVector, float* rightHandSideComplexVector, size_t vectorLength, float* resultReal, float* resultImag)
 {
