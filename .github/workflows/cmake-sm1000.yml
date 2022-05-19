@@ -23,11 +23,6 @@ jobs:
            sudo apt-get update
            sudo apt-get install octave octave-common octave-signal liboctave-dev gnuplot sox p7zip-full python3-numpy valgrind 
 
-    - name: Run ctests
-      working-directory: ${{github.workspace}}/build_linux
-      shell: bash
-      run: ctest --output-on-failure
-
     - name: Install ST Standard Peripheral Library (SM1000)
       working-directory: ${{github.workspace}}/stm32
       shell: bash
