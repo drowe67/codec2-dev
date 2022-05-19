@@ -63,3 +63,21 @@ jobs:
       # See https://cmake.org/cmake/help/latest/manual/ctest.1.html for more detail
       run: ctest --output-on-failure
 
+    - name: Install ST Standard Peripheral Library (SM1000)
+      working-directory: ${{github.workspace}}/stm32
+      shell: bash
+      run: git clone https://github.com/whimsicalraps/STM32F4xx_DSP_StdPeriph_Lib
+
+    - name: Install SM1000 prerequisites
+      working-directory: ${{github.workspace}}/stm32
+      shell: bash
+      run: sudo apt install gcc-arm-none-eabi
+
+    - name: Build SM1000
+      working-directory: ${{github.workspace}}/stm32
+      shell: bash
+      run: |
+           mkdir build_stm32
+           cd build_stm32
+           cmake -DCMAKE_TOOLCHAIN_FILE=../cmake/STM32_Toolchain.cmake -DPERIPHLIBDIR=${{github.workspace}}/stm32/STM32F4xx_DSP_StdPeriph_Lib ..
+           make
