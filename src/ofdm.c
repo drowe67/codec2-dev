@@ -1391,7 +1391,7 @@ static void ofdm_demod_core(struct OFDM *ofdm, int *rx_bits) {
     if (ofdm->timing_en == true) {
         /* update timing at start of every frame */
 
-        st = ofdm->rxbufst + ofdm->samplespersymbol + ofdm->samplesperframe - floorf(ofdm->ftwindowwidth / 2) + ofdm->timing_est;
+        st = ofdm->rxbufst + ofdm->samplespersymbol + ofdm->samplesperframe - (int) floorf((float)ofdm->ftwindowwidth / 2) + ofdm->timing_est;
         en = st + ofdm->samplesperframe - 1 + ofdm->samplespersymbol + ofdm->ftwindowwidth;
 
         complex float work[(en - st)];
@@ -1406,7 +1406,7 @@ static void ofdm_demod_core(struct OFDM *ofdm, int *rx_bits) {
 
         int ft_est = est_timing(ofdm, work, (en - st), 0.0f, &ofdm->timing_mx, &ofdm->timing_valid, 1);
 
-        ofdm->timing_est += ft_est - ceilf((float)ofdm->ftwindowwidth / 2) + 1;
+        ofdm->timing_est += ft_est - (int) ceilf((float)ofdm->ftwindowwidth / 2) + 1;
 
         if (ofdm->verbose > 2) {
             fprintf(stderr, "  ft_est: %2d timing_est: %2d sample_point: %2d\n", ft_est, ofdm->timing_est,
