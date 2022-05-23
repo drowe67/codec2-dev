@@ -6,7 +6,10 @@
 
   Codec2 simulation.  Combines encoder and decoder and allows
   switching in and out various algorithms and quantisation steps. Used
-  for algorithm development.
+  for algorithm development.  Various option to write/read vectors to
+  external files for plotting and external processing/VQ training.
+  Quite a lot of cruft and dead code over the years.  It isn't pretty
+  - but that's OK!
 
 \*---------------------------------------------------------------------------*/
 
@@ -52,14 +55,22 @@
 #include "lpcnet_freq.h"
 #include "sd.h"
 
-void synth_one_frame(int n_samp, codec2_fftr_cfg fftr_inv_cfg, short buf[], MODEL *model, float Sn_[], float Pn[], int prede, float *de_mem, float gain);
+void synth_one_frame(int n_samp, codec2_fftr_cfg fftr_inv_cfg, short buf[],
+                     MODEL *model, float Sn_[], float Pn[], int prede, float *de_mem, float gain);
 void print_help(const struct option *long_options, int num_opts, char* argv[]);
 
 #define N_SAMP n_samp  /* quick fix for run time sample rate selection */
 
 extern int phase_dispersion;
 
-/*---------------------------------------------------------------------------*\
+struct RATEKMEANCOMP {
+    float noise_gate;
+    float thresh;
+    float slope;
+    float makeup_gain;
+};
+
+/*---------------------------------------------------------------------------* \
 
 				MAIN
 
@@ -111,9 +122,8 @@ int main(int argc, char *argv[])
     FILE *fout = NULL;	/* output speech file */
     int   rateK = 0, newamp1vq = 0, rate_K_dec = 0, perframe=0, postfilter_newamp1_en=0, rateKlf=0, setK=0;
     float rateK_mean_min = -1E32, rateK_mean_max = 1E32;
-    int   rateK_mean_min_en, rateK_mean_max_en;
-    int   bands = 0, bands_lower_en;
-    float bands_lower = -1E32;
+    int   rateK_mean_min_en, rateK_mean_max_en, rateK_mean_comp_en;
+    struct RATEKMEANCOMP rateKmeancomp = {0.0,0.0,0.0,0.0};
     int   K = 20, K_st=0;
     int   K_en=K-1;
     float framelength_s = N_S;
@@ -125,10 +135,8 @@ int main(int argc, char *argv[])
     FILE  *frateKnomean = NULL;
     FILE  *frateKin = NULL;
     FILE  *frateKnomeanin = NULL;
-    int   rateKout, rateKnomeanout, rateKin, rateKnomeanin, rateK_peak_max_en;
-    float rateK_peak_max = 1E32;
-    FILE *fbands = NULL;
-    int   bands_resample = 0;
+    FILE  *frateKmean = NULL;
+    int   rateKout, rateKnomeanout, rateKmeanout_en, rateKin, rateKnomeanin;
     
     char* opt_string = "ho:";
     struct option long_options[] = {
@@ -142,16 +150,14 @@ int main(int argc, char *argv[])
         { "rateKdec", required_argument, &rate_K_dec, 1 },
         { "rateKout", required_argument, &rateKout, 1 },
         { "rateKnomeanout", required_argument, &rateKnomeanout, 1 },
+        { "rateKmeanout", required_argument, &rateKmeanout_en, 1 },
         { "rateKin", required_argument, &rateKin, 1 },
         { "rateKnomeanin", required_argument, &rateKnomeanin, 1 },
         { "rateK_mean_min", required_argument, &rateK_mean_min_en, 1 },
         { "rateK_mean_max", required_argument, &rateK_mean_max_en, 1 },
-        { "rateK_peak_max", required_argument, &rateK_peak_max_en, 1 },
+        { "rateK_mean_comp", required_argument, &rateK_mean_comp_en, 1 },
         { "postfilter_newamp1", no_argument, &postfilter_newamp1_en, 1 },
         { "rateKLF", no_argument, &rateKlf, 1 },
-        { "bands",required_argument, &bands, 1 },
-        { "bands_lower",required_argument, &bands_lower_en, 1 },
-        { "bands_resample", no_argument, &bands_resample, 1 },
         { "lpc", required_argument, &lpc_model, 1 },
         { "lsp", no_argument, &lsp, 1 },
         { "lspd", no_argument, &lspd, 1 },
@@ -248,7 +254,7 @@ int main(int argc, char *argv[])
                 rate_K_dec = atoi(optarg);
                 fprintf(stderr, "rate_K_dec: %d\n", rate_K_dec);
 	    } else if(strcmp(long_options[option_index].name, "rateKout") == 0) {
-                /* read model records from file or stdin */
+                /* write rateK vectors to file */
                 if ((frateK = fopen(optarg,"wb")) == NULL) {
 	            fprintf(stderr, "Error opening output rateK file: %s: %s\n",
 		        optarg, strerror(errno));
@@ -256,15 +262,23 @@ int main(int argc, char *argv[])
                 }
                 fprintf(stderr, "each record is %d bytes\n", (int)(K*sizeof(float)));
 	    } else if(strcmp(long_options[option_index].name, "rateKnomeanout") == 0) {
-                /* read model records from file or stdin */
+                /* write rateK mean removed vectors to file */
                 if ((frateKnomean = fopen(optarg,"wb")) == NULL) {
 	            fprintf(stderr, "Error opening output rateKnomean file: %s: %s\n",
 		        optarg, strerror(errno));
                     exit(1);
                 }
                 fprintf(stderr, "each record is %d bytes\n", (int)(K*sizeof(float)));
+	    } else if(strcmp(long_options[option_index].name, "rateKmeanout") == 0) {
+                /* write rateK mean scalar to file */
+                if ((frateKmean = fopen(optarg,"wb")) == NULL) {
+	            fprintf(stderr, "Error opening output rateKmean file: %s: %s\n",
+		        optarg, strerror(errno));
+                    exit(1);
+                }
+                fprintf(stderr, "each record is %d bytes\n", (int)sizeof(float));
 	    } else if(strcmp(long_options[option_index].name, "rateKin") == 0) {
-                /* read model records from file or stdin */
+                /* read rateK vectos from file */
                 if ((frateKin = fopen(optarg,"rb")) == NULL) {
 	            fprintf(stderr, "Error opening input rateK file: %s: %s\n",
 		        optarg, strerror(errno));
@@ -272,7 +286,7 @@ int main(int argc, char *argv[])
                 }
                 fprintf(stderr, "each record is %d bytes\n", (int)(K*sizeof(float)));
 	    } else if(strcmp(long_options[option_index].name, "rateKnomeanin") == 0) {
-                /* read model records from file or stdin */
+                /* read mean removed rateK vectors from file */
                 if ((frateKnomeanin = fopen(optarg,"rb")) == NULL) {
 	            fprintf(stderr, "Error opening input rateK file: %s: %s\n",
 		        optarg, strerror(errno));
@@ -285,19 +299,25 @@ int main(int argc, char *argv[])
             } else if(strcmp(long_options[option_index].name, "rateK_mean_max") == 0) {
                 rateK_mean_max = atof(optarg);
                 fprintf(stderr, "rateK_mean_max: %f\n", rateK_mean_max);
-            } else if(strcmp(long_options[option_index].name, "rateK_peak_max") == 0) {
-                rateK_peak_max = atof(optarg);
-                fprintf(stderr, "rateK_peak_max: %f\n", rateK_peak_max);
-	    } else if(strcmp(long_options[option_index].name, "bands") == 0) {
-                /* write mel spaced band energies to file or stdout */
-                if ((fbands = fopen(optarg,"wb")) == NULL) {
-	            fprintf(stderr, "Error opening bands file: %s: %s\n",
-		        optarg, strerror(errno));
-                    exit(1);
+            } else if(strcmp(long_options[option_index].name, "rateK_mean_comp") == 0) {
+                /* parse 4 values --rateK_mean_comp noisegate,thresh,slope,makeupgain */
+                fprintf(stderr,"rateK mean compressor %s\n", optarg);
+                char *comma, *p, val_str[80];
+                p = optarg;
+                float values[4];
+                for(int n=0; n<4; n++) {
+                    strcpy(val_str, p);
+                    comma = strchr(val_str, ',');
+                    if (comma) {
+                        *comma = 0;
+                        p = comma+1;
+                    }
+                    values[n] = atof(val_str);
                 }
-	    } else if(strcmp(long_options[option_index].name, "bands_lower") == 0) {
-		bands_lower = atof(optarg);
-		fprintf(stderr, "bands_lower: %f\n", bands_lower);
+                rateKmeancomp.noise_gate = values[0];
+                rateKmeancomp.thresh = values[1];
+                rateKmeancomp.slope = values[2];
+                rateKmeancomp.makeup_gain = values[3];
             } else if(strcmp(long_options[option_index].name, "dec") == 0) {
 
                 decimate = atoi(optarg);
@@ -906,27 +926,12 @@ int main(int argc, char *argv[])
             fwrite(&ak[1], order, sizeof(float), flspEWov);
         }
 
-	/* LPCNet type mel spaced band ML data */
-	float bands_mean = 0.0;
-	if (fbands) {
-	    float bandE[LPCNET_FREQ_MAX_BANDS];
-            float freqkHz[LPCNET_FREQ_MAX_BANDS];
-	    int nbands = lpcnet_compute_band_energy(bandE, freqkHz, Sw, Fs, FFT_ENC);
-	    for(int i=0; i<nbands; i++)
-		bands_mean += bandE[i];
-	    bands_mean /= nbands;
-	    //fprintf(stderr, "bands_mean: %f bands_lower %f\n", bands_mean,  bands_lower);
-	    if (bands_mean > bands_lower)
- 		assert(fwrite(bandE, sizeof(float), nbands, fbands) == nbands);
-            // optionally reconstruct [Am} by linear interpolation of band energies,
-            // this doesn't sound very Good
-            if (bands_resample)
-                resample_rate_L(&c2const, &model, &bandE[1], &freqkHz[1], nbands-2);
-	}
-
 	/*------------------------------------------------------------*\
 
-	            Optional newamp1 simulation, as used in 700C
+	   newamp1/rateK, as used in 700C.  We resample the rate L {Am}
+           samples to rate K.  L is dependant on the pitch Wo, so is
+           time varying. K is constant, but sampled at non-linear 
+           points n the frequency axis.
 
 	\*------------------------------------------------------------*/
 
@@ -934,26 +939,11 @@ int main(int argc, char *argv[])
             float rate_K_vec[K];
             resample_const_rate_f(&c2const, &model, rate_K_vec, rate_K_sample_freqs_kHz, K);
 
-            /* optional energy limit */
-            if (rateK_peak_max_en) {
-                int k;
-                float e = 0.0;
-                for(k=2; k<18; k++)
-                    e += POW10F(rate_K_vec[k]/10.0);
-                e = 10*log10(e/(18-2));
-                //fprintf(stderr, "e: %f\n", e);
-                float gain = rateK_peak_max - e;
-                if (gain < 0.0) {
-                     for(k=0; k<K; k++)
-                        rate_K_vec[k] += gain;
-                }
-            }
-            
 	    if (frateKin != NULL) {
 		assert(fread(rate_K_vec, sizeof(float), K, frateKin) == K);
 	    }
         
-            /* remove mean, as EQ and post filter work on mean removed vector */
+            /* remove mean (note EQ and post filter also work on mean removed vector) */            
 	    float sum = 0.0;
 	    for(int k=K_st; k<=K_en; k++)
 	      sum += rate_K_vec[k];
@@ -961,10 +951,23 @@ int main(int argc, char *argv[])
 	    float rate_K_vec_no_mean[K]; float rate_K_vec_no_mean_[K];
 	    for(int k=0; k<K; k++)
 	      rate_K_vec_no_mean[k] = rate_K_vec[k] - mean;
-	    if (mean < rateK_mean_min) mean = rateK_mean_min;
+
+            /* mean compressor */
+            if (rateK_mean_comp_en) {
+                if (mean < rateKmeancomp.noise_gate)
+                    mean = 0;
+                if (mean > rateKmeancomp.thresh)
+                    mean = rateKmeancomp.thresh + (mean-rateKmeancomp.thresh)*rateKmeancomp.slope;
+                mean += rateKmeancomp.makeup_gain;
+            }
+            
+            /* clip (limit) mean */
+            if (mean < rateK_mean_min) mean = rateK_mean_min;
 	    if (mean > rateK_mean_max) mean = rateK_mean_max;
 
-            // dump output after clipping mean for VQ training
+            if (frateKmean != NULL) assert(fwrite(&mean, sizeof(float), K, frateKmean) == 1);
+            
+            // dump output for VQ training
 	    if (frateK != NULL) {
                 float rate_K_vec[K];
                 for(int k=0; k<K; k++)
@@ -977,7 +980,8 @@ int main(int argc, char *argv[])
 	    if (frateKnomeanin != NULL) {
 		assert(fread(rate_K_vec_no_mean, sizeof(float), K, frateKnomeanin) == K);
 	    }
-	    
+
+            /* newamp1 VQ */
             float rate_K_vec_[K];
             if (newamp1vq) {
 		newamp1_eq(rate_K_vec_no_mean, eq, K, 1);
@@ -999,42 +1003,9 @@ int main(int argc, char *argv[])
 	    if (postfilter_newamp1_en)
 	        post_filter_newamp1(rate_K_vec_no_mean_, rate_K_sample_freqs_kHz, K, 1.5);
 	    for(int k=0; k<K; k++)
-	        rate_K_vec_[k] = rate_K_vec_no_mean_[k] +  mean;
+                rate_K_vec_[k] = rate_K_vec_no_mean_[k] +  mean;
 
-	    // another optional feature file for ML expriments
-	    if (frateKWov != NULL) {
-		/* We use standard nb_features=55 feature records for compatability with train_lpcnet.py */
-		float features[55] = {0};
-		/* just using 18/20 for compatability with LPCNet, coarse scaling for NN imput */
-		for(int i=0; i<18; i++)
-		    features[i] = (rate_K_vec_[i]-30)/40;
-		// keep in range of 40 ... 255 for pitch embedding
-		int pitch_index = 21 + 2.0*M_PI/model.Wo;
-		features[36] = 0.02*(pitch_index-100);
-		//features[36] = (model.Wo - c2const.Wo_min)/(c2const.Wo_max - c2const.Wo_min) - 0.5;
-		features[37] = model.voiced;
-		if (first)
-		    features[18] = -0.9;
-		if (lpc_model) {
-		    MODEL model_;
-		    model_.Wo = model.Wo;
-		    model_.L  = model.L;
-		    model_.voiced = model.voiced;
-		    float Rk[order+1], ak[order+1];
-		    resample_rate_L(&c2const, &model_, rate_K_vec_, rate_K_sample_freqs_kHz, K);
-		    determine_autoc(&c2const, Rk, order, &model_, NEWAMP1_PHASE_NFFT, phase_fft_fwd_cfg, phase_fft_inv_cfg);
-		    /* -40 dB noise floor and Lag windowing from LPCNet/freq.c - helps reduce large spikes in spectrum when LPC
-                       analysis loses it. */
-		    Rk[0] += Rk[0]*1e-4 + 320/12/38.;
-		    for (i=1;i<order+1;i++) Rk[i] *= (1 - 6e-5*i*i);
-		    levinson_durbin(Rk, ak, order);
-
-		    for(int i=0; i<order; i++)
-			features[18+i] = ak[i+1];
-		}
-		fwrite(features, 55, sizeof(float), frateKWov);
-	    }
-
+            /* decimation/interpolation of rateK vectors */
             if (rate_K_dec) {
                 // update delay lines
                 for(int d=0; d<rate_K_dec; d++) {
@@ -1185,15 +1156,8 @@ int main(int argc, char *argv[])
                 #endif
                 if (fout != NULL)
                     fwrite(buf,sizeof(short),N_SAMP,fout);
-                if (modelout) {
-		    /* optionally don't write to filter out low energy frames */
-		    if (bands) {
-			if (bands_mean > bands_lower)
-			    fwrite(&model_dec[i],sizeof(MODEL),1,fmodelout);
-		    }
-		    else
-			fwrite(&model_dec[i],sizeof(MODEL),1,fmodelout);
-		}
+                if (modelout)
+                    fwrite(&model_dec[i],sizeof(MODEL),1,fmodelout);
             }
 
             /* update memories for next frame ----------------------------*/
@@ -1244,11 +1208,11 @@ int main(int argc, char *argv[])
     if (fphasenn != NULL) fclose(fphasenn);
     if (frateK != NULL) fclose(frateK);
     if (frateKnomean != NULL) fclose(frateKnomean);
+    if (frateKmean != NULL) fclose(frateKmean);
     if (frateKin != NULL) fclose(frateKin);
     if (frateKnomeanin != NULL) fclose(frateKnomeanin);
     if (ften_ms_centre != NULL) fclose(ften_ms_centre);
     if (fmodelout != NULL) fclose(fmodelout);
-    if (fbands != NULL) fclose(fbands);
     if (frateKWov != NULL) fclose(frateKWov);
 
     return 0;
