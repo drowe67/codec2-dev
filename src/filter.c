@@ -19,6 +19,7 @@
 #include <string.h>
 #include <math.h>
 #include <complex.h>
+#include <assert.h>
 
 #include "filter.h"
 #include "filter_coef.h"
@@ -279,3 +280,60 @@ void quisk_ccfFilter(complex float * inSamples, complex float * outSamples, int 
     }
 }
 
+void fir_quick_init(struct fir_quick** filter, float* coeffs, int numCoefficients)
+{
+    assert(filter != NULL);
+    
+    *filter = MALLOC(sizeof(struct fir_quick));
+    assert(*filter != NULL);
+    
+    (*filter)->lookbackBuffer = MALLOC(sizeof(complex float) * numCoefficients);
+    assert((*filter)->lookbackBuffer != NULL);
+    memset((*filter)->lookbackBuffer, 0, sizeof(complex float) * numCoefficients);
+    
+    (*filter)->coefficients = coeffs;    
+    (*filter)->numCoefficients = numCoefficients;
+    (*filter)->currentLookbackWritePosition = 0;
+}
+
+void fir_quick_destroy(struct fir_quick** filter)
+{
+    assert(filter != NULL);
+    assert(*filter != NULL);
+    
+    FREE((*filter)->lookbackBuffer);
+    FREE(*filter);
+    *filter = NULL;
+}
+
+void fir_quick_exec(struct fir_quick* filter, complex float* input, complex float* output, int length)
+{
+    assert(filter != NULL);
+    
+    int numTimesThroughLoop = filter->numCoefficients;
+    
+    for (int index = 0; index < length; index++)
+    {
+        float* coeffPtr = filter->coefficients;
+        
+        filter->lookbackBuffer[filter->currentLookbackWritePosition++] = input[index];
+        if (filter->currentLookbackWritePosition >= filter->numCoefficients) filter->currentLookbackWritePosition = 0;
+                
+        float workingValReal = 0;        
+        float* endLookbackPtr = (float*)&filter->lookbackBuffer[filter->numCoefficients];
+        float* lookbackPtr = (float*)&filter->lookbackBuffer[filter->currentLookbackWritePosition];
+        for (int lookbackIndex = 0; 
+             lookbackIndex < numTimesThroughLoop;
+             lookbackIndex++)
+         {
+             workingValReal += (*coeffPtr++) * (*lookbackPtr);
+             lookbackPtr += 2;
+             if (lookbackPtr == endLookbackPtr)
+             {
+                 lookbackPtr = (float*)filter->lookbackBuffer;
+             }
+         }
+
+         output[index] = workingValReal;
+    }
+}
