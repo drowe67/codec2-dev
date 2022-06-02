@@ -1039,7 +1039,7 @@ void ofdm_set_off_est_hz(struct OFDM *ofdm, float val) {
 
 void ofdm_set_tx_bpf(struct OFDM *ofdm, bool val) {
     if (val == true) {
-    	 if (ofdm->tx_bpf == NULL)
+    	 if (ofdm->tx_bpf == NULL && ofdm->tx_bpf_quick == NULL)
              allocate_tx_bpf(ofdm);
 
     	ofdm->tx_bpf_en = true;
