@@ -940,6 +940,12 @@ void ofdm_txframe(struct OFDM *ofdm, complex float *tx, complex float *tx_sym_li
     ofdm_hilbert_clipper(ofdm, tx, samplesperpacket);
 }
 
+/* Enables optimized real-only BPF implementation. */
+void ofdm_set_realonlybpf(struct OFDM *ofdm, int use_real_bpf)
+{
+    assert(ofdm != NULL);
+    ofdm->use_realonly_bpf = use_real_bpf;
+}
 
 /* Scale Tx signal and optionally apply two stage Hilbert clipper to improve PAPR */
 void ofdm_hilbert_clipper(struct OFDM *ofdm, complex float *tx, size_t n) {
@@ -961,7 +967,14 @@ void ofdm_hilbert_clipper(struct OFDM *ofdm, complex float *tx, size_t n) {
         assert(ofdm->tx_bpf != NULL);
         complex float tx_filt[n];
 
-        quisk_ccfFilter(tx, tx_filt, n, ofdm->tx_bpf);
+        if (ofdm->use_realonly_bpf)
+        {
+            quisk_ccfFilter_realonly(tx, tx_filt, n, ofdm->tx_bpf);
+        }
+        else
+        {
+            quisk_ccfFilter(tx, tx_filt, n, ofdm->tx_bpf);
+        }
         memmove(tx, tx_filt, n * sizeof (complex float));
     }
 

@@ -340,9 +340,20 @@ void freedv_tx(struct freedv *f, short mod_out[], short speech_in[]) {
         }
         freedv_tx_fsk_voice(f, mod_out);
     } else {
+        // Temporarily enable real-only BPF to improve performance.
+        if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_700E, f->mode)) {
+            ofdm_set_realonlybpf(f->ofdm, 1);
+        }
+        
         freedv_comptx(f, tx_fdm, speech_in);
         for(i=0; i<f->n_nom_modem_samples; i++)
             mod_out[i] = tx_fdm[i].real;
+        
+        // Disable real-only BPF and use complex BPF. Required to ensure we're in the correct state
+        // to enable use of direct freedv_comptx().
+        if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_700E, f->mode)) {
+            ofdm_set_realonlybpf(f->ofdm, 0);
+        }
     }
 }
 

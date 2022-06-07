@@ -279,3 +279,43 @@ void quisk_ccfFilter(complex float * inSamples, complex float * outSamples, int 
     }
 }
 
+/*---------------------------------------------------------------------------*\
+
+  FUNCTIONS...: quisk_ccfFilter_realonly
+  AUTHOR......: Mooneer Salem
+  DATE CREATED: 6 June 2022
+
+  Implements an FIR bandpass filter similar to quisk_ccfFilter() except that
+  only real values are generated.
+
+\*---------------------------------------------------------------------------*/
+
+void quisk_ccfFilter_realonly(complex float * inSamples, complex float * outSamples, int count, struct quisk_cfFilter * filter) {
+    for (int i = 0; i < count; i++) 
+    {    
+        float* coeffPtr = (float*)filter->cpxCoefs;
+        int numValsInTaps = filter->nTaps * 2;
+        float filterOutAC = 0;
+        float filterOutBD = 0;
+        
+        *filter->ptcSamp = inSamples[i];
+        
+        complex float * ptSample = filter->ptcSamp;
+        for (int k = 0; k < numValsInTaps; k += 2) 
+        {
+            // Note: The below only calculates the real component of the result,
+            // not the complex one.
+            float* ptSampleReal = (float*)ptSample;
+            filterOutAC += ptSampleReal[0] * coeffPtr[k];
+            filterOutBD -= ptSampleReal[1] * coeffPtr[k + 1];
+            
+            if (--ptSample < filter->cSamples)
+                ptSample = filter->cSamples + filter->nTaps - 1;
+        }
+
+        outSamples[i] = filterOutAC + filterOutBD;
+        
+        if (++filter->ptcSamp >= filter->cSamples + filter->nTaps)
+            filter->ptcSamp = filter->cSamples;
+    }
+}

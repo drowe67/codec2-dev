@@ -238,6 +238,7 @@ struct OFDM {
     bool tx_bpf_en;
     bool dpsk_en;
     bool postambledetectoren; /* allows us to optionally disable the postamble detector */
+    bool use_realonly_bpf;
     
     char *codename;
     char *state_machine;
@@ -266,6 +267,7 @@ void ofdm_hilbert_clipper(struct OFDM *ofdm, complex float *tx, size_t n);
 float ofdm_esno_est_calc(complex float *rx_sym, int nsym);
 float ofdm_snr_from_esno(struct OFDM *ofdm, float EsNodB);
 void ofdm_get_demod_stats(struct OFDM *ofdm, struct MODEM_STATS *stats, complex float *rx_syms, int Nsymsperpacket);
+void ofdm_set_realonlybpf(struct OFDM *ofdm, int use_real_bpf);
 
 #ifdef __cplusplus
 }
