@@ -31,23 +31,11 @@ struct quisk_cfFilter {        // Structure to hold the static data for FIR filt
     complex float * cBuf;      // auxillary buffer for interpolation
 } ;
 
-struct fir_quick {
-    float* coefficients;
-    int numCoefficients;
-    int currentLookbackWritePosition;
-    complex float* lookbackBuffer;
-};
-
 extern int quisk_cfInterpDecim(complex float *, int, struct quisk_cfFilter *, int, int);
 extern void quisk_filt_cfInit(struct quisk_cfFilter *, float *, int);
 extern void quisk_filt_destroy(struct quisk_cfFilter *);
 extern void quisk_cfTune(struct quisk_cfFilter *, float);
 extern void quisk_ccfFilter(complex float *, complex float *, int, struct quisk_cfFilter *);
-
-// Alternative filter implementation that only uses real coefficients. 
-extern void fir_quick_init(struct fir_quick** filter, float* coeffs, int numCoefficients);
-extern void fir_quick_destroy(struct fir_quick** filter);
-extern void fir_quick_exec(struct fir_quick* filter, complex float* input, complex float* output, int length);
 
 extern float filtP400S600[100];
 extern float filtP550S750[160];
@@ -56,8 +44,5 @@ extern float filtP900S1100[100];
 extern float filtP1100S1300[100];
 
 extern float quiskFilt120t480[480];
-
-extern float bpf_1500C_1000W[256];
-extern float bpf_1500C_1000W_alt[100];
 
 #endif

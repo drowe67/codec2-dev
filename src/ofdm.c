@@ -365,7 +365,6 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
 
     /* Null pointers to unallocated buffers */
     ofdm->tx_bpf = NULL;
-    ofdm->tx_bpf_quick = NULL;
     if (ofdm->tx_bpf_en)
         allocate_tx_bpf(ofdm);
 
@@ -546,47 +545,35 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
 }
 
 static void allocate_tx_bpf(struct OFDM *ofdm) {
+    ofdm->tx_bpf = MALLOC(sizeof(struct quisk_cfFilter));
+    assert(ofdm->tx_bpf != NULL);
+
     /* Transmit bandpass filter; complex coefficients, center frequency */
 
     if (!strcmp(ofdm->mode, "700D")) {
-        assert(ofdm->tx_centre == 1500);
-        assert(ofdm->fs == 8000);
-        
-        fir_quick_init(&ofdm->tx_bpf_quick, bpf_1500C_1000W_alt, sizeof(bpf_1500C_1000W_alt) / sizeof(float));
+        quisk_filt_cfInit(ofdm->tx_bpf, filtP650S900, sizeof (filtP650S900) / sizeof (float));
+        quisk_cfTune(ofdm->tx_bpf, ofdm->tx_centre / ofdm->fs);
     }
-    else
-    {
-        ofdm->tx_bpf = MALLOC(sizeof(struct quisk_cfFilter));
-        assert(ofdm->tx_bpf != NULL);
-        
-        if (!strcmp(ofdm->mode, "700E") || !strcmp(ofdm->mode, "2020")) {
-            quisk_filt_cfInit(ofdm->tx_bpf, filtP900S1100, sizeof (filtP900S1100) / sizeof (float));
-            quisk_cfTune(ofdm->tx_bpf, ofdm->tx_centre / ofdm->fs);
-        }
-        else if (!strcmp(ofdm->mode, "2020B")) {
-            quisk_filt_cfInit(ofdm->tx_bpf, filtP1100S1300, sizeof (filtP1100S1300) / sizeof (float));
-            quisk_cfTune(ofdm->tx_bpf, ofdm->tx_centre / ofdm->fs);
-        }
-        else if  (!strcmp(ofdm->mode, "datac0") || !strcmp(ofdm->mode, "datac3")) {
-            quisk_filt_cfInit(ofdm->tx_bpf, filtP400S600, sizeof (filtP400S600) / sizeof (float));
-            quisk_cfTune(ofdm->tx_bpf, ofdm->tx_centre / ofdm->fs);
-        }
-        else assert(0);
+    else if (!strcmp(ofdm->mode, "700E") || !strcmp(ofdm->mode, "2020")) {
+        quisk_filt_cfInit(ofdm->tx_bpf, filtP900S1100, sizeof (filtP900S1100) / sizeof (float));
+        quisk_cfTune(ofdm->tx_bpf, ofdm->tx_centre / ofdm->fs);
     }
+    else if (!strcmp(ofdm->mode, "2020B")) {
+        quisk_filt_cfInit(ofdm->tx_bpf, filtP1100S1300, sizeof (filtP1100S1300) / sizeof (float));
+        quisk_cfTune(ofdm->tx_bpf, ofdm->tx_centre / ofdm->fs);
+    }
+    else if  (!strcmp(ofdm->mode, "datac0") || !strcmp(ofdm->mode, "datac3")) {
+        quisk_filt_cfInit(ofdm->tx_bpf, filtP400S600, sizeof (filtP400S600) / sizeof (float));
+        quisk_cfTune(ofdm->tx_bpf, ofdm->tx_centre / ofdm->fs);
+    }
+    else assert(0);
 }
 
 static void deallocate_tx_bpf(struct OFDM *ofdm) {
-    if (ofdm->tx_bpf_quick != NULL)
-    {
-        fir_quick_destroy(&ofdm->tx_bpf_quick);
-    }
-    else
-    {
-        assert(ofdm->tx_bpf != NULL);
-        quisk_filt_destroy(ofdm->tx_bpf);
-        FREE(ofdm->tx_bpf);
-        ofdm->tx_bpf = NULL;
-    }
+    assert(ofdm->tx_bpf != NULL);
+    quisk_filt_destroy(ofdm->tx_bpf);
+    FREE(ofdm->tx_bpf);
+    ofdm->tx_bpf = NULL;
 }
 
 void ofdm_destroy(struct OFDM *ofdm) {
@@ -596,7 +583,7 @@ void ofdm_destroy(struct OFDM *ofdm) {
         free(ofdm->tx_preamble);
         free(ofdm->tx_postamble);
     }
-    if (ofdm->tx_bpf || ofdm->tx_bpf_quick) {
+    if (ofdm->tx_bpf) {
         deallocate_tx_bpf(ofdm);
     }
 
@@ -971,17 +958,10 @@ void ofdm_hilbert_clipper(struct OFDM *ofdm, complex float *tx, size_t n) {
         assert(!strcmp(ofdm->mode, "700D") || !strcmp(ofdm->mode, "700E")
                || !strcmp(ofdm->mode, "2020") || !strcmp(ofdm->mode, "2020B")
                || !strcmp(ofdm->mode, "datac0") || !strcmp(ofdm->mode, "datac3"));
-        
+        assert(ofdm->tx_bpf != NULL);
         complex float tx_filt[n];
-        if (ofdm->tx_bpf_quick != NULL)
-        {
-            fir_quick_exec(ofdm->tx_bpf_quick, tx, tx_filt, n);
-        }
-        else
-        {
-            assert(ofdm->tx_bpf != NULL);
-            quisk_ccfFilter(tx, tx_filt, n, ofdm->tx_bpf);
-        }
+
+        quisk_ccfFilter(tx, tx_filt, n, ofdm->tx_bpf);
         memmove(tx, tx_filt, n * sizeof (complex float));
     }
 
@@ -1045,7 +1025,7 @@ void ofdm_set_tx_bpf(struct OFDM *ofdm, bool val) {
     	ofdm->tx_bpf_en = true;
     }
     else {
-    	if (ofdm->tx_bpf != NULL || ofdm->tx_bpf_quick != NULL)
+    	if (ofdm->tx_bpf != NULL)
             deallocate_tx_bpf(ofdm);
 
     	ofdm->tx_bpf_en = false;

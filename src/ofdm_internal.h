@@ -174,8 +174,7 @@ struct OFDM {
     // Pointers
 
     struct quisk_cfFilter *tx_bpf;
-    struct fir_quick *tx_bpf_quick;
-    
+
     complex float *pilot_samples;
     complex float *rxbuf;
     complex float *pilots;
