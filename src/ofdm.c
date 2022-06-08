@@ -260,7 +260,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     }
 
     ofdm->rs = (1.0f / ofdm->ts);                 /* Modulation Symbol Rate */
-    ofdm->m = (int) (ofdm->fs / ofdm->rs);        /* 700D: 144 */
+    ofdm->m = roundf(ofdm->fs / ofdm->rs);        /* 700D: 144 */
     ofdm->ncp = (int) (ofdm->tcp * ofdm->fs);     /* 700D: 16 */
     ofdm->inv_m = (1.0f / (float) ofdm->m);
 
@@ -382,7 +382,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     }
     /* carrier tables for up and down conversion */
 
-    ofdm->doc = (TAU / (ofdm->fs / ofdm->rs));
+    ofdm->doc = (TAU / ofdm->m);
     tval = ((float) ofdm->nc / 2.0f);
     ofdm->tx_nlower = roundf((ofdm->tx_centre / ofdm->rs) - tval) - 1.0f;
     ofdm->rx_nlower = roundf((ofdm->rx_centre / ofdm->rs) - tval) - 1.0f;
