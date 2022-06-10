@@ -282,7 +282,7 @@ void quisk_ccfFilter(complex float * inSamples, complex float * outSamples, int 
 
 /*---------------------------------------------------------------------------*\
 
-  FUNCTIONS...: quisk_ccfFilter_realonly
+  FUNCTIONS...: quisk_crfFilter
   AUTHOR......: Mooneer Salem
   DATE CREATED: 6 June 2022
 
@@ -291,7 +291,7 @@ void quisk_ccfFilter(complex float * inSamples, complex float * outSamples, int 
 
 \*---------------------------------------------------------------------------*/
 
-void quisk_ccfFilter_realonly(complex float * inSamples, complex float * outSamples, int count, struct quisk_cfFilter * filter) {
+void quisk_crfFilter(complex float * inSamples, complex float * outSamples, int count, struct quisk_cfFilter * filter) {
     for (int i = 0; i < count; i++) 
     {    
         float* coeffPtr = (float*)filter->cpxCoefs;

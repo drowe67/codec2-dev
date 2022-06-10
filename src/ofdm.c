@@ -969,7 +969,7 @@ void ofdm_hilbert_clipper(struct OFDM *ofdm, complex float *tx, size_t n) {
 
         if (ofdm->use_realonly_bpf)
         {
-            quisk_ccfFilter_realonly(tx, tx_filt, n, ofdm->tx_bpf);
+            quisk_crfFilter(tx, tx_filt, n, ofdm->tx_bpf);
         }
         else
         {

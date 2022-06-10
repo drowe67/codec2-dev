@@ -36,7 +36,7 @@ extern void quisk_filt_cfInit(struct quisk_cfFilter *, float *, int);
 extern void quisk_filt_destroy(struct quisk_cfFilter *);
 extern void quisk_cfTune(struct quisk_cfFilter *, float);
 extern void quisk_ccfFilter(complex float *, complex float *, int, struct quisk_cfFilter *);
-extern void quisk_ccfFilter_realonly(complex float *, complex float *, int, struct quisk_cfFilter *);
+extern void quisk_crfFilter(complex float *, complex float *, int, struct quisk_cfFilter *);
 
 extern float filtP400S600[100];
 extern float filtP550S750[160];
