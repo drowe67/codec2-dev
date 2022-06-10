@@ -48,7 +48,7 @@ void quisk_filt_cfInit(struct quisk_cfFilter * filter, float * coefs, int taps) 
     filter->cpxCoefs = NULL;
     filter->cSamples = (complex float *)MALLOC(taps * sizeof(complex float));
     memset(filter->cSamples, 0, taps * sizeof(complex float));
-    filter->ptcSamp = filter->cSamples;
+    filter->ptcSamp = filter->cSamples + taps - 1;
     filter->nTaps = taps;
     filter->cBuf = NULL;
     filter->nBuf = 0;
@@ -129,8 +129,8 @@ int quisk_cfInterpDecim(complex float * cSamples, int count, struct quisk_cfFilt
             for (k = 0; k < filter->nTaps / interp; k++, ptCoef += interp) {
                 csample += *ptSample * *ptCoef;
 
-                if (--ptSample < filter->cSamples)
-                    ptSample = filter->cSamples + filter->nTaps - 1;
+                if (++ptSample > filter->cSamples + filter->nTaps - 1)
+                    ptSample = filter->cSamples;
             }
 
             cSamples[nOut] = csample * interp;
@@ -138,8 +138,8 @@ int quisk_cfInterpDecim(complex float * cSamples, int count, struct quisk_cfFilt
             filter->decim_index += decim;
         }
 
-        if (++filter->ptcSamp >= filter->cSamples + filter->nTaps)
-            filter->ptcSamp = filter->cSamples;
+        if (--filter->ptcSamp < filter->cSamples)
+            filter->ptcSamp = filter->cSamples + filter->nTaps - 1;
 
         filter->decim_index = filter->decim_index - interp;
     }
@@ -265,17 +265,18 @@ void quisk_ccfFilter(complex float * inSamples, complex float * outSamples, int 
         ptSample = filter->ptcSamp;
         ptCoef = filter->cpxCoefs;
 
-        for (k = 0; k < filter->nTaps; k++, ptCoef++) {
-            accum += *ptSample  *  *ptCoef;
+        complex float* endPtSample = filter->cSamples + filter->nTaps;
+        for (k = 0; k < filter->nTaps; k++) {
+            accum += *ptSample++ * *ptCoef++;
 
-            if (--ptSample < filter->cSamples)
-                ptSample = filter->cSamples + filter->nTaps - 1;
+            if (ptSample == endPtSample)
+                ptSample = filter->cSamples;
         }
 
         outSamples[i] = accum;
 
-        if (++filter->ptcSamp >= filter->cSamples + filter->nTaps)
-            filter->ptcSamp = filter->cSamples;
+        if (--filter->ptcSamp < filter->cSamples)
+            filter->ptcSamp = filter->cSamples + filter->nTaps - 1;
     }
 }
 
@@ -300,22 +301,23 @@ void quisk_ccfFilter_realonly(complex float * inSamples, complex float * outSamp
         
         *filter->ptcSamp = inSamples[i];
         
-        complex float * ptSample = filter->ptcSamp;
+        float* ptSample = (float*)filter->ptcSamp;
+        float* endPtSample = (float*)(filter->cSamples + filter->nTaps);
         for (int k = 0; k < numValsInTaps; k += 2) 
         {
             // Note: The below only calculates the real component of the result,
-            // not the complex one.
-            float* ptSampleReal = (float*)ptSample;
-            filterOutAC += ptSampleReal[0] * coeffPtr[k];
-            filterOutBD -= ptSampleReal[1] * coeffPtr[k + 1];
+            // not the complex one. This works because:
+            // (a + bi)(c + di) = ac + bci + adi + bdi^2 = ac - bd + (ad + bc)i.
+            filterOutAC += *ptSample++ * *coeffPtr++;
+            filterOutBD -= *ptSample++ * *coeffPtr++;
             
-            if (--ptSample < filter->cSamples)
-                ptSample = filter->cSamples + filter->nTaps - 1;
+            if (ptSample == endPtSample)
+                ptSample = (float*)filter->cSamples;
         }
 
         outSamples[i] = filterOutAC + filterOutBD;
         
-        if (++filter->ptcSamp >= filter->cSamples + filter->nTaps)
-            filter->ptcSamp = filter->cSamples;
+        if (--filter->ptcSamp < filter->cSamples)
+            filter->ptcSamp = filter->cSamples + filter->nTaps - 1;
     }
 }
