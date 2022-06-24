@@ -260,7 +260,7 @@ int main(int argc, char *argv[])
 		        optarg, strerror(errno));
                     exit(1);
                 }
-                fprintf(stderr, "each record is %d bytes\n", (int)(K*sizeof(float)));
+                fprintf(stderr, "rateKout: each record is %d bytes\n", (int)(K*sizeof(float)));
 	    } else if(strcmp(long_options[option_index].name, "rateKnomeanout") == 0) {
                 /* write rateK mean removed vectors to file */
                 if ((frateKnomean = fopen(optarg,"wb")) == NULL) {
@@ -268,7 +268,7 @@ int main(int argc, char *argv[])
 		        optarg, strerror(errno));
                     exit(1);
                 }
-                fprintf(stderr, "each record is %d bytes\n", (int)(K*sizeof(float)));
+                fprintf(stderr, "rateKnomeanout: each record is %d bytes\n", (int)(K*sizeof(float)));
 	    } else if(strcmp(long_options[option_index].name, "rateKmeanout") == 0) {
                 /* write rateK mean scalar to file */
                 if ((frateKmean = fopen(optarg,"wb")) == NULL) {
@@ -276,7 +276,7 @@ int main(int argc, char *argv[])
 		        optarg, strerror(errno));
                     exit(1);
                 }
-                fprintf(stderr, "each record is %d bytes\n", (int)sizeof(float));
+                fprintf(stderr, "rateKmeanout: each record is %d bytes\n", (int)sizeof(float));
 	    } else if(strcmp(long_options[option_index].name, "rateKin") == 0) {
                 /* read rateK vectos from file */
                 if ((frateKin = fopen(optarg,"rb")) == NULL) {
@@ -284,7 +284,7 @@ int main(int argc, char *argv[])
 		        optarg, strerror(errno));
                     exit(1);
                 }
-                fprintf(stderr, "each record is %d bytes\n", (int)(K*sizeof(float)));
+                fprintf(stderr, "rateKin: each record is %d bytes\n", (int)(K*sizeof(float)));
 	    } else if(strcmp(long_options[option_index].name, "rateKnomeanin") == 0) {
                 /* read mean removed rateK vectors from file */
                 if ((frateKnomeanin = fopen(optarg,"rb")) == NULL) {
@@ -292,7 +292,7 @@ int main(int argc, char *argv[])
 		        optarg, strerror(errno));
                     exit(1);
                 }
-                fprintf(stderr, "each record is %d bytes\n", (int)(K*sizeof(float)));
+                fprintf(stderr, "rateKnomeanin: each record is %d bytes\n", (int)(K*sizeof(float)));
             } else if(strcmp(long_options[option_index].name, "rateK_mean_min") == 0) {
                 rateK_mean_min = atof(optarg);
                 fprintf(stderr, "rateK_mean_min: %f\n", rateK_mean_min);
@@ -442,7 +442,7 @@ int main(int argc, char *argv[])
 		        optarg, strerror(errno));
                     exit(1);
                 }
-                fprintf(stderr, "each model record is %d bytes\n", (int)sizeof(MODEL));
+                fprintf(stderr, "modelout: each model record is %d bytes\n", (int)sizeof(MODEL));
 	    } else if(strcmp(long_options[option_index].name, "modelin") == 0) {
                 /* read model records from file or stdin */
                 modelin = 1;
@@ -452,7 +452,7 @@ int main(int argc, char *argv[])
 		        optarg, strerror(errno));
                     exit(1);
                 }
-                fprintf(stderr, "each model record is %d bytes\n", (int)sizeof(MODEL));
+                fprintf(stderr, "modelin: each model record is %d bytes\n", (int)sizeof(MODEL));
             } else if(strcmp(long_options[option_index].name, "rate") == 0) {
                 if(strcmp(optarg,"3200") == 0) {
 	            lpc_model = 1;
@@ -965,7 +965,7 @@ int main(int argc, char *argv[])
             if (mean < rateK_mean_min) mean = rateK_mean_min;
 	    if (mean > rateK_mean_max) mean = rateK_mean_max;
 
-            if (frateKmean != NULL) assert(fwrite(&mean, sizeof(float), K, frateKmean) == 1);
+            if (frateKmean != NULL) assert(fwrite(&mean, sizeof(float), 1, frateKmean) == 1);
             
             // dump output for VQ training
 	    if (frateK != NULL) {

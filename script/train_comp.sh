@@ -151,14 +151,6 @@ function stats_compressed_two_band() {
   cat ${fullfile} | hpf | c2sim - --rateK --rateKout ${filename}_comp.f32 --comp 75 --comp_gain 10
 }
 
-function test_agc_nm2() {
-  fullfile=$TRAIN
-  filename=$(basename -- "$fullfile")
-  extension="${filename##*.}"
-  filename="${filename%.*}"
-  cat ${filename}_agc_nm.f32 | vq_mbest --st $Kst --en $Ken -k $K -q vq_gain.f32,vq_stage1.f32,vq_stage2.f32,vq_stage3.f32 --mbest 13 > /dev/null      
-}
-
 # -----------------------------------------------------------------------
 # Exploring the effect of the postfilter with newamp1 and phase0
 #  + listened with headphones
