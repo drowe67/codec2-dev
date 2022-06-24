@@ -122,3 +122,7 @@ add_custom_command(
   OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/faster_fading_samples.float
   COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR} && ./fading_files.sh ${CMAKE_CURRENT_BINARY_DIR}
 )
+
+add_executable(freedv_700d_comptx freedv_700d_comptx.c)
+target_link_libraries(freedv_700d_comptx m codec2)
+

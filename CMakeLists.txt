@@ -745,9 +745,16 @@ endif()
              COMMAND sh -c "dd bs=2560 count=120 if=/dev/zero | $<TARGET_FILE:freedv_tx> 700D - - --testframes | $<TARGET_FILE:ch> - - --No -20 -f -10 | $<TARGET_FILE:freedv_rx> 700D - /dev/null --testframes --discard"
              )
 
+    # exercises complex rx codepath, albiet with just real samples
     add_test(NAME test_freedv_api_700D_AWGN_BER_USECOMPLEX
              COMMAND sh -c "dd bs=2560 count=120 if=/dev/zero | $<TARGET_FILE:freedv_tx> 700D - - --testframes | $<TARGET_FILE:ch> - - --No -20 -f -10 | $<TARGET_FILE:freedv_rx> 700D - /dev/null --testframes --discard --usecomplex"
              )
+
+    add_test(NAME test_freedv_api_700D_real_comp
+             COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/unittest;
+                            PATH=$PATH:${CMAKE_CURRENT_BINARY_DIR}/demo:${CMAKE_CURRENT_BINARY_DIR}/unittest;
+                            ./check_real_comp.sh"
+            )
 
 if(LPCNET)
 
