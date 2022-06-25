@@ -21,17 +21,8 @@ ldpc
 global passes = 0;
 global fails = 0;
 
-% attempt to start up CML, path will be different on your machine
-
-path_to_cml = '~/cml';
-addpath(strcat(path_to_cml, "/mex"), strcat(path_to_cml, "/mat"));
-cml_support = 0;
-if exist("Somap") == 0
-  printf("Can't find CML mex directory so we won't run those tests for now...\n");
-else
-  printf("OK found CML mex directory so will add those tests...\n");
-  cml_support = 1;
-end
+init_cml()
+cml_support = 1
 
 % ---------------------------------------------------------------------
 % Run Octave version 
