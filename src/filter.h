@@ -23,6 +23,7 @@
 struct quisk_cfFilter {        // Structure to hold the static data for FIR filters
     float * dCoefs;            // real filter coefficients
     complex float * cpxCoefs;  // complex filter coefficients
+    float* realCoefs;          // real coefficients derived from cpxCoefs
     int nBuf;                  // dimension of cBuf
     int nTaps;                 // dimension of dSamples, cSamples, dCoefs
     int decim_index;           // index of next sample for decimation
