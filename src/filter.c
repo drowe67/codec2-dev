@@ -19,7 +19,6 @@
 #include <string.h>
 #include <math.h>
 #include <complex.h>
-#include <assert.h>
 
 #include "filter.h"
 #include "filter_coef.h"
@@ -47,7 +46,6 @@ void quisk_filt_cfInit(struct quisk_cfFilter * filter, float * coefs, int taps) 
     // be real or complex.
     filter->dCoefs = coefs;
     filter->cpxCoefs = NULL;
-    filter->realCoefs = NULL;
     filter->cSamples = (complex float *)MALLOC(taps * sizeof(complex float));
     memset(filter->cSamples, 0, taps * sizeof(complex float));
     filter->ptcSamp = filter->cSamples + taps - 1;
@@ -82,11 +80,6 @@ void quisk_filt_destroy(struct quisk_cfFilter * filter) {
     if (filter->cpxCoefs) {
         FREE(filter->cpxCoefs);
         filter->cpxCoefs = NULL;
-    }
-    
-    if (filter->realCoefs) {
-        FREE(filter->realCoefs);
-        filter->realCoefs = NULL;
     }
 }
 
@@ -236,19 +229,14 @@ void quisk_cfTune(struct quisk_cfFilter * filter, float freq) {
     int i;
 
     if ( ! filter->cpxCoefs)
-    {
         filter->cpxCoefs = (complex float *)MALLOC(filter->nTaps * sizeof(complex float));
-        filter->realCoefs = (float *)MALLOC(filter->nTaps * sizeof(float));
-        assert(filter->cpxCoefs && filter->realCoefs);
-    }
-    
+
     tune = 2.0 * M_PI * freq;
     D = (filter->nTaps - 1.0) / 2.0;
 
     for (i = 0; i < filter->nTaps; i++) {
         float tval = tune * (i - D);
         filter->cpxCoefs[i] = cmplx(tval) * filter->dCoefs[i];
-        filter->realCoefs[i] = cabsf(filter->cpxCoefs[i]);
     }
 }
 
@@ -306,11 +294,12 @@ void quisk_ccfFilter(complex float * inSamples, complex float * outSamples, int 
 void quisk_crfFilter(complex float * inSamples, complex float * outSamples, int count, struct quisk_cfFilter * filter) {
     for (int i = 0; i < count; i++) 
     {    
-        float* coeffPtr = filter->realCoefs;
+        float* coeffPtr = (float*)filter->cpxCoefs;
         int numValsInTaps = filter->nTaps * 2;
-        float filterOut = 0;
+        float filterOutAC = 0;
+        float filterOutBD = 0;
         
-        *filter->ptcSamp = cabsf(inSamples[i]);
+        *filter->ptcSamp = inSamples[i];
         
         float* ptSample = (float*)filter->ptcSamp;
         float* endPtSample = (float*)(filter->cSamples + filter->nTaps);
@@ -319,16 +308,16 @@ void quisk_crfFilter(complex float * inSamples, complex float * outSamples, int 
             // Note: The below only calculates the real component of the result,
             // not the complex one. This works because:
             // (a + bi)(c + di) = ac + bci + adi + bdi^2 = ac - bd + (ad + bc)i.
-            filterOut += *ptSample * *coeffPtr++;
-            ptSample += 2;
+            filterOutAC += *ptSample++ * *coeffPtr++;
+            filterOutBD -= *ptSample++ * *coeffPtr++;
             
             if (ptSample == endPtSample)
                 ptSample = (float*)filter->cSamples;
         }
 
-        outSamples[i] = filterOut;
+        outSamples[i] = filterOutAC + filterOutBD;
         
         if (--filter->ptcSamp < filter->cSamples)
-            filter->ptcSamp = (filter->cSamples + filter->nTaps - 1);
+            filter->ptcSamp = filter->cSamples + filter->nTaps - 1;
     }
 }
