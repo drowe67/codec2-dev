@@ -36,7 +36,7 @@
 extern char *ofdm_statemode[];
 
 #ifdef __LPCNET__
-void freedv_2020x_open(struct freedv *f, int vq_type) {
+void freedv_2020x_open(struct freedv *f) {
     f->speech_sample_rate = FREEDV_FS_16000;
     f->snr_squelch_thresh = 4.0;
     f->squelch_en = 0;
@@ -60,13 +60,16 @@ void freedv_2020x_open(struct freedv *f, int vq_type) {
 
     ldpc_codes_setup(f->ldpc, f->ofdm->codename);
     int data_bits_per_frame;
+    int vq_type;
     switch (f->mode) {
     case FREEDV_MODE_2020:
         data_bits_per_frame = 312;
+        vq_type = 1;    /* vanilla VQ */
         break;
     case FREEDV_MODE_2020B:
         f->ldpc->protection_mode = LDPC_PROT_2020B;
         data_bits_per_frame = 156;
+        vq_type = 2;    /* index optimised VQ for increased robustness to single bit errors */
         break;
     default:
         assert(0);
