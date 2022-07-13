@@ -197,7 +197,7 @@ struct freedv {
 void freedv_1600_open(struct freedv *f);
 void freedv_700c_open(struct freedv *f);
 void freedv_ofdm_voice_open(struct freedv *f, char *mode);
-void freedv_2020x_open(struct freedv *f, int vq_type);
+void freedv_2020x_open(struct freedv *f);
 void freedv_2400a_open(struct freedv *f);
 void freedv_2400b_open(struct freedv *f);
 void freedv_800xa_open(struct freedv *f);

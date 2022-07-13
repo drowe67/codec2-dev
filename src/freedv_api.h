@@ -4,7 +4,7 @@
   AUTHOR......: David Rowe
   DATE CREATED: August 2014
 
-  Library of API functions that implement FreeDV "modes", useful for
+  Library of API functions that implement the FreeDV API, useful for
   embedding FreeDV in other programs.  Please see:
 
   1. README_freedv.md
@@ -137,7 +137,7 @@ struct freedv;
 
 // Some modes allow extra configuration parameters
 struct freedv_advanced {
-    int lpcnet_vq_type;                      // see lpcnet_freedv.h
+    int interleave_frames;                   // now unused but remains to prevent breaking API for legacy apps
 
     // parameters for FREEDV_MODE_FSK_LDPC
     int M;                                   // 2 or 4 FSK

@@ -4,12 +4,13 @@
   AUTHOR......: David Rowe
   DATE CREATED: August 2014
 
-  Library of API functions that implement FreeDV "modes", useful for
+  Library of API functions that implement the FreeDV API, useful for
   embedding FreeDV in other programs.  Please see:
 
   1. README_freedv.md
-  2. Notes function use in freedv_api.c
-  3. The sample freedv_tx.c and freedv_rx.c programs
+  2. Notes on function use in this file
+  3. Simple demo programs in the "demo" directory
+  4. The full featured command line freedv_tx.c and freedv_rx.c programs
 
 \*---------------------------------------------------------------------------*/
 
@@ -110,17 +111,6 @@ char *rx_sync_flags_to_text[] = {
 struct freedv *freedv_open(int mode) {
     // defaults for those modes that support the use of adv
     struct freedv_advanced adv = {0,2,100,8000,1000,200, "H_256_512_4"};
-#ifdef __LPCNET__
-    // set up default Vector Quantisers (VQs) for LPCNet */
-    switch (mode) {
-    case FREEDV_MODE_2020:
-        adv.lpcnet_vq_type = 1;    /* vanilla VQ */
-        break;
-    case FREEDV_MODE_2020B:
-        adv.lpcnet_vq_type = 2;    /* index optimised VQ for theorectical robustness to single bit errors */
-        break;
-    }
-#endif        
     return freedv_open_advanced(mode, &adv);
 }
 
@@ -155,10 +145,9 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
     if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, mode)) freedv_ofdm_voice_open(f, "700D");
     if (FDV_MODE_ACTIVE( FREEDV_MODE_700E, mode)) freedv_ofdm_voice_open(f, "700E");
 #ifdef __LPCNET__
-    if (FDV_MODE_ACTIVE( FREEDV_MODE_2020, mode)  ||
-        FDV_MODE_ACTIVE( FREEDV_MODE_2020B, mode))
-        freedv_2020x_open(f, adv->lpcnet_vq_type);
-#endif
+    if (FDV_MODE_ACTIVE( FREEDV_MODE_2020, mode) || FDV_MODE_ACTIVE( FREEDV_MODE_2020B, mode))
+        freedv_2020x_open(f);
+#endif        
     if (FDV_MODE_ACTIVE( FREEDV_MODE_2400A, mode)) freedv_2400a_open(f);
     if (FDV_MODE_ACTIVE( FREEDV_MODE_2400B, mode)) freedv_2400b_open(f);
     if (FDV_MODE_ACTIVE( FREEDV_MODE_800XA, mode)) freedv_800xa_open(f);
