@@ -21,12 +21,18 @@
 
 int main(int argc, char *argv[]) {
 
-    /* optional frequency offset - a good way to exercise complex valued signals */
-    float foff_hz = 0.0;
+    /* with no arguments then run with no test code */
+    int test_num = 0;
     if (argc == 2) {
-        foff_hz = atof(argv[1]);
-        fprintf(stderr, "foff_hz: %f\n", foff_hz);
+        if (strcmp(argv[1],"tx") == 0) {
+            test_num = 1;
+        }
+        if (strcmp(argv[1],"rx") == 0) {
+            test_num = 2;
+        }
     }
+    fprintf(stderr,"%d\n", test_num);
+    
     struct freedv *freedv;
     freedv = freedv_open(FREEDV_MODE_700D);
     assert(freedv != NULL);
@@ -36,10 +42,8 @@ int main(int argc, char *argv[]) {
     short demod_in[2*freedv_get_n_max_modem_samples(freedv)];
     COMP  demod_in_comp[2*freedv_get_n_max_modem_samples(freedv)];
     
-    size_t nin, nout;
-    nin = freedv_nin(freedv);
-
     /* set up small freq offset */
+    float foff_hz = 25;
     COMP phase_ch; phase_ch.real = 1.0; phase_ch.imag = 0.0;
 
     /* set complex sine wave interferer at -fc */
@@ -55,6 +59,9 @@ int main(int argc, char *argv[]) {
     /* measure demod input power, interferer input power */
     float power_d = 0.0; float power_interferer = 0.0; 
     
+    size_t nin, nout;
+    nin = freedv_nin(freedv);
+
     while(fread(demod_in, sizeof(short), 2*nin, stdin) == 2*nin) {
         for(int i=0; i<nin; i++) {
             demod_in_comp[i].real = (float)demod_in[2*i];
@@ -62,31 +69,35 @@ int main(int argc, char *argv[]) {
             //demod_in_comp[i].imag = 0;
         }
 
-        /* So Tx is a complex OFDM signal centered at +fc.  A small
-           shift fd followed by Re{} will only work if Tx is complex.
-           If Tx is real, neg freq components at -fc+fd will be
-           aliased on top of fc+fd wanted signal by Re{} operation.
-           This can be tested by setting demod_in_comp[i].imag = 0
-           above */
-        fdmdv_freq_shift_coh(demod_in_comp, demod_in_comp, foff_hz, FREEDV_FS_8000, &phase_ch, nin);
-        for(int i=0; i<nin; i++)
-            demod_in_comp[i].imag = 0.0;
-        
-        /* a complex sinewave (carrier) at -fc will only be ignored if
-           Rx is treating signal as complex, otherwise if real a +fc
-           alias will appear in the middle of our wanted signal at
-           +fc, this can be tested by setting demod_in_comp[i].imag =
-           0 below */
-        for(int i=0; i<nin; i++) {
-            COMP a = fcmult(1E4,interferer_phase);
-            interferer_phase = cmult(interferer_phase, interferer_freq);
-            power_interferer += a.real*a.real + a.imag*a.imag;
-            COMP d = demod_in_comp[i];
-            power_d += d.real*d.real + d.imag*d.imag;
-            demod_in_comp[i] = cadd(d,a);
-            demod_in_comp[i].imag = 0;
+        if (test_num == 1) {
+            /* So Tx is a complex OFDM signal centered at +fc.  A small
+               shift fd followed by Re{} will only work if Tx is complex.
+               If Tx is real, neg freq components at -fc+fd will be
+               aliased on top of fc+fd wanted signal by Re{} operation.
+               This can be tested by setting demod_in_comp[i].imag = 0
+               above */
+            fdmdv_freq_shift_coh(demod_in_comp, demod_in_comp, foff_hz, FREEDV_FS_8000, &phase_ch, nin);
+            for(int i=0; i<nin; i++)
+                demod_in_comp[i].imag = 0.0;
         }
-
+    
+        if (test_num == 2) {
+            /* a complex sinewave (carrier) at -fc will only be ignored if
+               Rx is treating signal as complex, otherwise if real a +fc
+               alias will appear in the middle of our wanted signal at
+               +fc, this can be tested by setting demod_in_comp[i].imag =
+               0 below */
+            for(int i=0; i<nin; i++) {
+                COMP a = fcmult(2E4,interferer_phase);
+                interferer_phase = cmult(interferer_phase, interferer_freq);
+                power_interferer += a.real*a.real + a.imag*a.imag;
+                COMP d = demod_in_comp[i];
+                power_d += d.real*d.real + d.imag*d.imag;
+                demod_in_comp[i] = cadd(d,a);
+                //demod_in_comp[i].imag = 0;
+            }
+        }
+        
         /* useful to take a look at this with Octave */
         fwrite(demod_in_comp, sizeof(COMP), nin, fdemod);
         
@@ -101,6 +112,7 @@ int main(int argc, char *argv[]) {
     fclose(fdemod);
     freedv_close(freedv);
 
-    fprintf(stderr, "Demod/Interferer power ratio: %3.2f dB\n", 10*log10(power_d/power_interferer));
+    if (test_num == 2)
+        fprintf(stderr, "Demod/Interferer power ratio: %3.2f dB\n", 10*log10(power_d/power_interferer));
     return 0;
 }
