@@ -58,7 +58,8 @@ int main(int argc, char *argv[]) {
 
     /* measure demod input power, interferer input power */
     float power_d = 0.0; float power_interferer = 0.0; 
-    
+
+    int frames = 0, sum_sync = 0, frames_snr = 0; float sum_snr = 0.0;
     size_t nin, nout;
     nin = freedv_nin(freedv);
 
@@ -107,6 +108,7 @@ int main(int argc, char *argv[]) {
         int sync; float snr_est;
         freedv_get_modem_stats(freedv, &sync, &snr_est);
         fprintf(stderr, "sync: %d  snr_est: %f\n", sync, snr_est);
+        frames++; sum_sync += sync; if (sync) { sum_snr += snr_est; frames_snr++; }
     }
 
     fclose(fdemod);
@@ -114,5 +116,11 @@ int main(int argc, char *argv[]) {
 
     if (test_num == 2)
         fprintf(stderr, "Demod/Interferer power ratio: %3.2f dB\n", 10*log10(power_d/power_interferer));
-    return 0;
+    float snr_av = sum_snr/frames_snr;
+    fprintf(stderr, "frames: %d sum_sync: %d snr_av: %3.2f dB\n", frames, sum_sync, snr_av);
+
+    if (snr_av > 10.0)
+        return 0;
+    else
+        return 1;
 }
