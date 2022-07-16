@@ -47,7 +47,7 @@ set(CODEC2_VERSION_MAJOR 1)
 set(CODEC2_VERSION_MINOR 0)
 # Set to patch level if needed, otherwise leave FALSE.
 # Must be positive (non-zero) if set, since 0 == FALSE in CMake.
-set(CODEC2_VERSION_PATCH 4)
+set(CODEC2_VERSION_PATCH 5)
 set(CODEC2_VERSION "${CODEC2_VERSION_MAJOR}.${CODEC2_VERSION_MINOR}")
 # Patch level version bumps should not change API/ABI.
 set(SOVERSION "${CODEC2_VERSION_MAJOR}.${CODEC2_VERSION_MINOR}")
@@ -325,7 +325,7 @@ elseif(UNIX AND NOT APPLE)
     SET(CPACK_DEBIAN_FILE_NAME DEB-DEFAULT)
     SET(CPACK_DEBIAN_ENABLE_COMPONENT_DEPENDS ON)
     SET(CPACK_DEBIAN_LIB_PACKAGE_NAME "codec2")
-    SET(CPACK_DEBIAN_PACKAGE_DEPENDS "lpcnet (>= 0.2.0)")
+    SET(CPACK_DEBIAN_PACKAGE_DEPENDS "lpcnet (>= 0.3.0)")
     include(CPack)
     cpack_add_component(lib REQUIRED)
     cpack_add_component(dev DEPENDS lib)
