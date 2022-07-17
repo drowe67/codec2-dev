@@ -5,19 +5,13 @@
 # Please report questions, comments, problems, or patches to the freetel
 # mailing list: https://lists.sourceforge.net/lists/listinfo/freetel-codec2
 #
-set(CMAKE_OSX_DEPLOYMENT_TARGET "10.9" CACHE STRING "Minimum OS X deployment version")
-
-project(codec2)
-
-cmake_minimum_required(VERSION 3.0)
-
-# Set policies here, probably should move to cmake dir.
-if(POLICY CMP0075)
-    cmake_policy(SET CMP0075 NEW)
-endif()
-if(POLICY CMP0079)
-    cmake_policy(SET CMP0079 NEW)
-endif()
+cmake_minimum_required(VERSION 3.13)
+project(CODEC2
+  VERSION 1.0.5
+  DESCRIPTION "Next-Generation Digital Voice for Two-Way Radio"
+  HOMEPAGE_URL "https://www.rowetel.com/codec2.html"
+  LANGUAGES C
+  )
 
 include(GNUInstallDirs)
 mark_as_advanced(CLEAR
@@ -39,23 +33,6 @@ if("${CMAKE_SOURCE_DIR}" STREQUAL "${CMAKE_BINARY_DIR}")
    "separate build directory and run cmake from there.")
 endif("${CMAKE_SOURCE_DIR}" STREQUAL "${CMAKE_BINARY_DIR}")
 
-#
-# Set project version information. This should probably be done via external
-# file at some point.
-#
-set(CODEC2_VERSION_MAJOR 1)
-set(CODEC2_VERSION_MINOR 0)
-# Set to patch level if needed, otherwise leave FALSE.
-# Must be positive (non-zero) if set, since 0 == FALSE in CMake.
-set(CODEC2_VERSION_PATCH 5)
-set(CODEC2_VERSION "${CODEC2_VERSION_MAJOR}.${CODEC2_VERSION_MINOR}")
-# Patch level version bumps should not change API/ABI.
-set(SOVERSION "${CODEC2_VERSION_MAJOR}.${CODEC2_VERSION_MINOR}")
-if(CODEC2_VERSION_PATCH)
-    set(CODEC2_VERSION "${CODEC2_VERSION}.${CODEC2_VERSION_PATCH}")
-endif()
-message(STATUS "codec2 version: ${CODEC2_VERSION}")
-
 # Set default build type
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Debug")
@@ -65,6 +42,7 @@ endif()
 if(BUILD_OSX_UNIVERSAL)
 set(CMAKE_OSX_ARCHITECTURES "x86_64;arm64")
 endif(BUILD_OSX_UNIVERSAL)
+set(CMAKE_OSX_DEPLOYMENT_TARGET "10.9" CACHE STRING "Minimum OS X deployment version")
 
 #
 # Find the git hash if this is a working copy.
@@ -190,10 +168,6 @@ if (_GNU_SOURCE)
     add_definitions(-D_GNU_SOURCE=1)
 endif()
 
-if(UNIX)
-    set(CMAKE_REQUIRED_LIBRARIES m)
-endif()
-
 check_symbol_exists(floor  math.h   HAVE_FLOOR)
 check_symbol_exists(ceil   math.h   HAVE_CEIL)
 check_symbol_exists(pow    math.h   HAVE_POW)
@@ -288,11 +262,7 @@ else()
 endif()
 
 # Return the date (yyyy-mm-dd)
-macro(DATE RESULT)
-  execute_process(COMMAND "date" "+%Y%m%d" OUTPUT_VARIABLE ${RESULT})
-endmacro()
-DATE(DATE_RESULT)
-string(REGEX REPLACE "\n$" "" DATE_RESULT "${DATE_RESULT}")
+string(TIMESTAMP DATE_RESULT "%Y-%m-%d" UTC)
 message(STATUS "Compilation date = XX${DATE_RESULT}XX")
 
 set(CPACK_PACKAGE_VERSION_PATCH "${CPACK_PACKAGE_VERSION_PATCH}-${DATE_RESULT}-${FREEDV_HASH}")
