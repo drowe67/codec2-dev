@@ -51,7 +51,7 @@ if(EXISTS ${CMAKE_SOURCE_DIR}/.git)
     find_package(Git QUIET)
     if(Git_FOUND)
         execute_process(
-            COMMAND "${GIT_EXECUTABLE}" describe --always HEAD
+            COMMAND "${GIT_EXECUTABLE}" git rev-parse --short HEAD
             WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
             RESULT_VARIABLE res
             OUTPUT_VARIABLE FREEDV_HASH
