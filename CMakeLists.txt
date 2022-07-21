@@ -48,17 +48,17 @@ set(CMAKE_OSX_DEPLOYMENT_TARGET "10.9" CACHE STRING "Minimum OS X deployment ver
 # Find the git hash if this is a working copy.
 #
 if(EXISTS ${CMAKE_SOURCE_DIR}/.git)
-    find_package(Git QUIET)
+    find_package(Git)
     if(Git_FOUND)
         execute_process(
-            COMMAND "${GIT_EXECUTABLE}" git rev-parse --short HEAD
+            COMMAND "${GIT_EXECUTABLE}" rev-parse --short HEAD
             WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
             RESULT_VARIABLE res
-            OUTPUT_VARIABLE FREEDV_HASH
+            OUTPUT_VARIABLE CODEC2_HASH
             ERROR_QUIET
             OUTPUT_STRIP_TRAILING_WHITESPACE)
-        message(STATUS "freedv-gui current git hash: ${FREEDV_HASH}")
-        add_definitions(-DGIT_HASH="${FREEDV_HASH}")
+        message(STATUS "Codec2 current git hash: ${CODEC2_HASH}")
+        add_definitions(-DGIT_HASH="${CODEC2_HASH}")
     else()
         message(WARNING "Git not found. Can not determine current commit hash.")
         add_definitions(-DGIT_HASH="Unknown")
@@ -103,27 +103,6 @@ set(CMAKE_C_FLAGS_RELEASE "-O3")
 if(MINGW)
     message(STATUS "System is MinGW.")
 endif(MINGW)
-
-
-#
-# Find the git hash if this is a working copy.
-#
-if(EXISTS ${CMAKE_SOURCE_DIR}/.git)
-    find_package(Git)
-    if(Git_FOUND)
-        execute_process(
-            COMMAND "${GIT_EXECUTABLE}" describe --always HEAD
-            WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
-            RESULT_VARIABLE res
-            OUTPUT_VARIABLE CODEC2_HASH
-            ERROR_QUIET
-            OUTPUT_STRIP_TRAILING_WHITESPACE)
-        message(STATUS "Codec2 current git hash: ${CODEC2_HASH}")
-    else()
-        message(WARNING "Git not found. Can not determine current commit hash.")
-    endif()
-endif()
-
 
 #
 # Default options
@@ -265,7 +244,7 @@ endif()
 string(TIMESTAMP DATE_RESULT "%Y-%m-%d" UTC)
 message(STATUS "Compilation date = XX${DATE_RESULT}XX")
 
-set(CPACK_PACKAGE_VERSION_PATCH "${CPACK_PACKAGE_VERSION_PATCH}-${DATE_RESULT}-${FREEDV_HASH}")
+set(CPACK_PACKAGE_VERSION_PATCH "${CPACK_PACKAGE_VERSION_PATCH}-${DATE_RESULT}-${CODEC2_HASH}")
 
 if(WIN32)
     #
