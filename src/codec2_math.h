@@ -31,6 +31,9 @@ extern "C"
 {
 #endif // __cplusplus
 
+// Forward declare COMP struct (use comp.h to refer to items inside the struct).
+struct COMP;
+
 //==========================================================================
 // Note: the functions in this file must be implemented in your code if you 
 // intend on using Codec2 in a non-ARM based embedded device. Otherwise, 
@@ -59,7 +62,7 @@ extern void codec2_dot_product_f32(float* leftHandSideComplexVector, float* righ
 /// @param resultImag A pointer to the variable in which to store the imaginary component of the result.
 ///
 //==========================================================================
-extern void codec2_complex_dot_product_f32(float* leftHandSideComplexVector, float* rightHandSideComplexVector, size_t vectorLength, float* resultReal, float* resultImag) __attribute__((weak));
+extern void codec2_complex_dot_product_f32(COMP* leftHandSideComplexVector, COMP* rightHandSideComplexVector, size_t vectorLength, float* resultReal, float* resultImag) __attribute__((weak));
 
 #ifdef __cplusplus
 }

@@ -21,9 +21,8 @@
 //
 //==========================================================================
 
-#include "codec2_math.h"
-
 #if defined(__EMBEDDED__) && defined(__ARM_ARCH)
+#include "codec2_math.h"
 #include "arm_math.h"
 
 //==========================================================================
@@ -50,9 +49,9 @@ void codec2_dot_product_f32(float* leftHandSideRealVector, float* rightHandSideR
 ///
 /// @note Each array of floats is organized with even elements being real and odd elements imaginary.
 //==========================================================================
-void codec2_complex_dot_product_f32(float* leftHandSideComplexVector, float* rightHandSideComplexVector, size_t vectorLength, float* resultReal, float* resultImag)
+void codec2_complex_dot_product_f32(COMP* leftHandSideComplexVector, COMP* rightHandSideComplexVector, size_t vectorLength, float* resultReal, float* resultImag)
 {
-    arm_cmplx_dot_prod_f32(leftHandSideComplexVector, rightHandSideComplexVector, vectorLength, resultReal, resultImag);
+    arm_cmplx_dot_prod_f32((float*)leftHandSideComplexVector, (float*)rightHandSideComplexVector, vectorLength, resultReal, resultImag);
 }
 
 #endif // defined(__EMBEDDED__) && defined(__ARM_ARCH)

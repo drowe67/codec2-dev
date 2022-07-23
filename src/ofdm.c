@@ -755,10 +755,10 @@ static int est_timing(struct OFDM *ofdm, complex float *rx, int length,
 #elif defined(__EMBEDDED__)
         float re,im;
 
-        codec2_complex_dot_product_f32((float*)&rx[i], (float*)wvec_pilot, ofdm->samplespersymbol, &re, &im);
+        codec2_complex_dot_product_f32((COMP*)&rx[i], (COMP*)wvec_pilot, ofdm->samplespersymbol, &re, &im);
         corr_st = re + im * I;
 
-        codec2_complex_dot_product_f32((float*)&rx[i+ ofdm->samplesperframe], (float*)wvec_pilot, ofdm->samplespersymbol, &re, &im);
+        codec2_complex_dot_product_f32((COMP*)&rx[i+ ofdm->samplesperframe], (COMP*)wvec_pilot, ofdm->samplespersymbol, &re, &im);
         corr_en = re + im * I;
 #else
         for (j = 0; j < ofdm->samplespersymbol; j++) {
