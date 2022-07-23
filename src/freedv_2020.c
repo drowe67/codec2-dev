@@ -36,36 +36,64 @@
 extern char *ofdm_statemode[];
 
 #ifdef __LPCNET__
-void freedv_2020_open(struct freedv *f) {
+void freedv_2020x_open(struct freedv *f) {
     f->speech_sample_rate = FREEDV_FS_16000;
     f->snr_squelch_thresh = 4.0;
     f->squelch_en = 0;
 
     struct OFDM_CONFIG ofdm_config;
-    ofdm_init_mode("2020", &ofdm_config);
+    switch (f->mode) {
+    case FREEDV_MODE_2020:
+        ofdm_init_mode("2020", &ofdm_config);
+        break;
+    case FREEDV_MODE_2020B:
+        ofdm_init_mode("2020B", &ofdm_config);
+        break;
+    default:
+        assert(0);
+    }
+    
     f->ofdm = ofdm_create(&ofdm_config);
 
     f->ldpc = (struct LDPC*)MALLOC(sizeof(struct LDPC));
     assert(f->ldpc != NULL);
 
     ldpc_codes_setup(f->ldpc, f->ofdm->codename);
-    int data_bits_per_frame = 312;
+    int data_bits_per_frame;
+    int vq_type;
+    switch (f->mode) {
+    case FREEDV_MODE_2020:
+        data_bits_per_frame = 312;
+        vq_type = 1;    /* vanilla VQ */
+        break;
+    case FREEDV_MODE_2020B:
+        f->ldpc->protection_mode = LDPC_PROT_2020B;
+        data_bits_per_frame = 156;
+        vq_type = 2;    /* index optimised VQ for increased robustness to single bit errors */
+        break;
+    default:
+        assert(0);
+    }
+
     set_data_bits_per_frame(f->ldpc, data_bits_per_frame);
     int coded_syms_per_frame = f->ldpc->coded_bits_per_frame/f->ofdm->bps;
 
     f->ofdm_bitsperframe = ofdm_get_bits_per_frame(f->ofdm);
-    f->ofdm_nuwbits = (f->ofdm->config.ns - 1) * f->ofdm->config.bps - f->ofdm->config.txtbits;
+    f->ofdm_nuwbits = f->ofdm->config.nuwbits;
     f->ofdm_ntxtbits = f->ofdm->config.txtbits;
-    assert(f->ofdm_nuwbits == 10);
     assert(f->ofdm_ntxtbits == 4);
-
+    
     if (f->verbose) {
+        fprintf(stderr, "f->mode = %d\n", f->mode);
+        fprintf(stderr, "vq_type = %d\n", vq_type);
         fprintf(stderr, "ldpc_data_bits_per_frame = %d\n", f->ldpc->ldpc_data_bits_per_frame);
         fprintf(stderr, "ldpc_coded_bits_per_frame  = %d\n", f->ldpc->ldpc_coded_bits_per_frame);
         fprintf(stderr, "data_bits_per_frame = %d\n", data_bits_per_frame);
         fprintf(stderr, "coded_bits_per_frame  = %d\n", f->ldpc->coded_bits_per_frame);
         fprintf(stderr, "coded_syms_per_frame  = %d\n", f->ldpc->coded_bits_per_frame/f->ofdm->bps);
         fprintf(stderr, "ofdm_bits_per_frame  = %d\n", f->ofdm_bitsperframe);
+        fprintf(stderr, "ofdm_nuwbits = %d\n", f->ofdm_nuwbits);
+        fprintf(stderr, "ofdm_ntxtbits = %d\n", f->ofdm_ntxtbits);
     }
 
     f->codeword_symbols = (COMP*)MALLOC(sizeof(COMP) * coded_syms_per_frame);
@@ -98,7 +126,7 @@ void freedv_2020_open(struct freedv *f) {
     int nout_max = 2*freedv_get_n_max_modem_samples(f);
     assert(nout_max <= freedv_get_n_max_speech_samples(f));
 
-    f->lpcnet = lpcnet_freedv_create(1); assert(f->lpcnet != NULL);
+    f->lpcnet = lpcnet_freedv_create(vq_type); assert(f->lpcnet != NULL);
     f->codec2 = NULL;
 
     /* should be exactly an integer number of Codec frames in a OFDM modem frame */
@@ -185,6 +213,7 @@ int freedv_comprx_2020(struct freedv *f, COMP demod_in[]) {
 
     int Nerrs_raw = 0;
     int Nerrs_coded = 0;
+    int Ncoded;
     int iter = 0;
     int parityCheckCount = 0;
     uint8_t rx_uw[f->ofdm_nuwbits];
@@ -244,35 +273,17 @@ int freedv_comprx_2020(struct freedv *f, COMP demod_in[]) {
 
         symbols_to_llrs(llr, codeword_symbols_de, codeword_amps_de,
                 EsNo, ofdm->mean_amp, coded_syms_per_frame);
-        /* LDPC decoder */
-        if (ldpc->data_bits_per_frame == ldpc->ldpc_data_bits_per_frame) {
-            /* all data bits in code word used */
-            iter = run_ldpc_decoder(ldpc, out_char, llr, &parityCheckCount);
-        } else {
-            /* some unused data bits, set these to known values to strengthen code */
-            float llr_full_codeword[ldpc->ldpc_coded_bits_per_frame];
-            int unused_data_bits = ldpc->ldpc_data_bits_per_frame - ldpc->data_bits_per_frame;
-
-            // received data bits
-            for (i = 0; i < ldpc->data_bits_per_frame; i++)
-                llr_full_codeword[i] = llr[i];
-            // known bits ... so really likely
-            for (i = ldpc->data_bits_per_frame; i < ldpc->ldpc_data_bits_per_frame; i++)
-                llr_full_codeword[i] = -100.0f;
-            // parity bits at end
-            for (i = ldpc->ldpc_data_bits_per_frame; i < ldpc->ldpc_coded_bits_per_frame; i++)
-                llr_full_codeword[i] = llr[i - unused_data_bits];
-            iter = run_ldpc_decoder(ldpc, out_char, llr_full_codeword, &parityCheckCount);
-        }
-
+        ldpc_decode_frame(ldpc, &parityCheckCount, &iter, out_char, llr);
         if (parityCheckCount != ldpc->NumberParityBits) rx_status |= FREEDV_RX_BIT_ERRORS;
 
         if (f->test_frames) {
             uint8_t payload_data_bits[data_bits_per_frame];
             ofdm_generate_payload_data_bits(payload_data_bits, data_bits_per_frame);
-            Nerrs_coded = count_errors(payload_data_bits, out_char, data_bits_per_frame);
+            count_errors_protection_mode(ldpc->protection_mode, &Nerrs_coded, &Ncoded, payload_data_bits, out_char, data_bits_per_frame);
             f->total_bit_errors_coded += Nerrs_coded;
-            f->total_bits_coded += data_bits_per_frame;
+            f->total_bits_coded += Ncoded;
+            if (Nerrs_coded) f->total_packet_errors++;
+            f->total_packets++;
         } else {
             memcpy(f->rx_payload_bits, out_char, data_bits_per_frame);
         }
@@ -284,7 +295,9 @@ int freedv_comprx_2020(struct freedv *f, COMP demod_in[]) {
         for(k=0; k<f->ofdm_ntxtbits; k++)  {
             if (k % 2 == 0 && (f->freedv_put_next_rx_symbol != NULL))
             {
-                (*f->freedv_put_next_rx_symbol)(f->callback_state_sym, ofdm->rx_np[txt_sym_index], ofdm->rx_amp[txt_sym_index]);
+                (*f->freedv_put_next_rx_symbol)(f->callback_state_sym,
+                                                ofdm->rx_np[txt_sym_index],
+                                                ofdm->rx_amp[txt_sym_index]);
                 txt_sym_index++;
             }
             

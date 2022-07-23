@@ -34,7 +34,8 @@ struct LDPC {
     int ldpc_data_bits_per_frame;
     int ldpc_coded_bits_per_frame;
 
-    /* these three may vary if we don't use all data bits in code */
+    /* support for partial use of data bits in codeword and unequal protection schemes */
+    int protection_mode; 
     int data_bits_per_frame;
     int coded_bits_per_frame;
 };

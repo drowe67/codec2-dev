@@ -5,19 +5,13 @@
 # Please report questions, comments, problems, or patches to the freetel
 # mailing list: https://lists.sourceforge.net/lists/listinfo/freetel-codec2
 #
-set(CMAKE_OSX_DEPLOYMENT_TARGET "10.9" CACHE STRING "Minimum OS X deployment version")
-
-project(codec2)
-
-cmake_minimum_required(VERSION 3.0)
-
-# Set policies here, probably should move to cmake dir.
-if(POLICY CMP0075)
-    cmake_policy(SET CMP0075 NEW)
-endif()
-if(POLICY CMP0079)
-    cmake_policy(SET CMP0079 NEW)
-endif()
+cmake_minimum_required(VERSION 3.13)
+project(CODEC2
+  VERSION 1.0.5
+  DESCRIPTION "Next-Generation Digital Voice for Two-Way Radio"
+  HOMEPAGE_URL "https://www.rowetel.com/codec2.html"
+  LANGUAGES C
+  )
 
 include(GNUInstallDirs)
 mark_as_advanced(CLEAR
@@ -39,23 +33,6 @@ if("${CMAKE_SOURCE_DIR}" STREQUAL "${CMAKE_BINARY_DIR}")
    "separate build directory and run cmake from there.")
 endif("${CMAKE_SOURCE_DIR}" STREQUAL "${CMAKE_BINARY_DIR}")
 
-#
-# Set project version information. This should probably be done via external
-# file at some point.
-#
-set(CODEC2_VERSION_MAJOR 1)
-set(CODEC2_VERSION_MINOR 0)
-# Set to patch level if needed, otherwise leave FALSE.
-# Must be positive (non-zero) if set, since 0 == FALSE in CMake.
-set(CODEC2_VERSION_PATCH 3)
-set(CODEC2_VERSION "${CODEC2_VERSION_MAJOR}.${CODEC2_VERSION_MINOR}")
-# Patch level version bumps should not change API/ABI.
-set(SOVERSION "${CODEC2_VERSION_MAJOR}.${CODEC2_VERSION_MINOR}")
-if(CODEC2_VERSION_PATCH)
-    set(CODEC2_VERSION "${CODEC2_VERSION}.${CODEC2_VERSION_PATCH}")
-endif()
-message(STATUS "codec2 version: ${CODEC2_VERSION}")
-
 # Set default build type
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Debug")
@@ -65,22 +42,23 @@ endif()
 if(BUILD_OSX_UNIVERSAL)
 set(CMAKE_OSX_ARCHITECTURES "x86_64;arm64")
 endif(BUILD_OSX_UNIVERSAL)
+set(CMAKE_OSX_DEPLOYMENT_TARGET "10.9" CACHE STRING "Minimum OS X deployment version")
 
 #
 # Find the git hash if this is a working copy.
 #
 if(EXISTS ${CMAKE_SOURCE_DIR}/.git)
-    find_package(Git QUIET)
+    find_package(Git)
     if(Git_FOUND)
         execute_process(
-            COMMAND "${GIT_EXECUTABLE}" describe --always HEAD
+            COMMAND "${GIT_EXECUTABLE}" rev-parse --short HEAD
             WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
             RESULT_VARIABLE res
-            OUTPUT_VARIABLE FREEDV_HASH
+            OUTPUT_VARIABLE CODEC2_HASH
             ERROR_QUIET
             OUTPUT_STRIP_TRAILING_WHITESPACE)
-        message(STATUS "freedv-gui current git hash: ${FREEDV_HASH}")
-        add_definitions(-DGIT_HASH="${FREEDV_HASH}")
+        message(STATUS "Codec2 current git hash: ${CODEC2_HASH}")
+        add_definitions(-DGIT_HASH="${CODEC2_HASH}")
     else()
         message(WARNING "Git not found. Can not determine current commit hash.")
         add_definitions(-DGIT_HASH="Unknown")
@@ -126,27 +104,6 @@ if(MINGW)
     message(STATUS "System is MinGW.")
 endif(MINGW)
 
-
-#
-# Find the git hash if this is a working copy.
-#
-if(EXISTS ${CMAKE_SOURCE_DIR}/.git)
-    find_package(Git)
-    if(Git_FOUND)
-        execute_process(
-            COMMAND "${GIT_EXECUTABLE}" describe --always HEAD
-            WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
-            RESULT_VARIABLE res
-            OUTPUT_VARIABLE CODEC2_HASH
-            ERROR_QUIET
-            OUTPUT_STRIP_TRAILING_WHITESPACE)
-        message(STATUS "Codec2 current git hash: ${CODEC2_HASH}")
-    else()
-        message(WARNING "Git not found. Can not determine current commit hash.")
-    endif()
-endif()
-
-
 #
 # Default options
 #
@@ -188,10 +145,6 @@ endif()
 
 if (_GNU_SOURCE)
     add_definitions(-D_GNU_SOURCE=1)
-endif()
-
-if(UNIX)
-    set(CMAKE_REQUIRED_LIBRARIES m)
 endif()
 
 check_symbol_exists(floor  math.h   HAVE_FLOOR)
@@ -288,14 +241,10 @@ else()
 endif()
 
 # Return the date (yyyy-mm-dd)
-macro(DATE RESULT)
-  execute_process(COMMAND "date" "+%Y%m%d" OUTPUT_VARIABLE ${RESULT})
-endmacro()
-DATE(DATE_RESULT)
-string(REGEX REPLACE "\n$" "" DATE_RESULT "${DATE_RESULT}")
+string(TIMESTAMP DATE_RESULT "%Y-%m-%d" UTC)
 message(STATUS "Compilation date = XX${DATE_RESULT}XX")
 
-set(CPACK_PACKAGE_VERSION_PATCH "${CPACK_PACKAGE_VERSION_PATCH}-${DATE_RESULT}-${FREEDV_HASH}")
+set(CPACK_PACKAGE_VERSION_PATCH "${CPACK_PACKAGE_VERSION_PATCH}-${DATE_RESULT}-${CODEC2_HASH}")
 
 if(WIN32)
     #
@@ -325,7 +274,7 @@ elseif(UNIX AND NOT APPLE)
     SET(CPACK_DEBIAN_FILE_NAME DEB-DEFAULT)
     SET(CPACK_DEBIAN_ENABLE_COMPONENT_DEPENDS ON)
     SET(CPACK_DEBIAN_LIB_PACKAGE_NAME "codec2")
-    SET(CPACK_DEBIAN_PACKAGE_DEPENDS "lpcnet (>= 0.2.0)")
+    SET(CPACK_DEBIAN_PACKAGE_DEPENDS "lpcnet (>= 0.3.0)")
     include(CPack)
     cpack_add_component(lib REQUIRED)
     cpack_add_component(dev DEPENDS lib)
@@ -356,6 +305,12 @@ if(UNITTEST)
 
     add_test(NAME test_freedv_get_hash
              COMMAND sh -c "${CMAKE_CURRENT_BINARY_DIR}/unittest/thash")
+
+if(UNIX) # Uses pthreads
+     add_test(NAME test_fifo
+             COMMAND $<TARGET_FILE:tfifo>
+             )
+endif()
 
     # 16<->8 kHz float resamplers
     add_test(NAME test_fdmdv_16to8
@@ -514,16 +469,20 @@ if(UNITTEST)
                             ./ofdm_mod --ldpc |
                             ./ofdm_demod --ldpc --testframes > /dev/null")
 
-    # noise free 2020 test, including reading and writing payload bits.  fsk_*_test_bits used as it does it's own frame sync
+    # noise free 2020 test, including reading and writing payload bits.  fsk_*_test_bits
+    # used as it does it's own frame sync
     add_test(NAME test_OFDM_modem_2020_ldpc
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
                             ./fsk_get_test_bits - 5000 |
-                            ./ofdm_mod --ldpc --mode 2020 -p 312 |
-                            ./ofdm_demod  --ldpc --mode 2020 -p 312 |
+                            ./ofdm_mod --ldpc --mode 2020 |
+                            ./ofdm_demod  --ldpc --mode 2020 |
                             ./fsk_put_test_bits - -q")
 
     add_test(NAME test_OFDM_modem_AWGN_BER
-             COMMAND sh -c "$<TARGET_FILE:ofdm_mod> --in /dev/zero --ldpc --testframes 60 --txbpf | $<TARGET_FILE:ch> - - --No -20  -f -50 | $<TARGET_FILE:ofdm_demod> --out /dev/null --testframes --ldpc --verbose 1"
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            ./ofdm_mod --in /dev/zero --ldpc --testframes 60 --txbpf | 
+                            ./ch - - --No -20 -f -50 | 
+                            ./ofdm_demod --out /dev/null --testframes --ldpc --verbose 1"
              )
 
     add_test(NAME test_OFDM_modem_fading_BER
@@ -555,6 +514,13 @@ endif()
                             ./ch - - --No -22 |
                             ./ofdm_demod --mode 700E --ldpc --testframes -v 2 > /dev/null")
 
+    # 2020B AWGN test 
+    add_test(NAME test_OFDM_modem_2020B_AWGN
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            ./ofdm_mod --in /dev/zero --testframes 10 --mode 2020B --ldpc --clip --txbpf |
+                            ./ch - - --No -19 |
+                            ./ofdm_demod --mode 2020B --testframes --ldpc -v 2 > /dev/null")
+           
     # -------------------------------------------------------------------------
     #                                OFDM Data modes
     # -------------------------------------------------------------------------
@@ -728,30 +694,62 @@ endif()
              COMMAND sh -c "dd bs=2560 count=120 if=/dev/zero | $<TARGET_FILE:freedv_tx> 700D - - --testframes | $<TARGET_FILE:ch> - - --No -20 -f -10 | $<TARGET_FILE:freedv_rx> 700D - /dev/null --testframes --discard"
              )
 
+    # exercises complex rx codepath, albiet with just real samples
     add_test(NAME test_freedv_api_700D_AWGN_BER_USECOMPLEX
              COMMAND sh -c "dd bs=2560 count=120 if=/dev/zero | $<TARGET_FILE:freedv_tx> 700D - - --testframes | $<TARGET_FILE:ch> - - --No -20 -f -10 | $<TARGET_FILE:freedv_rx> 700D - /dev/null --testframes --discard --usecomplex"
              )
 
+    # check real part of freedv_comptx() matches freedv_tx()
+    add_test(NAME test_freedv_api_700D_real_comp
+             COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/unittest;
+                            PATH=$PATH:${CMAKE_CURRENT_BINARY_DIR}/demo:${CMAKE_CURRENT_BINARY_DIR}/unittest;
+                            ./check_real_comp.sh"
+            )
+
+    # exercises freedv_comptx()
+    add_test(NAME test_freedv_api_700D_comptx
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/unittest;
+                            cat ${CMAKE_CURRENT_SOURCE_DIR}/raw/ve9qrp_10s.raw |
+                            ./freedv_700d_comptx |
+                            ./freedv_700d_comprx tx > /dev/null"
+             )
+           
+    # exercises freedv_comprx()
+    add_test(NAME test_freedv_api_700D_comprx
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/unittest;
+                            cat ${CMAKE_CURRENT_SOURCE_DIR}/raw/ve9qrp_10s.raw |
+                            ./freedv_700d_comptx |
+                            ./freedv_700d_comprx rx > /dev/null"
+             )
+           
 if(LPCNET)
 
     add_test(NAME test_freedv_api_2020_to_ofdm_demod
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
                                ./freedv_tx 2020 ../../wav/wia_16kHz.wav - --testframes |
-                               ./ofdm_demod --mode 2020 --verbose 1 --ldpc -p 312 --testframes > /dev/null"
+                               ./ofdm_demod --mode 2020 --verbose 1 --ldpc --testframes > /dev/null"
              )
 
     add_test(NAME test_freedv_api_2020_from_ofdm_mod
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
-                            ./ofdm_mod --in /dev/zero --mode 2020 --verbose 1 --ldpc -p 312 --testframes 10 |
+                            ./ofdm_mod --in /dev/zero --mode 2020 --verbose 1 --ldpc --testframes 10 |
                             ./freedv_rx 2020 - /dev/null --testframes"
              )
 
-    add_test(NAME test_freedv_api_2020_awgn
-             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+     add_test(NAME test_freedv_api_2020_awgn
+              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
                             dd bs=32000 count=10 if=/dev/zero |
                             ./freedv_tx 2020 - - --testframes |
                             ./ch - - --No -24 |
                             ./freedv_rx 2020 - /dev/null --testframes"
+             )
+
+     add_test(NAME test_freedv_api_2020B_mpp
+              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            dd bs=32000 count=60 if=/dev/zero |
+                            ./freedv_tx 2020B - - --testframes --clip 1 |
+                            ./ch - - --No -25 --mpp --fading_dir ../unittest |
+                            ./freedv_rx 2020B - /dev/null --testframes"
              )
 endif()
 
@@ -782,12 +780,6 @@ endif()
              COMMAND sh -c "./tfreedv_2400B_rawdata"
              WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/unittest
              )
-
-if(UNIX) # Uses pthreads
-     add_test(NAME test_fifo
-             COMMAND $<TARGET_FILE:tfifo>
-             )
-endif()
 
     # -------------------------------------------------------------------------
     #                                Reliable Text
@@ -870,7 +862,7 @@ if(LPCNET)
 endif(LPCNET)
                                                      
     # -------------------------------------------------------------------------
-    #                                FreeDv API memory leaks
+    #                                FreeDV API memory leaks
     # -------------------------------------------------------------------------
 
 if (NOT APPLE)
@@ -940,16 +932,33 @@ if (NOT APPLE)
 if(LPCNET)
      add_test(NAME test_memory_leak_FreeDV_2020_tx
              COMMAND sh -c "cd  ${CMAKE_CURRENT_BINARY_DIR}/src;
-                            valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./freedv_tx 2020 ../../wav/wia_16kHz.wav /dev/null"
+                            valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes \
+                            ./freedv_tx 2020 ../../wav/wia_16kHz.wav /dev/null"
              )
              set_tests_properties(test_memory_leak_FreeDV_2020_tx PROPERTIES PASS_REGULAR_EXPRESSION "ERROR SUMMARY: 0 errors")
 
      add_test(NAME test_memory_leak_FreeDV_2020_rx
              COMMAND sh -c "cd  ${CMAKE_CURRENT_BINARY_DIR}/src;
                             ./freedv_tx 2020 ../../wav/wia_16kHz.wav t.raw; \
-                            valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./freedv_rx 2020 t.raw /dev/null"
+                            valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes \
+                            ./freedv_rx 2020 t.raw /dev/null"
              )
              set_tests_properties(test_memory_leak_FreeDV_2020_rx PROPERTIES PASS_REGULAR_EXPRESSION "ERROR SUMMARY: 0 errors")
+
+     add_test(NAME test_memory_leak_FreeDV_2020B_tx
+             COMMAND sh -c "cd  ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes \
+                            ./freedv_tx 2020B ../../wav/wia_16kHz.wav /dev/null"
+             )
+             set_tests_properties(test_memory_leak_FreeDV_2020B_tx PROPERTIES PASS_REGULAR_EXPRESSION "ERROR SUMMARY: 0 errors")
+
+     add_test(NAME test_memory_leak_FreeDV_2020B_rx
+             COMMAND sh -c "cd  ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            ./freedv_tx 2020B ../../wav/wia_16kHz.wav t.raw; \
+                            valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes \
+                            ./freedv_rx 2020B t.raw /dev/null"
+             )
+             set_tests_properties(test_memory_leak_FreeDV_2020B_rx PROPERTIES PASS_REGULAR_EXPRESSION "ERROR SUMMARY: 0 errors")
 endif(LPCNET)
 endif(NOT APPLE)
 

@@ -554,8 +554,12 @@ static void allocate_tx_bpf(struct OFDM *ofdm) {
         quisk_filt_cfInit(ofdm->tx_bpf, filtP650S900, sizeof (filtP650S900) / sizeof (float));
         quisk_cfTune(ofdm->tx_bpf, ofdm->tx_centre / ofdm->fs);
     }
-    else if (!strcmp(ofdm->mode, "700E")) {
+    else if (!strcmp(ofdm->mode, "700E") || !strcmp(ofdm->mode, "2020")) {
         quisk_filt_cfInit(ofdm->tx_bpf, filtP900S1100, sizeof (filtP900S1100) / sizeof (float));
+        quisk_cfTune(ofdm->tx_bpf, ofdm->tx_centre / ofdm->fs);
+    }
+    else if (!strcmp(ofdm->mode, "2020B")) {
+        quisk_filt_cfInit(ofdm->tx_bpf, filtP1100S1300, sizeof (filtP1100S1300) / sizeof (float));
         quisk_cfTune(ofdm->tx_bpf, ofdm->tx_centre / ofdm->fs);
     }
     else if  (!strcmp(ofdm->mode, "datac0") || !strcmp(ofdm->mode, "datac3")) {
@@ -947,9 +951,10 @@ void ofdm_hilbert_clipper(struct OFDM *ofdm, complex float *tx, size_t n) {
         ofdm_clip(tx, OFDM_PEAK, n);
     }
 
-   /* BPF to remove out of band energy clipper introduces */
+    /* BPF to remove out of band energy clipper introduces */
     if (ofdm->tx_bpf_en) {
-        assert(!strcmp(ofdm->mode, "700D") || !strcmp(ofdm->mode, "700E") 
+        assert(!strcmp(ofdm->mode, "700D") || !strcmp(ofdm->mode, "700E")
+               || !strcmp(ofdm->mode, "2020") || !strcmp(ofdm->mode, "2020B")
                || !strcmp(ofdm->mode, "datac0") || !strcmp(ofdm->mode, "datac3"));
         assert(ofdm->tx_bpf != NULL);
         complex float tx_filt[n];
@@ -1384,7 +1389,7 @@ static void ofdm_demod_core(struct OFDM *ofdm, int *rx_bits) {
     if (ofdm->timing_en == true) {
         /* update timing at start of every frame */
 
-        st = ofdm->rxbufst + ofdm->samplespersymbol + ofdm->samplesperframe - floorf(ofdm->ftwindowwidth / 2) + ofdm->timing_est;
+        st = ofdm->rxbufst + ofdm->samplespersymbol + ofdm->samplesperframe - (int) floorf((float)ofdm->ftwindowwidth / 2) + ofdm->timing_est;
         en = st + ofdm->samplesperframe - 1 + ofdm->samplespersymbol + ofdm->ftwindowwidth;
 
         complex float work[(en - st)];
@@ -1399,7 +1404,7 @@ static void ofdm_demod_core(struct OFDM *ofdm, int *rx_bits) {
 
         int ft_est = est_timing(ofdm, work, (en - st), 0.0f, &ofdm->timing_mx, &ofdm->timing_valid, 1);
 
-        ofdm->timing_est += ft_est - ceilf((float)ofdm->ftwindowwidth / 2) + 1;
+        ofdm->timing_est += ft_est - (int) ceilf((float)ofdm->ftwindowwidth / 2) + 1;
 
         if (ofdm->verbose > 2) {
             fprintf(stderr, "  ft_est: %2d timing_est: %2d sample_point: %2d\n", ft_est, ofdm->timing_est,

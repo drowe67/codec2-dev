@@ -101,7 +101,7 @@ for fr=1:frames
 
   [tx_bits f] = get_test_bits(f, Nc*Nb);
   tx_bits_log = [tx_bits_log tx_bits];
-  [tx_symbols f] = bits_to_psk(f, prev_tx_symbols, tx_bits, 'dqpsk');
+  [tx_symbols f] = bits_to_psk(f, prev_tx_symbols, tx_bits);
   prev_tx_symbols = tx_symbols;
   tx_symbols_log = [tx_symbols_log tx_symbols];
   [tx_baseband f] = tx_filter(f, tx_symbols);
