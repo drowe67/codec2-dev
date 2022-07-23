@@ -124,8 +124,13 @@ add_custom_command(
 )
 
 add_executable(freedv_700d_comptx freedv_700d_comptx.c)
-target_link_libraries(freedv_700d_comptx m codec2)
-
 add_executable(freedv_700d_comprx freedv_700d_comprx.c)
-target_link_libraries(freedv_700d_comprx m codec2)
 
+if(LPCNET AND lpcnetfreedv_FOUND)
+    target_link_libraries(freedv_700d_comptx m codec2 lpcnetfreedv)
+    target_link_libraries(freedv_700d_comprx m codec2 lpcnetfreedv)
+    list(APPEND CODEC2_PUBLIC_HEADERS ${CMAKE_SOURCE_DIR}/lpcnet/src/lpcnet_freedv.h)
+else()
+    target_link_libraries(freedv_700d_comptx m codec2)
+    target_link_libraries(freedv_700d_comprx m codec2)
+endif()

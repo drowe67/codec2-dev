@@ -1,0 +1,43 @@
+name: Build SM1000
+
+on: [pull_request]
+
+env:
+  # Customize the CMake build type here (Release, Debug, RelWithDebInfo, etc.)
+  BUILD_TYPE: Debug
+
+jobs:
+  build:
+    # The CMake configure and build commands are platform agnostic and should work equally
+    # well on Windows or Mac.  You can convert this to a matrix build if you need
+    # cross-platform coverage.
+    # See: https://docs.github.com/en/free-pro-team@latest/actions/learn-github-actions/managing-complex-workflows#using-a-build-matrix
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Install packages
+      shell: bash
+      run: |
+           sudo apt-get update
+           sudo apt-get install octave octave-common octave-signal liboctave-dev gnuplot sox p7zip-full python3-numpy valgrind 
+
+    - name: Install ST Standard Peripheral Library (SM1000)
+      working-directory: ${{github.workspace}}/stm32
+      shell: bash
+      run: git clone https://github.com/whimsicalraps/STM32F4xx_DSP_StdPeriph_Lib
+
+    - name: Install SM1000 prerequisites
+      working-directory: ${{github.workspace}}/stm32
+      shell: bash
+      run: sudo apt install gcc-arm-none-eabi
+
+    - name: Build SM1000
+      working-directory: ${{github.workspace}}/stm32
+      shell: bash
+      run: |
+           mkdir build_stm32
+           cd build_stm32
+           cmake -DCMAKE_TOOLCHAIN_FILE=../cmake/STM32_Toolchain.cmake -DPERIPHLIBDIR=${{github.workspace}}/stm32/STM32F4xx_DSP_StdPeriph_Lib ..
+           make
