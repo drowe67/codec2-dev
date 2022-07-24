@@ -213,7 +213,6 @@ set(CODEC2_SRCS
     ldpc_codes.c
     lpcnet_freq.c
     reliable_text.c
-    codec2_math_arm.c
 )
 
 set(CODEC2_PUBLIC_HEADERS

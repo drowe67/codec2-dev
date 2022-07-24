@@ -186,6 +186,7 @@ ${CODEC2_SRC}/mpdecode_core.c
 ${CODEC2_SRC}/ldpc_codes.c
 ${CODEC2_SRC}/phi0.c
 ${CODEC2_SRC}/HRAb_396_504.c
+${CODEC2_SRC}/codec2_math_arm.c
 codebook.c
 codebookd.c
 codebookjmv.c
