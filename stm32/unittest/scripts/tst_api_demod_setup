@@ -80,7 +80,7 @@ case "${TEST_OPT}" in
 		>> setup.log 2>&1
 	#
         # Reference - give it a hard time with some noise to exercise the LDPC codec and get us to max CPU
-	ch mod_bits.raw stm_in.raw -20 -f -5 2>&1 | tee setup.log
+	ch mod_bits.raw stm_in.raw --No -20 -f -5 2>&1 | tee setup.log
         freedv_rx 700D stm_in.raw ref_demod.raw -v \
 		> ref_gen.log 2>&1
 	;;
