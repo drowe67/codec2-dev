@@ -43,7 +43,7 @@
 #include "debug_alloc.h"
 #include "machdep.h"
 
-#if defined(__EMBEDDED__)
+#ifdef __EMBEDDED__
 #include "codec2_math.h"
 #endif /* __EMBEDDED__ */
 
@@ -746,29 +746,33 @@ static int est_timing(struct OFDM *ofdm, complex float *rx, int length,
         corr_st = 0.0f;
         corr_en = 0.0f;
 
-#if defined(__EMBEDDED__) && defined(__REAL__)
-        float re,im;
-
+#ifdef __EMBEDDED__
+#ifdef __REAL__
+        // Note: this code untested
+	float re,im;
+        
         codec2_dot_product_f32(&rx_real[i], wvec_pilot_real, ofdm->samplespersymbol, &re);
-        codec2_dot_product_f32(&rx_real[i], wvec_pilot_imag, ofdm->samplespersymbol, &im);
-        corr_st = re + im * I;
+	codec2_dot_product_f32(&rx_real[i], wvec_pilot_imag, ofdm->samplespersymbol, &im);
+	corr_st = re + im * I;
 
-        codec2_dot_product_f32(&rx_real[i+ ofdm->samplesperframe], wvec_pilot_real, ofdm->samplespersymbol, &re);
-        codec2_dot_product_f32(&rx_real[i+ ofdm->samplesperframe], wvec_pilot_imag, ofdm->samplespersymbol, &im);
-        corr_en = re + im * I;
-#elif defined(__EMBEDDED__)
-        float re,im;
-
-        codec2_complex_dot_product_f32((COMP*)&rx[i], (COMP*)wvec_pilot, ofdm->samplespersymbol, &re, &im);
-        corr_st = re + im * I;
-
-        codec2_complex_dot_product_f32((COMP*)&rx[i+ ofdm->samplesperframe], (COMP*)wvec_pilot, ofdm->samplespersymbol, &re, &im);
-        corr_en = re + im * I;
+	codec2_dot_product_f32(&rx_real[i+ ofdm->samplesperframe], wvec_pilot_real, ofdm->samplespersymbol, &re);
+	codec2_dot_product_f32(&rx_real[i+ ofdm->samplesperframe], wvec_pilot_imag, ofdm->samplespersymbol, &im);
+	corr_en = re + im * I;
+        
 #else
-        for (j = 0; j < ofdm->samplespersymbol; j++) {
+	float re,im;
+        
+	codec2_complex_dot_product_f32((COMP*)&rx[i], (COMP*)wvec_pilot, ofdm->samplespersymbol, &re, &im);
+	corr_st = re + im * I;
+
+	codec2_complex_dot_product_f32((COMP*)&rx[i+ ofdm->samplesperframe], (COMP*)wvec_pilot, ofdm->samplespersymbol, &re, &im);
+	corr_en = re + im * I;
+#endif
+#else
+	for (j = 0; j < ofdm->samplespersymbol; j++) {
             int ind = i + j;
 
-            corr_st = corr_st + (rx[ind                        ] * wvec_pilot[j]);
+	    corr_st = corr_st + (rx[ind                        ] * wvec_pilot[j]);
             corr_en = corr_en + (rx[ind + ofdm->samplesperframe] * wvec_pilot[j]);
         }
 #endif // __EMBEDDED__
