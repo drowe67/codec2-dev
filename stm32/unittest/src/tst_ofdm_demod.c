@@ -318,11 +318,17 @@ int main(int argc, char *argv[]) {
                 }
             } else {    // !llrs_en (or ldpc_en)
 
-                /* simple hard decision output for uncoded testing, all bits in frame dumped inlcuding UW and txt */
-                for(i=0; i<ofdm_bitsperframe; i++) {
-                    rx_bits_char[i] = rx_bits[i];
+                /* simple hard decision output for uncoded testing, excluding UW and txt */
+                assert(coded_syms_per_frame*ofdm_config->bps == coded_bits_per_frame);
+                for (i = 0; i < coded_syms_per_frame; i++) {
+                    int bits[2];
+                    complex float s = payload_syms[i].real + I * payload_syms[i].imag;
+                    qpsk_demod(s, bits);
+                    rx_bits_char[ofdm_config->bps * i] = bits[1];
+                    rx_bits_char[ofdm_config->bps * i + 1] = bits[0];
                 }
-                fwrite(rx_bits_char, sizeof(char), ofdm_bitsperframe, fout);
+
+                fwrite(rx_bits_char, sizeof (uint8_t), coded_bits_per_frame, fout);
             }
 
             /* optional error counting on uncoded data in non-LDPC testframe mode */
