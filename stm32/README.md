@@ -2,7 +2,11 @@
 
 ## Quickstart
 
-1. Build codec2 for your host system, see [codec2/README.md](../README.md)
+1. Build codec2 (with -DUNITTEST=1) for your host system, see [codec2/README.md](../README.md)
+   ```
+   $ cd ~/codec2
+   $ mkdir build_linux && cd build_linux && cmake -DUNITTEST=1 .. && make
+   ```
 
 2. Install a gcc arm toolchain:
    ```
