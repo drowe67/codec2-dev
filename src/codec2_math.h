@@ -49,7 +49,7 @@ extern "C"
 /// @param resultReal A pointer to the variable in which to store the scalar result.
 ///
 //==========================================================================
-void codec2_dot_product_f32(float* leftHandSideComplexVector, float* rightHandSideComplexVector, size_t vectorLength, float* resultReal);
+void codec2_dot_product_f32(float* leftHandSideRealVector, float* rightHandSideRealVector, size_t vectorLength, float* resultReal);
 
 //==========================================================================
 /// Calculates the dot product of two complex-valued float vectors.
