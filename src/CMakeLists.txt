@@ -227,6 +227,7 @@ set(CODEC2_PUBLIC_HEADERS
     modem_stats.h
     freedv_api.h
     reliable_text.h
+    codec2_math.h
     ${CODEC2_VERSION_PATH}/version.h
 )
 

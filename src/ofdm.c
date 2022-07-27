@@ -44,7 +44,7 @@
 #include "machdep.h"
 
 #ifdef __EMBEDDED__
-#include "arm_math.h"
+#include "codec2_math.h"
 #endif /* __EMBEDDED__ */
 
 /* Static Prototypes */
@@ -748,22 +748,24 @@ static int est_timing(struct OFDM *ofdm, complex float *rx, int length,
 
 #ifdef __EMBEDDED__
 #ifdef __REAL__
+        // Note: this code untested
 	float re,im;
-
-	arm_dot_prod_f32(&rx_real[i], wvec_pilot_real, ofdm->samplespersymbol, &re);
-	arm_dot_prod_f32(&rx_real[i], wvec_pilot_imag, ofdm->samplespersymbol, &im);
+        
+        codec2_dot_product_f32(&rx_real[i], wvec_pilot_real, ofdm->samplespersymbol, &re);
+	codec2_dot_product_f32(&rx_real[i], wvec_pilot_imag, ofdm->samplespersymbol, &im);
 	corr_st = re + im * I;
 
-	arm_dot_prod_f32(&rx_real[i+ ofdm->samplesperframe], wvec_pilot_real, ofdm->samplespersymbol, &re);
-	arm_dot_prod_f32(&rx_real[i+ ofdm->samplesperframe], wvec_pilot_imag, ofdm->samplespersymbol, &im);
+	codec2_dot_product_f32(&rx_real[i+ ofdm->samplesperframe], wvec_pilot_real, ofdm->samplespersymbol, &re);
+	codec2_dot_product_f32(&rx_real[i+ ofdm->samplesperframe], wvec_pilot_imag, ofdm->samplespersymbol, &im);
 	corr_en = re + im * I;
+        
 #else
 	float re,im;
-
-	arm_cmplx_dot_prod_f32((float*)&rx[i], (float*)wvec_pilot, ofdm->samplespersymbol, &re, &im);
+        
+	codec2_complex_dot_product_f32((COMP*)&rx[i], (COMP*)wvec_pilot, ofdm->samplespersymbol, &re, &im);
 	corr_st = re + im * I;
 
-	arm_cmplx_dot_prod_f32((float*)&rx[i+ ofdm->samplesperframe], (float*)wvec_pilot, ofdm->samplespersymbol, &re, &im);
+	codec2_complex_dot_product_f32((COMP*)&rx[i+ ofdm->samplesperframe], (COMP*)wvec_pilot, ofdm->samplespersymbol, &re, &im);
 	corr_en = re + im * I;
 #endif
 #else
