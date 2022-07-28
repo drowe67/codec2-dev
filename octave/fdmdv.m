@@ -7,17 +7,10 @@
 % This program is distributed under the terms of the GNU General Public License 
 % Version 2
 %
-% TODO:
-%   [X] refactor with states
-%   [X] remove commented out globals
-%   [X] tfdmdv works
-%   [X] fdmdv_demod works
-%   [ ] fdmdv_ut works
  
-% reqd to make sure we get same random bits at mod and demod
-
 fdmdv_common;
 
+% reqd to make sure we get same random bits at mod and demod
 rand('state',1); 
 randn('state',1);
 
