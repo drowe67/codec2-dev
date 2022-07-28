@@ -248,7 +248,6 @@ if(UNIX)
 endif(UNIX)
 if(LPCNET AND lpcnetfreedv_FOUND)
     target_link_libraries(codec2 PRIVATE lpcnetfreedv)
-    list(APPEND CODEC2_PUBLIC_HEADERS ${CMAKE_SOURCE_DIR}/lpcnet/src/lpcnet_freedv.h)
 endif()
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 set_target_properties(codec2 PROPERTIES
