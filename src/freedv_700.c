@@ -91,7 +91,7 @@ void freedv_comptx_700c(struct freedv *f, COMP mod_out[]) {
         gain = 2.5;
     }
     for(i=0; i<f->n_nat_modem_samples; i++)
-        mod_out[i] = fcmult(gain*FDMDV_SCALE*NORM_PWR_COHPSK, tx_fdm[i]);
+        mod_out[i] = fcmult(gain*COHPSK_SCALE, tx_fdm[i]);
     i = quisk_cfInterpDecim((complex float *)mod_out, f->n_nat_modem_samples, f->ptFilter7500to8000, 16, 15);
 }
 
@@ -281,7 +281,7 @@ int freedv_comprx_700c(struct freedv *f, COMP demod_in_8kHz[]) {
     i = quisk_cfInterpDecim((complex float *)demod_in, freedv_nin(f), f->ptFilter8000to7500, 15, 16);
 
     for(i=0; i<f->nin; i++)
-        demod_in[i] = fcmult(1.0/FDMDV_SCALE, demod_in[i]);
+        demod_in[i] = fcmult(1.0/COHPSK_SCALE, demod_in[i]);
 
     float rx_soft_bits[COHPSK_BITS_PER_FRAME];
 
