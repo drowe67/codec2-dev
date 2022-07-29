@@ -21,8 +21,9 @@ Q = fd.Q;
 
 % Simulation Parameters --------------------------------------
 
-frames = 50;
-EbNo_dB = 6.3;
+% Short-ish run for ctest.  For regular development try frames=100, EbNo_dB=7.3
+frames = 25;
+EbNo_dB = 100;
 Foff_hz = -100;
 modulation = 'dqpsk';
 hpa_clip = 150;

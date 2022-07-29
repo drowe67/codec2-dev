@@ -362,10 +362,35 @@ endif()
                DISPLAY=\"\" octave-cli -qf --eval 'tnewamp1(\"${CMAKE_CURRENT_BINARY_DIR}/src/cq_ref\", \"${CMAKE_CURRENT_BINARY_DIR}/unittest\")'")
              set_tests_properties(test_codec2_700c_octave_port PROPERTIES PASS_REGULAR_EXPRESSION "fails: 0")
 
+    # -------------------------------------------------------------------------
+    #                                FDMDV Modem
+    # -------------------------------------------------------------------------
+
+    add_test(NAME test_FDMDV_modem_octave_ut
+             COMMAND sh -c "
+               cd ${CMAKE_CURRENT_SOURCE_DIR}/octave/;
+               DISPLAY=\"\" octave-cli -qf fdmdv_ut.m")
+             set_tests_properties(test_FDMDV_modem_octave_ut PROPERTIES PASS_REGULAR_EXPRESSION "errors......: 0")
+
+    add_test(NAME test_FDMDV_modem_octave_mod_demod
+             COMMAND sh -c "
+               cd ${CMAKE_CURRENT_SOURCE_DIR}/octave/;
+               echo \"fdmdv_mod('test.raw',1400); fdmdv_demod('test.raw',1400); quit\" | DISPLAY=\"\" octave-cli")
+             set_tests_properties(test_FDMDV_modem_octave_mod_demod PROPERTIES PASS_REGULAR_EXPRESSION "0 errors")
+
     add_test(NAME test_FDMDV_modem_octave_port
              COMMAND sh -c "$<TARGET_FILE:tfdmdv> && DISPLAY=\"\" octave-cli --no-gui -qf ${CMAKE_CURRENT_SOURCE_DIR}/octave/tfdmdv.m"
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/octave)
-             set_tests_properties(PROPERTIES PASS_REGULAR_EXPRESSION "fails: 0")
+             set_tests_properties(test_FDMDV_modem_octave_port PROPERTIES PASS_REGULAR_EXPRESSION "fails: 0")
+
+    add_test(NAME test_FDMDV_modem_octave_c
+             COMMAND sh -c "
+               cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+               ./fdmdv_get_test_bits - 14000 | ./fdmdv_mod - - | 
+               ./fdmdv_demod - - 14 demod_dump.txt | ./fdmdv_put_test_bits - ;
+               cd ${CMAKE_CURRENT_SOURCE_DIR}/octave/;
+               DISPLAY=\"\" octave-cli -qf fdmdv_ut.m")
+             set_tests_properties(test_FDMDV_modem_octave_c PROPERTIES PASS_REGULAR_EXPRESSION "errors......: 0")
 
     add_test(NAME test_COHPSK_modem_octave_port
              COMMAND sh -c "$<TARGET_FILE:tcohpsk> && DISPLAY=\"\" octave-cli --no-gui -qf ${CMAKE_CURRENT_SOURCE_DIR}/octave/tcohpsk.m"
