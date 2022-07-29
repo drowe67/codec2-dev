@@ -36,7 +36,7 @@
 #define COHPSK_FS                   7500  /* note this is a wierd value to get an integer
                                              oversampling rate */
 #define COHPSK_CLIP                  6.5  /* hard clipping for Nc*Nc=14 to reduce PAPR     */
-#define COHPSK_SCALE                1020  /* suggested scaling for 16 bit shorts           */
+#define COHPSK_SCALE                 975  /* suggested scaling for 16 bit shorts           */
 
 #include "comp.h"
 #include "modem_stats.h"

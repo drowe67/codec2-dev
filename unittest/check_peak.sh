@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 #
-# Check peak level of each waveform
-# For manual run
+# Check peak level of each FreeDV waveform is about the same to present
+# consistent drive to transmitters.
+#
+# For manual run outside of ctest:
 #  cd codec/build_linux
 #  PATH=${PATH}:${HOME}/codec2/build_linux/src
 #  ../unitests/check_peak.sh
