@@ -342,7 +342,12 @@ int main(int argc, char *argv[])
               nclipped++;
             }
             tx_pwr += mag*mag;
-            if (mag > peak) { peak = mag; /*fprintf(stderr, "%f\n",mag);*/ }
+            /* we get a bit of overshoot in peak measurments if HT filter hasn't been primed */
+            if (frames*BUF_N > HT_N)
+                if (mag > peak) {
+                    peak = mag;
+                    //fprintf(stderr, "%d %f\n",frames, mag);
+                }
             ch_in[i].real = mag*cos(angle);
             ch_in[i].imag = mag*sin(angle);
         }
