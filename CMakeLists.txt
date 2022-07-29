@@ -806,6 +806,11 @@ endif()
              WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/unittest
              )
 
+     add_test(NAME test_peak_levels
+             COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/unittest;
+                            PATH=$PATH:${CMAKE_CURRENT_BINARY_DIR}/src ./check_peak.sh")
+             set_tests_properties(test_peak_levels PROPERTIES FAIL_REGULAR_EXPRESSION "FAIL")
+           
     # -------------------------------------------------------------------------
     #                                Reliable Text
     # -------------------------------------------------------------------------
