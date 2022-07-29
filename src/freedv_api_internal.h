@@ -49,8 +49,8 @@
 #endif
 
 // Experimentally derived fudge factors to normalise Tx power across modes
-#define NORM_PWR_COHPSK  1.12
-#define NORM_PWR_FSK     0.193
+#define NORM_PWR_COHPSK  1.2
+#define NORM_PWR_FSK     0.5
 #define NORM_PWR_OFDM    1.00
 
 // identifiers for non Codec 2 Speech codecs, make sure no overlap with CODEC2_XXX modes
