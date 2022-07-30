@@ -50,7 +50,6 @@
 #include "machdep.h"
 #include "bpf.h"
 #include "bpfb.h"
-#include "c2wideband.h"
 
 #include "debug_alloc.h"
 

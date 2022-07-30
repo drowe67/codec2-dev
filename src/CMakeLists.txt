@@ -293,9 +293,6 @@ target_link_libraries(fdmdv_demod m)
 add_executable(fdmdv_put_test_bits fdmdv_put_test_bits.c fdmdv.c kiss_fft.c codec2_fft.c kiss_fftr.c)
 target_link_libraries(fdmdv_put_test_bits m)
 
-add_executable(insert_errors insert_errors.c)
-target_link_libraries(insert_errors)
-
 add_executable(freedv_tx freedv_tx.c)
 target_link_libraries(freedv_tx codec2)
 
