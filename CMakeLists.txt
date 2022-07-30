@@ -348,6 +348,10 @@ endif()
              COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/octave; SHORT_VERSION_FOR_CTEST=1 octave-cli -qf ldpcut.m")
              set_tests_properties(test_CML_ldpcut PROPERTIES PASS_REGULAR_EXPRESSION "Nerr: 0")
 
+    # Golay (23,11) unit tests
+    add_test(NAME test_golay23 COMMAND sh -c "${CMAKE_CURRENT_BINARY_DIR}/unittest/golay23")
+    add_test(NAME test_golay23_runtime_tables COMMAND sh -c "${CMAKE_CURRENT_BINARY_DIR}/unittest/golay23_runtime_tables")
+
     # check channel simulator measures correct Peak to Average Power Ratio (about 0dB) with a sine wave input signal
     add_test(NAME test_ch_papr
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR};
