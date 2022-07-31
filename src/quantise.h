@@ -67,7 +67,7 @@ void decode_lsps_vq(int *indexes, float *xq, int order, int stages);
 
 long quantise(const float * cb, float vec[], float w[], int k, int m, float *se);
 void lspvq_quantise(float lsp[], float lsp_[], int order);
-void lspjvm_quantise(float lsps[], float lsps_[], int order);
+void lspjmv_quantise(float lsps[], float lsps_[], int order);
 
 void quantise_WoE(C2CONST *c2const, MODEL *model, float *e, float xq[]);
 int  encode_WoE(MODEL *model, float e, float xq[]);

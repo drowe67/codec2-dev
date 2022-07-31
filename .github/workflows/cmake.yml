@@ -1,4 +1,4 @@
-name: CMake
+name: Build Codec2 for Linux
 
 on: [pull_request]
 
@@ -63,3 +63,7 @@ jobs:
       # See https://cmake.org/cmake/help/latest/manual/ctest.1.html for more detail
       run: ctest --output-on-failure
 
+    - name: Test library installation
+      working-directory: ${{github.workspace}}/build_linux
+      shell: bash
+      run: cmake --install . --prefix "$HOME/codec2_install" && rm -rf "$HOME/codec2_install"

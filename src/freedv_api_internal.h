@@ -48,10 +48,8 @@
   extern "C" {
 #endif
 
-// Experimentally derived fudge factors to normalise Tx power across modes
-#define NORM_PWR_COHPSK  1.12
-#define NORM_PWR_FSK     0.193
-#define NORM_PWR_OFDM    1.00
+// Fudge factors to normalise Tx power across modes
+#define NORM_PWR_FSK     0.5
 
 // identifiers for non Codec 2 Speech codecs, make sure no overlap with CODEC2_XXX modes
 #define CODEC_MODE_LPCNET_1733 100
@@ -197,7 +195,7 @@ struct freedv {
 void freedv_1600_open(struct freedv *f);
 void freedv_700c_open(struct freedv *f);
 void freedv_ofdm_voice_open(struct freedv *f, char *mode);
-void freedv_2020x_open(struct freedv *f, int vq_type);
+void freedv_2020x_open(struct freedv *f);
 void freedv_2400a_open(struct freedv *f);
 void freedv_2400b_open(struct freedv *f);
 void freedv_800xa_open(struct freedv *f);

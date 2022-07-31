@@ -122,3 +122,20 @@ add_custom_command(
   OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/faster_fading_samples.float
   COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR} && ./fading_files.sh ${CMAKE_CURRENT_BINARY_DIR}
 )
+
+add_executable(freedv_700d_comptx freedv_700d_comptx.c)
+add_executable(freedv_700d_comprx freedv_700d_comprx.c)
+
+if(LPCNET AND lpcnetfreedv_FOUND)
+    target_link_libraries(freedv_700d_comptx m codec2 lpcnetfreedv)
+    target_link_libraries(freedv_700d_comprx m codec2 lpcnetfreedv)
+else()
+    target_link_libraries(freedv_700d_comptx m codec2)
+    target_link_libraries(freedv_700d_comprx m codec2)
+endif()
+
+add_executable(golay23 ../src/golay23.c)
+target_compile_options(golay23 PUBLIC -DGOLAY23_UNITTEST)
+
+add_executable(golay23_runtime_tables ../src/golay23.c)
+target_compile_options(golay23_runtime_tables PUBLIC -DGOLAY23_UNITTEST -DRUN_TIME_TABLES)

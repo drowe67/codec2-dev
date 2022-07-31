@@ -94,7 +94,7 @@ struct lsp_codebook {
     int			k;        /* dimension of vector	*/
     int			log2m;    /* number of bits in m	*/
     int			m;        /* elements in codebook	*/
-#ifdef __EMBEDDED__       /* make sure stored in flash  */
+#ifdef __EMBEDDED__               /* make sure stored in flash  */
   const float        *cb;	  /* The elements		*/
 #else
   float              *cb;	  /* The elements		*/
@@ -103,7 +103,7 @@ struct lsp_codebook {
 
 extern const struct lsp_codebook lsp_cb[];
 extern const struct lsp_codebook lsp_cbd[];
-extern const struct lsp_codebook lsp_cbjvm[];
+extern const struct lsp_codebook lsp_cbjmv[];
 extern const struct lsp_codebook ge_cb[];
 extern const struct lsp_codebook newamp1vq_cb[];
 extern const struct lsp_codebook newamp1_energy_cb[];

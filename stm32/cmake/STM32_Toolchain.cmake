@@ -7,6 +7,7 @@ set(CMAKE_ASM_FLAGS "${CFLAGS} -x assembler-with-cpp")
 set(CMAKE_C_COMPILER ${ARM_GCC_BIN}arm-none-eabi-gcc)
 set(CMAKE_CXX_COMPILER ${ARM_GCC_BIN}arm-none-eabi-cpp)
 set(CMAKE_ASM ${ARM_GCC_BIN}arm-none-eabi-as)
+set(CMAKE_OBJCOPY ${ARM_GCC_BIN}arm-none-eabi-objcopy)
 set(CMAKE_C_FLAGS_INIT "-specs=nosys.specs" CACHE STRING "Required compiler init flags")
 set(CMAKE_CXX_FLAGS_INIT "-specs=nosys.specs" CACHE STRING "Required compiler init flags")
 ## https://stackoverflow.com/questions/10599038/can-i-skip-cmake-compiler-tests-or-avoid-error-unrecognized-option-rdynamic

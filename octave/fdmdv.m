@@ -7,17 +7,10 @@
 % This program is distributed under the terms of the GNU General Public License 
 % Version 2
 %
-% TODO:
-%   [X] refactor with states
-%   [X] remove commented out globals
-%   [X] tfdmdv works
-%   [X] fdmdv_demod works
-%   [ ] fdmdv_ut works
  
-% reqd to make sure we get same random bits at mod and demod
-
 fdmdv_common;
 
+% reqd to make sure we get same random bits at mod and demod
 rand('state',1); 
 randn('state',1);
 
@@ -665,10 +658,9 @@ endfunction
 % Accepts nbits from rx and attempts to sync with test_bits sequence.
 % if sync OK measures bit errors
 
-function [sync bit_errors error_pattern f] = put_test_bits(f, test_bits, rx_bits)
-  Ntest_bits = f.Ntest_bits;      
-  rx_test_bits_mem = f.rx_test_bits_mem;
-
+function [sync bit_errors error_pattern f] = put_test_bits(f, rx_bits)
+  Ntest_bits = f.Ntest_bits;    
+  
   % Append to our memory
 
   [m n] = size(rx_bits);
@@ -677,7 +669,7 @@ function [sync bit_errors error_pattern f] = put_test_bits(f, test_bits, rx_bits
 
   % see how many bit errors we get when checked against test sequence
 
-  error_pattern = xor(test_bits, f.rx_test_bits_mem);
+  error_pattern = xor(f.test_bits, f.rx_test_bits_mem);
   bit_errors = sum(error_pattern);
 
   % if less than a thresh we are aligned and in sync with test sequence

@@ -4,7 +4,7 @@
   AUTHOR......: David Rowe
   DATE CREATED: May 2015
 
-  Channel impairment program for testing command line versions of modems.
+  Channel simulation program for testing command line versions of modems.
 
 \*---------------------------------------------------------------------------*/
 
@@ -92,21 +92,23 @@ int main(int argc, char *argv[])
 
     if (argc < 3) {
     helpmsg:
-        fprintf(stderr, "usage: %s InputRealModemRawFile OutputRealModemRawFile [Options]\n"
+        fprintf(stderr, "Command line channel simulation tool.\n"
+                        "\n"
+                        "usage: %s InputRealModemRawFile OutputRealModemRawFile [Options]\n"
                         "\n"
                         "  real int16 input -> Gain -> Hilbert Transform -> clipper -> freq shift ->\n"
                         "  Multipath -> AWGN noise -> SSB filter -> real int16 output\n"
                         "\n"
                         "[--clip int16]         Hilbert clipper (clip complex signal magnitude, default 32767)\n"
-                        "[--complexout]         Optional int16 IQ complex output (default real)\n"
+                        "[--complexout]         Optional int16 IQ complex output (default real int16)\n"
                         "[--ctest]              Check PAPR is around 0dB, used to support ctests\n"
-                        "[--freqq FoffHz]       Frequency offset (default 0Hz)\n"
+                        "[--freq FoffHz]        Frequency offset (default 0Hz)\n"
                         "[--fading_dir Path]    path to multipath fading files (default 'unittest')\n"
                         "[--Fs SampleRateHz]    Sample rate of simulation (default 8000 Hz)\n"
                         "[--gain G]             Linear gain (default 1.0)\n"
                         "[--mpg]                Multipath good 0.1Hz Doppler, 0.5ms delay\n"
-                        "[--mpp]                Multipath poor 1.0Hz Doppler, 1.0ms delay\n"
-                        "[--mpd]                Multipath disturbed 2.0Hz Doppler, 2.0ms delay\n"
+                        "[--mpp]                Multipath poor 1.0Hz Doppler, 2.0ms delay\n"
+                        "[--mpd]                Multipath disturbed 2.0Hz Doppler, 4.0ms delay\n"
                         "[--ssbfilt 0|1]        SSB bandwidth filter (default 1 on)\n"
                         "[--mulipath_delay ms]  Optionally adjust multipath delay\n"
                         "[--No dBHz]            AWGN Noise density dB/Hz (default -100)"
@@ -301,11 +303,11 @@ int main(int argc, char *argv[])
         frames++;
 
         /* Hilbert Transform to produce complex signal so we can do
-           single sided freq shifts, HF channel modemsl, and analog compression.
-           Allows us to use real signal I/O which is handy.
+           single sided freq shifts, HF channel models, and analog
+           compression.  Allows us to use real signal I/O.
 
-           As the real and imag filters both have unity gain, ch_in[] has twice
-           the power of the real input signal buf[].
+           As the real and imag filters both have unity gain, ch_in[]
+           has twice the power of the real input signal buf[].
         */
 
         for(i=0, j=HT_N; i<BUF_N; i++,j++) {
@@ -340,7 +342,12 @@ int main(int argc, char *argv[])
               nclipped++;
             }
             tx_pwr += mag*mag;
-            if (mag > peak) { peak = mag; /*fprintf(stderr, "%f\n",mag);*/ }
+            /* we get a bit of overshoot in peak measurments if HT filter hasn't been primed */
+            if (frames*BUF_N > HT_N)
+                if (mag > peak) {
+                    peak = mag;
+                    //fprintf(stderr, "%d %f\n",frames, mag);
+                }
             ch_in[i].real = mag*cos(angle);
             ch_in[i].imag = mag*sin(angle);
         }
@@ -363,7 +370,7 @@ int main(int argc, char *argv[])
                 ch_fdm_delay[i] = ch_fdm[j];
 
             /* combine direct and delayed paths, both multiplied by
-               "spreading" (doppler) functions */
+               "spreading" (Doppler) functions */
 
             for(i=0; i<BUF_N; i++) {
                 ret = fread(&aspread, sizeof(COMP), 1, ffading);
@@ -465,7 +472,7 @@ int main(int argc, char *argv[])
     if (ffading != NULL) fclose(ffading);
     if (ch_fdm_delay != NULL) FREE(ch_fdm_delay);
     if (ctest) {
-        /* special ctest modes, check CPAPR is around 0dB */
+        /* special ctest mode: check CPAPR is around 0dB */
         if (fabs(papr) < 0.7) return 0; else return 1;
     }
     else return 0;

@@ -96,7 +96,7 @@ void my_datatx(void *callback_state, unsigned char *packet, size_t *size) {
     *size = 0;
 }
 
-#define SPARE_RAM 4000
+#define SPARE_RAM 3000
 
 int main(int argc, char *argv[]) {
     char           dummy[SPARE_RAM];

@@ -83,7 +83,7 @@ void ofdm_init_mode(char mode[], struct OFDM_CONFIG *config) {
         memcpy(config->tx_uw, uw, sizeof(uw));
         config->timing_mx_thresh = 0.08f;    
         config->data_mode = "streaming";
-        config->amp_scale = 300E3; config->clip_gain1 = 2.2; config->clip_gain2 = 0.8;
+        config->amp_scale = 300E3; config->clip_gain1 = 2.2; config->clip_gain2 = 0.85;
         config->tx_bpf_en = true; config->clip_en = true;
     } else if (strcmp(mode,"datac1") == 0) {
         config->ns=5; config->np=38; config->tcp = 0.006; config->ts = 0.016; config->nc = 27;
