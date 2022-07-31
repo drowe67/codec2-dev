@@ -82,7 +82,7 @@ int main(int argc, char *argv[])
         Nc = atoi(argv[3]);
 
         if ((Nc < 2) || (Nc > FDMDV_NC_MAX) ) {
-            fprintf(stderr, "Error number of carriers must be btween 2 and %d\n",  FDMDV_NC_MAX);
+            fprintf(stderr, "Error number of carriers must be between 2 and %d\n",  FDMDV_NC_MAX);
             exit(1);
         }
    }

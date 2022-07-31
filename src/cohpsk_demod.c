@@ -173,7 +173,7 @@ int main(int argc, char *argv[])
 	/* scale and demod */
 
 	for(i=0; i<nin_frame; i++) {
-	    rx_fdm[i].real = rx_fdm_scaled[i]/FDMDV_SCALE;
+	    rx_fdm[i].real = rx_fdm_scaled[i]/COHPSK_SCALE;
             rx_fdm[i].imag = 0.0;
         }
 

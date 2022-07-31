@@ -9,7 +9,7 @@
 %
 
 function fdmdv_demod(rawfilename, nbits, NumCarriers=14, errorpatternfilename, symbolfilename)
-
+  pkg load signal;
   fdmdv; % include modem code
   f = fdmdv_init(NumCarriers);
   Nc = f.Nc; Nb = f.Nb; Rs = f.Rs; M = f.M; Fs = f.Fs; Nsync_mem = f.Nsync_mem;

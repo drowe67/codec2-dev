@@ -10,11 +10,10 @@
 %
 
 function fdmdv_demod_c(dumpfilename, bits)
- 
+  pkg load signal; 
   fdmdv; % include modem code
   f = fdmdv_init;
   Nc = f.Nc; Nb = f.Nb; Rs = f.Rs; M = f.M; Fs = f.Fs;
-  test_bits = f.test_bits;
   
   frames = bits/(Nc*Nb);
 
@@ -39,7 +38,7 @@ function fdmdv_demod_c(dumpfilename, bits)
 
     % count bit errors if we find a test frame
 
-    [test_frame_sync bit_errors error_pattern f] = put_test_bits(f, test_bits, rx_bits);
+    [test_frame_sync bit_errors error_pattern f] = put_test_bits(f, rx_bits);
     if (test_frame_sync == 1)
       total_bit_errors = total_bit_errors + bit_errors;
       total_bits = total_bits + f.Ntest_bits;

@@ -133,3 +133,9 @@ else()
     target_link_libraries(freedv_700d_comptx m codec2)
     target_link_libraries(freedv_700d_comprx m codec2)
 endif()
+
+add_executable(golay23 ../src/golay23.c)
+target_compile_options(golay23 PUBLIC -DGOLAY23_UNITTEST)
+
+add_executable(golay23_runtime_tables ../src/golay23.c)
+target_compile_options(golay23_runtime_tables PUBLIC -DGOLAY23_UNITTEST -DRUN_TIME_TABLES)

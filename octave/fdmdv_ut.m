@@ -9,11 +9,21 @@
 %
 
 fdmdv;               % load modem code
- 
+
+fd = fdmdv_init;
+Nc = fd.Nc;
+M  = fd.M;
+Fs = fd.Fs;
+Rs = fd.Rs;
+Nb = fd.Nb;
+P = fd.P;
+Q = fd.Q;
+
 % Simulation Parameters --------------------------------------
 
-frames = 100;
-EbNo_dB = 6.3;
+% Short-ish run for ctest.  For regular development try frames=100, EbNo_dB=7.3
+frames = 25;
+EbNo_dB = 100;
 Foff_hz = -100;
 modulation = 'dqpsk';
 hpa_clip = 150;
@@ -95,7 +105,7 @@ t = 0;
 foff = 0;
 fest_state = 0;
 fest_timer = 0;
-sync_mem = zeros(1,Nsync_mem);
+sync_mem = zeros(1,fd.Nsync_mem);
 sync = 0;
 sync_log = [];
 
@@ -115,12 +125,12 @@ for f=1:frames
   % Modulator
   % -------------------
 
-  tx_bits = get_test_bits(Nc*Nb);
-  tx_symbols = bits_to_psk(prev_tx_symbols, tx_bits, modulation);
+  [tx_bits fd] = get_test_bits(fd,Nc*Nb);
+  [tx_symbols fd] = bits_to_psk(fd, prev_tx_symbols, tx_bits);
   prev_tx_symbols = tx_symbols;
-  tx_baseband = tx_filter(tx_symbols);
+  [tx_baseband fd] = tx_filter(fd, tx_symbols);
   tx_baseband_log = [tx_baseband_log tx_baseband];
-  tx_fdm = fdm_upconvert(tx_baseband);
+  [tx_fdm fd] = fdm_upconvert(fd, tx_baseband);
   tx_pwr = 0.9*tx_pwr + 0.1*real(tx_fdm)*real(tx_fdm)'/(M);
 
   % -------------------
@@ -172,17 +182,17 @@ for f=1:frames
   % shift down to complex baseband
 
   for i=1:M
-    fbb_phase_rx = fbb_phase_rx*fbb_rect';
-    rx_fdm(i) = rx_fdm(i)*fbb_phase_rx;
+    fd.fbb_phase_rx = fd.fbb_phase_rx*fd.fbb_rect';
+    rx_fdm(i) = rx_fdm(i)*fd.fbb_phase_rx;
   end
-  mag = abs(fbb_phase_rx);
-  fbb_phase_rx /= mag;
+  mag = abs(fd.fbb_phase_rx);
+  fd.fbb_phase_rx /= mag;
 
   % frequency offset estimation and correction, need to call rx_est_freq_offset even in sync
   % mode to keep states updated
   
-  [pilot prev_pilot pilot_lut_index prev_pilot_lut_index] = get_pilot(pilot_lut_index, prev_pilot_lut_index, M);
-  [foff_coarse S1 S2] = rx_est_freq_offset(rx_fdm, pilot, prev_pilot, M, !sync);
+  [pilot prev_pilot fd.pilot_lut_index fd.prev_pilot_lut_index] = get_pilot(fd, fd.pilot_lut_index, fd.prev_pilot_lut_index, M);
+  [foff_coarse S1 S2 fd] = rx_est_freq_offset(fd, rx_fdm, pilot, prev_pilot, M, !sync);
 
   if sync == 0
     foff = foff_coarse;
@@ -196,17 +206,17 @@ for f=1:frames
     rx_fdm(i) = rx_fdm(i)*foff_phase;
   end
 
-  rx_fdm_filter = rxdec_filter(rx_fdm, M);
-  rx_filt = down_convert_and_rx_filter(rx_fdm_filter, M, M/Q);
+  [rx_fdm_filter fd]  = rxdec_filter(fd, rx_fdm, M);
+  [rx_filt fd] = down_convert_and_rx_filter(fd, rx_fdm_filter, M, M/Q);
 
-  [rx_symbols rx_timing] = rx_est_timing(rx_filt, M);
+  [rx_symbols rx_timing env fd] = rx_est_timing(fd, rx_filt, M);
   rx_timing_log = [rx_timing_log rx_timing];
 
   %rx_phase = rx_est_phase(rx_symbols);
   %rx_phase_log = [rx_phase_log rx_phase];
   %rx_symbols = rx_symbols*exp(j*rx_phase);
 
-  [rx_bits sync_bit foff_fine pd] = psk_to_bits(prev_rx_symbols, rx_symbols, modulation);
+  [rx_bits sync_bit foff_fine pd] = psk_to_bits(fd, prev_rx_symbols, rx_symbols, modulation);
   if strcmp(modulation,'dqpsk')
     rx_symbols_log = [rx_symbols_log pd];
   else
@@ -219,22 +229,22 @@ for f=1:frames
   
   % freq est state machine
 
-  [sync reliable_sync_bit fest_state fest_timer sync_mem] = freq_state(sync_bit, fest_state, fest_timer, sync_mem);
+  [sync reliable_sync_bit fest_state fest_timer sync_mem] = freq_state(fd, sync_bit, fest_state, fest_timer, sync_mem);
   sync_log = [sync_log sync];
 
   % Update SNR est
 
-  [sig_est noise_est] = snr_update(sig_est, noise_est, pd);
-  snr_log = [snr_log calc_snr(sig_est, noise_est)];
+  [sig_est noise_est] = snr_update(fd, sig_est, noise_est, pd);
+  snr_log = [snr_log calc_snr(fd, sig_est, noise_est)];
 
   % count bit errors if we find a test frame
   % Allow 15 frames for filter memories to fill and time est to settle
 
-  [test_frame_sync bit_errors] = put_test_bits(test_bits, rx_bits);
+  [test_frame_sync bit_errors error_pattern fd] = put_test_bits(fd, rx_bits);
   
   if test_frame_sync == 1
     total_bit_errors = total_bit_errors + bit_errors;
-    total_bits = total_bits + Ntest_bits;
+    total_bits = total_bits + fd.Ntest_bits;
     bit_errors_log = [bit_errors_log bit_errors];
     else
       bit_errors_log = [bit_errors_log 0];
@@ -284,13 +294,13 @@ papr_dB = 10*log10(papr);
 
 printf("Bits/symbol.: %d\n", Nb);
 printf("Num carriers: %d\n", Nc);
-printf("Bit Rate....: %d bits/s\n", Rb);
+printf("Bit Rate....: %d bits/s\n", fd.Rb);
 printf("Eb/No (meas): %2.2f (%2.2f) dB\n", EbNo_dB, 10*log10(0.25*tx_pwr*Fs/(Rs*Nc*noise_pwr)));
 printf("bits........: %d\n", total_bits);
 printf("errors......: %d\n", total_bit_errors);
 printf("BER.........: %1.4f\n",  ber);
 printf("PAPR........: %1.2f dB\n", papr_dB);
-printf("SNR...(meas): %2.2f (%2.2f) dB\n", SNR, calc_snr(sig_est, noise_est));
+printf("SNR...(meas): %2.2f (%2.2f) dB\n", SNR, calc_snr(fd, sig_est, noise_est));
 
 % ---------------------------------------------------------------------
 % Plots

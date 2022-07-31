@@ -65,7 +65,7 @@ int main(int argc, char *argv[]) {
     reliable_text_t           reliable_text_obj;
     char f2020[80] = {0};
 #ifdef __LPCNET__
-    sprintf(f2020,"|2020|2020");
+    sprintf(f2020,"|2020|2020B");
 #endif
    
     if (argc < 4) {

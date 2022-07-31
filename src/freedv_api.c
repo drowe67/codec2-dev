@@ -279,32 +279,21 @@ static int is_ofdm_data_mode(struct freedv *f) {
 
   Takes a frame of input speech samples, encodes and modulates them to
   produce a frame of modem samples that can be sent to the
-  transmitter.  See freedv_tx.c for an example.
+  transmitter.  See demo/freedv_700d_tx.c for an example.
 
-  speech_in[] is sampled at freedv_get_speech_sample_rate() Hz, and the
-  user must supply a block of exactly
-  freedv_get_n_speech_samples(). The speech_in[] level should be such
-  that the peak speech level is between +/- 16384 and +/- 32767.
+  speech_in[] is sampled at freedv_get_speech_sample_rate() Hz, and
+  the user must supply exactly freedv_get_n_speech_samples(). The peak
+  level should be between +/- 16384 and +/- 32767.
 
-  The FDM modem signal mod_out[] is sampled at
+  The modem signal mod_out[] is sampled at
   freedv_get_modem_sample_rate() and is always exactly
   freedv_get_n_nom_modem_samples() long.  mod_out[] will be scaled
-  such that the peak level is just less than +/-32767.
+  such that the peak level is around +/-16384.
 
-  The FreeDV 1600/700C/700D/2020 waveforms have a crest factor of
-  around 10dB, similar to SSB.  These modes are usually operated at a
-  "backoff" of 8dB.  Adjust the power amplifier drive so that the
-  average power is 8dB less than the peak power of the PA.  For
-  example, on a radio rated at 100W PEP for SSB, the average FreeDV
-  power is typically 20W.
-
-  Caution - some PAs cannot handle a high continuous power.  A
-  conservative level is 20W average for a 100W PEP rated PA.
-
-  The FreeDV 2400A/800XA modes are constant amplitude, designed for
-  Class C PAs.  They have a crest factor of 3dB. If using a SSB PA,
-  adjust the drive so you average power is within the limits of your PA
-  (e.g. 20W average for a 100W PA).
+  mod_out[] has a higher RMS power than SSB with the same peak level.
+  In other words, the crest factor or peak to average power ratio is
+  lower than typical SSB voice.  Ensure your transmitter is capable of
+  continuous high RMS power operation, or consider reducing Tx power.
 
 \*---------------------------------------------------------------------------*/
 
@@ -336,7 +325,7 @@ void freedv_tx(struct freedv *f, short mod_out[], short speech_in[]) {
 }
 
 
-/* complex float output samples version */
+/* complex float output version of freedv_tx() */
 
 void freedv_comptx(struct freedv *f, COMP mod_out[], short speech_in[]) {
     assert(f != NULL);
@@ -670,11 +659,11 @@ int freedv_rawdata_from_codec_frames(struct freedv *f, unsigned char *rawdata, u
   AUTHOR......: David Rowe
   DATE CREATED: 3 August 2014
 
-  Takes samples from the radio receiver, demodulates and FEC decodes
-  them, producing a frame of decoded speech samples.  See freedv_rx.c
-  for an example.
+  Takes samples from the radio receiver and decodes
+  them, producing a frame of decoded speech samples.  See
+  demo/freedv_700d_rx.c for an example.
 
-  demod_in[] is a block of received samples sampled at
+  demod_in[] is an array of received samples sampled at
   freedv_get_modem_sample_rate().  To account for difference in the
   transmit and receive sample clock frequencies, the number of
   demod_in[] samples is time varying. You MUST call freedv_nin()
@@ -684,29 +673,24 @@ int freedv_rawdata_from_codec_frames(struct freedv *f, unsigned char *rawdata, u
   short demod_in[freedv_get_n_max_modem_samples(f)];
   short speech_out[freedv_get_n_max_speech_samples(f)];
 
-  nin = freedv_nin(f);
+  nin = freedv_nin(f);  // num input samples for first read
   while(fread(demod_in, sizeof(short), nin, fin) == nin) {
       nout = freedv_rx(f, speech_out, demod_in);
       fwrite(speech_out, sizeof(short), nout, fout);
-      nin = freedv_nin(f);
+      nin = freedv_nin(f); // num input samples for next read
   }
 
   To help set your buffer sizes, The maximum value of freedv_nin() is
   freedv_get_n_max_modem_samples().
 
   freedv_rx() returns the number of output speech samples available in
-  speech_out[], which is sampled at freedv_get_speech_sample_rate(f).
+  speech_out[], which is sampled at freedv_get_speech_sample_rate().
   You should ALWAYS check the return value of freedv_rx(), and read
   EXACTLY that number of speech samples from speech_out[].
 
   Not every call to freedv_rx will return speech samples; in some
   modes several modem frames are processed before speech samples are
   returned.  When squelch is active, zero samples may be returned.
-
-  1600 and 700D mode: When out of sync, the number of output speech
-  samples returned will be freedv_nin(). When in sync to a valid
-  FreeDV 1600 signal, the number of output speech samples will
-  alternate between freedv_get_n_speech_samples() and 0.
 
   The peak level of demod_in[] is not critical, as the demod works
   well over a wide range of amplitude scaling.  However avoid clipping
@@ -763,7 +747,7 @@ int freedv_rx(struct freedv *f, short speech_out[], short demod_in[]) {
     return 0;
 }
 
-/* complex sample input version from the radio */
+/* complex sample input version of freedv_rx() */
 
 int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]) {
     assert(f != NULL);

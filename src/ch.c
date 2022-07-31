@@ -107,8 +107,8 @@ int main(int argc, char *argv[])
                         "[--Fs SampleRateHz]    Sample rate of simulation (default 8000 Hz)\n"
                         "[--gain G]             Linear gain (default 1.0)\n"
                         "[--mpg]                Multipath good 0.1Hz Doppler, 0.5ms delay\n"
-                        "[--mpp]                Multipath poor 1.0Hz Doppler, 1.0ms delay\n"
-                        "[--mpd]                Multipath disturbed 2.0Hz Doppler, 2.0ms delay\n"
+                        "[--mpp]                Multipath poor 1.0Hz Doppler, 2.0ms delay\n"
+                        "[--mpd]                Multipath disturbed 2.0Hz Doppler, 4.0ms delay\n"
                         "[--ssbfilt 0|1]        SSB bandwidth filter (default 1 on)\n"
                         "[--mulipath_delay ms]  Optionally adjust multipath delay\n"
                         "[--No dBHz]            AWGN Noise density dB/Hz (default -100)"
@@ -342,7 +342,12 @@ int main(int argc, char *argv[])
               nclipped++;
             }
             tx_pwr += mag*mag;
-            if (mag > peak) { peak = mag; /*fprintf(stderr, "%f\n",mag);*/ }
+            /* we get a bit of overshoot in peak measurments if HT filter hasn't been primed */
+            if (frames*BUF_N > HT_N)
+                if (mag > peak) {
+                    peak = mag;
+                    //fprintf(stderr, "%d %f\n",frames, mag);
+                }
             ch_in[i].real = mag*cos(angle);
             ch_in[i].imag = mag*sin(angle);
         }

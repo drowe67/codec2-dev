@@ -28,15 +28,15 @@
 #ifndef __CODEC2_COHPSK__
 #define __CODEC2_COHPSK__
 
-#define COHPSK_BITS_PER_FRAME         56              /* hard coded for now */
-#define COHPSK_NC                      7              /* hard coded for now */
+#define COHPSK_BITS_PER_FRAME         56              
+#define COHPSK_NC                      7  /* number of carriers                            */     
 #define COHPSK_NOM_SAMPLES_PER_FRAME 600
-#define COHPSK_MAX_SAMPLES_PER_FRAME 625
-#define COHPSK_RS                     75
-#define COHPSK_FS                   7500              /* note this is a wierd
-                                                         value to get an integer
-                                                         oversampling rate */
-#define COHPSK_CLIP       6.5                         /* hard clipping for Nc*Nc=14 to reduce PAPR */
+#define COHPSK_MAX_SAMPLES_PER_FRAME 625 
+#define COHPSK_RS                     75  /* symbol rate of each carrier                   */
+#define COHPSK_FS                   7500  /* note this is a wierd value to get an integer
+                                             oversampling rate */
+#define COHPSK_CLIP                  6.5  /* hard clipping for Nc*Nc=14 to reduce PAPR     */
+#define COHPSK_SCALE                 975  /* suggested scaling for 16 bit shorts           */
 
 #include "comp.h"
 #include "modem_stats.h"
