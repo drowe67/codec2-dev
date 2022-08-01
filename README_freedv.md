@@ -58,9 +58,9 @@ These are designed for use with a HF SSB radio.
 | 700C  | 2017 | Codec2 700C | 14 carrier coherent QPSK + diversity | 1500 | 1400 | - | - | 2 | good |
 | 700D  | 2018 | Codec2 700C | 17 carrier coherent OFDM/QPSK | 1000 | 1900 | LDPC (224,112)  | 25 | -2 | fair |
 | 700E  | 2020 | Codec2 700C | 21 carrier coherent OFDM/QPSK | 1500 | 3000 | LDPC (112,56)  | 25 | 1 | good |
-| 2020  | 2019 | LPCNet 1733 | 31 carrier coherent OFDM/QPSK | 1600 | 3000 | LDPC (504,396)  | 22.2 | 2 | poor |
-| 2020A | 2022 | LPCNet 1733 | 31 carrier coherent OFDM/QPSK | 1600 | 3000 | LDPC (504,396) unequal  | 22.2 | 2 | fair |
+| 2020  | 2019 | LPCNet 1733 | 31 carrier coherent OFDM/QPSK | 1600 | 3000 | LDPC (504,396)  | 22 | 2 | poor |
 | 2020B | 2022 | LPCNet 1733 | 29 carrier coherent OFDM/QPSK | 2100 | 4100 | LDPC (112,56) unequal  | 22.2 | 3 | good |
+| 2020C | 2022 | LPCNet 1733 | 29 carrier coherent OFDM/QPSK | 2100 | 4100 | LDPC (212,158) | 22.2 | 5 | good |
 
 Notes:
 
@@ -88,7 +88,7 @@ Notes:
 
 1. FEC was added fairly recently to FreeDV modes.  The voice codecs we use work OK at bit error rates of a few %, and packet error rates of 10%. Raw bit error rates on multipath channels often exceed 10%.  For reasonable latency (say 40ms) we need small codewords. Thus to be useful we require a FEC code that works at over 10% raw BER, has 1% output (coded) bit error rate, and a codeword of around 100 bits.  Digital voice has unusual requirements, most FEC codes are designed for data which is intolerant of any bit errors, and few operate over 10% raw BER.  Powerful FEC codes have long block lengths (1000's of bits) which leads to long latency.  However LDPC codes come close, and can also "clean up" other channel errors caused by static and interference.  The use of OFDM means we now have "room" for the extra bits required for FEC, so there is little cost in adding it, apart from latency.
 
-1. 2020A and 2020B use unequal error protection, only 11 bits from each 52 bit vocoder frame are protected by FEC.  This provides strong protection of the most important bits.  The effect is a gentle "slope" in the speech quality versus SNR curve.  These modes will work at lower SNRs that 2020, but will still have some audible errors even at high SNRs.  2020B has a modem waveform similar to 700E - a high pilot symbol rate so it operates on fast fading channels.  Compared to 2020 it has a shorter frame duration (90ms), lower latency and faster sync, but requires a few more dB SNR.
+1. 2020B uses unequal error protection, only 11 bits from each 52 bit vocoder frame are protected by FEC.  This provides strong protection of the most important bits.  The effect is a gentle "slope" in the speech quality versus SNR curve, but with some audible errors even at high SNRs.  2020C has a LDPC code that protects all bits - it will have no audible errors at high SNRs, but will fall over at about 5dB SNR. 2020B and 2020C have a modem waveform similar to 700E - a high pilot symbol rate to  operate on fast fading channels.  Compared to 2020, B&C have a shorter frame duration (90ms), lower latency and faster sync, but require a few more dB SNR.
 
 ## FreeDV VHF Modes
 
