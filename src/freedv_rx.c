@@ -72,7 +72,7 @@ int main(int argc, char *argv[]) {
       
     char f2020[80] = {0};
 #ifdef __LPCNET__
-    sprintf(f2020,"|2020|2020B");
+    sprintf(f2020,"|2020|2020B|2020C");
 #endif
     
     if (argc < 4) {
@@ -174,6 +174,7 @@ int main(int argc, char *argv[]) {
     #ifdef __LPCNET__
     if (!strcmp(argv[dx],"2020"))  mode = FREEDV_MODE_2020;
     if (!strcmp(argv[dx],"2020B"))  mode = FREEDV_MODE_2020B;
+    if (!strcmp(argv[dx],"2020C"))  mode = FREEDV_MODE_2020C;
     #endif
     if (mode == -1) {
         fprintf(stderr, "Error in mode: %s\n", argv[dx]);
@@ -301,7 +302,8 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "BER......: %5.4f  Tbits: %8d  Terrs: %8d\n",
 		                    (double)uncoded_ber, Tbits, Terrs);
         if ((mode == FREEDV_MODE_700D) || (mode == FREEDV_MODE_700E)  ||
-            (mode == FREEDV_MODE_2020) || (mode == FREEDV_MODE_2020B) ) {
+            (mode == FREEDV_MODE_2020) || (mode == FREEDV_MODE_2020B) ||
+            (mode == FREEDV_MODE_2020C)) {
             int Tbits_coded = freedv_get_total_bits_coded(freedv);
             int Terrs_coded = freedv_get_total_bit_errors_coded(freedv);
             float coded_ber = (float)Terrs_coded/Tbits_coded;

@@ -49,9 +49,10 @@
 #define FREEDV_MODE_800XA       5
 #define FREEDV_MODE_700C        6
 #define FREEDV_MODE_700D        7
+#define FREEDV_MODE_700E       13
 #define FREEDV_MODE_2020        8
 #define FREEDV_MODE_2020B      16
-#define FREEDV_MODE_700E       13
+#define FREEDV_MODE_2020C      17
 
 // available data modes
 #define FREEDV_MODE_FSK_LDPC    9
@@ -116,6 +117,9 @@
 #endif
 #if !defined(FREEDV_MODE_2020B_EN)
         #define FREEDV_MODE_2020B_EN FREEDV_MODE_EN_DEFAULT
+#endif
+#if !defined(FREEDV_MODE_2020C_EN)
+        #define FREEDV_MODE_2020C_EN FREEDV_MODE_EN_DEFAULT
 #endif
 #if !defined(FREEDV_MODE_FSK_LDPC_EN)
         #define FREEDV_MODE_FSK_LDPC_EN FREEDV_MODE_EN_DEFAULT
