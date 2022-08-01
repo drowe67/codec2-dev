@@ -7,7 +7,7 @@
 #
 cmake_minimum_required(VERSION 3.13)
 project(CODEC2
-  VERSION 1.0.5
+  VERSION 1.0.6
   DESCRIPTION "Next-Generation Digital Voice for Two-Way Radio"
   HOMEPAGE_URL "https://www.rowetel.com/codec2.html"
   LANGUAGES C
@@ -550,6 +550,13 @@ endif()
                             ./ch - - --No -19 |
                             ./ofdm_demod --mode 2020B --testframes --ldpc -v 2 > /dev/null")
            
+    # 2020C AWGN test 
+    add_test(NAME test_OFDM_modem_2020C_AWGN
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            ./ofdm_mod --in /dev/zero --testframes 10 --mode 2020C --ldpc --clip --txbpf |
+                            ./ch - - --No -21 |
+                            ./ofdm_demod --mode 2020C --testframes --ldpc -v 2 > /dev/null")
+           
     # -------------------------------------------------------------------------
     #                                OFDM Data modes
     # -------------------------------------------------------------------------
@@ -766,7 +773,7 @@ if(LPCNET)
                                ./ofdm_demod --mode 2020 --verbose 1 --ldpc --testframes > /dev/null"
              )
 
-    add_test(NAME test_freedv_api_2020_from_ofdm_mod
+     add_test(NAME test_freedv_api_2020_from_ofdm_mod
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
                             ./ofdm_mod --in /dev/zero --mode 2020 --verbose 1 --ldpc --testframes 10 |
                             ./freedv_rx 2020 - /dev/null --testframes"
@@ -780,12 +787,12 @@ if(LPCNET)
                             ./freedv_rx 2020 - /dev/null --testframes"
              )
 
-     add_test(NAME test_freedv_api_2020B_mpp
+     add_test(NAME test_freedv_api_2020C_mpp
               COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
                             dd bs=32000 count=60 if=/dev/zero |
-                            ./freedv_tx 2020B - - --testframes --clip 1 |
-                            ./ch - - --No -25 --mpp --fading_dir ../unittest |
-                            ./freedv_rx 2020B - /dev/null --testframes"
+                            ./freedv_tx 2020C - - --testframes --clip 1 |
+                            ./ch - - --No -30 --mpp --fading_dir ../unittest |
+                            ./freedv_rx 2020C - /dev/null --testframes"
              )
 endif()
 
