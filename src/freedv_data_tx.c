@@ -175,7 +175,7 @@ void my_datatx(void *callback_state, unsigned char *packet, size_t *size)
     } else {
         /* 
 	   Set size to zero, the freedv api will insert a header frame 
-	   This is usefull for identifying ourselves 
+	   This is useful for identifying ourselves 
 	 */
         *size = 0;
     }
@@ -258,8 +258,8 @@ int main(int argc, char *argv[]) {
 
     /* OK main loop */
 
-    /* We will loop untill the tx callback has been called n_packets times
-       After that we continue untill everything is transmitted, as a data 
+    /* We will loop until the tx callback has been called n_packets times
+       After that we continue until everything is transmitted, as a data 
        packet might be transmitted in multiple freedv frames.
      */
     while (my_cb_state.calls <= n_packets || freedv_data_ntxframes(freedv)) {

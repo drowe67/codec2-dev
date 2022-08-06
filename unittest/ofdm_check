@@ -4,7 +4,7 @@
 #
 # A series of checks of the ofdm functions, mostly decode.
 # 
-# This uses ofdm_mod to supply test data to ofdm_demod and mosty
+# This uses ofdm_mod to supply test data to ofdm_demod and mostly
 # assumes that the encode function is correct.
 
 # Define macros to (later) allow testing alternate versions.

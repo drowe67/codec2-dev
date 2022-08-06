@@ -173,7 +173,7 @@ function llr = sd_to_llr(sd, HD=0)     %    original 2FSK  + HD option
 endfunction
 
 
-% single point LDPC encoded frame simulation, usin 2FSK as a tractable starting point
+% single point LDPC encoded frame simulation, using 2FSK as a tractable starting point
 % Note: ~/cml/matCreateConstellation.m has some support for FSK - can it do 4FSK?
 
 %%%%%%%%%%%%%%%%%%%%%%%%%

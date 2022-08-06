@@ -5,7 +5,7 @@
   DATE CREATED: 25 June 2014
 
   Prints out the memory used by the FDMDV modem states.  Used to optimise
-  memory use for thw STM32F4 port.
+  memory use for the STM32F4 port.
 
 \*---------------------------------------------------------------------------*/
 

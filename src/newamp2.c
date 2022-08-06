@@ -414,7 +414,7 @@ void newamp2_16k_indexes_to_rate_K_vec(float  rate_K_vec_[],
   INSTITUTE...:	Institute for Electronics Engineering, University of Erlangen-Nuremberg
   DATE CREATED: July 2018
 
-  Interpolates to the 4 10ms Frames and leaves the forst 2 empty for plosives
+  Interpolates to the 4 10ms Frames and leaves the first 2 empty for plosives
 
 \*---------------------------------------------------------------------------*/
 

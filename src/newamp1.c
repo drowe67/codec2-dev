@@ -46,7 +46,7 @@
   AUTHOR......: David Rowe
   DATE CREATED: Jan 2017
 
-  General 2nd order parabolic interpolator.  Used splines orginally,
+  General 2nd order parabolic interpolator.  Used splines originally,
   but this is much simpler and we don't need much accuracy.  Given two
   vectors of points xp and yp, find interpolated values y at points x.
 
@@ -216,7 +216,7 @@ float rate_K_mbest_encode(int *indexes, float *x, float *xq, int ndim, int mbest
   DATE CREATED: Jan 2017
 
   Post Filter, has a big impact on speech quality after VQ.  When used
-  on a mean removed rate K vector, it raises formants, and supresses
+  on a mean removed rate K vector, it raises formants, and suppresses
   anti-formants.  As it manipulates amplitudes, we normalise energy to
   prevent clipping or large level variations.  pf_gain of 1.2 to 1.5
   (dB) seems to work OK.  Good area for further investigations and
@@ -263,7 +263,7 @@ void post_filter_newamp1(float vec[], float sample_freq_kHz[], int K, float pf_g
   DATE CREATED: Jan 2017
 
   Decoder side interpolation of Wo and voicing, to go from 25 Hz
-  sample rate used over channle to 100Hz internal sample rate of Codec 2.
+  sample rate used over channel to 100Hz internal sample rate of Codec 2.
 
 \*---------------------------------------------------------------------------*/
 

@@ -17,7 +17,7 @@
     http://stm32f4-discovery.com/2014/08/library-24-virtual-com-port-vcp-stm32f4xx/
 
   The key was changing APP_RX_DATA_SIZE in usbd_conf.h to 10000.  I
-  guess the previous size of 2048 was constraing the length of USB
+  guess the previous size of 2048 was constraining the length of USB
   packets, and the USB overhead meant slow throughput.  I could
   achieve a max of 450 kB/s with this change, about 1/3 of the
   theoretical 1.5 MB/s max for USB FS (12 Mbit/s).

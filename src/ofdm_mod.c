@@ -236,7 +236,7 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    /* init the modem with our (optinally) custom config */
+    /* init the modem with our (optionally) custom config */
     struct OFDM *ofdm = ofdm_create(ofdm_config);
     assert(ofdm != NULL);
 

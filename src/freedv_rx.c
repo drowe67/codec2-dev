@@ -209,7 +209,7 @@ int main(int argc, char *argv[]) {
     freedv_set_dpsk(freedv, use_dpsk);
     if (use_passthroughgain) freedv_passthrough_gain(freedv, passthroughgain);
     
-    /* install optional handler for recevied txt characters */
+    /* install optional handler for received txt characters */
     if (ftxt_rx != NULL)
     {
         if (use_reliabletext)

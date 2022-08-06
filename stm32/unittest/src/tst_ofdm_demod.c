@@ -39,7 +39,7 @@
  * This program reads a file "stm_cfg.txt" at startup to configure its options.
  *
  * This program is intended to be run using input data, typically
- * Codec2 frames, which may have had simulated RF degredation applied.
+ * Codec2 frames, which may have had simulated RF degradation applied.
  * For example:
  *
  *    ofdm_get_test_bits - 10 | * ofdm_mod - - | \

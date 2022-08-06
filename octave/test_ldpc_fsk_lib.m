@@ -253,7 +253,7 @@ endfunction
 
 
 % Oversamples by a factor of 2 using Octaves resample() function then
-% uses linear interpolation to achive fractional sample rate
+% uses linear interpolation to achieve fractional sample rate
 
 function rx_resample_fract = fractional_resample(rx, resample_rate);
     assert(resample_rate < 2, "keep resample_rate between 0 and 2");
@@ -318,7 +318,7 @@ function [n_uncoded_errs n_uncoded_bits] = run_sstv_sim(sim_in, EbNodB)
   states.df(1:states.M) = 0;
   states.dA(1:states.M) = 1;
   states.tx_real = 0;  % Octave fsk_mod generates complex valued output
-                       % so we can simulate rtl_sdr complex ouput
+                       % so we can simulate rtl_sdr complex output
 
   % Set up simulated tx tones to sit in the middle of cdsr passband
 
@@ -443,7 +443,7 @@ function [n_uncoded_errs n_uncoded_bits] = run_sstv_sim(sim_in, EbNodB)
 
     % C demod with resampler and use C code to measure PER, in this
     % test we don't need to run state machine below as C code gives us
-    % the ouputs we need
+    % the outputs we need
 
     assert(states.tx_real == 0, "need complex signal for this test");
     rx = tx + noise_complex;

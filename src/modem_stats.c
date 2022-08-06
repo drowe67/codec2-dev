@@ -67,8 +67,8 @@ void modem_stats_close(struct MODEM_STATS *f)
   range for plotting is 0 to -40dB.
 
   Note only the real part of the complex input signal is used at
-  present.  A complex variable is used for input for compatability
-  with the other rx signal procesing.
+  present.  A complex variable is used for input for compatibility
+  with the other rx signal processing.
 
   Successive calls can be used to build up a waterfall or spectrogram
   plot, by mapping the received levels to colours.

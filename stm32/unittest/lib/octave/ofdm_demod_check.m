@@ -4,7 +4,7 @@
 
 addpath("../../lib/octave")
 
-% Constants (would prefer paramters)
+% Constants (would prefer parameters)
 err_limit = 0.001;
 
 % Reference

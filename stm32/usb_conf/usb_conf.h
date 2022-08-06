@@ -205,7 +205,7 @@
  #endif
 #endif
 
-/****************** C Compilers dependant keywords ****************************/
+/****************** C Compilers dependent keywords ****************************/
 /* In HS mode and when the DMA is used, all variables and data structures dealing
    with the DMA during the transaction process should be 4-bytes aligned */
 #ifdef USB_OTG_HS_INTERNAL_DMA_ENABLED

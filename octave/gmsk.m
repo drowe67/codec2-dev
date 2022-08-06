@@ -309,7 +309,7 @@ function [rx_bits rx_int rx_filt] = gmsk_demod(gmsk_states, rx)
   else
     % non-coherent demod
 
-    % filter to get rid of most of noise before FM demod, but doesnt
+    % filter to get rid of most of noise before FM demod, but doesn't
     % introduce any ISI
 
     fc = Rs/(Fs/2);
@@ -321,7 +321,7 @@ function [rx_bits rx_int rx_filt] = gmsk_demod(gmsk_states, rx)
     rx_diff = [ 1 rx_filt(2:nsam) .* conj(rx_filt(1:nsam-1))];
     rx_filt = (1/wd)*atan2(imag(rx_diff),real(rx_diff));
 
-    % low pass filter, trade off betwen ISI and removing noise
+    % low pass filter, trade off between ISI and removing noise
 
     rx_filt = filter(gmsk_demod_coeff, 1, rx_filt);  
     Toff = 7;

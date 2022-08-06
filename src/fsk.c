@@ -103,7 +103,7 @@ static void fsk_generate_hann_table(struct FSK* fsk){
   In this version of the demod the standard/hbr modes have been
   largely combined at they shared so much common code.  The
   fsk_create/fsk_create_hbr function interface has been retained to
-  maximise compatability with existing applications.
+  maximise compatibility with existing applications.
 
 \*---------------------------------------------------------------------------*/
 

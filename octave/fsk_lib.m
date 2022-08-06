@@ -26,7 +26,7 @@ function states = fsk_init(Fs, Rs, M=2, P=8, nsym=50)
   N = states.N = Ts*states.nsym;                  % processing buffer size, nice big window for timing est
   bin_width_Hz = 0.1*Rs;                          % we want enough DFT bins to get within 10% of the tones centre
   Ndft = Fs/bin_width_Hz;
-  states.Ndft = 2.^ceil(log2(Ndft));              % round to nearest power of 2 for efficent FFT
+  states.Ndft = 2.^ceil(log2(Ndft));              % round to nearest power of 2 for efficient FFT
   states.Sf = zeros(states.Ndft,1);               % current memory of dft mag samples
   states.tc = 0.1;                                % average DFT over longtime window, accurate at low Eb/No, but slow
   

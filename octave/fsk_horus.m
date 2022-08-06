@@ -25,7 +25,7 @@ endfunction
 % init rtty protocol specific states
 
 function rtty = fsk_horus_init_rtty
-  % Generate unque word that correlates against the ASCII "$$$$$" that
+  % Generate unique word that correlates against the ASCII "$$$$$" that
   % is at the start of each frame.
   % $ -> 36 decimal -> 0 1 0 0 1 0 0 binary 
 

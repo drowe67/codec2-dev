@@ -56,7 +56,7 @@ endfunction
 % Work out series resistance Rl of series resonant inductor.  Connect
 % tracking generator to spec-an input, the series LC to ground.  V is
 % the ref TG level (e.g. with perfect 50 ohm term) in volts, Vmin is the
-% minumum at series res freq.
+% minimum at series res freq.
 %
 %  /-50-+---+
 %  |    |   |

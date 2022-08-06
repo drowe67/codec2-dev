@@ -31,7 +31,7 @@
 */
 
 /** @defgroup USB_DCD
-* @brief This file is the interface between EFSL ans Host mass-storage class
+* @brief This file is the interface between EFSL and Host mass-storage class
 * @{
 */
 

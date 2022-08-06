@@ -74,7 +74,7 @@ float spectral_dist(float ak1[], float ak2[], int p, codec2_fft_cfg fft_fwd_cfg,
 	P2 = A2[i].real*A2[i].real + A2[i].imag*A2[i].imag;
 	sd += pow(10.0*log10(P2/P1),2.0);
     }
-    sd = sd/n;	/* mean sd for this frame in dB*dB, whch can be further averaged across frames */
+    sd = sd/n;	/* mean sd for this frame in dB*dB, which can be further averaged across frames */
 
     return(sd);
 }

@@ -1,7 +1,7 @@
 /*
   elfsym.c
 
-  Read symbol adresses from a .elf file.
+  Read symbol addresses from a .elf file.
 
   Based on libelf-howto.c from: http://em386.blogspot.com
 
@@ -30,7 +30,7 @@ int elfsym_open(char file[]) {
     struct stat elf_stats;	/* fstat struct                */
 
     if((fd = open(file, O_RDWR)) == ERR) {
-        printf("couldnt open %s\n", file);
+        printf("couldn't open %s\n", file);
         return ERR;
     }
 

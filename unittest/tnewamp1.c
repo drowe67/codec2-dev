@@ -246,7 +246,7 @@ int main(int argc, char *argv[]) {
         //if (f == 7)
         //  exit(0);
 
-        /* with f == 0, we don't store ouput, but memories are updated, helps to match
+        /* with f == 0, we don't store output, but memories are updated, helps to match
            what happens in Codec 2 mode */
 
         if (f >= M) {

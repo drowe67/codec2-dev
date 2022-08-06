@@ -1,7 +1,7 @@
 % autotest.m
 % David Rowe Mar 2015
 %
-% Helper functions to plot output of C verson and difference between Octave and C versions
+% Helper functions to plot output of C version and difference between Octave and C versions
 
 1;
 

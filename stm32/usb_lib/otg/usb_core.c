@@ -82,7 +82,7 @@
 
 /**
 * @brief  USB_OTG_EnableCommonInt
-*         Initializes the commmon interrupts, used in both device and modes
+*         Initializes the common interrupts, used in both device and modes
 * @param  pdev : Selected device
 * @retval None
 */

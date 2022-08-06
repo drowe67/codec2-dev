@@ -2,7 +2,7 @@
 %
 % Demodulator function for FDMDV modem (Octave version).  Requires
 % 8kHz sample rate raw files as input.  This version uses experimental
-% psuedo coherent demodulation.
+% pseudo coherent demodulation.
 %
 % Copyright David Rowe 2013
 % This program is distributed under the terms of the GNU General Public License 
@@ -52,7 +52,7 @@ function fdmdv_demod_coh(rawfilename, nbits, pngname)
   track = 0;
   fest_state = 0;
 
-  % psuedo coherent demod states
+  % pseudo coherent demod states
 
   rx_symbols_ph_log = [];
   prev_rx_symbols_ph = ones(Nc+1,1);
@@ -114,7 +114,7 @@ function fdmdv_demod_coh(rawfilename, nbits, pngname)
     rx_symbols_ph_log = [rx_symbols_ph_log rx_symbols_ph .* exp(j*pi/4)];
     rx_symbols_ph = -1 + 2*(real(rx_symbols_ph .* exp(j*pi/4)) > 0) + j*(-1 + 2*(imag(rx_symbols_ph .* exp(j*pi/4)) > 0));
 
-    % Std differential (used for freq offset est and BPSK sync) and psuedo coherent detection -----------------------
+    % Std differential (used for freq offset est and BPSK sync) and pseudo coherent detection -----------------------
 
     [rx_bits_unused sync        f_err       pd       ] = qpsk_to_bits(prev_rx_symbols, rx_symbols, modulation);
     [rx_bits        sync_unused ferr_unused pd_unused] = qpsk_to_bits(prev_rx_symbols_ph, rx_symbols_ph, 'dqpsk');

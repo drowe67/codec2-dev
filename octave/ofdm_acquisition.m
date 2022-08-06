@@ -112,7 +112,7 @@ function Pa = frame_by_frame_acquisition_test(mode="datac1", Ntests=10, channel=
            target_acq(i) = -1; % flag bad candidate
          end
          if pre_eval.ok && (target_acq(i) == 0)
-           target_acq(i) = 1;  % flag a sucessful acquisition
+           target_acq(i) = 1;  % flag a successful acquisition
            next_state = "demod";
            modem_frame = 0;
          end

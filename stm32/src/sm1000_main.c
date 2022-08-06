@@ -120,7 +120,7 @@
  *                  machine, we return to STATE_RX.
  *
  *             On SELECT.HOLD:      select the current menu entry,
- *                                  if it is a submenu then make that the currnet level
+ *                                  if it is a submenu then make that the current level
  *             On SELECT.PRESS:     next entry in the current menu level
  *             On BACK.PRESS:       prev mode in the current menu level
  *             On BACK.HOLD:        go up to the previous menu 
@@ -907,7 +907,7 @@ int process_core_state_machine(int core_state, struct menu_t *menu, int *op_mode
  * 	|   |   |-        - SELECT.PRESS add 5 sec
  * 	|   |   |-        - BACK.PRESS subtracts 5 sec
  *      | 
- * 	|- "UI"         UI (morse code announcments) parameters
+ * 	|- "UI"         UI (morse code announcements) parameters
  * 	|   |- "FREQ"   - Set tone
  * 	|   |   |-        - SELECT.PRESS add 50 Hz
  * 	|   |   |-        - BACK.PRESS subtracts 50 Hz

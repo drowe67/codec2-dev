@@ -175,7 +175,7 @@ void my_datatx(void *callback_state, unsigned char *packet, size_t *size)
     } else {
         /* 
 	   Set size to zero, the freedv api will insert a header frame 
-	   This is usefull for identifying ourselves 
+	   This is useful for identifying ourselves 
 	 */
         *size = 0;
     }

@@ -44,7 +44,7 @@ float sample_log_amp(MODEL *model, float w);
   AUTHOR......: David Rowe
   DATE CREATED: 22/8/10
 
-  Given two frames decribed by model parameters 20ms apart, determines
+  Given two frames described by model parameters 20ms apart, determines
   the model parameters of the 10ms frame between them.  Assumes
   voicing is available for middle (interpolated) frame.  Outputs are
   amplitudes and Wo for the interpolated frame.
@@ -140,7 +140,7 @@ float sample_log_amp(MODEL *model, float w)
   AUTHOR......: David Rowe
   DATE CREATED: 10 Nov 2010
 
-  Given two frames decribed by model parameters 20ms apart, determines
+  Given two frames described by model parameters 20ms apart, determines
   the model parameters of the 10ms frame between them.  Assumes
   voicing is available for middle (interpolated) frame.  Outputs are
   amplitudes and Wo for the interpolated frame.

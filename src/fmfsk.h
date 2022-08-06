@@ -68,7 +68,7 @@ struct FMFSK{
  * 
  * int Fs - sample rate
  * int Rb - non-manchester bitrate
- * returns - new struct FMFSK on sucess, NULL on failure
+ * returns - new struct FMFSK on success, NULL on failure
  */
 struct FMFSK * fmfsk_create(int Fs,int Rb);
 

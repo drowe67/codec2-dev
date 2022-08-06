@@ -95,7 +95,7 @@ LoopFillZerobss:
   cmp  r2, r3
   bcc  FillZerobss
 
-/* Zero memory from bss up with a sentinal value */
+/* Zero memory from bss up with a sentinel value */
   b  LoopFillsentinel
 Fillsentinel:
   ldr  r3, = 0x55555555 /* sentinel value we put in memory */ 
@@ -106,7 +106,7 @@ LoopFillsentinel:
   cmp  r2, r3
   bcc  Fillsentinel
 
-/* Call the clock system intitialization function.*/
+/* Call the clock system initialization function.*/
   bl  SystemInit
 /* Call static constructors */
     bl __libc_init_array

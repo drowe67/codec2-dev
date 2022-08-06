@@ -5,7 +5,7 @@
   AUTHOR......: David Rowe
   DATE CREATED: May 2 2013
 
-  STM32F4 implementation of the machine dependant timer functions,
+  STM32F4 implementation of the machine dependent timer functions,
   e.g. profiling using a clock cycle counter..
 
 \*---------------------------------------------------------------------------*/

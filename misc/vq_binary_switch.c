@@ -5,7 +5,7 @@
   C implementation of [1], that re-arranges VQ indexes so they are robust to single
   bit errors.
 
-  [1] Psuedo Gray Coding, Zeger & Gersho 1990 
+  [1] Pseudo Gray Coding, Zeger & Gersho 1990 
 */
 
 #include <assert.h>

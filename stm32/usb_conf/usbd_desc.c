@@ -4,7 +4,7 @@
   * @author  MCD Application Team
   * @version V1.0.0
   * @date    19-September-2011
-  * @brief   This file provides the USBD descriptors and string formating method.
+  * @brief   This file provides the USBD descriptors and string formatting method.
   ******************************************************************************
   * @attention
   *

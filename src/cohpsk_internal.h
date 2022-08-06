@@ -29,7 +29,7 @@
 #define __COHPSK_INTERNAL__
 
 #define NCT_SYMB_BUF      (2*NSYMROWPILOT+2)
-#define COHPSK_ND         2                           /* diversity factor ND 1 is no diveristy, ND we have orginal plus
+#define COHPSK_ND         2                           /* diversity factor ND 1 is no diveristy, ND we have original plus
                                                          one copy */
 #define NSW               4                           /* number of sync window frames */
 #define COHPSK_M          100                         /* oversampling rate */

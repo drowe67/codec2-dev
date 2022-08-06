@@ -5,7 +5,7 @@
 # directory, and summarised in single line in the log file
 # log_voice.txt.  Designed to be used from cron.
 
-# use crontab -e to edit cron for currrent user, sample entry:
+# use crontab -e to edit cron for current user, sample entry:
 
 #       m     h   dom  mon  dow   command
 #    */10  6-12    24    4    *   cd codec2/unittest; ./ota_voice_auto.sh ~/your_speech_file.s16 your.kiwi.sdr

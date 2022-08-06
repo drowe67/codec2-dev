@@ -1,6 +1,6 @@
 % fdmdv_common.m
 %
-% Functions that implement a Frequency Divison Multiplexed Modem functions
+% Functions that implement a Frequency Division Multiplexed Modem functions
 %
 
 1;

@@ -320,7 +320,7 @@ function llrs = mfsk_hd_to_llrs(sd, map, SNRlin=4)
 % for M=4, compare these results to SD method of mfsk_sd_to_llrs
   [x, ind] = max(sd');     % find biggest SD
   b2 = map(ind', :)';      % get bit pairs 
-  b1 = b2(:)';             % covert to row vector
+  b1 = b2(:)';             % convert to row vector
   b1 = b1*2 -1;            % convert to -1/ +1
   llrs = -4*SNRlin*b1;     % approx scaling;  default is ~6dB SNR
 endfunction

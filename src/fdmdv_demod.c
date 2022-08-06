@@ -120,7 +120,7 @@ int main(int argc, char *argv[])
     bits_per_codec_frame = 2*fdmdv_bits_per_frame(fdmdv);
     bytes_per_codec_frame = (bits_per_codec_frame+7)/8;
 
-    /* malloc some buffers that are dependant on Nc */
+    /* malloc some buffers that are dependent on Nc */
 
     packed_bits = (char*)MALLOC(bytes_per_codec_frame); assert(packed_bits != NULL);
     rx_bits = (int*)MALLOC(sizeof(int)*bits_per_codec_frame); assert(rx_bits != NULL);

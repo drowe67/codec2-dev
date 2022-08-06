@@ -245,7 +245,7 @@ int freedv_comprx_fdmdv_1600(struct freedv *f, COMP demod_in[]) {
             } /* if (test_frames == 0) .... */
         }
 
-        /* note this freewheels if reliable sync dissapears on bad channels */
+        /* note this freewheels if reliable sync disappears on bad channels */
 
         if (f->evenframe)
             f->evenframe = 0;

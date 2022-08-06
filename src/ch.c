@@ -211,7 +211,7 @@ int main(int argc, char *argv[])
 
     /*  N = var = NoFs */
 
-    // arbitrary noise scaling, to maintain backwards compatability with many tests.  TODO make the No
+    // arbitrary noise scaling, to maintain backwards compatibility with many tests.  TODO make the No
     // units more sensible, and fix all the tests that depend on this scaling
     No = pow(10.0, NodB/10.0)*1000*1000;
     variance = Fs*No;
@@ -342,7 +342,7 @@ int main(int argc, char *argv[])
               nclipped++;
             }
             tx_pwr += mag*mag;
-            /* we get a bit of overshoot in peak measurments if HT filter hasn't been primed */
+            /* we get a bit of overshoot in peak measurements if HT filter hasn't been primed */
             if (frames*BUF_N > HT_N)
                 if (mag > peak) {
                     peak = mag;

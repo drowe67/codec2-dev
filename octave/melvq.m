@@ -59,7 +59,7 @@ function [res output_vecs ind] = mbest(vqset, input_vecs, m)
   [Ninput tmp] = size(input_vecs);
 
   res = [];         % residual error after VQ
-  output_vecs = []; % quantised ouput vectors
+  output_vecs = []; % quantised output vectors
   ind = [];         % index of vqs
   
   for i=1:Ninput

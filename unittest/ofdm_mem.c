@@ -5,7 +5,7 @@
   DATE CREATED: 11 June 2018
 
   Prints out the memory used by the OFDM modem states.  Used to optimise
-  memory use for thw STM32F4 port.
+  memory use for the STM32F4 port.
 
 \*---------------------------------------------------------------------------*/
 

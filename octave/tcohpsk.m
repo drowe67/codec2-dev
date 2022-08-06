@@ -28,13 +28,13 @@
 %  [X] false sync
 %      [X] doesn't sync up on noise (used EsNo = -12)
 %      [X] similar but invalid signal like huge f off
-%  [X] ability to "unsync" when signal dissapears
+%  [X] ability to "unsync" when signal disappears
 %  [ ] some calibrated tests against FreeDV 1600
 %      + compare sound quality at various Es/Nos
 %  [ ] sync
 %      + set some req & implement
 %      [ ] way to handle eom w/o nasties
-%          + like mute ouput when signal has gone or v low snr
+%          + like mute output when signal has gone or v low snr
 %          + instantaneous snr
 %  [X] ssb tx filter with 3dB passband ripple
 %      + diverisity helped for AWGN BER 0.024 down to 0.016
@@ -697,7 +697,7 @@ end
 
 
 % function to write C header file of noise samples so C version gives
-% extactly the same results
+% exactly the same results
 
 function write_noise_file(uvnoise_log)
 

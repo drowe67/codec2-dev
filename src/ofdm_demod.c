@@ -389,7 +389,7 @@ int main(int argc, char *argv[]) {
     float sum_SNR3kdB = 0.0;
     
     if (strlen(ofdm->data_mode) == 0)
-        Ndiscard = NDISCARD; /* backwards compatability with 700D/2020        */
+        Ndiscard = NDISCARD; /* backwards compatibility with 700D/2020        */
     else
         Ndiscard = 1;        /* much longer packets, so discard thresh smaller */
 

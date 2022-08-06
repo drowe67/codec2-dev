@@ -1,6 +1,6 @@
 % fdmdv.m
 %
-% Functions that implement a Frequency Divison Multiplexed Modem for
+% Functions that implement a Frequency Division Multiplexed Modem for
 % Digital Voice (FDMDV) over HF channels.
 %
 % Copyright David Rowe 2012
@@ -831,7 +831,7 @@ function [sync reliable_sync_bit state timer sync_mem] = freq_state(f, sync_bit,
       next_state = 3;
     end
   end
-  if state == 3            % tenative bad  state, but could be a fade
+  if state == 3            % tentative bad  state, but could be a fade
     if unique_word
       next_state = 2;
     else 

@@ -4,7 +4,7 @@
   AUTHOR......: David Rowe
   DATE CREATED: May 2 2013
 
-  Machine dependant functions, e.g. profiling that requires access to a clock
+  Machine dependent functions, e.g. profiling that requires access to a clock
   counter register.
 
 \*---------------------------------------------------------------------------*/
