@@ -1,7 +1,7 @@
 % cohpsk_demod_plot.m
 % David Rowe May 2015
 %
-% Plot Octave outputs from cohpsk_demod, c2dec, to visualise whats going on
+% Plot Octave outputs from cohpsk_demod, c2dec, to visualise what's going on
 % when errors hit the system
 
 #{

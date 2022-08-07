@@ -955,7 +955,7 @@ void fdmdv_freq_shift_coh(COMP rx_fdm_fcorr[], COMP rx_fdm[], float foff, float 
 	rx_fdm_fcorr[i] = cmult(rx_fdm[i], *foff_phase_rect);
     }
 
-    /* normalise digital oscilator as the magnitude can drfift over time */
+    /* normalise digital oscillator as the magnitude can drift over time */
 
     mag = cabsolute(*foff_phase_rect);
     foff_phase_rect->real /= mag;

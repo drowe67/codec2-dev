@@ -148,7 +148,7 @@ function ind = find_most_likely_index(y, vq, C, sd_table, h_table, nstages, ntxc
     end
 
     if verbose
-      printf("Evaulation of all possible paths:\n");
+      printf("Evaluation of all possible paths:\n");
       printf("  ");
       for s=1:nstages
         printf(" n%+d", s - (floor(nstages/2)+1));

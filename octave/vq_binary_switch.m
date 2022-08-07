@@ -4,7 +4,7 @@
 % Experiments in making VQs robust to bit errors, this is an Octave
 % implementation of [1].
 %
-% [1] Psuedo Gray Coding, Zeger & Gersho 1990
+% [1] Pseudo Gray Coding, Zeger & Gersho 1990
 
 1;
 

@@ -19,7 +19,7 @@ setup_common "${RUN_DIR}"
 # Change to test directory
 cd "${RUN_DIR}"
 
-# way of performing a rough comparsion of two output speech files that are not exactly the same
+# way of performing a rough comparison of two output speech files that are not exactly the same
 
 function compare_energy() {
     energy_ref=$(python3 -c "import numpy as np; x=np.fromfile(\"ref_demod.raw\",dtype=\"int16\").astype(float); print(10*np.log10(np.dot(x,x)))")
@@ -101,7 +101,7 @@ case "${TEST_OPT}" in
 	#    comparison is used on the output speech files, which
 	#    will trap any large errors.
 
-	# 4/ We can also manually evaulate the ouput decoded speech by
+	# 4/ We can also manually evaluate the output decoded speech by
 	#    listening to the output speech files.
 
 	compare_energy;
@@ -178,7 +178,7 @@ case "${TEST_OPT}" in
 	#    comparison is used on the output speech files, which
 	#    will trap any large errors.
 
-	# 4/ We can also manually evaulate the ouput decoded speech by
+	# 4/ We can also manually evaluate the output decoded speech by
 	#    listening to the output speech files.
 
 	compare_energy;

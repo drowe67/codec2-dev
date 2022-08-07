@@ -231,7 +231,7 @@ void phase_synth_zero_order(
 \*---------------------------------------------------------------------------*/
 
 void mag_to_phase(float phase[],             /* Nfft/2+1 output phase samples in radians       */
-                  float Gdbfk[],             /* Nfft/2+1 postive freq amplitudes samples in dB */
+                  float Gdbfk[],             /* Nfft/2+1 positive freq amplitudes samples in dB */
                   int Nfft, 
                   codec2_fft_cfg fft_fwd_cfg,
                   codec2_fft_cfg fft_inv_cfg

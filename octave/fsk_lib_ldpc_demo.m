@@ -95,7 +95,7 @@ function [states uber cber cper] = modem_run_test(HRA, EbNodB = 10, num_frames=1
       %printf("coded_bits: %d bps: %d st_bit: %d st_symbol: %d en_symbol: %d\n",
       %code_param.coded_bits_per_frame, states.bitspersymbol, st_bit,  st_symbol, en_symbol);
 
-      % map FSK filter ouputs to LLRs, then LDPC decode (see also fsk_cml_sam.m)
+      % map FSK filter outputs to LLRs, then LDPC decode (see also fsk_cml_sam.m)
       symL = DemodFSK(1/states.v_est*rx_filt(:,st_symbol:en_symbol), states.SNRest, 1);
       llr = -Somap(symL);
       [x_hat, PCcnt] = MpDecode(llr, code_param.H_rows, code_param.H_cols, max_iterations=100, decoder_type=0, 1, 1);

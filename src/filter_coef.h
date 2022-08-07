@@ -177,7 +177,7 @@ float filtP400S600[100]={
 
 /*
   Low pass filter, sample rate 8000 Hz, 60dB dB atten, pass 650 Hz, stop 900 Hz
-  Alternate filter for use with 700D and clipper.  A litte extra bandwidth helps
+  Alternate filter for use with 700D and clipper.  A little extra bandwidth helps
   reduce PAPR.
 
   Generated using Octave:

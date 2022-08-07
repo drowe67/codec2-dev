@@ -2,7 +2,7 @@
 % 
 % David Rowe Sep 2015
 %
-% Slighly modified version of http://www.dsprelated.com/showcode/20.php
+% Slightly modified version of http://www.dsprelated.com/showcode/20.php
 %
 % Given a magnitude spectrum in dB, returns a minimum-phase phase
 % spectra.  Both must be sampled at a Nfft. My understanding of this

@@ -128,7 +128,7 @@ function [rx_symb rx_int filt_log dco_log timing_adj Toff] = oqpsk_demod(oqpsk_s
       % http://www.ece.ualberta.ca/~ee401/parts/data/PLLIntro.pdf
 
       eta = 0.707;
-      wn = 2*pi*10*(Rs/4800);  % (Rs/4800) -> found reducing the BW benefical with falling Rs
+      wn = 2*pi*10*(Rs/4800);  % (Rs/4800) -> found reducing the BW beneficial with falling Rs
       Ts = 1/Fs;
       g1 = 1 - exp(-2*eta*wn*Ts);
       g2 = 1 + exp(-2*eta*wn*Ts) - 2*exp(-eta*wn*Ts)*cos(wn*Ts*sqrt(1-eta*eta));

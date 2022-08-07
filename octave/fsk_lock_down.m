@@ -55,7 +55,7 @@ function [states M bits_per_frame] = lock_down_init(Rs,Fs,df,tx_tone_separation=
   % our valid frame threshold is 50% probability, so if we get this many errors
   % we have a 50% chance it's a valid frame
   nerrs_valid = find(cdf>=0.5)(1);
-  % our invalid frame threshold is 99% probability, so very unlikley to
+  % our invalid frame threshold is 99% probability, so very unlikely to
   % get this many errors
   nerrs_invalid =  find(cdf>=0.99)(1);
   states.ber_valid_thresh = nerrs_valid/bits_per_frame;
@@ -108,7 +108,7 @@ function [states f_log f_log2 num_dud1 num_dud2 ber ber2] = freq_run_test(EbNodB
   nerrors = sum(xor(tx_bits(1:length(rx_bits)),rx_bits)); ber = nerrors/nbits;
   nerrors2 = sum(xor(tx_bits(1:length(rx_bits2)),rx_bits2)); ber2 = nerrors2/nbits;
   
-  % Lets say that for a valid freq estimate, all four tones must be within 0.1*Rs of their tx freqeuncy
+  % Lets say that for a valid freq estimate, all four tones must be within 0.1*Rs of their tx frequency
   num_dud1 = 0; num_dud2 = 0;
   for i=1:length(f_log)
     if sum(abs(f_log(i,:)-states.ftx) > 0.1*states.Rs)
@@ -156,7 +156,7 @@ function freq_run_single(EbNodB = 3, num_frames = 10)
 end
 
 
-% test peak and mask algorthms side by side
+% test peak and mask algorithms side by side
 function freq_run_curve_peak_mask
 
    EbNodB = 0:9;

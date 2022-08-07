@@ -82,7 +82,7 @@
   1/ If someone says "aaaaaaaahhhhhhhhh" will background estimator track
      up to speech level?  This would be a bad thing.
 
-  2/ If background noise suddenly dissapears from the source speech does
+  2/ If background noise suddenly disappears from the source speech does
      estimate drop quickly?  What is noise suddenly re-appears?
 
   3/ Background noise with a non-flat sepctrum.  Current algorithm just
@@ -115,7 +115,7 @@ void postfilter(
   assert(e > 0.0);
   e = 10.0*log10f(e/model->L);
 
-  /* If beneath threhold, update bg estimate.  The idea
+  /* If beneath threshold, update bg estimate.  The idea
      of the threshold is to prevent updating during high level
      speech. */
 

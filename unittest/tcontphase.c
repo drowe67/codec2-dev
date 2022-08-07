@@ -152,7 +152,7 @@ char *argv[];
 	/* lets make phases bounce around from frame to frame.  This
 	   could happen if H[m] is varying, for example due to frame
 	   to frame Wo variations, or non-stationary speech.
-	   Continous model generally results in smooth phase track
+	   Continuous model generally results in smooth phase track
 	   under these circumstances. */
 	if (j%2){
 	    H[1].real = 1.0; H[1].imag = 0.0;

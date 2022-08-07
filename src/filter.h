@@ -28,7 +28,7 @@ struct quisk_cfFilter {        // Structure to hold the static data for FIR filt
     int decim_index;           // index of next sample for decimation
     complex float * cSamples;  // storage for old samples
     complex float * ptcSamp;   // next available position in cSamples
-    complex float * cBuf;      // auxillary buffer for interpolation
+    complex float * cBuf;      // auxiliary buffer for interpolation
 } ;
 
 extern int quisk_cfInterpDecim(complex float *, int, struct quisk_cfFilter *, int, int);

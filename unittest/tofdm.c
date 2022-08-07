@@ -85,7 +85,7 @@ static int ofdm_samplesperframe;
 static int ofdm_samplespersymbol;
 static int ofdm_max_samplesperframe;
 static int ofdm_nrxbuf;
-static int ofdm_ntxtbits;           /* reserve bits/frame for auxillary text information */
+static int ofdm_ntxtbits;           /* reserve bits/frame for auxiliary text information */
 static int ofdm_nuwbits;            /* Unique word, used for positive indication of lock */
 
 /*---------------------------------------------------------------------------*\

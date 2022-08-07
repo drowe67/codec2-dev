@@ -318,7 +318,7 @@ struct CODEC2 * codec2_create(int mode)
 
     if ( CODEC2_MODE_ACTIVE(CODEC2_MODE_450PWB, c2->mode))
     {
-    	//Encode PWB doesnt make sense
+    	//Encode PWB doesn't make sense
 	c2->encode = codec2_encode_450;
 	c2->decode = codec2_decode_450pwb;
     }
@@ -405,7 +405,7 @@ int codec2_bits_per_frame(struct CODEC2 *c2) {
 
   Returns the number of bytes per frame.  Useful for allocated storage for
   codec2_encode()/codec2_decode().  Note the number of bits may not be a
-  multiple of 8, thefore some bits in the last byte may be unused.
+  multiple of 8, therefore some bits in the last byte may be unused.
 
 \*---------------------------------------------------------------------------*/
 
@@ -443,7 +443,7 @@ int codec2_samples_per_frame(struct CODEC2 *c2) {
 	return 320;
     if  ( CODEC2_MODE_ACTIVE(CODEC2_MODE_450PWB, c2->mode))
 	return 640;
-    return 0; /* shouldnt get here */
+    return 0; /* shouldn't get here */
 }
 
 
@@ -1654,9 +1654,9 @@ void codec2_decode_700c(struct CODEC2 *c2, short speech[], const unsigned char *
 
    for(i=0; i<M; i++) {
        if (c2->fmlfeat != NULL) {
-	   /* We use standard nb_features=55 feature records for compatability with train_lpcnet.py */
+	   /* We use standard nb_features=55 feature records for compatibility with train_lpcnet.py */
 	   float features[55] = {0};
-	   /* just using 18/20 for compatability with LPCNet, coarse scaling for NN imput */
+	   /* just using 18/20 for compatibility with LPCNet, coarse scaling for NN input */
 	   for(int j=0; j<18; j++)
 	       features[j] = (interpolated_surface_[i][j]-30)/40;
 	   int pitch_index = 21 + 2.0*M_PI/model[i].Wo;

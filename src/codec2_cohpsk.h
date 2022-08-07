@@ -33,7 +33,7 @@
 #define COHPSK_NOM_SAMPLES_PER_FRAME 600
 #define COHPSK_MAX_SAMPLES_PER_FRAME 625 
 #define COHPSK_RS                     75  /* symbol rate of each carrier                   */
-#define COHPSK_FS                   7500  /* note this is a wierd value to get an integer
+#define COHPSK_FS                   7500  /* note this is a weird value to get an integer
                                              oversampling rate */
 #define COHPSK_CLIP                  6.5  /* hard clipping for Nc*Nc=14 to reduce PAPR     */
 #define COHPSK_SCALE                 975  /* suggested scaling for 16 bit shorts           */

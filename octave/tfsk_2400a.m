@@ -644,5 +644,5 @@ plot_fsk_bers(4)
 if xpass
     printf("***** All tests passed! *****\n");
 else
-    printf("***** Some test failed! Look back thorugh output to find failed test *****\n");
+    printf("***** Some test failed! Look back through output to find failed test *****\n");
 end

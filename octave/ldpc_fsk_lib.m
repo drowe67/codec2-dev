@@ -6,7 +6,7 @@
 %
 % LDPC demo
 % Call the CML routines and simulate one set of SNRs.  
-% This fucntion is an updated version of ldpc3() which uses less 
+% This function is an updated version of ldpc3() which uses less 
 % of the CML functions 
 %
 % sim_in the input parameter structure

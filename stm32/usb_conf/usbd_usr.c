@@ -72,7 +72,7 @@ void USBD_USR_DeviceReset(uint8_t speed )
 * @brief  USBD_USR_DeviceConfigured
 *         Displays the message on LCD on device configuration Event
 * @param  None
-* @retval Staus
+* @retval Status
 */
 void USBD_USR_DeviceConfigured (void)
 {
@@ -83,7 +83,7 @@ void USBD_USR_DeviceConfigured (void)
 * @brief  USBD_USR_DeviceConnected
 *         Displays the message on LCD on device connection Event
 * @param  None
-* @retval Staus
+* @retval Status
 */
 void USBD_USR_DeviceConnected (void)
 {
@@ -94,7 +94,7 @@ void USBD_USR_DeviceConnected (void)
 * @brief  USBD_USR_DeviceDisonnected
 *         Displays the message on LCD on device disconnection Event
 * @param  None
-* @retval Staus
+* @retval Status
 */
 void USBD_USR_DeviceDisconnected (void)
 {

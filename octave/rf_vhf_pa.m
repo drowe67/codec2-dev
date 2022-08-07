@@ -7,7 +7,7 @@
 rfdesign;
 
 % BFQ19 Vce=5V Ic=50mA.  These are small signal S-params,
-% which (according to "RF Cicruit Design") are not valid.
+% which (according to "RF Circuit Design") are not valid.
 % However I need to start somewhere.
 
 S11 = 0.324*exp(j*(-158.1)*pi/180);

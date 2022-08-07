@@ -62,7 +62,7 @@ CDC_IF_Prop_TypeDef VCP_fops = { VCP_Init, VCP_DeInit, VCP_Ctrl, VCP_DataTx,
  * @brief  VCP_Init
  *         Initializes the Media on the STM32
  * @param  None
- * @retval Result of the opeartion (USBD_OK in all cases)
+ * @retval Result of the operation (USBD_OK in all cases)
  */
 static uint16_t VCP_Init(void) {
 	return USBD_OK;
@@ -72,7 +72,7 @@ static uint16_t VCP_Init(void) {
  * @brief  VCP_DeInit
  *         DeInitializes the Media on the STM32
  * @param  None
- * @retval Result of the opeartion (USBD_OK in all cases)
+ * @retval Result of the operation (USBD_OK in all cases)
  */
 static uint16_t VCP_DeInit(void) {
 	return USBD_OK;
@@ -84,7 +84,7 @@ static uint16_t VCP_DeInit(void) {
  * @param  Cmd: Command code
  * @param  Buf: Buffer containing command data (request parameters)
  * @param  Len: Number of data to be sent (in bytes)
- * @retval Result of the opeartion (USBD_OK in all cases)
+ * @retval Result of the operation (USBD_OK in all cases)
  */
 static uint16_t VCP_Ctrl(uint32_t Cmd, uint8_t* Buf, uint32_t Len) {
 	switch (Cmd) {
@@ -166,7 +166,7 @@ void VCP_send_buffer(uint8_t* buf, int len) {
  *         this function.
  * @param  Buf: Buffer of data to be sent
  * @param  Len: Number of data to be sent (in bytes)
- * @retval Result of the opeartion: USBD_OK if all operations are OK else VCP_FAIL
+ * @retval Result of the operation: USBD_OK if all operations are OK else VCP_FAIL
  */
 static uint16_t VCP_DataTx(uint8_t* Buf, uint32_t Len) {
 	uint32_t i = 0;
@@ -196,7 +196,7 @@ static uint16_t VCP_DataTx(uint8_t* Buf, uint32_t Len) {
  *
  * @param  Buf: Buffer of data to be received
  * @param  Len: Number of data received (in bytes)
- * @retval Result of the opeartion: USBD_OK if all operations are OK else VCP_FAIL
+ * @retval Result of the operation: USBD_OK if all operations are OK else VCP_FAIL
  */
 
 #define APP_TX_BUF_SIZE 128

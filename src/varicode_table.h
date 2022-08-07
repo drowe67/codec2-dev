@@ -291,7 +291,7 @@ unsigned char const varicode_table1[256] =	{
 };
 
 // This code was used on FDMDV version 1, and is more compact that Code 1, but only covers a subset
-// of the ASCII cahacter set
+// of the ASCII character set
 
 char const varicode_table2[] = {
 

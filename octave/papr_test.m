@@ -171,7 +171,7 @@ function [ber papr] = run_sim(Nc, Nsym, EbNodB, channel='awgn', plot_en=0, filt_
         norm_pwr = 10*log10(mean(abs(rx).^2));
         
         if phase_est
-            % auxillary rx to get ideal phase ests on signal after multipath but before AWGN noise is added
+            % auxiliary rx to get ideal phase ests on signal after multipath but before AWGN noise is added
 
             rx_phase = zeros(Nsym,Nc);
             for s=1:Nsym

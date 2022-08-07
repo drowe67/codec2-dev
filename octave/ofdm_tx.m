@@ -58,7 +58,7 @@ function ofdm_tx(filename, mode="700D", N, SNR3kdB=100, channel='awgn', varargin
     Npackets = round(N/states.Tpacket);
   end
 
-  % Generate fixed test frame of tx bits and concatentate packets
+  % Generate fixed test frame of tx bits and concatenate packets
 
   tx_bits = create_ldpc_test_frame(states, coded_frame=0);
   atx = ofdm_mod(states, tx_bits);

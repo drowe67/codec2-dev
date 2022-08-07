@@ -314,7 +314,7 @@ __ALIGN_BEGIN uint8_t usbd_cdc_CfgDesc[USB_CDC_CONFIG_DESC_SIZ]  __ALIGN_END =
 #endif /* USB_OTG_HS_INTERNAL_DMA_ENABLED */
 __ALIGN_BEGIN uint8_t usbd_cdc_OtherCfgDesc[USB_CDC_CONFIG_DESC_SIZ]  __ALIGN_END =
 {
-  0x09,   /* bLength: Configuation Descriptor size */
+  0x09,   /* bLength: Configuration Descriptor size */
   USB_DESC_TYPE_OTHER_SPEED_CONFIGURATION,
   USB_CDC_CONFIG_DESC_SIZ,
   0x00,
@@ -518,7 +518,7 @@ static uint8_t  usbd_cdc_Setup (void  *pdev,
                             CmdBuff,
                             req->wLength);
         }
-        else /* Host-to-Device requeset */
+        else /* Host-to-Device request */
         {
           /* Set the value of the current command to be processed */
           cdcCmd = req->bRequest;

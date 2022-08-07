@@ -884,7 +884,7 @@ void fdmdv_freq_shift(COMP rx_fdm_fcorr[], COMP rx_fdm[], float foff,
 	rx_fdm_fcorr[i] = cmult(rx_fdm[i], *foff_phase_rect);
     }
 
-    /* normalise digital oscilator as the magnitude can drfift over time */
+    /* normalise digital oscillator as the magnitude can drift over time */
 
     mag = cabsolute(*foff_phase_rect);
     foff_phase_rect->real /= mag;
@@ -1014,7 +1014,7 @@ void rxdec_filter(COMP rx_fdm_filter[], COMP rx_fdm[], COMP rxdec_lpf_mem[], int
   AUTHOR......: Danilo Beuche
   DATE CREATED: August 2016
 
-  Ths version submitted by Danilo for the STM32F4 platform.  The idea
+  This version submitted by Danilo for the STM32F4 platform.  The idea
   is to avoid reading the same value from the STM32F4 "slow" flash
   twice. 2-4ms of savings per frame were measured by Danilo and the mcHF
   team.
@@ -2008,7 +2008,7 @@ void fdmdv_dump_osc_mags(struct FDMDV *f)
 \*---------------------------------------------------------------------------*/
 
 #define RANDN_IT 12  /* This magic number of iterations gives us a
-                        unit variance.  I think beacuse var =
+                        unit variance.  I think because var =
                         (b-a)^2/12 for one uniform random variable, so
                         for a sum of n random variables it's
                         n(b-a)^2/12, or for b=1, a = 0, n=12, we get

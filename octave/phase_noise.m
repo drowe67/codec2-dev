@@ -2,7 +2,7 @@
 % David Nov 2019
 
 % Close-in look at phase noise.  Feed in a off-air sample file of a
-% sine wave, extracts the phase noise countour and returns the Doppler
+% sine wave, extracts the phase noise contour and returns the Doppler
 % spreading function that can be used to model the channel in
 % simulations
 

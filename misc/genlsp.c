@@ -4,7 +4,7 @@
 	AUTHOR......: David Rowe
 	DATE CREATED: 23/2/95
 
-	This program genrates a text file of LSP vectors from an input
+	This program generates a text file of LSP vectors from an input
 	speech file.
 
 \*--------------------------------------------------------------------------*/

@@ -346,7 +346,7 @@ global nxdn_info = nxdn;
 %        - timing_offset - how far the fine timing is offset
 %        - bitcnt - how many bits to check
 %        - demod_fx - demodulator function
-% Returns - ber - teh measured BER
+% Returns - ber - the measured BER
 %         - thrcoh - theory BER of a coherent demod
 %         - thrncoh - theory BER of non-coherent demod
 function [ber thrcoh thrncoh] = nfbert(aEsNodB,modem_config, bitcnt=100000, timing_offset = 10)

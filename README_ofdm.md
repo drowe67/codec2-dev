@@ -249,4 +249,4 @@ Notes:
    ```
    So we have about 1.8dB overhead for synchronisation, implementation loss,  and the text channel.
 1. "CCIR Poor" HF Multipath channel used for testing is two path, 1Hz Doppler, 1ms delay.
-1. The text channel is an auxillary channel, unprotected by FEC, that typically carries callsign/location information for Ham stations.
+1. The text channel is an auxiliary channel, unprotected by FEC, that typically carries callsign/location information for Ham stations.

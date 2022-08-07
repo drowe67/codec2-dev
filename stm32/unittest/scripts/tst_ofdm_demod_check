@@ -7,7 +7,7 @@
 
     Checks are different for each option, but similar
 
-    - Convert stm32 output to octave text foramt
+    - Convert stm32 output to octave text format
       (stm32 does not have memory for this)
 
     - ...

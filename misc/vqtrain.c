@@ -47,7 +47,7 @@
 
 \*-----------------------------------------------------------------------*/
 
-#define	DELTAQ 	0.005		/* quiting distortion			*/
+#define	DELTAQ 	0.005		/* quitting distortion			*/
 #define	MAX_STR	80		/* maximum string length		*/
 
 /*-----------------------------------------------------------------------*\

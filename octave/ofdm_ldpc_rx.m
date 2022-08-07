@@ -138,7 +138,7 @@ function ofdm_ldpc_rx(filename, mode="700D", varargin)
 
         % LDPC decode
 
-        % keep earlier mean amplitude estimator for compatability with 700D
+        % keep earlier mean amplitude estimator for compatibility with 700D
         if states.amp_est_mode == 0
           mean_amp = states.mean_amp;
         else
@@ -260,7 +260,7 @@ function ofdm_ldpc_rx(filename, mode="700D", varargin)
     figure(7); clf;
     subplot(211)
     stem(Nerrs_log);
-    title('Uncoded errrors/modem frame')
+    title('Uncoded errors/modem frame')
     axis([1 length(Nerrs_log) 0 Nbitsperpacket*0.2]);
     if length(Nerrs_coded_log)
       subplot(212)

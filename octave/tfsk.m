@@ -100,7 +100,7 @@ function pass = vcompare(vc,voct,vname,tname,tol,pnum)
     
 endfunction
 
-% Run C, then Octave verion of demod, and compare results
+% Run C, then Octave version of demod, and compare results
 function test_stats = fsk_demod_xt(Fs,Rs,f1,fsp,mod,tname,M=2,lock_nin=0)
     global print_verbose;
     global tfsk_location;
@@ -313,7 +313,7 @@ function stats = tfsk_run_sim(test_frame_mode,EbNodB,timing_offset,fading,df,M=2
   fading        [0|1]  modulates tx power at 2Hz with 20dB fade depth, 
                        e.g. to simulate balloon rotating at end of mission
   df                   tx tone freq drift in Hz/s
-  lock_nin      [0|1]  locks nin to a constant which makes tests much simpler by breaking feeback loop
+  lock_nin      [0|1]  locks nin to a constant which makes tests much simpler by breaking feedback loop
   #}
   global print_verbose;
   

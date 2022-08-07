@@ -359,7 +359,7 @@ function fm_demod_file(file_name_out, file_name_in)
   plot(rx)
   subplot(212)
   plot(20*log10(abs(fft(rx))))
-  title('FM Dmodulator Intput Spectrum');
+  title('FM Dmodulator Input Spectrum');
 
   figure(2)
   subplot(211)

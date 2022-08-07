@@ -490,7 +490,7 @@ function run_lots
     sim_in.EbNodB = 12; sim_in.demod = 1; run_sim(sim_in); 
   printf("Rs=2400 2FSK analog FM demod, needs more power for same BER!  Che?\n");
     sim_in.Rs = 2400; sim_in.EbNodB = 15; run_sim(sim_in);
-  printf("Hmm, doesnt improve with no 300Hz HPF, maybe due to less deviation?\n");
+  printf("Hmm, doesn't improve with no 300Hz HPF, maybe due to less deviation?\n");
     sim_in.hpf = 0; run_sim(sim_in);
   printf("Rs=2400 4FSK ideal demod, nice low Eb/No!\n");
     sim_in.demod = 2; sim_in.M = 4; sim_in.Rs = 2400; sim_in.EbNodB = 6; run_sim(sim_in);

@@ -375,7 +375,7 @@ def process_fsk(
 
     _runtime = time.time() - _start
 
-    # Try to grab last line of the stderr outout
+    # Try to grab last line of the stderr output
     try:
         _last_line = _output.split("\n")[-3]
     except:

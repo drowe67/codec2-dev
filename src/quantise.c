@@ -333,7 +333,7 @@ void force_min_lsp_dist(float lsp[], int order)
    lpc_post_filter()
 
    Applies a post filter to the LPC synthesis filter power spectrum
-   Pw, which supresses the inter-formant energy.
+   Pw, which suppresses the inter-formant energy.
 
    The algorithm is from p267 (Section 8.6) of "Digital Speech",
    edited by A.M. Kondoz, 1994 published by Wiley and Sons.  Chapter 8
@@ -347,7 +347,7 @@ void force_min_lsp_dist(float lsp[], int order)
    it should be possible to implement this more efficiently in the
    time domain.  Just not sure how to handle relative time delays
    between the synthesis stage and updating these coeffs.  A smaller
-   FFT size might also be accetable to save CPU.
+   FFT size might also be acceptable to save CPU.
 
    TODO:
    [ ] sync var names between Octave and C version
@@ -583,7 +583,7 @@ void aks_to_M2(
          just above nulls.  This algorithm does the reverse to
          compensate - raising the amplitudes of spectral peaks, while
          attenuating the null.  This enhances the formants, and
-         supresses the energy between formants. */
+         suppresses the energy between formants. */
 
       if (sim_pf) {
           if (Am > model->A[m])
@@ -1093,7 +1093,7 @@ void compute_weights2(const float *x, const float *xp, float *w)
   both the pitch and energy tend to only change by small amounts
   during voiced speech, however it is important that these changes be
   coded carefully.  During unvoiced speech they both change a lot but
-  the ear is less sensitve to errors so coarser quantisation is OK.
+  the ear is less sensitive to errors so coarser quantisation is OK.
 
   The ear is sensitive to log energy and loq pitch so we quantise in
   these domains.  That way the error measure used to quantise the

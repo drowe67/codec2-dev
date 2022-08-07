@@ -62,7 +62,7 @@ case "${TEST_OPT}" in
 	#              particular test is necessarily short due to the
 	#              slow speed of the semihosting system.  It is
 	#              therefore sufficient to check that the
-	#              performance is similar to the x86 C verison,
+	#              performance is similar to the x86 C version,
 	#              rather than expecting a low coded BER for a
 	#              short run.
 	

@@ -17,7 +17,7 @@ function L = find_L(Ln, fc, R)
 endfunction
 
 % 3rd order HP filter, 1dB ripple Cheby, 3MHz cut off, >20dB down at
-% 1MHz to nail stong AM broadcast signals, Table 3-7A. Use a Rs=50,
+% 1MHz to nail strong AM broadcast signals, Table 3-7A. Use a Rs=50,
 % Rl=50, so Rs/Rl = 1.  Note we assume a or phantom load in between
 % cascaded HP-LP sections of 50 ohms.
 

@@ -877,9 +877,9 @@ int main(int argc, char *argv[])
             }
 
 	    if (frateKWov != NULL) {
-		/* We use standard nb_features=55 feature records for compatability with train_lpcnet.py */
+		/* We use standard nb_features=55 feature records for compatibility with train_lpcnet.py */
 		float features[55] = {0};
-		/* just using 18/20 for compatability with LPCNet, coarse scaling for NN imput */
+		/* just using 18/20 for compatibility with LPCNet, coarse scaling for NN input */
 		for(int i=0; i<18; i++)
 		    features[i] = (rate_K_vec_[i]-30)/40;
 		// keep in range of 40 ... 255 for pitch embedding

@@ -5,7 +5,7 @@
   CREATED.: Sun 22 June 2014
 
   File I/O based test program for Speex pre-processor, used for
-  initial testing of Speech noise supression.
+  initial testing of Speech noise suppression.
 
 \*----------------------------------------------------------------------------*/
 

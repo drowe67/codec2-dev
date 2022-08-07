@@ -1,7 +1,7 @@
 /*
   elfsym.h
 
-  Read symbol adresses from a .elf file.
+  Read symbol addresses from a .elf file.
 */
 
 #ifndef __ELFSYM__
