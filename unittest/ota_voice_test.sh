@@ -44,6 +44,7 @@ function print_help {
     echo
     echo "    -c dev                    The sound device (in ALSA format on Linux, CoreAudio for macOS)"
     echo "    -d                        debug mode; trace script execution"
+    echo "    -f                        Frequency (kHz)"
     echo "    -g                        SSB (analog) compressor gain"
     echo "    -i StationIDWaveFile      Prepend this file to identify transmission (should be 8KHz mono)"
     echo "    -m mode   700c|700d|700e"
@@ -187,7 +188,7 @@ set -- "${POSITIONAL[@]}" # restore positional parameters
 
 # determine sample rate of freedv_tx/freedv_rx
 speechFs=8000
-if [ "$mode" == "2020" ] || [ "$mode" == "2020B" ]; then
+if [ "$mode" == "2020" ] || [ "$mode" == "2020B" ] || [ "$mode" == "2020C" ]; then
    speechFs=16000
 fi
 
