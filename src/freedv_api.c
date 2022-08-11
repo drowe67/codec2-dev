@@ -907,6 +907,7 @@ int freedv_bits_to_speech(struct freedv *f, short speech_out[], short demod_in[]
                    decode_speech = 1;
            }
        }
+       
     }
 
     if (decode_speech) {
@@ -923,6 +924,15 @@ int freedv_bits_to_speech(struct freedv *f, short speech_out[], short demod_in[]
             nout = f->n_speech_samples;
             for (int i = 0; i < frames; i++) {
                 lpcnet_dec(f->lpcnet, (char*) f->rx_payload_bits + i*bits_per_codec_frame, speech_out);
+                /* ear protection: on frames with errors and clipping, reduce level by 12dB */
+                if (rx_status & FREEDV_RX_BIT_ERRORS) {
+                    int max = 0.0;
+                    for (int j=0; j<lpcnet_samples_per_frame(f->lpcnet); j++)
+                        if (abs(speech_out[j]) > max) max = abs(speech_out[j]);
+                    if (max == 32767)
+                        for (int j=0; j<lpcnet_samples_per_frame(f->lpcnet); j++) speech_out[j] *= 0.25;
+                }
+ 
                 speech_out += lpcnet_samples_per_frame(f->lpcnet);
             }
 
