@@ -6,7 +6,9 @@
 # For manual run outside of ctest:
 #  cd codec/build_linux
 #  PATH=${PATH}:${HOME}/codec2/build_linux/src
-#  ../unitests/check_peak.sh
+#  ./unittest/check_peak.sh
+#  OR:
+#  
 
 voice_test() {
     mode=$1
@@ -32,18 +34,23 @@ data_test() {
     octave-cli -qf --eval "$octave_cmd"
 }
 
-voice_test "1600"
-voice_test "700C"
-voice_test "700D"
-voice_test "700E"
-voice_test "2020"
-voice_test "2020B"
-voice_test "800XA"
-voice_test "2400A"
-voice_test "2400B"
-data_test "datac0"
-data_test "datac1"
-data_test "datac3"
+if [ "$1" == "LPCNet" ]; then
+    # these don't get run unless we build with LPCNet
+    voice_test "2020"
+    voice_test "2020B"
+    voice_test "2020C"
+  else
+    voice_test "1600"
+    voice_test "700C"
+    voice_test "700D"
+    voice_test "700E"
+    voice_test "800XA"
+    voice_test "2400A"
+    voice_test "2400B"
+    data_test "datac0"
+    data_test "datac1"
+    data_test "datac3"
+fi
 
 exit 0
 
