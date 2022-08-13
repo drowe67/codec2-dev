@@ -49,6 +49,9 @@ void freedv_2020x_open(struct freedv *f) {
     case FREEDV_MODE_2020B:
         ofdm_init_mode("2020B", &ofdm_config);
         break;
+    case FREEDV_MODE_2020C:
+        ofdm_init_mode("2020C", &ofdm_config);
+        break;
     default:
         assert(0);
     }
@@ -68,6 +71,10 @@ void freedv_2020x_open(struct freedv *f) {
         break;
     case FREEDV_MODE_2020B:
         f->ldpc->protection_mode = LDPC_PROT_2020B;
+        data_bits_per_frame = 156;
+        vq_type = 2;    /* index optimised VQ for increased robustness to single bit errors */
+        break;
+    case FREEDV_MODE_2020C:
         data_bits_per_frame = 156;
         vq_type = 2;    /* index optimised VQ for increased robustness to single bit errors */
         break;

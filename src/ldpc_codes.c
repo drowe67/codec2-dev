@@ -22,6 +22,7 @@
 #include "H_4096_8192_3d.h"
 #include "H_16200_9720.h"
 #include "H_1024_2048_4f.h"
+#include "H_212_158.h"
 
 struct LDPC ldpc_codes[] = {
     /* short rate 1/2 code for FreeDV 700D */
@@ -89,6 +90,23 @@ struct LDPC ldpc_codes[] = {
         (uint16_t *)HRAb_396_504_H_cols
     },
 
+    
+    /* Rate 0.745 code for mopping up errors on 2020C from Bill VK5DSP */ 
+    {
+        "H_212_158",
+        H_212_158_MAX_ITER,
+        0,
+        1,
+        1,
+        H_212_158_CODELENGTH,
+        H_212_158_NUMBERPARITYBITS,
+        H_212_158_NUMBERROWSHCOLS,
+        H_212_158_MAX_ROW_WEIGHT,
+        H_212_158_MAX_COL_WEIGHT,
+        (uint16_t *)H_212_158_H_rows,
+        (uint16_t *)H_212_158_H_cols
+    },
+    
     /* rate 1/3 code, works at raw BER of 14% */
     {
         "H_256_768_22",
@@ -185,7 +203,7 @@ struct LDPC ldpc_codes[] = {
         (uint16_t *)H_16200_9720_H_cols
     },
      
-    /* Another fine code from Bill VK5DSK - also useful for HF data */ 
+    /* Another fine code from Bill VK5DSP - also useful for HF data */ 
     {
         "H_1024_2048_4f",
         H_1024_2048_4f_MAX_ITER,

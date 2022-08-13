@@ -7,7 +7,7 @@
 #
 cmake_minimum_required(VERSION 3.13)
 project(CODEC2
-  VERSION 1.0.5
+  VERSION 1.0.6
   DESCRIPTION "Next-Generation Digital Voice for Two-Way Radio"
   HOMEPAGE_URL "https://www.rowetel.com/codec2.html"
   LANGUAGES C
@@ -550,6 +550,13 @@ endif()
                             ./ch - - --No -19 |
                             ./ofdm_demod --mode 2020B --testframes --ldpc -v 2 > /dev/null")
            
+    # 2020C AWGN test 
+    add_test(NAME test_OFDM_modem_2020C_AWGN
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            ./ofdm_mod --in /dev/zero --testframes 10 --mode 2020C --ldpc --clip --txbpf |
+                            ./ch - - --No -21 |
+                            ./ofdm_demod --mode 2020C --testframes --ldpc -v 2 > /dev/null")
+           
     # -------------------------------------------------------------------------
     #                                OFDM Data modes
     # -------------------------------------------------------------------------
@@ -618,6 +625,13 @@ endif()
                             ./ldpc_enc /dev/zero - --sd --code HRA_56_56 --testframes 200 |
                             ./ldpc_noise - - 0.5 |
                             ./ldpc_dec - /dev/null --code HRA_56_56 --sd --testframes"
+             )
+
+    add_test(NAME test_ldpc_enc_dec_H_212_158
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            ./ldpc_enc /dev/zero - --sd --code H_212_158 --testframes 200 |
+                            ./ldpc_noise - - -2.0 |
+                            ./ldpc_dec - /dev/null --code H_212_158 --sd --testframes"
              )
 
     add_test(NAME test_ldpc_enc_dec_HRAb_396_504
@@ -759,7 +773,7 @@ if(LPCNET)
                                ./ofdm_demod --mode 2020 --verbose 1 --ldpc --testframes > /dev/null"
              )
 
-    add_test(NAME test_freedv_api_2020_from_ofdm_mod
+     add_test(NAME test_freedv_api_2020_from_ofdm_mod
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
                             ./ofdm_mod --in /dev/zero --mode 2020 --verbose 1 --ldpc --testframes 10 |
                             ./freedv_rx 2020 - /dev/null --testframes"
@@ -779,6 +793,14 @@ if(LPCNET)
                             ./freedv_tx 2020B - - --testframes --clip 1 |
                             ./ch - - --No -25 --mpp --fading_dir ../unittest |
                             ./freedv_rx 2020B - /dev/null --testframes"
+             )
+
+     add_test(NAME test_freedv_api_2020C_mpd
+              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            dd bs=32000 count=60 if=/dev/zero |
+                            ./freedv_tx 2020C - - --testframes --clip 1 |
+                            ./ch - - --No -31 --mpd --fading_dir ../unittest |
+                            ./freedv_rx 2020C - /dev/null --testframes"
              )
 endif()
 
@@ -814,6 +836,12 @@ endif()
              COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/unittest;
                             PATH=$PATH:${CMAKE_CURRENT_BINARY_DIR}/src ./check_peak.sh")
              set_tests_properties(test_peak_levels PROPERTIES FAIL_REGULAR_EXPRESSION "FAIL")
+if(LPCNET)
+     add_test(NAME test_peak_levels_lpcnet
+             COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/unittest;
+                            PATH=$PATH:${CMAKE_CURRENT_BINARY_DIR}/src ./check_peak.sh LPCNet")
+             set_tests_properties(test_peak_levels_lpcnet PROPERTIES FAIL_REGULAR_EXPRESSION "FAIL")
+endif()
            
     # -------------------------------------------------------------------------
     #                                Reliable Text

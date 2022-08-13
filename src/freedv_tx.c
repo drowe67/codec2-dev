@@ -65,7 +65,7 @@ int main(int argc, char *argv[]) {
     reliable_text_t           reliable_text_obj;
     char f2020[80] = {0};
 #ifdef __LPCNET__
-    sprintf(f2020,"|2020|2020B");
+    sprintf(f2020,"|2020|2020B|2020C");
 #endif
    
     if (argc < 4) {
@@ -142,6 +142,7 @@ int main(int argc, char *argv[]) {
     #ifdef __LPCNET__
     if (!strcmp(argv[dx],"2020"))  mode = FREEDV_MODE_2020;
     if (!strcmp(argv[dx],"2020B")) mode = FREEDV_MODE_2020B;    
+    if (!strcmp(argv[dx],"2020C")) mode = FREEDV_MODE_2020C;    
     #endif
     if (mode == -1) {
         fprintf(stderr, "Error in mode: %s\n", argv[dx]);
