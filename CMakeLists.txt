@@ -7,7 +7,7 @@
 #
 cmake_minimum_required(VERSION 3.13)
 project(CODEC2
-  VERSION 1.0.6
+  VERSION 1.0.7
   DESCRIPTION "Next-Generation Digital Voice for Two-Way Radio"
   HOMEPAGE_URL "https://www.rowetel.com/codec2.html"
   LANGUAGES C
