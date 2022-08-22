@@ -402,11 +402,21 @@ endif()
              set_tests_properties(test_COHPSK_modem_octave_port PROPERTIES PASS_REGULAR_EXPRESSION "fails: 0")
 
     add_test(NAME test_COHPSK_modem_AWGN_BER
-             COMMAND sh -c "$<TARGET_FILE:cohpsk_get_test_bits> - 5600 | $<TARGET_FILE:cohpsk_mod> - - | $<TARGET_FILE:ch> - - --No -30 --Fs 7500 | $<TARGET_FILE:cohpsk_demod> - - | $<TARGET_FILE:cohpsk_put_test_bits> -"
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            ./cohpsk_get_test_bits - 5600 |
+                            ./cohpsk_mod - - |
+                            ./ch - - --No -30 --Fs 7500 | 
+                            ./cohpsk_demod - - |
+                            ./cohpsk_put_test_bits -"
              )
 
     add_test(NAME test_COHPSK_modem_freq_offset
-             COMMAND sh -c "set -x; $<TARGET_FILE:cohpsk_get_test_bits> - 5600 | $<TARGET_FILE:cohpsk_mod> - - | $<TARGET_FILE:ch> - - --No -40 -f -30 --Fs 7500 | $<TARGET_FILE:cohpsk_demod> -v - - 2>log.txt | $<TARGET_FILE:cohpsk_put_test_bits> - ; ! grep 'lost sync' log.txt"
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            ./cohpsk_get_test_bits - 5600 |
+                            ./cohpsk_mod - - |
+                            ./ch - - --No -40 -f -30 --Fs 7500 | 
+                            ./cohpsk_demod - - |
+                            ./cohpsk_put_test_bits -"
              )
 
     # -------------------------------------------------------------------------
