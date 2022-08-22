@@ -809,7 +809,7 @@ if(LPCNET)
               COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
                             dd bs=32000 count=60 if=/dev/zero |
                             ./freedv_tx 2020C - - --testframes --clip 1 |
-                            ./ch - - --No -31 --mpd --fading_dir ../unittest |
+                            ./ch - - --No -32 --mpd --fading_dir ../unittest |
                             ./freedv_rx 2020C - /dev/null --testframes"
              )
 endif()
