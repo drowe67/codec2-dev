@@ -194,7 +194,7 @@ function fdmdv_demod(rawfilename, nbits, NumCarriers=14, errorpatternfilename, s
 
     % count bit errors if we find a test frame
 
-    [test_frame_sync bit_errors error_pattern f] = put_test_bits(f, test_bits, rx_bits);
+    [test_frame_sync bit_errors error_pattern f] = put_test_bits(f, rx_bits);
     if (test_frame_sync == 1)
       if (bit_errors)
         printf("fr: %d bit_errors: %d\n", fr, bit_errors);
