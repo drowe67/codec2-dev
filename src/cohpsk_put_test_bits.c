@@ -87,7 +87,7 @@ int main(int argc, char *argv[])
         if (state == 1) {
             for(i=0; i<COHPSK_BITS_PER_FRAME; i++)
                 error_positions_hist[i] += error_pattern[i];
-           if (logframes < LOG_FRAMES)
+            if (logframes < LOG_FRAMES)
                 nerr_log[logframes++] = bit_errors;
             nerrors += bit_errors;
             nbits   += COHPSK_BITS_PER_FRAME;
@@ -105,7 +105,7 @@ int main(int argc, char *argv[])
     fprintf(stderr, "BER: %4.3f Nbits: %d Nerrors: %d\n", ber, nbits, nerrors);
 
     /* return code for Ctest - 0 for pass, 1 for fail, based on 2% BER */
-    if (ber < 0.02)
+    if (nbits && (ber < 0.02))
         return 0;
     else
         return 1;

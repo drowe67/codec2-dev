@@ -68,25 +68,16 @@ Also included:
    
 ## FreeDV 2020 support (building with LPCNet)
 
-1. Build codec2 initially without LPCNet
-   ```
-   cd ~
-   git clone https://github.com/drowe67/codec2.git
-   cd codec2 && mkdir build_linux && cd build_linux
-   cmake ../
-   make
-   ```
-
 1. Build LPCNet:
    ```
    cd ~
    git clone https://github.com/drowe67/LPCNet
    cd LPCNet && mkdir build_linux && cd build_linux
-   cmake -DCODEC2_BUILD_DIR=~/codec2/build_linux ../ 
+   cmake .. 
    make
    ```
 
-1. (Re)build Codec 2 with LPCNet support:
+1. Build Codec 2 with LPCNet support:
    ```
    cd ~/codec2/build_linux && rm -Rf *
    cmake -DLPCNET_BUILD_DIR=~/LPCNet/build_linux ..

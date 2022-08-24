@@ -32,26 +32,17 @@ jobs:
       working-directory: ${{github.workspace}}/build_linux
       run: cmake -DUNITTEST=1 $GITHUB_WORKSPACE
 
-    - name: Build codec2
-      working-directory: ${{github.workspace}}/build_linux
-      shell: bash
-      # First pass build of codec2 without LPCNet 
-      run: make -j4
-
-    - name: Build LPCNet
+    - name: Build LPCNet and Run ctests
       shell: bash
       run: |
            cd $HOME
            git clone https://github.com/drowe67/LPCNet.git 
            cd LPCNet && mkdir -p build_linux && cd build_linux 
-           cmake -DCODEC2_BUILD_DIR=$GITHUB_WORKSPACE/build_linux ..
-           make
-           cd src && sox ../../wav/wia.wav -t raw -r 16000 - | ./lpcnet_enc -s | ./lpcnet_dec -s > /dev/null
+           cmake .. && make && ctest
 
-    - name: Rebuild codec2 with LPCNet
+    - name: Build codec2 with LPCNet
       working-directory: ${{github.workspace}}/build_linux
       shell: bash
-      # Second pass build of codec2 with LPCNet 
       run: |
            cmake -DLPCNET_BUILD_DIR=$HOME/LPCNet/build_linux -DUNITTEST=1 $GITHUB_WORKSPACE
            make -j4
@@ -59,8 +50,6 @@ jobs:
     - name: Run ctests
       working-directory: ${{github.workspace}}/build_linux
       shell: bash
-      # Execute tests defined by the CMake configuration.  
-      # See https://cmake.org/cmake/help/latest/manual/ctest.1.html for more detail
       run: ctest --output-on-failure
 
     - name: Test library installation
