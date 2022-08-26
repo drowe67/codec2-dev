@@ -88,7 +88,7 @@ int main(int argc, char *argv[])
     COMP          *ch_fdm_delay = NULL, aspread, aspread_2ms, delayed, direct;
     float          tx_pwr, tx_pwr_fade, noise_pwr, user_multipath_delay;
     int            frames, i, j, k, Fs, ret, nclipped, noutclipped, ssbfilt_en, complex_out, ctest;
-    float          sam, peak, clip, papr, CNo, snr3k, gain;
+    float          sam, peak, clip, clipmin, papr, CNo, snr3k, gain;
 
     if (argc < 3) {
     helpmsg:
@@ -99,7 +99,8 @@ int main(int argc, char *argv[])
                         "  real int16 input -> Gain -> Hilbert Transform -> clipper -> freq shift ->\n"
                         "  Multipath -> AWGN noise -> SSB filter -> real int16 output\n"
                         "\n"
-                        "[--clip int16]         Hilbert clipper (clip complex signal magnitude, default 32767)\n"
+                        "[--clip int16]         Hilbert clipper max (clip complex signal magnitude, default 32767)\n"
+                        "[--clipmin int16]      Hilbert clipper min (default 0)\n"
                         "[--complexout]         Optional int16 IQ complex output (default real int16)\n"
                         "[--ctest]              Check PAPR is around 0dB, used to support ctests\n"
                         "[--freq FoffHz]        Frequency offset (default 0Hz)\n"
@@ -133,7 +134,7 @@ int main(int argc, char *argv[])
 
     NodB = -100;
     Fs = 8000; foff_hz = 0.0; fading_en = 0; ctest = 0;
-    clip =32767; gain = 1.0;
+    clip = 32767; clipmin = 0; gain = 1.0;
     ssbfilt_en = 1; complex_out = 0;
     fading_dir = strdup(DEFAULT_FADING_DIR); user_multipath_delay = -1.0;
 
@@ -144,6 +145,7 @@ int main(int argc, char *argv[])
             {"complexout",      no_argument,        0, 'o'},
             {"ctest",           no_argument,        0, 't'},
             {"clip",            required_argument,  0, 'c'},
+            {"clipmin",         required_argument,  0, 'e'},
             {"fading_dir",      required_argument,  0, 'u'},
             {"freq",            required_argument,  0, 'f'},
             {"Fs",              required_argument,  0, 'r'},
@@ -158,7 +160,7 @@ int main(int argc, char *argv[])
             {0, 0, 0, 0}
         };
 
-        o = getopt_long(argc,argv,"c:df:g:im:n:opr:s:tu:h",long_opts,&opt_idx);
+        o = getopt_long(argc,argv,"c:de:f:g:im:n:opr:s:tu:h",long_opts,&opt_idx);
         
         switch(o) {
         case 'c':
@@ -166,6 +168,9 @@ int main(int argc, char *argv[])
             break;
         case 'd':
             fading_en = 3;
+            break;
+        case 'e':
+            clipmin = atof(optarg);
             break;
         case 'f':
             foff_hz = atof(optarg);
@@ -331,7 +336,7 @@ int main(int argc, char *argv[])
            htbuf[i] = htbuf[i+BUF_N];
 
         /* --------------------------------------------------------*\
-   	                    Clipping  mag of complex signal
+   	                    Clipping mag of complex signal
         \*---------------------------------------------------------*/
 
         for(i=0; i<BUF_N; i++) {
@@ -339,6 +344,10 @@ int main(int argc, char *argv[])
             float angle = atan2(ch_in[i].imag, ch_in[i].real);
             if (mag > clip) {
               mag = clip;
+              nclipped++;
+            }
+            if (mag < clipmin) {
+              mag = clipmin;
               nclipped++;
             }
             tx_pwr += mag*mag;

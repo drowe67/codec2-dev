@@ -2,9 +2,43 @@
 % This program is distributed under the terms of the GNU General Public License 
 % Version 2
 %
-% Plot phase modelling information from dump files.
+% Plot phase modelling information from dump files, original and phase0 models with n0 adjustment
+
+#{  
+  Usage:
+
+  1/ Contrived speech-like test signal:
+  
+  $ cd codec2/build_linux
+  $ ./misc/timpulse --f0 100 --n0 1 --filter | ./src/c2sim - --rateK --modelout - | ./misc/est_n0 > imp_n0.txt
+  $ ./misc/timpulse --f0 100 --n0 1 --filter | ./src/c2sim - --rateK --phase0 --dump imp
+  octave:> plphase("../build_linux/imp", 20)
+
+  2/ A real speech file:
+  
+  Generate n0 estimates for original and phase0:
+
+    $ cd codec2/build_linux
+    $ ./src/c2sim ../raw/hts1a.raw --rateK --modelout - | ./misc/est_n0 > hts1a_n0.txt
+    $ ./src/c2sim ../raw/hts1a.raw --rateK --phase0 --modelout - | ./misc/est_n0 > hts1a_phase0_n0.txt
+
+  Generate "dump files":
+  
+    $ ./src/c2sim ../raw/hts1a.raw --rateK --phase0 --dump hts1a
+
+  Note: above steps have been automated in scripts/plphase.sh:
+  
+    $ cd codec2/build_linux
+    $ ../script/plphase.sh ../raw/hts1a.raw
+
+  3/ Then view with this script:
+
+    octave:> plphase("../build_linux/hts1a", 44)
+#}
 
 function plphase(samname, f)
+
+  Fs = 8000; Fs2 = Fs/2;
   
   sn_name = strcat(samname,"_sn.txt");
   Sn = load(sn_name);
@@ -15,21 +49,15 @@ function plphase(samname, f)
   model_name = strcat(samname,"_model.txt");
   model = load(model_name);
 
-  sw__name = strcat(samname,"_sw_.txt");
-  if (file_in_path(".",sw__name))
-    Sw_ = load(sw__name);
+  n0_name = strcat(samname,"_n0.txt");
+  if (file_in_path(".",n0_name))
+    n0 = load(n0_name);
   endif
-
-  pw_name = strcat(samname,"_pw.txt");
-  if (file_in_path(".",pw_name))
-    Pw = load(pw_name);
+  phase0_n0_name = strcat(samname,"_phase0_n0.txt");
+  if (file_in_path(".",phase0_n0_name))
+    phase0_n0 = load(phase0_n0_name);
   endif
-
-  ak_name = strcat(samname,"_ak.txt");
-  if (file_in_path(".",ak_name))
-    ak = load(ak_name);
-  endif
-
+  
   phase_name = strcat(samname,"_phase.txt");
   if (file_in_path(".",phase_name))
     phase = load(phase_name);
@@ -40,23 +68,30 @@ function plphase(samname, f)
     phase_ = load(phase_name_);
   endif
 
-  snr_name = strcat(samname,"_snr.txt");
-  if (file_in_path(".",snr_name))
-    snr = load(snr_name);
-  endif
+  k = ' '; plot_group_delay=0; Pms = 1; plot_orig=1; plot_synth_sn=1;
+  do
+    Wo = model(f,1);
+    L = model(f,2);
+    Am = model(f,3:(L+2));
+    if plot_orig
+      phase_f = phase(f,1:L);
+      phase_linear = exp(j*(1:L)*Wo*n0(f));
+    else
+      phase_f = phase_(f,1:L);
+      phase_linear = exp(j*(1:L)*Wo*phase0_n0(f));
+    end
 
-  sn_name_ = strcat(samname,".raw");
-  if (file_in_path(".",sn_name_))
-    fs_ = fopen(sn_name_,"rb");
-    sn_  = fread(fs_,Inf,"short");
-  endif
-
-  k = ' ';
-  do 
-    figure(1);
-    clf;
+    figure(1); clf;
     s = [ Sn(2*f-1,:) Sn(2*f,:) ];
-    plot(s);
+    if plot_synth_sn
+      N=length(s);
+      s = zeros(1,N); t=0:N-1; f0 = Wo*Fs2/pi; P = Fs/f0;
+      for m=1:L
+        s += Am(m)*cos(Wo*m*t + phase_f(m));
+      end
+    end
+    papr_dB = 10*log10(max(abs(s.^2))/mean(s.^2));
+    plot(s,sprintf(";PAPR %3.1f dB;", papr_dB));
     grid;
     axis([1 length(s) -20000 20000]);
     if (k == 'p')
@@ -64,118 +99,66 @@ function plphase(samname, f)
        png(pngname);
     endif
 
-    figure(2);
-    Wo = model(f,1);
-    L = model(f,2);
-    Am = model(f,3:(L+2));
-    plot((1:L)*Wo*4000/pi, 20*log10(Am),"r;Am;");
-    axis([1 4000 -10 80]);
+    figure(2); clf;
+    plot((1:L)*Wo*4000/pi, 20*log10(Am),"g+-;Am;");
     hold on;
-    plot((0:255)*4000/256, Sw(f,:),";Sw;");
-    grid;
+ 
+    % estimate group and phase delay
 
-    if (file_in_path(".",sw__name))
-      plot((0:255)*4000/256, Sw_(f,:),"g;Sw_;");
-    endif	
-
-    if (file_in_path(".",pw_name))
-       plot((0:255)*4000/256, 10*log10(Pw(f,:)),";Pw;");
-    endif	
-
-    if (file_in_path(".",snr_name))
-      snr_label = sprintf(";phase SNR %4.2f dB;",snr(f));
-      plot(1,1,snr_label);
-    endif
-
-    % phase model - determine SNR and error spectrum for phase model 1
-
-    if (file_in_path(".",phase_name_))
-      orig  = Am.*exp(j*phase(f,1:L));
-      synth = Am.*exp(j*phase_(f,1:L));
-      signal = orig * orig';
-      noise = (orig-synth) * (orig-synth)';
-      snr_phase = 10*log10(signal/noise);
-
-      phase_err_label = sprintf("g;phase_err SNR %4.2f dB;",snr_phase);
-      plot((1:L)*Wo*4000/pi, 20*log10(orig-synth), phase_err_label);
-    endif
-
+    phase_rect = exp(j*phase_f);
+    phase_centred_rect = phase_rect .* conj(phase_linear);
+    phase_centred = angle(phase_centred_rect);
+    group_delay = [0 -(angle(phase_centred_rect(2:L).*conj(phase_centred_rect(1:L-1)))/Wo)*1000/Fs];
+    phase_delay = ( -phase_centred ./ ((1:L)*Wo) )*1000/Fs;
+    x_group = (0.5 + (1:L))*Wo*Fs2/pi;
+    x_phase = (1:L)*Wo*Fs2/pi;
+    if plot_group_delay
+      ax = plotyy((0:255)*Fs2/256, Sw(f,:), x_group, group_delay);
+    else
+      ax = plotyy((0:255)*Fs2/256, Sw(f,:), x_phase, phase_delay);
+    end
     hold off;
+    axis(ax(1), [1 Fs2 -10 80]);
+    axis(ax(2), [1 Fs2 -Pms Pms]);
+    xlabel('Frequency (Hz)');
+    ylabel(ax(1),'Amplitude (dB)');
+    if plot_group_delay
+      ylabel(ax(2),'Group Delay (ms)');
+    else
+      ylabel(ax(2),'Phase Delay (ms)');
+    end
+    grid;
+    
     if (k == 'p')
        pngname = sprintf("%s_%d_sw",samname,f);
        png(pngname);
     endif
 
-    if (file_in_path(".",phase_name))
-      figure(3);
-      plot((1:L)*Wo*4000/pi, phase(f,1:L)*180/pi, "-o;phase;");
-      axis;
-      if (file_in_path(".", phase_name_))
-        hold on;
-        plot((1:L)*Wo*4000/pi, phase_(f,1:L)*180/pi, "g;phase after;");
-	grid
-	hold off;
-      endif
-      if (k == 'p')
-        pngname = sprintf("%s_%d_phase",samname,f);
-        png(pngname);
-      endif
-    endif
-
-    % synthesised speech 
-
-    if (file_in_path(".",sn_name_))
-      figure(4);
-      s_ = sn_((f-3)*80+1:(f+1)*80);
-      plot(s_);
-      axis([1 length(s_) -20000 20000]);
-      if (k == 'p')
-        pngname = sprintf("%s_%d_sn_",samname,f)
-        png(pngname);
-      endif
-    endif
-
-    if (file_in_path(".",ak_name))
-      figure(5);
-      axis;
-      akw = ak(f,:);
-      weight = 1.0 .^ (0:length(akw)-1);
-      akw = akw .* weight;
-      H = 1./fft(akw,8000);
-      subplot(211);
-      plot(20*log10(abs(H(1:4000))),";LPC mag spec;");
-      grid;	
-      subplot(212);
-      plot(angle(H(1:4000))*180/pi,";LPC phase spec;");
-      grid;
-      if (k == 'p')
-        % stops multimode errors from gnuplot, I know not why...
-        figure(2);
-        figure(5);
-
-        pngname = sprintf("%s_%d_lpc",samname,f);
-        png(pngname);
-      endif
-    endif
-
-
-    % autocorrelation function to research voicing est
+    figure(3); clf;
+    subplot(211);
+    plot((1:L)*Wo*Fs2/pi, phase_f, "-o;phase;");
+    hold on;
+    plot((1:L)*Wo*Fs2/pi, phase_centred, "-og;phase centered;"); axis([0 Fs2 -pi pi]);
+    hold off;
+    subplot(212);
+    if plot_group_delay
+      plot(x_group, group_delay, "-o;group;");
+      axis([1 Fs2 -Pms Pms]);
+    else
+      plot(x_phase, phase_delay, "-o;phase;");
+      axis([1 Fs2 -1 1]);
+    end
     
-    %M = length(s);
-    %sw = s .* hanning(M)';
-    %for k=0:159
-    %  R(k+1) = sw(1:320-k) * sw(1+k:320)';
-    %endfor
-    %figure(4);
-    %R_label = sprintf(";R(k) %3.2f;",max(R(20:159))/R(1));
-    %plot(R/R(1),R_label);
-    %grid
-
-    figure(2);
-
+    if (k == 'p')
+      pngname = sprintf("%s_%d_phase",samname,f);
+      png(pngname);
+    endif
+ 
     % interactive menu
 
-    printf("\rframe: %d  menu: n-next  b-back  p-png  q-quit ", f);
+    if plot_group_delay; s1="[group dly]/phase dly"; else s1="group dly/[phase dly]"; end
+    if plot_orig; s2="[orig]/phase0"; else s2="orig/[phase0]"; end
+    printf("\rframe: %d  menu: n-next  b-back  g-%s o-%s p-png  q-quit ", f, s1,s2);
     fflush(stdout);
     k = kbhit();
     if (k == 'n')
@@ -184,9 +167,24 @@ function plphase(samname, f)
     if (k == 'b')
       f = f - 1;
     endif
+    if (k == 'g')
+      if plot_group_delay
+        plot_group_delay = 0;
+	Pms=1;
+      else
+        plot_group_delay = 1;
+	Pms=6;
+      end
+    endif
+    if (k == 'o')
+      if plot_orig
+        plot_orig = 0;
+      else
+        plot_orig = 1;
+      end
+    endif
 
     % optional print to PNG
-
     if (k == 'p')
        pngname = sprintf("%s_%d",samname,f);
        png(pngname);

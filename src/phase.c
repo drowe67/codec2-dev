@@ -38,7 +38,10 @@
 #include <string.h>
 #include <stdlib.h>
 
-/*---------------------------------------------------------------------------*\
+int phase_dispersion = 0;
+int phase_excitation_only = 0;
+
+/*---------------------------------------------------------------------------* \
 
   sample_phase()
 
@@ -187,9 +190,24 @@ void phase_synth_zero_order(
         /* generate excitation */
 
         if (model->voiced) {
-
-            Ex[m].real = cosf(ex_phase[0]*m);
-            Ex[m].imag = sinf(ex_phase[0]*m);
+	    float phi_m = 0;
+	    float Fs = 8000.0;
+	    float t0m = 0.0;
+	    int quadrant = 0;
+	    //fprintf(stderr, "dispersion: %d\n", dispersion);
+	    if (phase_dispersion == 1) {
+	      float f = m*model->Wo*Fs/TWO_PI;
+	      float dt0 = 0.1E-3; float df = 100.0; float Tspread = 1E-3;
+	      t0m = fmod((dt0/df)*f, Tspread);
+	    }
+	    if (phase_dispersion == 2) {
+	      quadrant = m/(model->L/4);
+	      t0m = quadrant*0.0005;
+	    }
+	    phi_m = -model->Wo*m*t0m*Fs;
+	    //fprintf(stderr,"d: %d m: %d q: %d t0m: %f phim: %f\n", dispersion, model->L, quadrant, t0m, phi_m);
+            Ex[m].real = cosf(ex_phase[0]*m+phi_m);
+            Ex[m].imag = sinf(ex_phase[0]*m+phi_m);
         }
         else {
 
@@ -202,8 +220,11 @@ void phase_synth_zero_order(
             Ex[m].imag = sinf(phi);
         }
 
+	if (phase_excitation_only) {
+	  // development mode used to visiulate excitation
+	  H[m].real = 1.0; H[m].imag = 0.0; model->A[m]= 100.0;
+	}
         /* filter using LPC filter */
-
         A_[m].real = H[m].real*Ex[m].real - H[m].imag*Ex[m].imag;
         A_[m].imag = H[m].imag*Ex[m].real + H[m].real*Ex[m].imag;
 

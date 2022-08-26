@@ -4,4 +4,5 @@
 function s = save_raw(fn,s)
   fs=fopen(fn,"wb");
   fwrite(fs,s,"short");
+  fclose(fs);
 endfunction

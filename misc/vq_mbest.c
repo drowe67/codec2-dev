@@ -189,7 +189,8 @@ int main(int argc, char *argv[]) {
 	vec_usage[indexes[0]]++;
     }
 
-    fprintf(stderr, "MSE: %4.2f\n", sqe/(nvecs*(en-st+1)));
+    float var = sqe/(nvecs*(en-st+1));
+    fprintf(stderr, "var: %4.2f  sd: %4.2f\n", var, sqrt(var));
 
     if (output_vec_usage) {
       for(int i=0; i<m[0]; i++)
