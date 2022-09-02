@@ -1021,7 +1021,7 @@ void rxdec_filter(COMP rx_fdm_filter[], COMP rx_fdm[], COMP rxdec_lpf_mem[], int
 
 \*---------------------------------------------------------------------------*/
 
-static void fir_filter2(float acc[2], float mem[], const float coeff[], const unsigned int dec_rate) {
+static void fir_filter2(float acc[], float mem[], const float coeff[], const unsigned int dec_rate) {
     acc[0] = 0.0;
     acc[1] = 0.0;
 
