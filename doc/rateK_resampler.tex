@@ -1,0 +1,41 @@
+\documentclass[12]{article}
+\usepackage{amsmath}
+\begin{document}
+Consider a vector $\mathbf{a}$ of $L$ spectral amplitudes, sampled at time $t=nT$ seconds, where $n$ is the frame number, and $T$ is the frame period, typically $T=0.01$ seconds. 
+\begin{equation}
+\mathbf{a} = \begin{bmatrix} A_1, A_2, \ldots A_L \end{bmatrix} 
+\end{equation}
+$A_m$ is sampled at the frequency $f_m=mF0$ Hz for $m=1 \ldots L$, where $L$ is given by:
+
+\begin{equation}
+L=\left \lfloor \frac{F_s}{2F0} \right \rfloor
+\end{equation}
+$F0$ is the fundamental frequency (pitch) in Hz. F0 is and hence $L$ is time varying as the pitch track evolves over time. For speech sampled at $F_s=8$ kHz, $L$ is typically in the range of 20 $\ldots$ 80. \\
+
+To quantise and transmit $\mathbf{a}$, it is convenient to resample to a fixed length $K$ element vector $\mathbf{b}$ using a resampling function:
+\begin{equation}
+\mathbf{b} = \begin{bmatrix} B_1, B_2, \ldots B_K \end{bmatrix} = R(\mathbf{a})
+\end{equation}
+To model the logarithmic frequency response of the human ear $B_k$  are sampled on non-linearly spaced points on the frequency axis $f_k=mel(kF0)$ Hz for $k=1 \ldots K$, where $mel(f)$ is a frequency warping function. A typical value of $K$ is 20. The rate $L$ vector can then be recovered by resampling $\mathbf{b}$ using another sampling function:
+\begin{equation}
+\hat{\mathbf{a}} = Q(\mathbf{b})
+\end{equation}
+A useful error metric is the mean square error:
+\begin{equation}
+E=\frac{1}{L}\sum_{m=1}^{L}(A_m-\hat{A}_m)^2
+\end{equation}
+If $A_m$ are in dB, this is known as spectral distortion. \\
+
+Notes:
+\begin{enumerate}
+\item if $K<L$ information may be lost due to undersampling, which implies $\hat{\mathbf{a}} \neq \mathbf{a}$.
+\item Undersampling may introduce undesirable aliasing, which may manifest as noise that is superimposed on $\mathbf{b}$.  TODO How to show aliasing? This may consume valuable quantister bits for no gain in speech quality.
+\item A useful property of $R$ may therefore be filtering $\mathbf{a}$ such that $E$ is small.  The filter should be chosen to minimise the perceptual distortion.
+\item A useful property is sensitivity to quantisation, which could be defined as $\frac{\partial E}{\partial \mathbf{b}}$. For example, given a 1dB RMS error in the elements of $\mathbf{b}$, what is the impact on $E$?
+\item To minimise bit rate, it is common to transmit $\mathbf{b}$ to the receiver at period $T/D$ seconds, where $D$ is the decimation ratio, and discarding the intermediate $D-1$ frames. A useful property is the ability to smoothly interpolate between transmitted frames $\mathbf{b}_n$ and $\mathbf{b}_{n+D}$ to recover $\mathbf{b}_n+i$ where $i=1 \ldots D-1$.  Need a definition for smoothness.
+\item Delta coding in time should result in increased quantiser efficiency (define).
+\item Small changes in $\mathbf{a}$ input should result in small changes in  $\mathbf{b}$.  A lack of sensitivity.  We don't want VQ choices bouncing about for stationary speech.
+\item Consider a filter function to remove aliasing such that $\tilde{\mathbf{a}} = \mathbf{a}$.  If chosen carefully, this will have minimal impact of the perceptual quality of the speech. 
+\item If the sample rate $K$ is sufficiently high (or bandwidth of $\mathbf{a}$ suffiently constrained), the actual VQ dimension won't matter.  The decorrelation properties of the VQ will ensure it achieves the same distortion over a range of dimensions.
+\end{enumerate}
+\end{document}
