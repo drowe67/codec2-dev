@@ -2,12 +2,19 @@
 \usepackage{amsmath}
 \usepackage{xstring}
 \usepackage{catchfile}
-\CatchFileDef{\HEAD}{../.git/refs/heads/master}{}
+
+\CatchFileDef{\headfull}{../.git/HEAD}{}
+\StrGobbleRight{\headfull}{1}[\head]
+\StrBehind[2]{\head}{/}[\branch]
+\IfFileExists{../.git/refs/heads/\branch}{%
+    \CatchFileDef{\commit}{../.git/refs/heads/\branch}{}}{%
+    \newcommand{\commit}{\dots~(in \emph{packed-refs})}}
 \newcommand{\gitrevision}{%
-  \StrLeft{\HEAD}{7}%
+  \StrLeft{\commit}{7}%
 }
+
 \title{Codec 2 Rate K Resampler}
-\author{David Rowe\\ \\ Git: \gitrevision}
+\author{David Rowe\\ \\ Revision: {\gitrevision} on branch: {\branch}}
 \date{\today}
 \begin{document}
 
