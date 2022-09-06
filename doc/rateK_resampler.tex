@@ -20,7 +20,7 @@
 
 \maketitle
 
-The Rate K resampler is used in Codec 2 700C to transform the variable length vectors of spectral amplitude samples to fixed length vectors suitable for vector quantisation.  This document was written in order to explore and possibly improve the resampler.
+The Rate K resampler is used in Codec 2 700C to transform the variable length vectors of spectral amplitude samples to fixed length $K$ vectors suitable for vector quantisation.  This document was written in order to explore and possibly improve the resampler.
 
 Consider a vector $\mathbf{a}$ of $L$ spectral amplitudes, sampled at time $t=nT$ seconds, where $n$ is the frame number, and $T$ is the frame period, typically $T=0.01$ seconds. 
 \begin{equation}
@@ -31,13 +31,13 @@ $A_m$ is sampled at the frequency $f_m=mF0$ Hz for $m=1 \ldots L$, where $F0$ is
 \begin{equation}
 L=\left \lfloor \frac{F_s}{2F0} \right \rfloor
 \end{equation}
-F0 is and hence $L$ is time varying as the pitch track evolves over time. For speech sampled at $F_s=8$ kHz, $L$ is typically in the range of 20 $\ldots$ 80. \\
+$F0$ and $L$ are time varying as the pitch track evolves over time. For speech sampled at $F_s=8$ kHz $F0$ is typically in the range of 50 to 400 Hz, giving $L$ in the range of 10 $\ldots$ 80. \\
 
-To quantise and transmit $\mathbf{a}$, it is convenient to resample to a fixed length $K$ element vector $\mathbf{b}$ using a resampling function:
+To quantise and transmit $\mathbf{a}$, it is convenient to resample $\mathbf{a}$ to a fixed length $K$ element vector $\mathbf{b}$ using a resampling function:
 \begin{equation}
 \mathbf{b} = \begin{bmatrix} B_1, B_2, \ldots B_K \end{bmatrix} = R(\mathbf{a})
 \end{equation}
-To model the logarithmic frequency response of the human ear $B_k$  are sampled on non-linearly spaced points on the frequency axis $f_k=mel(k)$ Hz for $k=1 \ldots K$, where $mel(k)$ is a frequency warping function. A typical value of $K$ is 20. The warping function $mel()$ samples the spectrum more densely at low frequencies, and less densely at high frequencies.  
+To model the logarithmic frequency response of the human ear $B_k$  are sampled on non-linearly spaced points on the frequency axis $f_k=warp(k)$ Hz for $k=1 \ldots K$, where $warp(k)$ is a frequency warping function. A typical value of $K$ is 20. A typical choice for $warp()$ is the Mel function which samples the spectrum more densely at low frequencies, and less densely at high frequencies.  
 
 The rate $K$ vector $\mathbf{b}$ is vector quantised for transmission over the channel:
 \begin{equation}
@@ -49,29 +49,53 @@ The rate $L$ vector can then be recovered by resampling $\mathbf{\hat{b}}$ using
 \end{equation}
 A useful error metric is the mean square error:
 \begin{equation}
-E=\frac{1}{L}\sum_{m=1}^{L}(A_m-\hat{A}_m)^2
+\begin{split}
+E & =\frac{1}{L_{max}-L_{min}+1}\sum_{m=L_{min}}^{L_{max}}(A_m-\hat{A}_m)^2 \\
+L_{min} & = round(200/F0) \\
+L_{max} & =\left \lfloor 3700/F0  \right \rfloor
+\end{split}
 \end{equation}
 If $A_m$ are in dB, $E$ can be denoted the spectral distortion in $dB^2$, which can be averaged over a testing database of $N$ frames to obtain mean spectral distortion.
 
-Consider a choice of $mel()$ with linear (non-warped) sampling of the frequency axis, and an ideal quantiser $Q$ such that $\hat{\mathbf{b}} = \mathbf{b}$. If $K<L$ information may be lost due to undersampling, which implies $\hat{\mathbf{a}} \neq \mathbf{a}$.  
+Consider a choice of $warp()$ with linear (non-warped) sampling of the frequency axis, and an ideal quantiser $Q$ such that $\hat{\mathbf{b}} = \mathbf{b}$. If $K<L$ information may be lost due to undersampling, which implies $\hat{\mathbf{a}} \neq \mathbf{a}$.  
 With nonlinear sampling, there will be local undersampling where the sampling rate of $\mathbf{b}$ is less than that of $\mathbf{a}$:
 \begin{equation}
-mel(k+1)-mel(k) < F0
+warp(k+1)-warp(k) < F0
 \end{equation}
-Undersampling may introduce undesirable aliasing, which may manifest as noise that is superimposed on $\mathbf{b}$. This noise may reduce perceptual quality and consume valuable quantiser bits for no benefit. Given the ear is less sensitive to detail at high frequencies, it is reasonable to choose a resampling function that smooths high frequency detail such that local undersampling and uncontrolled aliasing is minimised. A useful property of $R$ may therefore be smoothing (filtering) $\mathbf{a}$ such that $E$ is small when $\hat{\mathbf{b}} = \mathbf{b}$.  The filter should also be chosen to minimise the perceptual distortion.  A suitable filtering function would average energy of $A_m$ over the region $mel(k+1)-mel(k)$.
+If $A_m$ is changing rapidly, undersampling may introduce undesirable aliasing, which may manifest as noise that is superimposed on $\mathbf{b}$. This noise may reduce perceptual quality and consume valuable quantiser bits for no benefit. Given the ear is less sensitive to detail at high frequencies, it is reasonable to choose a resampling function that smooths high frequency detail such that local undersampling and uncontrolled aliasing is minimised. A useful property of $R$ may therefore be smoothing (filtering) $\mathbf{a}$ such that $E$ is small when $\hat{\mathbf{b}} = \mathbf{b}$.  The filter and number of sample points $K$ should also be chosen to minimise the perceptual distortion.  A suitable filtering function would average $A_m$ over the region $warp(k+1)-warp(k)$.
 
+Here are a suggested set of experiments to evaluate the ideas presented in this document.  Some of them require informal listening tests, others have objective measures which could be used as the basis for automated tests:
+ 
 \begin{enumerate}
 
-\item How to demonstrate aliasing?  Well we can run current rate K code, that uses a 2nd order parabolic resampler.  Then compare with a "better" filter.  Test over a small set of samples.  Goal is to show reduced $E$ with similar perceptual quality.  Smoothing does reduce information so there will be a trade off.  Too much smoothing and perceptual quality will reduce.  We should also notice improved VQ performance, as we won't be quantising noise.
+\item The baseline resampling (currently a 2nd order polynomial) is a potential source of distortion.  Conduct an experiment to test the theory that $E$ is small (and perceptual quality high) for $K>L$ using linear frequency sampling and large $K$.
+
+\item How to demonstrate aliasing?  Well we can run current rate K code, that uses a 2nd order parabolic resampler.  Then compare with a "better" resampler that uses filtering.  Perform an informal listening test over a small set of samples.  Goal is to show reduced $E$ with similar perceptual quality.  Smoothing does reduce information so there will be a trade off.  Too much smoothing and perceptual quality will reduce.  We should also notice improved VQ performance, as we won't be quantising noise.
 
 \item A useful property is sensitivity to quantisation, which could be defined as $\frac{\partial E}{\partial \mathbf{b}}$. For example, given a 1dB RMS error in the elements of $\mathbf{b}$, what is the impact on $E$?
 
-\item To minimise bit rate, it is common to transmit $\mathbf{b}$ to the receiver at period $T/D$ seconds, where $D$ is the decimation ratio, and discarding the intermediate $D-1$ frames. A useful property is the ability to smoothly interpolate between transmitted frames $\mathbf{b}_n$ and $\mathbf{b}_{n+D}$ to recover $\mathbf{b}_n+i$ where $i=1 \ldots D-1$.  Need a definition for smoothness.
+\item To minimise bit rate, it is common to transmit $\mathbf{b}$ to the receiver at period $T/D$ seconds, where $D$ is the decimation ratio, and discarding the intermediate $D-1$ frames. A useful property is the ability to smoothly interpolate between transmitted frames $\mathbf{b}_n$ and $\mathbf{b}_{n+D}$ to recover $\mathbf{b}_{n+i}$ where $i=1 \ldots D-1$.  Need a definition for smoothness.
 
-\item Delta coding in time should result in increased quantiser efficiency (define).
+\item Speech evolves slowly over time compared to the $T=0.01$ second frame period.  Adjacent frames of speech parameters such as $\mathbf{a}_n$ and $\mathbf{a}_{n+1}$ have some correlation which can be used to obtain coding efficiency:
+\begin{equation} \label{eq_delta}
+\begin{split}
+\mathbf{b}_{n+1} & = \mathbf{b}_{n} + \mathbf{\Delta}_n \\
+\mathbf{\Delta}_{n+1} & = \mathbf{b}_{n+1} - \mathbf{b}_{n}
+\end{split}
+\end{equation}
 
-\item Small changes in $\mathbf{a}$ input should result in small changes in  $\mathbf{b}$.  A lack of sensitivity.  We don't want VQ choices bouncing about for stationary speech.
+In general $\mathbf{\Delta}_n$ can be encoded with less bits than $\mathbf{b}_n$.  However consider the case where there is significant noise due to undersampling:
+\begin{equation}
+\mathbf{\hat{b}}_n = \mathbf{b}_{n} + \mathbf{n}_{n}
+\end{equation}
+where $\mathbf{n}_{n}$ is a vector of noise samples with an unknown distribution. Substituting into \ref{eq_delta}:
+\begin{equation}
+\mathbf{\Delta}_{n+1} = \mathbf{b}_{n+1} - \mathbf{b}_{n} + \mathbf{n}_{n+1} - \mathbf{n}_{n}
+\end{equation}
+If $\mathbf{n}_{n}$ and $\mathbf{n}_{n+1}$ are not well correlated they may become a significant source of noise that is summed with $\mathbf{\Delta}_{n}$, reducing the effectiveness of the quantister that will need to waste bits quantising the noise. We would therefore expect that in the absence of undersampling noise, delta coding in time should result in increased quantiser efficiency.
 
-\item If the sample rate $K$ is sufficiently high (or bandwidth of $\mathbf{a}$ sufficiently constrained), the actual VQ dimension won't matter.  The decorrelation properties of the VQ will ensure it achieves the same distortion over a range of dimensions.  A large enough dimension $K$ could be chosen to simplify $S$, which could be linear resampling. It would be good to decouple $mel()$ from K.
+\item Small changes in $\mathbf{a}$ input should result in small changes in $\mathbf{b}$ indicating a lack of sensitivity and undersampling noise in $R$.  If $R$ is sensitive, we may notice VQ choices changing from frame to frame for stationary speech.
+
+\item If the sample rate $K$ is sufficiently high (or bandwidth of $\mathbf{a}$ sufficiently constrained), the actual VQ dimension won't matter.  The decorrelation properties of the VQ will ensure it achieves the same distortion over a range of dimensions.  A large enough dimension $K$ could be chosen to simplify $S$, which could be linear resampling. It would be good to decouple $warp()$ from K.
 \end{enumerate}
 \end{document}

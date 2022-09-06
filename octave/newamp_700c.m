@@ -182,10 +182,24 @@ function [rate_K_surface rate_K_sample_freqs_kHz] = resample_const_rate_f_mel(mo
 endfunction
 
 
+function rate_K_sample_freqs_kHz = lin_sample_freqs_kHz(K)
+  lin_start = 100; lin_end = 3700;
+  step = (lin_end-lin_start)/(K-1);
+  rate_K_sample_freqs_Hz = lin_start:step:lin_end;
+  rate_K_sample_freqs_kHz = rate_K_sample_freqs_Hz/1000;
+endfunction
+
+
+function [rate_K_surface rate_K_sample_freqs_kHz] = resample_const_rate_f_lin(model, K)
+  rate_K_sample_freqs_kHz = lin_sample_freqs_kHz(K);
+  rate_K_surface = resample_const_rate_f(model, rate_K_sample_freqs_kHz, clip_en = 0);
+endfunction
+
+
 % Resample Am from time-varying rate L=floor(pi/Wo) to fixed rate K.  This can be viewed
 % as a 3D surface with time, freq, and ampitude axis.
 
-function [rate_K_surface rate_K_sample_freqs_kHz] = resample_const_rate_f(model, rate_K_sample_freqs_kHz)
+function [rate_K_surface rate_K_sample_freqs_kHz] = resample_const_rate_f(model, rate_K_sample_freqs_kHz, clip_en=1)
 
   % convert rate L=pi/Wo amplitude samples to fixed rate K
 
@@ -204,9 +218,11 @@ function [rate_K_surface rate_K_sample_freqs_kHz] = resample_const_rate_f(model,
 
     % clip between peak and peak -50dB, to reduce dynamic range
 
-    AmdB_peak = max(AmdB);
-    AmdB(find(AmdB < (AmdB_peak-50))) = AmdB_peak-50;
-
+    if clip_en
+      AmdB_peak = max(AmdB);
+      AmdB(find(AmdB < (AmdB_peak-50))) = AmdB_peak-50;
+    end
+    
     rate_L_sample_freqs_kHz = (1:L)*Wo*4/pi;
 
     %rate_K_surface(f,:) = interp1(rate_L_sample_freqs_kHz, AmdB, rate_K_sample_freqs_kHz, "spline", "extrap");
