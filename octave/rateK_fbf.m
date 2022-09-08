@@ -9,14 +9,14 @@
 %    instructions.
 %   ~/codec2-dev/build_linux/src$ ./c2sim ../../raw/hts1a.raw --dump hts1a
 %   $ cd ~/codec2-dev/octave
-%   octave:14> newamp1_fbf("../build_linux/src/hts1a",50)
+%   octave:14> rateK_fbf("../build_linux/src/hts1a",50)
 
 
 function rateK_fbf(samname, f)
   more off;
 
   newamp_700c;
-  Fs = 8000;  K = 40;
+  Fs = 8000;  K = 80;
 
   % load up text files dumped from c2sim ---------------------------------------
 
@@ -56,7 +56,7 @@ function rateK_fbf(samname, f)
     rate_K_vec_ = rate_K_surface(f,:);
 
     % back to rate L
-    model_(f,:) = resample_rate_L(model(f,:), rate_K_vec_, sample_freqs_kHz);
+    model_(f,:) = resample_rate_L(model(f,:), rate_K_vec_, sample_freqs_kHz, 'spline');
     Am_ = model_(f,3:(L+2)); AmdB_ = 20*log10(Am_);
     Lmin = round(200/F0); Lmax = floor(3700/F0);
     E = sum((AmdB(Lmin:Lmax) - AmdB_(Lmin:Lmax)).^2)/(Lmax-Lmin+1);
