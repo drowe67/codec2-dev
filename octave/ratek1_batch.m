@@ -1,32 +1,46 @@
-% rateK_batch.m
+% ratek1_batch.m
 %
 % David Rowe 2022
 %
-% batch mode rateK resampling
+% Rate K Experiment 1 - L>K linear rateK resampling batch mode 
 %
 % Usage:
 %   Make sure codec2-dev is compiled with the -DDUMP option - see README.md for
 %    instructions.
 %   ~/codec2-dev/build_linux/src$ ./c2sim ../../raw/hts1a.raw --dump hts1a
 %   $ cd ~/codec2-dev/octave
-%   octave:14> rateK_batch("../build_linux/src/hts1a")
+%   octave:14> ratek1_batch("../build_linux/src/hts1a")
 
-function rateK_batch(samname)
+function ratek1_batch(samname)
   more off;
-  
-  [Espline F0] = arateK_batch(samname,'spline');
-  Epara = arateK_batch(samname,'para');
-  figure(1); clf;
+
+  [Espline F0] = aratek1_batch(samname,'spline');
+  Epara = aratek1_batch(samname,'para');
+  h=figure(1); clf;
   plot(F0,Espline,'b+;spline;'); hold on;
   plot(F0,Epara,'g+;para;'); xlabel('F0 (Hz)'); hold off;
   xlabel('F0 (Hz)'); ylabel('E dB^2');
-  figure(2); clf;
+  [dir name ext] = fileparts(samname);
+  set(gca, 'FontSize', 16);
+  h = legend({"spline","para"}, "location", "north");
+  legend("boxoff")
+  set (h, "fontsize", 16);
+  print("-dpng", sprintf("ratek1_%s_E",name), "-S500,500");
+
+  h=figure(2); clf;
   [hspline nnspline] = hist(Espline,50);
   [hpara nnpara] = hist(Epara,50); hold on;
-  title('Histogram of E');
+  plot(nnspline, hspline, 'b+-;spline;'); hold on;
+  plot(nnpara, hpara, 'g+-;para;'); hold off;
+  title('Histogram of E'); xlabel('E dB^2'); grid;
+  set(gca, 'FontSize', 16);
+  h = legend({"spline","para"}, "location", "north");
+  legend("boxoff")
+  set (h, "fontsize", 16);
+  print("-dpng", sprintf("ratek1_%s_hist",name), "-S500,500");
 endfunction
 
-function [E F0] = arateK_batch(samname, resampler='spline')
+function [E F0] = aratek1_batch(samname, resampler='spline')
   more off;
   
   newamp_700c;

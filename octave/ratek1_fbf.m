@@ -1,22 +1,23 @@
-% rateK_fbf.m
+% ratek1_fbf.m
 %
 % David Rowe 2022
 %
-% Interactive Octave script to explore frame by frame operation of rateK resampling
+% Rate K Experiment 1 - L>K linear rateK resampling, interactive Octave script
+% to explore frame by frame operation of rate K resampling
 %
 % Usage:
 %   Make sure codec2-dev is compiled with the -DDUMP option - see README.md for
 %    instructions.
 %   ~/codec2-dev/build_linux/src$ ./c2sim ../../raw/hts1a.raw --dump hts1a
 %   $ cd ~/codec2-dev/octave
-%   octave:14> rateK_fbf("../build_linux/src/hts1a",50)
+%   octave:14> ratek1_fbf("../build_linux/src/hts1a",50)
 
 
-function rateK_fbf(samname, f)
+function ratek1_fbf(samname, f, resampler = 'spline')
   more off;
 
   newamp_700c;
-  Fs = 8000;  K = 80;
+  Fs = 8000;  K = 40;
 
   % load up text files dumped from c2sim ---------------------------------------
 
@@ -29,7 +30,7 @@ function rateK_fbf(samname, f)
   [frames tmp] = size(model);
 
   % pre-process
-  [rate_K_surface sample_freqs_kHz] = resample_const_rate_f_lin(model(1:frames,:), K);
+  [rate_K_surface sample_freqs_kHz] = resample_const_rate_f_lin(model(1:frames,:), K, resampler);
 
   % Keyboard loop --------------------------------------------------------------
 
@@ -56,7 +57,7 @@ function rateK_fbf(samname, f)
     rate_K_vec_ = rate_K_surface(f,:);
 
     % back to rate L
-    model_(f,:) = resample_rate_L(model(f,:), rate_K_vec_, sample_freqs_kHz, 'spline');
+    model_(f,:) = resample_rate_L(model(f,:), rate_K_vec_, sample_freqs_kHz, resampler);
     Am_ = model_(f,3:(L+2)); AmdB_ = 20*log10(Am_);
     Lmin = round(200/F0); Lmax = floor(3700/F0);
     E = sum((AmdB(Lmin:Lmax) - AmdB_(Lmin:Lmax)).^2)/(Lmax-Lmin+1);
@@ -64,6 +65,7 @@ function rateK_fbf(samname, f)
     plot((1:L)*Wo*4000/pi, AmdB_,";AmdB bar;r+-");
     l = sprintf(";E %3.2f dB;bk+-", E);
     plot((Lmin:Lmax)*F0, (AmdB(Lmin:Lmax) - AmdB_(Lmin:Lmax)), l);
+    axis([0 Fs/2 -10 80]);
     hold off;
 
     % interactive menu ------------------------------------------
@@ -77,6 +79,15 @@ function rateK_fbf(samname, f)
     endif
     if k == 'b'
       f = f - 1;
+    endif
+    if (k == 'p')
+      [dir name ext]=fileparts("../build_linux/big_dog");
+      set(gca, 'FontSize', 16);
+      h = legend({"Rate L Am","Rate K Bm", "Rate L Am hat"}, "location", "north");
+      legend("boxoff")
+      set (h, "fontsize", 16);
+      xlabel('Freq (Hz)'); ylabel('Amplitude (dB)');
+      print(sprintf("ratek1_%s_%d",name,f),"-dpng","-S500,500");
     endif
 
   until (k == 'q')

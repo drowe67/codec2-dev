@@ -2,6 +2,9 @@
 \usepackage{amsmath}
 \usepackage{xstring}
 \usepackage{catchfile}
+\usepackage{graphicx}
+\graphicspath{ {../octave/} }
+\usepackage{url}
 
 \CatchFileDef{\headfull}{../.git/HEAD}{}
 \StrGobbleRight{\headfull}{1}[\head]
@@ -20,7 +23,11 @@
 
 \maketitle
 
+\section{Introduction}
+
 The Rate K resampler is used in Codec 2 700C to transform the variable length vectors of spectral amplitude samples to fixed length $K$ vectors suitable for vector quantisation.  This document was written in order to explore and possibly improve the resampler.
+
+\section{Theoretical Model}
 
 Consider a vector $\mathbf{a}$ of $L$ spectral amplitudes, sampled at time $t=nT$ seconds, where $n$ is the frame number, and $T$ is the frame period, typically $T=0.01$ seconds. 
 \begin{equation}
@@ -64,8 +71,10 @@ warp(k+1)-warp(k) < F0
 \end{equation}
 If $A_m$ is changing rapidly, undersampling may introduce undesirable aliasing, which may manifest as noise that is superimposed on $\mathbf{b}$. This noise may reduce perceptual quality and consume valuable quantiser bits for no benefit. Given the ear is less sensitive to detail at high frequencies, it is reasonable to choose a resampling function that smooths high frequency detail such that local undersampling and uncontrolled aliasing is minimised. A useful property of $R$ may therefore be smoothing (filtering) $\mathbf{a}$ such that $E$ is small when $\hat{\mathbf{b}} = \mathbf{b}$.  The filter and number of sample points $K$ should also be chosen to minimise the perceptual distortion.  A suitable filtering function would average $A_m$ over the region $warp(k+1)-warp(k)$.
 
-Here are a suggested set of experiments to evaluate the ideas presented in this document.  Some of them require informal listening tests, others have objective measures which could be used as the basis for automated tests:
+\section{Suggested Experiments}
  
+Here are a suggested set of experiments to evaluate the ideas presented in this document.  Some of them require informal listening tests, others have objective measures which could be used as the basis for automated tests:
+
 \begin{enumerate}
 
 \item The baseline resampling (currently a 2nd order polynomial) is a potential source of distortion.  Conduct an experiment to test the theory that $E$ is small (and perceptual quality high) for $K>L$ using linear frequency sampling and large $K$.
@@ -98,4 +107,61 @@ If $\mathbf{n}_{n}$ and $\mathbf{n}_{n+1}$ are not well correlated they may beco
 
 \item If the sample rate $K$ is sufficiently high (or bandwidth of $\mathbf{a}$ sufficiently constrained), the actual VQ dimension won't matter.  The decorrelation properties of the VQ will ensure it achieves the same distortion over a range of dimensions.  A large enough dimension $K$ could be chosen to simplify $S$, which could be linear resampling. It would be good to decouple $warp()$ from K.
 \end{enumerate}
+
+\section{Experiment 1: rate $K>L$ linear}
+
+This experiment tests the ability to resample perfectly ($E=0$) with $K>L$, and linear frequency sampling and was implemented with Octave scripts \path{ratek1_fbf.m} and \path{ratek1_batch.m}.
+
+Figure \ref{fig:ratek1_big_dog_50} illustrates why the resampler choice is important.  In the region of F1, the spectral samples $A_{m}$ are changing quickly.  The parabolic resampler fails to track these changes leading to distortion in a perceptually important feature of the spectrum.  When the resampler is viewed as a filter, this can be interpreted as a low pass response in the parabolic resampler, and is most noticable when $K$ is close to $L$.
+
+\begin{figure}[h]
+\caption{Frame 50 of big\_dog sample with $K=40$ just larger than $L=37$, 2nd order parabolic resampler.  Note distortion around F1 at 500 Hz }
+\label{fig:ratek1_big_dog_50}
+\includegraphics[width=10cm]{ratek1_big_dog_50}
+\end{figure}
+
+Figure \ref{fig:ratek1_hts_E} shows the spline and parabolic resampler $E$, plotted against $F0$ for a 24 second sample containing four speakers.  Table \ref{table:ratek1_mean_E} is the mean spectral distortion $E$.  The spline interpolator perfoms better than the parabolic interpolator.  $L$ is time varying, but as it approaches $K$, $E$ increases, once again showing that interpolators struggle with $K$ close to $L$.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{c c }
+ \hline
+ Resampler & mean $E$ $dB^2$ \\
+ \hline
+ spline & 0.02 \\ 
+ para  & 0.31 \\
+ \hline
+\end{tabular}
+\caption{Table to test captions and labels.}
+\label{table:ratek1_mean_E}
+\end{table}
+
+In this experiment with $K=80$ both resamplers have low average $E$ (less than $1 dB^2$), and even the occasional high $E$ frames are unlikley to be audible.  With unvoiced or background noise the pitch estimator tends to low $F0$ values.  With this type of signal the ear is quite insensitive to spectral distortion $E$.  With a lower choice of $K$, this may not be the case, as we would start to get resampling distortion (Figure \ref{fig:ratek1_big_dog_50}), or when $K<L$, aliasing.
+
+\begin{figure}[h]
+\caption{Scatter plot of $E$ versus $F0$ for hts sample, spline and parabolic resampler}
+\label{fig:ratek1_hts_E}
+\includegraphics[width=10cm]{ratek1_hts_E.png}
+\end{figure}
+
+\begin{figure}[h]
+\caption{Histogram of $E$ for spline and parabolic resampler}
+\label{fig:ratek1_hts_hist}
+\includegraphics[width=10cm]{ratek1_hts_hist.png}
+\end{figure}
+
+Conclusions:
+\begin{enumerate}
+\item The resampler matters, especially when $K$ is close to $L$.  The current rate $K$ Codec 2 700C system uses $K < L$ (at least at high frequencies) with a parabolic resampler and no filtering.  This may be suffering from resampling noise that affects VQ performance and speech quality. It seems prudent to use a low distortion resampler.  We do not want to add any additional distortion sources to our system.
+
+\item We intend to use $K < L$, which will lead to aliasing distortion.  It would be wise to filter $A_{m}$ prior to resampling to remove the possibility of aliasing and resampler distortion, such that with $\mathbf{b}=\hat{\mathbf{b}}$, $\mathbf{a}$ = $\hat{\mathbf{a}}$. TODO reformulate this with filtering maths
+
+\item Once filtered, we are free to use any choice of $K$ for $\mathbf{b}$ that can represent the filtered samples for vector quntisation, as the "bandwidth" of the sampled sequence (and presumably VQ distortion for a given number of bits) will be independant of $K$.  While a larger $K$ will use more VQ storage, it may simplify resampling at the receiver.  If $K$ is large, a simple linear resampler may suffice.
+
+\item With non-linear frequency sampling, we may need a high local rate near F1 to accurately represent sharp formants, especially for males.  There may be other ways to encode this information, for a example a resampling function or VQ that takes into account $F0$ - "sharpening" F1 for low $F0$ speakers.
+
+\item The sensitivity of F1 to low $K$ resampling also hints at the newamp1 postfilter function.  This experimentally derived algorithm sharpens formants after vector quantisation and has a large impact on Codec 2 700C speech quality.  Its function is not well understood.
+
+\end{enumerate}
+
 \end{document}
