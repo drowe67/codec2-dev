@@ -5,6 +5,8 @@
 \usepackage{graphicx}
 \graphicspath{ {../octave/} }
 \usepackage{url}
+\usepackage{tikz}
+\usepackage{tkz-euclide}
 
 \CatchFileDef{\headfull}{../.git/HEAD}{}
 \StrGobbleRight{\headfull}{1}[\head]
@@ -43,14 +45,14 @@ $F0$ and $L$ are time varying as the pitch track evolves over time. For speech s
 To quantise and transmit $\mathbf{a}$, it is convenient to resample $\mathbf{a}$ to a fixed length $K$ element vector $\mathbf{b}$ using a resampling function:
 \begin{equation}
 \begin{split}
-\mathbf{f} &= \begin{bmatrix} f_1, f_2, \ldots f_L \end{bmatrix} = F(\mathbf{a}) \\
+\mathbf{y} &= \begin{bmatrix} Y_1, Y_2, \ldots Y_L \end{bmatrix} = H(\mathbf{a}) \\
 \mathbf{b} &= \begin{bmatrix} B_1, B_2, \ldots B_K \end{bmatrix} = R(\mathbf{f})
 \end{split}
 \end{equation}
-Where $F()$ is a filter function chosen to smooth the spectral amplitude samples $A_m$ while not significantly altering the perceptual quality of the speech; and $R()$ is a resampling function. To model the logarithmic frequency response of the human ear $B_k$  are sampled on $K$ non-linearly spaced points on the frequency axis:
+Where $H()$ is a filter function chosen to smooth the spectral amplitude samples $A_m$ while not significantly altering the perceptual quality of the speech; and $R()$ is a resampling function. To model the logarithmic frequency response of the human ear $B_k$  are sampled on $K$ non-linearly spaced points on the frequency axis:
 \begin{equation}
 \begin{split}
-w_k &= warp(k,K) \ \textrm{Hz} \quad k=1 \ldots K \\
+f_k &= warp(k,K) \ \textrm{Hz} \quad k=1 \ldots K \\
 warp(1,K) &= 200 \ \textrm{Hz} \\
 warp(K,K) &= 3700 \ \textrm{Hz}
 \end{split}
@@ -63,12 +65,12 @@ The rate $K$ vector $\mathbf{b}$ is vector quantised for transmission over the c
 \end{equation}
 The rate filtered rate $L$ vector can then be recovered by resampling $\mathbf{\hat{b}}$ using another resampling function:
 \begin{equation}
-\hat{\mathbf{f}} = S(\hat{\mathbf{b}})
+\hat{\mathbf{y}} = S(\hat{\mathbf{b}})
 \end{equation}
 A useful error metric is the mean square error:
 \begin{equation} \label{eq:E1}
 \begin{split}
-E & =\frac{1}{L_{max}-L_{min}+1}\sum_{m=L_{min}}^{L_{max}}(f_m-\hat{f}_m)^2 \\
+E & =\frac{1}{L_{max}-L_{min}+1}\sum_{m=L_{min}}^{L_{max}}(Y_m-\hat{Y}_m)^2 \\
 L_{min} & = round(200/F0) \\
 L_{max} & =\left \lfloor 3700/F0  \right \rfloor
 \end{split}
@@ -76,20 +78,20 @@ L_{max} & =\left \lfloor 3700/F0  \right \rfloor
 In the case where there is no filtering (e.g. \url{newamp1}) then:
 \begin{equation}
 \begin{split}
-F(\mathbf{x}) &= \mathbf{x} \\
-\mathbf{f} &= \mathbf{a} \\
-\hat{\mathbf{a}} &= \hat{\mathbf{f}} \\
+H(\mathbf{x}) &= \mathbf{x} \\
+\mathbf{y} &= \mathbf{a} \\
+\hat{\mathbf{a}} &= \hat{\mathbf{y}} \\
 E &=\frac{1}{L_{max}-L_{min}+1}\sum_{m=L_{min}}^{L_{max}}(A_m-\hat{A}_m)^2 
 \end{split}
 \end{equation}
 If $A_m$ are in dB, $E$ can be denoted the spectral distortion in $dB^2$, which can be averaged over a testing database of $N$ frames to obtain mean spectral distortion.
 
-Consider a choice of $warp()$ with linear (non-warped) sampling of the frequency axis, $F(\mathbf{x})=\mathbf{x}$, and an ideal quantiser $Q$ such that $\hat{\mathbf{b}} = \mathbf{b}$. If $K<L$ information may be lost due to undersampling, which implies $\hat{\mathbf{a}} \neq \mathbf{a}$.  
+Consider a choice of $warp()$ with linear (non-warped) sampling of the frequency axis, $H(\mathbf{x})=\mathbf{x}$, and an ideal quantiser $Q$ such that $\hat{\mathbf{b}} = \mathbf{b}$. If $K<L$ information may be lost due to undersampling, which implies $\hat{\mathbf{a}} \neq \mathbf{a}$.  
 With nonlinear sampling, there will be local undersampling where the sampling rate of $\mathbf{b}$ is less than that of $\mathbf{a}$:
 \begin{equation}
 warp(k+1,K)-warp(k,K) < F0
 \end{equation}
-If $A_m$ is changing rapidly, undersampling may introduce undesirable aliasing, which may manifest as noise that is superimposed on $\mathbf{b}$. This noise may reduce perceptual quality and consume valuable quantiser bits for no benefit. Therefore $F()$ should be chosen to smooth high frequency detail such that local undersampling and uncontrolled aliasing is minimised. This may be restated as choosing $F()$ to minimise $E$ (\ref{eq:E1}) when $\hat{\mathbf{b}} = \mathbf{b}$.
+If $A_m$ is changing rapidly, undersampling may introduce undesirable aliasing, which may manifest as noise that is superimposed on $\mathbf{b}$. This noise may reduce perceptual quality and consume valuable quantiser bits for no benefit. Therefore $H()$ should be chosen to smooth high frequency detail such that local undersampling and uncontrolled aliasing is minimised. This may be restated as choosing $H()$ to minimise $E$ (\ref{eq:E1}) when $\hat{\mathbf{b}} = \mathbf{b}$.
 
 \section{Suggested Experiments}
  
@@ -97,7 +99,7 @@ Here are a suggested set of experiments to evaluate the ideas presented in this 
 
 \begin{enumerate}
 
-\item The baseline resampling (currently a 2nd order polynomial) is a potential source of distortion.  Conduct an experiment to test the theory that $E$ is small (and perceptual quality high) for $K>L$ using linear frequency sampling, $F(x)=x$ and large $K$.
+\item The baseline resampling (currently a 2nd order polynomial) is a potential source of distortion.  Conduct an experiment to test the theory that $E$ is small (and perceptual quality high) for $K>L$ using linear frequency sampling, $H(\mathbf{x})=\mathbf{x}$ and large $K$.
 
 \item How to demonstrate aliasing?  Well we can run current rate K code, that uses a 2nd order parabolic resampler.  Then compare with a "better" resampler that uses filtering.  Perform an informal listening test over a small set of samples.  Goal is to show reduced $E$ with similar perceptual quality.  Smoothing does reduce information so there will be a trade off.  Too much smoothing and perceptual quality will reduce.  We should also notice improved VQ performance, as we won't be quantising noise.
 
@@ -130,7 +132,7 @@ If $\mathbf{n}_{n}$ and $\mathbf{n}_{n+1}$ are not well correlated they may beco
 
 \section{Experiment 1: rate $K>L$ linear}
 
-This experiment tests the ability to resample perfectly ($E=0$) with $K>L$, no filtering ($F(x)=x$) and linear frequency sampling and was implemented with Octave scripts \path{ratek1_fbf.m} and \path{ratek1_batch.m}.
+This experiment tests the ability to resample perfectly ($E=0$) with $K>L$, no filtering ($H(x)=x$) and linear frequency sampling and was implemented with Octave scripts \path{ratek1_fbf.m} and \path{ratek1_batch.m}.
 
 Figure \ref{fig:ratek1_big_dog_50} illustrates why the resampler choice is important.  In the region of F1, the spectral samples $A_{m}$ are changing quickly.  The parabolic resampler fails to track these changes leading to distortion in a perceptually important feature of the spectrum.  When the resampler is viewed as a filter, this can be interpreted as a low pass response in the parabolic resampler, and is most noticable when $K$ is close to $L$.
 
@@ -174,14 +176,72 @@ Conclusions:
 \begin{enumerate}
 \item The resampler matters, especially when $K$ is close to $L$.  The current rate $K$ Codec 2 700C system uses $K < L$ (at least at high frequencies) with a parabolic resampler and no filtering.  This may be suffering from resampling noise that affects VQ performance and speech quality. It seems prudent to use a low distortion resampler.  We do not want to add any additional distortion sources to our system.
 
-\item We intend to use $K<L$, which will lead to aliasing distortion.  It would be wise to filter $A_{m}$ prior to resampling to remove the possibility of aliasing and resampler distortion, that is choose $F()$ such that with $\mathbf{b}=\hat{\mathbf{b}}$, $E$ (\ref{eq:E1}) is minimised.
+\item We intend to use $K<L$, which will lead to aliasing distortion.  It would be wise to filter $A_{m}$ prior to resampling to remove the possibility of aliasing and resampler distortion, that is choose $H()$ such that with $\mathbf{b}=\hat{\mathbf{b}}$, $E$ (\ref{eq:E1}) is minimised.
 
 \item Once filtered, there will be some minimum value of $K_{min}$ required for $\mathbf{b}$ such that the rate $L$ vector $\hat{\mathbf{f}}$ can be recovered with minimal $E$. However we are free to choose $K>K_{min}$ as the "bandwidth" of the sampled sequence (and presumably VQ distortion for a given number of bits) will be independant of $K$ when $K>K_{min}$.  While a larger $K$ will use more VQ storage, it may simplify resampling at the receiver.  If $K$ is large enough, a simple linear resampler may suffice.
 
 \item With non-linear frequency sampling, we may need a high local rate near F1 to accurately represent sharp formants, especially for males.  There may be other ways to encode this information, for a example a resampling function or VQ that takes into account $F0$ - "sharpening" F1 for low $F0$ speakers.
 
-\item The sensitivity of F1 to low $K$ resampling also hints at the newamp1 postfilter function.  This experimentally derived algorithm sharpens formants after vector quantisation and has a large impact on Codec 2 700C speech quality.  Its function is not well understood.
+\item The newamp1 postfilter is an experimentally derived algorithm that raises peaks and lowers troughs in the rate $K$ spectrum, effectively "sharpening" formants.  When used after vector quantisation it has a large impact on Codec 2 700C speech quality, especially for male speakers.  However it's function is not well understood and in some cases it may be adding distortion.  The sensitivity of F1 to low $K$ resampling provides some hints as to why the postfilter is required.  Resampler distortion in Figure \ref{fig:ratek1_big_dog_50} distorts F1, which is further degraded by vector quantisation.  An increased sample rate and better resampling may reduce the need for the postfilter.
 
 \end{enumerate}
 
+\section{Experiment 2 - Filtering}
+
+The goal of this experiment is to filter the spectral amplitudes $\mathbf{a}$ such that they can be more coarsely resampled without resampling or aliasing errors, and with mimimal impact on the perceptual quality.
+The $m-th$ filtered sample can be obtained by:
+\begin{equation}
+Y_m = \frac{1}{g_{sum}}\sum_{k=st}^{en}A_k g(k)
+\end{equation}
+where $g(k)$ is sequence of samples defining a suitable filter, and $st$ and $en$ define the start and end harmonics of the filtering operation.  To avoid any amplitude scaling:
+\begin{equation}
+g_{sum}=\sum_{k=st}^{en}g(k)
+\end{equation}
+
+As we wish to resample on a non-linear frequency axis, we need a set of filters that become wider as frequency increases. We can use the frequency warping function to divide the speech spectrum into $N_b$ bands, with the centre frequency of each band given by:
+\begin{equation}
+\begin{split}
+f_b &= warp(b,N_b) \ \textrm{Hz} \quad b=1 \ldots N_b \\
+warp(1,Nb) &= 200 \ \textrm{Hz} \\
+warp(Nb,Nb) &= 3700 \ \textrm{Hz}
+\end{split}
+\end{equation}
+For this experiment, we wish to separate the filtering $H()$ from the rate $K$ resampling operation, and perform the filtering on the rate $L$ samples $A_m$.  In this case it is convenient to treat $b$ as a continuous variable.  Given the $m-th$ harmonic, we can determine the filter band:
+\begin{equation}
+\begin{split}
+f_b &= mF0 \\
+b &= warp^{-1}(f_b,N_b) \\
+\end{split}
+\end{equation}
+A common choice for filtering $g(k)$ is a triangular function, which tapers down to zero in the centre of adjacent bands $b-1$ and $b+1$.  This can be defined in terms of the harmonic indexes, as illustrated in  Figure \ref{fig:triangle_filter}.
+\begin{equation}
+\begin{split}
+st &= round(warp(b-1,N_b)/F0) \\
+en &= round(warp(b+1,N_b)/F0) \\
+g(k) &= \frac{k-st}{m-st} \quad k=st \ldots m \\
+g(k) &= \frac{1-k}{en-m} \quad k=m+1 \ldots en
+\end{split}
+\end{equation}
+It can be seen that $N_b$ controls the filtering.  As $Nb$ becomes smaller, $g(k)$ becomes wider, reducing the rate of change of the filtered spectral samples $Y_m$.  While this presumably improves VQ performance, at some point it will also affect the perceptual quality of the speech.
+
+\begin{figure}[h]
+\caption{Triangular Filter $h(k)$.  Note asymmetry on linear frequency axis}
+\vspace{5mm}
+\label{fig:triangle_filter}
+\centering
+\begin{tikzpicture}
+\tkzDefPoint(0,0){A}
+\tkzDefPoint(2,2){B}
+\tkzDefPoint(5,0){C}
+\draw[step=1cm,gray,very thin] (-1,-1) grid (6,3);
+\draw[thick] (0,0) node [below]{(st,0)} -- (2,2) node [above]{(m,1)};
+\draw[thick] (2,2) -- (5,0) node [below]{(en,0)};
+\draw[thick,->] (-1,0) -- (6,0) node [below]{$Freq$};
+\foreach \n in {A,B,C}
+  \node at (\n)[circle,fill,inner sep=1.5pt]{};
+\end{tikzpicture}
+\end{figure}
+
+
 \end{document}
+
