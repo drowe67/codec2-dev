@@ -379,3 +379,20 @@ function [rate_K_vec eq] = front_eq(rate_K_vec, eq)
   eq = (1-gain)*eq + gain*update;
   eq(find(eq < 0)) = 0;
 endfunction
+
+
+function fHz = warp(k, K)
+  mel_start = ftomel(200); mel_end = ftomel(3700);
+  step = (mel_end-mel_start)/(K-1);
+  mel = mel_start + (k-1)*step;
+  fHz = 700*((10 .^ (mel/2595)) - 1);
+endfunction
+
+
+function k = warp_inv(fHz, K)
+  mel_start = ftomel(200); mel_end = ftomel(3700);
+  step = (mel_end-mel_start)/(K-1);
+  mel = ftomel(fHz) - step;
+  k = (ftomel(fHz) - mel_start)/step + 1;
+endfunction
+

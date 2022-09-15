@@ -46,7 +46,7 @@ To quantise and transmit $\mathbf{a}$, it is convenient to resample $\mathbf{a}$
 \begin{equation}
 \begin{split}
 \mathbf{y} &= \begin{bmatrix} Y_1, Y_2, \ldots Y_L \end{bmatrix} = H(\mathbf{a}) \\
-\mathbf{b} &= \begin{bmatrix} B_1, B_2, \ldots B_K \end{bmatrix} = R(\mathbf{f})
+\mathbf{b} &= \begin{bmatrix} B_1, B_2, \ldots B_K \end{bmatrix} = R(\mathbf{y})
 \end{split}
 \end{equation}
 Where $H()$ is a filter function chosen to smooth the spectral amplitude samples $A_m$ while not significantly altering the perceptual quality of the speech; and $R()$ is a resampling function. To model the logarithmic frequency response of the human ear $B_k$  are sampled on $K$ non-linearly spaced points on the frequency axis:
@@ -57,7 +57,61 @@ warp(1,K) &= 200 \ \textrm{Hz} \\
 warp(K,K) &= 3700 \ \textrm{Hz}
 \end{split}
 \end{equation}
-where $warp()$ is a frequency warping function. Codec 2 700C uses $K=20$, and $warp()$ defined by the Mel function which samples the spectrum more densely at low frequencies, and less densely at high frequencies.
+where $warp()$ is a frequency warping function. Codec 2 700C uses $K=20$, and $warp()$ is defined using the Mel function (Figure \ref{fig:mel_fhz}) which samples the spectrum more densely at low frequencies, and less densely at high frequencies:
+\begin{equation} \label{eq:mel_f}
+mel(f) = 2595log_{10}(1+f/700)
+\end{equation}
+The inverse mapping of $f$ in Hz from $mel(f)$ is given by:
+\begin{equation} \label{eq:f_mel}
+f = mel^{-1}(x) = 700(10^{x/2595} - 1);
+\end{equation}
+
+\begin{figure}[h]
+\caption{Mel function}
+\label{fig:mel_fhz}
+\includegraphics[width=10cm]{ratek_mel_fhz}
+\end{figure}
+
+We wish to use $mel(f)$ to construct $warp(k,K)$, such that there are $K$ evenly spaced points on the $mel(f)$ axis (Figure \ref{fig:mel_k}).  Solving for the equation of a straight line we can obtain $mel(f)$ as a function of $k$, and hence $warp(k,K)$ (Figure \ref{fig:warp_fhz_k}):
+\begin{equation} \label{eq:mel_k}
+\begin{split}
+g &= \frac{mel(3700)-mel(200)}{K-1} \\
+mel(f) &= g(k-1) + mel(200)
+\end{split}
+\end{equation}
+Substituting (\ref{eq:f_mel}) into the LHS:
+\begin{equation} \label{eq:warp}
+\begin{split}
+2595log_{10}(1+f/700) &= g(k-1) + mel(200) \\
+f = warp(k,K) &= mel^{-1} ( g(k-1) + mel(200) ) \\
+\end{split}
+\end{equation}
+and the inverse warp function:
+\begin{equation} \label{warp_inv}
+k = warp^{-1}(f,K) = \frac{mel(f)-mel(200)}{g} + 1
+\end{equation}
+
+\begin{figure}[h]
+\caption{Linear mapping of $mel(f)$ to Rate $K$ sample index $k$}
+\vspace{5mm}
+\label{fig:mel_k}
+\centering
+\begin{tikzpicture}
+\tkzDefPoint(1,1){A}
+\tkzDefPoint(5,5){B}
+\draw[thick] (1,1) node [right]{(1,mel(200))} -- (5,5) node [right]{(K,mel(3700))};
+\draw[thick,->] (0,0) -- (6,0) node [below]{k};
+\draw[thick,->] (0,0) -- (0,6) node [left]{mel(f)};
+\foreach \n in {A,B}
+  \node at (\n)[circle,fill,inner sep=1.5pt]{};
+\end{tikzpicture}
+\end{figure}
+
+\begin{figure}[h]
+\caption{$warp(k,K)$ function}
+\label{fig:warp_fhz_k}
+\includegraphics[width=10cm]{warp_fhz_k}
+\end{figure}
 
 The rate $K$ vector $\mathbf{b}$ is vector quantised for transmission over the channel:
 \begin{equation}
@@ -86,7 +140,7 @@ E &=\frac{1}{L_{max}-L_{min}+1}\sum_{m=L_{min}}^{L_{max}}(A_m-\hat{A}_m)^2
 \end{equation}
 If $A_m$ are in dB, $E$ can be denoted the spectral distortion in $dB^2$, which can be averaged over a testing database of $N$ frames to obtain mean spectral distortion.
 
-Consider a choice of $warp()$ with linear (non-warped) sampling of the frequency axis, $H(\mathbf{x})=\mathbf{x}$, and an ideal quantiser $Q$ such that $\hat{\mathbf{b}} = \mathbf{b}$. If $K<L$ information may be lost due to undersampling, which implies $\hat{\mathbf{a}} \neq \mathbf{a}$.  
+Consider a choice of $warp()$ with linear (non-warped) sampling of the frequency axis, no filtering such that $H(\mathbf{x})=\mathbf{x}$, and an ideal quantiser $Q$ such that $\hat{\mathbf{b}} = \mathbf{b}$. If $K<L$ information may be lost due to undersampling, which implies $\hat{\mathbf{a}} \neq \mathbf{a}$.  
 With nonlinear sampling, there will be local undersampling where the sampling rate of $\mathbf{b}$ is less than that of $\mathbf{a}$:
 \begin{equation}
 warp(k+1,K)-warp(k,K) < F0
@@ -219,7 +273,7 @@ A common choice for filtering $g(k)$ is a triangular function, which tapers down
 st &= round(warp(b-1,N_b)/F0) \\
 en &= round(warp(b+1,N_b)/F0) \\
 g(k) &= \frac{k-st}{m-st} \quad k=st \ldots m \\
-g(k) &= \frac{1-k}{en-m} \quad k=m+1 \ldots en
+g(k) &= \frac{en-k}{en-m} \quad k=m+1 \ldots en
 \end{split}
 \end{equation}
 It can be seen that $N_b$ controls the filtering.  As $Nb$ becomes smaller, $g(k)$ becomes wider, reducing the rate of change of the filtered spectral samples $Y_m$.  While this presumably improves VQ performance, at some point it will also affect the perceptual quality of the speech.
@@ -233,7 +287,6 @@ It can be seen that $N_b$ controls the filtering.  As $Nb$ becomes smaller, $g(k
 \tkzDefPoint(0,0){A}
 \tkzDefPoint(2,2){B}
 \tkzDefPoint(5,0){C}
-\draw[step=1cm,gray,very thin] (-1,-1) grid (6,3);
 \draw[thick] (0,0) node [below]{(st,0)} -- (2,2) node [above]{(m,1)};
 \draw[thick] (2,2) -- (5,0) node [below]{(en,0)};
 \draw[thick,->] (-1,0) -- (6,0) node [below]{$Freq$};
