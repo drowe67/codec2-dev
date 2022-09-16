@@ -26,4 +26,15 @@ function ratek_plots()
   xlabel('k'); ylabel('f (Hz)');
   print("warp_fhz_k","-dpng","-S500,500");
 
+  figure(1); clf; 
+  Fs=8000; f0=200; L=floor(Fs/(2*f0)); Nb=10;
+  hold on;
+  for m=1:L
+    plot((1:L)*f0,generate_filter(m,f0,L,Nb),'o-');
+  end
+  hold off; grid;
+  set(gca, 'FontSize', 16);
+  xlabel('f (Hz)'); ylabel('h(m=f/F0)');
+  print("filters_h","-dpng","-S500,500");
+
 endfunction

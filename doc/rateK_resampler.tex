@@ -243,14 +243,11 @@ Conclusions:
 \section{Experiment 2 - Filtering}
 
 The goal of this experiment is to filter the spectral amplitudes $\mathbf{a}$ such that they can be more coarsely resampled without resampling or aliasing errors, and with mimimal impact on the perceptual quality.
-The $m-th$ filtered sample can be obtained by:
+The $m$th filtered sample can be obtained by:
 \begin{equation}
-Y_m = \frac{1}{g_{sum}}\sum_{k=st}^{en}A_k g(k)
+Y_m = \sum_{k=st}^{en}A_k h(k)
 \end{equation}
-where $g(k)$ is sequence of samples defining a suitable filter, and $st$ and $en$ define the start and end harmonics of the filtering operation.  To avoid any amplitude scaling:
-\begin{equation}
-g_{sum}=\sum_{k=st}^{en}g(k)
-\end{equation}
+where $h(k)$ is sequence of samples defining a suitable filter, and $st$ and $en$ define the start and end harmonics used as input to the filtering operation for the $m$th sample.
 
 As we wish to resample on a non-linear frequency axis, we need a set of filters that become wider as frequency increases. We can use the frequency warping function to divide the speech spectrum into $N_b$ bands, with the centre frequency of each band given by:
 \begin{equation}
@@ -260,7 +257,7 @@ warp(1,Nb) &= 200 \ \textrm{Hz} \\
 warp(Nb,Nb) &= 3700 \ \textrm{Hz}
 \end{split}
 \end{equation}
-For this experiment, we wish to separate the filtering $H()$ from the rate $K$ resampling operation, and perform the filtering on the rate $L$ samples $A_m$.  In this case it is convenient to treat $b$ as a continuous variable.  Given the $m-th$ harmonic, we can determine the filter band:
+For this experiment, we wish to separate the filtering $H()$ from the rate $K$ resampling operation, and perform the filtering on the rate $L$ samples $A_m$.  In this case it is convenient to treat $b$ as a continuous variable.  Given the $m$th harmonic, we can determine the filter band:
 \begin{equation}
 \begin{split}
 f_b &= mF0 \\
@@ -270,13 +267,16 @@ b &= warp^{-1}(f_b,N_b) \\
 A common choice for filtering $g(k)$ is a triangular function, which tapers down to zero in the centre of adjacent bands $b-1$ and $b+1$.  This can be defined in terms of the harmonic indexes, as illustrated in  Figure \ref{fig:triangle_filter}.
 \begin{equation}
 \begin{split}
-st &= round(warp(b-1,N_b)/F0) \\
-en &= round(warp(b+1,N_b)/F0) \\
-g(k) &= \frac{k-st}{m-st} \quad k=st \ldots m \\
-g(k) &= \frac{en-k}{en-m} \quad k=m+1 \ldots en
+st &= max(1,round(warp(b-1,N_b)/F0)) \\
+en &= min(L,round(warp(b+1,N_b)/F0)) \\
+g(k) &= \frac{k-st}{m-st} \quad k=st \ldots m-1 \\
+g(m) &= 1 \\
+g(k) &= \frac{en-k}{en-m} \quad k=m+1 \ldots en \\
+g_{sum} &= \sum_{k=st}^{en}g(k) \\
+h(k) &= g(k)/g_{sum}
 \end{split}
 \end{equation}
-It can be seen that $N_b$ controls the filtering.  As $Nb$ becomes smaller, $g(k)$ becomes wider, reducing the rate of change of the filtered spectral samples $Y_m$.  While this presumably improves VQ performance, at some point it will also affect the perceptual quality of the speech.
+Note the normalising term $g_{sum}$ to ensure the energy of $A_m$ is not altered by the filtering operation. Figure \ref{fig:filters_h} is an example set of filters. It can be seen that $N_b$ controls the filtering.  As $Nb$ becomes smaller, $g(k)$ becomes wider, reducing the rate of change of the filtered spectral samples $Y_m$.  While this presumably improves VQ performance, at some point it will also affect the perceptual quality of the speech.
 
 \begin{figure}[h]
 \caption{Triangular Filter $h(k)$.  Note asymmetry on linear frequency axis}
@@ -295,6 +295,11 @@ It can be seen that $N_b$ controls the filtering.  As $Nb$ becomes smaller, $g(k
 \end{tikzpicture}
 \end{figure}
 
+\begin{figure}[h]
+\caption{Filters $h(k)$ for $N_b=10, m=1 \ldots L, F0=200 \textrm{Hz}, L=20$}
+\label{fig:filters_h}
+\includegraphics[width=10cm]{filters_h.png}
+\end{figure}
 
 \end{document}
 

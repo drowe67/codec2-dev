@@ -396,3 +396,29 @@ function k = warp_inv(fHz, K)
   k = (ftomel(fHz) - mel_start)/step + 1;
 endfunction
 
+
+function h = generate_filter(m,f0,L,Nb)
+  g = zeros(1,L);
+  fb = m*f0;
+  b = warp_inv(fb,Nb);
+  st = round(warp(b-1,Nb)/f0); st = max(st,1);
+  en = round(warp(b+1,Nb)/f0); en = min(en,L);
+  printf("fb: %f b: %f warp(b-1): %f warp(b+1): %f st: %d en: %d\n", fb, b, warp(b-1,Nb), warp(b+1,Nb), st, en);
+  for k=st:m-1
+    g(k) = (k-st)/(m-st);
+  end
+  g(m) = 1;
+  for k=m+1:en
+    g(k) = (en-k)/(en-m);
+  end
+  g_sum = sum(g);
+  h = g/g_sum;
+endfunction
+
+% make sure nothing breaks when we generate a bunch of filters
+function test_filters
+  Fs=8000; f0=200; L=floor(Fs/(2*f0));
+  for m=1:L
+    generate_filter(m,f0,L,20);
+  end
+end
