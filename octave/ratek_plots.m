@@ -5,7 +5,6 @@
 % Plots for Rate K report.
 %
 
-
 function ratek_plots()
   more off;
 

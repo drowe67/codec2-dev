@@ -403,7 +403,7 @@ function h = generate_filter(m,f0,L,Nb)
   b = warp_inv(fb,Nb);
   st = round(warp(b-1,Nb)/f0); st = max(st,1);
   en = round(warp(b+1,Nb)/f0); en = min(en,L);
-  printf("fb: %f b: %f warp(b-1): %f warp(b+1): %f st: %d en: %d\n", fb, b, warp(b-1,Nb), warp(b+1,Nb), st, en);
+  %printf("fb: %f b: %f warp(b-1): %f warp(b+1): %f st: %d en: %d\n", fb, b, warp(b-1,Nb), warp(b+1,Nb), st, en);
   for k=st:m-1
     g(k) = (k-st)/(m-st);
   end
