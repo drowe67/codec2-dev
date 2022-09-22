@@ -69,7 +69,9 @@ f = mel^{-1}(x) = 700(10^{x/2595} - 1);
 \begin{figure}[h]
 \caption{Mel function}
 \label{fig:mel_fhz}
-\includegraphics[width=10cm]{ratek_mel_fhz}
+\begin{center}
+\includegraphics[width=8cm]{ratek_mel_fhz}
+\end{center}
 \end{figure}
 
 We wish to use $mel(f)$ to construct $warp(k,K)$, such that there are $K$ evenly spaced points on the $mel(f)$ axis (Figure \ref{fig:mel_k}).  Solving for the equation of a straight line we can obtain $mel(f)$ as a function of $k$, and hence $warp(k,K)$ (Figure \ref{fig:warp_fhz_k}):
@@ -108,9 +110,11 @@ k = warp^{-1}(f,K) = \frac{mel(f)-mel(200)}{g} + 1
 \end{figure}
 
 \begin{figure}[h]
-\caption{$warp(k,K)$ function}
+\caption{$warp(k,K)$ function for $K=20$}
 \label{fig:warp_fhz_k}
-\includegraphics[width=10cm]{warp_fhz_k}
+\begin{center}
+\includegraphics[width=8cm]{warp_fhz_k}
+\end{center}
 \end{figure}
 
 The rate $K$ vector $\mathbf{b}$ is vector quantised for transmission over the channel:
@@ -142,7 +146,7 @@ If $A_m$ are in dB, $E$ can be denoted the spectral distortion in $dB^2$, which 
 
 Consider a choice of $warp()$ with linear (non-warped) sampling of the frequency axis, no filtering such that $H(\mathbf{x})=\mathbf{x}$, and an ideal quantiser $Q$ such that $\hat{\mathbf{b}} = \mathbf{b}$. If $K<L$ information may be lost due to undersampling, which implies $\hat{\mathbf{a}} \neq \mathbf{a}$.  
 With nonlinear sampling, there will be local undersampling where the sampling rate of $\mathbf{b}$ is less than that of $\mathbf{a}$:
-\begin{equation}
+\begin{equation} \label{eq:local_undersampling}
 warp(k+1,K)-warp(k,K) < F0
 \end{equation}
 If $A_m$ is changing rapidly, undersampling may introduce undesirable aliasing, which may manifest as noise that is superimposed on $\mathbf{b}$. This noise may reduce perceptual quality and consume valuable quantiser bits for no benefit. Therefore $H()$ should be chosen to smooth high frequency detail such that local undersampling and uncontrolled aliasing is minimised. This may be restated as choosing $H()$ to minimise $E$ (\ref{eq:E1}) when $\hat{\mathbf{b}} = \mathbf{b}$.
@@ -173,7 +177,7 @@ In general $\mathbf{\Delta}_n$ can be encoded with less bits than $\mathbf{b}_n$
 \begin{equation}
 \mathbf{\hat{b}}_n = \mathbf{b}_{n} + \mathbf{n}_{n}
 \end{equation}
-where $\mathbf{n}_{n}$ is a vector of noise samples with an unknown distribution. Substituting into (i\ref{eq:delta}):
+where $\mathbf{n}_{n}$ is a vector of noise samples with an unknown distribution. Substituting into (\ref{eq:delta}):
 \begin{equation}
 \mathbf{\Delta}_{n+1} = \mathbf{b}_{n+1} - \mathbf{b}_{n} + \mathbf{n}_{n+1} - \mathbf{n}_{n}
 \end{equation}
@@ -193,7 +197,9 @@ Figure \ref{fig:ratek1_big_dog_50} illustrates why the resampler choice is impor
 \begin{figure}[h]
 \caption{Frame 50 of big\_dog sample with $K=40$ just larger than $L=37$, 2nd order parabolic resampler.  Note distortion around F1 at 500 Hz }
 \label{fig:ratek1_big_dog_50}
+\begin{center}
 \includegraphics[width=10cm]{ratek1_big_dog_50}
+\end{center}
 \end{figure}
 
 Figure \ref{fig:ratek1_hts_E} shows the spline and parabolic resampler $E$, plotted against $F0$ for a 24 second sample containing four speakers.  Table \ref{table:ratek1_mean_E} is the mean spectral distortion $E$ over the sample.  The spline interpolator perfoms better than the parabolic interpolator.  $L$ is time varying, but as it approaches $K$, $E$ increases, once again showing that interpolators struggle with $K$ close to $L$.
@@ -215,15 +221,19 @@ Figure \ref{fig:ratek1_hts_E} shows the spline and parabolic resampler $E$, plot
 In this experiment with $K=80$ both resamplers have low average $E$ (less than $1 dB^2$). On inspection using \url{ratek_fbf} the occasional high $E$ frames were found to be unvoiced speech or background noise, where the pitch estimator tends to return low $F0$ (high $L$) estimates.  Fortunately the ear is quite insensitive to spectral distortion in unvoiced of background noise frames, so it is unlikley these errors are audible.  However with a lower choice of $K$ we would start to get resampling distortion duing voiced speech as $K$ approaches $L$ (Figure \ref{fig:ratek1_big_dog_50}), or when $K<L$, aliasing.
 
 \begin{figure}[h]
-\caption{Scatter plot of $E$ versus $F0$ for hts sample, spline and parabolic resampler}
+\caption{Scatter plot of $E$ versus $F0$ for \emph{hts} sample, spline and parabolic resampler}
 \label{fig:ratek1_hts_E}
-\includegraphics[width=10cm]{ratek1_hts_E.png}
+\begin{center}
+\includegraphics[width=8cm]{ratek1_hts_E.png}
+\end{center}
 \end{figure}
 
 \begin{figure}[h]
 \caption{Histogram of $E$ for spline and parabolic resampler}
 \label{fig:ratek1_hts_hist}
-\includegraphics[width=10cm]{ratek1_hts_hist.png}
+\begin{center}
+\includegraphics[width=8cm]{ratek1_hts_hist.png}
+\end{center}
 \end{figure}
 
 Conclusions:
@@ -298,8 +308,25 @@ Note the normalising term $g_{sum}$ to ensure the energy of $A_m$ is not altered
 \begin{figure}[h]
 \caption{Filters $h(k)$ for $N_b=10, m=1 \ldots L, F0=200 \textrm{Hz}, L=20$.  There is no smoothing (length 1 filters) up to 1000 Hz, higher frequencies have progressively more smoothing.}
 \label{fig:filters_h}
-\includegraphics[width=10cm]{filters_h.png}
+\begin{center}
+\includegraphics[width=8cm]{filters_h.png}
+\end{center}
 \end{figure}
+
+Figure \ref{fig:ratek2_E_K_hts} illustrates the effect of varying $K$ for a family of filters by attempting to recover $\hat{\mathbf{y}} = S(R(\mathbf{y}))$ where $\mathbf{y}=H(\mathbf{a})$. As suggested in the conclusion of Experiment 1, once $K>K_{min}$, $\hat{\mathbf{y}}$ can be recovered with very low distortion $E$, even though $K<L$ for many frames.
+
+As $N_b$ increases, the filter width reduces such that $h(k)=1$ for $k=m$ and $h(k)=0$ for $k\ne m$. Thus $N_b=100$ (where $N_b=100 > L_{max}$=80) corresponds to no filtering.  As expected, with $N_b=100$ there is a large spectral distortion $E$ due to undersampling.
+
+Informal listening tests were conducted (3 samples, headphones, spline interpolator, \url{c2sim} tool) with $A_m={\hat{Y}_m}$ to determine the subjective effects of filtering. For $N_b \geq 20$, the speech quality is not significantly affected.  For $N_b \leq 15$ the speech became muffled and harder to understand, presumably as the formants become less well defined.  The filters have the unfortunate property of reducing the spectral peak/trough ratio which the human ear uses to perceive speech.  A better smoothing function would preserve the peak/trough ratio of formants, while reducing only the frequency resolution (location and width of formants on the frequency axis). 
+
+It was also noted that even for $N_b=100$, the speech quality was not significantly affected, despite the high objective distortion evident in Figure \ref{fig:ratek2_E_K_hts} for $Nb=100$.  This is puzzling, as there is significant difference between $\hat{\mathbf{y}}$ and $\mathbf{y}$ due to the nonlinear frequency axis used for the rate K resampling $R()$, especially at high frequencies where condition (\ref{eq:local_undersampling}) is not met.  This suggests that the ear is insenstive to noise in the high frequency region, which could be exploited during quantisation to optimise bit allocation.
+
+\begin{figure}[h]
+\caption{Mean spectral distortion $E$ against $K$ for a family of filters $H()$ for the 24 second \emph{hts} database. $N_b=100$ coresponds to no filtering $H(x)=x$, the \emph{para} case is equivalent to the \emph{newamp1} algorithm rate K resampler.}
+\label{fig:ratek2_E_K_hts}
+\includegraphics[width=10cm]{ratek2_E_K_hts.png}
+\end{figure}
+
 
 \end{document}
 
