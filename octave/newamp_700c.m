@@ -255,9 +255,8 @@ function [model_ AmdB_] = resample_rate_L(model, rate_K_surface, rate_K_sample_f
     if strcmp(resampler, 'para')
       AmdB_ = interp_para([ 0 rate_K_sample_freqs_kHz 4], [0 rate_K_surface(f,:) 0], rate_L_sample_freqs_kHz);
     else
-      AmdB_ = interp1(rate_K_sample_freqs_kHz, rate_K_surface(f,:), rate_L_sample_freqs_kHz, "spline", 0);
+      AmdB_ = interp1([0 rate_K_sample_freqs_kHz 4], [0 rate_K_surface(f,:) 0], rate_L_sample_freqs_kHz, "spline", 0);
     end
-    
     model_(f,1) = Wo; model_(f,2) = L; model_(f,3:(L+2)) = 10 .^ (AmdB_(1:L)/20);
    end
 endfunction
