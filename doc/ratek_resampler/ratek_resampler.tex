@@ -3,16 +3,15 @@
 \usepackage{xstring}
 \usepackage{catchfile}
 \usepackage{graphicx}
-\graphicspath{ {../octave/} }
 \usepackage{url}
 \usepackage{tikz}
 \usepackage{tkz-euclide}
 
-\CatchFileDef{\headfull}{../.git/HEAD}{}
+\CatchFileDef{\headfull}{../../.git/HEAD}{}
 \StrGobbleRight{\headfull}{1}[\head]
 \StrBehind[2]{\head}{/}[\branch]
-\IfFileExists{../.git/refs/heads/\branch}{%
-    \CatchFileDef{\commit}{../.git/refs/heads/\branch}{}}{%
+\IfFileExists{../../.git/refs/heads/\branch}{%
+    \CatchFileDef{\commit}{../../.git/refs/heads/\branch}{}}{%
     \newcommand{\commit}{\dots~(in \emph{packed-refs})}}
 \newcommand{\gitrevision}{%
   \StrLeft{\commit}{7}%
@@ -252,12 +251,12 @@ Conclusions:
 
 \section{Experiment 2 - Filtering}
 
-The goal of this experiment is to filter the spectral amplitudes $\mathbf{a}$ such that they can be more coarsely resampled without resampling or aliasing errors, and with mimimal impact on the perceptual quality.
+The goal of this experiment is to filter the spectral amplitudes $\mathbf{a}$ such that they can be coarsely resampled without resampling or aliasing errors, and with mimimal impact on the perceptual quality.
 The $m$th filtered sample can be obtained by:
 \begin{equation}
-Y_m = \sum_{k=st}^{en}A_k h(k)
+Y_m = \sqrt{\sum_{k=st}^{en}A_k^2 h(k)}
 \end{equation}
-where $h(k)$ is sequence of samples defining a suitable filter, and $st$ and $en$ define the start and end harmonics used as input to the filtering operation for the $m$th sample.
+where $A_k$ is the $k$th \emph{linear} harmonic amplitude, $h(k)$ is sequence of samples defining a suitable filter, and $st$ and $en$ define the start and end harmonics used as input to the filtering operation for the $m$th sample.  This formulation filters the harmonic energies, allowing high amplitude samples (peaks) to contribute more than low amplitude samples. This is an appoximation of the ears masking behaivour, and was determined by experiment to slightly improve the peak/trough ratio of formants compared to filtering linear or log (dB) $A_k$.
 
 As we wish to resample on a non-linear frequency axis, we need a set of filters that become wider as frequency increases. We can use the frequency warping function to divide the speech spectrum into $N_b$ bands, with the centre frequency of each band given by:
 \begin{equation}
@@ -274,7 +273,7 @@ f_b &= mF0 \\
 b &= warp^{-1}(f_b,N_b) \\
 \end{split}
 \end{equation}
-A common choice for filtering $g(k)$ is a triangular function, which tapers down to zero in the centre of adjacent bands $b-1$ and $b+1$.  This can be defined in terms of the harmonic indexes, as illustrated in  Figure \ref{fig:triangle_filter}.
+A common choice for filtering $g(k)$ is a triangular function, which tapers to zero in the centre of adjacent bands $b-1$ and $b+1$.  This can be defined in terms of the harmonic indexes, as illustrated in  Figure \ref{fig:triangle_filter}.
 \begin{equation}
 \begin{split}
 st &= max(1,round(warp(b-1,N_b)/F0)) \\
@@ -317,16 +316,35 @@ Figure \ref{fig:ratek2_E_K_hts} illustrates the effect of varying $K$ for a fami
 
 As $N_b$ increases, the filter width reduces such that $h(k)=1$ for $k=m$ and $h(k)=0$ for $k\ne m$. Thus $N_b=100$ (where $N_b=100 > L_{max}$=80) corresponds to no filtering.  As expected, with $N_b=100$ there is a large spectral distortion $E$ due to undersampling.
 
-Informal listening tests were conducted (3 samples, headphones, spline interpolator, \url{c2sim} tool) with $A_m={\hat{Y}_m}$ to determine the subjective effects of filtering. For $N_b \geq 20$, the speech quality is not significantly affected.  For $N_b \leq 15$ the speech became muffled and harder to understand, presumably as the formants become less well defined.  The filters have the unfortunate property of reducing the spectral peak/trough ratio which the human ear uses to perceive speech.  A better smoothing function would preserve the peak/trough ratio of formants, while reducing only the frequency resolution (location and width of formants on the frequency axis). 
-
-It was also noted that even for $N_b=100$, the speech quality was not significantly affected, despite the high objective distortion evident in Figure \ref{fig:ratek2_E_K_hts} for $Nb=100$.  This is puzzling, as there is significant difference between $\hat{\mathbf{y}}$ and $\mathbf{y}$ due to the nonlinear frequency axis used for the rate K resampling $R()$, especially at high frequencies where condition (\ref{eq:local_undersampling}) is not met.  This suggests that the ear is insenstive to noise in the high frequency region, which could be exploited during quantisation to optimise bit allocation.
+Informal listening tests were conducted (3 samples, headphones, spline interpolator, \url{c2sim} tool) with $A_m={\hat{Y}_m}$ to determine the subjective effects of filtering. For $N_b \geq 20$, the speech quality is not significantly affected.  For $N_b \leq 15$ the speech became muffled and harder to understand, presumably as the formants become less well defined.  The filters have the unfortunate property of reducing the spectral peak/trough ratio which the human ear uses to perceive speech (Figure \ref{fig:ratek2_nb_big_dog_50}).  A better smoothing function would preserve the peak/trough ratio of formants, while reducing only the frequency resolution (location and width of formants on the frequency axis). 
 
 \begin{figure}[h]
-\caption{Mean spectral distortion $E$ against $K$ for a family of filters $H()$ for the 24 second \emph{hts} database. $N_b=100$ coresponds to no filtering $H(x)=x$, the \emph{para} case is equivalent to the \emph{newamp1} algorithm rate K resampler.}
+\caption{Frame 50 of \emph{big\_dog}, plot of filter output $\mathbf{y}$ for $Nb=10$ and $Nb=20$.  Peak to trough ratio decreases with $Nb$, reducing intelligability}
+\label{fig:ratek2_nb_big_dog_50}
+\begin{center}
+\includegraphics[width=8cm]{ratek2_nb_big_dog_50.png}
+\end{center}
+\end{figure}
+
+It was also noted that even for $N_b=100$, the speech quality was not significantly affected, despite the high objective distortion evident in Figure \ref{fig:ratek2_E_K_hts} for $Nb=100$.  This is puzzling, as there is significant difference between $\hat{\mathbf{y}}$ and $\mathbf{y}$ due to the aliasing from the rate K resampling $R()$, especially at high frequencies where condition (\ref{eq:local_undersampling}) is not met.  This suggests that the ear is insensitive to noise in the high frequency region, which could be exploited during quantisation to optimise bit allocation.
+
+\begin{figure}[h]
+\caption{Mean spectral distortion $E$ against $K$ for a family of filters $H()$ for the 24 second \emph{hts} sample. $N_b=100$ coresponds to no filtering $H(x)=x$, the \emph{para} case is equivalent to the \emph{newamp1} algorithm rate K resampler.}
 \label{fig:ratek2_E_K_hts}
 \includegraphics[width=10cm]{ratek2_E_K_hts.png}
 \end{figure}
 
-
+Consider the rate $K$ vectors obtained with ($\mathbf{b_1}$) and without ($\mathbf{b_2}$) filtering:
+\begin{equation}
+\begin{split}
+\mathbf{b_1} &= R(H(\mathbf{a})) \\
+\mathbf{b_2} &= R(\mathbf{a}) \\
+\mathbf{b_2} &= R(H(\mathbf{a})) + N(\mathbf{a})
+\end{split}
+\end{equation}
+where $N(\mathbf{a})$ is the noise created by local undersampling of $\mathbf{a}$.  If $N(\mathbf{a})$ is even partially uncorrelated with $R(H(\mathbf{a}))$.  We would then we would expect it will take more bits to quantise $\mathbf{b_2}$ than $\mathbf{b_1}$ to a given level of quantiser distortion $E_q$ given by:
+\begin{equation}
+E_q =\frac{1}{K}\sum_{k=1}^{K}(b_k-\hat{b}_k)^2 
+\end{equation}
 \end{document}
 
