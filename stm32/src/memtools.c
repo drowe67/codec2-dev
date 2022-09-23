@@ -5,6 +5,7 @@
   Tools for looking at memory on the stm32.  See also debug_alloc.h
 */
 
+#include <stdlib.h>
 #include <sys/types.h>
 #include <math.h>
 #include "memtools.h"
