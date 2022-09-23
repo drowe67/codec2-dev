@@ -3,12 +3,12 @@
 % David Rowe 2022
 %
 % Rate K Experiment 2 - Filtering Am, resampling rate L<->K
-%                     - batch mode version
+%                     - batch mode version, various functions
 %
 % Usage:
 %   Make sure codec2-dev is compiled with the -DDUMP option - see README.md for
 %    instructions.
-%   ~/codec2-dev/build_linux$ ./c2sim ../raw/big_dog.raw --dump big_dog
+%   ~/codec2-dev/build_linux$ ./src/c2sim ../raw/big_dog.raw --dump big_dog
 %   $ cd ~/codec2-dev/octave
 %   octave:14> ratek2_batch("../build_linux/big_dog")
 
@@ -109,5 +109,57 @@ function [E F0] = aratek2_batch(samname, Nb=20, K=30, resampler='spline', Y_out_
   end
   
   printf("Nb: %d K: %d mean SD: %4.2f dB^2\n", Nb, K, mean(E));
+endfunction
+
+% used to generate rate K VQ training data
+#{
+  To compare VQ perf with Nb=20 and Nb=100:
+  
+  cd codec2/build_linux
+  ./src/c2sim ~/Downloads/train_120.spc --dump train_120
+  octave:49> ratek2_batch;  B = ratek2_model_to_ratek("../build_linux/train_120",20,30,"train_120_Nb20_K30.f32");
+  octave:50> ratek2_batch;  B = ratek2_model_to_ratek("../build_linux/train_120",100,30,"train_120_Nb100_K30.f32");
+  $ ../script/ratek_resampler.sh ../octave/train_120_Nb20_K30.f32
+  $ ../script/ratek_resampler.sh ../octave/train_120_Nb100_K30.f32
+#}
+
+function B = ratek2_model_to_ratek(samname, Nb=20, K=30, B_out_fn="")
+  more off;
+  
+  newamp_700c;
+  Fs = 8000; max_amp = 160; resampler='spline';
+
+  model_name = strcat(samname,"_model.txt");
+  model = load(model_name);
+  [frames tmp] = size(model);
+  rate_K_sample_freqs_kHz = mel_sample_freqs_kHz(K);
+  B = zeros(frames,K);
+  
+  for f=1:frames
+    Wo = model(f,1); F0 = Fs*Wo/(2*pi); L = model(f,2);
+    Am = model(f,3:(L+2));
+    Am_freqs_kHz = (1:L)*Wo*4/pi;
+
+    % Filter at rate L, Y = F(A)
+    Y = zeros(1,L);
+    for m=1:L
+      h = generate_filter(m,F0,L,Nb);
+      Y(m) = sqrt(sum(Am.^2 .* h));
+    end
+
+    % Resample to rate K
+    amodel = model(f,:); amodel(3:(L+2)) = Y;
+    B(f,:) = resample_const_rate_f(amodel, rate_K_sample_freqs_kHz, clip_en = 0, resampler);
+  end
+
+  % optionally write B for a .f32 file for external VQ training
+  if length(B_out_fn)
+    fb = fopen(B_out_fn,"wb");
+    for f=1:frames
+      Bfloat = B(f,:);
+      fwrite(fb, Bfloat, "float32");
+    end
+    fclose(fb);
+  end
 endfunction
 

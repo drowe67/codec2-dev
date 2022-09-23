@@ -141,7 +141,7 @@ H(\mathbf{x}) &= \mathbf{x} \\
 E &=\frac{1}{L_{max}-L_{min}+1}\sum_{m=L_{min}}^{L_{max}}(A_m-\hat{A}_m)^2 
 \end{split}
 \end{equation}
-If $A_m$ are in dB, $E$ can be denoted the spectral distortion in $dB^2$, which can be averaged over a testing database of $N$ frames to obtain mean spectral distortion.
+If $A_m$ are in dB, $E$ can be denoted the spectral distortion in $\textrm{dB}^2$, which can be averaged over a testing database of $N$ frames to obtain mean spectral distortion.
 
 Consider a choice of $warp()$ with linear (non-warped) sampling of the frequency axis, no filtering such that $H(\mathbf{x})=\mathbf{x}$, and an ideal quantiser $Q$ such that $\hat{\mathbf{b}} = \mathbf{b}$. If $K<L$ information may be lost due to undersampling, which implies $\hat{\mathbf{a}} \neq \mathbf{a}$.  
 With nonlinear sampling, there will be local undersampling where the sampling rate of $\mathbf{b}$ is less than that of $\mathbf{a}$:
@@ -207,17 +207,16 @@ Figure \ref{fig:ratek1_hts_E} shows the spline and parabolic resampler $E$, plot
 \centering
 \begin{tabular}{c c }
  \hline
- Resampler & mean $E$ $dB^2$ \\
+ Resampler & mean $E$ $\textrm{dB}^2$ \\
  \hline
  spline & 0.02 \\ 
  para  & 0.31 \\
  \hline
 \end{tabular}
-\caption{Table to test captions and labels.}
-\label{table:ratek1_mean_E}
+\caption{Mean spectral distortion $E$ for spline and parabolic interpolators}\label{table:ratek1_mean_E}
 \end{table}
 
-In this experiment with $K=80$ both resamplers have low average $E$ (less than $1 dB^2$). On inspection using \url{ratek_fbf} the occasional high $E$ frames were found to be unvoiced speech or background noise, where the pitch estimator tends to return low $F0$ (high $L$) estimates.  Fortunately the ear is quite insensitive to spectral distortion in unvoiced of background noise frames, so it is unlikley these errors are audible.  However with a lower choice of $K$ we would start to get resampling distortion duing voiced speech as $K$ approaches $L$ (Figure \ref{fig:ratek1_big_dog_50}), or when $K<L$, aliasing.
+In this experiment with $K=80$ both resamplers have low average $E$ (less than $1 \textrm{dB}^2$). On inspection using \url{ratek_fbf} the occasional high $E$ frames were found to be unvoiced speech or background noise, where the pitch estimator tends to return low $F0$ (high $L$) estimates.  Fortunately the ear is quite insensitive to spectral distortion in unvoiced of background noise frames, so it is unlikley these errors are audible.  However with a lower choice of $K$ we would start to get resampling distortion duing voiced speech as $K$ approaches $L$ (Figure \ref{fig:ratek1_big_dog_50}), or when $K<L$, aliasing.
 
 \begin{figure}[h]
 \caption{Scatter plot of $E$ versus $F0$ for \emph{hts} sample, spline and parabolic resampler}
@@ -346,5 +345,20 @@ where $N(\mathbf{a})$ is the noise created by local undersampling of $\mathbf{a}
 \begin{equation}
 E_q =\frac{1}{K}\sum_{k=1}^{K}(b_k-\hat{b}_k)^2 
 \end{equation}
+An experiment was conducted to train a two stage VQ (mean removed) with and without filtering, the results are presented in Table \ref{table:ratek2_vq}.  A 120 second sample was used to train the VQ. This VQ design and training material is similar to that used for Codec 2 700C.  These results suggest that as expected the lack of aliasing noise results in a smaller quantiser distortion $E_q$ for a given bit allocation.
+\begin{table}[h]
+\centering
+\begin{tabular}{c c c}
+ \hline
+ Filter & mean $E_q$ $\textrm{dB}^2$ & RMS $E_q$ dB \\
+ \hline
+ $N_b=20$ & 3.44 & 1.85 \\ 
+ $N_b=100$ (no filtering) & 5.77 & 2.40 \\
+ \hline
+\end{tabular}
+\caption{Spectral distortion for 18 bit, 2 stage, mean removed VQ}
+\label{table:ratek2_vq}
+\end{table}
+
 \end{document}
 

@@ -15,7 +15,7 @@
 #include <limits.h>
 #include "mbest.h"
 
-#define MAX_K       20
+#define MAX_K       50
 #define MAX_ENTRIES 4096
 #define MAX_STAGES  5
 
