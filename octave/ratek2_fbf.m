@@ -18,7 +18,7 @@ function ratek2_fbf(samname, f, resampler = 'spline')
   more off;
 
   newamp_700c;
-  Fs = 8000; Nb = 30; K = 30; resampler = 'spline';
+  Fs = 8000; Nb = 20; K = 30; resampler = 'spline';
 
   % load up text files dumped from c2sim ---------------------------------------
 
