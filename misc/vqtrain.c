@@ -60,6 +60,7 @@ void zero(float v[], int k);
 void acc(float v1[], float v2[], int k);
 void norm(float v[], int k, long n);
 long quantise(float cb[], float vec[], int k, int m, int st, int en, float *beste, float *se);
+void split(float *codebook, int nb_entries, int ndim);
 
 /*-----------------------------------------------------------------------* \
 
@@ -68,11 +69,11 @@ long quantise(float cb[], float vec[], int k, int m, int st, int en, float *best
 \*-----------------------------------------------------------------------*/
 
 int main(int argc, char *argv[]) {
-    long   k,m;		/* dimension and codebook size			*/
+    long    k,m;	/* dimension and codebook size			*/
     float  *vec;	/* current vector 				*/
     float  *cb;		/* vector codebook				*/
     float  *cent;	/* centroids for each codebook entry		*/
-    long   *n;		/* number of vectors in this interval		*/
+    long    *n;		/* number of vectors in this interval		*/
     long   J;		/* number of vectors in training set		*/
     long   i,j;
     long   ind;	     	/* index of current vector			*/
@@ -88,7 +89,8 @@ int main(int argc, char *argv[]) {
     FILE   *fres = NULL;
     int     st = -1;
     int     en = -1;
-    int     init_rand = 0;
+    int     reseed = 0;
+    int     split_en = 0;
     
     int o = 0;
     int opt_idx = 0;
@@ -99,11 +101,12 @@ int main(int argc, char *argv[]) {
             {"stop",     required_argument, 0, 's'},
             {"st",       required_argument, 0, 't'},
             {"en",       required_argument, 0, 'e'},
-            {"rand",     no_argument,       0, 'i'},
+            {"reseed",   no_argument,       0, 'i'},
+            {"split",    no_argument,       0, 'p'},
             {0, 0, 0, 0}
         };
         
-        o = getopt_long(argc,argv,"hr:s:t:e:",long_opts,&opt_idx);
+        o = getopt_long(argc,argv,"hr:s:t:e:l",long_opts,&opt_idx);
         
         switch(o) {
         case 'r':
@@ -121,7 +124,10 @@ int main(int argc, char *argv[]) {
             en = atoi(optarg);
             break;
         case 'i':
-            init_rand = 1;
+            reseed = 1;
+            break;
+        case 'l':
+            split_en = 1;
             break;
         case 'h':
         case '?':
@@ -139,7 +145,8 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "  -s --stop StopDelta\n");
         fprintf(stderr, "     --st   Kst        start vector element for error calculation (default 0)\n");
         fprintf(stderr, "     --en   Ken        end vector element for error calculation (default K-1)\n");
-        fprintf(stderr, "     --rand            use random sampling for initial VQ population\n");
+        fprintf(stderr, "     --reseed          reseed random number generator used for init\n");
+        fprintf(stderr, "     --split           use LBG style splitting\n");
         exit(1);
     }
 
@@ -153,7 +160,8 @@ int main(int argc, char *argv[]) {
     /* determine k and m, and allocate arrays */
     k = atol(argv[dx+1]);
     m = atol(argv[dx+2]);
-
+    int m_final = m;
+    
     /* default to measuring error on entire vector */
     if (st == -1) st = 0; 
     if (en == -1) en = k-1;
@@ -176,7 +184,7 @@ int main(int argc, char *argv[]) {
     }
     printf("J=%ld vectors in training set\n", J);
 
-    /* Lets measure 0 bit VQ (i.e. mean of training set) as starting point */   
+    /* Lets measure 0 bit VQ (i.e. centroid of training set) as starting point */   
     norm(cent, k, J);
     memcpy(cb, cent, k*sizeof(float));
     se = 0.0;
@@ -189,65 +197,75 @@ int main(int argc, char *argv[]) {
     var = se/(J*(en-st+1));
     printf("\r  It:  0, var: %6.2f sd: %6.2f\n", var, sqrt(var));
 
-    /* set up initial codebook state from samples of training set */
-    if (init_rand) srand(time(NULL));
+    if (split_en) {
+        assert(log2(m) == floor(log2(m)));
+        m = 1;
+    }
+    
+    /* set up initial codebook state from random samples of training set */
+    if (reseed) srand(time(NULL));
     for(i=0; i<m; i++) {
-        if (init_rand)
-            j = J*(float)rand()/RAND_MAX;
-        else
-            j = i*(J/m);
+        j = J*(float)rand()/RAND_MAX;
         fseek(ftrain, j*k*sizeof(float), SEEK_SET);
         ret = fread(&cb[i*k], sizeof(float), k, ftrain);
         assert(ret == k);
     }
 
-    /* main loop */
-    j = 1;
     do {
-	var_1 = var;
+        /* main loop */
+        j = 1;
+        do {
+            var_1 = var;
 
-	/* zero centroids */
-	for(i=0; i<m; i++) {
-	    zero(&cent[i*k], k);
-	    n[i] = 0;
-	}
+            /* zero centroids */
+            for(i=0; i<m; i++) {
+                zero(&cent[i*k], k);
+                n[i] = 0;
+            }
 
-	/* quantise training set */
-	se = 0.0; noutliers[0] = noutliers[1] = noutliers[2] = 0;
-	rewind(ftrain);
-	for(i=0; i<J; i++) {
-	    ret = fread(vec, sizeof(float), k, ftrain);
-            assert(ret == k);
-	    ind = quantise(cb, vec, k, m, st, en, &e, &se);
-	    n[ind]++;
-	    acc(&cent[ind*k], vec, k);
-            if (sqrt(e/(en-st+1)) > 1.0) noutliers[0]++;
-            if (sqrt(e/(en-st+1)) > 2.0) noutliers[1]++;
-            if (sqrt(e/(en-st+1)) > 3.0) noutliers[2]++;
-	}
-	var = se/(J*(en-st+1));
-	delta = (var_1-var)/var;
-        int n_min = J;
-        int n_max = 0;
-	for(i=0; i<m; i++) {
-            if (n[i] < n_min) n_min = n[i];
-            if (n[i] > n_max) n_max = n[i];
+            /* quantise training set */
+            se = 0.0; noutliers[0] = noutliers[1] = noutliers[2] = 0;
+            rewind(ftrain);
+            for(i=0; i<J; i++) {
+                ret = fread(vec, sizeof(float), k, ftrain);
+                assert(ret == k);
+                ind = quantise(cb, vec, k, m, st, en, &e, &se);
+                n[ind]++;
+                acc(&cent[ind*k], vec, k);
+                if (sqrt(e/(en-st+1)) > 1.0) noutliers[0]++;
+                if (sqrt(e/(en-st+1)) > 2.0) noutliers[1]++;
+                if (sqrt(e/(en-st+1)) > 3.0) noutliers[2]++;
+            }
+            var = se/(J*(en-st+1));
+            delta = (var_1-var)/var;
+            int n_min = J;
+            int n_max = 0;
+            for(i=0; i<m; i++) {
+                if (n[i] < n_min) n_min = n[i];
+                if (n[i] > n_max) n_max = n[i];
+            }
+            printf("\r  It: %2ld, m: %ld var: %6.2f sd: %6.2f outliers > 1/2/3 dB = %3.2f/%3.2f/%3.2f Delta = %5.4f %d %d\n",
+                   j, m, var, sqrt(var),
+                   (float)noutliers[0]/J, (float)noutliers[1]/J, (float)noutliers[2]/J, delta, n_min, n_max);
+            j++;
+
+            /* determine new codebook from centroids */
+            if (delta > deltaq_stop)
+                for(i=0; i<m; i++) {
+                    if (n[i] != 0) {
+                        norm(&cent[i*k], k, n[i]);
+                        memcpy(&cb[i*k], &cent[i*k], k*sizeof(float));
+                    }
+                }
+
+        } while (delta > deltaq_stop);
+
+        if (split_en && (m*2 <= m_final)) {
+            split(cb, m, k);
+            m *=2;
         }
-	printf("\r  It: %2ld, var: %6.2f sd: %6.2f outliers > 1/2/3 dB = %3.2f/%3.2f/%3.2f Delta = %5.4f %d %d\n", j, var, sqrt(var),
-               (float)noutliers[0]/J, (float)noutliers[1]/J, (float)noutliers[2]/J, delta, n_min, n_max);
-	j++;
-
-	/* determine new codebook from centroids */
-	if (delta > deltaq_stop)
-	    for(i=0; i<m; i++) {
-		if (n[i] != 0) {
-		    norm(&cent[i*k], k, n[i]);
-		    memcpy(&cb[i*k], &cent[i*k], k*sizeof(float));
-		}
-	    }
-
-    } while (delta > deltaq_stop);
-
+    } while (m != m_final);
+    
     /* save VQ to disk */
     fvq = fopen(argv[dx+3],"wt");
     if (fvq == NULL) {
@@ -397,3 +415,16 @@ long quantise(float  cb[],   // current VQ codebook
    return(besti);
 }
 
+void split(float *codebook, int nb_entries, int ndim)
+{
+  int i,j;
+  for (i=0;i<nb_entries;i++)
+  {
+    for (j=0;j<ndim;j++)
+    {
+      float delta = .01*(rand()/(float)RAND_MAX-.5);
+      codebook[i*ndim+j] += delta;
+      codebook[(i+nb_entries)*ndim+j] = codebook[i*ndim+j] - delta;
+    }
+  }
+}
