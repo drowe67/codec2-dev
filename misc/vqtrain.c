@@ -106,7 +106,7 @@ int main(int argc, char *argv[]) {
             {0, 0, 0, 0}
         };
         
-        o = getopt_long(argc,argv,"hr:s:t:e:l",long_opts,&opt_idx);
+        o = getopt_long(argc,argv,"hr:s:t:e:p",long_opts,&opt_idx);
         
         switch(o) {
         case 'r':
@@ -126,7 +126,7 @@ int main(int argc, char *argv[]) {
         case 'i':
             reseed = 1;
             break;
-        case 'l':
+        case 'p':
             split_en = 1;
             break;
         case 'h':
@@ -200,22 +200,28 @@ int main(int argc, char *argv[]) {
     if (split_en) {
         assert(log2(m) == floor(log2(m)));
         m = 1;
+	fprintf(stderr, "split_en: %d\n", split_en);
+    } else {
+    
+	/* set up initial codebook state from random samples of training set */
+	if (reseed) srand(time(NULL));
+	for(i=0; i<m; i++) {
+	    j = J*(float)rand()/RAND_MAX;
+	    fseek(ftrain, j*k*sizeof(float), SEEK_SET);
+	    ret = fread(&cb[i*k], sizeof(float), k, ftrain);
+	    assert(ret == k);
+	}
     }
     
-    /* set up initial codebook state from random samples of training set */
-    if (reseed) srand(time(NULL));
-    for(i=0; i<m; i++) {
-        j = J*(float)rand()/RAND_MAX;
-        fseek(ftrain, j*k*sizeof(float), SEEK_SET);
-        ret = fread(&cb[i*k], sizeof(float), k, ftrain);
-        assert(ret == k);
-    }
-
     do {
         /* main loop */
+        if (split_en) {
+	    split(cb, m, k);
+            m *=2;
+        }
         j = 1;
         do {
-            var_1 = var;
+           var_1 = var;
 
             /* zero centroids */
             for(i=0; i<m; i++) {
@@ -244,13 +250,13 @@ int main(int argc, char *argv[]) {
                 if (n[i] < n_min) n_min = n[i];
                 if (n[i] > n_max) n_max = n[i];
             }
-            printf("\r  It: %2ld, m: %ld var: %6.2f sd: %6.2f outliers > 1/2/3 dB = %3.2f/%3.2f/%3.2f Delta = %5.4f %d %d\n",
+            printf("\r  It: %2ld, m: %4ld var: %6.2f sd: %6.2f outliers > 1/2/3 dB = %3.2f/%3.2f/%3.2f Delta = %5.4f %d %d\n",
                    j, m, var, sqrt(var),
                    (float)noutliers[0]/J, (float)noutliers[1]/J, (float)noutliers[2]/J, delta, n_min, n_max);
             j++;
 
             /* determine new codebook from centroids */
-            if (delta > deltaq_stop)
+            if ((delta > deltaq_stop) || (j<3))
                 for(i=0; i<m; i++) {
                     if (n[i] != 0) {
                         norm(&cent[i*k], k, n[i]);
@@ -258,13 +264,9 @@ int main(int argc, char *argv[]) {
                     }
                 }
 
-        } while (delta > deltaq_stop);
+        } while ((delta > deltaq_stop) || (j<3));
 
-        if (split_en && (m*2 <= m_final)) {
-            split(cb, m, k);
-            m *=2;
-        }
-    } while (m != m_final);
+    } while (m < m_final);
     
     /* save VQ to disk */
     fvq = fopen(argv[dx+3],"wt");
