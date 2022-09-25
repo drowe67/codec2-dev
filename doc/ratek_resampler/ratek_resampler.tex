@@ -330,7 +330,9 @@ It was also noted that even for $N_b=100$, the speech quality was not significan
 \begin{figure}[h]
 \caption{Mean spectral distortion $E$ against $K$ for a family of filters $H()$ for the 24 second \emph{hts} sample. $N_b=100$ coresponds to no filtering $H(x)=x$, the \emph{para} case is equivalent to the \emph{newamp1} algorithm rate K resampler.}
 \label{fig:ratek2_E_K_hts}
+\begin{center}
 \includegraphics[width=10cm]{ratek2_E_K_hts.png}
+\end{center}
 \end{figure}
 
 Consider the rate $K$ vectors obtained with ($\mathbf{b_1}$) and without ($\mathbf{b_2}$) filtering:
@@ -345,7 +347,11 @@ where $N(\mathbf{a})$ is the noise created by local undersampling of $\mathbf{a}
 \begin{equation}
 E_q =\frac{1}{K}\sum_{k=1}^{K}(b_k-\hat{b}_k)^2 
 \end{equation}
-An experiment was conducted to train a two stage VQ (mean removed) with and without filtering, the results are presented in Table \ref{table:ratek2_vq}.  A 120 second sample was used to train the VQ. This VQ design and training material is similar to that used for Codec 2 700C.  These results suggest that as expected the lack of aliasing noise results in a smaller quantiser distortion $E_q$ for a given bit allocation.
+An experiment was conducted to train a two stage VQ (mean removed) with and without filtering, the results are presented in Table \ref{table:ratek2_vq} and Figure \ref{fig:20_100_vq}.  A 120 second sample was used to train the VQ. This VQ design and training material is similar to that used for Codec 2 700C.  These results suggest that as expected the lack of aliasing noise results in a smaller quantiser distortion $E_q$ for a given bit allocation.
+
+Figure \ref{fig:train_120_Nb20_K30_vq} compares the Kmeans and LBG algorithms for VQ training.  Kmeans initialises the $M=512$ size VQ with random samples from the training set, then performs Kmeans iterations until a distortion metric is met. LBG trains a $M=1$ (0 bit) VQ, then splits and Kmeans trains to get $M=2$ (1 bit), and repeats the process to get to the final $M=512$ size VQ.  For this training set, both algorithms arrive at approximately the same final spectral distortion.
+
+In Figure \ref{fig:20_100_vq} and Figure \ref{fig:train_120_Nb20_K30_vq} we note the 2nd stage performs quite poorly, there appears to be step change in the gradient compared to the stage 1 curve.  This suggests a larger single stage VQ may be a better choice, although multi-stage search algorithms such as \emph{mbest} may improve this situation.
 \begin{table}[h]
 \centering
 \begin{tabular}{c c c}
@@ -359,6 +365,23 @@ An experiment was conducted to train a two stage VQ (mean removed) with and with
 \caption{Spectral distortion for 18 bit, 2 stage, mean removed VQ}
 \label{table:ratek2_vq}
 \end{table}
+
+\begin{figure}[h]
+\caption{VQ spectral distortion $E_q$ against VQ size in bits for $Nb=20$ and $Nb=100$.  Note the 2nd stage performs quite poorly.}
+\label{fig:20_100_vq}
+\begin{center}
+\includegraphics[width=8cm]{20_100_vq.png}
+\end{center}
+\end{figure}
+
+\begin{figure}[h]
+\caption{Kmeans and LBG VQ training, very similar results for this training set.}
+\label{fig:train_120_Nb20_K30_vq}
+\begin{center}
+\includegraphics[width=8cm]{train_120_Nb20_K30_vq.png}
+\end{center}
+\end{figure}
+
 
 \end{document}
 

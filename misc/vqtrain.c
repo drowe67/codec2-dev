@@ -111,11 +111,9 @@ int main(int argc, char *argv[]) {
         switch(o) {
         case 'r':
             fres = fopen(optarg,"wb"); assert(fres != NULL);
-            //fprintf(stderr, "writing res to : %s \n", optarg);
             break;
         case 's':
             deltaq_stop = atof(optarg);
-            //fprintf(stderr, "deltaq_stop :%f\n", deltaq_stop);
             break;
         case 't':
             st = atoi(optarg);
@@ -153,7 +151,7 @@ int main(int argc, char *argv[]) {
     /* Open training file */
     ftrain = fopen(argv[dx],"rb");
     if (ftrain == NULL) {
-	printf("Error opening training database file: %s\n",argv[dx]);
+        fprintf(stderr, "Error opening training database file: %s\n",argv[dx]);
 	exit(1);
     }
 
@@ -166,13 +164,13 @@ int main(int argc, char *argv[]) {
     if (st == -1) st = 0; 
     if (en == -1) en = k-1;
 
-    printf("vector dimension K=%ld  codebook size M=%ld ", k, m);
+    fprintf(stderr, "vector dimension K=%ld  codebook size M=%ld ", k, m);
     vec = (float*)malloc(sizeof(float)*k);
     cb = (float*)malloc(sizeof(float)*k*m);
     cent = (float*)malloc(sizeof(float)*k*m);
     n = (long*)malloc(sizeof(long)*m);
     if (vec == NULL || cb == NULL || cent == NULL || n == NULL) {
-	printf("Error in malloc.\n");
+	fprintf(stderr, "Error in malloc.\n");
 	exit(1);
     }
 
@@ -182,7 +180,7 @@ int main(int argc, char *argv[]) {
         J++;
         acc(cent, vec, k);
     }
-    printf("J=%ld vectors in training set\n", J);
+    fprintf(stderr, "J=%ld vectors in training set\n", J);
 
     /* Lets measure 0 bit VQ (i.e. centroid of training set) as starting point */   
     norm(cent, k, J);
@@ -195,12 +193,11 @@ int main(int argc, char *argv[]) {
         quantise(cb, vec, k, 1, st, en, &e, &se);
     }
     var = se/(J*(en-st+1));
-    printf("\r  It:  0, var: %6.2f sd: %6.2f\n", var, sqrt(var));
+    fprintf(stderr, "  It:  0, var: %6.2f sd: %6.2f\n", var, sqrt(var));
 
     if (split_en) {
         assert(log2(m) == floor(log2(m)));
         m = 1;
-	fprintf(stderr, "split_en: %d\n", split_en);
     } else {
     
 	/* set up initial codebook state from random samples of training set */
@@ -250,28 +247,30 @@ int main(int argc, char *argv[]) {
                 if (n[i] < n_min) n_min = n[i];
                 if (n[i] > n_max) n_max = n[i];
             }
-            printf("\r  It: %2ld, m: %4ld var: %6.2f sd: %6.2f outliers > 1/2/3 dB = %3.2f/%3.2f/%3.2f Delta = %5.4f %d %d\n",
+            fprintf(stderr, "\r  It: %2ld, m: %4ld var: %6.2f sd: %6.2f outliers > 1/2/3 dB = %3.2f/%3.2f/%3.2f Delta = %5.4f %d %d\n",
                    j, m, var, sqrt(var),
                    (float)noutliers[0]/J, (float)noutliers[1]/J, (float)noutliers[2]/J, delta, n_min, n_max);
             j++;
 
             /* determine new codebook from centroids */
-            if ((delta > deltaq_stop) || (j<3))
+            if ((delta > deltaq_stop) || (j<3)) {
                 for(i=0; i<m; i++) {
                     if (n[i] != 0) {
                         norm(&cent[i*k], k, n[i]);
                         memcpy(&cb[i*k], &cent[i*k], k*sizeof(float));
                     }
                 }
+	    }
+       } while ((delta > deltaq_stop) || (j<3));
 
-        } while ((delta > deltaq_stop) || (j<3));
-
+       printf("%ld %f\n", m, var);
+ 
     } while (m < m_final);
     
     /* save VQ to disk */
     fvq = fopen(argv[dx+3],"wt");
     if (fvq == NULL) {
-	printf("Error opening VQ file: %s\n",argv[dx+3]);
+        fprintf(stderr, "Error opening VQ file: %s\n",argv[dx+3]);
 	exit(1);
     }
 
