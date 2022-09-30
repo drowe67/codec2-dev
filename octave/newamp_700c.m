@@ -199,10 +199,10 @@ endfunction
 % Resample Am from time-varying rate L=floor(pi/Wo) to fixed rate K.  This can be viewed
 % as a 3D surface with time, freq, and ampitude axis.
 
-function [rate_K_surface rate_K_sample_freqs_kHz] = resample_const_rate_f(model,
-                                                                          rate_K_sample_freqs_kHz,
-                                                                          clip_en=1,
-                                                                          resampler='para')
+function rate_K_surface = resample_const_rate_f(model,
+                                                rate_K_sample_freqs_kHz,
+                                                clip_en=1,
+                                                resampler='para')
   % convert rate L=pi/Wo amplitude samples to fixed rate K
 
   max_amp = 80;
@@ -215,8 +215,6 @@ function [rate_K_surface rate_K_sample_freqs_kHz] = resample_const_rate_f(model,
     L = min([model(f,2) max_amp-1]);
     Am = model(f,3:(L+2));
     AmdB = 20*log10(Am);
-    %pre = 10*log10((1:L)*Wo*4/(pi*0.3));
-    %AmdB += pre;
 
     % clip between peak and peak -50dB, to reduce dynamic range
 
@@ -228,7 +226,7 @@ function [rate_K_surface rate_K_sample_freqs_kHz] = resample_const_rate_f(model,
     rate_L_sample_freqs_kHz = (1:L)*Wo*4/pi;
 
     if strcmp(resampler, 'para')
-      rate_K_surface(f,:)  = interp_para(rate_L_sample_freqs_kHz, AmdB, rate_K_sample_freqs_kHz);
+      rate_K_surface(f,:) = interp_para(rate_L_sample_freqs_kHz, AmdB, rate_K_sample_freqs_kHz);
     else
       rate_K_surface(f,:) = interp1(rate_L_sample_freqs_kHz, AmdB, rate_K_sample_freqs_kHz, "spline", "extrap");
     end

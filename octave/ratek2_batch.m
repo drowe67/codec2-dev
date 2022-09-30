@@ -30,7 +30,7 @@ function ratek2_batch_curves(samname)
     leg{i} = sprintf('Nb=%d',Nb); i++;
   end
 
-  % final curve with para - models current rateK
+  % curve with para - models current rateK
   K_vec = []; E_vec = [];
   Nb = 100;
   for K=[10 15 20 25 30 40 50]
@@ -40,6 +40,17 @@ function ratek2_batch_curves(samname)
   end
   plot(K_vec, E_vec,'-+');
   leg{i} = sprintf('Nb=%d para',Nb); i++;
+  
+  % curve with efficient ratek2
+  K_vec = []; E_vec = [];
+  Nb = 20;
+  for K=[10 15 20 25 30 40 50]
+    E = aratek2_batch_efficient(samname, Nb, K);
+    K_vec = [K_vec K];
+    E_vec = [E_vec mean(E)];
+  end
+  plot(K_vec, E_vec,'-o');
+  leg{i} = sprintf('Nb=%d Eff',Nb); i++;
   
   hold off;
   axis([0 50 0 10]);
@@ -111,6 +122,67 @@ function [E F0] = aratek2_batch(samname, Nb=20, K=30, resampler='spline', Y_out_
   printf("Nb: %d K: %d mean SD: %4.2f dB^2\n", Nb, K, mean(E));
 endfunction
 
+% More efficient implementation, we resample from rate L to Lhigh then filter at rate Lhigh,
+% so that we only need to calculate filters once.
+
+function [E F0] = aratek2_batch_efficient(samname, Nb=20, K=30)
+  more off;
+  
+  newamp_700c;
+  Fs = 8000; max_amp = 160;  Lmax = 80; Lhigh = Lmax;
+
+  model_name = strcat(samname,"_model.txt");
+  model = load(model_name);
+  [frames model_cols] = size(model);
+  amodel = zeros(frames,model_cols);
+  rate_K_sample_freqs_kHz = mel_sample_freqs_kHz(K);
+  E = zeros(1,frames);
+  F0 = zeros(1,frames);
+  
+  % precompute filters at rate Lhigh. Note range of harmonics is 1:Lhigh-1, as
+  % we don't use Lhigh-th harmonic as it's on Fs/2
+
+  h = zeros(Lhigh, Lhigh);
+  F0high = (Fs/2)/Lhigh;
+  for m=1:Lhigh-1
+    h(m,:) = generate_filter(m,F0high,Lhigh,Nb);
+  end
+  rate_Lhigh_sample_freqs_kHz = (F0high:F0high:(Lhigh-1)*F0high)/1000;
+   
+  for f=1:frames
+    Wo = model(f,1); F0(f) = Fs*Wo/(2*pi); L = model(f,2);
+    Am = model(f,3:(L+2)); AmdB = 20*log10(Am);
+    rate_L_sample_freqs_kHz = ((1:L)*F0(f))/1000;
+
+    % resample from rate L to rate Lhigh (both linearly spaced)
+    
+    AmdB_rate_Lhigh = interp1([0 rate_L_sample_freqs_kHz 4], [0 AmdB 0], rate_Lhigh_sample_freqs_kHz, "spline", "extrap");
+    
+    % Filter at rate Lhigh, y = F(R(a)). Note we filter in linear energy domain, and Lhigh are linearly spaced
+
+    YdB = zeros(1,Lhigh-1);
+    for m=1:Lhigh-1
+      Am_rate_Lhigh = 10.^(AmdB_rate_Lhigh/20);
+      Y = sum(Am_rate_Lhigh.^2 .* h(m,1:Lhigh-1));
+      YdB(m) = 10*log10(Y);
+    end
+    
+    % Resample from rate Lhigh to rate K b=R(Y), note K are non-linearly spaced (warped freq axis)
+
+    B = interp1(rate_Lhigh_sample_freqs_kHz, YdB, rate_K_sample_freqs_kHz, "spline", "extrap");
+
+    % now back to rate Lhigh
+    
+    YdB_ = interp1([0 rate_K_sample_freqs_kHz 4], [0 B 0], rate_Lhigh_sample_freqs_kHz, "spline", 0);
+    
+    Lmin = round(200/F0high); Lmax = floor(3700/F0high);
+    E(f)  = sum((YdB(Lmin:Lmax) - YdB_(Lmin:Lmax)).^2)/(Lmax-Lmin+1);
+  end
+
+  printf("Nb: %d K: %d mean SD: %4.2f dB^2\n", Nb, K, mean(E));
+endfunction
+
+
 % used to generate rate K VQ training data
 #{
   To compare VQ perf with Nb=20 and Nb=100:
@@ -127,7 +199,7 @@ function B = ratek2_model_to_ratek(samname, Nb=20, K=30, B_out_fn="")
   more off;
   
   newamp_700c;
-  Fs = 8000; max_amp = 160; resampler='spline';
+  Fs = 8000; max_amp = 160; resampler='spline'; Lhigh=80;
 
   model_name = strcat(samname,"_model.txt");
   model = load(model_name);
@@ -135,24 +207,40 @@ function B = ratek2_model_to_ratek(samname, Nb=20, K=30, B_out_fn="")
   rate_K_sample_freqs_kHz = mel_sample_freqs_kHz(K);
   B = zeros(frames,K);
   
+  % precompute filters at rate Lhigh. Note range of harmonics is 1:Lhigh-1, as
+  % we don't use Lhigh-th harmonic as it's on Fs/2
+
+  h = zeros(Lhigh, Lhigh);
+  F0high = (Fs/2)/Lhigh;
+  for m=1:Lhigh-1
+    h(m,:) = generate_filter(m,F0high,Lhigh,Nb);
+  end
+  rate_Lhigh_sample_freqs_kHz = (F0high:F0high:(Lhigh-1)*F0high)/1000;
+   
   for f=1:frames
     Wo = model(f,1); F0 = Fs*Wo/(2*pi); L = model(f,2);
-    Am = model(f,3:(L+2));
-    Am_freqs_kHz = (1:L)*Wo*4/pi;
+    Am = model(f,3:(L+2)); AmdB = 20*log10(Am);
+    rate_L_sample_freqs_kHz = ((1:L)*F0)/1000;
 
-    % Filter at rate L, Y = F(A)
-    Y = zeros(1,L);
-    for m=1:L
-      h = generate_filter(m,F0,L,Nb);
-      Y(m) = sqrt(sum(Am.^2 .* h));
+    % resample from rate L to rate Lhigh (both linearly spaced)
+    
+    AmdB_rate_Lhigh = interp1([0 rate_L_sample_freqs_kHz 4], [0 AmdB 0], rate_Lhigh_sample_freqs_kHz, "spline", "extrap");
+    
+    % Filter at rate Lhigh, y = F(R(a)). Note we filter in linear energy domain, and Lhigh are linearly spaced
+
+    YdB = zeros(1,Lhigh-1);
+    for m=1:Lhigh-1
+      Am_rate_Lhigh = 10.^(AmdB_rate_Lhigh/20);
+      Y = sum(Am_rate_Lhigh.^2 .* h(m,1:Lhigh-1));
+      YdB(m) = 10*log10(Y);
     end
+    
+    % Resample from rate Lhigh to rate K b=R(Y), note K are non-linearly spaced (warped freq axis)
 
-    % Resample to rate K
-    amodel = model(f,:); amodel(3:(L+2)) = Y;
-    B(f,:) = resample_const_rate_f(amodel, rate_K_sample_freqs_kHz, clip_en = 0, resampler);
+    B(f,:) = interp1(rate_Lhigh_sample_freqs_kHz, YdB, rate_K_sample_freqs_kHz, "spline", "extrap");
   end
 
-  % optionally write B for a .f32 file for external VQ training
+  % optionally write B to a .f32 file for external VQ training
   if length(B_out_fn)
     fb = fopen(B_out_fn,"wb");
     for f=1:frames
