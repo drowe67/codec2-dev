@@ -162,6 +162,7 @@ int main(int argc, char *argv[]) {
     for(int i=0; i<m[0]; i++) vec_usage[i] = 0;
     float target[k], quantised[k];
     float sqe = 0.0;
+    int frame = 0;
     while(fread(&target, sizeof(float), k, stdin) && (nvecs < num)) {
 	for(int i=0; i<k; i++)
             target[i] *= w[i];
@@ -178,11 +179,17 @@ int main(int argc, char *argv[]) {
 		target[i] += -difference;
 	    dont_count = 1;
 	}
+        if (verbose) fprintf(stderr, "frame: %d -------------------------------------------------------\n", ++frame);
+        
 	quant_mbest(quantised, indexes, target, num_stages, vqw, vq, m, k, mbest_survivors);
 	if (dont_count == 0) {
 	    for(int i=st; i<=en; i++)
 		sqe += pow(target[i]-quantised[i], 2.0);
 	}
+        if (verbose) {
+            for(int i=0; i<num_stages; i++) fprintf(stderr, "index: %d ", indexes[i]);
+            fprintf(stderr, "\n");
+        }
 	fwrite(&quantised, sizeof(float), k, stdout);
 	nvecs++;
 	// count number f time each vector is used (just for first stage)
@@ -245,7 +252,10 @@ void quant_mbest(float vec_out[],
        mbest_survivors at each stage */
     
     mbest_search(vqw, err, k, m[0], mbest_stage[0], index);
-    if (verbose) mbest_print("Stage 1:", mbest_stage[0]);
+    if (verbose) {
+        fprintf(stderr, "se1: %f\n", se1);
+        mbest_print("Stage 1:", mbest_stage[0]);
+    }
     
     for(s=1; s<num_stages; s++) {
 
@@ -296,7 +306,6 @@ void quant_mbest(float vec_out[],
     pv("\n  vec_in: ", vec_in, k);
     pv("  vec_out: ", vec_out, k);
     pv("    err: ", err, k);
-    if (verbose) fprintf(stderr, "    se1: %f\n", se1);
 
     for(i=0; i<num_stages; i++)
         mbest_destroy(mbest_stage[i]);

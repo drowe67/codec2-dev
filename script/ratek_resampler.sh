@@ -7,9 +7,40 @@
 CODEC2_PATH=$HOME/codec2
 PATH=$PATH:$CODEC2_PATH/build_linux/src:$CODEC2_PATH/build_linux/misc
 K=30
-M=512
+M=4096
 Kst=0
 Ken=29
+
+# usage:
+#   cd ~/codec2/build_linux
+#   ../script/ratek_resampler.sh ../raw/big_dog
+function test() {
+  fullfile=$1
+  filename=$(basename -- "$fullfile")
+  extension="${filename##*.}"
+  filename="${filename%.*}"
+
+  c2sim $fullfile --hpf --dump $filename
+  echo "ratek2_batch;  ratek2_model_to_ratek(\"../build_linux/${filename}\",20,30,\"${filename}.f32\"); quit;" \
+  | octave -p ${CODEC2_PATH}/octave -qf 
+  extract -t $K -s $Kst -e $Ken --removemean --writeall ${filename}.f32 ${filename}_nomean.f32
+  cat ${filename}_nomean.f32 | vq_mbest --mbest 5 -k $K -q vq_stage1.f32,vq_stage2.f32 >> /dev/null
+}
+
+# usage: see ratek2_batch.m
+function train_kmeans() {
+  fullfile=$1
+  filename=$(basename -- "$fullfile")
+  extension="${filename##*.}"
+  filename="${filename%.*}"
+  
+  # remove mean, train 2 stages - kmeans
+  extract -t $K -s $Kst -e $Ken --lower 10 --removemean --writeall $fullfile ${filename}_nomean.f32
+  vqtrain ${filename}_nomean.f32 $K $M  --st $Kst --en $Ken -s 1e-3 vq_stage1.f32 -r res1.f32 > kmeans_res1.txt
+  vqtrain res1.f32 $K $M  --st $Kst --en $Ken  -s 1e-3 vq_stage2.f32 -r res2.f32 > kmeans_res2.txt
+}
+
+# comparing kmeans to lbg
 
 function train_kmeans_lbg() {
   fullfile=$1
@@ -80,8 +111,14 @@ function train_Nb() {
         quit" | octave  -qf
 }
 
+# TODO: make these selectable via CLI
+
+test $1
+
+#train_kmeans $1
+
 #../script/ratek_resampler.sh ../octave/train_120_Nb20_K30.f32
-train_kmeans_lbg $1
+#train_kmeans_lbg $1
 
 # ../script/ratek_resampler.sh ../octave/train_120_Nb20_K30.f32 ../octave/train_120_Nb100_K30.f32 20 100 
 #train_Nb $1 $2 $3 $4
