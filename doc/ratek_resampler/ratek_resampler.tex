@@ -6,6 +6,7 @@
 \usepackage{url}
 \usepackage{tikz}
 \usepackage{tkz-euclide}
+\usepackage[section]{placeins}
 
 \CatchFileDef{\headfull}{../../.git/HEAD}{}
 \StrGobbleRight{\headfull}{1}[\head]
@@ -408,7 +409,7 @@ As $L$ is time varying, it is necessary to determine the filters $g(k)$ for ever
 
 \section{Vector Quantiser Training}
 
-Using the algorithms developed above, the 24 minute (144,000 frame) \emph{train.spc} sample was used to train several vector quantisers (Table \ref{table:train_vqs}).  Each frame was resampled to rate $L_{high}$, $N_b=20$ filtered, and resampled to a training set of rate $K=30$ vectors. The results for the single stage VQ were dissapointing, however the two stage VQ appears to perform quite well, and is a candidate for an improved 1200 bit/s Codec 2 mode.  As a sanity check, two 4 second samples from within the training set (\emph{big\_dog} and \emph{two\_line}) also give reasonable results.
+Using the algorithms developed above, the 24 minute (144,000 frame) \emph{train.spc} sample was used to train several vector quantisers (Table \ref{table:train_vqs}).  Each frame was resampled to rate $L_{high}$, $N_b=20$ filtered, and resampled to a training set of rate $K=30$ vectors. The results for the single stage VQ were dissapointing, however the two stage VQ appears to perform quite well, and is a candidate for an improved 1200 bit/s Codec 2 mode.  As a sanity check, two 4 second samples from within the training set (\emph{big\_dog} and \emph{two\_lines}) also give reasonable results.
 
 \begin{table}[h]
 \centering
@@ -419,13 +420,58 @@ Using the algorithms developed above, the 24 minute (144,000 frame) \emph{train.
  train.spc & 1 x 12 bit & 4.84 & 2.20 \\ 
  train.spc & 2 x 12 bit & 1.7 & 1.3 \\
  big\_dog & 2 x 12 bit & 2.03 & 1.43 \\
- two\_line & 2 x 12 bit & 2.04 & 1.43 \\
+ two\_lines & 2 x 12 bit & 2.04 & 1.43 \\
  \hline
 \end{tabular}
 \caption{Spectral distortion for vector quantisers trained using \emph{train.spc}}
 \label{table:train_vqs}
 \end{table}
 
+\begin{figure}[h]
+\caption{Two stage VQ of frame 61 of \emph{big\_dog} (male) }
+\label{fig:vq_2stage_big_dog_61}
+\begin{center}
+\includegraphics[width=8cm]{vq_2stage_big_dog_61.png}
+\end{center}
+\end{figure}
+
+\begin{figure}[h]
+\caption{Two stage VQ of frame 61 of \emph{two\_lines} (female) }
+\label{fig:vq_2stage_two_lines_61}
+\begin{center}
+\includegraphics[width=8cm]{vq_2stage_two_lines_61.png}
+\end{center}
+\end{figure}
+
+\FloatBarrier
+
+\section{Pitch Dependant Spectral Envelope}
+
+Figures \ref{fig:ratek7_big_dog_61} and \ref{fig:ratek7_two_lines_61} overlay the speech spectrum and the corresponding upsampled and filtered rate $L_{high}$ vector $\mathbf{y}$.
+
+When $K$ > $L$, there are many solutions that result in a low $E$ fit.
+
+Unlike a low pitch male (can we define by L?) peak doesn't correspond to formant positions.  Spectral envelope doesn't correspond directly to vocal tract. This means for the same formant uttered by a male and female, the vector required to represnet it may be different.  Fault in splitting the spectrally relevant information. Is this relevant?  Also width quite wide compared to males.
+
+Implies quantisation of all points equally important, not just peaks.  DIfferent spectral envelop fit for say LPC (which works in the time domain). It woudl also find pitch dependnat solutions.
+
+Narrowness is required for males to prevent muffling. So VQ is carrying pitch information
+
+\begin{figure}[h]
+\caption{$\mathbf{y}$ for frame 61 of \emph{big\_dog} (high $L$ male), note narrow peak at F1 }
+\label{fig:ratek7_big_dog_61}
+\begin{center}
+\includegraphics[width=8cm]{ratek7_big_dog_61.png}
+\end{center}
+\end{figure}
+
+\begin{figure}[h]
+\caption{$\mathbf{y}$ for frame 61 of \emph{two\_lines} (low $L$ female), note low frequency peak of $\mathbf{y}$ is not at the same frequency as the spectrum. }
+\label{fig:ratek7_two_lines_61}
+\begin{center}
+\includegraphics[width=8cm]{ratek7_two_lines_61.png}
+\end{center}
+\end{figure}
 
 \end{document}
 

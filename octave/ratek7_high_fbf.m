@@ -1,24 +1,25 @@
-% ratek2_high_fbf.m
+% rate7_high_fbf.m
 %
 % David Rowe 2022
 %
-% Rate K Experiment 2 - Resample rate L to rate Lhigh, filter, and optionally VQ
-%                     - interactive Octave script to explore frame by frame
+% Rate K Experiment 7 - interactive Octave script to explore frame by frame
 %                       operation of rate K resampling
+%                     - Resampling rate Am to rate Lhigh and filter
+%                     - this version plots original spectra
 %
 % Usage:
 %   Make sure codec2-dev is compiled with the -DDUMP option - see README.md for
 %    instructions.
-%   ~/codec2-dev/build_linux$ ./c2sim ../raw/big_dog.raw --hpf --dump big_dog
+%   ~/codec2-dev/build_linux$ ./c2sim ../raw/two_lines.raw --hpf --dump two_lines
 %   $ cd ~/codec2-dev/octave
-%   octave:14> ratek2_high_fbf("../build_linux/big_dog",50)
+%   octave:14> ratek2_high_fbf("../build_linux/two_lines",60)
 
 
-function ratek2_high_fbf(samname, f, vq_stage1_f32="", vq_stage2_f32="")
+function ratek7_high_fbf(samname, f)
   more off;
 
   newamp_700c; melvq;
-  Fs = 8000; Nb = 20; K = 30; resampler = 'spline'; Lhigh = 80; vq_en = 0; all_en = 0;
+  Fs = 8000; Nb = 20; K = 30; resampler = 'spline'; Lhigh = 80;
 
   % load up text files dumped from c2sim ---------------------------------------
 
@@ -30,21 +31,6 @@ function ratek2_high_fbf(samname, f, vq_stage1_f32="", vq_stage2_f32="")
   model = load(model_name);
   [frames tmp] = size(model);
   rate_K_sample_freqs_kHz = mel_sample_freqs_kHz(K);
-
-  % optionally load up VQ
-
-  if length(vq_stage1_f32)
-    vq_stage1 = load_f32(vq_stage1_f32,K);
-    vq(:,:,1)= vq_stage1; 
-    [M tmp] = size(vq_stage1); printf("stage 1 vq size: %d\n", M);
-    mbest_depth = 1;
-    if length(vq_stage2_f32)
-      vq_stage2 = load_f32(vq_stage2_f32,K);
-      vq(:,:,2)= vq_stage2; 
-      [M tmp] = size(vq_stage2); printf("stage 2 vq size: %d\n", M);
-      mbest_depth = 5;
-    end
-  end
 
   % precompute filters at rate Lhigh. Note range of harmonics is 1:Lhigh-1, as
   % we don't use Lhigh-th harmonic as it's on Fs/2
@@ -84,42 +70,19 @@ function ratek2_high_fbf(samname, f, vq_stage1_f32="", vq_stage2_f32="")
       YdB(m) = 10*log10(Y);
     end
     
-    % Resample to rate K, optionally VQ, then back to rate Lhigh to check error
-
-    B = interp1(rate_Lhigh_sample_freqs_kHz, YdB, rate_K_sample_freqs_kHz, "spline", "extrap");
-
-    Eq = 0;
-    if vq_en
-      amean = mean(B);
-      %[mse_list index_list] = search_vq(vq, B-amean, 1);
-      [res B_hat ind] = mbest(vq, B-amean, mbest_depth);
-      B_hat = B_hat + amean;
-      Eq = sum((B-B_hat).^2)/K;
-      B = B_hat;
-    end
-    YdB_ = interp1([0 rate_K_sample_freqs_kHz 4], [0 B 0], rate_Lhigh_sample_freqs_kHz, "spline", 0);
-    
     figure(3); clf;
     hold on;
+    plot((0:255)*4000/256, Sw(f,:),";Sw;");
     l = sprintf(";rate %d AmdB;g+-", L);
-    if all_en
-      plot((1:L)*Wo*4000/pi, AmdB, l);
-      plot(rate_Lhigh_sample_freqs_kHz*1000, AmdB_rate_Lhigh, ';rate Lhigh AdB;k+-');    
-    end
+    plot((1:L)*Wo*4000/pi, AmdB, l);
     plot(rate_Lhigh_sample_freqs_kHz*1000, YdB, ';rate Lhigh YdB;b+-');    
-    stem(rate_K_sample_freqs_kHz*1000, B, ";rate K;c+-");
 
-    Lmin = round(200/F0high); Lmax = floor(3700/F0high);
-    E = sum((YdB(Lmin:Lmax) - YdB_(Lmin:Lmax)).^2)/(Lmax-Lmin+1);
-    plot((1:Lhigh-1)*F0high, YdB_,";rate Lhigh YdB hat;r+-");
-    le = sprintf("Eq %3.2f E %3.2f dB", Eq, E);
-    plot((Lmin:Lmax)*F0high, (YdB(Lmin:Lmax) - YdB_(Lmin:Lmax)), sprintf(";%s;bk+-",le));
     axis([0 Fs/2 -10 80]);
     hold off;
 
     % interactive menu ------------------------------------------
 
-    printf("\rframe: %d  menu: n-next  b-back  q-quit p-png v-vq[%d] a-all plots", f, vq_en);
+    printf("\rframe: %d  menu: n-next  b-back  q-quit p-png", f);
     fflush(stdout);
     k = kbhit();
 
@@ -136,20 +99,14 @@ function ratek2_high_fbf(samname, f, vq_stage1_f32="", vq_stage2_f32="")
         energy = 1;
       end
     end
-    if k == 'v'
-      if vq_en, vq_en = 0; else vq_en = 1; end
-    end
-    if k == 'a'
-      if all_en, all_en = 0; else all_en = 1; end
-    end
     if (k == 'p')
       [dir name ext]=fileparts(samname);
       set(gca, 'FontSize', 16);
-      hl = legend({"Rate Lhigh YdB","Rate K" "Rate Lhigh YdB hat",le}, "location", "northeast");
+      hl = legend({"Spectrum","Rate AmdB" "Rate Lhigh YdB"}, "location", "northeast");
       legend("boxoff")
       set (hl, "fontsize", 16);
       xlabel('Freq (Hz)'); ylabel('Amplitude (dB)');
-      print(sprintf("ratek2_%s_%d",name,f),"-dpng","-S500,500");
+      print(sprintf("ratek7_%s_%d",name,f),"-dpng","-S500,500");
     endif
 
   until (k == 'q')
