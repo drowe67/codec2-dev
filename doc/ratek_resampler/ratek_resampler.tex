@@ -27,7 +27,7 @@
 
 \section{Introduction}
 
-To efficiently transmit spectral amplitude information Codec 2 700C uses a set of algorithms collectively denoted \url{newamp1}. One of these algorithms is the Rate K resampler which transforms the variable length vectors of spectral amplitude samples to fixed length $K$ vectors suitable for vector quantisation.  This document was written in order to explore and possibly improve rate $K$ resampling.
+To efficiently transmit spectral amplitude information Codec 2 700C uses a set of algorithms collectively denoted \emph{newamp1}. One of these algorithms is the Rate K resampler which transforms the variable length vectors of spectral amplitude samples to fixed length $K$ vectors suitable for vector quantisation.  This document was written in order to explore and possibly improve rate $K$ resampling.
 
 \section{Theoretical Model}
 
@@ -447,15 +447,29 @@ Using the algorithms developed above, the 24 minute (144,000 frame) \emph{train.
 
 \section{Pitch Dependant Spectral Envelope}
 
+Treating $\mathbf{a}$ as a sequence of samples can be interpreted in terms of the source-filter model of speech production, where a spectrally flat impulse train at $F0$ excites a filter with spectral envelope defined by the samples of $\mathbf{a}$.
+
 Figures \ref{fig:ratek7_big_dog_61} and \ref{fig:ratek7_two_lines_61} overlay the speech spectrum and the corresponding upsampled and filtered rate $L_{high}$ vector $\mathbf{y}$.
 
-When $K$ > $L$, there are many solutions that result in a low $E$ fit.
+When $L<K$ (e.g. females), there are many interpolation functions that result in a low $E$ fit.  It has been observed that for some frames the peaks in $\mathbf{y}$ do not correspond to the peaks in the speech spectrum.  This is acceptable if the quantisation error is low, as with $\hat{\mathbf{y}}\approx\mathbf{y}$ the input sequence can be reconstructed at any interpolated point.  However it suggests that for a given phoneme, $\mathbf{y}$ may be pitch dependant, requiring seperate VQ entries to represent the same phoneme from different $F0$, thus increasing the overall bit rate for a given speech quality.
 
-Unlike a low pitch male (can we define by L?) peak doesn't correspond to formant positions.  Spectral envelope doesn't correspond directly to vocal tract. This means for the same formant uttered by a male and female, the vector required to represnet it may be different.  Fault in splitting the spectrally relevant information. Is this relevant?  Also width quite wide compared to males.
+With low $F0$ males, we note $\mathbf{y}$ is also carrying information about the bandwidth of the peak that is not present for high $F0$ speakers. Narrow bandwidth peaks (in particular F1), have been shown experimentally to be important for the perception of male speech.  As the bandwidth of F1 broadens, the speech becomes muffled.  We suggest this is because several adjacent harmonics inside the same spectral peak cause confusion as to the frequency of the peak and hence the formant being perceived.  This problem is less noticable in females as the harmonics are widely spaced, and unlikely to fall within one spectral peak.
 
-Implies quantisation of all points equally important, not just peaks.  DIfferent spectral envelop fit for say LPC (which works in the time domain). It woudl also find pitch dependnat solutions.
+Thus with low $F0$ speakers, this also suggests a pitch dependancy in the spectral envelope $\mathbf{y}$, and corresponding inefficiency in quantisation.
 
-Narrowness is required for males to prevent muffling. So VQ is carrying pitch information
+This pitch dependancy explains several results in Codec 2 and the wider literature:
+\begin{enumerate}
+\item Neural speech synthesis use a feature set equivilent to a small $N_b$, small $K$ $\mathbf{b}$ vectors, and produce very high quality speech.  When attempts were made to synthesise speech directly from this feature set using a sinusoidal model, the result was muffled speech. However a Neural model has the ability to use $F0$ as an input feature:
+\begin{equation}
+\hat{\mathbf{y}} = F(F0, \mathbf{b}) 
+\end{equation}
+and thus forms narrow bandwidth formants in the model output $\hat{\mathbf{y}}$ during low $F0$ speech.
+
+\item The Codec 2 \emph{newamp1} algorithm used in Codec 2 700 uses an experimentally derived postfilter that has a large impact in the quality of male speech.  It works by expanding the dynamic range of the rate $K$ spectra (multiplying the rate $K$ samples by a constant, then renormalising to keep energy constant).  The peak harmonics become higher than adjacent harmonics, effectively narrowing the bandwidth of peaks.
+
+\item The group delay of a harmonic in the centre of narrow bandwidth filter will be larger compared to adjacent harmonics outside of the peak.  If F1 is narrow it will "ring" for longer, and the time domain waveform will not decay completely between pitch periods.  This increases the Peak to Average Power Ratio (PAPR) of the synthesised speech, and makes it sound less buzzy.
+
+\end{enumerate}
 
 \begin{figure}[h]
 \caption{$\mathbf{y}$ for frame 61 of \emph{big\_dog} (high $L$ male), note narrow peak at F1 }
