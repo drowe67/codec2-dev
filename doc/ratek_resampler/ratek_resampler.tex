@@ -382,7 +382,7 @@ In Figure \ref{fig:20_100_vq} and Figure \ref{fig:train_120_Nb20_K30_vq} we note
 
 \item Other possibilities are a bug in this analysis (or the software tools), perhaps due to the small size of the training database. 
 
-\item An alternative quantiser based on PCA or DCT rather than direct VQ of $\mathbf{b}$.  Consider a DCT of $\mathbf{b}$ folllowed by a DCT. The residual into a second stage would still likely be K Gaussians of similar variance, so may suffer the same poor second stage performance.  A mothod that reduces the dimension of the Gaussians being quantised by the second stage VQ would be useful.
+\item An alternative quantiser based on PCA or DCT rather than direct VQ of $\mathbf{b}$.  Consider a DCT of $\mathbf{b}$ folllowed by a DCT. The residual into a second stage would still likely be K Gaussians of similar variance, so may suffer the same poor second stage performance.  A method that reduces the dimension of the Gaussians being quantised by the second stage VQ would be useful.
 
 \end{enumerate}
 
@@ -401,6 +401,30 @@ In Figure \ref{fig:20_100_vq} and Figure \ref{fig:train_120_Nb20_K30_vq} we note
 \includegraphics[width=8cm]{train_120_Nb20_K30_vq.png}
 \end{center}
 \end{figure}
+
+\section{Efficient Filtering}
+
+As $L$ is time varying, it is necessary to determine the filters $g(k)$ for every frame which is computationally inefficient.  A more efficient procedure is to resample $\mathbf{a}$ to rate $L_{high}=L_{max}$, and perform the filtering before resampling to the non-linearly spaced rate $K$.  This allows $g(k)$ to be precomputed for rate $L_{high}$.  In Figure \ref{fig:ratek2_E_K_hts}, the \emph{Nb=20 eff} curve shows the results of the efficient filtering algorithm, which as expcted, are very close to the \emph{Nb=20} curve.
+
+\section{Vector Quantiser Training}
+
+Using the algorithms developed above, the 24 minute (144,000 frame) \emph{train.spc} sample was used to train several vector quantisers (Table \ref{table:train_vqs}).  Each frame was resampled to rate $L_{high}$, $N_b=20$ filtered, and resampled to a training set of rate $K=30$ vectors. The results for the single stage VQ were dissapointing, however the two stage VQ appears to perform quite well, and is a candidate for an improved 1200 bit/s Codec 2 mode.  As a sanity check, two 4 second samples from within the training set (\emph{big\_dog} and \emph{two\_line}) also give reasonable results.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{c c c c}
+ \hline
+ Sample & Vector Quantiser & $E_q$ $\textrm{dB}^2$ & RMS $E_q$ dB \\
+ \hline
+ train.spc & 1 x 12 bit & 4.84 & 2.20 \\ 
+ train.spc & 2 x 12 bit & 1.7 & 1.3 \\
+ big\_dog & 2 x 12 bit & 2.03 & 1.43 \\
+ two\_line & 2 x 12 bit & 2.04 & 1.43 \\
+ \hline
+\end{tabular}
+\caption{Spectral distortion for vector quantisers trained using \emph{train.spc}}
+\label{table:train_vqs}
+\end{table}
 
 
 \end{document}
