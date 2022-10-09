@@ -405,7 +405,7 @@ In Figure \ref{fig:20_100_vq} and Figure \ref{fig:train_120_Nb20_K30_vq} we note
 
 \section{Efficient Filtering}
 
-As $L$ is time varying, it is necessary to determine the filters $g(k)$ for every frame which is computationally inefficient.  A more efficient procedure is to resample $\mathbf{a}$ to rate $L_{high}=L_{max}$, and perform the filtering before resampling to the non-linearly spaced rate $K$.  This allows $g(k)$ to be precomputed for rate $L_{high}$.  In Figure \ref{fig:ratek2_E_K_hts}, the \emph{Nb=20 eff} curve shows the results of the efficient filtering algorithm, which as expcted, are very close to the \emph{Nb=20} curve.
+As $L$ is time varying, it is necessary to determine the filters $g(k)$ for every frame which is computationally inefficient.  A more efficient procedure is to resample $\mathbf{a}$ to rate $L_{high}=L_{max}$, perform the filtering at rate $L_{high}$, then resample to the non-linearly spaced rate $K$.  This allows $g(k)$ to be precomputed for rate $L_{high}$.  In Figure \ref{fig:ratek2_E_K_hts}, the \emph{Nb=20 eff} curve shows the results of the efficient filtering algorithm, which as expected, are very close to the \emph{Nb=20} curve.
 
 \section{Vector Quantiser Training}
 
@@ -451,7 +451,7 @@ Treating $\mathbf{a}$ as a sequence of samples can be interpreted in terms of th
 
 Figures \ref{fig:ratek7_big_dog_61} and \ref{fig:ratek7_two_lines_61} overlay the speech spectrum and the corresponding upsampled and filtered rate $L_{high}$ vector $\mathbf{y}$.
 
-When $L<K$ (e.g. females), there are many interpolation functions that result in a low $E$ fit.  It has been observed that for some frames the peaks in $\mathbf{y}$ do not correspond to the peaks in the speech spectrum.  This is acceptable if the quantisation error is low, as with $\hat{\mathbf{y}}\approx\mathbf{y}$ the input sequence can be reconstructed at any interpolated point.  However it suggests that for a given phoneme, $\mathbf{y}$ may be pitch dependant, requiring seperate VQ entries to represent the same phoneme from different $F0$, thus increasing the overall bit rate for a given speech quality.
+When $L<K$ (e.g. females), there are many interpolation functions that result in a low $E$ fit.  It has been observed that for some frames the peaks in $\mathbf{y}$ do not correspond to the peaks in the speech spectrum.  This is acceptable if the quantisation error is low, as with $\hat{\mathbf{y}}\approx\mathbf{y}$ the input sequence can be reconstructed at any interpolated point.  However it suggests that for a given phoneme, $\mathbf{y}$ may be pitch dependant, requiring seperate VQ entries to represent the same spectral envelope from different $F0$ frames, thus increasing the overall bit rate for a given speech quality.
 
 With low $F0$ males, we note $\mathbf{y}$ is also carrying information about the bandwidth of the peak that is not present for high $F0$ speakers. Narrow bandwidth peaks (in particular F1), have been shown experimentally to be important for the perception of male speech.  As the bandwidth of F1 broadens, the speech becomes muffled.  We suggest this is because several adjacent harmonics inside the same spectral peak cause confusion as to the frequency of the peak and hence the formant being perceived.  This problem is less noticable in females as the harmonics are widely spaced, and unlikely to fall within one spectral peak.
 
@@ -463,11 +463,11 @@ This pitch dependancy explains several results in Codec 2 and the wider literatu
 \begin{equation}
 \hat{\mathbf{y}} = F(F0, \mathbf{b}) 
 \end{equation}
-and thus forms narrow bandwidth formants in the model output $\hat{\mathbf{y}}$ during low $F0$ speech.
+and thus forms narrow bandwidth formants in the model output $\hat{\mathbf{y}}$ during low $F0$ speech. The function $F()$ is typically non-linear, so the peak/formant ratio of $\mathbf{y}$ can be enhanced on reconstruction in a way not possible with a linear resampler, overcoming the smoothing effect of low $N_b$ filtering. 
 
 \item The Codec 2 \emph{newamp1} algorithm used in Codec 2 700 uses an experimentally derived postfilter that has a large impact in the quality of male speech.  It works by expanding the dynamic range of the rate $K$ spectra (multiplying the rate $K$ samples by a constant, then renormalising to keep energy constant).  The peak harmonics become higher than adjacent harmonics, effectively narrowing the bandwidth of peaks.
 
-\item The group delay of a harmonic in the centre of narrow bandwidth filter will be larger compared to adjacent harmonics outside of the peak.  If F1 is narrow it will "ring" for longer, and the time domain waveform will not decay completely between pitch periods.  This increases the Peak to Average Power Ratio (PAPR) of the synthesised speech, and makes it sound less buzzy.
+\item The group delay of a harmonic in the centre of narrow bandwidth filter will be larger compared to adjacent harmonics outside of the peak.  If F1 is narrow it will "ring" for longer, and the time domain waveform will not decay completely between pitch periods.  This increases the Peak to Average Power Ratio (PAPR) of the synthesised speech, makes it sound less buzzy, and closer to the input speech waveform.
 
 \end{enumerate}
 
