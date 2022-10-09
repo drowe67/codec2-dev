@@ -10,11 +10,39 @@ K=30
 M=4096
 Kst=0
 Ken=29
+out_dir=ratek_out
+
+# Process sample with various methods including 1 and 2 stage VQ
+# usage:
+#   cd ~/codec2/build_linux
+#   ../script/ratek_resampler.sh
+function vq_test() {
+  fullfile=$1
+  filename=$(basename -- "$fullfile")
+  extension="${filename##*.}"
+  filename="${filename%.*}"
+
+  c2sim $fullfile --hpf --phase0 --postfilter --dump $filename -o - | sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_1_out.wav
+  echo "ratek2_batch;  ratek2_model_to_ratek(\"${filename}\",20,30,'','','',\"${filename}_novq.f32\"); quit;" \
+  | octave -p ${CODEC2_PATH}/octave -qf 
+  c2sim $fullfile --hpf --phase0 --postfilter --amread ${filename}_novq.f32 -o - | \
+      sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_2_novq.wav
+  echo "ratek2_batch;  ratek2_model_to_ratek(\"${filename}\",20,30,'','vq_stage1.f32','',\"${filename}_vq1.f32\"); quit;" \
+  | octave -p ${CODEC2_PATH}/octave -qf 
+  c2sim $fullfile --hpf --phase0 --postfilter --amread ${filename}_vq1.f32 -o - | \
+      sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_3_vq1.wav
+  echo "ratek2_batch;  ratek2_model_to_ratek(\"${filename}\",20,30,'','vq_stage1.f32','vq_stage2.f32',\"${filename}_vq2.f32\"); quit;" \
+  | octave -p ${CODEC2_PATH}/octave -qf 
+  c2sim $fullfile --hpf --phase0 --postfilter --amread ${filename}_vq2.f32 -o - | \
+      sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_4_vq2.wav
+  c2enc 3200 $fullfile - | c2dec 3200 - - | sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_5_3200.wav
+  #TODO consider SSB simulation, codec 2 1200, 700C
+}
 
 # usage:
 #   cd ~/codec2/build_linux
 #   ../script/ratek_resampler.sh ../raw/big_dog
-function test() {
+function vq_test1() {
   fullfile=$1
   filename=$(basename -- "$fullfile")
   extension="${filename##*.}"
@@ -112,8 +140,10 @@ function train_Nb() {
 }
 
 # TODO: make these selectable via CLI
+vq_test ../raw/big_dog.raw
+vq_test ../raw/two_lines.raw
 
-test $1
+#test $1
 
 #train_kmeans $1
 

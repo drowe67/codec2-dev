@@ -195,7 +195,7 @@ endfunction
   $ ../script/ratek_resampler.sh ../octave/train_120_Nb100_K30.f32
 #}
 
-function B = ratek2_model_to_ratek(samname, Nb=20, K=30, B_out_fn="")
+function B = ratek2_model_to_ratek(samname, Nb=20, K=30, B_out_fn="", vq_stage1_f32="", vq_stage2_f32="", Y_out_fn="")
   more off;
   
   newamp_700c;
@@ -216,7 +216,24 @@ function B = ratek2_model_to_ratek(samname, Nb=20, K=30, B_out_fn="")
     h(m,:) = generate_filter(m,F0high,Lhigh,Nb);
   end
   rate_Lhigh_sample_freqs_kHz = (F0high:F0high:(Lhigh-1)*F0high)/1000;
-   
+
+  % optionally load up VQ
+
+  vq_en = 0;
+  if length(vq_stage1_f32)
+    vq_en = 1;
+    vq_stage1 = load_f32(vq_stage1_f32,K);
+    vq(:,:,1)= vq_stage1; 
+    [M tmp] = size(vq_stage1); printf("stage 1 vq size: %d\n", M);
+    mbest_depth = 1;
+    if length(vq_stage2_f32)
+      vq_stage2 = load_f32(vq_stage2_f32,K);
+      vq(:,:,2)= vq_stage2; 
+      [M tmp] = size(vq_stage2); printf("stage 2 vq size: %d\n", M);
+      mbest_depth = 5;
+    end
+  end
+
   for f=1:frames
     Wo = model(f,1); F0 = Fs*Wo/(2*pi); L = model(f,2);
     Am = model(f,3:(L+2)); AmdB = 20*log10(Am);
@@ -238,6 +255,20 @@ function B = ratek2_model_to_ratek(samname, Nb=20, K=30, B_out_fn="")
     % Resample from rate Lhigh to rate K b=R(Y), note K are non-linearly spaced (warped freq axis)
 
     B(f,:) = interp1(rate_Lhigh_sample_freqs_kHz, YdB, rate_K_sample_freqs_kHz, "spline", "extrap");
+
+    if vq_en
+      amean = mean(B(f,:));
+      [res B_hat ind] = mbest(vq, B(f,:)-amean, mbest_depth);
+      B_hat = B_hat + amean;
+      Eq(f) = sum((B(f,:)-B_hat).^2)/K;
+      YdB_ = interp1([0 rate_K_sample_freqs_kHz 4], [0 B_hat 0], rate_L_sample_freqs_kHz, "spline", 0);
+      Y_(f,1:L) = 10.^(YdB_/20);
+      printf("f: %d Eq: %3.2f dB\n", f, Eq(f)); 
+    else
+      YdB_ = interp1([0 rate_K_sample_freqs_kHz 4], [0 B(f,:) 0], rate_L_sample_freqs_kHz, "spline", 0);
+      Y_(f,1:L) = 10.^(YdB_/20);
+    end
+    
   end
 
   % optionally write B to a .f32 file for external VQ training
@@ -248,6 +279,24 @@ function B = ratek2_model_to_ratek(samname, Nb=20, K=30, B_out_fn="")
       fwrite(fb, Bfloat, "float32");
     end
     fclose(fb);
+  end
+
+  % optionally write Y, so we can listen using:
+  %   ./src/c2sim ../raw/big_dog.raw --amread ../octave/big_dog_y.f32 -o - | aplay -f S16_LE
+  if length(Y_out_fn)
+    max_amp = 160;
+    fy = fopen(Y_out_fn,"wb");
+    for f=1:frames
+      Yfloat_ = zeros(1,max_amp);
+      L = model(f,2);
+      Yfloat_(2:L+1) = Y_(f,1:L);
+      fwrite(fy, Yfloat_, "float32");
+    end
+    fclose(fy);
+  end
+
+  if vq_en
+    printf("Nb: %d K: %d mean SD: %4.2f dB^2\n", Nb, K, mean(Eq));
   end
 endfunction
 
