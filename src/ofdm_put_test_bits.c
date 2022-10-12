@@ -33,6 +33,11 @@
 #include <math.h>
 #include <errno.h>
 
+#ifdef _WIN32
+#include <io.h>
+#include <fcntl.h>
+#endif /* _WIN32 */
+
 #include "codec2_ofdm.h"
 #include "ofdm_internal.h"
 #include "test_bits_ofdm.h"
@@ -72,6 +77,10 @@ int main(int argc, char *argv[])
          argv[1], strerror(errno));
 	exit(1);
     }
+    
+#ifdef _WIN32
+    setmode(fileno(fin), O_BINARY);
+#endif /* _WIN32 */
 
     verbose = 0;
     if (opt_exists(argv, argc, "-v")) {

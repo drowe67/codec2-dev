@@ -35,6 +35,11 @@
 #include <errno.h>
 #include <math.h>
 
+#ifdef _WIN32
+#include <io.h>
+#include <fcntl.h>
+#endif /* _WIN32 */
+
 int main(int argc, char *argv[])
 {
     int            mode;
@@ -86,6 +91,10 @@ int main(int argc, char *argv[])
          argv[2], strerror(errno));
 	exit(1);
     }
+    
+#ifdef _WIN32
+    setmode(fileno(fin), O_BINARY);
+#endif /* _WIN32 */
 
     if (strcmp(argv[3], "-") == 0) fout = stdout;
     else if ( (fout = fopen(argv[3],"wb")) == NULL ) {
@@ -93,6 +102,10 @@ int main(int argc, char *argv[])
          argv[3], strerror(errno));
 	exit(1);
     }
+    
+#ifdef _WIN32
+    setmode(fileno(fout), O_BINARY);
+#endif /* _WIN32 */
     
     // Write a header if we're writing to a .c2 file
     char *ext = strrchr(argv[3], '.');

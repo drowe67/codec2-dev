@@ -33,6 +33,11 @@
 #include <stdint.h>
 #include <string.h>
 
+#ifdef _WIN32
+#include <io.h>
+#include <fcntl.h>
+#endif /* _WIN32 */
+
 #define OVERSAMPLE 100
 
 int main(int argc,char *argv[]){
@@ -62,6 +67,11 @@ int main(int argc,char *argv[]){
     } else {
         fout = fopen(argv[2],"w");
     }
+    
+#ifdef _WIN32
+    setmode(fileno(fin), O_BINARY);
+    setmode(fileno(fout), O_BINARY);
+#endif /* _WIN32 */
     
     m = atoi(argv[3]); log2m = log2(m);
     printf("log2m: %d\n", log2m);

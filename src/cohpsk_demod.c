@@ -34,6 +34,11 @@
 #include <errno.h>
 #include <getopt.h>
 
+#ifdef _WIN32
+#include <io.h>
+#include <fcntl.h>
+#endif /* _WIN32 */
+
 #include "codec2_cohpsk.h"
 #include "cohpsk_defs.h"
 #include "cohpsk_internal.h"
@@ -146,6 +151,11 @@ int main(int argc, char *argv[])
          argv[2], strerror(errno));
 	exit(1);
     }
+    
+#ifdef _WIN32
+    setmode(fileno(fin), O_BINARY);
+    setmode(fileno(fout), O_BINARY);
+#endif /* _WIN32 */
 
     cohpsk = cohpsk_create();
     cohpsk_set_verbose(cohpsk, verbose);

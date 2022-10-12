@@ -31,6 +31,12 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+
+#ifdef _WIN32
+#include <io.h>
+#include <fcntl.h>
+#endif /* _WIN32 */
+
 #include "freedv_vhf_framing.h"
 
 int main(int argc,char *argv[]){
@@ -59,15 +65,20 @@ int main(int argc,char *argv[]){
     if(strcmp(argv[2],"-")==0){
         fin = stdin;
     }else{
-        fin = fopen(argv[2],"r");
+        fin = fopen(argv[2],"rb");
     }
 	
     if(strcmp(argv[3],"-")==0){
         fout = stdout;
     }else{
-        fout = fopen(argv[3],"w");
+        fout = fopen(argv[3],"wb");
     }
-
+    
+#ifdef _WIN32
+    setmode(fileno(fin), O_BINARY);
+    setmode(fileno(fout), O_BINARY);
+#endif /* _WIN32 */
+    
     /* Set up deframer */
     deframer = fvhff_create_deframer(frame_fmt,0);
     

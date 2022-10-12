@@ -40,6 +40,11 @@
 #include <math.h>
 #include <errno.h>
 
+#ifdef _WIN32
+#include <io.h>
+#include <fcntl.h>
+#endif /* _WIN32 */
+
 #include "codec2_fdmdv.h"
 #include "octave.h"
 #include "freedv_api.h"
@@ -101,6 +106,11 @@ int main(int argc, char *argv[])
          argv[2], strerror(errno));
 	exit(1);
     }
+    
+#ifdef _WIN32
+    setmode(fileno(fin), O_BINARY);
+    setmode(fileno(fout), O_BINARY);
+#endif /* _WIN32 */
 
     if (argc >= 4) {
         Nc = atoi(argv[3]);

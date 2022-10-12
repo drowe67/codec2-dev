@@ -31,6 +31,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#ifdef _WIN32
+#include <io.h>
+#include <fcntl.h>
+#endif /* _WIN32 */
+
 #include "fsk.h"
 
 unsigned int toInt(char c)
@@ -66,6 +72,11 @@ int main(int argc,char *argv[]){
             exit(1);
         }
     }
+    
+#ifdef _WIN32
+    setmode(fileno(fin), O_BINARY);
+    setmode(fileno(fout), O_BINARY);
+#endif /* _WIN32 */
 
     /* extract UW array */
     

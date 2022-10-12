@@ -34,6 +34,11 @@
 #include <getopt.h>
 #include <signal.h>
 
+#ifdef _WIN32
+#include <io.h>
+#include <fcntl.h>
+#endif /* _WIN32 */
+
 #include "freedv_api.h"
 #include "modem_stats.h"
 #include "octave.h"
@@ -176,6 +181,11 @@ int main(int argc, char *argv[]) {
                argv[3], strerror(errno));
 	     exit(1);
     }
+    
+#ifdef _WIN32
+    setmode(fileno(fin), O_BINARY);
+    setmode(fileno(fout), O_BINARY);
+#endif /* _WIN32 */
 
     if (mode != FREEDV_MODE_FSK_LDPC)
         freedv = freedv_open(mode);

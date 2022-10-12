@@ -36,6 +36,11 @@
 #include <signal.h>
 #include <unistd.h>
 
+#ifdef _WIN32
+#include <io.h>
+#include <fcntl.h>
+#endif /* _WIN32 */
+
 #include "fsk.h"
 #include "codec2_fdmdv.h"
 #include "mpdecode_core.h"
@@ -205,6 +210,11 @@ int main(int argc,char *argv[]){
     }else{
         fout = fopen(argv[dx + 4],"w");
     }
+    
+#ifdef _WIN32
+    setmode(fileno(fin), O_BINARY);
+    setmode(fileno(fout), O_BINARY);
+#endif /* _WIN32 */
 
     /* set up FSK */
     fsk = fsk_create_hbr(Fs,Rs,M,P,nsym,FSK_NONE,tone_separation);

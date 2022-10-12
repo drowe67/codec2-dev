@@ -33,6 +33,11 @@
 #include <math.h>
 #include <errno.h>
 
+#ifdef _WIN32
+#include <io.h>
+#include <fcntl.h>
+#endif /* _WIN32 */
+
 #include "codec2_fdmdv.h"
 
 int main(int argc, char *argv[])
@@ -60,6 +65,10 @@ int main(int argc, char *argv[])
          argv[1], strerror(errno));
 	exit(1);
     }
+    
+#ifdef _WIN32
+    setmode(fileno(fout), O_BINARY);
+#endif /* _WIN32 */
 
     numBits = atoi(argv[2]);
 

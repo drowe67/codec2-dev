@@ -14,6 +14,11 @@
 #include <math.h>
 #include <errno.h>
 
+#ifdef _WIN32
+#include <io.h>
+#include <fcntl.h>
+#endif /* _WIN32 */
+
 int main(int argc, char *argv[]) {
     FILE        *fin, *fout;
     float	datain, dataout;
@@ -38,6 +43,11 @@ int main(int argc, char *argv[]) {
                 argv[2], strerror(errno));
         exit(1);
     }
+    
+#ifdef _WIN32
+    setmode(fileno(fin), O_BINARY);
+    setmode(fileno(fout), O_BINARY);
+#endif /* _WIN32 */
 
     double NodB = atof(argv[3]);
     double No = pow(10.0, NodB/10.0);

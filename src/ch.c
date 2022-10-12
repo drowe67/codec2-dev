@@ -33,6 +33,11 @@
 #include <errno.h>
 #include <getopt.h>
 
+#ifdef _WIN32
+#include <io.h>
+#include <fcntl.h>
+#endif /* _WIN32 */
+
 #include "freedv_api.h"
 #include "codec2_cohpsk.h"
 #include "comp_prim.h"
@@ -130,6 +135,11 @@ int main(int argc, char *argv[])
                 argv[2], strerror(errno));
         exit(1);
     }
+    
+#ifdef _WIN32
+    setmode(fileno(fin), O_BINARY);
+    setmode(fileno(fout), O_BINARY);
+#endif /* _WIN32 */
 
     NodB = -100;
     Fs = 8000; foff_hz = 0.0; fading_en = 0; ctest = 0;

@@ -36,6 +36,11 @@
 #include <math.h>
 #include <errno.h>
 
+#ifdef _WIN32
+#include <io.h>
+#include <fcntl.h>
+#endif /* _WIN32 */
+
 #include "codec2_ofdm.h"
 #include "ofdm_internal.h"
 #include "ldpc_codes.h"
@@ -132,6 +137,10 @@ int main(int argc, char *argv[])
             exit(-1);
         }
     }
+    
+#ifdef _WIN32
+    setmode(fileno(fout), O_BINARY);
+#endif /* _WIN32 */
 
     if (verbose)
         fprintf(stderr, "Nframes: %d Ndatabitsperframe: %d bcb: %d\n", Nframes, Ndatabitsperpacket, bcb_en);

@@ -30,6 +30,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#ifdef _WIN32
+#include <io.h>
+#include <fcntl.h>
+#endif /* _WIN32 */
+
 #include "fsk.h"
 
 #define TEST_FRAME_SIZE 100  /* arbitrary choice, repeats after this
@@ -71,6 +77,10 @@ int main(int argc,char *argv[]){
         fprintf(stderr,"Couldn't open output file: %s\n", argv[1]);
         exit(1);
     }
+    
+#ifdef _WIN32
+    setmode(fileno(fout), O_BINARY);
+#endif /* _WIN32 */
     
     /* allocate buffers for processing */
     bitbuf = (uint8_t*)malloc(sizeof(uint8_t)*framesize);

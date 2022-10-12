@@ -34,6 +34,11 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#ifdef _WIN32
+#include <io.h>
+#include <fcntl.h>
+#endif /* _WIN32 */
+
 #include "freedv_api.h"
 #include "codec2.h"
 
@@ -221,6 +226,10 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "Error opening output modem sample file: %s: %s.\n", argv[3], strerror(errno));
         exit(1);
     }
+    
+#ifdef _WIN32
+    setmode(fileno(fout), O_BINARY);
+#endif /* _WIN32 */
 
     if (argc > 3) {
         for (i = 3; i < argc; i++) {

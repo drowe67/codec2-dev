@@ -36,6 +36,11 @@
 #include <errno.h>
 #include <getopt.h>
 
+#ifdef _WIN32
+#include <io.h>
+#include <fcntl.h>
+#endif /* _WIN32 */
+
 #define NONE          0  /* no bit errors                          */
 #define UNIFORM       1  /* random bit errors                      */
 #define TWO_STATE     2  /* Two state error model                  */
@@ -99,13 +104,21 @@ int main(int argc, char *argv[])
          argv[2], strerror(errno));
 	exit(1);
     }
-
+    
+#ifdef _WIN32
+    setmode(fileno(fin), O_BINARY);
+#endif /* _WIN32 */
+    
     if (strcmp(argv[3], "-") == 0) fout = stdout;
     else if ( (fout = fopen(argv[3],"wb")) == NULL ) {
 	fprintf(stderr, "Error opening output speech file: %s: %s.\n",
          argv[3], strerror(errno));
 	exit(1);
     }
+    
+#ifdef _WIN32
+    setmode(fileno(fout), O_BINARY);
+#endif /* _WIN32 */
 
     // Attempt to detect a .c2 file with a header
     struct c2_header in_hdr;

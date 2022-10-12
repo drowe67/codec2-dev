@@ -37,6 +37,11 @@
 #include <errno.h>
 #include <getopt.h>
 
+#ifdef _WIN32
+#include <io.h>
+#include <fcntl.h>
+#endif /* _WIN32 */
+
 #include "reliable_text.h"
 #include "freedv_api.h"
 #include "modem_stats.h"
@@ -194,6 +199,11 @@ int main(int argc, char *argv[]) {
                 argv[dx+2], strerror(errno));
 	exit(1);
     }
+    
+#ifdef _WIN32
+    setmode(fileno(fin), O_BINARY);
+    setmode(fileno(fout), O_BINARY);
+#endif /* _WIN32 */
 
     freedv = freedv_open(mode);
     assert(freedv != NULL);

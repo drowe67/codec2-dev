@@ -33,6 +33,11 @@
 #include <math.h>
 #include <errno.h>
 
+#ifdef _WIN32
+#include <io.h>
+#include <fcntl.h>
+#endif /* _WIN32 */
+
 #include "codec2_cohpsk.h"
 #include "test_bits_coh.h"
 
@@ -56,6 +61,10 @@ int main(int argc, char *argv[])
 	exit(1);
     }
 
+#ifdef _WIN32
+    setmode(fileno(fout), O_BINARY);
+#endif /* _WIN32 */
+    
     ptest_bits_coh = (int*)test_bits_coh;
     ptest_bits_coh_end = (int*)test_bits_coh + sizeof(test_bits_coh)/sizeof(int);
     numBits = atoi(argv[2]);

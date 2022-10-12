@@ -39,6 +39,11 @@
 #include <math.h>
 #include <errno.h>
 
+#ifdef _WIN32
+#include <io.h>
+#include <fcntl.h>
+#endif /* _WIN32 */
+
 #include "codec2_ofdm.h"
 #include "ofdm_internal.h"
 #include "octave.h"
@@ -268,6 +273,11 @@ int main(int argc, char *argv[]) {
             exit(-1);
         }
     }
+    
+#ifdef _WIN32
+    setmode(fileno(fin), O_BINARY);
+    setmode(fileno(fout), O_BINARY);
+#endif /* _WIN32 */
 
     if (log_specified == true) {
         if ((foct = fopen(log_name, "wt")) == NULL) {

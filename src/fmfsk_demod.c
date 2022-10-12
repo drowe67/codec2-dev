@@ -30,6 +30,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#ifdef _WIN32
+#include <io.h>
+#include <fcntl.h>
+#endif /* _WIN32 */
+
 #include "fmfsk.h"
 #include "modem_stats.h"
 #define MODEMPROBE_ENABLE
@@ -72,6 +78,11 @@ int main(int argc,char *argv[]){
 	fout = fopen(argv[4],"w");
     }
 	
+#ifdef _WIN32
+    setmode(fileno(fin), O_BINARY);
+    setmode(fileno(fout), O_BINARY);
+#endif /* _WIN32 */
+    
     /* set up FSK */
     fmfsk = fmfsk_create(Fs,Rb);
 

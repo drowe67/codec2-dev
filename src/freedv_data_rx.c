@@ -34,6 +34,11 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#ifdef _WIN32
+#include <io.h>
+#include <fcntl.h>
+#endif /* _WIN32 */
+
 #include "freedv_api.h"
 
 /**********************************************************
@@ -186,6 +191,10 @@ int main(int argc, char *argv[]) {
          argv[2], strerror(errno));
 	exit(1);
     }
+    
+#ifdef _WIN32
+    setmode(fileno(fin), O_BINARY);
+#endif /* _WIN32 */
 
     verbose = 0;
     

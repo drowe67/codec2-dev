@@ -35,6 +35,11 @@
 #include <math.h>
 #include <errno.h>
 
+#ifdef _WIN32
+#include <io.h>
+#include <fcntl.h>
+#endif /* _WIN32 */
+
 #include "codec2_cohpsk.h"
 #include "octave.h"
 
@@ -65,6 +70,10 @@ int main(int argc, char *argv[])
 	exit(1);
     }
 
+#ifdef _WIN32
+    setmode(fileno(fin), O_BINARY);
+#endif /* _WIN32 */
+    
     coh = cohpsk_create();
 
     foct = NULL;

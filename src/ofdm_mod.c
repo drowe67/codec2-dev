@@ -37,6 +37,11 @@
 #include <string.h>
 #include <math.h>
 
+#ifdef _WIN32
+#include <io.h>
+#include <fcntl.h>
+#endif /* _WIN32 */
+
 #include "codec2_ofdm.h"
 #include "ofdm_internal.h"
 #include "gp_interleaver.h"
@@ -235,6 +240,11 @@ int main(int argc, char *argv[]) {
             exit(-1);
         }
     }
+    
+#ifdef _WIN32
+    setmode(fileno(fin), O_BINARY);
+    setmode(fileno(fout), O_BINARY);
+#endif /* _WIN32 */
 
     /* init the modem with our (optionally) custom config */
     struct OFDM *ofdm = ofdm_create(ofdm_config);

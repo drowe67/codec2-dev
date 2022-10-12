@@ -36,6 +36,11 @@
 #include <unistd.h>
 #include <getopt.h>
 
+#ifdef _WIN32
+#include <io.h>
+#include <fcntl.h>
+#endif /* _WIN32 */
+
 #include "defines.h"
 #include "sine.h"
 #include "nlp.h"
@@ -441,6 +446,28 @@ int main(int argc, char *argv[])
 		argv[optind], strerror(errno));
 	exit(1);
     }
+    
+#ifdef _WIN32
+    if (fin != NULL)
+    {
+        setmode(fileno(fin), O_BINARY);
+    }
+    
+    if (fout != NULL)
+    {
+        setmode(fileno(fout), O_BINARY);
+    }
+    
+    if (fmodelin != NULL)
+    {
+        setmode(fileno(fmodelin), O_BINARY);
+    }
+    
+    if (fmodelout != NULL)
+    {
+        setmode(fileno(fmodelout), O_BINARY);
+    }
+#endif /* _WIN32 */
 
     C2CONST c2const = c2const_create(Fs, framelength_s);
     int   n_samp = c2const.n_samp;

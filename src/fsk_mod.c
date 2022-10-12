@@ -28,6 +28,12 @@
 #include <stdio.h>
 #include <string.h>
 #include <getopt.h>
+
+#ifdef _WIN32
+#include <io.h>
+#include <fcntl.h>
+#endif /* _WIN32 */
+
 #include "fsk.h"
 #include "codec2_fdmdv.h"
 
@@ -93,6 +99,11 @@ int main(int argc,char *argv[]){
     }else{
         fout = fopen(argv[optind],"w");
     }
+    
+#ifdef _WIN32
+    setmode(fileno(fin), O_BINARY);
+    setmode(fileno(fout), O_BINARY);
+#endif /* _WIN32 */
 
     /* p is not actually used for the modulator, but we need to set it for fsk_create() to be happy */    
     if (!user_p)

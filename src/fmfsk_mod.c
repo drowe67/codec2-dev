@@ -31,6 +31,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#ifdef _WIN32
+#include <io.h>
+#include <fcntl.h>
+#endif /* _WIN32 */
+
 #include "fmfsk.h"
 #include "codec2_fdmdv.h"
 
@@ -64,6 +70,10 @@ int main(int argc,char *argv[]){
 		fout = fopen(argv[4],"w");
 	}
     
+#ifdef _WIN32
+    setmode(fileno(fin), O_BINARY);
+    setmode(fileno(fout), O_BINARY);
+#endif /* _WIN32 */
     
     /* set up FMFSK */
     fmfsk = fmfsk_create(Fs,Rb);

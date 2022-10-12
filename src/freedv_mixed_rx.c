@@ -34,6 +34,11 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+#ifdef _WIN32
+#include <io.h>
+#include <fcntl.h>
+#endif /* _WIN32 */
+
 #include "freedv_api.h"
 #include "modem_stats.h"
 
@@ -109,6 +114,11 @@ int main(int argc, char *argv[]) {
          argv[3], strerror(errno));
 	exit(1);
     }
+    
+#ifdef _WIN32
+    setmode(fileno(fin), O_BINARY);
+    setmode(fileno(fout), O_BINARY);
+#endif /* _WIN32 */
 
     use_codecrx = 0; verbose = 0;
     
