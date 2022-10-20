@@ -181,7 +181,7 @@ where $\mathbf{n}_{n}$ is a vector of noise samples with an unknown distribution
 \begin{equation}
 \mathbf{\Delta}_{n+1} = \mathbf{b}_{n+1} - \mathbf{b}_{n} + \mathbf{n}_{n+1} - \mathbf{n}_{n}
 \end{equation}
-If $\mathbf{n}_{n}$ and $\mathbf{n}_{n+1}$ are not well correlated they may become a significant source of noise that is summed with $\mathbf{\Delta}_{n}$, reducing the effectiveness of the quantister that will need to waste bits quantising the noise. We would therefore expect that in the absence of undersampling noise, delta coding in time should result in increased quantiser efficiency.
+If $\mathbf{n}_{n}$ and $\mathbf{n}_{n+1}$ are not well correlated they may become a significant source of noise that is summed with $\mathbf{\Delta}_{n}$, reducing the effectiveness of the quantiser that will need to waste bits quantising the noise. We would therefore expect that in the absence of undersampling noise, delta coding in time should result in increased quantiser efficiency.
 
 \item Small changes in $\mathbf{a}$ input should result in small changes in $\mathbf{b}$ indicating a lack of sensitivity and undersampling noise in $R$.  If $R$ is sensitive, we may notice VQ choices changing from frame to frame for stationary speech.
 
@@ -202,7 +202,7 @@ Figure \ref{fig:ratek1_big_dog_50} illustrates why the resampler choice is impor
 \end{center}
 \end{figure}
 
-Figure \ref{fig:ratek1_hts_E} shows the spline and parabolic resampler $E$, plotted against $F0$ for a 24 second sample containing four speakers.  Table \ref{table:ratek1_mean_E} is the mean spectral distortion $E$ over the sample.  The spline interpolator perfoms better than the parabolic interpolator.  $L$ is time varying, but as it approaches $K$, $E$ increases, once again showing that interpolators struggle with $K$ close to $L$.
+Figure \ref{fig:ratek1_hts_E} shows the spline and parabolic resampler $E$, plotted against $F0$ for a 24 second sample containing four speakers.  Table \ref{table:ratek1_mean_E} is the mean spectral distortion $E$ over the sample.  The spline interpolator performs better than the parabolic interpolator.  $L$ is time varying, but as it approaches $K$, $E$ increases, once again showing that interpolators struggle with $K$ close to $L$.
 
 \begin{table}[h]
 \centering
@@ -217,7 +217,7 @@ Figure \ref{fig:ratek1_hts_E} shows the spline and parabolic resampler $E$, plot
 \caption{Mean spectral distortion $E$ for spline and parabolic interpolators}\label{table:ratek1_mean_E}
 \end{table}
 
-In this experiment with $K=80$ both resamplers have low average $E$ (less than $1 \textrm{dB}^2$). On inspection using \url{ratek_fbf} the occasional high $E$ frames were found to be unvoiced speech or background noise, where the pitch estimator tends to return low $F0$ (high $L$) estimates.  Fortunately the ear is quite insensitive to spectral distortion in unvoiced of background noise frames, so it is unlikley these errors are audible.  However with a lower choice of $K$ we would start to get resampling distortion duing voiced speech as $K$ approaches $L$ (Figure \ref{fig:ratek1_big_dog_50}), or when $K<L$, aliasing.
+In this experiment with $K=80$ both resamplers have low average $E$ (less than $1 \textrm{dB}^2$). On inspection using \url{ratek_fbf} the occasional high $E$ frames were found to be unvoiced speech or background noise, where the pitch estimator tends to return low $F0$ (high $L$) estimates.  Fortunately the ear is quite insensitive to spectral distortion in unvoiced of background noise frames, so it is unlikely these errors are audible.  However with a lower choice of $K$ we would start to get resampling distortion during voiced speech as $K$ approaches $L$ (Figure \ref{fig:ratek1_big_dog_50}), or when $K<L$, aliasing.
 
 \begin{figure}[h]
 \caption{Scatter plot of $E$ versus $F0$ for \emph{hts} sample, spline and parabolic resampler}
@@ -241,7 +241,7 @@ Conclusions:
 
 \item We intend to use $K<L$, which will lead to aliasing distortion.  It would be wise to filter $A_{m}$ prior to resampling to remove the possibility of aliasing and resampler distortion, that is choose $H()$ such that with $\mathbf{b}=\hat{\mathbf{b}}$, $E$ (\ref{eq:E1}) is minimised.
 
-\item Once filtered, there will be some minimum value of $K_{min}$ required for $\mathbf{b}$ such that the rate $L$ vector $\hat{\mathbf{f}}$ can be recovered with minimal $E$. However we are free to choose $K>K_{min}$ as the "bandwidth" of the sampled sequence (and presumably VQ distortion for a given number of bits) will be independant of $K$ when $K>K_{min}$.  While a larger $K$ will use more VQ storage, it may simplify resampling at the receiver.  If $K$ is large enough, a simple linear resampler may suffice.
+\item Once filtered, there will be some minimum value of $K_{min}$ required for $\mathbf{b}$ such that the rate $L$ vector $\hat{\mathbf{f}}$ can be recovered with minimal $E$. However we are free to choose $K>K_{min}$ as the "bandwidth" of the sampled sequence (and presumably VQ distortion for a given number of bits) will be independent of $K$ when $K>K_{min}$.  While a larger $K$ will use more VQ storage, it may simplify resampling at the receiver.  If $K$ is large enough, a simple linear resampler may suffice.
 
 \item With non-linear frequency sampling, we may need a high local rate near F1 to accurately represent sharp formants, especially for males.  There may be other ways to encode this information, for a example a resampling function or VQ that takes into account $F0$ - "sharpening" F1 for low $F0$ speakers.
 
@@ -256,7 +256,7 @@ The $m$th filtered sample can be obtained by:
 \begin{equation}
 Y_m = \sqrt{\sum_{k=st}^{en}A_k^2 h(k)}
 \end{equation}
-where $A_k$ is the $k$th \emph{linear} harmonic amplitude, $h(k)$ is sequence of samples defining a suitable filter, and $st$ and $en$ define the start and end harmonics used as input to the filtering operation for the $m$th sample.  This formulation filters the harmonic energies, allowing high amplitude samples (peaks) to contribute more than low amplitude samples. This is an appoximation of the ears masking behaivour, and was determined by experiment to slightly improve the peak/trough ratio of formants compared to filtering linear or log (dB) $A_k$.
+where $A_k$ is the $k$th \emph{linear} harmonic amplitude, $h(k)$ is sequence of samples defining a suitable filter, and $st$ and $en$ define the start and end harmonics used as input to the filtering operation for the $m$th sample.  This formulation filters the harmonic energies, allowing high amplitude samples (peaks) to contribute more than low amplitude samples. This is an approximation of the ears masking behaviour, and was determined by experiment to slightly improve the peak/trough ratio of formants compared to filtering linear or log (dB) $A_k$.
 
 As we wish to resample on a non-linear frequency axis, we need a set of filters that become wider as frequency increases. We can use the frequency warping function to divide the speech spectrum into $N_b$ bands, with the centre frequency of each band given by:
 \begin{equation}
@@ -329,7 +329,7 @@ Informal listening tests were conducted (3 samples, headphones, spline interpola
 It was also noted that even for $N_b=100$, the speech quality was not significantly affected, despite the high objective distortion evident in Figure \ref{fig:ratek2_E_K_hts} for $Nb=100$.  This is puzzling, as there is significant difference between $\hat{\mathbf{y}}$ and $\mathbf{y}$ due to the aliasing from the rate K resampling $R()$, especially at high frequencies where condition (\ref{eq:local_undersampling}) is not met.  This suggests that the ear is insensitive to noise in the high frequency region, which could be exploited during quantisation to optimise bit allocation.
 
 \begin{figure}[h]
-\caption{Mean spectral distortion $E$ against $K$ for a family of filters $H()$ for the 24 second \emph{hts} sample. $N_b=100$ coresponds to no filtering $H(x)=x$, the \emph{para} case is equivalent to the \emph{newamp1} algorithm rate K resampler.}
+\caption{Mean spectral distortion $E$ against $K$ for a family of filters $H()$ for the 24 second \emph{hts} sample. $N_b=100$ corresponds to no filtering $H(x)=x$, the \emph{para} case is equivalent to the \emph{newamp1} algorithm rate K resampler.}
 \label{fig:ratek2_E_K_hts}
 \begin{center}
 \includegraphics[width=10cm]{ratek2_E_K_hts.png}
@@ -371,7 +371,7 @@ In Figure \ref{fig:20_100_vq} and Figure \ref{fig:train_120_Nb20_K30_vq} we note
 
 \begin{enumerate}
 
-\item The residual error from stage 1 may be a set of K independant Gaussians, with very little correlation between them.  Inuitively, it makes sense that the first VQ stage would train to make the stage 1 residual error variance in each vector element similar.  Exploring the residual vectors in \url{Octave} shows this is indeed the case - zero mean Gaussian shaped histograms with variances around 7 dB$^2$ for most elements (curiously $k=1$ and $k=30$ higher at 9 and 12 dB$^2$).
+\item The residual error from stage 1 may be a set of K independent Gaussians, with very little correlation between them.  Intuitively, it makes sense that the first VQ stage would train to make the stage 1 residual error variance in each vector element similar.  Exploring the residual vectors in \url{Octave} shows this is indeed the case - zero mean Gaussian shaped histograms with variances around 7 dB$^2$ for most elements (curiously $k=1$ and $k=30$ higher at 9 and 12 dB$^2$).
 
 \item The $E_q$ after second stage VQ will reduce slowly as the number of bits increases.  
 
@@ -383,7 +383,7 @@ In Figure \ref{fig:20_100_vq} and Figure \ref{fig:train_120_Nb20_K30_vq} we note
 
 \item Other possibilities are a bug in this analysis (or the software tools), perhaps due to the small size of the training database. 
 
-\item An alternative quantiser based on PCA or DCT rather than direct VQ of $\mathbf{b}$.  Consider a DCT of $\mathbf{b}$ folllowed by a DCT. The residual into a second stage would still likely be K Gaussians of similar variance, so may suffer the same poor second stage performance.  A method that reduces the dimension of the Gaussians being quantised by the second stage VQ would be useful.
+\item An alternative quantiser based on PCA or DCT rather than direct VQ of $\mathbf{b}$.  Consider a DCT of $\mathbf{b}$ followed by a DCT. The residual into a second stage would still likely be K Gaussians of similar variance, so may suffer the same poor second stage performance.  A method that reduces the dimension of the Gaussians being quantised by the second stage VQ would be useful.
 
 \end{enumerate}
 
@@ -405,11 +405,25 @@ In Figure \ref{fig:20_100_vq} and Figure \ref{fig:train_120_Nb20_K30_vq} we note
 
 \section{Efficient Filtering}
 
-As $L$ is time varying, it is necessary to determine the filters $g(k)$ for every frame which is computationally inefficient.  A more efficient procedure is to resample $\mathbf{a}$ to rate $L_{high}=L_{max}$, perform the filtering at rate $L_{high}$, then resample to the non-linearly spaced rate $K$.  This allows $g(k)$ to be precomputed for rate $L_{high}$.  In Figure \ref{fig:ratek2_E_K_hts}, the \emph{Nb=20 eff} curve shows the results of the efficient filtering algorithm, which as expected, are very close to the \emph{Nb=20} curve.
+As $L$ is time varying, it is necessary to determine the filters $g(k)$ for every frame which is computationally inefficient.  A more efficient procedure is to resample $\mathbf{a}$ to rate $L_{high}=L_{max}$ vector $\mathbf{x}$ using the resampler $T()$, perform the filtering $G()$ at rate $L_{high}$, then resample $R()$ to the non-linearly spaced rate $K$ vector $\mathbf{b}$.  This allows $g(k)$ to be precomputed for rate $L_{high}$.  The process now becomes:
+
+\begin{equation}
+\begin{split}
+\mathbf{x} &=T(\mathbf{a}) \\
+\mathbf{y} &= H(\mathbf{x}) \\
+\mathbf{b} &= R(\mathbf{y}) \\
+\hat{\mathbf{b}} &= Q(\mathbf{b}) \\
+\hat{\mathbf{y}}^L &= S(\hat{\mathbf{b}})
+\end{split}
+\end{equation}
+
+where $\hat{\mathbf{y}}^L$ is sampled at rate $L$, unlike $\mathbf{y}$ which is sampled at rate $L_{high}$.  Note that for the purpose of calculating spectral distortion $E$ it may be covenient to configure $S()$ to extract $\hat{\mathbf{y}}^{Lhigh}$ at rate $L_{high}$.
+
+In Figure \ref{fig:ratek2_E_K_hts}, the \emph{Nb=20 eff} curve shows the results of the efficient filtering algorithm with $\hat{\mathbf{b}} = \mathbf{b}$, which as expected, are very close to the \emph{Nb=20} curve.
 
 \section{Vector Quantiser Training}
 
-Using the algorithms developed above, the 24 minute (144,000 frame) \emph{train.spc} sample was used to train several vector quantisers (Table \ref{table:train_vqs}).  Each frame was resampled to rate $L_{high}$, $N_b=20$ filtered, and resampled to a training set of rate $K=30$ vectors. The results for the single stage VQ were dissapointing, however the two stage VQ appears to perform quite well, and is a candidate for an improved 1200 bit/s Codec 2 mode.  As a sanity check, two 4 second samples from within the training set (\emph{big\_dog} and \emph{two\_lines}) also give reasonable results.
+Using the algorithms developed above, the 24 minute (144,000 frame) \emph{train.spc} sample was used to train several vector quantisers (Table \ref{table:train_vqs}).  Each frame was resampled to rate $L_{high}$, $N_b=20$ filtered, and resampled to a training set of rate $K=30$ vectors. The spectral distortion $E_q$ results for the single stage VQ were disappointing, however the two stage VQ appears to perform quite well, and is a candidate for an improved 1200 bit/s Codec 2 mode.  As a sanity check, two 4 second samples from within the training set (\emph{big\_dog} and \emph{two\_lines}) were tested with results consistent with the entire training data set.
 
 \begin{table}[h]
 \centering
@@ -447,25 +461,23 @@ Using the algorithms developed above, the 24 minute (144,000 frame) \emph{train.
 
 \section{Pitch Dependant Spectral Envelope}
 
-Treating $\mathbf{a}$ as a sequence of samples can be interpreted in terms of the source-filter model of speech production, where a spectrally flat impulse train at $F0$ excites a filter with spectral envelope defined by the samples of $\mathbf{a}$.
-
 Figures \ref{fig:ratek7_big_dog_61} and \ref{fig:ratek7_two_lines_61} overlay the speech spectrum and the corresponding upsampled and filtered rate $L_{high}$ vector $\mathbf{y}$.
 
-When $L<K$ (e.g. females), there are many interpolation functions that result in a low $E$ fit.  It has been observed that for some frames the peaks in $\mathbf{y}$ do not correspond to the peaks in the speech spectrum.  This is acceptable if the quantisation error is low, as with $\hat{\mathbf{y}}\approx\mathbf{y}$ the input sequence can be reconstructed at any interpolated point.  However it suggests that for a given phoneme, $\mathbf{y}$ may be pitch dependant, requiring seperate VQ entries to represent the same spectral envelope from different $F0$ frames, thus increasing the overall bit rate for a given speech quality.
+When $L<K$ (e.g. females), there are many interpolation functions that result in a low $E$ fit.  It has been observed that for some frames the peaks in $\mathbf{y}$ do not correspond to the peaks in the speech spectrum.  This is acceptable if the quantisation error is small ($\hat{\mathbf{b}}\approx\mathbf{b}$) as the sequence $\mathbf{y}$ can be reconstructed at any interpolated point.  However it suggests that $\mathbf{y}$ may be pitch dependant, requiring separate VQ entries to represent essentially the same spectral information from different $F0$ frames, thus increasing the overall bit rate for a given speech quality.
 
 With low $F0$ males, we note $\mathbf{y}$ is also carrying information about the bandwidth of the peak that is not present for high $F0$ speakers. Narrow bandwidth peaks (in particular F1), have been shown experimentally to be important for the perception of male speech.  As the bandwidth of F1 broadens, the speech becomes muffled.  We suggest this is because several adjacent harmonics inside the same spectral peak cause confusion as to the frequency of the peak and hence the formant being perceived.  This problem is less noticable in females as the harmonics are widely spaced, and unlikely to fall within one spectral peak.
 
-Thus with low $F0$ speakers, this also suggests a pitch dependancy in the spectral envelope $\mathbf{y}$, and corresponding inefficiency in quantisation.
+Thus with low $F0$ speakers, this also suggests a pitch dependency in the spectral envelope $\mathbf{y}$, and corresponding inefficiency in quantisation.
 
-This pitch dependancy explains several results in Codec 2 and the wider literature:
+This pitch dependency explains several results in Codec 2 and the wider literature:
 \begin{enumerate}
-\item Neural speech synthesis use a feature set equivilent to a small $N_b$, small $K$ $\mathbf{b}$ vectors, and produce very high quality speech.  When attempts were made to synthesise speech directly from this feature set using a sinusoidal model, the result was muffled speech. However a Neural model has the ability to use $F0$ as an input feature:
+\item Neural speech synthesis use a feature set equivalent to a small $N_b$, small $K$ $\mathbf{b}$ vectors, and produce very high quality speech.  When attempts were made to synthesise speech directly from this feature set using a sinusoidal model, the result was muffled speech. However a Neural model has the ability to use $F0$ as an input feature:
 \begin{equation}
 \hat{\mathbf{y}} = F(F0, \mathbf{b}) 
 \end{equation}
 and thus forms narrow bandwidth formants in the model output $\hat{\mathbf{y}}$ during low $F0$ speech. The function $F()$ is typically non-linear, so the peak/formant ratio of $\mathbf{y}$ can be enhanced on reconstruction in a way not possible with a linear resampler, overcoming the smoothing effect of low $N_b$ filtering. 
 
-\item The Codec 2 \emph{newamp1} algorithm used in Codec 2 700 uses an experimentally derived postfilter that has a large impact in the quality of male speech.  It works by expanding the dynamic range of the rate $K$ spectra (multiplying the rate $K$ samples by a constant, then renormalising to keep energy constant).  The peak harmonics become higher than adjacent harmonics, effectively narrowing the bandwidth of peaks.
+\item The Codec 2 \emph{newamp1} algorithm used in Codec 2 700 uses an experimentally derived postfilter that has a large impact in the quality of male speech.  It works by expanding the dynamic range of the rate $K$ spectra (multiplying the rate $K$ samples by a constant, then re-normalising to keep energy constant).  The peak harmonics become higher than adjacent harmonics, effectively narrowing the bandwidth of peaks.
 
 \item The group delay of a harmonic in the centre of narrow bandwidth filter will be larger compared to adjacent harmonics outside of the peak.  If F1 is narrow it will "ring" for longer, and the time domain waveform will not decay completely between pitch periods.  This increases the Peak to Average Power Ratio (PAPR) of the synthesised speech, makes it sound less buzzy, and closer to the input speech waveform.
 
@@ -486,6 +498,80 @@ and thus forms narrow bandwidth formants in the model output $\hat{\mathbf{y}}$ 
 \includegraphics[width=8cm]{ratek7_two_lines_61.png}
 \end{center}
 \end{figure}
+
+\section{First Pass VQ Listening tests}
+
+Initial listening tests were conducted using a single male (\emph{big\_dog}) and female (\emph{two\_lines}) samples from inside the training dataset and evaluated using headphones.  Samples synthesised with original amplitudes and codec 2 3200 were used as controls.  The \emph{phase0} algorithm was used for all samples to synthesise phases. The female sample sounded quite good under quantisation, however the male sounded buzzy and muffled.
+
+Key observations:
+\begin{enumerate}
+\item A low frequency artifact, possibly due to reconstruction errors beneath $warp(1,K)$ Hz.  These appeared to go away when a high pass filter was applied to the synthesised speech.
+\item Muffled/buzzy, even without vector quantisation, e.g. just filtered and resampled $\hat{\mathbf{y}}^L = S(\mathbf{b})$).  Suggests filtering alone is causing problems, but only for males.
+\item Codec 2 3200 sounds fine, this uses a LPC/LSP representation that can model sharp harmonics at all frequencies due to the high bit rate.
+\item Application of the \emph{phase0} model with the filtered amplitudes ($\hat{\mathbf{y}}^L = S(\mathbf{b})$) is worse than original phases and the filtered amplitudes.  Use of original phases removes some of the muffled/buzzy effect.  This effect has been observed before.
+\item The female sounds fine.
+\end{enumerate}
+
+Theory: bandwidth of formants matters at all frequencies (not just F1), even if the ear is only sensitive to the log of the centre frequency of the peaks.  We need to preserve sharp peaks at high frequencies.
+
+Discussion:
+\begin{enumerate}
+\item The filtering currently employed broadens high frequency spectral peaks, causing poor quality speech for males. An example can be seen in Figure \ref{fig:ratek7_big_dog_61}, near 2000 and 3000 Hz.
+\item The ear prefers speech waveforms with a low peak to average power ratio, such as that obtained from narrow bandwidth spectral peaks (see \emph{phase0} discussion below).  These waveforms are common with amplitude compressors, such as those for sound recording and SSB radio.
+\item The theory explains the good results for Codec 2 3200 on the same male.  Due to the high bit rate of this mode we can accurately represent narrow bandwidth peaks at any frequency.  It also explain why the speech quality declines with the lower rate Codec 2 modes that employ LPC/LSPs. They lack the bits to represent the bandwidth of all spectral peaks.
+\item As discussed above, representing narrow peaks for low $F0$ male speakers at many frequencies has the potential for VQ inefficiency and an increased bit rate.  A method needs to be found that can preserve the bandwidth or peaks, and still employ a non-linear frequency axis for the location of the centre of the peaks.
+\item Intuitively, we should be able to represent the speech spectrum with the same number of bits for females as for males.
+\item NN codecs suggest it may be possible to infer or regenerate narrow bandwidth peaks from simpler, lower bit rate (lower $N_b$) spectral respresentations.  This could be performed via a post filtering algorithm or by training a neural net. 
+\item If we use the current low $N_b$ filtering, the post filter should be frequency dependant, only narrowing the bandwidth of high frequency peaks.
+\end{enumerate}
+
+Possible ways forward:
+\begin{enumerate}
+\item Raise Nb until males sound OK, design VQ and see how well it works.  May be inefficient, or there may be some correlations across males that VQ can find.
+\item Perform filtering on pre-emphasised speech.  Spectral valley energy at frequencies just lower than a high frequency peak can sometimes be higher than the spectral peak due to the slope of the speeech spectra.  This can causes reduced spectral peak/valley ratios after filtering.  For an example see the spectral peak of Figure \ref{fig:ratek7_big_dog_61} around 2000 Hz.
+\item A freq-dep postfilter.  Need to prove we can narrow formants for males, and enhance peak/valley ratio.
+\item A NN is one solution - sharp peaks for males (based on F0), and enhance peaks/valley ration at high frequencies.  What would we use as ground truth?  Is there a toy example we can train against?  How can we make it handle wide dynamic ranges?  How do we know we have enough training data? Need to see it enhancing indep of frequency of formant - that would be a good test.  Just train on voiced, high energy frames.
+\end{enumerate}
+
+Table \ref{table:ratek_phase} summarises the speech quality for a combination of rate $K$ amplitude modelling (\emph{newamp} algorithm) and phase synthesised using the \emph{phase0} model.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{c c c c}
+ \hline
+  & Original Phase & Synthesised Phase \\
+ \hline
+ Original Amplitudes & Good & Good \\ 
+ Rate K amplitudes & Good & Poor \\
+ \hline
+\end{tabular}
+\caption{Subjective speech sample for a male sample with Rate $K$ amplitudes and synthesised phase}
+\label{table:ratek_phase}
+\end{table}
+
+The \emph{phase0} algorithm fits a minimum phase model to the spectral amplitudes.  Near spectral peaks this can be approximated by a pair of poles that describes a second order all pole system with time domain impulse response:
+\begin{equation}
+x(n)=Ae^{-\alpha n}cos(\omega n)
+\end{equation}
+$\alpha$ is the time constant that controls the time domain decay of the envelope.  For a wide bandwidth peak $\alpha$ will be large, $x(n)$ will decay quickly and the formant energy will be contained in a shorter period of time.  For a narrow bandwidth peak $\alpha$ will be small and $x(n)$ will decay slowly, the format will "ring" longer and the peak to average ratio will be smaller.
+
+In the frequency domain a small $\alpha$ system results in a rapid phase shift near the peak frequency.  If the system is excited by an impulse train (harmonic frequency spectra), a small $\alpha$ results in adjacent harmonics having different phases, and not being aligned in time, shifting time domain energy away from a central peak at the pitch pulse onset.
+
+This model can be used to explain some of the results in Table \ref{table:ratek_phase}.  With original amplitude we have narrow peaks so the \emph{phase0} algorithm produces a small-$\alpha$ $x(n)$ that rings for some time and sounds natural.  With rate $K$ amplitudes and original phase, we have a phase spectra from the original speech which despite a broad amplitude peak, has a phase spectra that results in a time domain signal with energy shifted away from a central peak at the pitch pulse onset.  With rate $K$ amplitudes and the \emph{phase0} algorithm, we get a large-$\alpha$ $x(n)$ with energy concentrated near the start of the impulse, which is perceptually of lower quality.
+ 
+\section{Post Filter Design}
+
+We require a function $P()$ that modifies a smoothed vector of spectral magnitude samples $\mathbf(y)$ to sharpen formant peaks and increase peak/valley ratio at high frequencies.
+
+The filter $P()$ is needed for low $F0$ speakers, where multiple harmonics fit inside the smoothed high frequency spectral peaks of $\mathbf(y)$, reducing the perceptual speech quality.
+
+The smoothed vector $\mathbf(y)$ is obtained by filtering $\mathbf(y)=H(\mathbf(x)$, where $H()$ is a filter function defined by the parameter $N_b$ that provides progressively more smoothing as frequency increases.  This smoothing reduces the information in $\mathbf(y)$ making it possible to quantise at low bit rates. At low frequencies $H(X_k)=X_k$ therefore $P()$ should modify the spectra only at high frequencies, leaving low frequencies unchanged. 
+
+Representing the sharp peaks required for male speech is possible by direct quantisation of $\mathbf(x)$ but requires a prohibitively high bit rate for our use case.  High $F0$ speakers can be adequately represented by a low $N_b$ vector  which suggests there should be a way to reproduce male speech of adequate quality from low $N_b$ vectors.  $P()$ should have no effect on high $F0$ speakers, which are already adequately represented by the smoothed spectral samples.
+
+The algorithm should only operate on Voiced speech
+
+NN or expression solution
 
 \end{document}
 
