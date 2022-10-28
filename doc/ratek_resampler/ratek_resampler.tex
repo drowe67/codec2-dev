@@ -506,7 +506,7 @@ Initial listening tests were conducted using a single male (\emph{big\_dog}) and
 Key observations:
 \begin{enumerate}
 \item A low frequency artifact, possibly due to reconstruction errors beneath $warp(1,K)$ Hz.  These appeared to go away when a high pass filter was applied to the synthesised speech.
-\item Muffled/buzzy, even without vector quantisation, e.g. just filtered and resampled $\hat{\mathbf{y}}^L = S(\mathbf{b})$).  Suggests filtering alone is causing problems, but only for males.
+\item Muffled/buzzy, even without vector quantisation, e.g. just filtered and resampled $\hat{\mathbf{y}}^L = S(\mathbf{b})$.  Suggests filtering alone is causing problems, but only for males.
 \item Codec 2 3200 sounds fine, this uses a LPC/LSP representation that can model sharp harmonics at all frequencies due to the high bit rate.
 \item Application of the \emph{phase0} model with the filtered amplitudes ($\hat{\mathbf{y}}^L = S(\mathbf{b})$) is worse than original phases and the filtered amplitudes.  Use of original phases removes some of the muffled/buzzy effect.  This effect has been observed before.
 \item The female sounds fine.
@@ -519,9 +519,9 @@ Discussion:
 \item The filtering currently employed broadens high frequency spectral peaks, causing poor quality speech for males. An example can be seen in Figure \ref{fig:ratek7_big_dog_61}, near 2000 and 3000 Hz.
 \item The ear prefers speech waveforms with a low peak to average power ratio, such as that obtained from narrow bandwidth spectral peaks (see \emph{phase0} discussion below).  These waveforms are common with amplitude compressors, such as those for sound recording and SSB radio.
 \item The theory explains the good results for Codec 2 3200 on the same male.  Due to the high bit rate of this mode we can accurately represent narrow bandwidth peaks at any frequency.  It also explain why the speech quality declines with the lower rate Codec 2 modes that employ LPC/LSPs. They lack the bits to represent the bandwidth of all spectral peaks.
-\item As discussed above, representing narrow peaks for low $F0$ male speakers at many frequencies has the potential for VQ inefficiency and an increased bit rate.  A method needs to be found that can preserve the bandwidth or peaks, and still employ a non-linear frequency axis for the location of the centre of the peaks.
+\item As discussed above, representing narrow peaks for low $F0$ male speakers at many frequencies has the potential for VQ inefficiency and an increased bit rate.  A method needs to be found that can preserve the bandwidth of peaks, and still employ a non-linear frequency axis for the location of the centre of the peaks.
 \item Intuitively, we should be able to represent the speech spectrum with the same number of bits for females as for males.
-\item NN codecs suggest it may be possible to infer or regenerate narrow bandwidth peaks from simpler, lower bit rate (lower $N_b$) spectral respresentations.  This could be performed via a post filtering algorithm or by training a neural net. 
+\item NN codecs suggest it may be possible to infer or regenerate narrow bandwidth peaks from simpler, lower bit rate (lower $N_b$) spectral representations.  This could be performed via a post filtering algorithm or by training a neural net. 
 \item If we use the current low $N_b$ filtering, the post filter should be frequency dependant, only narrowing the bandwidth of high frequency peaks.
 \end{enumerate}
 
@@ -530,7 +530,7 @@ Possible ways forward:
 \item Raise Nb until males sound OK, design VQ and see how well it works.  May be inefficient, or there may be some correlations across males that VQ can find.
 \item Perform filtering on pre-emphasised speech.  Spectral valley energy at frequencies just lower than a high frequency peak can sometimes be higher than the spectral peak due to the slope of the speeech spectra.  This can causes reduced spectral peak/valley ratios after filtering.  For an example see the spectral peak of Figure \ref{fig:ratek7_big_dog_61} around 2000 Hz.
 \item A freq-dep postfilter.  Need to prove we can narrow formants for males, and enhance peak/valley ratio.
-\item A NN is one solution - sharp peaks for males (based on F0), and enhance peaks/valley ration at high frequencies.  What would we use as ground truth?  Is there a toy example we can train against?  How can we make it handle wide dynamic ranges?  How do we know we have enough training data? Need to see it enhancing indep of frequency of formant - that would be a good test.  Just train on voiced, high energy frames.
+\item A NN is one solution - sharp peaks for males (based on F0), and enhance peaks/valley ratio at high frequencies.  What would we use as ground truth?  Is there a toy example we can train against?  How can we make it handle wide dynamic ranges?  How do we know we have enough training data? Need to see it enhancing indep of frequency of formant - that would be a good test.  Just train on voiced, high energy frames.
 \end{enumerate}
 
 Table \ref{table:ratek_phase} summarises the speech quality for a combination of rate $K$ amplitude modelling (\emph{newamp} algorithm) and phase synthesised using the \emph{phase0} model.
@@ -545,7 +545,7 @@ Table \ref{table:ratek_phase} summarises the speech quality for a combination of
  Rate K amplitudes & Good & Poor \\
  \hline
 \end{tabular}
-\caption{Subjective speech sample for a male sample with Rate $K$ amplitudes and synthesised phase}
+\caption{Subjective speech quality for a male sample with Rate $K$ amplitudes and synthesised phase}
 \label{table:ratek_phase}
 \end{table}
 
@@ -561,17 +561,16 @@ This model can be used to explain some of the results in Table \ref{table:ratek_
  
 \section{Post Filter Design}
 
-We require a function $P()$ that modifies a smoothed vector of spectral magnitude samples $\mathbf(y)$ to sharpen formant peaks and increase peak/valley ratio at high frequencies.
+We require a function $P()$ that modifies a smoothed vector of spectral magnitude samples $\mathbf{y}$ to sharpen formant peaks and increase peak/valley ratio at high frequencies.
 
-The filter $P()$ is needed for low $F0$ speakers, where multiple harmonics fit inside the smoothed high frequency spectral peaks of $\mathbf(y)$, reducing the perceptual speech quality.
+The filter $P()$ is needed for low $F0$ speakers, where multiple harmonics fit inside the smoothed high frequency spectral peaks of $\mathbf{y}$, reducing the perceptual speech quality.
 
-The smoothed vector $\mathbf(y)$ is obtained by filtering $\mathbf(y)=H(\mathbf(x)$, where $H()$ is a filter function defined by the parameter $N_b$ that provides progressively more smoothing as frequency increases.  This smoothing reduces the information in $\mathbf(y)$ making it possible to quantise at low bit rates. At low frequencies $H(X_k)=X_k$ therefore $P()$ should modify the spectra only at high frequencies, leaving low frequencies unchanged. 
+The smoothed vector $\mathbf{y}$ is obtained by filtering $\mathbf{y}=H(\mathbf{x})$, where $H()$ is a filter function defined by the parameter $N_b$ that provides progressively more smoothing as frequency increases.  This smoothing reduces the information in $\mathbf{y}$ making it possible to quantise at low bit rates. At low frequencies $H(X_k)=X_k$ therefore $P()$ should modify the spectra only at high frequencies, leaving low frequencies unchanged. 
 
-Representing the sharp peaks required for male speech is possible by direct quantisation of $\mathbf(x)$ but requires a prohibitively high bit rate for our use case.  High $F0$ speakers can be adequately represented by a low $N_b$ vector  which suggests there should be a way to reproduce male speech of adequate quality from low $N_b$ vectors.  $P()$ should have no effect on high $F0$ speakers, which are already adequately represented by the smoothed spectral samples.
+Representing the sharp peaks required for male speech is possible by direct quantisation of $\mathbf{x}$ but requires a prohibitively high bit rate for our use case.  High $F0$ speakers can be adequately represented by a low $N_b$ vector  which suggests there should be a way to reproduce male speech of adequate quality from low $N_b$ vectors.  $P()$ should have no effect on high $F0$ speakers, which are already adequately represented by the smoothed spectral samples.
 
 The algorithm should only operate on Voiced speech
 
-NN or expression solution
 
 \end{document}
 
