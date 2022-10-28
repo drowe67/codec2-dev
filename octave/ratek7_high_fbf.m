@@ -15,11 +15,11 @@
 %   octave:14> ratek2_high_fbf("../build_linux/two_lines",60)
 
 
-function ratek7_high_fbf(samname, f)
+function ratek7_high_fbf(samname, f, Nb=20, K=30)
   more off;
 
-  newamp_700c; melvq;
-  Fs = 8000; Nb = 20; K = 30; resampler = 'spline'; Lhigh = 80;
+  newamp_700c; melvq; pf_en = 0;
+  Fs = 8000; resampler = 'spline'; Lhigh = 80;
 
   % load up text files dumped from c2sim ---------------------------------------
 
@@ -75,8 +75,22 @@ function ratek7_high_fbf(samname, f)
     plot((0:255)*4000/256, Sw(f,:),";Sw;");
     l = sprintf(";rate %d AmdB;g+-", L);
     plot((1:L)*Wo*4000/pi, AmdB, l);
-    plot(rate_Lhigh_sample_freqs_kHz*1000, YdB, ';rate Lhigh YdB;b+-');    
 
+    dY_df = YdB(2:end)-YdB(1:end-1);
+    PdB = zeros(1,length(dY_df));    
+    for i=20:length(dY_df)-1
+      if dY_df(i)>0 && dY_df(i+1)<0
+        PdB(i-2:i+2) = [2 4 6 4 2];
+      end
+    end
+    plot(rate_Lhigh_sample_freqs_kHz(1:length(dY_df))*1000+F0high/2, dY_df);    
+    plot(rate_Lhigh_sample_freqs_kHz(1:length(dY_df))*1000, PdB);    
+
+    if pf_en
+      YdB(2:length(PdB)-1) = YdB(2:length(PdB)-1) + PdB(1:length(PdB)-2);
+    end
+    plot(rate_Lhigh_sample_freqs_kHz*1000, YdB, ';rate Lhigh YdB;b+-');
+    
     axis([0 Fs/2 -10 80]);
     hold off;
 
@@ -92,12 +106,8 @@ function ratek7_high_fbf(samname, f)
     if k == 'b'
       f = f - 1;
     endif
-    if k == 'e'
-      if energy == 1
-        energy = 0;
-      else
-        energy = 1;
-      end
+    if k == 'f'
+      if pf_en, pf_en = 0; else pf_en = 1; end
     end
     if (k == 'p')
       [dir name ext]=fileparts(samname);
