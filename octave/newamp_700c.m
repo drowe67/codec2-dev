@@ -222,7 +222,7 @@ function rate_K_surface = resample_const_rate_f(model,
       AmdB_peak = max(AmdB);
       AmdB(find(AmdB < (AmdB_peak-50))) = AmdB_peak-50;
     end
-    
+
     rate_L_sample_freqs_kHz = (1:L)*Wo*4/pi;
 
     if strcmp(resampler, 'para')
@@ -418,4 +418,34 @@ function test_filters
   for m=1:L
     generate_filter(m,f0,L,20);
   end
+end
+
+% Given a magnitude spectrum, compute the LPC coeffcients
+% w and mag row vectors
+function a = lpc_from_mag_spectrum(w, mag, order)
+  assert(isrow(w));
+  assert(isrow(mag));
+  assert(length(w)==length(mag));
+  M = length(w);
+  P = mag.^2;
+  R = zeros(order+1,1); % R(i) actually stored in R(i+1) because Octave
+  for i=0:order
+    R(i+1) = (1/M)*P*cos(i*w)';
+  end
+  R_toeplitz = toeplitz(R(1:order));
+  a = -inv(R_toeplitz)*R(2:order+1);
+  a = [1 a'];
+end
+
+function test_lpc_from_mag_spectrum
+  step=pi/100;
+  w = 0:step:pi-step;
+  omega = pi/4; beta=0.9;
+  a_target =  [1 -2*beta*cos(omega) beta*beta];
+  mag = abs(freqz(1, a_target, w));
+  a_est = lpc_from_mag_spectrum(w, mag, 2);
+  mag_est = abs(freqz(1, a_est, w));
+  SD = mean((20*log10(mag)-20*log10(mag_est)).^2);
+  assert(SD < 0.1);
+  clf; plot(w,mag); hold on; plot(w,mag_est); hold off;
 end
