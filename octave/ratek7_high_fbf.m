@@ -10,9 +10,9 @@
 % Usage:
 %   Make sure codec2-dev is compiled with the -DDUMP option - see README.md for
 %    instructions.
-%   ~/codec2-dev/build_linux$ ./c2sim ../raw/two_lines.raw --hpf --dump two_lines
+%   ~/codec2-dev/build_linux$ ./src/c2sim ../raw/big_dog.raw --hpf --dump big_dog
 %   $ cd ~/codec2-dev/octave
-%   octave:14> ratek2_high_fbf("../build_linux/two_lines",60)
+%   octave:14> ratek7_high_fbf("../build_linux/big_dog",60)
 
 
 function ratek7_high_fbf(samname, f, Nb=20, K=30)
@@ -43,12 +43,12 @@ function ratek7_high_fbf(samname, f, Nb=20, K=30)
     plot((1:Lhigh-1)*F0high,h(m,1:Lhigh-1))
   end
   hold off;
-  
+
   rate_Lhigh_sample_freqs_kHz = (F0high:F0high:(Lhigh-1)*F0high)/1000;
 
   % Keyboard loop --------------------------------------------------------------
 
-  k = ' '; 
+  k = ' ';
   do
     s = [ Sn(2*f-1,:) Sn(2*f,:) ];
     figure(1); clf; plot(s); axis([1 length(s) -20000 20000]);
@@ -58,39 +58,37 @@ function ratek7_high_fbf(samname, f, Nb=20, K=30)
     Am_freqs_kHz = (1:L)*Wo*4/pi;
 
     % resample from rate L to rate Lhigh (both linearly spaced)
-    
+
     AmdB_rate_Lhigh = interp1([0 Am_freqs_kHz 4], [0 AmdB 0], rate_Lhigh_sample_freqs_kHz, "spline", "extrap");
-    
+
     % Filter at rate Lhigh, y = F(R(a)). Note we filter in linear energy domain, and Lhigh are linearly spaced
 
-    YdB = zeros(1,Lhigh-1);
+    Y = zeros(1,Lhigh-1); YdB = zeros(1,Lhigh-1);
     for m=1:Lhigh-1
       Am_rate_Lhigh = 10.^(AmdB_rate_Lhigh/20);
-      Y = sum(Am_rate_Lhigh.^2 .* h(m,1:Lhigh-1));
-      YdB(m) = 10*log10(Y);
+      Y(m) = sqrt(sum(Am_rate_Lhigh.^2 .* h(m,1:Lhigh-1)));
+      YdB(m) = 20*log10(Y(m));
     end
-    
+
     figure(3); clf;
     hold on;
     plot((0:255)*4000/256, Sw(f,:),";Sw;");
     l = sprintf(";rate %d AmdB;g+-", L);
     plot((1:L)*Wo*4000/pi, AmdB, l);
 
-    dY_df = YdB(2:end)-YdB(1:end-1);
-    PdB = zeros(1,length(dY_df));    
-    for i=20:length(dY_df)-1
-      if dY_df(i)>0 && dY_df(i+1)<0
-        PdB(i-2:i+2) = [2 4 6 4 2];
-      end
-    end
-    plot(rate_Lhigh_sample_freqs_kHz(1:length(dY_df))*1000+F0high/2, dY_df);    
-    plot(rate_Lhigh_sample_freqs_kHz(1:length(dY_df))*1000, PdB);    
+    % fit LPC model to Y (power spectrum)
+    w = 2*pi*rate_Lhigh_sample_freqs_kHz*1000/Fs;
+    [a G] = lpc_from_mag_spectrum(w, Y, 10);
+    gamma = 0.9;
+    P = G*freqz(1,a,w);
+    PdB = 20*log10(abs(P));
+    plot(rate_Lhigh_sample_freqs_kHz*1000, PdB);
 
     if pf_en
       YdB(2:length(PdB)-1) = YdB(2:length(PdB)-1) + PdB(1:length(PdB)-2);
     end
     plot(rate_Lhigh_sample_freqs_kHz*1000, YdB, ';rate Lhigh YdB;b+-');
-    
+
     axis([0 Fs/2 -10 80]);
     hold off;
 

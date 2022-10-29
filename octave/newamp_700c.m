@@ -422,7 +422,7 @@ end
 
 % Given a magnitude spectrum, compute the LPC coeffcients
 % w and mag row vectors
-function a = lpc_from_mag_spectrum(w, mag, order)
+function [a G] = lpc_from_mag_spectrum(w, mag, order)
   assert(isrow(w));
   assert(isrow(mag));
   assert(length(w)==length(mag));
@@ -434,6 +434,7 @@ function a = lpc_from_mag_spectrum(w, mag, order)
   end
   R_toeplitz = toeplitz(R(1:order));
   a = -inv(R_toeplitz)*R(2:order+1);
+  G = sqrt(R(1) + a'*R(2:order+1));
   a = [1 a'];
 end
 
@@ -443,9 +444,10 @@ function test_lpc_from_mag_spectrum
   omega = pi/4; beta=0.9;
   a_target =  [1 -2*beta*cos(omega) beta*beta];
   mag = abs(freqz(1, a_target, w));
-  a_est = lpc_from_mag_spectrum(w, mag, 2);
+  [a_est G] = lpc_from_mag_spectrum(w, mag, 2);
   mag_est = abs(freqz(1, a_est, w));
   SD = mean((20*log10(mag)-20*log10(mag_est)).^2);
   assert(SD < 0.1);
+  assert(abs(G-1) < 0.1);
   clf; plot(w,mag); hold on; plot(w,mag_est); hold off;
 end
