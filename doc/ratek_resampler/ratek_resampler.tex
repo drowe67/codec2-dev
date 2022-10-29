@@ -49,7 +49,7 @@ To quantise and transmit $\mathbf{a}$, it is convenient to resample $\mathbf{a}$
 \mathbf{b} &= \begin{bmatrix} B_1, B_2, \ldots B_K \end{bmatrix} = R(\mathbf{y})
 \end{split}
 \end{equation}
-Where $H()$ is a filter function chosen to smooth the spectral amplitude samples $A_m$ while not significantly altering the perceptual quality of the speech; and $R()$ is a resampling function. To model the logarithmic frequency response of the human ear $B_k$  are sampled on $K$ non-linearly spaced points on the frequency axis:
+Where $H()$ is a filter function chosen to smooth the spectral amplitude samples $A_m$ while not significantly altering the perceptual quality of the speech; and $R()$ is a resampling function. To model the response of the human ear $B_k$  are sampled on $K$ non-linearly spaced points on the frequency axis:
 \begin{equation}
 \begin{split}
 f_k &= warp(k,K) \ \textrm{Hz} \quad k=1 \ldots K \\
@@ -57,7 +57,7 @@ warp(1,K) &= 200 \ \textrm{Hz} \\
 warp(K,K) &= 3700 \ \textrm{Hz}
 \end{split}
 \end{equation}
-where $warp()$ is a frequency warping function. Codec 2 700C uses $K=20$, and $warp()$ is defined using the Mel function (Figure \ref{fig:mel_fhz}) which samples the spectrum more densely at low frequencies, and less densely at high frequencies:
+where $warp()$ is a frequency warping function. Codec 2 700C uses $K=20$, and $warp()$ is defined using the Mel function \cite[p 150]{o1997human} (Figure \ref{fig:mel_fhz}) which samples the spectrum more densely at low frequencies, and less densely at high frequencies:
 \begin{equation} \label{eq:mel_f}
 mel(f) = 2595log_{10}(1+f/700)
 \end{equation}
@@ -159,7 +159,7 @@ Here are a suggested set of experiments to evaluate the ideas presented in this 
 
 \item The baseline resampling (currently a 2nd order polynomial) is a potential source of distortion.  Conduct an experiment to test the theory that $E$ is small (and perceptual quality high) for $K>L$ using linear frequency sampling, $H(\mathbf{x})=\mathbf{x}$ and large $K$.
 
-\item How to demonstrate aliasing?  Well we can run current rate K code, that uses a 2nd order parabolic resampler.  Then compare with a "better" resampler that uses filtering.  Perform an informal listening test over a small set of samples.  Goal is to show reduced $E$ with similar perceptual quality.  Smoothing does reduce information so there will be a trade off.  Too much smoothing and perceptual quality will reduce.  We should also notice improved VQ performance, as we won't be quantising noise.
+\item How to demonstrate aliasing?  Well we can run current rate K code, that uses a 2nd order parabolic resampler.  Then compare with a "better" resampler that uses filtering.  Perform an informal listening test over a small set of samples.  Goal is to show reduced $E$ with similar perceptual quality.  Smoothing does reduce information so there will be a trade off.  Too much smoothing and perceptual quality will reduce.  We shoMel-frequency cepstral coefficients (MFCCs)uld also notice improved VQ performance, as we won't be quantising noise.
 
 \item A useful property is sensitivity to quantisation, which could be defined as $\frac{\partial E}{\partial \mathbf{b}}$. For example, given a 1dB RMS error in the elements of $\mathbf{b}$, what is the impact on $E$?
 
@@ -273,7 +273,7 @@ f_b &= mF0 \\
 b &= warp^{-1}(f_b,N_b) \\
 \end{split}
 \end{equation}
-A common choice for filtering $g(k)$ is a triangular function, which tapers to zero in the centre of adjacent bands $b-1$ and $b+1$.  This can be defined in terms of the harmonic indexes, as illustrated in  Figure \ref{fig:triangle_filter}.
+A triangular function for $g(k)$ has been selected, which tapers to zero in the centre of adjacent bands $b-1$ and $b+1$.  A similar triangular function is used for the filtering stage in the computation of Mel-frequency cepstral coefficients (MFCCs) \cite{davis1980comparison}. This function can be defined in terms of the harmonic indexes, as illustrated in  Figure \ref{fig:triangle_filter}.
 \begin{equation}
 \begin{split}
 st &= max(1,round(warp(b-1,N_b)/F0)) \\
@@ -465,7 +465,7 @@ Figures \ref{fig:ratek7_big_dog_61} and \ref{fig:ratek7_two_lines_61} overlay th
 
 When $L<K$ (e.g. females), there are many interpolation functions that result in a low $E$ fit.  It has been observed that for some frames the peaks in $\mathbf{y}$ do not correspond to the peaks in the speech spectrum.  This is acceptable if the quantisation error is small ($\hat{\mathbf{b}}\approx\mathbf{b}$) as the sequence $\mathbf{y}$ can be reconstructed at any interpolated point.  However it suggests that $\mathbf{y}$ may be pitch dependant, requiring separate VQ entries to represent essentially the same spectral information from different $F0$ frames, thus increasing the overall bit rate for a given speech quality.
 
-With low $F0$ males, we note $\mathbf{y}$ is also carrying information about the bandwidth of the peak that is not present for high $F0$ speakers. Narrow bandwidth peaks (in particular F1), have been shown experimentally to be important for the perception of male speech.  As the bandwidth of F1 broadens, the speech becomes muffled.  We suggest this is because several adjacent harmonics inside the same spectral peak cause confusion as to the frequency of the peak and hence the formant being perceived.  This problem is less noticable in females as the harmonics are widely spaced, and unlikely to fall within one spectral peak.
+With low $F0$ males, we note $\mathbf{y}$ is also carrying information about the bandwidth of the peak that is not present for high $F0$ speakers. Narrow bandwidth peaks (in particular F1), have been shown experimentally to be important for the perception of male speech.  As the bandwidth of F1 broadens, the speech becomes muffled.
 
 Thus with low $F0$ speakers, this also suggests a pitch dependency in the spectral envelope $\mathbf{y}$, and corresponding inefficiency in quantisation.
 
@@ -507,30 +507,23 @@ Key observations:
 \begin{enumerate}
 \item A low frequency artifact, possibly due to reconstruction errors beneath $warp(1,K)$ Hz.  These appeared to go away when a high pass filter was applied to the synthesised speech.
 \item Muffled/buzzy, even without vector quantisation, e.g. just filtered and resampled $\hat{\mathbf{y}}^L = S(\mathbf{b})$.  Suggests filtering alone is causing problems, but only for males.
-\item Codec 2 3200 sounds fine, this uses a LPC/LSP representation that can model sharp harmonics at all frequencies due to the high bit rate.
+\item Codec 2 3200 sounds fine, this uses a LPC/LSP representation that can accurately model sharp harmonics at all frequencies due to the high bit rate.
 \item Application of the \emph{phase0} model with the filtered amplitudes ($\hat{\mathbf{y}}^L = S(\mathbf{b})$) is worse than original phases and the filtered amplitudes.  Use of original phases removes some of the muffled/buzzy effect.  This effect has been observed before.
 \item The female sounds fine.
 \end{enumerate}
 
-Theory: bandwidth of formants matters at all frequencies (not just F1), even if the ear is only sensitive to the log of the centre frequency of the peaks.  We need to preserve sharp peaks at high frequencies.
+Theory: For low $F0$ speakers, the bandwidth of formants matters at high frequencies, despite the ear having reduced frequency resolution.  We need narrow bandwidth peaks at high frequencies.
 
 Discussion:
 \begin{enumerate}
-\item The filtering currently employed broadens high frequency spectral peaks, causing poor quality speech for males. An example can be seen in Figure \ref{fig:ratek7_big_dog_61}, near 2000 and 3000 Hz.
-\item The ear prefers speech waveforms with a low peak to average power ratio, such as that obtained from narrow bandwidth spectral peaks (see \emph{phase0} discussion below).  These waveforms are common with amplitude compressors, such as those for sound recording and SSB radio.
-\item The theory explains the good results for Codec 2 3200 on the same male.  Due to the high bit rate of this mode we can accurately represent narrow bandwidth peaks at any frequency.  It also explain why the speech quality declines with the lower rate Codec 2 modes that employ LPC/LSPs. They lack the bits to represent the bandwidth of all spectral peaks.
-\item As discussed above, representing narrow peaks for low $F0$ male speakers at many frequencies has the potential for VQ inefficiency and an increased bit rate.  A method needs to be found that can preserve the bandwidth of peaks, and still employ a non-linear frequency axis for the location of the centre of the peaks.
+\item The filtering $H()$ broadens high frequency spectral peaks, causing poor quality speech for males. An example can be seen in Figure \ref{fig:ratek7_big_dog_61}, near 2000 and 3000 Hz.
+\item A physiological reason based on loudness perception is given in \cite[p 62]{moore97}. For tone pulses of variable duration (2-20ms) but \emph{equal energy}, the probability of detection by a listener is proportional to the tone duration. This suggests \cite{pobloth1999phase} the distribution in time of the energy across a pitch cycle is important. 
+\item This effect can be interpreted in terms of the Peak to Average Power Ratio (PAPR) of the speech waveform. For a fixed total energy, the ear prefers speech waveforms with a low PAPR. This has parallels with amplitude compression algorithms such as those for sound recording and analog radio modulation, which also seek to lower the PAPR in order to improve perceptual loudness and intelligibility in high background noise use cases. Several authors \cite{mccree1992improving} \cite{sambur1978reducing} have explored the problem of buzzy and muffled synthesised speech for low $F0$ speakers and noted peakiness (higher PAPR) in the time domain envelope. In the limiting case where all of the pitch cycle energy is concentrated in an impulse (zero phase speech) \cite{xu2017distorting} reported robotic sound quality and decreased intelligibility scores.
+\item The theory explains the good results for Codec 2 3200 on the same male.  Due to the high bit rate of this mode we can accurately represent narrow bandwidth peaks at any frequency.  It also explains why the speech quality declines with the lower rate Codec 2 modes that employ LPC/LSPs. They lack the bits to represent the bandwidth of all spectral peaks.
+\item As discussed above, representing narrow peaks for low $F0$ male speakers at many frequencies has the potential for VQ inefficiency and an increased bit rate.  A method needs to be found that can preserve the bandwidth of peaks, and still employ a non-linear frequency axis for efficient encoding of the formant centre frequencies.
 \item Intuitively, we should be able to represent the speech spectrum with the same number of bits for females as for males.
-\item NN codecs suggest it may be possible to infer or regenerate narrow bandwidth peaks from simpler, lower bit rate (lower $N_b$) spectral representations.  This could be performed via a post filtering algorithm or by training a neural net. 
+\item The high quality of speech synthesised from neural networks with low frequency resolution cepstral vectors suggests it is possible to infer or regenerate narrow bandwidth peaks from simpler, lower bit rate (lower $N_b$) spectral representations.  This could be performed via a post filtering algorithm or by training a neural net. 
 \item If we use the current low $N_b$ filtering, the post filter should be frequency dependant, only narrowing the bandwidth of high frequency peaks.
-\end{enumerate}
-
-Possible ways forward:
-\begin{enumerate}
-\item Raise Nb until males sound OK, design VQ and see how well it works.  May be inefficient, or there may be some correlations across males that VQ can find.
-\item Perform filtering on pre-emphasised speech.  Spectral valley energy at frequencies just lower than a high frequency peak can sometimes be higher than the spectral peak due to the slope of the speeech spectra.  This can causes reduced spectral peak/valley ratios after filtering.  For an example see the spectral peak of Figure \ref{fig:ratek7_big_dog_61} around 2000 Hz.
-\item A freq-dep postfilter.  Need to prove we can narrow formants for males, and enhance peak/valley ratio.
-\item A NN is one solution - sharp peaks for males (based on F0), and enhance peaks/valley ratio at high frequencies.  What would we use as ground truth?  Is there a toy example we can train against?  How can we make it handle wide dynamic ranges?  How do we know we have enough training data? Need to see it enhancing indep of frequency of formant - that would be a good test.  Just train on voiced, high energy frames.
 \end{enumerate}
 
 Table \ref{table:ratek_phase} summarises the speech quality for a combination of rate $K$ amplitude modelling (\emph{newamp} algorithm) and phase synthesised using the \emph{phase0} model.
@@ -545,32 +538,45 @@ Table \ref{table:ratek_phase} summarises the speech quality for a combination of
  Rate K amplitudes & Good & Poor \\
  \hline
 \end{tabular}
-\caption{Subjective speech quality for a male sample with Rate $K$ amplitudes and synthesised phase}
+\caption{Subjective speech quality for a low pitch male sample with Rate $K$ amplitudes and synthesised phase}
 \label{table:ratek_phase}
 \end{table}
 
-The \emph{phase0} algorithm fits a minimum phase model to the spectral amplitudes.  Near spectral peaks this can be approximated by a pair of poles that describes a second order all pole system with time domain impulse response:
+The \emph{phase0} algorithm fits a minimum phase model to the spectral amplitudes in order to synthesise phase spectra at the decoder.  Near spectral peaks this can be approximated by a second order all pole system with time domain impulse response:
 \begin{equation}
 x(n)=Ae^{-\alpha n}cos(\omega n)
 \end{equation}
-$\alpha$ is the time constant that controls the time domain decay of the envelope.  For a wide bandwidth peak $\alpha$ will be large, $x(n)$ will decay quickly and the formant energy will be contained in a shorter period of time.  For a narrow bandwidth peak $\alpha$ will be small and $x(n)$ will decay slowly, the format will "ring" longer and the peak to average ratio will be smaller.
+$\alpha$ is the time constant that controls the time domain decay of the envelope.  For a wide bandwidth peak $\alpha$ will be large, $x(n)$ will decay quickly and the formant energy will be contained in a shorter period of time.  For a narrow bandwidth peak $\alpha$ will be small and $x(n)$ will decay slowly, the format will "ring" longer and the PAPR will be smaller.
 
-In the frequency domain a small $\alpha$ system results in a rapid phase shift near the peak frequency.  If the system is excited by an impulse train (harmonic frequency spectra), a small $\alpha$ results in adjacent harmonics having different phases, and not being aligned in time, shifting time domain energy away from a central peak at the pitch pulse onset.
+In the frequency domain a small $\alpha$ system results in a rapid phase shift near the peak frequency. If the system is excited by an impulse train (harmonic frequency spectra), a small $\alpha$ results in adjacent harmonics having different phases, and not being aligned in time, shifting time domain energy away from a central peak at the pitch pulse onset.
 
-This model can be used to explain some of the results in Table \ref{table:ratek_phase}.  With original amplitude we have narrow peaks so the \emph{phase0} algorithm produces a small-$\alpha$ $x(n)$ that rings for some time and sounds natural.  With rate $K$ amplitudes and original phase, we have a phase spectra from the original speech which despite a broad amplitude peak, has a phase spectra that results in a time domain signal with energy shifted away from a central peak at the pitch pulse onset.  With rate $K$ amplitudes and the \emph{phase0} algorithm, we get a large-$\alpha$ $x(n)$ with energy concentrated near the start of the impulse, which is perceptually of lower quality.
- 
+Group delay is a measure of how long it takes for a tone burst to propagate through a system.  In a minimum phase system, group delay is related to the slope of the frequency response \cite{kates2005principles}.  For a small $\alpha$ (sharper peaks) group delay will be longer, delaying the attack and decay time of the response (mainly energy at the formant centre frequency) to the impulse exciting the system.
+
+This model and the theory above can be used to explain the results in Table \ref{table:ratek_phase}.  With original amplitude we have narrow peaks so the \emph{phase0} algorithm produces a small-$\alpha$ $x(n)$ that rings for some time and sounds natural.  With rate $K$ amplitudes and original phase, we have a phase spectra from the original speech which despite a broad amplitude peak, results in a time domain signal with energy shifted in time from the pitch pulse onset.
+
+With rate $K$ amplitudes and the \emph{phase0} algorithm we have a wide bandwidth amplitude spectra peak that has a small slope near the peak.  Recalling that for minimum phase systems (such as that employed by the \emph{phase0} algorithm), phase shift and group delay are proportional to the slope of the amplitude spectra. Hence adjacent harmonics have small phase shifts, concentrating the energy in time.  Viewed in the time domain, a wide bandwidth means a large-$\alpha$ $x(n)$ again with energy concentrated near the start of the impulse.
+
+The theory also explains why high $F0$ speakers sound better.  Even for broad spectral peaks, the pitch periods are so short that they run together before having a chance to decay.  The ear experiences continuous tones bursts aiding perception of the formant energy.
+
+Possible ways forward:
+\begin{enumerate}
+\item Raise Nb until males sound OK, design VQ and see how well it works.  May be inefficient, or there may be some correlations across males that VQ can find.
+\item Perform filtering on pre-emphasised speech.  Spectral valley energy at frequencies just lower than a high frequency peak can sometimes be higher than the spectral peak due to the slope of the speech spectra.  This can causes reduced spectral peak/valley ratios after filtering.  For an example see the spectral peak of Figure \ref{fig:ratek7_big_dog_61} around 2000 Hz.
+\item A freq-dep postfilter.  Need to prove we can narrow formants for males, and enhance peak/valley ratio.
+\item A NN is one solution - sharp peaks for males (based on F0), and enhance peaks/valley ratio at high frequencies.  What would we use as ground truth?  Is there a toy example we can train against?  How can we make it handle wide dynamic ranges?  How do we know we have enough training data? Need to see it enhancing indep of frequency of formant - that would be a good test.  Just train on voiced, high energy frames.
+\end{enumerate}
+
 \section{Post Filter Design}
 
 We require a function $P()$ that modifies a smoothed vector of spectral magnitude samples $\mathbf{y}$ to sharpen formant peaks and increase peak/valley ratio at high frequencies.
 
-The filter $P()$ is needed for low $F0$ speakers, where multiple harmonics fit inside the smoothed high frequency spectral peaks of $\mathbf{y}$, reducing the perceptual speech quality.
+The filter $P()$ is needed for low $F0$ speakers and voiced speech.
 
 The smoothed vector $\mathbf{y}$ is obtained by filtering $\mathbf{y}=H(\mathbf{x})$, where $H()$ is a filter function defined by the parameter $N_b$ that provides progressively more smoothing as frequency increases.  This smoothing reduces the information in $\mathbf{y}$ making it possible to quantise at low bit rates. At low frequencies $H(X_k)=X_k$ therefore $P()$ should modify the spectra only at high frequencies, leaving low frequencies unchanged. 
 
 Representing the sharp peaks required for male speech is possible by direct quantisation of $\mathbf{x}$ but requires a prohibitively high bit rate for our use case.  High $F0$ speakers can be adequately represented by a low $N_b$ vector  which suggests there should be a way to reproduce male speech of adequate quality from low $N_b$ vectors.  $P()$ should have no effect on high $F0$ speakers, which are already adequately represented by the smoothed spectral samples.
 
-The algorithm should only operate on Voiced speech
-
-
+\bibliographystyle{plain}
+\bibliography{ratek_references}
 \end{document}
 
