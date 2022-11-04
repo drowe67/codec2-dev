@@ -576,6 +576,38 @@ The smoothed vector $\mathbf{y}$ is obtained by filtering $\mathbf{y}=H(\mathbf{
 
 Representing the sharp peaks required for male speech is possible by direct quantisation of $\mathbf{x}$ but requires a prohibitively high bit rate for our use case.  High $F0$ speakers can be adequately represented by a low $N_b$ vector  which suggests there should be a way to reproduce male speech of adequate quality from low $N_b$ vectors.  $P()$ should have no effect on high $F0$ speakers, which are already adequately represented by the smoothed spectral samples.
 
+\section{Group Delay Interpretation}
+
+Explanation of why ratek with original phases works.  At high frequency, the bandwidth of the spectral peak is broadened. Original phases means the group delay $\tau_g=\frac{d\phi}{d\omega}$ will remain the same for the central harmonic(s) that were part of the original peak.  High group delay means a slow response to amplitude envelope changes, in our case an impulse train exciting the system. Harmonic energy in the peak centre will be smeared in time (ringing), lowering PAPR, and having the same probability of detection by the ear as the original waveform.
+
+Adjacent, newly high amplitude peaks have a similar amplitude to the peak but having been outside of the original peak, may have lower group delay when using the original phase spectra. They will therefore decay quickly and not be detected.
+
+The mixture of high group delay and low group delay harmonics may have the same perceptual loudness as with original amplitudes, as the amplitude of the central harmonic(s) is unchanged by broadening the peak, and the adjacent harmonics are not detected due to low group delay.
+
+Another interpretation.  With broadened peaks but original phases, we now have a non-minimum phase system as phase response is not related to magnitude response by a Hilbert Transform.  This implies the energy is not maximally concentrated in time and group delay is not minimised.
+
+This suggests a post filter design (and indeed explanation of current post filters).  Enhancing the spectral envelope by expanding the dynamic range of the envelope $\hat{\mathbf{y}}=\mathbf{y}^\beta$ will increase the slope of the edges of the spectral peak.  If we derive a phase spectra using a HT, the group delay will be large at the peak edges, but small in the centre.  The amplitudes at the edges will be similar to the central peak.  Thus each edge will contribute low PAPR harmonics with increased probability of detection.  It remains to be seen if this will will be perceived in the same way as a single peak in the centre of the harmonic, given the poor ability of the ear to separate closely spaced tones at high frequencies.
+
+TODO: table of original ampl phase0 to explain each combination
+
+TODO: table of scripts used in this study
+
+\section{Latex Sandbox}
+
+\begin{figure}[h]
+\caption{Test Octave -depslatex}
+\begin{center}
+\input ratek7_big_dog_50.tex
+\end{center}
+
+\end{figure}
+\begin{figure}[h]
+\caption{Test Octave -depsc}
+\begin{center}
+\includegraphics{ratek7_big_dog_50.eps}
+\end{center}
+\end{figure}
+
 \bibliographystyle{plain}
 \bibliography{ratek_references}
 \end{document}
