@@ -76,13 +76,22 @@ function ratek7_high_fbf(samname, f, Nb=20, K=30)
     l = sprintf(";rate %d AmdB;g+-", L);
     plot((1:L)*Wo*4000/pi, AmdB, l);
 
-    % fit LPC model to Y (power spectrum)
+    % straight line fit to YdB to estimate spectral slope SdB
     w = 2*pi*rate_Lhigh_sample_freqs_kHz*1000/Fs;
-    [a G] = lpc_from_mag_spectrum(w, Y, 10);
-    gamma = 0.9;
-    P = G*freqz(1,a,w);
+    st = round(200/F0high);
+    en = round(3700/F0high);
+    [m b] = linreg(w(st:en),YdB(st:en),en-st+1);
+    SdB = w*m+b; S = 10.^(SdB/20);
+    plot(rate_Lhigh_sample_freqs_kHz*1000, SdB,';slope SdB;ro-');
+    plot(rate_Lhigh_sample_freqs_kHz*1000, YdB-SdB,';flattened YdB;ro-');
+
+    % fit LPC model to YS
+    order = 10;
+    [a G] = lpc_from_mag_spectrum(w, Y./S, order);
+    gamma = 1.0;
+    P = freqz(a.*(gamma.^(0:order)),1,w);
     PdB = 20*log10(abs(P));
-    plot(rate_Lhigh_sample_freqs_kHz*1000, PdB);
+    plot(rate_Lhigh_sample_freqs_kHz*1000, PdB,';Post Filter P;c-');
 
     if pf_en
       YdB(2:length(PdB)-1) = YdB(2:length(PdB)-1) + PdB(1:length(PdB)-2);
@@ -94,7 +103,7 @@ function ratek7_high_fbf(samname, f, Nb=20, K=30)
 
     % interactive menu ------------------------------------------
 
-    printf("\rframe: %d  menu: n-next  b-back  q-quit p-png", f);
+    printf("\rframe: %d  menu: n-next  b-back  q-quit p-print", f);
     fflush(stdout);
     k = kbhit();
 
@@ -109,12 +118,11 @@ function ratek7_high_fbf(samname, f, Nb=20, K=30)
     end
     if (k == 'p')
       [dir name ext]=fileparts(samname);
-      set(gca, 'FontSize', 16);
       hl = legend({"Spectrum","Rate AmdB" "Rate Lhigh YdB"}, "location", "northeast");
       legend("boxoff")
-      set (hl, "fontsize", 16);
       xlabel('Freq (Hz)'); ylabel('Amplitude (dB)');
-      print(sprintf("ratek7_%s_%d",name,f),"-dpng","-S500,500");
+      print(sprintf("ratek7_%s_%d",name,f),"-depsc","-S300,300");
+      printf("printing...")
     endif
 
   until (k == 'q')
