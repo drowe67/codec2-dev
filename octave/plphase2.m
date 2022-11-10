@@ -1,16 +1,20 @@
 % plphase2.m
 %
-% Plot phase modelling information from dump files, compare two synthetic phase
-% spectra, derived from two sets of {Am} magnitudes.
+% Experiment to compare original and phase0 synthesised phase combined with rate K amplitude model.
+% 1. Attempt to plot phase and group delay by removing linear phase component (n0), this doesn't
+%    work very well for original phases, more meaningful for phase0.
+% 2. Plot time domain speech in 0-1000Hz, 1000-2000, and 2000-4000Hz bands so we can explore envelope
+%    of synthesised speech, which is realted to phase spectra in formants
 
 #{
-  TODO - should we be running with origial phase here?
   Usage:
 
     $ cd codec2/build_linux
     $ ./src/c2sim ../raw/hts1a.raw --phase0 --dump hts1a
-    $ ./src/c2sim ../raw/hts1a.raw --rateK --phase0 --dump hts1a_ratek
+    $ ./src/c2sim ../raw/hts1a.raw --modelout - | ./misc/est_n0 > hts1a_n0.txt
 
+    $ cd codec2/build_linux/octave
+    $ octave-cli
     octave:> plphase2("../build_linux/hts1a", 44)
 #}
 
@@ -49,7 +53,8 @@ function plphase2(samname, f, Nb=20, K=30)
 
   rate_Lhigh_sample_freqs_kHz = (F0high:F0high:(Lhigh-1)*F0high)/1000;
 
-  k = ' '; plot_group_delay=1; Pms = 6; plot_orig=1; plot_synth_sn=1;
+  k = ' '; plot_group_delay=1; Pms = 6; plot_synth_sn=1; phase0_en=0;
+  postfilter_en = 0;
   do
     Wo = model(f,1); F0 = Fs*Wo/(2*pi); L = model(f,2);
     Am = model(f,3:(L+2)); AmdB = 20*log10(Am);
@@ -68,6 +73,28 @@ function plphase2(samname, f, Nb=20, K=30)
       YdB(m) = 20*log10(Y(m));
     end
 
+    if postfilter_en
+      % straight line fit to YdB to estimate spectral slope SdB
+      w = 2*pi*rate_Lhigh_sample_freqs_kHz*1000/Fs;
+      st = round(200/F0high);
+      en = round(3700/F0high);
+      [m b] = linreg(w(st:en),YdB(st:en),en-st+1);
+      SdB = w*m+b; S = 10.^(SdB/20);
+
+      Y_energy1 = sum(Y .^ 2);
+
+      % remove slope and expand dynamic range
+      YdB -= SdB;
+      YdB *= 2.0;
+      YdB += SdB;
+
+      % normalise energy
+      Y = 10 .^ (YdB/20);
+      Y_energy2 = sum(Y .^ 2);
+      Y *= sqrt(Y_energy1/Y_energy2);
+      YdB =20*log10(Y);
+    end
+
     % resample from rate Lhigh to rate L (both linearly spaced)
 
     AmdB_ = interp1([0 rate_Lhigh_sample_freqs_kHz 4], [0 YdB 0], Am_freqs_kHz, "spline", "extrap");
@@ -80,24 +107,27 @@ function plphase2(samname, f, Nb=20, K=30)
     phase_centred = angle(phase_centred_rect);
     phase_centred = unwrap(phase_centred);
 
-    % TODO phase from HT for synth speech, way to move thru orig phases,
-    % ratek ampl + orig phase, orig amps + phase0
+    % Synthesised phase0 model using Hilbert Transform
     Nfft=512;
     sample_freqs_kHz = (Fs/1000)*[0:Nfft/2]/Nfft;  % fft frequency grid (nonneg freqs)
     Gdbfk = interp1([0 rate_Lhigh_sample_freqs_kHz 4], [0 YdB 0], sample_freqs_kHz, "spline", "extrap");
+    if postfilter_en
+      Gdbfk *= 1.5;
+    end
     [phase_ht s] = mag_to_phase(Gdbfk, Nfft);
     for m=1:L
       b = round(m*Wo*Nfft/(2*pi));
-      phase_ratek(f,m) = phase_ht(b);
+      phase0(f,m) = phase_ht(b);
     end
 
-    % TODO phase from Codec 2 3200 ?  We know that sounds better
+    % TODO phase from Codec 2 3200 ?  We know that sounds better, essentially
+    % a phase model from time domain LPC
 
-    % time domain speech ---------------------------------------------
-    % TODO separate HF/LF (window/colour/toggle)
+    % plot time domain speech ---------------------------------------------
     figure(1); clf;
     s = [ Sn(2*f-1,:) Sn(2*f,:) ];
     y_off = -5000;
+    if phase0_en, phase_ratek(f,1:L) = phase0(f,1:L); else phase_ratek(f,1:L) = phase(f,1:L); end
     if plot_synth_sn
       N=length(s);
       s1_lo = zeros(1,N); s2_lo = zeros(1,N);
@@ -116,12 +146,13 @@ function plphase2(samname, f, Nb=20, K=30)
         s1_hi += Am(m)*cos(Wo*m*t + phase(f,m));
         s2_hi += Am_(m)*cos(Wo*m*t + phase_ratek(f,m));
       end
-      maxy = max([s1_lo s2_lo]); miny = min([s1_hi s2_hi]);
+      maxy = max([s1_lo]); miny = min([s1_hi]);
       maxy = ceil(maxy/5000)*5000; miny = floor(miny/5000)*5000;
       subplot(211); hold on; plot(s1_lo,'g'); plot(s1_mid,'r'); plot(s1_hi,'b'); hold off;
-      axis([1 length(s) miny maxy]); grid;
+      axis([1 length(s) miny maxy]); grid; title('orig Am & orig phase');
       subplot(212); hold on; plot(s2_lo,'g'); plot(s2_mid,'r'); plot(s2_hi,'b'); hold off;
-      axis([1 length(s) miny maxy]); grid;
+      if phase0_en, phase_str = 'phase0'; else phase_str = 'orig phase'; end
+      axis([1 length(s) miny maxy]); grid; title(sprintf("Filtered Am & %s",phase_str));
     end
     if (k == 'p')
     endif
@@ -129,28 +160,27 @@ function plphase2(samname, f, Nb=20, K=30)
     figure(2); clf;
     plot((1:L)*Wo*4000/pi, 20*log10(Am),"g+-;Am;");
     hold on;
-    plot((1:L)*Wo*4000/pi, 20*log10(Am_),"r+-;Am*;");
     plot(rate_Lhigh_sample_freqs_kHz*1000, YdB, ';rate Lhigh YdB;b+-');
 
     % estimate group and phase delay
 
     group_delay = [0 -((phase_centred(2:L) - phase_centred(1:L-1))/Wo)*1000/Fs];
     phase_delay = ( -phase_centred(1:L) ./ ((1:L)*Wo) )*1000/Fs;
-    group_delay_ratek = [0 -((phase_ratek(f,2:L) - phase_ratek(f,1:L-1))/Wo)*1000/Fs];
-    phase_delay_ratek = ( -phase_ratek(f,1:L) ./ ((1:L)*Wo) )*1000/Fs;
+    group_delay_phase0 = [0 -((phase0(f,2:L) - phase0(f,1:L-1))/Wo)*1000/Fs];
+    phase_delay_phase0 = ( -phase0(f,1:L) ./ ((1:L)*Wo) )*1000/Fs;
     x_group = (0.5 + (1:L))*Wo*Fs2/pi;
     x_phase = (1:L)*Wo*Fs2/pi;
-    if plot_orig
+    if phase0_en
+       if plot_group_delay
+          [ax h1 h2] = plotyy((0:255)*Fs2/256, Sw(f,:), x_group, group_delay_phase0);
+       else
+          [ax h1 h2] = plotyy((0:255)*Fs2/256, Sw(f,:), x_phase, phase_delay_phase0);
+       end
+    else
        if plot_group_delay
           [ax h1 h2] = plotyy((0:255)*Fs2/256, Sw(f,:), x_group, group_delay);
        else
           [ax h1 h2] = plotyy((0:255)*Fs2/256, Sw(f,:), x_phase, phase_delay);
-       end
-    else
-       if plot_group_delay
-          [ax h1 h2] = plotyy((0:255)*Fs2/256, Sw(f,:), x_group, group_delay_ratek);
-       else
-          [ax h1 h2] = plotyy((0:255)*Fs2/256, Sw(f,:), x_phase, phase_delay_ratek);
        end
     end
     hold off;
@@ -177,23 +207,23 @@ function plphase2(samname, f, Nb=20, K=30)
       adj = 2*pi;
     end
     adj_ratek = 0;
-    if mean(phase_ratek(f,1:L)) < -2*pi
+    if mean(phase0(f,1:L)) < -2*pi
       adj_ratek = 2*pi;
     end
     plot((1:L)*Wo*Fs2/pi, phase_centred+adj, "-og;phase;");
     hold on;
-    plot((1:L)*Wo*Fs2/pi, phase_ratek(f,1:L)+adj_ratek, "-or;phase ratek;");
-    % axis([0 Fs2 -2*pi 2*pi]);
+    plot((1:L)*Wo*Fs2/pi, phase0(f,1:L)+adj_ratek, "-or;phase0;");
+    axis([0 Fs2 -2*pi 2*pi]);
     hold off;
     subplot(212);
     if plot_group_delay
-      plot(x_group, group_delay, "-og;group;");
-      hold on; plot(x_group, group_delay_ratek, "-or;group ratek;"); hold off;
-      % axis([1 Fs2 -1 Pms]);
+      plot(x_group, group_delay, "-og;group delay;");
+      hold on; plot(x_group, group_delay_phase0, "-or;group delay phase0;"); hold off;
+      axis([1 Fs2 -Pms Pms]);
     else
-      plot(x_phase, phase_delay, "-og;phase;");
-      hold on; plot(x_group, phase_delay_ratek, "-or;phase ratek;"); hold off;
-      % axis([1 Fs2 -1 1]);
+      plot(x_phase, phase_delay, "-og;phase delay;");
+      hold on; plot(x_group, phase_delay_phase0, "-or;phase delay phase0;"); hold off;
+      axis([1 Fs2 -Pms Pms]);
     end
 
     if (k == 'p')
@@ -202,8 +232,8 @@ function plphase2(samname, f, Nb=20, K=30)
     % interactive menu
 
     if plot_group_delay; s1="[group dly]/phase dly"; else s1="group dly/[phase dly]"; end
-    if plot_orig; s2="[orig]/rateK"; else s2="orig/[rateK]"; end
-    printf("\rframe: %d  menu: n-next  b-back  g-%s o-%s p-png  q-quit ", f, s1,s2);
+    if phase0_en; s2="orig/[phase0]"; else s2="[orig]/phase0"; end
+    printf("\rframe: %d  menu: n-next  b-back  g-%s 0-%s p-png f-postFilter[%d] q-quit ", f, s1, s2, postfilter_en);
     fflush(stdout);
     k = kbhit();
     if (k == 'n')
@@ -218,17 +248,15 @@ function plphase2(samname, f, Nb=20, K=30)
       	Pms=1;
       else
         plot_group_delay = 1;
-	      Pms=6;
+	Pms=6;
       end
-    endif
-    if (k == 'o')
-      if plot_orig
-        plot_orig = 0;
-      else
-        plot_orig = 1;
-      end
-    endif
-
+    end
+    if k == '0',
+      if phase0_en, phase0_en = 0; else phase0_en = 1; end
+    end
+    if k == 'f',
+      if postfilter_en, postfilter_en = 0; else postfilter_en = 1; end
+    end
   until (k == 'q')
   printf("\n");
 

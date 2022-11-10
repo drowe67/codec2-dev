@@ -1,21 +1,21 @@
 % Copyright David Rowe 2009
-% This program is distributed under the terms of the GNU General Public License 
+% This program is distributed under the terms of the GNU General Public License
 % Version 2
 %
 % Plot phase modelling information from dump files, original and phase0 models with n0 adjustment
 
-#{  
+#{
   Usage:
 
   1/ Contrived speech-like test signal:
-  
+
   $ cd codec2/build_linux
   $ ./misc/timpulse --f0 100 --n0 1 --filter | ./src/c2sim - --rateK --modelout - | ./misc/est_n0 > imp_n0.txt
   $ ./misc/timpulse --f0 100 --n0 1 --filter | ./src/c2sim - --rateK --phase0 --dump imp
   octave:> plphase("../build_linux/imp", 20)
 
   2/ A real speech file:
-  
+
   Generate n0 estimates for original and phase0:
 
     $ cd codec2/build_linux
@@ -23,11 +23,11 @@
     $ ./src/c2sim ../raw/hts1a.raw --rateK --phase0 --modelout - | ./misc/est_n0 > hts1a_phase0_n0.txt
 
   Generate "dump files":
-  
+
     $ ./src/c2sim ../raw/hts1a.raw --rateK --phase0 --dump hts1a
 
   Note: above steps have been automated in scripts/plphase.sh:
-  
+
     $ cd codec2/build_linux
     $ ../script/plphase.sh ../raw/hts1a.raw
 
@@ -39,7 +39,7 @@
 function plphase(samname, f)
 
   Fs = 8000; Fs2 = Fs/2;
-  
+
   sn_name = strcat(samname,"_sn.txt");
   Sn = load(sn_name);
 
@@ -52,12 +52,12 @@ function plphase(samname, f)
   n0_name = strcat(samname,"_n0.txt");
   if (file_in_path(".",n0_name))
     n0 = load(n0_name);
-  endif
+  endif../octave/plphase2.m
   phase0_n0_name = strcat(samname,"_phase0_n0.txt");
   if (file_in_path(".",phase0_n0_name))
     phase0_n0 = load(phase0_n0_name);
   endif
-  
+
   phase_name = strcat(samname,"_phase.txt");
   if (file_in_path(".",phase_name))
     phase = load(phase_name);
@@ -102,7 +102,7 @@ function plphase(samname, f)
     figure(2); clf;
     plot((1:L)*Wo*4000/pi, 20*log10(Am),"g+-;Am;");
     hold on;
- 
+
     % estimate group and phase delay
 
     phase_rect = exp(j*phase_f);
@@ -128,7 +128,7 @@ function plphase(samname, f)
       ylabel(ax(2),'Phase Delay (ms)');
     end
     grid;
-    
+
     if (k == 'p')
        pngname = sprintf("%s_%d_sw",samname,f);
        png(pngname);
@@ -148,12 +148,12 @@ function plphase(samname, f)
       plot(x_phase, phase_delay, "-o;phase;");
       axis([1 Fs2 -1 1]);
     end
-    
+
     if (k == 'p')
       pngname = sprintf("%s_%d_phase",samname,f);
       png(pngname);
     endif
- 
+
     % interactive menu
 
     if plot_group_delay; s1="[group dly]/phase dly"; else s1="group dly/[phase dly]"; end
