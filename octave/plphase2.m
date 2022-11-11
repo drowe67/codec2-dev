@@ -53,7 +53,7 @@ function plphase2(samname, f, Nb=20, K=30)
 
   rate_Lhigh_sample_freqs_kHz = (F0high:F0high:(Lhigh-1)*F0high)/1000;
 
-  k = ' '; plot_group_delay=1; Pms = 6; plot_synth_sn=1; phase0_en=0;
+  k = ' '; plot_group_delay=0; Pms = 6; plot_synth_sn=1; phase0_en=0;
   postfilter_en = 0;
   do
     Wo = model(f,1); F0 = Fs*Wo/(2*pi); L = model(f,2);
@@ -162,7 +162,7 @@ function plphase2(samname, f, Nb=20, K=30)
     hold on;
     plot(rate_Lhigh_sample_freqs_kHz*1000, YdB, ';rate Lhigh YdB;b+-');
 
-    % estimate group and phase delay
+    % estimate group and phase delay and optionally plot ------------------------
 
     group_delay = [0 -((phase_centred(2:L) - phase_centred(1:L-1))/Wo)*1000/Fs];
     phase_delay = ( -phase_centred(1:L) ./ ((1:L)*Wo) )*1000/Fs;
@@ -171,32 +171,39 @@ function plphase2(samname, f, Nb=20, K=30)
     x_group = (0.5 + (1:L))*Wo*Fs2/pi;
     x_phase = (1:L)*Wo*Fs2/pi;
     if phase0_en
-       if plot_group_delay
+       if plot_group_delay == 1
           [ax h1 h2] = plotyy((0:255)*Fs2/256, Sw(f,:), x_group, group_delay_phase0);
-       else
+       end
+       if plot_group_delay == 2
           [ax h1 h2] = plotyy((0:255)*Fs2/256, Sw(f,:), x_phase, phase_delay_phase0);
        end
     else
-       if plot_group_delay
+       if plot_group_delay == 1
           [ax h1 h2] = plotyy((0:255)*Fs2/256, Sw(f,:), x_group, group_delay);
-       else
+       end
+      if plot_group_delay == 2
           [ax h1 h2] = plotyy((0:255)*Fs2/256, Sw(f,:), x_phase, phase_delay);
        end
     end
-    hold off;
-    axis(ax(1), [1 Fs2 -10 80]);
-    axis(ax(2), [1 Fs2 -Pms Pms]);
-    set(h2,'color','black');
-    set(ax(2),'ycolor','black');
-    xlabel('Frequency (Hz)');
-    ylabel(ax(1),'Amplitude (dB)');
     if plot_group_delay
-      ylabel(ax(2),'Group Delay (ms)');
+      axis(ax(1), [1 Fs2 -10 80]);
+      axis(ax(2), [1 Fs2 -Pms Pms]);
+      set(h2,'color','black');
+      set(ax(2),'ycolor','black');
+      ylabel(ax(1),'Amplitude (dB)');
+      if plot_group_delay == 1
+        ylabel(ax(2),'Group Delay (ms)');
+      else
+        ylabel(ax(2),'Phase Delay (ms)');
+      end
     else
-      ylabel(ax(2),'Phase Delay (ms)');
+      plot((0:255)*Fs2/256, Sw(f,:));
+      axis([1 Fs2 -10 80]);
+      ylabel('Amplitude (dB)');
     end
-    grid;
+    hold off; xlabel('Frequency (Hz)'); grid;
 
+    % print tp EPS -------------------------------------------------------------
     if (k == 'p')
     endif
 
@@ -231,7 +238,9 @@ function plphase2(samname, f, Nb=20, K=30)
 
     % interactive menu
 
-    if plot_group_delay; s1="[group dly]/phase dly"; else s1="group dly/[phase dly]"; end
+    if plot_group_delay==0, s1="group/phase dly"; end
+    if plot_group_delay==1, s1="[group]/phase dly"; end
+    if plot_group_delay==2, s1="group/[phase] dly"; end
     if phase0_en; s2="orig/[phase0]"; else s2="[orig]/phase0"; end
     printf("\rframe: %d  menu: n-next  b-back  g-%s 0-%s p-png f-postFilter[%d] q-quit ", f, s1, s2, postfilter_en);
     fflush(stdout);
@@ -243,13 +252,7 @@ function plphase2(samname, f, Nb=20, K=30)
       f = f - 1;
     endif
     if (k == 'g')
-      if plot_group_delay
-        plot_group_delay = 0;
-      	Pms=1;
-      else
-        plot_group_delay = 1;
-	Pms=6;
-      end
+      if plot_group_delay, plot_group_delay = mod(plot_group_delay+1,3); end
     end
     if k == '0',
       if phase0_en, phase0_en = 0; else phase0_en = 1; end
