@@ -120,10 +120,19 @@ function plphase2(samname, f, Nb=20, K=30)
       end
       maxy = max([s1_lo]); miny = min([s1_hi]);
       maxy = ceil(maxy/5000)*5000; miny = floor(miny/5000)*5000;
-      subplot(211); hold on; plot(s1_lo,'g'); plot(s1_mid,'r'); plot(s1_hi,'b'); hold off;
+      subplot(211); hold on;
+      plot(s1_lo,sprintf('g;%s;',papr(s1_lo)));
+      plot(s1_mid,sprintf('r;%s;',papr(s1_mid)));
+      plot(s1_hi,sprintf('b;%s;',papr(s1_hi)));
+      hold off;
       axis([1 length(s) miny maxy]); grid; title('orig Am & orig phase');
-      subplot(212); hold on; plot(s2_lo,'g'); plot(s2_mid,'r'); plot(s2_hi,'b'); hold off;
+      subplot(212); hold on;
+      plot(s2_lo,sprintf('g;%s;',papr(s2_lo)));
+      plot(s2_mid,sprintf('r;%s;',papr(s2_mid)));
+      plot(s2_hi,sprintf('b;%s;',papr(s2_hi)));
+      hold off;
       if phase0_en, phase_str = 'phase0'; else phase_str = 'orig phase'; end
+      if postfilter_en, phase_str = sprintf('%s & postfilter', phase_str); end
       axis([1 length(s) miny maxy]); grid; title(sprintf("Filtered Am & %s",phase_str));
     end
     if (k == 'p')
