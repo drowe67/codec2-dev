@@ -74,25 +74,7 @@ function plphase2(samname, f, Nb=20, K=30)
     end
 
     if postfilter_en
-      % straight line fit to YdB to estimate spectral slope SdB
-      w = 2*pi*rate_Lhigh_sample_freqs_kHz*1000/Fs;
-      st = round(200/F0high);
-      en = round(3700/F0high);
-      [m b] = linreg(w(st:en),YdB(st:en),en-st+1);
-      SdB = w*m+b; S = 10.^(SdB/20);
-
-      Y_energy1 = sum(Y .^ 2);
-
-      % remove slope and expand dynamic range
-      YdB -= SdB;
-      YdB *= 2.0;
-      YdB += SdB;
-
-      % normalise energy
-      Y = 10 .^ (YdB/20);
-      Y_energy2 = sum(Y .^ 2);
-      Y *= sqrt(Y_energy1/Y_energy2);
-      YdB =20*log10(Y);
+      YdB = amplitude_postfilter(rate_Lhigh_sample_freqs_kHz, YdB, Fs, F0high);
     end
 
     % resample from rate Lhigh to rate L (both linearly spaced)
@@ -108,17 +90,7 @@ function plphase2(samname, f, Nb=20, K=30)
     phase_centred = unwrap(phase_centred);
 
     % Synthesised phase0 model using Hilbert Transform
-    Nfft=512;
-    sample_freqs_kHz = (Fs/1000)*[0:Nfft/2]/Nfft;  % fft frequency grid (nonneg freqs)
-    Gdbfk = interp1([0 rate_Lhigh_sample_freqs_kHz 4], [0 YdB 0], sample_freqs_kHz, "spline", "extrap");
-    if postfilter_en
-      Gdbfk *= 1.5;
-    end
-    [phase_ht s] = mag_to_phase(Gdbfk, Nfft);
-    for m=1:L
-      b = round(m*Wo*Nfft/(2*pi));
-      phase0(f,m) = phase_ht(b);
-    end
+    phase0(f,1:L) = synth_phase_from_mag(rate_Lhigh_sample_freqs_kHz, YdB, Fs, Wo, L, postfilter_en);
 
     % TODO phase from Codec 2 3200 ?  We know that sounds better, essentially
     % a phase model from time domain LPC
@@ -201,7 +173,8 @@ function plphase2(samname, f, Nb=20, K=30)
       axis([1 Fs2 -10 80]);
       ylabel('Amplitude (dB)');
     end
-    hold off; xlabel('Frequency (Hz)'); grid;
+    hold off; xlabel('Frequency (Hz)');
+grid;
 
     % print tp EPS -------------------------------------------------------------
     if (k == 'p')

@@ -377,6 +377,9 @@ function [rate_K_vec eq] = front_eq(rate_K_vec, eq)
   eq(find(eq < 0)) = 0;
 endfunction
 
+% ----------------------------------------------------------------------
+% Functions added in "Rate K" experimental R&D campaign from August 2022
+% ----------------------------------------------------------------------
 
 function fHz = warp(k, K)
   mel_start = ftomel(200); mel_end = ftomel(3700);
@@ -450,4 +453,45 @@ function test_lpc_from_mag_spectrum
   assert(SD < 0.1);
   assert(abs(G-1) < 0.1);
   clf; plot(w,mag); hold on; plot(w,mag_est); hold off;
+end
+
+% Synthesised phase0 model using Hilbert Transform
+function phase0 = synth_phase_from_mag(rate_Lhigh_sample_freqs_kHz, YdB, Fs, Wo, L, postfilter_en)
+  Nfft=512;
+  sample_freqs_kHz = (Fs/1000)*[0:Nfft/2]/Nfft;  % fft frequency grid (nonneg freqs)
+  Gdbfk = interp1([0 rate_Lhigh_sample_freqs_kHz 4], [0 YdB 0], sample_freqs_kHz, "spline", "extrap");
+  if postfilter_en
+    % optional "all pass" or "phase" postfiltering
+    % in a minimum phase system, group delay is proportional to slope of mag spectrum
+    Gdbfk *= 1.5;
+  end
+  [phase_ht s] = mag_to_phase(Gdbfk, Nfft);
+  phase0 = zeros(1,L);
+  for m=1:L
+    b = round(m*Wo*Nfft/(2*pi));
+    phase0(m) = phase_ht(b);
+  end
+end
+
+function YdB = amplitude_postfilter(rate_Lhigh_sample_freqs_kHz, YdB, Fs, F0high)
+  % straight line fit to YdB to estimate spectral slope SdB
+  w = 2*pi*rate_Lhigh_sample_freqs_kHz*1000/Fs;
+  st = round(200/F0high);
+  en = round(3700/F0high);
+  [m b] = linreg(w(st:en),YdB(st:en),en-st+1);
+  SdB = w*m+b; S = 10.^(SdB/20);
+
+  Y = 10 .^ (YdB/20);
+  Y_energy1 = sum(Y .^ 2);
+
+  % remove slope and expand dynamic range
+  YdB -= SdB;
+  YdB *= 2.0;
+  YdB += SdB;
+
+  % normalise energy
+  Y = 10 .^ (YdB/20);
+  Y_energy2 = sum(Y .^ 2);
+  Y *= sqrt(Y_energy1/Y_energy2);
+  YdB = 20*log10(Y);
 end
