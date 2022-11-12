@@ -54,7 +54,7 @@ function plphase2(samname, f, Nb=20, K=30)
   rate_Lhigh_sample_freqs_kHz = (F0high:F0high:(Lhigh-1)*F0high)/1000;
 
   k = ' '; plot_group_delay=0; Pms = 6; plot_synth_sn=1; phase0_en=0;
-  postfilter_en = 0;
+  postfilter_en = 0; ratek_en = 1;
   do
     Wo = model(f,1); F0 = Fs*Wo/(2*pi); L = model(f,2);
     Am = model(f,3:(L+2)); AmdB = 20*log10(Am);
@@ -64,21 +64,27 @@ function plphase2(samname, f, Nb=20, K=30)
     AmdB_rate_Lhigh = interp1([0 Am_freqs_kHz 4], [0 AmdB 0],
                               rate_Lhigh_sample_freqs_kHz, "spline", "extrap");
 
-    % Filter at rate Lhigh, y = F(R(a)). Note we filter in linear energy domain,
-    % and Lhigh are linearly spaced
-    Y = zeros(1,Lhigh-1); YdB = zeros(1,Lhigh-1);
-    for m=1:Lhigh-1
-      Am_rate_Lhigh = 10.^(AmdB_rate_Lhigh/20);
-      Y(m) = sqrt(sum(Am_rate_Lhigh.^2 .* h(m,1:Lhigh-1)));
-      YdB(m) = 20*log10(Y(m));
+    if ratek_en
+      % Filter at rate Lhigh, y = F(R(a)). Note we filter in linear energy domain,
+      % and Lhigh are linearly spaced
+      Y = zeros(1,Lhigh-1); YdB = zeros(1,Lhigh-1);
+      for m=1:Lhigh-1
+        Am_rate_Lhigh = 10.^(AmdB_rate_Lhigh/20);
+        Y(m) = sqrt(sum(Am_rate_Lhigh.^2 .* h(m,1:Lhigh-1)));
+        YdB(m) = 20*log10(Y(m));
+      end
+    else
+      YdB = AmdB_rate_Lhigh; Y = 10 .^ (YdB/20);
     end
 
     if postfilter_en
       YdB = amplitude_postfilter(rate_Lhigh_sample_freqs_kHz, YdB, Fs, F0high);
     end
 
-    % resample from rate Lhigh to rate L (both linearly spaced)
+    % Synthesised phase0 model using Hilbert Transform
+    phase0(f,1:L) = synth_phase_from_mag(rate_Lhigh_sample_freqs_kHz, YdB, Fs, Wo, L, postfilter_en);
 
+    % resample from rate Lhigh to rate L (both linearly spaced)
     AmdB_ = interp1([0 rate_Lhigh_sample_freqs_kHz 4], [0 YdB 0], Am_freqs_kHz, "spline", "extrap");
     Am_ = 10 .^ (AmdB_/20);
 
@@ -88,9 +94,6 @@ function plphase2(samname, f, Nb=20, K=30)
     phase_centred_rect = phase_rect .* conj(phase_linear);
     phase_centred = angle(phase_centred_rect);
     phase_centred = unwrap(phase_centred);
-
-    % Synthesised phase0 model using Hilbert Transform
-    phase0(f,1:L) = synth_phase_from_mag(rate_Lhigh_sample_freqs_kHz, YdB, Fs, Wo, L, postfilter_en);
 
     % TODO phase from Codec 2 3200 ?  We know that sounds better, essentially
     % a phase model from time domain LPC
@@ -131,9 +134,10 @@ function plphase2(samname, f, Nb=20, K=30)
       plot(s2_mid,sprintf('r;%s;',papr(s2_mid)));
       plot(s2_hi,sprintf('b;%s;',papr(s2_hi)));
       hold off;
+      if ratek_en, am_str = "filtered Am"; else am_str = "orig Am"; end
       if phase0_en, phase_str = 'phase0'; else phase_str = 'orig phase'; end
       if postfilter_en, phase_str = sprintf('%s & postfilter', phase_str); end
-      axis([1 length(s) miny maxy]); grid; title(sprintf("Filtered Am & %s",phase_str));
+      axis([1 length(s) miny maxy]); grid; title(sprintf("%s & %s",am_str, phase_str));
     end
     if (k == 'p')
     endif
@@ -183,7 +187,7 @@ function plphase2(samname, f, Nb=20, K=30)
       ylabel('Amplitude (dB)');
     end
     hold off; xlabel('Frequency (Hz)');
-grid;
+    grid;
 
     % print tp EPS -------------------------------------------------------------
     if (k == 'p')
@@ -205,11 +209,12 @@ grid;
     axis([0 Fs2 -2*pi 2*pi]);
     hold off;
     subplot(212);
-    if plot_group_delay
+    if plot_group_delay == 1
       plot(x_group, group_delay, "-og;group delay;");
       hold on; plot(x_group, group_delay_phase0, "-or;group delay phase0;"); hold off;
       axis([1 Fs2 -Pms Pms]);
-    else
+    end
+    if plot_group_delay == 2
       plot(x_phase, phase_delay, "-og;phase delay;");
       hold on; plot(x_group, phase_delay_phase0, "-or;phase delay phase0;"); hold off;
       axis([1 Fs2 -Pms Pms]);
@@ -224,7 +229,7 @@ grid;
     if plot_group_delay==1, s1="[group]/phase dly"; end
     if plot_group_delay==2, s1="group/[phase] dly"; end
     if phase0_en; s2="orig/[phase0]"; else s2="[orig]/phase0"; end
-    printf("\rframe: %d  menu: n-next  b-back  g-%s 0-%s p-png f-postFilter[%d] q-quit ", f, s1, s2, postfilter_en);
+    printf("\rframe: %d  menu: n-next  b-back  g-%s ratek-r 0-%s p-png f-postFilter[%d] q-quit ", f, s1, s2, postfilter_en);
     fflush(stdout);
     k = kbhit();
     if (k == 'n')
@@ -241,6 +246,9 @@ grid;
     end
     if k == 'f',
       if postfilter_en, postfilter_en = 0; else postfilter_en = 1; end
+    end
+    if k == 'r',
+      if ratek_en, ratek_en = 0; else ratek_en = 1; end
     end
   until (k == 'q')
   printf("\n");
