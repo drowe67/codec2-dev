@@ -308,7 +308,7 @@ endfunction
   ./src/c2sim ../raw/big_dog.raw --phase0 --postfilter --amread ../octave/big_dog_a.f32 --hmread ../octave/big_dog_h.f32 -o - | aplay -f S16_LE
 #}
 
-function ratek2_model_postfilter(samname, A_out_fn="", H_out_fn="", postfilter_en=0)
+function ratek2_model_postfilter(samname, A_out_fn="", H_out_fn="", amp_pf_en=0, phase_pf_en=0)
   more off;
 
   newamp_700c;
@@ -348,11 +348,11 @@ function ratek2_model_postfilter(samname, A_out_fn="", H_out_fn="", postfilter_e
       YdB(m) = 10*log10(Y);
     end
 
-    if postfilter_en
+    if amp_pf_en
       YdB = amplitude_postfilter(rate_Lhigh_sample_freqs_kHz, YdB, Fs, F0high);
     end
     % Synthesised phase0 model using Hilbert Transform
-    H(f,1:L) = synth_phase_from_mag(rate_Lhigh_sample_freqs_kHz, YdB, Fs, Wo, L, postfilter_en);
+    H(f,1:L) = synth_phase_from_mag(rate_Lhigh_sample_freqs_kHz, YdB, Fs, Wo, L, phase_pf_en);
 
     AmdB_ = interp1([0 rate_Lhigh_sample_freqs_kHz 4], [0 YdB 0], rate_L_sample_freqs_kHz, "spline", "extrap");
     Am_(f,1:L) = 10.^(AmdB_/20);
