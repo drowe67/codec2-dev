@@ -5,6 +5,12 @@
 # Please report questions, comments, problems, or patches to the freetel
 # mailing list: https://lists.sourceforge.net/lists/listinfo/freetel-codec2
 #
+
+# Note: this has to be at the beginning of the file in order for CMake to 
+# actually recognize this override (vs. simply telling the macOS build toolchain
+# to mandate the current release).
+set(CMAKE_OSX_DEPLOYMENT_TARGET "10.9" CACHE STRING "Minimum OS X deployment version")
+
 cmake_minimum_required(VERSION 3.13)
 project(CODEC2
   VERSION 1.0.7
