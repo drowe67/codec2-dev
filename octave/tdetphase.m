@@ -3,10 +3,10 @@
 %
 % Testing Hilbert Transform recover of phase from magnitude spectra
 
-newamp;
+newamp_700c;
 Fs = 8000;
 
-w = 2*pi*500/Fs; gamma = 0.95
+w = 2*pi*500/Fs; gamma = 0.95;
 ak = [1 -2*gamma*cos(w) gamma*gamma];
 Nfft = 512;
 
@@ -52,10 +52,10 @@ subplot(212); plot(fftx, angle(h)); hold on; plot(fftx, phase(1:Nfft/2),'g'); ho
 
 % Test 3 - Use real harmonic amplitudes
 
-model = load("../build_linux/src/hts1a_model.txt");
-phase_orig = load("../build_linux/src/hts1a_phase.txt");
+model = load("../build_linux/hts1a_model.txt");
+phase_orig = load("../build_linux/hts1a_phase.txt");
 
-f = 184;
+f = 42;
 Wo = model(f,1); L = model(f,2); Am = model(f,3:L+2); AmdB = 20*log10(Am);
 [phase Gdbfk s] = determine_phase(model, f, Nfft);
 
@@ -67,18 +67,20 @@ subplot(211); plot(fftx, Gdbfk(1:Nfft/2));
 subplot(212); plot(s(1:Nfft/2))
 
 figure(fg++); clf;
-subplot(211); plot(harmx, AmdB, 'g+');
-              hold on; plot(fftx, Gdbfk(1:Nfft/2), 'r'); hold off;
-subplot(212); plot(fftx, phase(1:Nfft/2),'g');
+subplot(211); plot(harmx, AmdB, 'g+;AmdB;','markersize',10);
+              hold on; plot(fftx, Gdbfk(1:Nfft/2), 'r;Gdbfk;'); hold off;
+              axis([0 Fs/2 0 80]);
+subplot(212); plot(fftx, phase(1:Nfft/2),'g;HT phase;');
 
 % synthesise using phases
 
 N = 320;
 s = s_phase = zeros(1,N);
-for m=1:L/4
+for m=1:L
   s = s + Am(m)*cos(m*Wo*(1:N) + phase_orig(f,m));
   b = round(m*Wo*Nfft/(2*pi));
   s_phase = s_phase + Am(m)*cos(m*Wo*(1:N) + phase(b));
 end
 figure(fg++); clf;
-subplot(211); plot(s); subplot(212); plot(s_phase,'g');
+subplot(211); plot(s); title('Speech from Orig Phase');
+subplot(212); plot(s_phase,'g'); title('Speech From HT Phase');
