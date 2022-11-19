@@ -54,7 +54,7 @@ function plphase2(samname, f, Nb=20, K=30)
   rate_Lhigh_sample_freqs_kHz = (F0high:F0high:(Lhigh-1)*F0high)/1000;
 
   k = ' '; plot_group_delay=0; Pms = 6; plot_synth_sn=1; phase0_en=0;
-  postfilter_en = 0; ratek_en = 1;
+  postfilter_en = 0; ratek_en = 1; smear_en = 0;
   do
     Wo = model(f,1); F0 = Fs*Wo/(2*pi); L = model(f,2);
     Am = model(f,3:(L+2)); AmdB = 20*log10(Am);
@@ -103,6 +103,11 @@ function plphase2(samname, f, Nb=20, K=30)
     s = [ Sn(2*f-1,:) Sn(2*f,:) ];
     y_off = -5000;
     if phase0_en, phase_ratek(f,1:L) = phase0(f,1:L); else phase_ratek(f,1:L) = phase(f,1:L); end
+    if smear_en
+      gdc = -(0.005/2000) * (Fs^2) / (2*pi) / 2;
+    else
+      gdc = 0;
+    end
     if plot_synth_sn
       N=length(s);
       s1_lo = zeros(1,N); s2_lo = zeros(1,N);
@@ -111,15 +116,15 @@ function plphase2(samname, f, Nb=20, K=30)
       t=0:N-1; f0 = Wo*Fs2/pi; P = Fs/f0;
       for m=1:round(L/4)
         s1_lo += Am(m)*cos(Wo*m*t + phase(f,m));
-        s2_lo += Am_(m)*cos(Wo*m*t + phase_ratek(f,m));
+        s2_lo += Am_(m)*cos(Wo*m*t - gdc*(Wo*m).^2 + phase_ratek(f,m));
       end
       for m=round(L/4)+1:round(L/2)
         s1_mid += Am(m)*cos(Wo*m*t + phase(f,m));
-        s2_mid += Am_(m)*cos(Wo*m*t + phase_ratek(f,m));
+        s2_mid += Am_(m)*cos(Wo*m*t - gdc*(Wo*m).^2 + phase_ratek(f,m));
       end
       for m=round(L/2)+1:L
         s1_hi += Am(m)*cos(Wo*m*t + phase(f,m));
-        s2_hi += Am_(m)*cos(Wo*m*t + phase_ratek(f,m));
+        s2_hi += Am_(m)*cos(Wo*m*t - gdc*(Wo*m).^2 + phase_ratek(f,m));
       end
       maxy = max([s1_lo]); miny = min([s1_hi]);
       maxy = ceil(maxy/5000)*5000; miny = floor(miny/5000)*5000;
@@ -229,7 +234,8 @@ function plphase2(samname, f, Nb=20, K=30)
     if plot_group_delay==1, s1="[group]/phase dly"; end
     if plot_group_delay==2, s1="group/[phase] dly"; end
     if phase0_en; s2="orig/[phase0]"; else s2="[orig]/phase0"; end
-    printf("\rframe: %d  menu: n-next  b-back  g-%s ratek-r 0-%s p-png f-postFilter[%d] q-quit ", f, s1, s2, postfilter_en);
+    printf("\rframe: %d  n-nxt b-bk g-%s ratek-r 0-%s f-pf[%d] s-smear[%d] q-quit "
+            , f, s1, s2, postfilter_en, smear_en);
     fflush(stdout);
     k = kbhit();
     if (k == 'n')
@@ -250,7 +256,10 @@ function plphase2(samname, f, Nb=20, K=30)
     if k == 'r',
       if ratek_en, ratek_en = 0; else ratek_en = 1; end
     end
-  until (k == 'q')
+    if k == 's',
+      if smear_en, smear_en = 0; else smear_en = 1; end
+    end
+ until (k == 'q')
   printf("\n");
 
 endfunction
