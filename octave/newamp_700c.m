@@ -486,7 +486,8 @@ function YdB = amplitude_postfilter(rate_Lhigh_sample_freqs_kHz, YdB, Fs, F0high
 
   % remove slope and expand dynamic range
   YdB -= SdB;
-  YdB *= 1.2;
+  m1 = (2.0-1.2)/pi; c1 = 1.2;
+  YdB = YdB .* (m1*w+c1);
   YdB += SdB;
 
   % normalise energy
