@@ -38,10 +38,10 @@ function postfilter_test() {
   c2sim $fullfile --hpf --phase0 --postfilter --amread ${filename}_am.f32 --hmread ${filename}_hm.f32 -o - | \
       sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_4_ratek_p0.wav
 
-  echo "ratek2_batch; ratek2_model_postfilter(\"${filename}\",\"${filename}_am.f32\",\"\",1,0); quit;" \
+  echo "ratek2_batch; ratek2_model_postfilter(\"${filename}\",\"${filename}_am.f32\",\"${filename}_hm.f32\",1,0); quit;" \
   | octave -p ${CODEC2_PATH}/octave -qf
-  c2sim $fullfile --hpf --amread ${filename}_am.f32 -o - | \
-      sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_5_ratek_pf.wav
+  c2sim $fullfile --hpf --phase0 --amread ${filename}_am.f32 --hmread ${filename}_hm.f32 -o - | \
+      sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_5_ratek_pf_p0.wav
 
   echo "ratek2_batch; ratek2_model_postfilter(\"${filename}\",\"${filename}_am.f32\",\"${filename}_hm.f32\",0,1); quit;" \
   | octave -p ${CODEC2_PATH}/octave -qf
@@ -53,7 +53,12 @@ function postfilter_test() {
   c2sim $fullfile --hpf --phase0 --postfilter --amread ${filename}_am.f32 --hmread ${filename}_hm.f32 -o - | \
       sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_7_ratek_pf_p0_pf.wav
 
-  c2enc 3200 $fullfile - | c2dec 3200 - - | sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_8_3200.wav
+  echo "ratek2_batch; ratek2_model_postfilter(\"${filename}\",\"${filename}_am.f32\",\"${filename}_hm.f32\",0,0,1); quit;" \
+  | octave -p ${CODEC2_PATH}/octave -qf
+  c2sim $fullfile --hpf --phase0 --postfilter --amread ${filename}_am.f32 --hmread ${filename}_hm.f32 -o - | \
+      sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_8_ratek_p0_smear.wav
+
+  c2enc 3200 $fullfile - | c2dec 3200 - - | sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_9_3200.wav
 }
 
 # Process sample with various methods including 1 and 2 stage VQ
@@ -187,7 +192,11 @@ function train_Nb() {
 # TODO: make these selectable via CLI
 postfilter_test ../raw/big_dog.raw
 postfilter_test ../raw/hts1a.raw
+postfilter_test ../raw/hts2a.raw
 postfilter_test ../raw/two_lines.raw
+postfilter_test ../raw/cq_ref.raw
+postfilter_test ../raw/kristoff.raw
+postfilter_test ../raw/mmt1.raw
 
 #test $1
 
