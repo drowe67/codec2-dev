@@ -186,7 +186,11 @@ include_directories(${PROJECT_BINARY_DIR})
 #
 if(LPCNET)
     if(LPCNET_BUILD_DIR)
+        # Theoretically this shouldn't be needed as we're also defining LPCNET_BUILD_DIR
+        # in the PATHS section below. But on Fedora 37, CMake can't find LPCNet (at least
+        # in Docker) without this.
         set(lpcnetfreedv_DIR ${LPCNET_BUILD_DIR})
+        
         find_package(lpcnetfreedv REQUIRED
             PATHS ${LPCNET_BUILD_DIR}
             NO_DEFAULT_PATH
