@@ -186,6 +186,7 @@ include_directories(${PROJECT_BINARY_DIR})
 #
 if(LPCNET)
     if(LPCNET_BUILD_DIR)
+        set(lpcnetfreedv_DIR ${LPCNET_BUILD_DIR})
         find_package(lpcnetfreedv REQUIRED
             PATHS ${LPCNET_BUILD_DIR}
             NO_DEFAULT_PATH
