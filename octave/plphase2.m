@@ -53,7 +53,7 @@ function plphase2(samname, f, Nb=20, K=30)
 
   rate_Lhigh_sample_freqs_kHz = (F0high:F0high:(Lhigh-1)*F0high)/1000;
 
-  k = ' '; plot_group_delay=0; Pms = 6; plot_synth_sn=1; phase0_en=0;
+  k = ' '; plot_group_delay=0; Pms = 6; plot_synth_sn=1; phase0_en=1;
   postfilter_en = 0; ratek_en = 1; smear_en = 0;
   do
     Wo = model(f,1); F0 = Fs*Wo/(2*pi); L = model(f,2);
@@ -135,7 +135,7 @@ function plphase2(samname, f, Nb=20, K=30)
       plot(s1_hi,sprintf('b;%s;',papr(s1_hi)));
       legend("boxoff")
       hold off;
-      axis([1 length(s) miny maxy]); grid; title('orig Am & orig phase');
+      axis([1 length(s) miny maxy]); grid; title('orig Am and orig phase');
       subplot(212); hold on;
       plot(s2_lo,sprintf('g;%s;',papr(s2_lo)));
       plot(s2_mid,sprintf('r;%s;',papr(s2_mid)));
@@ -144,11 +144,9 @@ function plphase2(samname, f, Nb=20, K=30)
       hold off;
       if ratek_en, am_str = "filtered Am"; else am_str = "orig Am"; end
       if phase0_en, phase_str = 'phase0'; else phase_str = 'orig phase'; end
-      if postfilter_en, phase_str = sprintf('%s & postfilter', phase_str); end
-      axis([1 length(s) miny maxy]); grid; title(sprintf("%s & %s",am_str, phase_str));
+      if postfilter_en, phase_str = sprintf('%s and postfilter', phase_str); end
+      axis([1 length(s) miny maxy]); grid; title(sprintf("%s and %s",am_str, phase_str));
     end
-    if (k == 'p')
-    endif
 
     figure(2); clf;
     if postfilter_en == 0
@@ -241,12 +239,12 @@ function plphase2(samname, f, Nb=20, K=30)
       else
         fn=sprintf("plphase2_%s_%d_time",name,f);
       end
-      print(fn,"-depsc","-S300,300");
+      print(fn,"-depslatex","-S300,300");
       printf("\nprinting... %s\n", fn);
       if postfilter_en
         figure(2);
         fn=sprintf("plphase2_%s_%d_freq_pf",name,f);
-        print(fn,"-depsc","-S300,300");
+        print(fn,"-depslatex","-S300,300");
         printf("printing... %s\n", fn);
       end
     endif

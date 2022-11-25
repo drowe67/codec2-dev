@@ -588,9 +588,46 @@ Another interpretation.  With broadened peaks but original phases, we now have a
 
 This suggests a post filter design (and indeed explanation of current post filters).  Enhancing the spectral envelope by expanding the dynamic range of the envelope $\hat{\mathbf{y}}=\mathbf{y}^\beta$ will increase the slope of the edges of the spectral peak.  If we derive a phase spectra using a HT, the group delay will be large at the peak edges, but small in the centre.  The amplitudes at the edges will be similar to the central peak.  Thus each edge will contribute low PAPR harmonics with increased probability of detection.  It remains to be seen if this will will be perceived in the same way as a single peak in the centre of the harmonic, given the poor ability of the ear to separate closely spaced tones at high frequencies.
 
+\section{Post filter}
+
+hts1a\ f44, big\_dog f61, plphase2
+
+Need before and after pf time domain/freq domain plots.  Easier to do A/B on GUI. Before and after group delay plots would be useful too.  Maybe three way plots?  Or another format with ratek/orig at top?
+
+Expressions for PF algorithm, ampl and phase post filtering.
+
+note post filter signal symmetric, not classic damped exponential.  This may not matter to the ear, which cares more about length of time energy is distributed over. hts1a F2 is virtually a single harmonic poking up - a better post filter would restore this peak.
+
+NOt always better PAPR in F2, but energy still looks better distributed.
+
 TODO: table of original ampl phase0 to explain each combination
 
 TODO: table of scripts used in this study
+
+\begin{figure}[h]
+\caption{Time domain: 40ms centred on big\_dog frame 61; green 0-1k, red 2-3, blue 2-4 kHz. Note bottom subplot has energy more concentrated in time}
+\label{fig:plphase2_big_dog_61_time}
+\begin{center}
+\input plphase2_big_dog_61_time.tex
+\input plphase2_big_dog_61_time_pf.tex
+\end{center}
+\end{figure}
+
+\begin{figure}[h]
+\caption{Time domain post filter: Low subplot has post filter applied, note energy less concentrated in time compared to \ref{fig:plphase2_big_dog_61_time}, lower PAPR in 0-1 kHz}
+\label{fig:plphase2_big_dog_61_time_pf}
+\begin{center}
+\input plphase2_big_dog_61_time_pf.tex
+\end{center}
+\end{figure}
+
+\begin{figure}[h]
+\caption{Frequency domain post filter: note post filter effect increases with frequency}
+\begin{center}
+\input plphase2_big_dog_61_freq_pf.tex
+\end{center}
+\end{figure}
+
 
 \section{Latex Sandbox}
 
@@ -599,8 +636,8 @@ TODO: table of scripts used in this study
 \begin{center}
 \input ratek7_big_dog_50.tex
 \end{center}
-
 \end{figure}
+
 \begin{figure}[h]
 \caption{Test Octave -depsc}
 \begin{center}
