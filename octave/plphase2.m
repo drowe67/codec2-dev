@@ -78,6 +78,7 @@ function plphase2(samname, f, Nb=20, K=30)
     end
 
     if postfilter_en
+      YdB_orig = YdB;
       YdB = amplitude_postfilter(rate_Lhigh_sample_freqs_kHz, YdB, Fs, F0high);
     end
 
@@ -132,12 +133,14 @@ function plphase2(samname, f, Nb=20, K=30)
       plot(s1_lo,sprintf('g;%s;',papr(s1_lo)));
       plot(s1_mid,sprintf('r;%s;',papr(s1_mid)));
       plot(s1_hi,sprintf('b;%s;',papr(s1_hi)));
+      legend("boxoff")
       hold off;
       axis([1 length(s) miny maxy]); grid; title('orig Am & orig phase');
       subplot(212); hold on;
       plot(s2_lo,sprintf('g;%s;',papr(s2_lo)));
       plot(s2_mid,sprintf('r;%s;',papr(s2_mid)));
       plot(s2_hi,sprintf('b;%s;',papr(s2_hi)));
+      legend("boxoff")
       hold off;
       if ratek_en, am_str = "filtered Am"; else am_str = "orig Am"; end
       if phase0_en, phase_str = 'phase0'; else phase_str = 'orig phase'; end
@@ -148,9 +151,16 @@ function plphase2(samname, f, Nb=20, K=30)
     endif
 
     figure(2); clf;
-    plot((1:L)*Wo*4000/pi, 20*log10(Am),"g+-;Am;");
+    if postfilter_en == 0
+      plot((1:L)*Wo*4000/pi, 20*log10(Am),"g+-;Am;");
+    endif
     hold on;
-    plot(rate_Lhigh_sample_freqs_kHz*1000, YdB, ';rate Lhigh YdB;b+-');
+    if postfilter_en
+      plot(rate_Lhigh_sample_freqs_kHz*1000, YdB_orig, ';rate Lhigh YdB;b-');
+      plot(rate_Lhigh_sample_freqs_kHz*1000, YdB, ';rate Lhigh YdB postfilter;r-');
+    else
+      plot(rate_Lhigh_sample_freqs_kHz*1000, YdB, ';rate Lhigh YdB;b-');
+    end
 
     % estimate group and phase delay and optionally plot ------------------------
 
@@ -190,13 +200,10 @@ function plphase2(samname, f, Nb=20, K=30)
       plot((0:255)*Fs2/256, Sw(f,:));
       axis([1 Fs2 -10 80]);
       ylabel('Amplitude (dB)');
+      legend("boxoff"); legend("location","north");
     end
     hold off; xlabel('Frequency (Hz)');
     grid;
-
-    % print tp EPS -------------------------------------------------------------
-    if (k == 'p')
-    endif
 
     figure(3); clf;
     subplot(211);
@@ -226,6 +233,22 @@ function plphase2(samname, f, Nb=20, K=30)
     end
 
     if (k == 'p')
+      [dir name ext]=fileparts(samname);
+      figure(1);
+      legend("boxoff")
+      if postfilter_en
+        fn=sprintf("plphase2_%s_%d_time_pf",name,f);
+      else
+        fn=sprintf("plphase2_%s_%d_time",name,f);
+      end
+      print(fn,"-depsc","-S300,300");
+      printf("\nprinting... %s\n", fn);
+      if postfilter_en
+        figure(2);
+        fn=sprintf("plphase2_%s_%d_freq_pf",name,f);
+        print(fn,"-depsc","-S300,300");
+        printf("printing... %s\n", fn);
+      end
     endif
 
     % interactive menu
