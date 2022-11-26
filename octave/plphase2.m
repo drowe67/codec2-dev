@@ -90,37 +90,38 @@ function plphase2(samname, f, Nb=20, K=30)
     s = [ Sn(2*f-1,:) Sn(2*f,:) ];
     y_off = -5000;
     if phase0_en, phase_ratek(f,1:L) = phase0(f,1:L); else phase_ratek(f,1:L) = phase(f,1:L); end
-     if plot_synth_sn
+    if plot_synth_sn
       N=length(s);
       s1_lo = zeros(1,N); s2_lo = zeros(1,N);
-      s1_mid = y_off*ones(1,N); s2_mid = y_off*ones(1,N);
-      s1_hi = 2*y_off*ones(1,N); s2_hi = 2*y_off*ones(1,N);
+      s1_mid = ones(1,N); s2_mid = ones(1,N);
+      s1_hi = ones(1,N); s2_hi = ones(1,N);
       t=0:N-1; f0 = Wo*Fs2/pi; P = Fs/f0;
       for m=1:round(L/4)
-        s1_lo += Am(m)*cos(Wo*m*t + phase(f,m));
-        s2_lo += Am_(m)*cos(Wo*m*t + phase_ratek(f,m));
+        s1_lo += Am(m)*exp(j*(Wo*m*t + phase(f,m)));
+        s2_lo += Am_(m)*exp(j*(Wo*m*t + phase_ratek(f,m)));
       end
       for m=round(L/4)+1:round(L/2)
-        s1_mid += Am(m)*cos(Wo*m*t + phase(f,m));
-        s2_mid += Am_(m)*cos(Wo*m*t + phase_ratek(f,m));
+        s1_mid += Am(m)*exp(j*(Wo*m*t + phase(f,m)));
+        s2_mid += Am_(m)*exp(j*(Wo*m*t + phase_ratek(f,m)));
       end
       for m=round(L/2)+1:L
-        s1_hi += Am(m)*cos(Wo*m*t + phase(f,m));
-        s2_hi += Am_(m)*cos(Wo*m*t + phase_ratek(f,m));
+        s1_hi += Am(m)*exp(j*(Wo*m*t + phase(f,m)));
+        s2_hi += Am_(m)*exp(j*(Wo*m*t + phase_ratek(f,m)));
       end
-      maxy = max([s1_lo]); miny = min([s1_hi]);
+      maxy =  10000;
+      miny = -15000;
       maxy = ceil(maxy/5000)*5000; miny = floor(miny/5000)*5000;
       subplot(211); hold on;
-      plot(s1_lo,sprintf('g;%s;',papr(s1_lo)));
-      plot(s1_mid,sprintf('r;%s;',papr(s1_mid)));
-      plot(s1_hi,sprintf('b;%s;',papr(s1_hi)));
+      plot(real(s1_lo),sprintf('g;%s;',papr(s1_lo)));
+      plot(y_off + real(s1_mid),sprintf('r;%s;',papr(s1_mid)));
+      plot(2*y_off + real(s1_hi),sprintf('b;%s;',papr(s1_hi)));
       legend("boxoff")
       hold off;
       axis([1 length(s) miny maxy]); grid; title('orig Am and orig phase');
       subplot(212); hold on;
-      plot(s2_lo,sprintf('g;%s;',papr(s2_lo)));
-      plot(s2_mid,sprintf('r;%s;',papr(s2_mid)));
-      plot(s2_hi,sprintf('b;%s;',papr(s2_hi)));
+      plot(real(s2_lo),sprintf('g;%s;',papr(s2_lo)));
+      plot(y_off + real(s2_mid),sprintf('r;%s;',papr(s2_mid)));
+      plot(2*y_off + real(s2_hi),sprintf('b;%s;',papr(s2_hi)));
       legend("boxoff")
       hold off;
       if ratek_en, am_str = "filtered Am"; else am_str = "orig Am"; end

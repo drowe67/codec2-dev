@@ -498,6 +498,6 @@ function YdB = amplitude_postfilter(rate_Lhigh_sample_freqs_kHz, YdB, Fs, F0high
 end
 
 function str = papr(s)
-  papr_dB = 10*log10(max(s.^2)/mean(s.^2));
-  str = sprintf("PAPR: %3.1f dB", papr_dB);
+  papr_dB = 10*log10(max(abs(s).^2)/mean(abs(s).^2));
+  str = sprintf("CPAPR: %3.1f dB", papr_dB);
 end
