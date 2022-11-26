@@ -473,13 +473,13 @@ function phase0 = synth_phase_from_mag(rate_Lhigh_sample_freqs_kHz, YdB, Fs, Wo,
   end
 end
 
-function YdB = amplitude_postfilter(rate_Lhigh_sample_freqs_kHz, YdB, Fs, F0high)
+function [YdB SdB] = amplitude_postfilter(rate_Lhigh_sample_freqs_kHz, YdB, Fs, F0high)
   % straight line fit to YdB to estimate spectral slope SdB
   w = 2*pi*rate_Lhigh_sample_freqs_kHz*1000/Fs;
   st = round(200/F0high);
   en = round(3700/F0high);
   [m b] = linreg(w(st:en),YdB(st:en),en-st+1);
-  SdB = w*m+b; S = 10.^(SdB/20);
+  SdB = w*m+b;
 
   Y = 10 .^ (YdB/20);
   Y_energy1 = sum(Y .^ 2);
@@ -493,8 +493,7 @@ function YdB = amplitude_postfilter(rate_Lhigh_sample_freqs_kHz, YdB, Fs, F0high
   % normalise energy
   Y = 10 .^ (YdB/20);
   Y_energy2 = sum(Y .^ 2);
-  Y *= sqrt(Y_energy1/Y_energy2);
-  YdB = 20*log10(Y);
+  YdB += 10*log10(Y_energy1/Y_energy2);
 end
 
 function str = papr(s)
