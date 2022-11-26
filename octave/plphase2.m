@@ -61,14 +61,7 @@ function plphase2(samname, f, Nb=20, K=30)
                               rate_Lhigh_sample_freqs_kHz, "spline", "extrap");
 
     if ratek_en
-      % Filter at rate Lhigh, y = F(R(a)). Note we filter in linear energy domain,
-      % and Lhigh are linearly spaced
-      Y = zeros(1,Lhigh-1); YdB = zeros(1,Lhigh-1);
-      for m=1:Lhigh-1
-        Am_rate_Lhigh = 10.^(AmdB_rate_Lhigh/20);
-        Y(m) = sqrt(sum(Am_rate_Lhigh.^2 .* h(m,1:Lhigh-1)));
-        YdB(m) = 20*log10(Y(m));
-      end
+      [YdB Y] = filter_rate_Lhigh(Lhigh,h,AmdB_rate_Lhigh);
     else
       YdB = AmdB_rate_Lhigh; Y = 10 .^ (YdB/20);
     end
@@ -92,38 +85,14 @@ function plphase2(samname, f, Nb=20, K=30)
     if phase0_en, phase_ratek(f,1:L) = phase0(f,1:L); else phase_ratek(f,1:L) = phase(f,1:L); end
     if plot_synth_sn
       N=length(s);
-      s1_lo = zeros(1,N); s2_lo = zeros(1,N);
-      s1_mid = ones(1,N); s2_mid = ones(1,N);
-      s1_hi = ones(1,N); s2_hi = ones(1,N);
-      t=0:N-1; f0 = Wo*Fs2/pi; P = Fs/f0;
-      for m=1:round(L/4)
-        s1_lo += Am(m)*exp(j*(Wo*m*t + phase(f,m)));
-        s2_lo += Am_(m)*exp(j*(Wo*m*t + phase_ratek(f,m)));
-      end
-      for m=round(L/4)+1:round(L/2)
-        s1_mid += Am(m)*exp(j*(Wo*m*t + phase(f,m)));
-        s2_mid += Am_(m)*exp(j*(Wo*m*t + phase_ratek(f,m)));
-      end
-      for m=round(L/2)+1:L
-        s1_hi += Am(m)*exp(j*(Wo*m*t + phase(f,m)));
-        s2_hi += Am_(m)*exp(j*(Wo*m*t + phase_ratek(f,m)));
-      end
+      [s1_lo s1_mid s1_hi] = synth_time(Wo, L, Am, phase(f,:), N);
+      [s2_lo s2_mid s2_hi] = synth_time(Wo, L, Am_, phase_ratek(f,:), N);
       maxy =  10000;
       miny = -15000;
       maxy = ceil(maxy/5000)*5000; miny = floor(miny/5000)*5000;
-      subplot(211); hold on;
-      plot(real(s1_lo),sprintf('g;%s;',papr(s1_lo)));
-      plot(y_off + real(s1_mid),sprintf('r;%s;',papr(s1_mid)));
-      plot(2*y_off + real(s1_hi),sprintf('b;%s;',papr(s1_hi)));
-      legend("boxoff")
-      hold off;
+      subplot(211); plot_time(s1_lo, s1_mid, s1_hi);
       axis([1 length(s) miny maxy]); grid; title('orig Am and orig phase');
-      subplot(212); hold on;
-      plot(real(s2_lo),sprintf('g;%s;',papr(s2_lo)));
-      plot(y_off + real(s2_mid),sprintf('r;%s;',papr(s2_mid)));
-      plot(2*y_off + real(s2_hi),sprintf('b;%s;',papr(s2_hi)));
-      legend("boxoff")
-      hold off;
+      subplot(212); plot_time(s2_lo, s2_mid, s2_hi);
       if ratek_en, am_str = "filtered Am"; else am_str = "orig Am"; end
       if phase0_en, phase_str = 'phase0'; else phase_str = 'orig phase'; end
       if postfilter_en, phase_str = sprintf('%s and postfilter', phase_str); end
@@ -183,44 +152,54 @@ function plphase2(samname, f, Nb=20, K=30)
       adj_ratek = 2*pi;
     end
     plot((1:L)*Wo*Fs2/pi, phase0(f,1:L)+adj_ratek, "-or;phase0;");
-    axis([0 Fs2 -2*pi 2*pi]);
+    axis([0 Fs2 -2*pi 2*pi]); ylabel('Phase (rads)')
     subplot(212);
     if plot_group_delay == 1
       plot(x_group, group_delay_phase0, "-or;group delay phase0;");
-      axis([1 Fs2 -Pms Pms]);
+      axis([1 Fs2 -Pms Pms]); ylabel('Group delay (ms)')
     end
     if plot_group_delay == 2
       plot(x_group, phase_delay_phase0, "-or;phase delay phase0;");
-      axis([1 Fs2 -Pms Pms]);
+      axis([1 Fs2 -Pms Pms]); ylabel('Phase delay (ms)')
     end
 
     if (k == 'p')
       [dir name ext]=fileparts(samname);
-      fn=sprintf("plphase2_%s_%d_time_pf",name,f);
-      if postfilter_en
-        % We just want a plot of the lower subplot for document
-        figure(4); clf; subplot(111); hold on;
-        plot(s2_lo,sprintf('g;%s;',papr(s2_lo)));
-        plot(s2_mid,sprintf('r;%s;',papr(s2_mid)));
-        plot(s2_hi,sprintf('b;%s;',papr(s2_hi)));
-        legend("boxoff")
-        hold off;
-        if ratek_en, am_str = "filtered Am"; else am_str = "orig Am"; end
-        if phase0_en, phase_str = 'phase0'; else phase_str = 'orig phase'; end
-        if postfilter_en, phase_str = sprintf('%s and postfilter', phase_str); end
-        axis([1 length(s) miny maxy]); grid; title(sprintf("%s and %s",am_str, phase_str));
-        print(fn,"-depslatex","-S300,150");
-      else
-        figure(1);
-        print(fn,"-depslatex","-S300,300");
-      end
+
+      % orig Am, orig phase
+      [s1_lo s1_mid s1_hi] = synth_time(Wo, L, Am, phase(f,:), N);
+
+      % filtered Am, phase0
+      [YdB Y] = filter_rate_Lhigh(Lhigh,h,AmdB_rate_Lhigh);
+      phase0 = synth_phase_from_mag(rate_Lhigh_sample_freqs_kHz, YdB, Fs, Wo, L, 0);
+      AmdB_ = interp1([0 rate_Lhigh_sample_freqs_kHz 4], [0 YdB 0], Am_freqs_kHz, "spline", "extrap");
+      Am_ = 10 .^ (AmdB_/20);
+      [s2_lo s2_mid s2_hi] = synth_time(Wo, L, Am_, phase0, N);
+
+      % filtered Am, phase0, postfilter
+      YdB = amplitude_postfilter(rate_Lhigh_sample_freqs_kHz, YdB, Fs, F0high);
+      phase0 = synth_phase_from_mag(rate_Lhigh_sample_freqs_kHz, YdB, Fs, Wo, L, 1);
+      AmdB_ = interp1([0 rate_Lhigh_sample_freqs_kHz 4], [0 YdB 0], Am_freqs_kHz, "spline", "extrap");
+      Am_ = 10 .^ (AmdB_/20);
+      [s3_lo s3_mid s3_hi] = synth_time(Wo, L, Am_, phase0, N);
+
+      figure(4); clf;
+      maxy =  10000; miny = -15000;
+      subplot(311); plot_time(s1_lo, s1_mid, s1_hi);
+      axis([1 length(s) miny maxy]); grid; title('orig Am and orig phase');
+      subplot(312); plot_time(s2_lo, s2_mid, s2_hi);
+      axis([1 length(s) miny maxy]); grid; title('filtered Am and phase0');
+      subplot(313); plot_time(s3_lo, s3_mid, s3_hi);
+      axis([1 length(s) miny maxy]); grid; title('filtered Am and phase0 and post filter');
+
+      fn=sprintf("plphase2_%s_%d_time",name,f);
+      print(fn,"-depslatex","-S300,450");
       printf("\nprinting... %s\n", fn);
-      if postfilter_en
-        figure(2);
-        fn=sprintf("plphase2_%s_%d_freq_pf",name,f);
-        print(fn,"-depslatex","-S300,300");
-        printf("printing... %s\n", fn);
-      end
+
+      figure(2);
+      fn=sprintf("plphase2_%s_%d_freq",name,f);
+      print(fn,"-depslatex","-S300,300");
+      printf("printing... %s\n", fn);
     endif
 
     % interactive menu
@@ -253,4 +232,42 @@ function plphase2(samname, f, Nb=20, K=30)
     until (k == 'q')
   printf("\n");
 
+endfunction
+
+% Filter at rate Lhigh, y = F(R(a)). Note we filter in linear energy domain,
+% and Lhigh are linearly spaced
+function [YdB Y] = filter_rate_Lhigh(Lhigh, h, AmdB_rate_Lhigh)
+  Y = zeros(1,Lhigh-1); YdB = zeros(1,Lhigh-1);
+  for m=1:Lhigh-1
+    Am_rate_Lhigh = 10.^(AmdB_rate_Lhigh/20);
+    Y(m) = sqrt(sum(Am_rate_Lhigh.^2 .* h(m,1:Lhigh-1)));
+    YdB(m) = 20*log10(Y(m));
+  end
+endfunction
+
+% synth time domain waveform, broken into three frequency bands
+function [lo mid hi] = synth_time(Wo, L, Am, phase, N)
+  lo = zeros(1,N);
+  mid = ones(1,N);
+  hi = ones(1,N);
+  t=0:N-1;
+  for m=1:round(L/4)
+    lo += Am(m)*exp(j*(Wo*m*t + phase(m)));
+  end
+  for m=round(L/4)+1:round(L/2)
+    mid += Am(m)*exp(j*(Wo*m*t + phase(m)));
+  end
+  for m=round(L/2)+1:L
+    hi += Am(m)*exp(j*(Wo*m*t + phase(m)));
+  end
+endfunction
+
+function plot_time(lo, mid, hi)
+  y_off = -5000;
+  hold on;
+  plot(real(lo),sprintf('g;%s;',papr(lo)));
+  plot(y_off + real(mid),sprintf('r;%s;',papr(mid)));
+  plot(2*y_off + real(hi),sprintf('b;%s;',papr(hi)));
+  legend("boxoff")
+  hold off;
 endfunction
