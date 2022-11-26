@@ -18,7 +18,7 @@
     octave:> plphase2("../build_linux/hts1a", 44)
 #}
 
-function plphase2(samname, f, Nb=20, K=30)
+function plphase2(samname, f, Nb=20, K=30, print_path="../doc/ratek_resampler/")
   [dir basename ext] = fileparts(samname);
 
   newamp_700c; melvq;
@@ -68,7 +68,7 @@ function plphase2(samname, f, Nb=20, K=30)
 
     if postfilter_en
       YdB_orig = YdB;
-      YdB = amplitude_postfilter(rate_Lhigh_sample_freqs_kHz, YdB, Fs, F0high);
+      [YdB SdB] = amplitude_postfilter(rate_Lhigh_sample_freqs_kHz, YdB, Fs, F0high);
     end
 
     % Synthesised phase0 model using Hilbert Transform
@@ -106,7 +106,9 @@ function plphase2(samname, f, Nb=20, K=30)
     hold on;
     if postfilter_en
       plot(rate_Lhigh_sample_freqs_kHz*1000, YdB_orig, ';rate Lhigh YdB;b-');
-      plot(rate_Lhigh_sample_freqs_kHz*1000, YdB, ';rate Lhigh YdB postfilter;r-');
+      plot(rate_Lhigh_sample_freqs_kHz*1000, YdB, ';rate Lhigh YdB postfilter;g-');
+      plot(rate_Lhigh_sample_freqs_kHz*1000, SdB, ';rate Lhigh SdB;g--');
+      plot(rate_Lhigh_sample_freqs_kHz*1000, YdB_orig-SdB, ';rate Lhigh YdB-SdB;-');
     else
       plot(rate_Lhigh_sample_freqs_kHz*1000, YdB, ';rate Lhigh YdB;b-');
     end
@@ -184,6 +186,13 @@ function plphase2(samname, f, Nb=20, K=30)
       [s3_lo s3_mid s3_hi] = synth_time(Wo, L, Am_, phase0, N);
 
       figure(4); clf;
+      % save plot defaults and set up for Latex plots
+      textfontsize = get(0,"defaulttextfontsize");
+      linewidth = get(0,"defaultlinelinewidth");
+      set(0, "defaulttextfontsize", 10);
+      set(0, "defaultaxesfontsize", 10);
+      set(0, "defaultlinelinewidth", 0.5);
+
       maxy =  10000; miny = -15000;
       subplot(311); plot_time(s1_lo, s1_mid, s1_hi);
       axis([1 length(s) miny maxy]); grid; title('orig Am and orig phase');
@@ -193,13 +202,32 @@ function plphase2(samname, f, Nb=20, K=30)
       axis([1 length(s) miny maxy]); grid; title('filtered Am and phase0 and post filter');
 
       fn=sprintf("plphase2_%s_%d_time",name,f);
+      old_dir=cd(print_path);
       print(fn,"-depslatex","-S300,450");
-      printf("\nprinting... %s\n", fn);
+      printf("\nprinting... %s%s\n", print_path,fn);
+      cd(old_dir);
 
-      figure(2);
+      figure(5); clf;
+      hold on;
+      plot(rate_Lhigh_sample_freqs_kHz*1000, YdB_orig, ';rate Lhigh YdB;b-');
+      plot(rate_Lhigh_sample_freqs_kHz*1000, YdB, ';rate Lhigh YdB postfilter;g-');
+      plot(rate_Lhigh_sample_freqs_kHz*1000, SdB, ';rate Lhigh SdB;b--');
+      plot(rate_Lhigh_sample_freqs_kHz*1000, YdB_orig-SdB, ';rate Lhigh YdB-SdB;-');
+      plot((0:255)*Fs2/256, Sw(f,:));
+      axis([1 Fs2 -10 80]);
+      ylabel('Amplitude (dB)');
+      legend("boxoff"); legend("location","north");
+      hold off; xlabel('Frequency (Hz)'); grid;
       fn=sprintf("plphase2_%s_%d_freq",name,f);
+      old_dir=cd(print_path);
       print(fn,"-depslatex","-S300,300");
-      printf("printing... %s\n", fn);
+      printf("printing... %s%s\n", print_path,fn);
+      cd(old_dir);
+
+      % restore plot defaults
+      set(0, "defaulttextfontsize", textfontsize);
+      set(0, "defaultaxesfontsize", textfontsize);
+      set(0, "defaultlinelinewidth", linewidth);
     endif
 
     % interactive menu
