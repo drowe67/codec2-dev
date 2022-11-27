@@ -405,7 +405,15 @@ In Figure \ref{fig:20_100_vq} and Figure \ref{fig:train_120_Nb20_K30_vq} we note
 
 \section{Efficient Filtering}
 
-As $L$ is time varying, it is necessary to determine the filters $g(k)$ for every frame which is computationally inefficient.  A more efficient procedure is to resample $\mathbf{a}$ to rate $L_{high}=L_{max}$ vector $\mathbf{x}$ using the resampler $T()$, perform the filtering $G()$ at rate $L_{high}$, then resample $R()$ to the non-linearly spaced rate $K$ vector $\mathbf{b}$.  This allows $g(k)$ to be precomputed for rate $L_{high}$.  The process now becomes:
+As $L$ is time varying, it is necessary to determine the filters $g(k)$ for every frame which is computationally inefficient.  A more efficient procedure is to resample $\mathbf{a}$ to rate $L_{high}=L_{max}$ vector $\mathbf{x}$ using the resampler $T()$, perform the filtering $H()$ at rate $L_{high}$, then resample $R()$ to the no\begin{equation}
+\begin{split}
+\mathbf{x} &=T(\mathbf{a}) \\
+\mathbf{y} &= H(\mathbf{x}) \\
+\mathbf{b} &= R(\mathbf{y}) \\
+\hat{\mathbf{b}} &= Q(\mathbf{b}) \\
+\hat{\mathbf{y}}^L &= S(\hat{\mathbf{b}})
+\end{split}
+\end{equation}n-linearly spaced rate $K$ vector $\mathbf{b}$.  This allows $g(k)$ to be precomputed for rate $L_{high}$.  The process now becomes:
 
 \begin{equation}
 \begin{split}
@@ -586,64 +594,86 @@ The mixture of high group delay and low group delay harmonics may have the same 
 
 Another interpretation.  With broadened peaks but original phases, we now have a non-minimum phase system as phase response is not related to magnitude response by a Hilbert Transform.  This implies the energy is not maximally concentrated in time and group delay is not minimised.
 
-This suggests a post filter design (and indeed explanation of current post filters).  Enhancing the spectral envelope by expanding the dynamic range of the envelope $\hat{\mathbf{y}}=\mathbf{y}^\beta$ will increase the slope of the edges of the spectral peak.  If we derive a phase spectra using a HT, the group delay will be large at the peak edges, but small in the centre.  The amplitudes at the edges will be similar to the central peak.  Thus each edge will contribute low PAPR harmonics with increased probability of detection.  It remains to be seen if this will will be perceived in the same way as a single peak in the centre of the harmonic, given the poor ability of the ear to separate closely spaced tones at high frequencies.
+This suggests a post filter design (and indeed explanation of current post filters).  Enhancing the spectral envelope by expanding the dynamic range of the envelope $\hat{\mathbf{y}}=\beta\mathbf{y}$ ($\mathbf{y}$ in dB) will increase the slope of the edges of the spectral peak.  If we derive a phase spectra using a HT, the group delay will be large at the peak edges, but small in the centre.  The amplitudes at the edges will be similar to the central peak.  Thus each edge will contribute low PAPR harmonics with increased probability of detection.  It remains to be seen if this will will be perceived in the same way as a single peak in the centre of the harmonic, given the poor ability of the ear to separate closely spaced tones at high frequencies.
 
 \section{Post filter}
 
-hts1a\ f44, big\_dog f61, plphase2
+A post filter has been developed, and is providing a reasonable improvement in speech quality over a small database of speech samples from the \emph{codec2} repository, in particular when a small loudspeaker is used for playback. The post filter reduces the buzzy/muffled effect for low pitch males, and importantly does not reduce the quality of other samples (such as females). It improves intelligibility of several samples, even those with high pitch.  It does "colour" the speech - samples sound different compared to no post filtering, however the overall effect is positive. 
 
-Need before and after pf time domain/freq domain plots.  Easier to do A/B on GUI. Before and after group delay plots would be useful too.  Maybe three way plots?  Or another format with ratek/orig at top?
-
-Expressions for PF algorithm, ampl and phase post filtering.
-
-note post filter signal symmetric, not classic damped exponential.  This may not matter to the ear, which cares more about length of time energy is distributed over. hts1a F2 is virtually a single harmonic poking up - a better post filter would restore this peak.
-
-NOt always better PAPR in F2, but energy still looks better distributed.
-
-TODO: table of original ampl phase0 to explain each combination
-
-TODO: table of scripts used in this study
+The \emph{newamp1} post filter employed in Codec 2 is based on the MBE frequency domain post filter \cite[Section 8.6, p 267]{kondoz1994digital}, which is turn based on the frequency domain post filter from McAulay and Quatieri \cite[Section 4.3, p 148]{kleijn1995speech}.
 
 \begin{figure}[h]
-\caption{Time domain: 40ms centred on big\_dog frame 61; green 0-1k, red 2-3, blue 2-4 kHz. Note bottom subplot has energy more concentrated in time}
+\caption{Time domain: 40ms centred on big\_dog frame 61; green 0-1k, red 1-2, blue 2-4 kHz. Note middle subplot has energy more concentrated in time compared to top.  With the post filter applied (bottom), energy is less concentrated}
 \label{fig:plphase2_big_dog_61_time}
 \begin{center}
 \input plphase2_big_dog_61_time.tex
-\input plphase2_big_dog_61_time_pf.tex
 \end{center}
 \end{figure}
 
 \begin{figure}[h]
-\caption{Time domain post filter: Low subplot has post filter applied, note energy less concentrated in time compared to \ref{fig:plphase2_big_dog_61_time}, lower PAPR in 0-1 kHz}
-\label{fig:plphase2_big_dog_61_time_pf}
+\caption{Frequency domain view of post filter: note post filter effect increases with frequency.  Also shown is the least squares spectral slope estimate, and equalised vector (bottom)}
+\label{fig:plphase2_big_dog_61_freq}
 \begin{center}
-\input plphase2_big_dog_61_time_pf.tex
+\input plphase2_big_dog_61_freq.tex
 \end{center}
 \end{figure}
 
-\begin{figure}[h]
-\caption{Frequency domain post filter: note post filter effect increases with frequency}
-\begin{center}
-\input plphase2_big_dog_61_freq_pf.tex
-\end{center}
-\end{figure}
+Figure \ref{fig:plphase2_big_dog_61_time} illustrates the algorithm in action in the time domain, and Figure \ref{fig:plphase2_big_dog_61_freq} shows the effect in the frequency domain.  Compared to the \emph{phase0} algorithm alone, the algorithm better distributes the energy of each pitch cycle in time, which can be objectively measured by a reduction in PAPR. We note that the post filtered signal envelope is more symmetric in time than the original which shows the classic damped exponential envelope.  This may not matter to the ear, as our theory suggests it is the PAPR that matters, not the shape of the time domain envelope.
 
+The algorithm acts on both the amplitudes $\mathbf{y}$, and phases ${\mathbf{\Omega}}$ in two stages.  For convenience it currently operates at rate $L_{high}$, and was developed using unquantised vectors. The amplitude stage:
+ \begin{enumerate}
+ \item Makes a straight line least squares fit to the amplitude samples $\mathbf{y}$ (in dB) between 200 and 3700 Hz to estimate the spectral slope $\mathbf{s}$.
+ \item Subtracts the spectral slope to operate on an equalised vector of amplitudes.
+ \item Multiples each equalised vector sample by a weighting vector $\mathbf{w}$ sampled at the same rate as $\mathbf{y}$ that varies linearly from 1.2 to 2.0 over 0 to 4 kHz, such that the elements $w(f)=f*(2.0-1.2)/4000+1.2$, to compensate for the effect of the filtering operation $H()$ which tends to reduce the dynamic range at high frequencies.
+ \item Restores the spectral slope.
+ \item Scales the energy in post filtered vector to be the same as the original vector. 
+ \end{enumerate}
+ 
+\begin{equation}
+\begin{split}
+\mathbf{y}' &= (\mathbf{y}-\mathbf{s})\odot\mathbf{w} + \mathbf{s} \\
+\hat{\mathbf{y}} &= \mathbf{y}'+10\log_{10}(||\mathbf{y}||^2/||\mathbf{y'}||^2) \\
+\end{split}
+\end{equation}
+where $\odot$ represents element by element multiplication, all vectors are in dB, and the operation $||\mathbf{x}||^2$ calculates the total \emph{linear} energy in the vector $\mathbf{x}$.
 
-\section{Latex Sandbox}
+The second step involves an additional weighting of the input to the Hilbert Transform used to calculate the phase spectra:
+\begin{equation}
+\mathbf{\Omega}=HT(1.5*\hat{\mathbf{y}})
+\end{equation}
+where $HT()$ is a the Hilbert Transform function that returns a vector of phase samples $\mathbf{\Omega}$ from a vector of amplitude samples $\mathbf{y}$.  This was found to provide a further dispersion of the time domain energy, without affecting the magnitude spectrum.
 
-\begin{figure}[h]
-\caption{Test Octave -depslatex}
-\begin{center}
-\input ratek7_big_dog_50.tex
-\end{center}
-\end{figure}
+The \path{plphase2.m} Octave script was used for development of the post filter described in this section.  It supports frame-by-frame single stepping through speech samples, and switching various option in and out while plotting the signal in the time, frequency, and group delay domains.  The \path{ratek2_batch.m} Octave script (\emph{ratek2\_model\_postfilter} function) provides batch processing of speech samples, and the top level \path{ratek_resampler.sh} shell script processes multiples speech files using various options, generating wave files for subjective listening tests. \emph{hts1a} frame 44 and \emph{big\_dog} frame 61 are two test frames useful for visualising the problem, and effect of the post filter.  
 
-\begin{figure}[h]
-\caption{Test Octave -depsc}
-\begin{center}
-\includegraphics{ratek7_big_dog_50.eps}
-\end{center}
-\end{figure}
+Inspecting \emph{hts1a} with \path{plphase2.m} provides a good example of the effect of the post filtering on group delay.  This low pitch sample has frames where a single harmonic defines formants, demonstrating just how narrow male formant bandwidths can be.
+
+Complex PAPR (CPAPR) is defined as:
+\begin{equation}
+\begin{split}
+CPAPR &= 10\log_{10} \frac{ \max |s(n)|^2 }{ \textrm{mean} |s(n)|^2 } \\
+s(n) &= \sum_{m=1}^{L}A_m e^{j(\omega_0mn+\theta_m)} \\
+\end{split}
+\end{equation}
+CPAPR tracks the time domain magnitude envelope of the signal.
+
+\subsection{Further Work}
+
+We now have a better understanding of how the post filter improves speech quality:
+\begin{enumerate}
+\item It increases the formant/anti-formant ratio, better defining formant locations to the ear, and hence increasing intelligibility. This helps improve speech quality for males and females.
+\item For low pitch males, it distributes the time domain speech energy more equally in time across the pitch period than the minimum phase \emph{phase0} model alone, increasing the probability of detection of formant energy by the ear, reducing muffling and increasing intelligibility.
+\end{enumerate}
+
+The post filter algorithm presented here was developed by experiment, and there is much room for further development. The weights and partition between the amplitude and phase stages were chosen by experiment. Too much filtering in the amplitude stage (especially at low frequencies) resulted in hollow sounding speech.
+
+The slope removal/equalisation phase deserves further examination.  In the \emph{newamp1} post filter, $\mathbf{s}$ was set to a fixed 6dB.  Others \cite[Section 4.3, p 148]{kleijn1995speech} have fit a first order all pole model.
+
+The accuracy of the fit of $\mathbf{y}$ to $\mathbf{a}$ varies from frame to frame, so the amount of post filtering required to obtain a distribution of energy in time similar to the original varies.  A more formal definition of energy distribution could lead to an algorithm to better calculate a phase spectra.
+
+For low frequency harmonics, it is important to have phase continuity between frames to prevent roughness.  The algorithm does not currently track or modify phase continuity between adjacent frames.
+
+The question of where to apply the post filter (e.g. before or after quantisation) is open.  Equalisation of the speech spectra early in the signal processing chain would likely lead to lower VQ distortion, if the effect on speech quality is acceptable.
+
 
 \bibliographystyle{plain}
 \bibliography{ratek_references}
