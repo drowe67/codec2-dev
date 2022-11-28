@@ -192,7 +192,7 @@ If $\mathbf{n}_{n}$ and $\mathbf{n}_{n+1}$ are not well correlated they may beco
 
 This experiment tests the ability to resample perfectly ($E=0$) with $K>L$, no filtering ($H(x)=x$) and linear frequency sampling and was implemented with Octave scripts \path{ratek1_fbf.m} and \path{ratek1_batch.m}.
 
-Figure \ref{fig:ratek1_big_dog_50} illustrates why the resampler choice is important.  In the region of F1, the spectral samples $A_{m}$ are changing quickly.  The parabolic resampler fails to track these changes leading to distortion in a perceptually important feature of the spectrum.  When the resampler is viewed as a filter, this can be interpreted as a low pass response in the parabolic resampler, and is most noticable when $K$ is close to $L$.
+Figure \ref{fig:ratek1_big_dog_50} illustrates why the resampler choice is important.  In the region of F1, the spectral samples $A_{m}$ are changing quickly.  The parabolic resampler fails to track these changes leading to distortion in a perceptually important feature of the spectrum.  When the resampler is viewed as a filter, this can be interpreted as a low pass response in the parabolic resampler, and is most noticeable when $K$ is close to $L$.
 
 \begin{figure}[h]
 \caption{Frame 50 of big\_dog sample with $K=40$ just larger than $L=37$, 2nd order parabolic resampler.  Note distortion around F1 at 500 Hz }
@@ -251,7 +251,7 @@ Conclusions:
 
 \section{Experiment 2 - Filtering}
 
-The goal of this experiment is to filter the spectral amplitudes $\mathbf{a}$ such that they can be coarsely resampled without resampling or aliasing errors, and with mimimal impact on the perceptual quality.
+The goal of this experiment is to filter the spectral amplitudes $\mathbf{a}$ such that they can be coarsely resampled without resampling or aliasing errors, and with minimal impact on the perceptual quality.
 The $m$th filtered sample can be obtained by:
 \begin{equation}
 Y_m = \sqrt{\sum_{k=st}^{en}A_k^2 h(k)}
@@ -319,7 +319,7 @@ As $N_b$ increases, the filter width reduces such that $h(k)=1$ for $k=m$ and $h
 Informal listening tests were conducted (3 samples, headphones, spline interpolator, \url{c2sim} tool) with $A_m={\hat{Y}_m}$ to determine the subjective effects of filtering. For $N_b \geq 20$, the speech quality is not significantly affected.  For $N_b \leq 15$ the speech became muffled and harder to understand, presumably as the formants become less well defined.  The filters have the unfortunate property of reducing the spectral peak/trough ratio which the human ear uses to perceive speech (Figure \ref{fig:ratek2_nb_big_dog_50}).  A better smoothing function would preserve the peak/trough ratio of formants, while reducing only the frequency resolution (location and width of formants on the frequency axis). 
 
 \begin{figure}[h]
-\caption{Frame 50 of \emph{big\_dog}, plot of filter output $\mathbf{y}$ for $Nb=10$ and $Nb=20$.  Peak to trough ratio decreases with $Nb$, reducing intelligability}
+\caption{Frame 50 of \emph{big\_dog}, plot of filter output $\mathbf{y}$ for $Nb=10$ and $Nb=20$.  Peak to trough ratio decreases with $Nb$, reducing intelligibility}
 \label{fig:ratek2_nb_big_dog_50}
 \begin{center}
 \includegraphics[width=8cm]{ratek2_nb_big_dog_50.png}
@@ -375,7 +375,7 @@ In Figure \ref{fig:20_100_vq} and Figure \ref{fig:train_120_Nb20_K30_vq} we note
 
 \item The $E_q$ after second stage VQ will reduce slowly as the number of bits increases.  
 
-\item The size of $K$ will then be important - it takes more bits to quantise a vector of $K+1$ independant Gaussians than a vector of size $K$.  This is unlike the first stage (and the theory elsewhere in this study) which states $K>K_{min}$ will have little impact on VQ performance as the information (frequency content) in the vector is the same.
+\item The size of $K$ will then be important - it takes more bits to quantise a vector of $K+1$ independent Gaussians than a vector of size $K$.  This is unlike the first stage (and the theory elsewhere in this study) which states $K>K_{min}$ will have little impact on VQ performance as the information (frequency content) in the vector is the same.
  
 \item A larger single stage VQ may be a better choice.  Interpolating the Figure \ref{fig:20_100_vq} first stage line, a 12 bit single stage VQ would achieve a similar $E_q$ to the 18 bit two stage VQ.  It would still be feasible to store and search this VQ on a small machine (the entries in dB could be quantised to 8 bits/element, $K2^{12}=123$ kbytes).
 
@@ -425,7 +425,7 @@ As $L$ is time varying, it is necessary to determine the filters $g(k)$ for ever
 \end{split}
 \end{equation}
 
-where $\hat{\mathbf{y}}^L$ is sampled at rate $L$, unlike $\mathbf{y}$ which is sampled at rate $L_{high}$.  Note that for the purpose of calculating spectral distortion $E$ it may be covenient to configure $S()$ to extract $\hat{\mathbf{y}}^{Lhigh}$ at rate $L_{high}$.
+where $\hat{\mathbf{y}}^L$ is sampled at rate $L$, unlike $\mathbf{y}$ which is sampled at rate $L_{high}$.  Note that for the purpose of calculating spectral distortion $E$ it may be convenient to configure $S()$ to extract $\hat{\mathbf{y}}^{Lhigh}$ at rate $L_{high}$.
 
 In Figure \ref{fig:ratek2_E_K_hts}, the \emph{Nb=20 eff} curve shows the results of the efficient filtering algorithm with $\hat{\mathbf{b}} = \mathbf{b}$, which as expected, are very close to the \emph{Nb=20} curve.
 
@@ -513,14 +513,14 @@ Initial listening tests were conducted using a single male (\emph{big\_dog}) and
 
 Key observations:
 \begin{enumerate}
-\item A low frequency artifact, possibly due to reconstruction errors beneath $warp(1,K)$ Hz.  These appeared to go away when a high pass filter was applied to the synthesised speech.
-\item Muffled/buzzy, even without vector quantisation, e.g. just filtered and resampled $\hat{\mathbf{y}}^L = S(\mathbf{b})$.  Suggests filtering alone is causing problems, but only for males.
-\item Codec 2 3200 sounds fine, this uses a LPC/LSP representation that can accurately model sharp harmonics at all frequencies due to the high bit rate.
+\item A low frequency artefact, possibly due to reconstruction errors beneath $warp(1,K)$ Hz.  These appeared to go away when a high pass filter was applied to the synthesised speech.
+\item Muffled/buzzy, even without vector quantisation, e.g. just filtered and resampled $\hat{\mathbf{y}}^L = S(\mathbf{b})$.  This suggests filtering alone is causing problems, but only for males.
+\item Codec 2 3200 sounds fine, this uses a LPC/LSP representation that can accurately model narrow bandwidth formants at all frequencies due to the high bit rate.
 \item Application of the \emph{phase0} model with the filtered amplitudes ($\hat{\mathbf{y}}^L = S(\mathbf{b})$) is worse than original phases and the filtered amplitudes.  Use of original phases removes some of the muffled/buzzy effect.  This effect has been observed before.
 \item The female sounds fine.
 \end{enumerate}
 
-Theory: For low $F0$ speakers, the bandwidth of formants matters at high frequencies, despite the ear having reduced frequency resolution.  We need narrow bandwidth peaks at high frequencies.
+Theory: For low $F0$ speakers, accurate representation of formant bandwidth is important at all frequencies, despite the ear having reduced frequency resolution at high frequencies.
 
 Discussion:
 \begin{enumerate}
@@ -554,7 +554,7 @@ The \emph{phase0} algorithm fits a minimum phase model to the spectral amplitude
 \begin{equation}
 x(n)=Ae^{-\alpha n}cos(\omega n)
 \end{equation}
-$\alpha$ is the time constant that controls the time domain decay of the envelope.  For a wide bandwidth peak $\alpha$ will be large, $x(n)$ will decay quickly and the formant energy will be contained in a shorter period of time.  For a narrow bandwidth peak $\alpha$ will be small and $x(n)$ will decay slowly, the format will "ring" longer and the PAPR will be smaller.
+$\alpha$ is the time constant that controls the decay of the time domain envelope.  For a wide bandwidth peak $\alpha$ will be large, $x(n)$ will decay quickly and the formant energy will be contained in a shorter period of time.  For a narrow bandwidth peak $\alpha$ will be small and $x(n)$ will decay slowly, the format will "ring" longer and the PAPR will be smaller.
 
 In the frequency domain a small $\alpha$ system results in a rapid phase shift near the peak frequency. If the system is excited by an impulse train (harmonic frequency spectra), a small $\alpha$ results in adjacent harmonics having different phases, and not being aligned in time, shifting time domain energy away from a central peak at the pitch pulse onset.
 
@@ -618,7 +618,9 @@ The \emph{newamp1} post filter employed in Codec 2 is based on the MBE frequency
 \end{center}
 \end{figure}
 
-Figure \ref{fig:plphase2_big_dog_61_time} illustrates the algorithm in action in the time domain, and Figure \ref{fig:plphase2_big_dog_61_freq} shows the effect in the frequency domain.  Compared to the \emph{phase0} algorithm alone, the algorithm better distributes the energy of each pitch cycle in time, which can be objectively measured by a reduction in PAPR. We note that the post filtered signal envelope is more symmetric in time than the original which shows the classic damped exponential envelope.  This may not matter to the ear, as our theory suggests it is the PAPR that matters, not the shape of the time domain envelope.
+Figure \ref{fig:plphase2_big_dog_61_time} illustrates the algorithm in action in the time domain, and Figure \ref{fig:plphase2_big_dog_61_freq} shows the effect in the frequency domain.  Compared to the \emph{phase0} algorithm alone, the algorithm better distributes the energy of each pitch cycle in time, which can be objectively measured by a reduction in PAPR.
+
+We note that the post filtered signal envelope is more symmetric in time than the original which shows the classic damped exponential envelope.  This may not matter to the ear, as our theory suggests it is the PAPR that matters, not the shape of the time domain envelope.  In high pitched speech the pitch cycles run together without appreciable envelope decay, so the time domain envelope is nearly constant.
 
 The algorithm acts on both the amplitudes $\mathbf{y}$, and phases ${\mathbf{\Omega}}$ in two stages.  For convenience it currently operates at rate $L_{high}$, and was developed using unquantised vectors. The amplitude stage:
  \begin{enumerate}
@@ -637,11 +639,11 @@ The algorithm acts on both the amplitudes $\mathbf{y}$, and phases ${\mathbf{\Om
 \end{equation}
 where $\odot$ represents element by element multiplication, all vectors are in dB, and the operation $||\mathbf{x}||^2$ calculates the total \emph{linear} energy in the vector $\mathbf{x}$.
 
-The second step involves an additional weighting of the input to the Hilbert Transform used to calculate the phase spectra:
+Using informal listening tests during development it was found that too much post filtering in the amplitude stage (especially at low frequencies) resulted in hollow, unnatural sounding speech.  Therefore a second stage that affects just the harmonic phases was introduced. The second stage weights the input to the Hilbert Transform used to calculate the phase spectra:
 \begin{equation}
 \mathbf{\Omega}=HT(1.5*\hat{\mathbf{y}})
 \end{equation}
-where $HT()$ is a the Hilbert Transform function that returns a vector of phase samples $\mathbf{\Omega}$ from a vector of amplitude samples $\mathbf{y}$.  This was found to provide a further dispersion of the time domain energy, without affecting the magnitude spectrum.
+where $HT()$ is a the Hilbert Transform function that returns a vector of phase samples $\mathbf{\Omega}$ from a vector of amplitude samples $\mathbf{y}$.  This was found to provide a further dispersion of the time domain energy, without additional modification of the magnitude spectrum.
 
 The \path{plphase2.m} Octave script was used for development of the post filter described in this section.  It supports frame-by-frame single stepping through speech samples, and switching various option in and out while plotting the signal in the time, frequency, and group delay domains.  The \path{ratek2_batch.m} Octave script (\emph{ratek2\_model\_postfilter} function) provides batch processing of speech samples, and the top level \path{ratek_resampler.sh} shell script processes multiples speech files using various options, generating wave files for subjective listening tests. \emph{hts1a} frame 44 and \emph{big\_dog} frame 61 are two test frames useful for visualising the problem, and effect of the post filter.  
 
@@ -654,14 +656,14 @@ CPAPR &= 10\log_{10} \frac{ \max |s(n)|^2 }{ \textrm{mean} |s(n)|^2 } \\
 s(n) &= \sum_{m=1}^{L}A_m e^{j(\omega_0mn+\theta_m)} \\
 \end{split}
 \end{equation}
-CPAPR tracks the time domain magnitude envelope of the signal.
+CPAPR is sensitive to the time domain magnitude envelope of the synthesised speech signal.
 
 \subsection{Further Work}
 
-We now have a better understanding of how the post filter improves speech quality:
+We now have a better understanding of how frequency domain post filters such as those used in the \emph{newamp1} algorithm improve speech quality:
 \begin{enumerate}
-\item It increases the formant/anti-formant ratio, better defining formant locations to the ear, and hence increasing intelligibility. This helps improve speech quality for males and females.
-\item For low pitch males, it distributes the time domain speech energy more equally in time across the pitch period than the minimum phase \emph{phase0} model alone, increasing the probability of detection of formant energy by the ear, reducing muffling and increasing intelligibility.
+\item Increasing the formant/anti-formant ratio better defines the formant locations for the ear, increasing intelligibility. This helps improve speech quality for males and females.
+\item For low pitch males, the post filter distributes the time domain speech energy more equally across the pitch period than the minimum phase \emph{phase0} model alone, increasing the probability of detection of formant energy by the ear, reducing muffling and increasing intelligibility.
 \end{enumerate}
 
 The post filter algorithm presented here was developed by experiment, and there is much room for further development. The weights and partition between the amplitude and phase stages were chosen by experiment. Too much filtering in the amplitude stage (especially at low frequencies) resulted in hollow sounding speech.
@@ -670,7 +672,7 @@ The slope removal/equalisation phase deserves further examination.  In the \emph
 
 The accuracy of the fit of $\mathbf{y}$ to $\mathbf{a}$ varies from frame to frame, so the amount of post filtering required to obtain a distribution of energy in time similar to the original varies.  A more formal definition of energy distribution could lead to an algorithm to better calculate a phase spectra.
 
-For low frequency harmonics, it is important to have phase continuity between frames to prevent roughness.  The algorithm does not currently track or modify phase continuity between adjacent frames.
+For low frequency harmonics, it is important to have phase continuity between frames to prevent roughness.  The algorithm does not currently track or regulate phase continuity between adjacent frames.
 
 The question of where to apply the post filter (e.g. before or after quantisation) is open.  Equalisation of the speech spectra early in the signal processing chain would likely lead to lower VQ distortion, if the effect on speech quality is acceptable.
 
