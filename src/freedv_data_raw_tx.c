@@ -301,7 +301,7 @@ int main(int argc, char *argv[]) {
                 /* just enough silence at the end of burst to allow demod to complete processing */
                 samples_delay = 2*freedv_get_n_nom_modem_samples(freedv);
             }
-            on_samples += send_silence(fout, shorts_per_sample, samples_delay);
+            off_samples += send_silence(fout, shorts_per_sample, samples_delay);
         }
 
     } else {
