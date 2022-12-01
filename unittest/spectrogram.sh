@@ -3,7 +3,7 @@
 #
 # Render a spectrogram from a wave file.
 
-PATH=${PATH}:${HOME}/codec2/build_linux/src:${HOME}/kiwiclient
+PATH=${PATH}:${HOME}/codec2/build_linux/src
 CODEC2=${HOME}/codec2
 
 fullfile=$1
