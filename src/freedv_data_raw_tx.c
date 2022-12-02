@@ -350,7 +350,7 @@ int main(int argc, char *argv[]) {
     /* SNR offset to use in channel simulator to account for on/off time of burst signal */
     float mark_space_ratio = (float)on_samples/(on_samples+off_samples);
     float mark_space_SNR_offset = 10*log10(mark_space_ratio);
-    if (!quiet) fprintf(stderr, "marks:space: %3.2f SNR offset: %5.2f\n", mark_space_ratio, mark_space_SNR_offset);
+    if (!quiet) fprintf(stderr, "mark:space: %3.2f SNR offset: %5.2f\n", mark_space_ratio, mark_space_SNR_offset);
     
     freedv_close(freedv);
     fclose(fin);
