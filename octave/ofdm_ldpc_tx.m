@@ -17,6 +17,11 @@
   
     octave:6> ofdm_ldpc_tx("test_datac0.raw","datac0",1,100,"awgn","bursts",3)
     
+  4. Data mode example, three bursts of one packet each, SNR=100dB, with CRC
+     to enable demodulation by freedv_data_raw_rx:
+  
+    octave:6> ofdm_ldpc_tx("test_datac0.raw","datac0",1,100,"awgn","bursts",3, "crc")
+    
 #}
 
 function ofdm_ldpc_tx(filename, mode="700D", N, SNR3kdB=100, channel='awgn', varargin)
@@ -29,14 +34,17 @@ function ofdm_ldpc_tx(filename, mode="700D", N, SNR3kdB=100, channel='awgn', var
   more off;
 
   tx_clip_en = 0; freq_offset_Hz = 0.0; burst_mode = 0; Nbursts = 1;
+  crc_mode = 0;
   i = 1;
   while i<=length(varargin)
     if strcmp(varargin{i},"txclip") 
-      txclip_en = 1;
+      tx_clip_en = 1;
     elseif strcmp(varargin{i},"bursts") 
       burst_mode = 1;
       Nbursts = varargin{i+1}; i++;
-    else
+    elseif strcmp(varargin{i},"crc") 
+      crc_mode = 1;
+     else
       printf("\nERROR unknown argument: %s\n", varargin{i});
       return;
     end
@@ -67,6 +75,10 @@ function ofdm_ldpc_tx(filename, mode="700D", N, SNR3kdB=100, channel='awgn', var
     payload_bits = round(ofdm_rand(Ncodecframespermodemframe*Nbitspercodecframe)/32767);
   else
     payload_bits = round(ofdm_rand(code_param.data_bits_per_frame)/32767);
+    if crc_mode
+      unpacked_crc16 = crc16_unpacked(payload_bits(1:end-16));
+      payload_bits(end-15:end) = unpacked_crc16;
+    end
   end
   [packet_bits bits_per_packet] = fec_encode(states, code_param, mode, payload_bits, Ncodecframespermodemframe, Nbitspercodecframe);
 

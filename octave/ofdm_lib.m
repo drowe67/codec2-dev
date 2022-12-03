@@ -1908,3 +1908,22 @@ function [rx_real rx] = ofdm_channel(states, tx, SNR3kdB, channel, freq_offset_H
     printf("WARNING: output samples clipped, reducing level\n")
   end
 endfunction
+
+% returns an unpacked CRC16 (array of 16 bits) calculated from an array of unpacked bits 
+function unpacked_crc16 = crc16_unpacked(unpacked_bits)
+  % pack into bytes
+  mod(length(unpacked_bits),8);
+  assert(mod(length(unpacked_bits),8) == 0);
+  nbytes = length(unpacked_bits)/8;
+  mask = 2 .^ (7:-1:0);
+  for i=1:nbytes
+    st = (i-1)*8 + 1; en = st+7;
+    bytes(i) = sum(mask .* unpacked_bits(st:en));
+  end
+  crc16_hex = crc16(bytes);
+  crc16_dec = [hex2dec(crc16_hex(1:2)) hex2dec(crc16_hex(3:4)) ];
+  unpacked_crc16 = [];
+  for b=1:length(crc16_dec)
+    unpacked_crc16 = [unpacked_crc16 bitand(crc16_dec(b), mask) > 0];
+  end
+endfunction
