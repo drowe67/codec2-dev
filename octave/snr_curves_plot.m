@@ -122,27 +122,51 @@ function ber_per_v_snr(source, mode, colour)
   semilogy(snr, per, sprintf('%s;%s %s per;', colour, source, mode));
  endfunction
 
-function ber_per_v_snr_screen
+function octave_ch_noise_screen
   clf; hold on;
   ber_per_v_snr('oct','datac0','bo-')
   ber_per_v_snr('ch','datac0','bx-')
   ber_per_v_snr('oct','datac1','go-')
   ber_per_v_snr('ch','datac1','gx-')
   ber_per_v_snr('oct','datac3','ro-')
-  ber_per_v_snr('ch','datac3','rx-') #}
+  ber_per_v_snr('ch','datac3','rx-')
   xlabel('SNR (dB)'); grid;
   hold off; axis([-6 8 1E-3 1]);
+  title('Comparsion of Injecting Noise from Octave (oct) and ch tool');
 endfunction
 
-function ber_per_v_snr_print
-  state_vec = set_graphics_state_print()
-  ber_per_v_snr_screen;
-  print("ber_per_v_snr.png", "-dpng","-S800,600");
+function octave_ch_noise_print
+  state_vec = set_graphics_state_print();
+  octave_ch_noise_screen;
+  print("octave_ch_noise.png", "-dpng","-S800,600");
   set_graphics_state_screen(state_vec);
 endfunction
 
-figure(1); ber_per_v_snr_screen;
-figure(2); ber_per_v_snr_print;
+function octave_c_tx_screen
+  clf; hold on;
+  ber_per_v_snr('oct','datac0','bo-')
+  ber_per_v_snr('ctx','datac0','bx-')
+  ber_per_v_snr('oct','datac1','go-')
+  ber_per_v_snr('ctx','datac1','gx-')
+  ber_per_v_snr('oct','datac3','ro-')
+  ber_per_v_snr('ctx','datac3','rx-')
+  xlabel('SNR (dB)'); grid;
+  hold off; axis([-6 8 1E-3 1]);
+  title('Comparsion of Octave Tx and C Tx (no compression)');
+endfunction
+
+function octave_c_tx_print
+  state_vec = set_graphics_state_print();
+  octave_c_tx_screen;
+  print("octave_c_tx.png", "-dpng","-S800,600");
+  set_graphics_state_screen(state_vec);
+endfunction
+
+figure(1); octave_ch_noise_screen;
+figure(2); octave_c_tx_screen;
+
+figure(3); octave_ch_noise_print;
+figure(4); octave_c_tx_print;
 
 #{
 figure(1); snr_scatter_screen;
