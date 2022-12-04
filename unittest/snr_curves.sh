@@ -86,52 +86,60 @@ function generate_ch_data {
 # Uses C Tx
 function generate_snrest_v_snr_data {
   mode=$1
+  clip=0
+  id='ctx'
+  if [ "$#" -eq 2 ]; then
+    clip=$2
+    id='ctxc'
+  fi
 
   tx_log=$(mktemp)
   ch_log=$(mktemp)
   rx_log=$(mktemp)
 
   i=1
-  rm snrest_ctx_${mode}*.txt
-  rm ber_ctx_${mode}*.txt
-  rm per_ctx_${mode}*.txt
+  rm snrest_${id}_${mode}*.txt
+  rm ber_${id}_${mode}*.txt
+  rm per_${id}_${mode}*.txt
   for No in $No_list
   do
-    freedv_data_raw_tx --clip 0 --txbpf 0 --bursts $Nbursts --testframes $Nbursts $mode /dev/zero - 2>${tx_log} | \
+    freedv_data_raw_tx --clip ${clip} --txbpf ${clip} --bursts $Nbursts --testframes $Nbursts $mode /dev/zero - 2>${tx_log} | \
     ch - - --No $No -f 20 2>>${ch_log} | \
     freedv_data_raw_rx --testframes $mode - /dev/null 2>${rx_log} -v
     SNRoffset=$(cat ${tx_log} | grep "mark:space" | tr -s ' ' | cut -d' ' -f 5)
    
     SNRest=$(cat ${rx_log} | grep '\-BS\-' | tr -s ' ' | cut -d' ' -f17)
     if [ ! -z "$SNRest" ]; then
-      echo ${SNRest} > snrest_ctx_${mode}_${i}.txt
+      echo ${SNRest} > snrest_${id}_${mode}_${i}.txt
     fi
     BERmeas=$(cat ${rx_log} | grep 'BER......:' | cut -d' ' -f2)
     PERmeas=$(cat ${rx_log} | grep 'Coded FER' | cut -d' ' -f3)
-    echo ${BERmeas} >> ber_ctx_${mode}.txt
-    echo ${PERmeas} >> per_ctx_${mode}.txt
+    echo ${BERmeas} >> ber_${id}_${mode}.txt
+    echo ${PERmeas} >> per_${id}_${mode}.txt
     i=$((i+1))
   done
 
-  echo ${SNRoffset} > offset_ctx_${mode}.txt
+  echo ${SNRoffset} > offset_${id}_${mode}.txt
   SNRch=$(cat ${ch_log} | grep SNR3k | tr -s ' ' | cut -d' ' -f3)
-  echo ${SNRch} > snr_ctx_${mode}.txt
+  echo ${SNRch} > snr_${id}_${mode}.txt
 }
 
-# Experiment to compare Octave Tx and ch as SNR source of truth, the BER/PER 
-# curves should be on top of each other. These results can be rendered with 
-# snr_curves_plot.m:octave_ch_noise_screen()
+# These results can be rendered with snr_curves_plot.m
 
-#generate_octave_tx_data 'datac0'
-#generate_ch_data 'datac0'
-#generate_octave_tx_data 'datac1'
-#generate_ch_data 'datac1'
-#generate_octave_tx_data 'datac3'
-#generate_ch_data 'datac3'
+# Compare Octave Tx and ch as SNR source of truth, PER/BER curves
+# should be on top of each other
+generate_octave_tx_data 'datac0'
+generate_ch_data 'datac0'
+generate_octave_tx_data 'datac1'
+generate_ch_data 'datac1'
+generate_octave_tx_data 'datac3'
+generate_ch_data 'datac3'
+
+# (a) PER/BER for C TX with & without compression 
+# (b) Measure SNR estimates v actual SNR
 generate_snrest_v_snr_data 'datac0'
 generate_snrest_v_snr_data 'datac1'
 generate_snrest_v_snr_data 'datac3'
+generate_snrest_v_snr_data 'datac0' 1
+generate_snrest_v_snr_data 'datac3' 1
 
-#generate_snrest_v_snr_data 'datac0'
-#generate_snrest_v_snr_data 'datac1'
-#generate_snrest_v_snr_data 'datac3'

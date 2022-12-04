@@ -153,18 +153,30 @@ function octave_c_tx_print
   set_graphics_state_screen(state_vec);
 endfunction
 
-#figure(1); octave_ch_noise_screen;
-#figure(2); octave_c_tx_screen;
-figure(3); snrest_snr_screen;
+function octave_c_tx_comp_screen
+  clf; hold on;
+  ber_per_v_snr('oct','datac0','bo-')
+  ber_per_v_snr('ctxc','datac0','bx-')
+  ber_per_v_snr('oct','datac3','ro-')
+  ber_per_v_snr('ctxc','datac3','rx-')
+  xlabel('SNR (dB)'); grid;
+  hold off; axis([-6 8 1E-3 1]);
+  title('Comparsion of Octave Tx and C Tx (with compression)');
+endfunction
 
-#figure(4); octave_ch_noise_print;
-#figure(5); octave_c_tx_print;
-figure(6); snrest_snr_print;
+function octave_c_tx_comp_print
+  state_vec = set_graphics_state_print();
+  octave_c_tx_comp_screen;
+  print("octave_c_tx_comp.png", "-dpng","-S800,600");
+  set_graphics_state_screen(state_vec);
+endfunction
 
-#{
-figure(1); snr_scatter_screen;
-figure(2); snr_scatter_print;
-figure(3); per_snr_screen;
-figure(4); per_snr_print;
-#}
+figure(1); octave_ch_noise_screen;
+figure(2); octave_c_tx_screen;
+figure(3); octave_c_tx_comp_screen
+figure(4); snrest_snr_screen;
 
+figure(5); octave_ch_noise_print;
+figure(6); octave_c_tx_print;
+figure(7); octave_c_tx_comp_print;
+figure(8); snrest_snr_print;
