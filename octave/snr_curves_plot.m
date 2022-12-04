@@ -1,6 +1,6 @@
 % snr_curves_plot.m
 %
-% Script to plot data from unittest/snr_cuvres
+% Companion script for unittest/Script to plot data from unittest/snr_curves.sh
 
 1;
 
@@ -47,9 +47,9 @@ function state_vec = set_graphics_state_print()
   textfontsize = get(0,"defaulttextfontsize");
   linewidth = get(0,"defaultlinelinewidth");
   markersize = get(0, "defaultlinemarkersize");
-  set(0, "defaulttextfontsize", 10);
-  set(0, "defaultaxesfontsize", 10);
-  set(0, "defaultlinelinewidth", 0.5);
+  set(0, "defaulttextfontsize", 16);
+  set(0, "defaultaxesfontsize", 16);
+  set(0, "defaultlinelinewidth", 1);
   state_vec = [textfontsize linewidth markersize];
 endfunction
 
@@ -129,13 +129,13 @@ function ber_per_v_snr_screen
   ber_per_v_snr('oct','datac1','go-')
   ber_per_v_snr('ch','datac1','gx-')
   ber_per_v_snr('oct','datac3','ro-')
-  ber_per_v_snr('ch','datac3','rx-')
-  xlabel('SNR (dB)'); ylabel('BER'); grid;
+  ber_per_v_snr('ch','datac3','rx-') #}
+  xlabel('SNR (dB)'); grid;
   hold off; axis([-6 8 1E-3 1]);
 endfunction
 
 function ber_per_v_snr_print
-  state_vec = set_graphics_state_print();
+  state_vec = set_graphics_state_print()
   ber_per_v_snr_screen;
   print("ber_per_v_snr.png", "-dpng","-S800,600");
   set_graphics_state_screen(state_vec);
