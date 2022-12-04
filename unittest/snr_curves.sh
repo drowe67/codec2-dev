@@ -5,7 +5,7 @@
 # script (and companion Octave snr_curves_plot.m) plots estimated versus actual
 # SNR curves for raw data modes
 
-set -x
+#set -x
 
 PATH=${PATH}:${HOME}/codec2/build_linux/src
 CODEC2=${HOME}/codec2
@@ -123,6 +123,15 @@ function generate_snrest_v_snr_data {
   SNRch=$(cat ${ch_log} | grep SNR3k | tr -s ' ' | cut -d' ' -f3)
   echo ${SNRch} > snr_${id}_${mode}.txt
 }
+
+
+# Sanity check to make sure Octave/CML is set up OK
+echo "ldpcut; quit" | DISPLAY="" octave-cli -p ${CODEC2}/octave
+if [ "$?" -ne 0 ]; then
+    echo "basic octave test failed, you may need to"
+    echo "(a) run ctests to create build_xxx/cml"
+    echo "(b) set up ~/.octaverc as per octave/ldpc.m"
+fi
 
 # These results can be rendered with snr_curves_plot.m
 
