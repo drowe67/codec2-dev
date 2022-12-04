@@ -18,15 +18,13 @@ CODEC2=${HOME}/codec2
 #                  extend to MPP channels
 
 snr_list='-4 -2 0 2 4'
-No_list='-28 -26 -24 -22 -20 -18 -16 -14 -12 -10 -8'
+No_list='-14 -16 -18 -20 -22'
 Nbursts=10
 
 # Using Octave Tx as source of truth for SNR, generate BER/PER v SNR
 function generate_octave_tx_data {
   mode=$1
 
-  tx_log=$(mktemp)
-  ch_log=$(mktemp)
   rx_log=$(mktemp)
 
   i=1
@@ -38,7 +36,6 @@ function generate_octave_tx_data {
     echo "ofdm_ldpc_tx('test_${mode}.raw','${mode}',1,${snr},'awgn','bursts',10,'crc'); quit" | \
     DISPLAY="" octave-cli -p ${CODEC2}/octave
     freedv_data_raw_rx --testframes $mode test_${mode}.raw /dev/null 2>${rx_log} -v
-    cat ${rx_log}
     BERmeas=$(cat ${rx_log} | grep 'BER......:' | cut -d' ' -f2)
     PERmeas=$(cat ${rx_log} | grep 'Coded FER' | cut -d' ' -f3)
     
@@ -47,6 +44,39 @@ function generate_octave_tx_data {
     echo ${PERmeas} >> per_oct_${mode}.txt
     i=$((i+1))
   done
+}
+
+# Using Octave ch as source of truth for SNR, generate BER/PER v SNR
+function generate_ch_data {
+  mode=$1
+
+  octave_log=$(mktemp)
+  ch_log=$(mktemp)
+  rx_log=$(mktemp)
+
+  i=1
+  rm snr_ch_${mode}*.txt
+  rm ber_ch_${mode}*.txt
+  rm per_ch_${mode}*.txt
+  for No in $No_list
+  do
+    echo "ofdm_ldpc_tx('test_${mode}.raw','${mode}',1,100,'awgn','bursts',10,'crc'); quit" | \
+    DISPLAY="" octave-cli -p ${CODEC2}/octave 1>${octave_log} 
+    SNRoffset=$(cat ${octave_log} | grep 'Burst offset:' | cut -d' ' -f5)
+    
+    ch test_${mode}.raw - --No $No 2>>${ch_log} | \
+    freedv_data_raw_rx --testframes $mode - /dev/null -v 2>${rx_log}
+    BERmeas=$(cat ${rx_log} | grep 'BER......:' | cut -d' ' -f2)
+    PERmeas=$(cat ${rx_log} | grep 'Coded FER' | cut -d' ' -f3)
+    
+    echo ${BERmeas} >> ber_ch_${mode}.txt
+    echo ${PERmeas} >> per_ch_${mode}.txt
+    i=$((i+1))
+  done
+  
+  echo ${SNRoffset} > offset_ch_${mode}.txt
+  SNRch=$(cat ${ch_log} | grep SNR3k | tr -s ' ' | cut -d' ' -f3)
+  echo ${SNRch} > snr_ch_${mode}.txt
 }
 
 # Using ch as source of truth for channel SNR, collect SNR estimates from modem
@@ -80,7 +110,8 @@ function generate_snrest_v_snr_data {
   echo ${SNRch} > snrch_${mode}.txt
 }
 
-generate_octave_tx_data 'datac0'
+#generate_octave_tx_data 'datac0'
+generate_ch_data 'datac0'
 
 #generate_snrest_v_snr_data 'datac0'
 #generate_snrest_v_snr_data 'datac1'
