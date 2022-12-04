@@ -19,6 +19,7 @@ CODEC2=${HOME}/codec2
 
 snr_list='-5 -4 -3 -2 0 1 2 4'
 No_list='-13 -14 -15 -16 -18 -20 -22'
+No_list_comp='-9 -10 -11 -12 -13 -14 -15 -16 -18'
 Nbursts=20
 
 # Using Octave Tx as source of truth for SNR, generate BER/PER v SNR, uses
@@ -88,9 +89,11 @@ function generate_snrest_v_snr_data {
   mode=$1
   clip=0
   id='ctx'
+  No_list_c=$No_list
   if [ "$#" -eq 2 ]; then
     clip=$2
     id='ctxc'
+    No_list_c=$No_list_comp
   fi
 
   tx_log=$(mktemp)
@@ -101,7 +104,7 @@ function generate_snrest_v_snr_data {
   rm snrest_${id}_${mode}*.txt
   rm ber_${id}_${mode}*.txt
   rm per_${id}_${mode}*.txt
-  for No in $No_list
+  for No in $No_list_c
   do
     freedv_data_raw_tx --clip ${clip} --txbpf ${clip} --bursts $Nbursts --testframes $Nbursts $mode /dev/zero - 2>${tx_log} | \
     ch - - --No $No -f 20 2>>${ch_log} | \
