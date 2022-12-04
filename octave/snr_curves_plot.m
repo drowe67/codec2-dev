@@ -4,45 +4,6 @@
 
 1;
 
-function [snr_ch per] = snr_scatter(mode, colour)
-  snrch = load(sprintf("../unittest/snrch_%s.txt",mode));
-  snroffset = load(sprintf("../unittest/snroffset_%s.txt",mode));
-  snrch -= snroffset; snrch_x = []; snrest_y = [];
-  for i=1:length(snrch)
-    fn = sprintf('../unittest/snrest_%s_%d.txt',mode,i);
-    if exist(fn,'file') == 2
-      snrest=load(fn);
-      if i == 1
-        plot(snrch(i)*ones(1,length(snrest)), snrest, sprintf('%s+;%s;',colour,mode));
-      else
-        plot(snrch(i)*ones(1,length(snrest)), snrest, sprintf('%s+',colour));
-      end
-      snrch_x = [snrch_x snrch(i)]; snrest_y = [snrest_y mean(snrest)];
-    end
-  end
-  plot(snrch_x, snrest_y, sprintf('%so-', colour));
-endfunction
-
-function [snr_ch per] = per_snr(mode, colour)
-  snrch = load(sprintf("../unittest/snrch_%s.txt",mode));
-  snroffset = load(sprintf("../unittest/snroffset_%s.txt",mode));
-  snrch -= snroffset; 
-  per = load(sprintf("../unittest/per_%s.txt",mode));
-  plot(snrch, per, sprintf('%so-;%s;', colour, mode));
-endfunction
-
-% we need different font sizes for printing
-function snr_scatter_screen
-  clf; hold on;
-  snr_scatter('datac0','b')
-  snr_scatter('datac1','g')
-  snr_scatter('datac3','r')
-  xlabel('SNR (dB)'); ylabel('SNRest (dB)'); grid('minor');
-  a = axis;
-  plot([a(1) a(2)],[a(1) a(2)]);
-  hold off;
-endfunction
-
 function state_vec = set_graphics_state_print()
   textfontsize = get(0,"defaulttextfontsize");
   linewidth = get(0,"defaultlinelinewidth");
@@ -63,23 +24,53 @@ function set_graphics_state_screen(state_vec)
   set(0, "defaultlinemarkersize", markersize);
 endfunction
 
-% we need different font sizes for printing
-function snr_scatter_print(png_name)
-  textfontsize = get(0,"defaulttextfontsize");
-  linewidth = get(0,"defaultlinelinewidth");
-  markersize = get(0, "defaultlinemarkersize");
-  set(0, "defaulttextfontsize", 10);
-  set(0, "defaultaxesfontsize", 10);
-  set(0, "defaultlinelinewidth", 0.5);
-  
-  snr_scatter_screen;
-  print("snr_curves.png", "-dpng", "-S500,500");
+function [snr_ch per] = snr_scatter(source, mode, colour)
+  suffix = sprintf("_%s_%s",source, mode);
+  snr = load(sprintf("../unittest/snr%s.txt",suffix));
+  offset = load(sprintf("../unittest/offset%s.txt",suffix));
+  snr -= offset;
+  snr_x = []; snrest_y = [];
+  for i=1:length(snr)
+    fn = sprintf('../unittest/snrest%s_%d.txt',suffix,i);
+    if exist(fn,'file') == 2
+      snrest=load(fn);
+      if i == length(snr)
+        plot(snr(i)*ones(1,length(snrest)), snrest, sprintf('%s;%s %s;',colour,source,mode));
+      else
+        plot(snr(i)*ones(1,length(snrest)), snrest, sprintf('%s',colour));
+      end
+      snr_x = [snr_x snr(i)]; snrest_y = [snrest_y mean(snrest)];
+    end
+  end
+  plot(snr_x, snrest_y, sprintf('%s', colour));
+endfunction
 
-  % restore plot defaults
-  set(0, "defaulttextfontsize", textfontsize);
-  set(0, "defaultaxesfontsize", textfontsize);
-  set(0, "defaultlinelinewidth", linewidth);  
-  set(0, "defaultlinemarkersize", markersize);
+function [snr_ch per] = per_snr(mode, colour)
+  snrch = load(sprintf("../unittest/snrch_%s.txt",mode));
+  snroffset = load(sprintf("../unittest/snroffset_%s.txt",mode));
+  snrch -= snroffset; 
+  per = load(sprintf("../unittest/per_%s.txt",mode));
+  plot(snrch, per, sprintf('%so-;%s;', colour, mode));
+endfunction
+
+function snrest_snr_screen
+  clf; hold on;
+  snr_scatter('ctx', 'datac0','b+-')
+  snr_scatter('ctx', 'datac1','g+-')
+  snr_scatter('ctx', 'datac3','r+-')
+  xlabel('SNR (dB)'); ylabel('SNRest (dB)'); grid('minor');
+  a = axis;
+  plot([a(1) a(2)],[a(1) a(2)],'bk-');
+  hold off;
+  title('SNR estimate versus SNR')
+  legend('location','northwest');
+endfunction
+
+function snrest_snr_print(png_name)
+  state_vec = set_graphics_state_print();
+  snrest_snr_screen;
+  print("snrest_snr.png", "-dpng", "-S800,600");
+  set_graphics_state_screen(state_vec);
 endfunction
 
 % we need different font sizes for printing
@@ -162,11 +153,13 @@ function octave_c_tx_print
   set_graphics_state_screen(state_vec);
 endfunction
 
-figure(1); octave_ch_noise_screen;
-figure(2); octave_c_tx_screen;
+#figure(1); octave_ch_noise_screen;
+#figure(2); octave_c_tx_screen;
+figure(3); snrest_snr_screen;
 
-figure(3); octave_ch_noise_print;
-figure(4); octave_c_tx_print;
+#figure(4); octave_ch_noise_print;
+#figure(5); octave_c_tx_print;
+figure(6); snrest_snr_print;
 
 #{
 figure(1); snr_scatter_screen;
