@@ -11,15 +11,15 @@ PATH=${PATH}:${HOME}/codec2/build_linux/src
 CODEC2=${HOME}/codec2
 
 # 1. Use Octave Tx built-in channel simulation as source of truth for actual SNR.
-# 2. Check the C "ch" tool calibration against Octave source of truth.
+# 2. Check the C "ch" tool calibration against Octave source of truth, using PER/BER.
 # 3. Plot SNR est versus SNR for clean and clipped waveforms
 # 4. Plot PER versus SNR
 # 5. Further work: plot PER versus peak power to show benefit of clipping, 
 #                  extend to MPP channels
 
-snr_list='-4 -2 0 2 4'
-No_list='-14 -16 -18 -20 -22'
-Nbursts=10
+snr_list='-5 -4 -3 -2 0 2 4'
+No_list='-13 -14 -15 -16 -18 -20 -22'
+Nbursts=20
 
 # Using Octave Tx as source of truth for SNR, generate BER/PER v SNR
 function generate_octave_tx_data {
@@ -33,7 +33,7 @@ function generate_octave_tx_data {
   rm per_oct_${mode}*.txt
   for snr in $snr_list
   do
-    echo "ofdm_ldpc_tx('test_${mode}.raw','${mode}',1,${snr},'awgn','bursts',10,'crc'); quit" | \
+    echo "ofdm_ldpc_tx('test_${mode}.raw','${mode}',1,${snr},'awgn','bursts',${Nbursts},'crc'); quit" | \
     DISPLAY="" octave-cli -p ${CODEC2}/octave
     freedv_data_raw_rx --testframes $mode test_${mode}.raw /dev/null 2>${rx_log} -v
     BERmeas=$(cat ${rx_log} | grep 'BER......:' | cut -d' ' -f2)
@@ -44,6 +44,7 @@ function generate_octave_tx_data {
     echo ${PERmeas} >> per_oct_${mode}.txt
     i=$((i+1))
   done
+  echo 0 > offset_oct_${mode}.txt
 }
 
 # Using Octave ch as source of truth for SNR, generate BER/PER v SNR
@@ -60,7 +61,7 @@ function generate_ch_data {
   rm per_ch_${mode}*.txt
   for No in $No_list
   do
-    echo "ofdm_ldpc_tx('test_${mode}.raw','${mode}',1,100,'awgn','bursts',10,'crc'); quit" | \
+    echo "ofdm_ldpc_tx('test_${mode}.raw','${mode}',1,100,'awgn','bursts',${Nbursts},'crc'); quit" | \
     DISPLAY="" octave-cli -p ${CODEC2}/octave 1>${octave_log} 
     SNRoffset=$(cat ${octave_log} | grep 'Burst offset:' | cut -d' ' -f5)
     
@@ -110,8 +111,13 @@ function generate_snrest_v_snr_data {
   echo ${SNRch} > snrch_${mode}.txt
 }
 
-#generate_octave_tx_data 'datac0'
+# these results can be rendered with snr_curves_plot.m:ber_per_v_snr_screen
+generate_octave_tx_data 'datac0'
 generate_ch_data 'datac0'
+generate_octave_tx_data 'datac1'
+generate_ch_data 'datac1'
+generate_octave_tx_data 'datac3'
+generate_ch_data 'datac3'
 
 #generate_snrest_v_snr_data 'datac0'
 #generate_snrest_v_snr_data 'datac1'
