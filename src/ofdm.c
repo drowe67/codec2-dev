@@ -945,7 +945,7 @@ void ofdm_txframe(struct OFDM *ofdm, complex float *tx, complex float *tx_sym_li
 
 /* Scale Tx signal and optionally apply two stage Hilbert clipper to improve PAPR */
 void ofdm_hilbert_clipper(struct OFDM *ofdm, complex float *tx, size_t n) {
-    
+
     /* vanilla Tx output waveform should be about OFDM_PEAK */
     for(int i=0; i<n; i++) tx[i] *= ofdm->amp_scale;
 
@@ -2413,7 +2413,9 @@ void ofdm_generate_preamble(struct OFDM *ofdm, COMP *tx_preamble, int seed) {
   for(int i=0; i<ofdm_preamble.bitsperpacket; i++) 
       preamble_bits[i] = r[i] > 16384;
   // ensures the signal passes through hilbert clipper unchanged
-  ofdm_preamble.amp_scale = 1.0; ofdm_preamble.tx_bpf_en = false;
+  ofdm_preamble.amp_scale = 1.0; 
+  ofdm_preamble.tx_bpf_en = false;
+  ofdm_preamble.clip_en = false;
   ofdm_mod(&ofdm_preamble, tx_preamble, preamble_bits);
 }
 
