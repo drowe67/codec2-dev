@@ -1,6 +1,6 @@
 % snr_curves_plot.m
 %
-% Companion script for unittest/Script to plot data from unittest/snr_curves.sh
+% Companion script for to plot data raw data curves
 
 1;
 
@@ -26,12 +26,12 @@ endfunction
 
 function [snr_ch per] = snr_scatter(source, mode, colour)
   suffix = sprintf("_%s_%s",source, mode);
-  snr = load(sprintf("../unittest/snr%s.txt",suffix));
-  offset = load(sprintf("../unittest/offset%s.txt",suffix));
+  snr = load(sprintf("snr%s.txt",suffix));
+  offset = load(sprintf("offset%s.txt",suffix));
   snr -= offset;
   snr_x = []; snrest_y = [];
   for i=1:length(snr)
-    fn = sprintf('../unittest/snrest%s_%d.txt',suffix,i);
+    fn = sprintf('snrest%s_%d.txt',suffix,i);
     if exist(fn,'file') == 2
       snrest=load(fn);
       if i == length(snr)
@@ -46,10 +46,10 @@ function [snr_ch per] = snr_scatter(source, mode, colour)
 endfunction
 
 function [snr_ch per] = per_snr(mode, colour)
-  snrch = load(sprintf("../unittest/snrch_%s.txt",mode));
-  snroffset = load(sprintf("../unittest/snroffset_%s.txt",mode));
+  snrch = load(sprintf("snrch_%s.txt",mode));
+  snroffset = load(sprintf("snroffset_%s.txt",mode));
   snrch -= snroffset; 
-  per = load(sprintf("../unittest/per_%s.txt",mode));
+  per = load(sprintf("per_%s.txt",mode));
   plot(snrch, per, sprintf('%so-;%s;', colour, mode));
 endfunction
 
@@ -61,7 +61,7 @@ function snrest_snr_screen
   xlabel('SNR (dB)'); ylabel('SNRest (dB)'); grid('minor');
   a = axis;
   plot([a(1) a(2)],[a(1) a(2)],'bk-');
-  hold off;
+  hold off; grid;
   title('SNR estimate versus SNR')
   legend('location','northwest');
 endfunction
@@ -104,11 +104,11 @@ endfunction
 
 function ber_per_v_snr(source, mode, colour)
   suffix = sprintf("_%s_%s.txt",source, mode);
-  snr = load(sprintf("../unittest/snr%s",suffix));
-  offset = load(sprintf("../unittest/offset%s",suffix));
+  snr = load(sprintf("snr%s",suffix));
+  offset = load(sprintf("offset%s",suffix));
   snr -= offset;
-  ber = load(sprintf("../unittest/ber%s",suffix)) + 1E-6;
-  per = load(sprintf("../unittest/per%s",suffix)) + 1E-6;
+  ber = load(sprintf("ber%s",suffix)) + 1E-6;
+  per = load(sprintf("per%s",suffix)) + 1E-6;
   semilogy(snr, ber, sprintf('%s;%s %s ber;', colour, source, mode));
   semilogy(snr, per, sprintf('%s;%s %s per;', colour, source, mode));
  endfunction
@@ -171,6 +171,7 @@ function octave_c_tx_comp_print
   set_graphics_state_screen(state_vec);
 endfunction
 
+#{
 figure(1); octave_ch_noise_screen;
 figure(2); octave_c_tx_screen;
 figure(3); octave_c_tx_comp_screen
@@ -180,3 +181,4 @@ figure(5); octave_ch_noise_print;
 figure(6); octave_c_tx_print;
 figure(7); octave_c_tx_comp_print;
 figure(8); snrest_snr_print;
+#}

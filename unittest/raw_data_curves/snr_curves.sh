@@ -1,11 +1,10 @@
-#!/usr/bin/env bash
 # snr_curves.sh
 #
 # The raw data mode modems can estimate channel SNR from the Rx signal. This
 # script (and companion Octave snr_curves_plot.m) plots estimated versus actual
 # SNR curves for raw data modes
 
-#set -x
+set - x
 
 PATH=${PATH}:${HOME}/codec2/build_linux/src
 CODEC2=${HOME}/codec2
@@ -30,13 +29,14 @@ function generate_octave_tx_data {
   rx_log=$(mktemp)
 
   i=1
-  rm snr_oct_${mode}*.txt
-  rm ber_oct_${mode}*.txt
-  rm per_oct_${mode}*.txt
+  rm -f snr_oct_${mode}*.txt
+  rm -f ber_oct_${mode}*.txt
+  rm -f per_oct_${mode}*.txt
   for snr in $snr_list
   do
-    echo "ofdm_ldpc_tx('test_${mode}.raw','${mode}',1,${snr},'awgn','bursts',${Nbursts},'crc'); quit" | \
-    DISPLAY="" octave-cli -p ${CODEC2}/octave
+    echo "warning ('off', 'Octave:data-file-in-path');
+    ofdm_ldpc_tx('test_${mode}.raw','${mode}',1,${snr},'awgn','bursts',${Nbursts},'crc');
+    quit" | DISPLAY="" octave-cli -p ${CODEC2}/octave
     freedv_data_raw_rx --testframes $mode test_${mode}.raw /dev/null 2>${rx_log} -v
     BERmeas=$(cat ${rx_log} | grep 'BER......:' | cut -d' ' -f2)
     PERmeas=$(cat ${rx_log} | grep 'Coded FER' | cut -d' ' -f3)
@@ -59,13 +59,14 @@ function generate_ch_data {
   rx_log=$(mktemp)
 
   i=1
-  rm snr_ch_${mode}*.txt
-  rm ber_ch_${mode}*.txt
-  rm per_ch_${mode}*.txt
+  rm -f snr_ch_${mode}*.txt
+  rm -f ber_ch_${mode}*.txt
+  rm -f per_ch_${mode}*.txt
   for No in $No_list
   do
-    echo "ofdm_ldpc_tx('test_${mode}.raw','${mode}',1,100,'awgn','bursts',${Nbursts},'crc'); quit" | \
-    DISPLAY="" octave-cli -p ${CODEC2}/octave 1>${octave_log} 
+    echo "warning ('off', 'Octave:data-file-in-path');
+    ofdm_ldpc_tx('test_${mode}.raw','${mode}',1,100,'awgn','bursts',${Nbursts},'crc'); 
+    quit" | DISPLAY="" octave-cli -p ${CODEC2}/octave 1>${octave_log}
     SNRoffset=$(cat ${octave_log} | grep 'Burst offset:' | cut -d' ' -f5)
     
     ch test_${mode}.raw - --No $No 2>>${ch_log} | \
@@ -101,9 +102,9 @@ function generate_snrest_v_snr_data {
   rx_log=$(mktemp)
 
   i=1
-  rm snrest_${id}_${mode}*.txt
-  rm ber_${id}_${mode}*.txt
-  rm per_${id}_${mode}*.txt
+  rm -f snrest_${id}_${mode}*.txt
+  rm -f ber_${id}_${mode}*.txt
+  rm -f per_${id}_${mode}*.txt
   for No in $No_list_c
   do
     freedv_data_raw_tx --clip ${clip} --txbpf ${clip} --bursts $Nbursts --testframes $Nbursts $mode /dev/zero - 2>${tx_log} | \
@@ -140,18 +141,18 @@ fi
 
 # Compare Octave Tx and ch as SNR source of truth, PER/BER curves
 # should be on top of each other
-generate_octave_tx_data 'datac0'
-generate_ch_data 'datac0'
-generate_octave_tx_data 'datac1'
-generate_ch_data 'datac1'
-generate_octave_tx_data 'datac3'
-generate_ch_data 'datac3'
+#generate_octave_tx_data 'datac0'
+#generate_ch_data 'datac0'
+#generate_octave_tx_data 'datac1'
+#generate_ch_data 'datac1'
+#generate_octave_tx_data 'datac3'
+#generate_ch_data 'datac3'
 
 # (a) PER/BER for C TX with & without compression 
 # (b) Measure SNR estimates v actual SNR
-generate_snrest_v_snr_data 'datac0'
-generate_snrest_v_snr_data 'datac1'
-generate_snrest_v_snr_data 'datac3'
-generate_snrest_v_snr_data 'datac0' 1
-generate_snrest_v_snr_data 'datac3' 1
+#generate_snrest_v_snr_data 'datac0'
+#generate_snrest_v_snr_data 'datac1'
+#generate_snrest_v_snr_data 'datac3'
+#generate_snrest_v_snr_data 'datac0' 1
+#generate_snrest_v_snr_data 'datac3' 1
 
