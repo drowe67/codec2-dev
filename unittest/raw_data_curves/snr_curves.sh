@@ -1,28 +1,18 @@
 # snr_curves.sh
 #
-# The raw data mode modems can estimate channel SNR from the Rx signal. This
-# script (and companion Octave snr_curves_plot.m) plots estimated versus actual
-# SNR curves for raw data modes
+# Library of bash functions to generate data for SNR curves.
 
-set - x
+#set -x
 
 PATH=${PATH}:${HOME}/codec2/build_linux/src
 CODEC2=${HOME}/codec2
-
-# 1. Use Octave Tx built-in channel simulation as source of truth for actual SNR.
-# 2. Check the C "ch" tool calibration against Octave source of truth, using PER/BER.
-# 3. Plot SNR est versus SNR for clean and clipped waveforms
-# 4. Plot PER versus SNR
-# 5. Further work: plot PER versus peak power to show benefit of clipping, 
-#                  extend to MPP channels
 
 snr_list='-5 -4 -3 -2 0 1 2 4'
 No_list='-13 -14 -15 -16 -18 -20 -22'
 No_list_comp='-9 -10 -11 -12 -13 -14 -15 -16 -18'
 Nbursts=20
 
-# Using Octave Tx as source of truth for SNR, generate BER/PER v SNR, uses
-# Octave Tx
+# Octave Tx injects noise and is source of truth for SNR, measure BER/PER v SNR
 function generate_octave_tx_data {
   mode=$1
 
@@ -49,7 +39,7 @@ function generate_octave_tx_data {
   echo 0 > offset_oct_${mode}.txt
 }
 
-# Using Octave ch as source of truth for SNR, generate BER/PER v SNR, uses
+# ch injects noise and is source of truth for SNR, measure BER/PER v SNR
 # Octave Tx
 function generate_ch_data {
   mode=$1
@@ -84,8 +74,8 @@ function generate_ch_data {
   echo ${SNRch} > snr_ch_${mode}.txt
 }
 
-# Using ch as source of truth for channel SNR, collect SNR estimates from modem
-# Uses C Tx
+# ch injects noise and is source of truth for SNR, measure BER/PER v SNR and
+# SNR estimates v SNR from rx, C Tx
 function generate_snrest_v_snr_data {
   mode=$1
   clip=0
@@ -128,31 +118,15 @@ function generate_snrest_v_snr_data {
   echo ${SNRch} > snr_${id}_${mode}.txt
 }
 
-
 # Sanity check to make sure Octave/CML is set up OK
-echo "ldpcut; quit" | DISPLAY="" octave-cli -p ${CODEC2}/octave
-if [ "$?" -ne 0 ]; then
-    echo "basic octave test failed, you may need to"
+function test_ldpc {
+  echo "ldpcut; quit" | DISPLAY="" octave-cli -p ${CODEC2}/octave
+  if [ "$?" -ne 0 ]; then
+     echo "basic octave test failed, you may need to"
     echo "(a) run ctests to create build_xxx/cml"
     echo "(b) set up ~/.octaverc as per octave/ldpc.m"
-fi
-
-# These results can be rendered with snr_curves_plot.m
-
-# Compare Octave Tx and ch as SNR source of truth, PER/BER curves
-# should be on top of each other
-#generate_octave_tx_data 'datac0'
-#generate_ch_data 'datac0'
-#generate_octave_tx_data 'datac1'
-#generate_ch_data 'datac1'
-#generate_octave_tx_data 'datac3'
-#generate_ch_data 'datac3'
-
-# (a) PER/BER for C TX with & without compression 
-# (b) Measure SNR estimates v actual SNR
-#generate_snrest_v_snr_data 'datac0'
-#generate_snrest_v_snr_data 'datac1'
-#generate_snrest_v_snr_data 'datac3'
-#generate_snrest_v_snr_data 'datac0' 1
-#generate_snrest_v_snr_data 'datac3' 1
-
+    exit 1
+  else
+      echo "OK"
+  fi
+}

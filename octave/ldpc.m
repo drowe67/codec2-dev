@@ -18,7 +18,7 @@
   environment variable for CML_PATH in your shell or in your
   codec2/octave/.octaverc file:
 
-    setenv("CML_PATH","/home/yourhome/codec2/build_linux/cml")
+    setenv("CML_PATH",sprintf("%s/codec2/build_linux/cml",getenv("HOME")))
 #}
 
 1;

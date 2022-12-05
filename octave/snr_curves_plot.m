@@ -1,6 +1,6 @@
 % snr_curves_plot.m
 %
-% Companion script for to plot data raw data curves
+% Companion script for unittest/raw_data_curves
 
 1;
 
