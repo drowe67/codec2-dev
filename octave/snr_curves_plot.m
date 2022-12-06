@@ -24,8 +24,8 @@ function set_graphics_state_screen(state_vec)
   set(0, "defaultlinemarkersize", markersize);
 endfunction
 
-function [snr_ch per] = snr_scatter(source, mode, colour)
-  suffix = sprintf("_%s_%s",source, mode);
+function [snr_ch per] = snr_scatter(source, mode, channel, colour)
+  suffix = sprintf("_%s_%s_%s",source, mode, channel)
   snr = load(sprintf("snr%s.txt",suffix));
   offset = load(sprintf("offset%s.txt",suffix));
   snr -= offset;
@@ -53,32 +53,32 @@ function [snr_ch per] = per_snr(mode, colour)
   plot(snrch, per, sprintf('%so-;%s;', colour, mode));
 endfunction
 
-function snrest_snr_screen
+function snrest_snr_screen(channel)
   clf; hold on;
-  snr_scatter('ctx', 'datac0','b+-')
-  snr_scatter('ctx', 'datac1','g+-')
-  snr_scatter('ctx', 'datac3','r+-')
+  snr_scatter('ctx', 'datac0', channel,'b+-')
+  snr_scatter('ctx', 'datac1', channel,'g+-')
+  snr_scatter('ctx', 'datac3', channel,'r+-')
   xlabel('SNR (dB)'); ylabel('SNRest (dB)'); grid('minor');
   a = axis;
   plot([a(1) a(2)],[a(1) a(2)],'bk-');
   hold off; grid;
-  title('SNR estimate versus SNR')
+  title(sprintf('SNR estimate versus SNR (%s)', channel));
   legend('location','northwest');
 endfunction
 
-function snrest_snr_print(png_name)
+function snrest_snr_print(channel)
   state_vec = set_graphics_state_print();
-  snrest_snr_screen;
+  snrest_snr_screen(channel);
   print("snrest_snr.png", "-dpng", "-S800,600");
   set_graphics_state_screen(state_vec);
 endfunction
 
 % we need different font sizes for printing
-function per_snr_screen
+function per_snr_screen(channel)
   clf; hold on;
-  per_snr('datac0','b')
-  per_snr('datac1','g')
-  per_snr('datac3','r')
+  per_snr('datac0',channel,'b')
+  per_snr('datac1',channel,'g')
+  per_snr('datac3',channel,'r')
   xlabel('SNR (dB)'); ylabel('PER'); grid;
   hold off;
 endfunction
@@ -102,8 +102,8 @@ function per_snr_print
   set(0, "defaultlinemarkersize", markersize);
 endfunction
 
-function ber_per_v_snr(source, mode, colour)
-  suffix = sprintf("_%s_%s.txt",source, mode);
+function ber_per_v_snr(source, mode, channel, colour)
+  suffix = sprintf("_%s_%s_%s.txt",source, mode, channel);
   snr = load(sprintf("snr%s",suffix));
   offset = load(sprintf("offset%s",suffix));
   snr -= offset;
@@ -113,61 +113,61 @@ function ber_per_v_snr(source, mode, colour)
   semilogy(snr, per, sprintf('%s;%s %s per;', colour, source, mode));
  endfunction
 
-function octave_ch_noise_screen
+function octave_ch_noise_screen(channel)
   clf; hold on;
-  ber_per_v_snr('oct','datac0','bo-')
-  ber_per_v_snr('ch','datac0','bx-')
-  ber_per_v_snr('oct','datac1','go-')
-  ber_per_v_snr('ch','datac1','gx-')
-  ber_per_v_snr('oct','datac3','ro-')
-  ber_per_v_snr('ch','datac3','rx-')
+  ber_per_v_snr('oct','datac0',channel,'bo-')
+  ber_per_v_snr('ch' ,'datac0',channel,'bx-')
+  ber_per_v_snr('oct','datac1',channel,'go-')
+  ber_per_v_snr('ch' ,'datac1',channel,'gx-')
+  ber_per_v_snr('oct','datac3',channel,'ro-')
+  ber_per_v_snr('ch' ,'datac3',channel,'rx-')
   xlabel('SNR (dB)'); grid;
   hold off; axis([-6 8 1E-3 1]);
-  title('Comparsion of Injecting Noise from Octave (oct) and ch tool');
+  title(sprintf('Comparsion of Measuring SNR from Octave and ch tool (%s)', channel));
 endfunction
 
-function octave_ch_noise_print
+function octave_ch_noise_print(channel)
   state_vec = set_graphics_state_print();
-  octave_ch_noise_screen;
-  print("octave_ch_noise.png", "-dpng","-S800,600");
+  octave_ch_noise_screen(channel);
+  print(sprintf("octave_ch_noise_%s.png", channel), "-dpng","-S800,600");
   set_graphics_state_screen(state_vec);
 endfunction
 
-function octave_c_tx_screen
+function octave_c_tx_screen(channel)
   clf; hold on;
-  ber_per_v_snr('oct','datac0','bo-')
-  ber_per_v_snr('ctx','datac0','bx-')
-  ber_per_v_snr('oct','datac1','go-')
-  ber_per_v_snr('ctx','datac1','gx-')
-  ber_per_v_snr('oct','datac3','ro-')
-  ber_per_v_snr('ctx','datac3','rx-')
+  ber_per_v_snr('oct','datac0',channel,'bo-')
+  ber_per_v_snr('ctx','datac0',channel,'bx-')
+  ber_per_v_snr('oct','datac1',channel,'go-')
+  ber_per_v_snr('ctx','datac1',channel,'gx-')
+  ber_per_v_snr('oct','datac3',channel,'ro-')
+  ber_per_v_snr('ctx','datac3',channel,'rx-')
   xlabel('SNR (dB)'); grid;
   hold off; axis([-6 8 1E-3 1]);
-  title('Comparsion of Octave Tx and C Tx (no compression)');
+  title(sprintf('Comparsion of Octave Tx and C Tx (no compression) (%s)', channel));
 endfunction
 
-function octave_c_tx_print
+function octave_c_tx_print(channel)
   state_vec = set_graphics_state_print();
-  octave_c_tx_screen;
-  print("octave_c_tx.png", "-dpng","-S800,600");
+  octave_c_tx_screen(channel);
+  print(sprintf("octave_c_tx_%s.png", channel), "-dpng","-S800,600");
   set_graphics_state_screen(state_vec);
 endfunction
 
-function octave_c_tx_comp_screen
+function octave_c_tx_comp_screen(channel)
   clf; hold on;
-  ber_per_v_snr('oct','datac0','bo-')
-  ber_per_v_snr('ctxc','datac0','bx-')
-  ber_per_v_snr('oct','datac3','ro-')
-  ber_per_v_snr('ctxc','datac3','rx-')
+  ber_per_v_snr('oct','datac0',channel,'bo-')
+  ber_per_v_snr('ctxc','datac0',channel,'bx-')
+  ber_per_v_snr('oct','datac3',channel,'ro-')
+  ber_per_v_snr('ctxc','datac3',channel,'rx-')
   xlabel('SNR (dB)'); grid;
   hold off; axis([-6 8 1E-3 1]);
-  title('Comparsion of Octave Tx and C Tx (with compression)');
+  title(sprintf('Comparsion of Octave Tx and C Tx (with compression) (%s)', channel));
 endfunction
 
-function octave_c_tx_comp_print
+function octave_c_tx_comp_print(channel)
   state_vec = set_graphics_state_print();
-  octave_c_tx_comp_screen;
-  print("octave_c_tx_comp.png", "-dpng","-S800,600");
+  octave_c_tx_comp_screen(channel);
+  print(sprintf("octave_c_tx_comp_%s.png", channel), "-dpng","-S800,600");
   set_graphics_state_screen(state_vec);
 endfunction
 
