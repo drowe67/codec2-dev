@@ -256,6 +256,19 @@ int main(int argc, char *argv[]) {
     size_t on_samples = 0;
     size_t off_samples = 0;
 
+    /* initial silence */
+    
+    int samples_delay = 0;
+    if (inter_burst_delay_ms) {
+        /* user defined inter-burst delay */
+        samples_delay = FREEDV_FS_8000*inter_burst_delay_ms/1000;
+    }
+    else {                
+        /* just enough silence at the end of burst to allow demod to complete processing */
+        samples_delay = 2*freedv_get_n_nom_modem_samples(freedv);
+    }
+    off_samples += send_silence(fout, shorts_per_sample, samples_delay);
+        
     /* --------- Test Frame Mode --------------------------------------------------*/
     
     if (testframes) {
