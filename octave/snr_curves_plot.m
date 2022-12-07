@@ -25,7 +25,7 @@ function set_graphics_state_screen(state_vec)
 endfunction
 
 function [snr_ch per] = snr_scatter(source, mode, channel, colour)
-  suffix = sprintf("_%s_%s_%s",source, mode, channel)
+  suffix = sprintf("_%s_%s_%s",source, mode, channel);
   snr = load(sprintf("snr%s.txt",suffix));
   offset = load(sprintf("offset%s.txt",suffix));
   snr -= offset;
@@ -167,6 +167,8 @@ function octave_c_tx_comp_screen(channel)
   clf; hold on;
   ber_per_v_snr('oct','datac0',channel,'bo-')
   ber_per_v_snr('ctxc','datac0',channel,'bx-')
+  ber_per_v_snr('oct','datac1',channel,'go-')
+  ber_per_v_snr('ctxc','datac1',channel,'gx-')
   ber_per_v_snr('oct','datac3',channel,'ro-')
   ber_per_v_snr('ctxc','datac3',channel,'rx-')
   xlabel('SNR (dB)'); grid;

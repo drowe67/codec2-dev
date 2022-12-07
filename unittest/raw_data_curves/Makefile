@@ -65,10 +65,12 @@ $(snr_ctx_mpp):
 
 $(snr_ctxc):
 	source snr_curves.sh; generate_snrest_v_snr_data datac0 awgn 1
+	source snr_curves.sh; generate_snrest_v_snr_data datac1 awgn 1
 	source snr_curves.sh; generate_snrest_v_snr_data datac3 awgn 1
 
 $(snr_ctxc_mpp):
 	source snr_curves.sh; generate_snrest_v_snr_data datac0 mpp 1
+	source snr_curves.sh; generate_snrest_v_snr_data datac1 mpp 1
 	source snr_curves.sh; generate_snrest_v_snr_data datac3 mpp 1
 
 # Octave and C curves should be on top of each other, indicating Octave
