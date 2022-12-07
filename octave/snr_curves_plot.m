@@ -69,7 +69,7 @@ endfunction
 function snrest_snr_print(channel)
   state_vec = set_graphics_state_print();
   snrest_snr_screen(channel);
-  print("snrest_snr.png", "-dpng", "-S800,600");
+  print("snrest_snr.png", "-dpng", "-S1000,800");
   set_graphics_state_screen(state_vec);
 endfunction
 
@@ -110,8 +110,8 @@ function ber_per_v_snr(source, mode, channel, colour)
   ber = load(sprintf("ber%s",suffix)) + 1E-6;
   per = load(sprintf("per%s",suffix)) + 1E-6;
   semilogy(snr, ber, sprintf('%s;%s %s ber;', colour, source, mode));
-  semilogy(snr, per, sprintf('%s;%s %s per;', colour, source, mode));
- endfunction
+  semilogy(snr, per, sprintf('%s;%s %s per;', colour, source, mode),'linewidth',3,'markersize',10);
+endfunction
 
 function octave_ch_noise_screen(channel)
   clf; hold on;
@@ -122,14 +122,19 @@ function octave_ch_noise_screen(channel)
   ber_per_v_snr('oct','datac3',channel,'ro-')
   ber_per_v_snr('ch' ,'datac3',channel,'rx-')
   xlabel('SNR (dB)'); grid;
-  hold off; axis([-6 8 1E-3 1]);
+  hold off;
+  if strcmp(channel,"awgn")
+    axis([-6 8 1E-3 1]);
+  else
+    axis([-2 12 1E-3 1]);
+  end
   title(sprintf('Comparsion of Measuring SNR from Octave and ch tool (%s)', channel));
 endfunction
 
 function octave_ch_noise_print(channel)
   state_vec = set_graphics_state_print();
   octave_ch_noise_screen(channel);
-  print(sprintf("octave_ch_noise_%s.png", channel), "-dpng","-S800,600");
+  print(sprintf("octave_ch_noise_%s.png", channel), "-dpng","-S1000,800");
   set_graphics_state_screen(state_vec);
 endfunction
 
@@ -142,14 +147,19 @@ function octave_c_tx_screen(channel)
   ber_per_v_snr('oct','datac3',channel,'ro-')
   ber_per_v_snr('ctx','datac3',channel,'rx-')
   xlabel('SNR (dB)'); grid;
-  hold off; axis([-6 8 1E-3 1]);
+  hold off;
+  if strcmp(channel,"awgn")
+    axis([-6 8 1E-3 1]);
+  else
+    axis([-2 12 1E-3 1]);
+  end
   title(sprintf('Comparsion of Octave Tx and C Tx (no compression) (%s)', channel));
 endfunction
 
 function octave_c_tx_print(channel)
   state_vec = set_graphics_state_print();
   octave_c_tx_screen(channel);
-  print(sprintf("octave_c_tx_%s.png", channel), "-dpng","-S800,600");
+  print(sprintf("octave_c_tx_%s.png", channel), "-dpng","-S1000,800");
   set_graphics_state_screen(state_vec);
 endfunction
 
@@ -160,14 +170,19 @@ function octave_c_tx_comp_screen(channel)
   ber_per_v_snr('oct','datac3',channel,'ro-')
   ber_per_v_snr('ctxc','datac3',channel,'rx-')
   xlabel('SNR (dB)'); grid;
-  hold off; axis([-6 8 1E-3 1]);
+  hold off;
+  if strcmp(channel,"awgn")
+    axis([-6 8 1E-3 1]);
+  else
+    axis([-2 12 1E-3 1]);
+  end
   title(sprintf('Comparsion of Octave Tx and C Tx (with compression) (%s)', channel));
 endfunction
 
 function octave_c_tx_comp_print(channel)
   state_vec = set_graphics_state_print();
   octave_c_tx_comp_screen(channel);
-  print(sprintf("octave_c_tx_comp_%s.png", channel), "-dpng","-S800,600");
+  print(sprintf("octave_c_tx_comp_%s.png", channel), "-dpng","-S1000,800");
   set_graphics_state_screen(state_vec);
 endfunction
 

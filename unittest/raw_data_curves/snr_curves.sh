@@ -14,12 +14,20 @@ FADING_DIR=${CODEC2}/build_linux/unittest
 snr_list='-5 -4 -3 -2 0 1 2 4'
 No_list='-13 -14 -15 -16 -18 -20 -22'
 No_list_comp='-9 -10 -11 -12 -13 -14 -15 -16 -18'
-Nbursts=20
+Nbursts_awgn=20
+Nbursts_mpp=100
 
 # Octave Tx injects noise and is source of truth for SNR, measure BER/PER v SNR
 function generate_octave_tx_data {
   mode=$1
   channel=$2
+  
+  Nbursts=$Nbursts_awgn
+  snr_nudge=0
+  if [ "$channel" == "mpp" ]; then
+    Nbursts=$Nbursts_mpp
+    snr_nudge=4  
+  fi
   
   rx_log=$(mktemp)
 
@@ -29,14 +37,15 @@ function generate_octave_tx_data {
   rm -f per_oct_${mode}_${channel}*.txt
   for snr in $snr_list
   do
+    snr_adj=$((${snr}+${snr_nudge}))  
     echo "warning ('off', 'Octave:data-file-in-path');
-    ofdm_ldpc_tx('test_${mode}.raw','${mode}',1,${snr},'${channel}','bursts',${Nbursts},'crc');
+    ofdm_ldpc_tx('test_${mode}.raw','${mode}',1,${snr_adj},'${channel}','bursts',${Nbursts},'crc');
     quit" | DISPLAY="" octave-cli -p ${CODEC2}/octave
     freedv_data_raw_rx --testframes $mode test_${mode}.raw /dev/null 2>${rx_log} -v
     BERmeas=$(cat ${rx_log} | grep 'BER......:' | cut -d' ' -f2)
     PERmeas=$(cat ${rx_log} | grep 'Coded FER' | cut -d' ' -f3)
     
-    echo ${snr} >> snr_oct_${mode}_${channel}.txt
+    echo ${snr_adj} >> snr_oct_${mode}_${channel}.txt
     echo ${BERmeas} >> ber_oct_${mode}_${channel}.txt
     echo ${PERmeas} >> per_oct_${mode}_${channel}.txt
     i=$((i+1))
@@ -51,8 +60,12 @@ function generate_ch_data {
   channel=$2
 
   ch_multipath=''
+  Nbursts=$Nbursts_awgn
+  snr_nudge=0  
   if [ "$channel" == "mpp" ]; then
     ch_multipath='--mpp'
+    Nbursts=$Nbursts_mpp
+    snr_nudge=4  
   fi    
     
   octave_log=$(mktemp)
@@ -65,12 +78,13 @@ function generate_ch_data {
   rm -f per_ch_${mode}_${channel}*.txt
   for No in $No_list
   do
+    No_adj=$((${No}-${snr_nudge}))  
     echo "warning ('off', 'Octave:data-file-in-path');
     ofdm_ldpc_tx('test_${mode}.raw','${mode}',1,100,'awgn','bursts',${Nbursts},'crc'); 
     quit" | DISPLAY="" octave-cli -p ${CODEC2}/octave 1>${octave_log}
     SNRoffset=$(cat ${octave_log} | grep 'Burst offset:' | cut -d' ' -f5)
     
-    ch test_${mode}.raw - --No $No ${ch_multipath} --fading_dir ${FADING_DIR} 2>>${ch_log} | \
+    ch test_${mode}.raw - --No $No_adj ${ch_multipath} --fading_dir ${FADING_DIR} 2>>${ch_log} | \
     freedv_data_raw_rx --testframes $mode - /dev/null -v 2>${rx_log}
     BERmeas=$(cat ${rx_log} | grep 'BER......:' | cut -d' ' -f2)
     PERmeas=$(cat ${rx_log} | grep 'Coded FER' | cut -d' ' -f3)
@@ -90,9 +104,14 @@ function generate_ch_data {
 function generate_snrest_v_snr_data {
   mode=$1
   channel=$2  
+
   ch_multipath=''
+  Nbursts=$Nbursts_awgn
+  snr_nudge=0
   if [ "$channel" == "mpp" ]; then
     ch_multipath='--mpp'
+    Nbursts=$Nbursts_mpp
+    snr_nudge=4  
   fi    
 
   clip=0
@@ -114,8 +133,9 @@ function generate_snrest_v_snr_data {
   rm -f per_${id}_${mode}_${channel}*.txt
   for No in $No_list_c
   do
-    freedv_data_raw_tx --clip ${clip} --txbpf ${clip} --bursts $Nbursts --testframes $Nbursts $mode /dev/zero - 2>${tx_log} | \
-    ch - - --No $No ${ch_multipath} --fading_dir ${FADING_DIR} 2>>${ch_log} | \
+    No_adj=$((${No}-${snr_nudge}))  
+    freedv_data_raw_tx --clip ${clip} --delay 1000 --txbpf ${clip} --bursts $Nbursts --testframes $Nbursts $mode /dev/zero - 2>${tx_log} | \
+    ch - - --No $No_adj ${ch_multipath} --fading_dir ${FADING_DIR} 2>>${ch_log} | \
     freedv_data_raw_rx --testframes $mode - /dev/null 2>${rx_log} -v
     SNRoffset=$(cat ${tx_log} | grep "mark:space" | tr -s ' ' | cut -d' ' -f 5)
    

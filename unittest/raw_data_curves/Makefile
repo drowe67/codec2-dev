@@ -75,29 +75,29 @@ $(snr_ctxc_mpp):
 # and ch noise injection/SNR measurement are equivalent
 octave_ch_noise_awgn.png: $(snr_oct) $(snr_ch)
 	echo "snr_curves_plot; octave_ch_noise_print('awgn'); quit" | \
-        DISPLAY="" octave-cli -p $(CODEC2)/octave
+        octave-cli -p $(CODEC2)/octave
 octave_ch_noise_mpp.png: $(snr_oct_mpp) $(snr_ch_mpp)
 	echo "snr_curves_plot; octave_ch_noise_print('mpp'); quit" | \
-        DISPLAY="" octave-cli -p $(CODEC2)/octave
+        octave-cli -p $(CODEC2)/octave
 
 # Octave Tx and C Tx curves should be on top of each other
 octave_c_tx_awgn.png: $(snr_oct) $(snr_ctx)
 	echo "snr_curves_plot; octave_c_tx_print('awgn'); quit" | \
-        DISPLAY="" octave-cli -p $(CODEC2)/octave
+        octave-cli -p $(CODEC2)/octave
 octave_c_tx_mpp.png: $(snr_oct_mpp) $(snr_ctx_mpp)
 	echo "snr_curves_plot; octave_c_tx_print('mpp'); quit" | \
-        DISPLAY="" octave-cli -p $(CODEC2)/octave
+        octave-cli -p $(CODEC2)/octave
 
 # Octave Tx and C Tx (compressed) curves should be close, but C may be 1dB
 # poorer
 octave_c_tx_comp_awgn.png: $(snr_oc) $(snr_ctxc)
 	echo "snr_curves_plot; octave_c_tx_comp_print('awgn'); quit" | \
-        DISPLAY="" octave-cli -p $(CODEC2)/octave
+        octave-cli -p $(CODEC2)/octave
 octave_c_tx_comp_mpp.png: $(snr_oct_mpp) $(snr_ctxc_mpp)
 	echo "snr_curves_plot; octave_c_tx_comp_print('mpp'); quit" | \
-        DISPLAY="" octave-cli -p $(CODEC2)/octave
+        octave-cli -p $(CODEC2)/octave
 
 # Curve of SNR estimates from C Rx compared to actual SNR, useful for "gear shifting"
 snrest_snr.png: $(snr_ctx)
 	echo "snr_curves_plot; snrest_snr_print('awgn'); quit" | \
-        DISPLAY="" octave-cli -p $(CODEC2)/octave
+        octave-cli -p $(CODEC2)/octave
