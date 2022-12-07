@@ -358,8 +358,12 @@ function config = ofdm_init_mode(mode="700D")
     config.Ntxtbits = 0; config.Nuwbits = 16; config.bad_uw_errors = 6;
     config.state_machine = "data";
     config.ftwindow_width = 80; config.amp_est_mode = 1; config.EsNodB = 3;
-    % just use default clipper (with no BPF) and let SSB BPF clean it up
-    % config.amp_scale = 125E3; config.clip_gain1 = 2.5; config.clip_gain2 = 0.8;
+    % clipper/compression adjustment:
+    % 1. With clipper off increase amp_scale until peak just hit 16384
+    % 2. With clipper on increase clip_gain1 until about 30% clipped
+    % 3. BPF will drop level beneath 16384, adjust clip_gain2 to just hit 16384 peak again
+    % 4. Clipped/unclipped operating point for same PER should be about 1dB apart
+    config.amp_scale = 145E3; config.clip_gain1 = 2.7; config.clip_gain2 = 0.8;
     config.edge_pilots = 0; config.timing_mx_thresh = 0.10;
     config.tx_uw = [1 1 0 0  1 0 1 0  1 1 1 1  0 0 0 0];
   elseif strcmp(mode,"datac3")

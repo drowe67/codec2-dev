@@ -554,7 +554,7 @@ static void allocate_tx_bpf(struct OFDM *ofdm) {
         quisk_filt_cfInit(ofdm->tx_bpf, filtP650S900, sizeof (filtP650S900) / sizeof (float));
         quisk_cfTune(ofdm->tx_bpf, ofdm->tx_centre / ofdm->fs);
     }
-    else if (!strcmp(ofdm->mode, "700E") || !strcmp(ofdm->mode, "2020")) {
+    else if (!strcmp(ofdm->mode, "700E") || !strcmp(ofdm->mode, "2020") || !strcmp(ofdm->mode, "datac1")) {
         quisk_filt_cfInit(ofdm->tx_bpf, filtP900S1100, sizeof (filtP900S1100) / sizeof (float));
         quisk_cfTune(ofdm->tx_bpf, ofdm->tx_centre / ofdm->fs);
     }
@@ -960,7 +960,8 @@ void ofdm_hilbert_clipper(struct OFDM *ofdm, complex float *tx, size_t n) {
         assert(!strcmp(ofdm->mode, "700D") || !strcmp(ofdm->mode, "700E")
                || !strcmp(ofdm->mode, "2020") || !strcmp(ofdm->mode, "2020B")
                || !strcmp(ofdm->mode, "2020C")
-               || !strcmp(ofdm->mode, "datac0") || !strcmp(ofdm->mode, "datac3"));
+               || !strcmp(ofdm->mode, "datac0") || !strcmp(ofdm->mode, "datac1")
+               || !strcmp(ofdm->mode, "datac3"));
         assert(ofdm->tx_bpf != NULL);
         complex float tx_filt[n];
 
