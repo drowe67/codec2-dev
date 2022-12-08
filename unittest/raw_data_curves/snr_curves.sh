@@ -13,7 +13,6 @@ FADING_DIR=${CODEC2}/build_linux/unittest
 
 snr_list='-5 -4 -3 -2 0 1 2 4'
 No_list='-13 -14 -15 -16 -18 -20 -22'
-No_list_comp='-9 -10 -11 -12 -13 -14 -15 -16 -18'
 Nbursts_awgn=20
 Nbursts_mpp=100
 
@@ -105,22 +104,26 @@ function generate_snrest_v_snr_data {
   mode=$1
   channel=$2  
 
+  % nudge SNR test range to get meaningful results for this test
+  snr_nudge=0
+  if [ "$mode" == "datac1" ]; then
+    snr_nudge=4
+  fi
+  
   ch_multipath=''
   Nbursts=$Nbursts_awgn
-  snr_nudge=0
   if [ "$channel" == "mpp" ]; then
     ch_multipath='--mpp'
     Nbursts=$Nbursts_mpp
-    snr_nudge=4  
+    snr_nudge=$((${snr_nudge}+4))
   fi    
 
   clip=0
   id='ctx'
-  No_list_c=$No_list
   if [ "$#" -eq 3 ]; then
     clip=$3
     id='ctxc'
-    No_list_c=$No_list_comp
+    snr_nudge=$((${snr_nudge}-4))
   fi
 
   tx_log=$(mktemp)
@@ -131,7 +134,7 @@ function generate_snrest_v_snr_data {
   rm -f snrest_${id}_${mode}_${channel}*.txt
   rm -f ber_${id}_${mode}_${channel}*.txt
   rm -f per_${id}_${mode}_${channel}*.txt
-  for No in $No_list_c
+  for No in $No_list
   do
     No_adj=$((${No}-${snr_nudge}))  
     freedv_data_raw_tx --clip ${clip} --delay 1000 --txbpf ${clip} --bursts $Nbursts --testframes $Nbursts $mode /dev/zero - 2>${tx_log} | \

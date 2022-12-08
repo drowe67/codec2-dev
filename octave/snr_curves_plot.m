@@ -113,6 +113,35 @@ function ber_per_v_snr(source, mode, channel, colour)
   semilogy(snr, per, sprintf('%s;%s %s per;', colour, source, mode),'linewidth',3,'markersize',10);
 endfunction
 
+function per_v_snr(source, mode, channel, colour)
+  suffix = sprintf("_%s_%s_%s.txt",source, mode, channel);
+  snr = load(sprintf("snr%s",suffix));
+  offset = load(sprintf("offset%s",suffix));
+  snr -= offset;
+  per = load(sprintf("per%s",suffix)) + 1E-6;
+  if strcmp(channel,"awgn")
+    semilogy(snr, per, sprintf('%s;%s %s;', colour, mode, channel));
+  else
+    semilogy(snr, per, sprintf('%s;%s %s;', colour, mode, channel),'linewidth',3,'markersize',10);
+  end
+endfunction
+
+function thruput_v_snr(source, mode, channel, colour)
+  suffix = sprintf("_%s_%s_%s.txt",source, mode, channel);
+  snr = load(sprintf("snr%s",suffix));
+  offset = load(sprintf("offset%s",suffix));
+  snr -= offset;
+  per = load(sprintf("per%s",suffix)) + 1E-6;
+  if strcmp(mode,"datac0") Rb=291; end;
+  if strcmp(mode,"datac1") Rb=980; end;
+  if strcmp(mode,"datac3") Rb=321; end;
+  if strcmp(channel,"awgn")
+    plot(snr, Rb*(1-per), sprintf('%s;%s %s ber;', colour, source, mode));
+  else
+    plot(snr, Rb*(1-per), sprintf('%s;%s %s ber;', colour, source, mode),'linewidth',3,'markersize',10);
+  end
+endfunction
+
 function octave_ch_noise_screen(channel)
   clf; hold on;
   ber_per_v_snr('oct','datac0',channel,'bo-')
@@ -185,6 +214,50 @@ function octave_c_tx_comp_print(channel)
   state_vec = set_graphics_state_print();
   octave_c_tx_comp_screen(channel);
   print(sprintf("octave_c_tx_comp_%s.png", channel), "-dpng","-S1000,800");
+  set_graphics_state_screen(state_vec);
+endfunction
+
+% composite AWGN and MPP for compressed
+function c_tx_comp_screen
+  clf; hold on;
+  per_v_snr('ctxc','datac0','awgn','bo-')
+  per_v_snr('ctxc','datac1','awgn','go-')
+  per_v_snr('ctxc','datac3','awgn','ro-')
+  per_v_snr('ctxc','datac0','mpp','bx-')
+  per_v_snr('ctxc','datac1','mpp','gx-')
+  per_v_snr('ctxc','datac3','mpp','rx-')
+  xlabel('SNR (dB)'); ylabel('PER'); grid;
+  hold off;
+  axis([-6 14 1E-3 1]);
+  title('PER of C Raw Data Modes (with compression)');
+endfunction
+
+function c_tx_comp_print;
+  state_vec = set_graphics_state_print();
+  c_tx_comp_screen;
+  print("c_tx_comp.png", "-dpng","-S1000,800");
+  set_graphics_state_screen(state_vec);
+endfunction
+
+function c_tx_comp_thruput_screen
+  clf; hold on;
+  thruput_v_snr('ctxc','datac0','awgn','bo-')
+  thruput_v_snr('ctxc','datac1','awgn','go-')
+  thruput_v_snr('ctxc','datac3','awgn','ro-')
+  thruput_v_snr('ctxc','datac0','mpp','bx-')
+  thruput_v_snr('ctxc','datac1','mpp','gx-')
+  thruput_v_snr('ctxc','datac3','mpp','rx-')
+  xlabel('SNR (dB)'); ylabel('bits/s'); grid;
+  hold off;
+  axis([-6 12 0 1000]);
+  title(' Throughput for C Tx (with compression)');
+  legend('location','east');
+endfunction
+
+function c_tx_comp_thruput_print;
+  state_vec = set_graphics_state_print;
+  c_tx_comp_thruput_screen;
+  print("c_tx_comp_thruput.png", "-dpng","-S1000,800");
   set_graphics_state_screen(state_vec);
 endfunction
 
