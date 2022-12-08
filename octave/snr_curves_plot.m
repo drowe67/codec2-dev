@@ -136,9 +136,9 @@ function thruput_v_snr(source, mode, channel, colour)
   if strcmp(mode,"datac1") Rb=980; end;
   if strcmp(mode,"datac3") Rb=321; end;
   if strcmp(channel,"awgn")
-    plot(snr, Rb*(1-per), sprintf('%s;%s %s ber;', colour, source, mode));
+    plot(snr, Rb*(1-per), sprintf('%s;%s %s;', colour, mode, channel));
   else
-    plot(snr, Rb*(1-per), sprintf('%s;%s %s ber;', colour, source, mode),'linewidth',3,'markersize',10);
+    plot(snr, Rb*(1-per), sprintf('%s;%s %s;', colour, mode, channel),'linewidth',3,'markersize',10);
   end
 endfunction
 
@@ -228,7 +228,7 @@ function c_tx_comp_screen
   per_v_snr('ctxc','datac3','mpp','rx-')
   xlabel('SNR (dB)'); ylabel('PER'); grid;
   hold off;
-  axis([-6 14 1E-3 1]);
+  axis([-5 10 1E-3 1]);
   title('PER of C Raw Data Modes (with compression)');
 endfunction
 
