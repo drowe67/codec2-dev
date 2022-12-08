@@ -353,6 +353,15 @@ function config = ofdm_init_mode(mode="700D")
     config.tx_uw = zeros(1,config.Nuwbits);
     config.tx_uw(1:16) = [1 1 0 0  1 0 1 0  1 1 1 1  0 0 0 0];
     config.amp_scale = 300E3; config.clip_gain1 = 2.2; config.clip_gain2 = 0.85;
+  elseif strcmp(mode,"datac5")
+    Ns=5; config.Np=58; Tcp = 0.004; Ts = 0.016; Nc = 35; config.data_mode = "streaming";
+    config.Ntxtbits = 0; config.Nuwbits = 40; config.bad_uw_errors = 14;
+    config.state_machine = "data";
+    config.ftwindow_width = 80; config.amp_est_mode = 1; config.EsNodB = 3;
+    config.amp_scale = 145E3; config.clip_gain1 = 2.7; config.clip_gain2 = 0.8;
+    config.edge_pilots = 0; config.timing_mx_thresh = 0.10;
+    config.tx_uw = zeros(1,config.Nuwbits);
+    config.tx_uw(1:16) = [1 1 0 0  1 0 1 0  1 1 1 1  0 0 0 0];
   elseif strcmp(mode,"datac1")
     Ns=5; config.Np=38; Tcp = 0.006; Ts = 0.016; Nc = 27; config.data_mode = "streaming";
     config.Ntxtbits = 0; config.Nuwbits = 16; config.bad_uw_errors = 6;
@@ -1709,6 +1718,10 @@ function [code_param Nbitspercodecframe Ncodecframespermodemframe] = codec_to_fr
       framesize = 16200; rate = 0.6;
       code_param = ldpc_init_builtin("dvbs2", rate, framesize, modulation='QAM', mod_order=16, mapping="", reshape(states.qam16,1,16));
   end
+  if strcmp(mode, "datac5")
+      framesize = 16200; rate = 0.6;
+      code_param = ldpc_init_builtin("dvbs2", rate, framesize, modulation='QPSK', mod_order=4, mapping="");
+  end
   if strcmp(mode, "datac0")
     load H_128_256_5.mat
     code_param = ldpc_init_user(H, modulation, mod_order, mapping);
@@ -1725,7 +1738,7 @@ function [code_param Nbitspercodecframe Ncodecframespermodemframe] = codec_to_fr
     load H_256_512_4.mat
     code_param = ldpc_init_user(H, modulation, mod_order, mapping);
   end
-  if strcmp(mode, "datac0") || strcmp(mode, "datac1") || strcmp(mode, "datac3") || strcmp(mode, "datac4") || strcmp(mode, "qam16c1") || strcmp(mode, "qam16c2")
+  if strcmp(mode, "datac0") || strcmp(mode, "datac1") || strcmp(mode, "datac3") || strcmp(mode, "datac4") || strcmp(mode, "qam16c1") || strcmp(mode, "qam16c2") || strcmp(mode, "datac5") 
     printf("ldpc_data_bits_per_frame = %d\n", code_param.ldpc_data_bits_per_frame);
     printf("ldpc_coded_bits_per_frame  = %d\n", code_param.ldpc_coded_bits_per_frame);
     printf("ldpc_parity_bits_per_frame  = %d\n", code_param.ldpc_parity_bits_per_frame);
