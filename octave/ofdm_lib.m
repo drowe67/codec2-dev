@@ -390,7 +390,7 @@ function config = ofdm_init_mode(mode="700D")
     Ns=5; config.Np=23; Tcp = 0.006; Ts = 0.016; Nc = 3; config.data_mode = "streaming";
     config.edge_pilots = 0;
     config.Ntxtbits = 0; config.Nuwbits = 40; config.bad_uw_errors = 10;
-    config.ftwindow_width = 80; config.timing_mx_thresh = 0.08;
+    config.ftwindow_width = 80; config.timing_mx_thresh = 0.25;
     config.tx_uw = zeros(1,config.Nuwbits);
     config.tx_uw(1:24) = [1 1 0 0  1 0 1 0  1 1 1 1  0 0 0 0  1 1 1 1  0 0 0 0];
     config.tx_uw(end-24+1:end) = [1 1 0 0  1 0 1 0  1 1 1 1  0 0 0 0  1 1 1 1  0 0 0 0];

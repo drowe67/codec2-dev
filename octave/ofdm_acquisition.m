@@ -5,7 +5,7 @@
 %
 % To run headless on a server:
 %
-%   DISPLAY=\"\" octave-cli --no-gui -qf ofdm_dev.m > 210218.txt &
+%   DISPLAY=\"\" octave-cli --no-gui -qf ofdm_acquisition.m > 210218.txt &
 
 ofdm_lib;
 channel_lib;
@@ -39,7 +39,13 @@ function [rx tx_preamble tx_postamble burst_len padded_burst_len ct_targets stat
   mark_space_SNR_offset = 10*log10(burst_len/padded_burst_len);
   SNRdB_setpoint = sim_in.SNR3kdB + mark_space_SNR_offset;
   %printf("SNR3kdB: %f Burst offset: %f\n", sim_in.SNR3kdB, mark_space_SNR_offset)
-  rx = channel_simulate(Fs, SNRdB_setpoint, sim_in.foff_Hz, sim_in.channel, tx);
+
+  % experimental BPF
+  if strcmp(sim_in.mode,"datac4")
+    rx = channel_simulate(Fs, SNRdB_setpoint, sim_in.foff_Hz, sim_in.channel, tx);
+    rx = filter(fir1(100,[1400 1600]/4000),1,rx);
+    l = length(rx); rx = [rx(50:l) zeros(1,50)];
+  end
 endfunction
 
 
@@ -227,5 +233,11 @@ randn('seed',1);
 % choose simulation to run here 
 % ---------------------------------------------------------
 
-frame_by_frame_acquisition_test("datac0", Ntests=5, 'mpp', SNR3kdB=5, foff_hz=0, verbose=1+8);
-%acquistion_curves_frame_by_frame_modes_channels_snr(Ntests=50, quick_test=0)
+if exist("ctest","var")
+  % simple tests to run as part of ctests
+  frame_by_frame_acquisition_test("datac0", Ntests=5, 'mpp', SNR3kdB=5, foff_hz=0, verbose=1+8);
+else
+  % other development work here
+  frame_by_frame_acquisition_test("datac4", Ntests=20, 'mpp', SNR3kdB=-5, foff_hz=0, verbose=1+8);
+  %acquistion_curves_frame_by_frame_modes_channels_snr(Ntests=50, quick_test=0)
+end

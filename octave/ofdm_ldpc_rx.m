@@ -54,7 +54,10 @@ function ofdm_ldpc_rx(filename, mode="700D", varargin)
   frx=fopen(filename,"rb"); rx = fread(frx, Inf, "short")/Ascale; fclose(frx);
   Nsam = length(rx);
   prx = 1;
-
+  if strcmp(mode,"datac4")
+    rx = filter(fir1(100,[1400 1600]/4000),1,rx);
+  end
+  
   % Generate tx frame for BER calcs
 
   payload_bits = round(ofdm_rand(code_param.data_bits_per_frame)/32767);
@@ -270,7 +273,7 @@ function ofdm_ldpc_rx(filename, mode="700D", varargin)
     end
   end
 
-  figure(9); clf; plot_specgram(rx);
+  figure(9); clf; plot_specgram(rx, Fs=8000, 0, 3000);
 
   if pass_packet_count > 0
     if packet_count >= pass_packet_count printf("Pass!\n"); else printf("Fail!\n"); end;
