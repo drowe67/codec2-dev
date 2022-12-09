@@ -39,10 +39,10 @@ function [rx tx_preamble tx_postamble burst_len padded_burst_len ct_targets stat
   mark_space_SNR_offset = 10*log10(burst_len/padded_burst_len);
   SNRdB_setpoint = sim_in.SNR3kdB + mark_space_SNR_offset;
   %printf("SNR3kdB: %f Burst offset: %f\n", sim_in.SNR3kdB, mark_space_SNR_offset)
+  rx = channel_simulate(Fs, SNRdB_setpoint, sim_in.foff_Hz, sim_in.channel, tx);
 
   % experimental BPF
   if strcmp(sim_in.mode,"datac4")
-    rx = channel_simulate(Fs, SNRdB_setpoint, sim_in.foff_Hz, sim_in.channel, tx);
     rx = filter(fir1(100,[1400 1600]/4000),1,rx);
     l = length(rx); rx = [rx(50:l) zeros(1,50)];
   end
