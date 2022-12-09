@@ -470,7 +470,7 @@ endif()
     
     add_test(NAME test_OFDM_modem_octave_burst_acq
              COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/octave;
-                            echo \"ofdm_acquisition; quit\" | DISPLAY=\"\" octave-cli")
+                            echo \"ctest=1; ofdm_acquisition; quit\" | DISPLAY=\"\" octave-cli")
              set_tests_properties(test_OFDM_modem_octave_burst_acq PROPERTIES PASS_REGULAR_EXPRESSION "P.acq. = 1.00")
 
     add_test(NAME test_OFDM_modem_octave_datac0_postamble
