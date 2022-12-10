@@ -204,6 +204,23 @@ On Ubuntu 17 and above:
  wait for it to build.
  ```
 
+The above will create a working libcodec2.dll file for inclusion in other applications
+but the utility programs (e.g. `freedv-rx.exe`) are not guaranteed to work properly in 
+a native Windows environment. Usage of Codec2 via the Windows Subsystem For Linux (WSL) 
+is recommended:
+
+1. Open a Command Prompt as Administrator and type `wsl --install` to install WSL.
+   *Note: you will need to reboot before proceeding with the next steps.*
+2. Open the Start menu and type "Ubuntu" to open the WSL environment.
+3. Follow the Linux instructions to build Codec2:
+   ```
+sudo apt install build-essential cmake
+git clone https://github.com/drowe67/codec2.git
+cd codec2
+mkdir build
+cmake ..
+make
+```
 
 ## Including Codec 2 in an Android project
 
