@@ -38,6 +38,7 @@
 #include "modem_stats.h"
 #include "octave.h"
 #include "fsk.h"
+#include "ldpc_codes.h"
 
 /* other processes can end this program using signals */
 
@@ -49,7 +50,8 @@ void  INThandler(int sig) {
 
 int main(int argc, char *argv[]) {
     FILE                      *fin, *fout;
-    struct freedv_advanced     adv = {0,2,100,8000,1000,200, "H_256_512_4"};
+    char                       codename[80] = "H_256_512_4";
+    struct freedv_advanced     adv = {0,2,100,8000,1000,200, codename};
     struct freedv             *freedv;
     int                        nin, nbytes, nbytes_out = 0, nframes_out = 0, buf = 0;
     int                        mode;
@@ -63,30 +65,6 @@ int main(int argc, char *argv[]) {
     int                        fsk_lower = 0, fsk_upper = 0;
     int                        user_fsk_lower = 0, user_fsk_upper = 0;
     
-    if (argc < 3) {
-    helpmsg:
-      	fprintf(stderr, "\nusage: %s [options] FSK_LDPC|DATAC0|DATAC1|DATAC3 InputModemSpeechFile BinaryDataFile\n"
-               "  -v or --vv              verbose options\n"
-               "  --testframes            count raw and coded errors in testframes sent by tx\n"
-               "  --framesperburst  N     N frames per burst (default 1, must match Tx)\n"
-               "  --scatter         file  write scatter diagram symbols to file (Octave text file format)\n"
-               "  --singleline            single line summary at end of test, used for logging\n"
-               "  --quiet\n"
-               "\n"
-               "For FSK_LDPC only:\n\n"
-               "  -m      2|4     number of FSK tones\n"
-               "  --Fs    FreqHz  sample rate (default 8000)\n"
-               "  --Rs    FreqHz  symbol rate (default 100)\n"
-               "  --mask shiftHz  Use \"mask\" freq estimator (default is \"peak\" estimator)\n\n"
-               "  --shift FreqHz  shift between tones (default 200)\n"
-               " --fsk_lower freq   lower limit of freq estimator (default 0)\n"
-               " --fsk_upper freq   upper limit of freq estimator (default Fs/2)\n"
-               "\n", argv[0]);
-       	
-        fprintf(stderr, "example: %s --framesperburst 1 --testframes datac0 samples.s16 /dev/null\n\n", argv[0]);
-	    exit(1);
-    }
-
     int o = 0;
     int opt_idx = 0;
     while( o != -1 ){
@@ -105,6 +83,8 @@ int main(int argc, char *argv[]) {
             {"singleline",      no_argument,        0, 'b'},
             {"fsk_lower",       required_argument,  0, 'l'},
             {"fsk_upper",       required_argument,  0, 'u'},
+            {"code",            required_argument,  0, 'o'},
+            {"listcodes",       no_argument,        0, 'i'},
             {0, 0, 0, 0}
         };
 
@@ -160,6 +140,17 @@ int main(int argc, char *argv[]) {
         case 'y':
             verbose = 3;
             break;
+        case 'o':
+            if (ldpc_codes_find(optarg) == -1) {
+                fprintf(stderr, "%s not found, try --listcodes\n", optarg);
+                exit(1);
+            }
+            strcpy(codename, optarg);
+            break;
+        case 'i':
+            ldpc_codes_list();
+            exit(0);
+            break;
         case 'h':
         case '?':
             goto helpmsg;
@@ -167,6 +158,32 @@ int main(int argc, char *argv[]) {
         }
     }
     int dx = optind;
+
+    if (argc < 3) {
+    helpmsg:
+      	fprintf(stderr, "\nusage: %s [options] FSK_LDPC|DATAC0|DATAC1|DATAC3 InputModemSpeechFile BinaryDataFile\n"
+               "  -v or --vv              verbose options\n"
+               "  --testframes            count raw and coded errors in testframes sent by tx\n"
+               "  --framesperburst  N     N frames per burst (default 1, must match Tx)\n"
+               "  --scatter         file  write scatter diagram symbols to file (Octave text file format)\n"
+               "  --singleline            single line summary at end of test, used for logging\n"
+               "  --quiet\n"
+               "\n"
+               "For FSK_LDPC only:\n\n"
+               "  -m          2|4       number of FSK tones\n"
+               "  --Fs        FreqHz    sample rate (default 8000)\n"
+               "  --Rs        FreqHz    symbol rate (default 100)\n"
+               "  --mask      shiftHz   Use \"mask\" freq estimator (default is \"peak\" estimator)\n\n"
+               "  --shift     FreqHz    shift between tones (default 200)\n"
+               " --fsk_lower  freq      lower limit of freq estimator (default 0)\n"
+               " --fsk_upper  freq      upper limit of freq estimator (default Fs/2)\n"
+               "  --code      CodeName  LDPC code (defaults (512,256)\n"
+               "  --listcodes           list available LDPC codes\n"
+               "\n", argv[0]);
+       	
+        fprintf(stderr, "example: %s --framesperburst 1 --testframes datac0 samples.s16 /dev/null\n\n", argv[0]);
+	    exit(1);
+    }
 
     if( (argc - dx) < 3) {
         fprintf(stderr, "too few arguments.\n");

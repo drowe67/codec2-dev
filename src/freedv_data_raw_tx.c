@@ -37,6 +37,7 @@
 #include "freedv_api.h"
 #include "fsk.h"
 #include "ofdm_internal.h"
+#include "ldpc_codes.h"
 
 size_t send_preamble(struct freedv *freedv, FILE *fout, int use_complex, size_t n_mod_out);
 size_t send_modulated_data(struct freedv *freedv, FILE *fout, int use_complex, size_t n_mod_out, uint8_t bytes_in[]);
@@ -46,7 +47,8 @@ void comp_to_short(short mod_out_short[], COMP mod_out_comp[], int n_mod_out);
 
 int main(int argc, char *argv[]) {
     FILE                     *fin, *fout;
-    struct freedv_advanced    adv = {0,2,100,8000,1000,200, "H_256_512_4"};
+    char                      codename[80] = "H_256_512_4";
+    struct freedv_advanced    adv = {0,2,100,8000,1000,200, codename};
     struct freedv            *freedv;
     int                       mode;
     int                       use_clip, use_txbpf, testframes, Ntestframes = 0;
@@ -57,36 +59,6 @@ int main(int argc, char *argv[]) {
     int                       inter_burst_delay_ms = 0;
     int                       postdelay_ms = 0;
     uint8_t                   source_byte = 0;
-
-    if (argc < 4) {
-    helpmsg:
-        fprintf(stderr, "\nusage: %s [options] FSK_LDPC|DATAC0|DATAC1|DATAC3 InputBinaryDataFile OutputModemRawFile\n"
-               "\n"
-               "  --testframes      T         send a total of T test frames (T should equal B*N)\n"
-               "  --bursts          B         send B bursts of N testframes (default 1)\n"
-               "  --framesperburst  N         burst mode, N frames per burst (default 1)\n"
-               "  --delay           ms        testframe inter-burst delay in ms\n"
-               "  --postdelay       ms        additional delay at end of run in ms\n"
-               "  -c                          complex signed 16 bit output format (default real)\n"
-               "  --clip            0|1       clipping for reduced PAPR\n"
-               "  --txbpf           0|1       bandpass filter\n"
-               "  --seq                       send packet sequence numbers (breaks testframe BER counting)\n"
-               "  --source          Byte      insert a (non-zero) source address att byte[0]\n"
-               "  --complexout                complex sample output (default real)\n"
-               "  --quiet\n"
-               "\n"
-               "For FSK_LDPC only:\n\n"
-               "  -a      amp     maximum amplitude of FSK signal\n"
-               "  -m      2|4     number of FSK tones\n"
-               "  --Fs    FreqHz  sample rate (default 8000)\n"
-               "  --Rs    FreqHz  symbol rate (default 100)\n"
-               "  --tone1 FreqHz  freq of first tone (default 1000)\n"
-               "  --shift FreqHz  shift between tones (default 200)\n\n"
-               , argv[0]);
-        fprintf(stderr, "example: $ %s --testframes 6 --bursts 3 --framesperburst 2 datac0 /dev/zero samples.s16\n", argv[0]);
-        fprintf(stderr, "example: $ %s  -c --testframes 10 FSK_LDPC /dev/zero samples.iq16\n\n", argv[0]);
-        exit(1);
-    }
 
     use_clip = -1; use_txbpf = -1; testframes = 0;
     int framesperburst = 1;
@@ -113,11 +85,13 @@ int main(int argc, char *argv[]) {
             {"amp",            required_argument,  0, 'a'},
             {"quiet",          no_argument,        0, 'q'},
             {"complexout",     no_argument,        0, 'c'},
+            {"code",           required_argument,  0, 'o'},
+            {"listcodes",      no_argument,        0, 'x'},
             {0, 0, 0, 0}
         };
 
-        o = getopt_long(argc,argv,"a:cdt:hb:l:e:f:g:r:1:s:m:qi:",long_opts,&opt_idx);
-
+        o = getopt_long(argc,argv,"a:cdt:hb:l:e:f:g:r:1:s:m:qi:o:x",long_opts,&opt_idx);
+        
         switch(o) {
         case 'a':
             amp = atof(optarg)/2.0;
@@ -173,6 +147,17 @@ int main(int argc, char *argv[]) {
         case 's':
             adv.tone_spacing = atoi(optarg);
             break;
+        case 'o':
+            if (ldpc_codes_find(optarg) == -1) {
+                fprintf(stderr, "%s not found, try --listcodes\n", optarg);
+                exit(1);
+            }
+            strcpy(codename, optarg);
+            break;
+        case 'x':
+            ldpc_codes_list();
+            exit(0);
+            break;
         case 'h':
         case '?':
             goto helpmsg;
@@ -180,6 +165,38 @@ int main(int argc, char *argv[]) {
         }
     }
     int dx = optind;
+
+    if (argc < 4) {
+    helpmsg:
+        fprintf(stderr, "\nusage: %s [options] FSK_LDPC|DATAC0|DATAC1|DATAC3 InputBinaryDataFile OutputModemRawFile\n"
+               "\n"
+               "  --testframes      T         send a total of T test frames (T should equal B*N)\n"
+               "  --bursts          B         send B bursts of N testframes (default 1)\n"
+               "  --framesperburst  N         burst mode, N frames per burst (default 1)\n"
+               "  --delay           ms        testframe inter-burst delay in ms\n"
+               "  --postdelay       ms        additional delay at end of run in ms\n"
+               "  -c                          complex signed 16 bit output format (default real)\n"
+               "  --clip            0|1       clipping for reduced PAPR\n"
+               "  --txbpf           0|1       bandpass filter\n"
+               "  --seq                       send packet sequence numbers (breaks testframe BER counting)\n"
+               "  --source          Byte      insert a (non-zero) source address att byte[0]\n"
+               "  --complexout                complex sample output (default real)\n"
+               "  --quiet\n"
+               "\n"
+               "For FSK_LDPC only:\n\n"
+               "  -a           amp      maximum amplitude of FSK signal\n"
+               "  -m           2|4      number of FSK tones\n"
+               "  --Fs         FreqHz   sample rate (default 8000)\n"
+               "  --Rs         FreqHz   symbol rate (default 100)\n"
+               "  --tone1      FreqHz   freq of first tone (default 1000)\n"
+               "  --shift      FreqHz   shift between tones (default 200)\n\n"
+               "  --code       CodeName LDPC code (defaults (512,256)\n"
+               "  --listcodes           list available LDPC codes\n\n"
+               , argv[0]);
+        fprintf(stderr, "example: $ %s --testframes 6 --bursts 3 --framesperburst 2 datac0 /dev/zero samples.s16\n", argv[0]);
+        fprintf(stderr, "example: $ %s  -c --testframes 10 FSK_LDPC /dev/zero samples.iq16\n\n", argv[0]);
+        exit(1);
+    }
 
     if( (argc - dx) < 3) {
         fprintf(stderr, "too few arguments.\n");
