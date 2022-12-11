@@ -230,8 +230,8 @@ int main(int argc, char *argv[]) {
     uint8_t bytes_in[bytes_per_modem_frame];
 
     if (mode == FREEDV_MODE_FSK_LDPC) {
-        if (!quiet) fprintf(stderr, "Frequency: Fs: %4.1f kHz Rs: %4.1f kHz Tone1: %4.1f kHz Shift: %4.1f kHz M: %d \n",
-                        (float)adv.Fs/1E3, (float)adv.Rs/1E3, (float)adv.first_tone/1E3, (float)adv.tone_spacing/1E3, adv.M);
+        if (!quiet) fprintf(stderr, "Frequency: Fs: %4.1f Hz Rs: %5.0f Hz Tone1: %5.0f Hz Shift: %5.0f Hz M: %d \n",
+                        (float)adv.Fs, (float)adv.Rs, (float)adv.first_tone, (float)adv.tone_spacing, adv.M);
 
         if (adv.tone_spacing < adv.Rs) {
             fprintf(stderr, "Need shift: %d > Rs: %d\n", adv.tone_spacing, adv.Rs);

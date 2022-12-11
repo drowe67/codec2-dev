@@ -60,6 +60,8 @@ int main(int argc, char *argv[]) {
     int                        quiet = 0;
     int                        single_line_summary = 0;
     float                      snr_sum = 0.0;
+    int                        fsk_lower = 0, fsk_upper = 0;
+    int                        user_fsk_lower = 0, user_fsk_upper = 0;
     
     if (argc < 3) {
     helpmsg:
@@ -75,7 +77,11 @@ int main(int argc, char *argv[]) {
                "  -m      2|4     number of FSK tones\n"
                "  --Fs    FreqHz  sample rate (default 8000)\n"
                "  --Rs    FreqHz  symbol rate (default 100)\n"
-               "  --mask shiftHz  Use \"mask\" freq estimator (default is \"peak\" estimator)\n\n", argv[0]);
+               "  --mask shiftHz  Use \"mask\" freq estimator (default is \"peak\" estimator)\n\n"
+               "  --shift FreqHz  shift between tones (default 200)\n"
+               " --fsk_lower freq   lower limit of freq estimator (default 0)\n"
+               " --fsk_upper freq   upper limit of freq estimator (default Fs/2)\n"
+               "\n", argv[0]);
        	
         fprintf(stderr, "example: %s --framesperburst 1 --testframes datac0 samples.s16 /dev/null\n\n", argv[0]);
 	    exit(1);
@@ -89,13 +95,16 @@ int main(int argc, char *argv[]) {
             {"help",            no_argument,        0, 'h'},
             {"Fs",              required_argument,  0, 'f'},
             {"Rs",              required_argument,  0, 'r'},
+            {"shift",           required_argument,  0, 's'},
             {"vv",              no_argument,        0, 'x'},
             {"vvv",             no_argument,        0, 'y'},
             {"mask",            required_argument,  0, 'k'},
-            {"framesperburst",  required_argument,  0, 's'},
+            {"framesperburst",  required_argument,  0, 'g'},
             {"scatter",         required_argument,  0, 'c'},
             {"quiet",           required_argument,  0, 'q'},
             {"singleline",      no_argument,        0, 'b'},
+            {"fsk_lower",       required_argument,  0, 'l'},
+            {"fsk_upper",       required_argument,  0, 'u'},
             {0, 0, 0, 0}
         };
 
@@ -119,6 +128,14 @@ int main(int argc, char *argv[]) {
         case 'm':
             adv.M = atoi(optarg);
             break;
+        case 'l':
+            fsk_lower = atoi(optarg);
+            user_fsk_lower = 1;
+            break;
+        case 'u':
+            fsk_upper = atoi(optarg);
+            user_fsk_upper = 1;
+            break;
         case 'q':
             quiet = 1;
             break;
@@ -126,6 +143,9 @@ int main(int argc, char *argv[]) {
             adv.Rs = atoi(optarg);
             break;
         case 's':
+            adv.tone_spacing = atoi(optarg);
+            break;
+        case 'g':
             framesperburst = atoi(optarg);
             break;
         case 't':
@@ -177,12 +197,19 @@ int main(int argc, char *argv[]) {
 	     exit(1);
     }
 
-    if (mode != FREEDV_MODE_FSK_LDPC)
-        freedv = freedv_open(mode);
-    else {
+    if (mode == FREEDV_MODE_FSK_LDPC) {
         freedv = freedv_open_advanced(mode, &adv);
         struct FSK *fsk = freedv_get_fsk(freedv);
         fsk_set_freq_est_alg(fsk, mask);
+        
+        /* optionally set freq estimator limits */
+        if (!user_fsk_lower) fsk_lower = 0;
+        if (!user_fsk_upper) fsk_upper = adv.Fs/2;
+        fprintf(stderr,"Setting estimator limits to %d to %d Hz.\n", fsk_lower, fsk_upper);
+        fsk_set_freq_est_limits(fsk,fsk_lower,fsk_upper);
+    }
+    else {
+       freedv = freedv_open(mode);
     }
 
     assert(freedv != NULL);
