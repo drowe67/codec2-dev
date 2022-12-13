@@ -12,7 +12,7 @@ CODEC2=${HOME}/codec2
 FADING_DIR=${CODEC2}/build_linux/unittest
 
 snr_list='-5 -4 -3 -2 0 1 2 4'
-No_list='-13 -14 -15 -16 -18 -20 -22'
+No_list='-13 -14 -15 -16 -18 -20 -22 -24 -26'
 Nbursts_awgn=20
 Nbursts_mpp=100
 
@@ -104,10 +104,14 @@ function generate_snrest_v_snr_data {
   mode=$1
   channel=$2  
 
-  % nudge SNR test range to get meaningful results for this test
   snr_nudge=0
+  aNo_list=$No_list
   if [ "$mode" == "datac1" ]; then
+    # nudge SNR test range to get meaningful results for this test  
     snr_nudge=4
+  else
+    # few extra points to test SNRest at high SNRs on low rate waveforms
+    aNo_list=$No_list" -28 -30"
   fi
   
   ch_multipath=''
@@ -134,7 +138,7 @@ function generate_snrest_v_snr_data {
   rm -f snrest_${id}_${mode}_${channel}*.txt
   rm -f ber_${id}_${mode}_${channel}*.txt
   rm -f per_${id}_${mode}_${channel}*.txt
-  for No in $No_list
+  for No in $aNo_list
   do
     No_adj=$((${No}-${snr_nudge}))  
     freedv_data_raw_tx --clip ${clip} --delay 1000 --txbpf ${clip} --bursts $Nbursts --testframes $Nbursts $mode /dev/zero - 2>${tx_log} | \
