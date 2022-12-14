@@ -1331,6 +1331,7 @@ endif(NOT APPLE)
         test_OFDM_modem_datac1_octave
         test_OFDM_modem_datac3_octave
         test_fsk_lib_4fsk_ldpc
+        test_OFDM_modem_datac0_compression
         PROPERTIES
         ENVIRONMENT "CML_PATH=${CMAKE_CURRENT_BINARY_DIR}/cml"
     )
