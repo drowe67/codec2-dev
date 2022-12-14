@@ -503,6 +503,11 @@ endif()
                             DISPLAY=\"\" octave-cli")
              set_tests_properties(test_OFDM_modem_octave_datac0_mpp_coded PROPERTIES PASS_REGULAR_EXPRESSION "Pass")
 
+    # Check Octave and C compressed waveforms are about the same
+    add_test(NAME test_OFDM_modem_datac0_compression
+             COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/unittest;
+                            ./check_comp.sh ${CMAKE_CURRENT_SOURCE_DIR} $PATH:${CMAKE_CURRENT_BINARY_DIR}/src")
+           
     #  ---------------------------------- ofdm_mod/demod level C modem tests ----------------------------------
     
     # noise free uncoded 700D test, including reading and writing payload bits
