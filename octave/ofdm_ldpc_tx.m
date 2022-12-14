@@ -118,13 +118,14 @@ function ofdm_ldpc_tx(filename, mode="700D", N, SNR3kdB=100, channel='awgn', var
   
   % if burst mode concatenate multiple bursts with spaces
   if burst_mode
-    atx = tx; tx = [];
+    atx = tx; tx = zeros(1,states.Fs); on_time = 0; off_time = states.Fs;
     for b=1:Nbursts
       tx = [tx atx zeros(1,states.Fs)];
+      on_time += length(atx);
+      off_time += states.Fs;
     end
     % adjust channel simulator SNR setpoint given (burst on length)/(total length including silence) ratio
-    burst_len = length(atx); padded_burst_len = burst_len + states.Fs;
-    mark_space_SNR_offset = 10*log10(burst_len/padded_burst_len);
+    mark_space_SNR_offset = 10*log10(on_time/(on_time+off_time));
     SNRdB_setpoint = SNR3kdB + mark_space_SNR_offset;
     printf("SNR3kdB: %4.2f Burst offset: %4.2f SNRdB_setpoint: %4.2f\n", SNR3kdB, mark_space_SNR_offset, SNRdB_setpoint)
   else
