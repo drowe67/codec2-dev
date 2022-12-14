@@ -287,21 +287,27 @@ Coded PER: 0.0000 Tpkts:     6 Tpers:     0
 Lets add some noise and a 20 Hz frequency offset:
 ```
 ./src/freedv_data_raw_tx --framesperburst 2 --bursts 3 --testframes 6 DATAC0 /dev/zero - |
-./src/ch - - --No -20 -f 20 |
-./src/freedv_data_raw_rx --framesperburst 2 --testframes DATAC0 - /dev/null --vv
+./src/ch - - --No -14 -f 20 |
+./src/freedv_data_raw_rx --framesperburst 2 --testframes DATAC0 - /dev/null
 <snip>
-marks:space: 0.83 SNR offset: -0.79
-ch: SNR3k(dB):    -0.36  C/No....:    34.42
-<snip>
-BER......: 0.0195 Tbits:  1536 Terrs:    30
+mark:space: 0.79 SNR offset: -1.03
+ch: SNR3k(dB):    -0.96  C/No....:    33.82
+ch: peak.....: 16394.23  RMS.....:  9814.35   CPAPR.....:  4.46 
+ch: Nsamples.:    33440  clipped.:     0.00%  OutClipped:  0.03%
+modembufs:     35 bytes:    84 Frms.:     6 SNRAv: -1.15
+BER......: 0.0319 Tbits:  1536 Terrs:    49
 Coded BER: 0.0000 Tbits:   768 Terrs:     0
-Coded PER: 0.0000 Tpkts:     6 Tpers:     0
+Coded FER: 0.0000 Tfrms:     6 Tfers:     0
 ```
-We still received 6 frames OK (Tpkts field), but in this case there was a raw BER of about 2% which the FEC cleaned up nicely (Coded BER 0.0).  Just above that we can see the "SNR offset" and "ch: SNR3k" fields.  In the silence between bursts the modem signal has zero power, which biases the SNR measured by the `ch` channels simulation tool.  This bias is the "SNR offset".  So the true SNR for this test is actually:
+We still received 6 frames OK (Tpkts field), but in this case there was a raw BER of about 3% which the FEC cleaned up nicely (Coded BER 0.0).  Just above that we can see the "SNR offset" and "ch: SNR3k" fields.  In the silence between bursts the modem signal has zero power, which biases the SNR measured by the `ch` channel simulation tool.  This bias is the "SNR offset".  So the true SNR for this test is actually:
 ```
-SNR = -0.36 - (-0.79) = 0.43 dB
+SNR = -1.15 - (-1.03) = -0.12 dB
 ```
-The same offset applies the the Peak to Average Power measurement (CPAPR) returned by the `ch` tool.
+The same offset applies the the Peak to Average Power measurement (CPAPR) returned by the `ch` tool, but in the other direction.  So the unbiased CPAPR is:
+```
+CPAPR = 4.46 - 1.03 = 3.43 dB
+```
+CPAPR refers to the PAPR of the complex valued signal.
 
 In the `raw` directory is a real world off-air sample of a signal sent between Adelaide and Melbourne (800km) using about 20W on 40m.  This can be decoded with:
 ```
