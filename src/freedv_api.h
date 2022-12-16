@@ -35,6 +35,7 @@
 #define __FREEDV_API__
 
 #include <sys/types.h>
+#include <stdbool.h>
 // This declares a single-precision (float) complex number
 #include "comp.h"
 
@@ -225,9 +226,9 @@ void freedv_set_callback_data           (struct freedv *freedv, freedv_callback_
 void freedv_set_test_frames		        (struct freedv *freedv, int test_frames);
 void freedv_set_test_frames_diversity	(struct freedv *freedv, int test_frames_diversity);
 void freedv_set_smooth_symbols		    (struct freedv *freedv, int smooth_symbols);
-void freedv_set_squelch_en		        (struct freedv *freedv, int squelch_en);
+void freedv_set_squelch_en		        (struct freedv *freedv, bool squelch_en);
 void freedv_set_snr_squelch_thresh	    (struct freedv *freedv, float snr_squelch_thresh);
-void freedv_set_clip	                (struct freedv *freedv, int val);
+void freedv_set_clip	                (struct freedv *freedv, bool val);
 void freedv_set_total_bit_errors    	(struct freedv *freedv, int val);
 void freedv_set_total_bits              (struct freedv *freedv, int val);
 void freedv_set_total_bit_errors_coded  (struct freedv *freedv, int val);
@@ -245,7 +246,7 @@ void freedv_set_tx_amp                  (struct freedv *freedv, float amp);
 void freedv_set_dpsk                    (struct freedv *freedv, int val);
 void freedv_set_ext_vco                 (struct freedv *f, int val);
 void freedv_set_phase_est_bandwidth_mode(struct freedv *f, int val);
-void freedv_set_eq                      (struct freedv *f, int val);
+void freedv_set_eq                      (struct freedv *f, bool val);
 void freedv_set_frames_per_burst        (struct freedv *f, int framesperburst);
 void freedv_passthrough_gain            (struct freedv *f, float g);
 int freedv_set_tuning_range             (struct freedv *freedv, float val_fmin, float val_fmax);

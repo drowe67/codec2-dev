@@ -127,12 +127,12 @@ struct freedv {
     int                 *tx_bits;                            /* FSK modem frame under construction */
     int                  tx_sync_bit;
     int                  frames;
-    int                  clip_en;                            /* non-zero for modem Tx clipping to lower PAPR */
+    bool                 clip_en;                            /* non-zero for modem Tx clipping to lower PAPR */
     int                  sync;                               /* we set this when a mode is in sync */
     int                  evenframe;
     float                snr_est;                            /* we set this each time the modes's demod estimates SNR */
     float                snr_squelch_thresh;
-    int                  squelch_en;
+    bool                 squelch_en;
     int                  nin, nin_prev;
     int                  verbose;
     int                  ext_vco;                            /* 2400A/800XA use external VCO flag */

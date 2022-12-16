@@ -39,7 +39,7 @@ extern char *ofdm_statemode[];
 
 void freedv_700c_open(struct freedv *f) {
     f->snr_squelch_thresh = 0.0;
-    f->squelch_en = 0;
+    f->squelch_en = false;
 
     f->cohpsk = cohpsk_create();
     f->nin = f->nin_prev = COHPSK_NOM_SAMPLES_PER_FRAME;
@@ -47,7 +47,7 @@ void freedv_700c_open(struct freedv *f) {
     f->n_nom_modem_samples = f->n_nat_modem_samples * FREEDV_FS_8000 / COHPSK_FS;// number of samples after native samples are interpolated to 8000 sps
     f->n_max_modem_samples = COHPSK_MAX_SAMPLES_PER_FRAME * FREEDV_FS_8000 / COHPSK_FS + 1;
     f->modem_sample_rate = FREEDV_FS_8000;                                       // note weird sample rate tamed by resampling
-    f->clip_en = 1;
+    f->clip_en = true;
     f->sz_error_pattern = cohpsk_error_pattern_size();
     f->test_frames_diversity = 1;
 
@@ -98,7 +98,7 @@ void freedv_comptx_700c(struct freedv *f, COMP mod_out[]) {
 // open function for OFDM voice modes
 void freedv_ofdm_voice_open(struct freedv *f, char *mode) {
     f->snr_squelch_thresh = 0.0;
-    f->squelch_en = 0;
+    f->squelch_en = false;
     struct OFDM_CONFIG *ofdm_config = (struct OFDM_CONFIG *) calloc(1, sizeof (struct OFDM_CONFIG));
     assert(ofdm_config != NULL);
     ofdm_init_mode(mode, ofdm_config);
@@ -135,7 +135,7 @@ void freedv_ofdm_voice_open(struct freedv *f, char *mode) {
     f->n_nom_modem_samples = ofdm_get_samples_per_frame(f->ofdm);
     f->n_max_modem_samples = ofdm_get_max_samples_per_frame(f->ofdm);
     f->modem_sample_rate = f->ofdm->config.fs;
-    f->clip_en = 0;
+    f->clip_en = false;
     f->sz_error_pattern = f->ofdm_bitsperframe;
 
     f->tx_bits = NULL; /* not used for 700D */

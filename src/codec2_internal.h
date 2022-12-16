@@ -28,6 +28,7 @@
 
 #ifndef __CODEC2_INTERNAL__
 #define __CODEC2_INTERNAL__
+#include <stdbool.h>
 
 #include "codec2_fft.h"
 #include "newamp1.h"
@@ -81,9 +82,9 @@ struct CODEC2 {
     float          se;                       /* running sum of squared error */
     unsigned int   nse;                      /* number of terms in sum       */
     float         *user_rate_K_vec_no_mean_; /* optional, user supplied vector for quantisation experiments */
-    int            post_filter_en;
+    bool           post_filter_en;
     float          eq[NEWAMP1_K];            /* optional equaliser */
-    int            eq_en;
+    bool           eq_en;
     
     /*newamp2 states (also uses newamp1 states )*/
     float 	   energy_prev;

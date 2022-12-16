@@ -28,7 +28,7 @@
 
 #ifndef __CODEC2__
 #define  __CODEC2__
-
+#include <stdbool.h>
 #include <codec2/version.h>
 
 #ifdef __cplusplus
@@ -112,8 +112,8 @@ float codec2_get_var(struct CODEC2 *codec2_state);
 float *codec2_enable_user_ratek(struct CODEC2 *codec2_state, int *K);
 
 // 700C post filter and equaliser
-void codec2_700c_post_filter(struct CODEC2 *codec2_state, int en);
-void codec2_700c_eq(struct CODEC2 *codec2_state, int en);
+void codec2_700c_post_filter(struct CODEC2 *codec2_state, bool en);
+void codec2_700c_eq(struct CODEC2 *codec2_state, bool en);
       
 #ifdef __cplusplus
 }

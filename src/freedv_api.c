@@ -859,7 +859,7 @@ int freedv_bits_to_speech(struct freedv *f, short speech_out[], short demod_in[]
     int decode_speech = 0;
     if ((rx_status & FREEDV_RX_SYNC) == 0) {
 
-        if (f->squelch_en == 0) {
+        if (!f->squelch_en) {
 
             /* pass through received samples so we can hear what's going on, e.g. during tuning */
 
@@ -889,7 +889,7 @@ int freedv_bits_to_speech(struct freedv *f, short speech_out[], short demod_in[]
        /* following logic is tricky so spell it out clearly, see table
           in: https://github.com/drowe67/codec2/pull/111 */
 
-       if (f->squelch_en == 0) {
+       if (!f->squelch_en) {
            decode_speech = 1;
        } else {
            /* squelch is enabled */
@@ -1241,7 +1241,7 @@ void freedv_get_modem_stats(struct freedv *f, int *sync, float *snr_est)
 
 void freedv_set_test_frames               (struct freedv *f, int val) {f->test_frames = val;}
 void freedv_set_test_frames_diversity	  (struct freedv *f, int val) {f->test_frames_diversity = val;}
-void freedv_set_squelch_en                (struct freedv *f, int val) {f->squelch_en = val;}
+void freedv_set_squelch_en                (struct freedv *f, bool val) {f->squelch_en = val;}
 void freedv_set_total_bit_errors          (struct freedv *f, int val) {f->total_bit_errors = val;}
 void freedv_set_total_bits                (struct freedv *f, int val) {f->total_bits = val;}
 void freedv_set_total_bit_errors_coded    (struct freedv *f, int val) {f->total_bit_errors_coded = val;}
@@ -1256,7 +1256,7 @@ void freedv_passthrough_gain              (struct freedv *f, float g) {f->passth
 
 /* supported by 700C, 700D, 700E */
 
-void freedv_set_clip(struct freedv *f, int val) {
+void freedv_set_clip(struct freedv *f, bool val) {
     f->clip_en = val;
     if (is_ofdm_mode(f)) {
       f->ofdm->clip_en = val;
@@ -1289,7 +1289,7 @@ void freedv_set_phase_est_bandwidth_mode(struct freedv *f, int val) {
 }
 
 // For those FreeDV modes using the codec 2 700C vocoder 700C/D/E/800XA
-void freedv_set_eq(struct freedv *f, int val) {
+void freedv_set_eq(struct freedv *f, bool val) {
     if (f->codec2 != NULL) {
         codec2_700c_eq(f->codec2, val);
     }
