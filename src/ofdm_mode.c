@@ -102,9 +102,8 @@ void ofdm_init_mode(char mode[], struct OFDM_CONFIG *config) {
         memcpy(config->tx_uw, uw, config->nuwbits);
         config->timing_mx_thresh = 0.10f;    
         config->data_mode = "streaming";
-        // WIP but for now just let SSB filter do BPF of clipped signal
-        //config->amp_scale = 1253; config->clip_gain1 = 2.5; config->clip_gain2 = 0.8;
-        config->tx_bpf_en = false; config->clip_en = false;
+        config->amp_scale = 145E3; config->clip_gain1 = 2.7; config->clip_gain2 = 0.8;
+        config->tx_bpf_en = true; config->clip_en = true;
     } else if (strcmp(mode,"datac3") == 0) {
         config->ns=5; config->np=29; config->tcp = 0.006; config->ts = 0.016; config->nc = 9;
         config->edge_pilots = 0;

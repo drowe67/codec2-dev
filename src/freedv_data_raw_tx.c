@@ -256,6 +256,19 @@ int main(int argc, char *argv[]) {
     size_t on_samples = 0;
     size_t off_samples = 0;
 
+    /* initial silence */
+    
+    int samples_delay = 0;
+    if (inter_burst_delay_ms) {
+        /* user defined inter-burst delay */
+        samples_delay = FREEDV_FS_8000*inter_burst_delay_ms/1000;
+    }
+    else {                
+        /* just enough silence at the end of burst to allow demod to complete processing */
+        samples_delay = 2*freedv_get_n_nom_modem_samples(freedv);
+    }
+    off_samples += send_silence(fout, shorts_per_sample, samples_delay);
+        
     /* --------- Test Frame Mode --------------------------------------------------*/
     
     if (testframes) {
@@ -301,7 +314,7 @@ int main(int argc, char *argv[]) {
                 /* just enough silence at the end of burst to allow demod to complete processing */
                 samples_delay = 2*freedv_get_n_nom_modem_samples(freedv);
             }
-            on_samples += send_silence(fout, shorts_per_sample, samples_delay);
+            off_samples += send_silence(fout, shorts_per_sample, samples_delay);
         }
 
     } else {
@@ -350,7 +363,7 @@ int main(int argc, char *argv[]) {
     /* SNR offset to use in channel simulator to account for on/off time of burst signal */
     float mark_space_ratio = (float)on_samples/(on_samples+off_samples);
     float mark_space_SNR_offset = 10*log10(mark_space_ratio);
-    if (!quiet) fprintf(stderr, "marks:space: %3.2f SNR offset: %5.2f\n", mark_space_ratio, mark_space_SNR_offset);
+    if (!quiet) fprintf(stderr, "mark:space: %3.2f SNR offset: %5.2f\n", mark_space_ratio, mark_space_SNR_offset);
     
     freedv_close(freedv);
     fclose(fin);

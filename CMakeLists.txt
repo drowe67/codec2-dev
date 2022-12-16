@@ -503,6 +503,11 @@ endif()
                             DISPLAY=\"\" octave-cli")
              set_tests_properties(test_OFDM_modem_octave_datac0_mpp_coded PROPERTIES PASS_REGULAR_EXPRESSION "Pass")
 
+    # Check Octave and C compressed waveforms are about the same
+    add_test(NAME test_OFDM_modem_datac0_compression
+             COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/unittest;
+                            ./check_comp.sh ${CMAKE_CURRENT_SOURCE_DIR} $PATH:${CMAKE_CURRENT_BINARY_DIR}/src")
+           
     #  ---------------------------------- ofdm_mod/demod level C modem tests ----------------------------------
     
     # noise free uncoded 700D test, including reading and writing payload bits
@@ -1264,7 +1269,7 @@ endif(NOT APPLE)
      add_test(NAME test_freedv_data_raw_fsk_ldpc_10k
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
                             ./freedv_data_raw_tx --Fs 100000 --Rs 10000 --tone1 10000 --shift 10000 --framesperburst 100 --bursts 10 --testframes 1000 FSK_LDPC /dev/zero - |
-                            ./ch - - --No -15 --ssbfilt 0 |
+                            ./ch - - --No -16 --ssbfilt 0 |
                             ./freedv_data_raw_rx --testframes -v --Fs 100000 --Rs 10000 FSK_LDPC - /dev/null")
              set_tests_properties(test_freedv_data_raw_fsk_ldpc_10k PROPERTIES PASS_REGULAR_EXPRESSION "Frms.:  1000")
 
@@ -1326,6 +1331,7 @@ endif(NOT APPLE)
         test_OFDM_modem_datac1_octave
         test_OFDM_modem_datac3_octave
         test_fsk_lib_4fsk_ldpc
+        test_OFDM_modem_datac0_compression
         PROPERTIES
         ENVIRONMENT "CML_PATH=${CMAKE_CURRENT_BINARY_DIR}/cml"
     )
