@@ -53,53 +53,29 @@ function [snr_ch per] = per_snr(mode, colour)
   plot(snrch, per, sprintf('%so-;%s;', colour, mode));
 endfunction
 
-function snrest_snr_screen(channel)
+function snrest_snr_screen(source, channel)
   clf; hold on;
-  snr_scatter('ctx', 'datac0', channel,'b+-')
-  snr_scatter('ctx', 'datac1', channel,'g+-')
-  snr_scatter('ctx', 'datac3', channel,'r+-')
+  snr_scatter(source, 'datac0', channel,'b+-')
+  snr_scatter(source, 'datac1', channel,'g+-')
+  snr_scatter(source, 'datac3', channel,'r+-')
   xlabel('SNR (dB)'); ylabel('SNRest (dB)'); grid('minor');
+  axis([-5 12 -5 12]);
   a = axis;
   plot([a(1) a(2)],[a(1) a(2)],'bk-');
   hold off; grid;
-  title(sprintf('SNR estimate versus SNR (%s)', channel));
+  if strcmp(source,'ctx')
+    title(sprintf('SNR estimate versus SNR (%s) (no compression)', channel));
+  else
+    title(sprintf('SNR estimate versus SNR (%s) (with compression)', channel));
+  end
   legend('location','northwest');
 endfunction
 
-function snrest_snr_print(channel)
+function snrest_snr_print(source, channel)
   state_vec = set_graphics_state_print();
-  snrest_snr_screen(channel);
-  print("snrest_snr.png", "-dpng", "-S1000,800");
+  snrest_snr_screen(source, channel);
+  print(sprintf("snrest_snr_%s.png", source), "-dpng", "-S1000,800");
   set_graphics_state_screen(state_vec);
-endfunction
-
-% we need different font sizes for printing
-function per_snr_screen(channel)
-  clf; hold on;
-  per_snr('datac0',channel,'b')
-  per_snr('datac1',channel,'g')
-  per_snr('datac3',channel,'r')
-  xlabel('SNR (dB)'); ylabel('PER'); grid;
-  hold off;
-endfunction
-
-% we need different font sizes for printing
-function per_snr_print
-  textfontsize = get(0,"defaulttextfontsize");
-  linewidth = get(0,"defaultlinelinewidth");
-  markersize = get(0, "defaultlinemarkersize");
-  set(0, "defaulttextfontsize", 10);
-  set(0, "defaultaxesfontsize", 10);
-  set(0, "defaultlinelinewidth", 0.5);
-  
-  per_snr_screen;
-  print("per_snr.png", "-dpng", "-S500,500");
-
-  % restore plot defaults
-  set(0, "defaulttextfontsize", textfontsize);
-  set(0, "defaultaxesfontsize", textfontsize);
-  set(0, "defaultlinelinewidth", linewidth);  
-  set(0, "defaultlinemarkersize", markersize);
 endfunction
 
 function ber_per_v_snr(source, mode, channel, colour)

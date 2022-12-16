@@ -1919,7 +1919,7 @@ function tx = ofdm_hilbert_clipper(states, tx, tx_clip_en)
   cpapr = 10*log10((peak.^2)/(RMS.^2));
 
   if states.verbose
-    printf("Peak: %4.2f RMS: %5.2f CPAPR: %4.1f clipped: %5.2f%%\n",
+    printf("Peak: %4.2f RMS: %5.2f CPAPR: %4.2f clipped: %5.2f%%\n",
            peak, RMS, cpapr, nclipped*100/length(tx));
   end
 endfunction
@@ -1929,9 +1929,6 @@ endfunction
 function [rx_real rx] = ofdm_channel(states, tx, SNR3kdB, channel, freq_offset_Hz)
   [rx_real rx sigma] = channel_simulate(states.Fs, SNR3kdB, freq_offset_Hz, channel, tx, states.verbose);
     
-  % add a few seconds of no-signal at the start
-  rx_real = [sigma*randn(1,states.Fs) rx_real];
-  
   % multipath models can lead to clipping of int16 samples
   num_clipped = length(find(abs(rx_real>32767)));
   while num_clipped/length(rx_real) > 0.001

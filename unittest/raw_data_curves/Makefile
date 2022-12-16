@@ -14,7 +14,8 @@ CODEC2 := $(HOME)/codec2
 all: test \
      octave_ch_noise_awgn.png octave_c_tx_awgn.png octave_c_tx_comp_awgn.png \
      octave_ch_noise_mpp.png octave_c_tx_mpp.png octave_c_tx_comp_mpp.png \
-     snrest_snr.png c_tx_comp.png c_tx_comp_thruput.png
+     snrest_snr_ctx.png snrest_snr_ctxc.png \
+     c_tx_comp.png c_tx_comp_thruput.png
 
 clean:
 	rm -f *.txt *.png *.raw
@@ -101,16 +102,19 @@ octave_c_tx_comp_mpp.png: $(snr_oct_mpp) $(snr_ctxc_mpp)
         octave-cli -p $(CODEC2)/octave
 
 # composite AWGN and MPP from C Tx (compressed) - what end users would run
-c_tx_comp.png: $(snr_ctxc_awgn) $(snr_ctxc_mpp)
+c_tx_comp.png: $(snr_ctxc) $(snr_ctxc_mpp)
 	echo "snr_curves_plot; c_tx_comp_print; quit" | \
         octave-cli -p $(CODEC2)/octave
 
-# Curve of SNR estimates from C Rx compared to actual SNR, useful for "gear shifting"
-snrest_snr.png: $(snr_ctx)
-	echo "snr_curves_plot; snrest_snr_print('awgn'); quit" | \
+# Curves of SNR estimates from C Rx compared to actual SNR, useful for "gear shifting"
+snrest_snr_ctx.png: $(snr_ctx)
+	echo "snr_curves_plot; snrest_snr_print('ctx', 'awgn'); quit" | \
+        octave-cli -p $(CODEC2)/octave
+snrest_snr_ctxc.png: $(snr_ctxc)
+	echo "snr_curves_plot; snrest_snr_print('ctxc', 'awgn'); quit" | \
         octave-cli -p $(CODEC2)/octave
 
 # Throughput of payload data in bits/s of modes against SNR
-c_tx_comp_thruput.png: $(snr_ctxc_awgn) $(snr_ctxc_mpp)
+c_tx_comp_thruput.png: $(snr_ctxc) $(snr_ctxc_mpp)
 	echo "snr_curves_plot; c_tx_comp_thruput_print; quit" | \
         octave-cli -p $(CODEC2)/octave
