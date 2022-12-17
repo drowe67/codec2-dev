@@ -456,10 +456,10 @@ function test_lpc_from_mag_spectrum
 end
 
 % Synthesised phase0 model using Hilbert Transform
-function phase0 = synth_phase_from_mag(rate_Lhigh_sample_freqs_kHz, YdB, Fs, Wo, L, postfilter_en)
+function phase0 = synth_phase_from_mag(mag_sample_freqs_kHz, mag_dB, Fs, Wo, L, postfilter_en)
   Nfft=512;
   sample_freqs_kHz = (Fs/1000)*[0:Nfft/2]/Nfft;  % fft frequency grid (nonneg freqs)
-  Gdbfk = interp1([0 rate_Lhigh_sample_freqs_kHz 4], [0 YdB 0], sample_freqs_kHz, "spline", "extrap");
+  Gdbfk = interp1([0 mag_sample_freqs_kHz 4], [0 mag_dB 0], sample_freqs_kHz, "spline", "extrap");
   if postfilter_en
     % optional "all pass" or "phase" postfiltering
     % in a minimum phase system, group delay is proportional to slope of mag spectrum
