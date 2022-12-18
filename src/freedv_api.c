@@ -1269,8 +1269,7 @@ void freedv_set_clip(struct freedv *f, int val) {
 /* Band Pass Filter to cleanup OFDM tx waveform, only supported by some modes */
 
 void freedv_set_tx_bpf(struct freedv *f, int val) {
-    if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_700E, f->mode) 
-        || FDV_MODE_ACTIVE( FREEDV_MODE_DATAC0, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_DATAC3, f->mode)) {
+    if (is_ofdm_mode(f)) {
         ofdm_set_tx_bpf(f->ofdm, val);
     }
 }
