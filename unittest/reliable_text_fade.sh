@@ -20,6 +20,7 @@ fi
 
 $tx $mode ../raw/ve9qrp.raw - --reliabletext AB1CDEF $clip_args | $build_folder/ch - - --No $snr --mpp -f -5 --fading_dir $fading_dir > $results/reliable_fade.raw 
 $rx $mode $results/reliable_fade.raw /dev/null --txtrx $results/reliable_fade.txt --reliabletext
+cat $results/reliable_fade.txt | wc -l
 if [ `cat $results/reliable_fade.txt | wc -l` -ge $min_text_packets ]; then
     exit 0
 else
