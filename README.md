@@ -186,7 +186,9 @@ wav         - speech files in wave file format
 
 ## Building for Windows on a Linux machine
 
-On Ubuntu 17 and above:
+We recommend using Linux to cross compile for Windows.
+
+On Ubuntu Linux:
    ```
    sudo apt-get install mingw-w64
    mkdir build_windows && cd build_windows
@@ -194,33 +196,9 @@ On Ubuntu 17 and above:
    make
    ```
    
-## Building for Windows on a Windows machine
+This will create a working libcodec2.dll file for use with other applications (e.g. FreeDV GUI which is in wide spread use on Windows).  Please note the utility/development command line applications (e.g. `freedv_rx.exe`) may not work exactly the same on the Windows CLI compared to running on a Unix machine/shell.  For example pipes may not function as expected, and ctests are not supported.  Our primary development and test environment is Unix, and we lack the resources to support and maintain these applications for other operating systems.
 
- ```
- mkdir build_windows (Or what ever you want to call your build dir)
- cmake -G "MinGW Makefiles" -D CMAKE_MAKE_PROGRAM=mingw32-make.exe
- Or if you use ninja for building cmake -G "Ninja" ..
- mingw32-make or ninja  depends on what you used in the last command
- wait for it to build.
- ```
-
-The above will create a working libcodec2.dll file for inclusion in other applications
-but the utility programs (e.g. `freedv-rx.exe`) are not guaranteed to work properly in 
-a native Windows environment. Usage of Codec2 via the Windows Subsystem For Linux (WSL) 
-is recommended:
-
-1. Open a Command Prompt as Administrator and type `wsl --install` to install WSL.
-   *Note: you will need to reboot before proceeding with the next steps.*
-2. Open the Start menu and type "Ubuntu" to open the WSL environment.
-3. Follow the Linux instructions to build Codec2:
-   ```
-sudo apt install build-essential cmake
-git clone https://github.com/drowe67/codec2.git
-cd codec2
-mkdir build
-cmake ..
-make
-```
+We have anecdotal reports that Windows Subsystem For Linux (WSL) provides better support for the Codec 2 command line applications.
 
 ## Including Codec 2 in an Android project
 
