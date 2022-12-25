@@ -196,7 +196,7 @@ On Ubuntu Linux:
    make
    ```
    
-This will create a working libcodec2.dll file for use with other applications (e.g. FreeDV GUI which is in wide spread use on Windows).  Please note the utility/development command line applications (e.g. `freedv_rx.exe`) may not work exactly the same on the Windows CLI compared to running on a Unix machine/shell.  For example pipes may not function as expected, and ctests are not supported.  Our primary development and test environment is Unix, and we lack the resources to support and maintain these applications for other operating systems.
+This will create a working `libcodec2.dll` file for use with other applications (e.g. FreeDV GUI which is in wide spread use on Windows).  Please note the utility/development command line applications (e.g. `freedv_rx.exe`) may not work exactly the same on the Windows CLI compared to running on a Unix machine/shell.  For example pipes may not function as expected, and ctests are not supported.  Our primary development and test environment is Unix, and we lack the resources to support and maintain these applications for other operating systems.
 
 We have anecdotal reports that Windows Subsystem For Linux (WSL) provides better support for the Codec 2 command line applications.
 
