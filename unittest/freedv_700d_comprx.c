@@ -119,7 +119,7 @@ int main(int argc, char *argv[]) {
     float snr_av = sum_snr/frames_snr;
     fprintf(stderr, "frames: %d sum_sync: %d snr_av: %3.2f dB\n", frames, sum_sync, snr_av);
 
-    if (snr_av > 10.0)
+    if (snr_av > 8.0)
         return 0;
     else
         return 1;
