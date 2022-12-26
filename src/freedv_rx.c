@@ -63,7 +63,7 @@ int main(int argc, char *argv[]) {
     int                        sync;
     float                      snr_est;
     float                      clock_offset;
-    int                        use_testframes, verbose, discard, use_complex, use_dpsk, use_reliabletext;
+    int                        use_testframes, verbose, discard, use_complex, use_reliabletext;
     int                        use_squelch;
     float                      squelch = 0;
     struct freedv             *freedv;
@@ -80,7 +80,6 @@ int main(int argc, char *argv[]) {
 	fprintf(stderr, "usage: %s [options]  1600|700C|700D|700E|2400A|2400B|800XA%s InputModemSpeechFile OutputSpeechRawFile\n"
                 "\n"
                 "  --discard               Reset BER stats on loss of sync, helps us get sensible BER results\n"
-                "  --dpsk                  Use differential PSK rather than coherent PSK\n"
                 "  --reliabletext txt      Send 'txt' using reliable text protocol\n"
                 "  --txtrx        filename Store reliable text output to filename\n"
                 "  --squelch      leveldB  Set squelch level\n"
@@ -93,7 +92,7 @@ int main(int argc, char *argv[]) {
 	exit(1);
     }
 
-    use_testframes = verbose = discard = use_complex = use_dpsk = use_squelch = 0; use_reliabletext = 0;
+    use_testframes = verbose = discard = use_complex = use_squelch = 0; use_reliabletext = 0;
     use_passthroughgain = 0;
     
     int o = 0;
@@ -101,7 +100,6 @@ int main(int argc, char *argv[]) {
     while( o != -1 ){
         static struct option long_opts[] = {
             {"discard",         no_argument,        0, 'i'},
-            {"dpsk",            no_argument,        0, 'd'},
             {"help",            no_argument,        0, 'h'},
             {"reliabletext",    no_argument,        0, 'r'},
             {"squelch",         required_argument,  0, 's'},
@@ -122,9 +120,6 @@ int main(int argc, char *argv[]) {
             break;
         case 'c':
             use_complex = 1;
-            break;
-        case 'd':
-            use_dpsk = 1;
             break;
 	case 'p':
 	    use_passthroughgain = 1;
@@ -207,7 +202,6 @@ int main(int argc, char *argv[]) {
         freedv_set_snr_squelch_thresh(freedv, squelch);
         freedv_set_squelch_en(freedv, true);
     }
-    freedv_set_dpsk(freedv, use_dpsk);
     if (use_passthroughgain) freedv_passthrough_gain(freedv, passthroughgain);
     
     /* install optional handler for received txt characters */

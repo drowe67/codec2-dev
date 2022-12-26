@@ -548,10 +548,6 @@ endif()
              COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/unittest;
                             PATH=$PATH:${CMAKE_CURRENT_BINARY_DIR}/src ./ofdm_phase_est_bw.sh ${CMAKE_CURRENT_BINARY_DIR}/unittest")
 
-    add_test(NAME test_OFDM_modem_fading_DPSK_BER
-             COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/unittest;
-                            PATH=$PATH:${CMAKE_CURRENT_BINARY_DIR}/src ./ofdm_fade_dpsk.sh ${CMAKE_CURRENT_BINARY_DIR}/unittest")
-
     add_test(NAME test_OFDM_modem_time_sync_700D
              COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/unittest;
                             PATH=$PATH:${CMAKE_CURRENT_BINARY_DIR}/src ./ofdm_time_sync.sh 700D")
