@@ -9,7 +9,7 @@ more off;
 
 % generate a file of transmit samples
 filename = "test_datac0.raw";
-ofdm_tx(filename,"datac0",1,10,"awgn","bursts",1);
+ofdm_tx(filename,"datac0",1,10,"awgn","bursts",1, "txclip");
 
 printf("\nRunning Octave version....\n");
 config = ofdm_init_mode("datac0");

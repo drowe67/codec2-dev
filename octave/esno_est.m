@@ -1,7 +1,7 @@
 % esno_est.m
 % David Rowe Mar 2017
 %
-% Functions for esimating Es/No from QPSK symbols, an dsupporting tests
+% Functions for esimating Es/No from QPSK symbols, and supporting tests
 
 1;
 

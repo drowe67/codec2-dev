@@ -5,6 +5,12 @@
 # Please report questions, comments, problems, or patches to the freetel
 # mailing list: https://lists.sourceforge.net/lists/listinfo/freetel-codec2
 #
+
+# Note: this has to be at the beginning of the file in order for CMake to 
+# actually recognize this override (vs. simply telling the macOS build toolchain
+# to mandate the current release).
+set(CMAKE_OSX_DEPLOYMENT_TARGET "10.9" CACHE STRING "Minimum OS X deployment version")
+
 cmake_minimum_required(VERSION 3.13)
 project(CODEC2
   VERSION 1.0.7
@@ -180,6 +186,11 @@ include_directories(${PROJECT_BINARY_DIR})
 #
 if(LPCNET)
     if(LPCNET_BUILD_DIR)
+        # Theoretically this shouldn't be needed as we're also defining LPCNET_BUILD_DIR
+        # in the PATHS section below. But on Fedora 37, CMake can't find LPCNet (at least
+        # in Docker) without this.
+        set(lpcnetfreedv_DIR ${LPCNET_BUILD_DIR})
+        
         find_package(lpcnetfreedv REQUIRED
             PATHS ${LPCNET_BUILD_DIR}
             NO_DEFAULT_PATH
@@ -492,6 +503,11 @@ endif()
                             DISPLAY=\"\" octave-cli")
              set_tests_properties(test_OFDM_modem_octave_datac0_mpp_coded PROPERTIES PASS_REGULAR_EXPRESSION "Pass")
 
+    # Check Octave and C compressed waveforms are about the same
+    add_test(NAME test_OFDM_modem_datac0_compression
+             COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/unittest;
+                            ./check_comp.sh ${CMAKE_CURRENT_SOURCE_DIR} $PATH:${CMAKE_CURRENT_BINARY_DIR}/src")
+           
     #  ---------------------------------- ofdm_mod/demod level C modem tests ----------------------------------
     
     # noise free uncoded 700D test, including reading and writing payload bits
@@ -1253,7 +1269,7 @@ endif(NOT APPLE)
      add_test(NAME test_freedv_data_raw_fsk_ldpc_10k
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
                             ./freedv_data_raw_tx --Fs 100000 --Rs 10000 --tone1 10000 --shift 10000 --framesperburst 100 --bursts 10 --testframes 1000 FSK_LDPC /dev/zero - |
-                            ./ch - - --No -15 --ssbfilt 0 |
+                            ./ch - - --No -16 --ssbfilt 0 |
                             ./freedv_data_raw_rx --testframes -v --Fs 100000 --Rs 10000 FSK_LDPC - /dev/null")
              set_tests_properties(test_freedv_data_raw_fsk_ldpc_10k PROPERTIES PASS_REGULAR_EXPRESSION "Frms.:  1000")
 
@@ -1315,6 +1331,7 @@ endif(NOT APPLE)
         test_OFDM_modem_datac1_octave
         test_OFDM_modem_datac3_octave
         test_fsk_lib_4fsk_ldpc
+        test_OFDM_modem_datac0_compression
         PROPERTIES
         ENVIRONMENT "CML_PATH=${CMAKE_CURRENT_BINARY_DIR}/cml"
     )

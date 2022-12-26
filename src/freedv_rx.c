@@ -205,7 +205,7 @@ int main(int argc, char *argv[]) {
     
     if (use_squelch) {
         freedv_set_snr_squelch_thresh(freedv, squelch);
-        freedv_set_squelch_en(freedv, 1);
+        freedv_set_squelch_en(freedv, true);
     }
     freedv_set_dpsk(freedv, use_dpsk);
     if (use_passthroughgain) freedv_passthrough_gain(freedv, passthroughgain);
