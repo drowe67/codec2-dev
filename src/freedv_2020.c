@@ -120,7 +120,7 @@ void freedv_2020x_open(struct freedv *f) {
     f->n_nom_modem_samples = ofdm_get_samples_per_frame(f->ofdm);
     f->n_max_modem_samples = ofdm_get_max_samples_per_frame(f->ofdm);
     f->modem_sample_rate = f->ofdm->config.fs;
-    f->clip_en = 0;
+    f->clip_en = false;
     f->sz_error_pattern = f->ofdm_bitsperframe;
 
     /* storage for pass through audio interpolating filter.  These are

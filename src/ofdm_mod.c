@@ -98,7 +98,7 @@ int main(int argc, char *argv[]) {
     int input_specified = 0;
     int output_specified = 0;
     int verbose = 0;
-    int clip_en = 0;
+    bool clip_en = false;
     int txbpf_en = 0;
     int testframes = 0;
     int use_text = 0;
@@ -206,7 +206,7 @@ int main(int argc, char *argv[]) {
                 dpsk = 1;
                 break;
             case 'r':
-                clip_en = 1;
+                clip_en = true;
                 break;
             case 'v':
                 verbose = atoi(options.optarg);
