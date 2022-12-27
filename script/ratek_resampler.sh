@@ -10,8 +10,54 @@ K=30
 M=4096
 Kst=0
 Ken=29
-out_dir=postfilter_out
+out_dir="${out_dir:-ratek_out}"
 Nb=20
+
+# Test postfilter/Am resampling with rate Lhigh and rate K processing, using ratek3_batch processing tool
+# usage:
+#   cd ~/codec2/build_linux
+#   ../script/ratek_resampler.sh --postfilter_rate_test
+
+function postfilter_rate_test() {
+  fullfile=$1
+  filename=$(basename -- "$fullfile")
+  extension="${filename##*.}"
+  filename="${filename%.*}"
+  mkdir -p $out_dir
+
+  # orig amp and phase
+  c2sim $fullfile --hpf -o - | sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_1_out.wav
+  
+  # orig amp and phase0.  Note uses c2sim internal Am->Hm, rather than our Octave version, bypassing Nb filtering
+  c2sim $fullfile --hpf --phase0 --postfilter --dump $filename -o - | sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_2_p0.wav
+
+  # amps Nb filtered, original phase
+  echo "ratek3_batch; ratek3_batch_tool(\"${filename}\",'A_out',\"${filename}_a.f32\"); quit;" \
+  | octave -p ${CODEC2_PATH}/octave -qf
+  c2sim $fullfile --hpf --amread ${filename}_a.f32 -o - | \
+      sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_3_Nb.wav
+
+  # amps Nb filtered, phase0
+  echo "ratek3_batch; ratek3_batch_tool(\"${filename}\",'A_out',\"${filename}_a.f32\",'H_out',\"${filename}_h.f32\"); quit;" \
+  | octave -p ${CODEC2_PATH}/octave -qf
+  c2sim $fullfile --hpf --phase0 --postfilter --amread ${filename}_a.f32 --hmread ${filename}_h.f32 -o - | \
+      sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_4_Nb_p0.wav
+
+  # Amps Nb filtered, phase0, amp and phase postfilters, rate Lhigh
+  echo "ratek3_batch; ratek3_batch_tool(\"${filename}\",'A_out',\"${filename}_a.f32\",'H_out',\"${filename}_h.f32\",'amp_pf','phase_pf'); quit;" \
+  | octave -p ${CODEC2_PATH}/octave -qf
+  c2sim $fullfile --hpf --phase0 --postfilter --amread ${filename}_a.f32 --hmread ${filename}_h.f32 -o - | \
+      sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_5_Nb_p0_pf_rateLhigh.wav
+
+  # Amps Nb filtered, phase0, amp and phase postfilters, rate K
+  echo "ratek3_batch; ratek3_batch_tool(\"${filename}\",'A_out',\"${filename}_a.f32\",'H_out',\"${filename}_h.f32\",'amp_pf','phase_pf','rateK'); quit;" \
+  | octave -p ${CODEC2_PATH}/octave -qf
+  c2sim $fullfile --hpf --phase0 --postfilter --amread ${filename}_a.f32 --hmread ${filename}_h.f32 -o - | \
+      sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_6_Nb_p0_pf_rateK.wav
+
+  # Codec 2 3200 control
+  c2enc 3200 $fullfile - | c2dec 3200 - - | sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_7_3200.wav
+}
 
 # Process sample with various postfilter methods
 # usage:
@@ -40,7 +86,7 @@ function postfilter_test() {
 
   echo "ratek2_batch; ratek2_model_postfilter(\"${filename}\",\"${filename}_am.f32\",\"${filename}_hm.f32\",1,0); quit;" \
   | octave -p ${CODEC2_PATH}/octave -qf
-  c2sim $fullfile --hpf --phase0 --amread ${filename}_am.f32 --hmread ${filename}_hm.f32 -o - | \
+  c2sim $fullfile --hpf --phase0 --postfilter --amread ${filename}_am.f32 --hmread ${filename}_hm.f32 -o - | \
       sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_5_ratek_pf_p0.wav
 
   echo "ratek2_batch; ratek2_model_postfilter(\"${filename}\",\"${filename}_am.f32\",\"${filename}_hm.f32\",0,1); quit;" \
@@ -189,14 +235,29 @@ function train_Nb() {
         quit" | octave  -qf
 }
 
+if [ $# -gt 0 ]; then
+  case $1 in
+    --postfilter_rate_test)
+        postfilter_rate_test ../raw/big_dog.raw
+        postfilter_rate_test ../raw/hts1a.raw
+        postfilter_rate_test ../raw/hts2a.raw
+        postfilter_rate_test ../raw/two_lines.raw
+        postfilter_rate_test ../raw/cq_ref.raw
+        postfilter_rate_test ../raw/kristoff.raw
+        postfilter_rate_test ../raw/mmt1.raw      
+        ;;
+  esac
+else
+  echo usage:
+  echo   ./ratek_resampler.sh --test_name
+fi
+
 # TODO: make these selectable via CLI
-postfilter_test ../raw/big_dog.raw
-postfilter_test ../raw/hts1a.raw
-postfilter_test ../raw/hts2a.raw
-postfilter_test ../raw/two_lines.raw
-postfilter_test ../raw/cq_ref.raw
-postfilter_test ../raw/kristoff.raw
-postfilter_test ../raw/mmt1.raw
+#postfilter_test ../raw/hts1a.raw
+#postfilter_test ../raw/two_lines.raw
+#postfilter_test ../raw/cq_ref.raw
+#postfilter_test ../raw/kristoff.raw
+#postfilter_test ../raw/mmt1.raw
 
 #test $1
 
