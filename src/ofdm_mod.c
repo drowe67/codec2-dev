@@ -66,7 +66,6 @@ void opt_help() {
     fprintf(stderr, "  --text                Include a standard text message boolean (default off)\n");
     fprintf(stderr, "  -i --ldpc    [1|2]    Run LDPC decoder (1 -> (224,112) 700D code, 2 -> (504,396) 2020 code).\n"
                     "                        In testframe mode raw and coded errors will be counted.\n");
-    fprintf(stderr, "  --dpsk                Differential PSK.\n");
     fprintf(stderr, "  --bursts   nBursts    Burst mode: Send nBursts of testframes each\n");
     fprintf(stderr, "\n");
     exit(-1);
@@ -102,7 +101,6 @@ int main(int argc, char *argv[]) {
     int txbpf_en = 0;
     int testframes = 0;
     int use_text = 0;
-    int dpsk = 0;
 
     int Npackets = 0;
     int Nsec = 0;
@@ -133,7 +131,6 @@ int main(int argc, char *argv[]) {
         {"clip", 'r', OPTPARSE_NONE},
         {"text", 'l', OPTPARSE_NONE},
         {"verbose", 'v', OPTPARSE_REQUIRED},
-        {"dpsk", 'q', OPTPARSE_NONE},
         {"mode", 'g', OPTPARSE_REQUIRED},
         {"help", 'h', OPTPARSE_NONE},
         {"bursts", 'o', OPTPARSE_REQUIRED},
@@ -201,9 +198,6 @@ int main(int argc, char *argv[]) {
                 break;
             case 'l':
                 use_text = 1;
-                break;
-            case 'q':
-                dpsk = 1;
                 break;
             case 'r':
                 clip_en = true;
@@ -295,7 +289,6 @@ int main(int argc, char *argv[]) {
 
     if (clip_en) { ofdm->clip_en = true; }
     if (txbpf_en) { ofdm_set_tx_bpf(ofdm, 1); }
-    if (dpsk) { ofdm_set_dpsk(ofdm, 1); }
 
     uint8_t txt_bits[ofdm->ntxtbits];
     memset(txt_bits, 0, ofdm->ntxtbits);

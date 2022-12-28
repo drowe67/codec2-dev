@@ -60,7 +60,7 @@ int main(int argc, char *argv[]) {
     FILE                     *fin, *fout;
     struct freedv            *freedv;
     int                       mode;
-    int                       use_testframes, use_clip, use_txbpf, use_dpsk, use_reliabletext;
+    int                       use_testframes, use_clip, use_txbpf, use_reliabletext;
     char                     *callsign = "";
     reliable_text_t           reliable_text_obj;
     char f2020[80] = {0};
@@ -74,7 +74,6 @@ int main(int argc, char *argv[]) {
                 "\n"
                 "  --clip         0|1  Clipping (compression) of modem output samples for reduced PAPR\n"
                 "                      and higher average power\n"
-                "  --dpsk              Use differential PSK rather than coherent PSK\n"
                 "  --reliabletext txt  Send 'txt' using reliable text protocol\n"
                 "  --testframes        Send testframe instead of coded speech. Number of testsframes depends on\n"
                 "                      length of speech input file\n"
@@ -84,14 +83,13 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
-    use_testframes = 0; use_clip = 0; use_txbpf = 1; use_dpsk = 0; use_reliabletext = 0;
+    use_testframes = 0; use_clip = 0; use_txbpf = 1; use_reliabletext = 0;
 
     int o = 0;
     int opt_idx = 0;
     while( o != -1 ){
         static struct option long_opts[] = {
             {"clip",           required_argument,  0, 'l'},
-            {"dpsk",           no_argument,        0, 'd'},
             {"help",           no_argument,        0, 'h'},
             {"reliabletext",   required_argument,  0, 'r'},
             {"testframes",     no_argument,        0, 't'},
@@ -104,9 +102,6 @@ int main(int argc, char *argv[]) {
         switch(o) {
         case 'b':
             use_txbpf = atoi(optarg);
-            break;
-        case 'd':
-            use_dpsk = 1;
             break;
         case 'l':
             use_clip = atoi(optarg);
@@ -168,7 +163,6 @@ int main(int argc, char *argv[]) {
     freedv_set_test_frames(freedv, use_testframes);
     freedv_set_clip(freedv, use_clip);
     freedv_set_tx_bpf(freedv, use_txbpf);
-    freedv_set_dpsk(freedv, use_dpsk);
     freedv_set_verbose(freedv, 1);
     freedv_set_eq(freedv, true); /* for 700C/D/E & 800XA */
 
