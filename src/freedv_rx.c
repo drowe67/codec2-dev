@@ -62,7 +62,7 @@ int main(int argc, char *argv[]) {
     int                        mode;
     int                        sync;
     float                      snr_est;
-    float                      clock_offset;
+    float                      clock_offset, foff;
     int                        use_testframes, verbose, discard, use_complex, use_reliabletext;
     int                        use_squelch;
     float                      squelch = 0;
