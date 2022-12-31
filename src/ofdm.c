@@ -1127,7 +1127,10 @@ int ofdm_sync_search_shorts(struct OFDM *ofdm, short *rxbuf_in, float gain) {
 
 /* Joint estimation of timing and freq used for burst data acquisition */
 
-/* Determine if we can use vector ops below. */
+/* Determine if we can use vector ops below. Only for non-embedded platforms
+   as double can be significantly slower on those.  */
+#ifndef __EMBEDDED__
+
 #if __GNUC__ > 4 || \
     (__GNUC__ == 4 && (__GNUC_MINOR__ > 6 || \
                        (__GNUC_MINOR__ == 6 && \
@@ -1141,9 +1144,10 @@ int ofdm_sync_search_shorts(struct OFDM *ofdm, short *rxbuf_in, float gain) {
 #endif
 
 #if USE_VECTOR_OPS
-typedef float float4 __attribute__ ((vector_size (16)));
-typedef float float2 __attribute__ ((vector_size (8)));
+typedef double double4 __attribute__ ((vector_size (32)));
 #endif /* USE_VECTOR_OPS */
+
+#endif /* __EMBEDDED__ */
 
 static float est_timing_and_freq(struct OFDM *ofdm, 
                                  int *t_est, float *foff_est,
@@ -1164,38 +1168,34 @@ static float est_timing_and_freq(struct OFDM *ofdm,
 #if USE_VECTOR_OPS
             float *rxPtr = (float*)&rx[t];
             float *vecPtr = (float*)mvec;
-            float2 accum = { 0, 0 };
             float corrR = 0, corrI = 0;
             int numBlocks = Npsam >> 1;
+            double4 accum = { 0, 0, 0, 0 };
+            double4 accum2 = { 0, 0, 0, 0 };
             for (int i = 0; i < numBlocks; i++)
             {
                 /* Lay out vectors as follows: 
                    vec1 = rx[0].a, rx[0].b, rx[1].a, rx[1].b, ...
                    vec2 = mvec[0].c, mvec[0].d, mvec[1].c, mvec1[1].d, ... */
-                float4 vec1 = { rxPtr[0], rxPtr[1], rxPtr[2], rxPtr[3] };
-                float4 vec2 = { vecPtr[0], vecPtr[1], vecPtr[2], vecPtr[3] };
+                double4 vec1 = { rxPtr[0], rxPtr[1], rxPtr[2], rxPtr[3] };
+                double4 vec2 = { vecPtr[0], vecPtr[1], vecPtr[2], vecPtr[3] };
 
                 /* Lay out vec3 as { rx[0].b, rx[0].a, rx[1].b, rx[0].b, ... }.
                    Multiply vec3 by vec2 to get us bc, ad, bc, ad
                    and add to second accumulator. */
-                float4 vec3 = { rxPtr[1], rxPtr[0], rxPtr[3], rxPtr[2] };
+                double4 vec3 = { rxPtr[1], rxPtr[0], rxPtr[3], rxPtr[2] };
 
-                float4 res1 = vec1 * vec2;
-                float4 res2 = vec3 * vec2;
-
-                float2 res = {
-                    res1[0] - res1[1] + res1[2] - res1[3],
-                    res2[0] + res2[1] + res2[2] + res2[3]
-                };
-
-                accum += res;
+                accum += vec1 * vec2;
+                accum2 += vec3 * vec2;
 
                 /* Shift pointers forward by 4 (2 complex floats). */
                 rxPtr += 4; vecPtr += 4;
             }
 
             /* dot product: (a + bi)(c + di) = (ac - bd) + i(bc + ad) */
-            complex float corr = accum[0] + I * accum[1]; 
+            corrR = (accum[0] + accum[2]) - (accum[1] + accum[3]);
+            corrI = (accum2[0] + accum2[1]) + (accum2[2] + accum2[3]);
+            complex float corr = corrR + I * corrI;
 
             /* Add remaining values to corr that couldn't be vectorized above. */
             for (int i = numBlocks << 1; i < Npsam; i++)
