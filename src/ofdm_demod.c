@@ -634,8 +634,6 @@ int main(int argc, char *argv[]) {
         f++;
     }
 
-    ofdm_destroy(ofdm);
-
     if (input_specified == true)
         fclose(fin);
 
@@ -695,5 +693,7 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "Npre.....: %6d Npost: %5d uw_fails: %2d\n", ofdm->pre, ofdm->post, ofdm->uw_fails);
     }
     
+    ofdm_destroy(ofdm);
+
     return ret;
 }
