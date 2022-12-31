@@ -1127,7 +1127,10 @@ int ofdm_sync_search_shorts(struct OFDM *ofdm, short *rxbuf_in, float gain) {
 
 /* Joint estimation of timing and freq used for burst data acquisition */
 
-/* Determine if we can use vector ops below. */
+/* Determine if we can use vector ops below. Only for non-embedded platforms
+   as double can be significantly slower on those.  */
+#ifndef __EMBEDDED__
+
 #if __GNUC__ > 4 || \
     (__GNUC__ == 4 && (__GNUC_MINOR__ > 6 || \
                        (__GNUC_MINOR__ == 6 && \
@@ -1141,8 +1144,10 @@ int ofdm_sync_search_shorts(struct OFDM *ofdm, short *rxbuf_in, float gain) {
 #endif
 
 #if USE_VECTOR_OPS
-typedef float float8 __attribute__ ((vector_size (32)));
+typedef double double4 __attribute__ ((vector_size (32)));
 #endif /* USE_VECTOR_OPS */
+
+#endif /* __EMBEDDED__ */
 
 static float est_timing_and_freq(struct OFDM *ofdm, 
                                  int *t_est, float *foff_est,
@@ -1165,17 +1170,31 @@ static float est_timing_and_freq(struct OFDM *ofdm,
             float *vecPtr = (float*)mvec;
             float corrR = 0, corrI = 0;
             int numBlocks = Npsam >> 1;
+            double4 accum = { 0, 0, 0, 0 };
+            double4 accum2 = { 0, 0, 0, 0 };
             for (int i = 0; i < numBlocks; i++)
             {
-                float8 vec1 = { rxPtr[0], rxPtr[1], rxPtr[1], rxPtr[0], rxPtr[2], rxPtr[3], rxPtr[3], rxPtr[2] };
-                float8 vec2 = { vecPtr[0], vecPtr[1], vecPtr[0], vecPtr[1], vecPtr[2], vecPtr[3], vecPtr[2], vecPtr[3] };
-                float8 vec3 = vec1 * vec2;
-                rxPtr += 4; vecPtr += 4;
+                /* Lay out vectors as follows: 
+                   vec1 = rx[0].a, rx[0].b, rx[1].a, rx[1].b, ...
+                   vec2 = mvec[0].c, mvec[0].d, mvec[1].c, mvec1[1].d, ... */
+                double4 vec1 = { rxPtr[0], rxPtr[1], rxPtr[2], rxPtr[3] };
+                double4 vec2 = { vecPtr[0], vecPtr[1], vecPtr[2], vecPtr[3] };
 
-                /* dot product: (a + bi)(c + di) = (ac - bd) + i(bc + ad) */
-                corrR += vec3[0] - vec3[1] + vec3[4] - vec3[5];
-                corrI += vec3[2] + vec3[3] + vec3[6] + vec3[7];
+                /* Lay out vec3 as { rx[0].b, rx[0].a, rx[1].b, rx[0].b, ... }.
+                   Multiply vec3 by vec2 to get us bc, ad, bc, ad
+                   and add to second accumulator. */
+                double4 vec3 = { rxPtr[1], rxPtr[0], rxPtr[3], rxPtr[2] };
+
+                accum += vec1 * vec2;
+                accum2 += vec3 * vec2;
+
+                /* Shift pointers forward by 4 (2 complex floats). */
+                rxPtr += 4; vecPtr += 4;
             }
+
+            /* dot product: (a + bi)(c + di) = (ac - bd) + i(bc + ad) */
+            corrR = (accum[0] + accum[2]) - (accum[1] + accum[3]);
+            corrI = (accum2[0] + accum2[1]) + (accum2[2] + accum2[3]);
             complex float corr = corrR + I * corrI;
 
             /* Add remaining values to corr that couldn't be vectorized above. */
@@ -1190,6 +1209,7 @@ static float est_timing_and_freq(struct OFDM *ofdm,
                 corr += rx[i + t] * mvec[i];
             }
 #endif /* USE_VECTOR_OPS */
+
             if (cabsf(corr) > max_corr) {
                 max_corr = cabsf(corr);
                 *t_est = t;
