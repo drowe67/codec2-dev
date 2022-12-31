@@ -1127,6 +1127,23 @@ int ofdm_sync_search_shorts(struct OFDM *ofdm, short *rxbuf_in, float gain) {
 
 /* Joint estimation of timing and freq used for burst data acquisition */
 
+/* Determine if we can use vector ops below. */
+#if __GNUC__ > 4 || \
+    (__GNUC__ == 4 && (__GNUC_MINOR__ > 6 || \
+                       (__GNUC_MINOR__ == 6 && \
+                        __GNUC_PATCHLEVEL__ > 0)))
+#define USE_VECTOR_OPS 1
+#elif __clang_major__ > 3 || \
+    (__clang_minor__ == 3 && (__clang_minor__ > 7 || \
+                       (__clang_minor__ == 7 && \
+                        __clang_patchlevel__ > 0)))
+#define USE_VECTOR_OPS 1
+#endif
+
+#if USE_VECTOR_OPS
+typedef float float8 __attribute__ ((vector_size (32)));
+#endif /* USE_VECTOR_OPS */
+
 static float est_timing_and_freq(struct OFDM *ofdm, 
                                  int *t_est, float *foff_est,
                                  complex float *rx, int Nrx, 
@@ -1140,12 +1157,32 @@ static float est_timing_and_freq(struct OFDM *ofdm,
         complex float mvec[Npsam];
         for(int i=0; i<Npsam; i++) {
             complex float ph = cmplx(w*i);
-            mvec[i] = known_samples[i]*ph;
+            mvec[i] = conjf(known_samples[i]*ph);
         }
         for(int t=0; t<Ncorr; t+=tstep) {
+#if USE_VECTOR_OPS
+            float *rxPtr = (float*)&rx[t];
+            float *vecPtr = (float*)mvec;
+            float corrR = 0, corrI = 0;
+            for (int i = 0; i < Npsam; i++)
+            {
+                float8 vec1 = { rxPtr[0], rxPtr[1], rxPtr[1], rxPtr[0], rxPtr[2], rxPtr[3], rxPtr[3], rxPtr[2] };
+                float8 vec2 = { vecPtr[0], vecPtr[1], vecPtr[0], vecPtr[1], vecPtr[2], vecPtr[3], vecPtr[2], vecPtr[3] };
+                float8 vec3 = vec1 * vec2;
+                rxPtr += 4; vecPtr += 4;
+
+                /* dot product: (a + bi)(c + di) = (ac - bd) + i(bc + ad) */
+                corrR += vec3[0] - vec3[1] + vec3[4] - vec3[5];
+                corrI += vec3[2] + vec3[3] + vec3[6] + vec3[7];
+            }
+            complex float corr = corrR + I * corrI;
+#else
             complex float corr = 0;
-            for(int i=0; i<Npsam; i++)
-                corr += rx[i+t]*conjf(mvec[i]);
+            for (int i = 0; i < Npsam; i++)
+            {
+                corr += rx[i + t] * mvec[i];
+            }
+#endif /* USE_VECTOR_OPS */
             if (cabsf(corr) > max_corr) {
                 max_corr = cabsf(corr);
                 *t_est = t;
