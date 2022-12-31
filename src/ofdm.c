@@ -1164,7 +1164,8 @@ static float est_timing_and_freq(struct OFDM *ofdm,
             float *rxPtr = (float*)&rx[t];
             float *vecPtr = (float*)mvec;
             float corrR = 0, corrI = 0;
-            for (int i = 0; i < Npsam; i++)
+            int numBlocks = Npsam >> 2;
+            for (int i = 0; i < numBlocks; i++)
             {
                 float8 vec1 = { rxPtr[0], rxPtr[1], rxPtr[1], rxPtr[0], rxPtr[2], rxPtr[3], rxPtr[3], rxPtr[2] };
                 float8 vec2 = { vecPtr[0], vecPtr[1], vecPtr[0], vecPtr[1], vecPtr[2], vecPtr[3], vecPtr[2], vecPtr[3] };
@@ -1176,6 +1177,12 @@ static float est_timing_and_freq(struct OFDM *ofdm,
                 corrI += vec3[2] + vec3[3] + vec3[6] + vec3[7];
             }
             complex float corr = corrR + I * corrI;
+
+            /* Add remaining values to corr that couldn't be vectorized above. */
+            for (int i = numBlocks << 2; i < Npsam; i++)
+            {
+                corr += rx[i + t] * mvec[i];
+            }
 #else
             complex float corr = 0;
             for (int i = 0; i < Npsam; i++)
