@@ -62,7 +62,7 @@ int main(int argc, char *argv[]) {
     int                        mode;
     int                        sync;
     float                      snr_est;
-    float                      clock_offset;
+    float                      clock_offset, foff;
     int                        use_testframes, verbose, discard, use_complex, use_dpsk, use_reliabletext;
     int                        use_squelch;
     float                      squelch = 0;
@@ -268,6 +268,7 @@ int main(int argc, char *argv[]) {
         freedv_get_modem_extended_stats(freedv, &stats);
         int total_bit_errors = freedv_get_total_bit_errors(freedv);
         clock_offset = stats.clock_offset;
+        foff = stats.foff;
 
         if (discard && (sync == 0)) {
             // discard BER results if we get out of sync, helps us get sensible BER results
@@ -279,8 +280,8 @@ int main(int argc, char *argv[]) {
         nout_total += nout;
 
         if (verbose == 1) {
-            fprintf(stderr, "frame: %d  demod sync: %d  nin: %d demod snr: %3.2f dB  bit errors: %d clock_offset: %f\n",
-                    frame, sync, nin, snr_est, total_bit_errors, clock_offset);
+            fprintf(stderr, "frame: %d  sync: %d  nin: %d snr: %3.2f dB  bit errors: %d clock_off: %6.2f foff: %5.2f\n",
+                    frame, sync, nin, snr_est, total_bit_errors, clock_offset, foff);
         }
 
 	/* if using pipes we probably don't want the usual buffering
