@@ -1127,7 +1127,7 @@ int ofdm_sync_search_shorts(struct OFDM *ofdm, short *rxbuf_in, float gain) {
 /* Joint estimation of timing and freq used for burst data acquisition */
 
 /* Determine if we can use vector ops below. Only for non-embedded platforms
-   as double can be significantly slower on those.  */
+   as this can be significantly slower on those.  */
 #ifndef __EMBEDDED__
 #if __GNUC__ > 4 || \
     (__GNUC__ == 4 && (__GNUC_MINOR__ > 6 || \
