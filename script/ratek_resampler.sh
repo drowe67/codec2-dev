@@ -16,7 +16,7 @@ Nb=20
 # Test postfilter/Am resampling with rate Lhigh and rate K processing, using ratek3_batch processing tool
 # usage:
 #   cd ~/codec2/build_linux
-#   ../script/ratek_resampler.sh --postfilter_rate_test
+#   ../script/ratek_resampler.sh postfilter_rate_test
 
 function postfilter_rate_test() {
   fullfile=$1
@@ -108,9 +108,6 @@ function postfilter_test() {
 }
 
 # Process sample with various methods including 1 and 2 stage VQ
-# usage:
-#   cd ~/codec2/build_linux
-#   ../script/ratek_resampler.sh
 function vq_test() {
   fullfile=$1
   filename=$(basename -- "$fullfile")
@@ -118,40 +115,47 @@ function vq_test() {
   filename="${filename%.*}"
   mkdir -p $out_dir
 
-  c2sim $fullfile --hpf --phase0 --postfilter --dump $filename -o - | sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_1_out.wav
-  echo "ratek2_batch;  ratek2_model_to_ratek(\"${filename}\",${Nb},30,'','','',\"${filename}_novq.f32\"); quit;" \
+  c2sim $fullfile --hpf --dump $filename
+  
+  # Amps Nb filtered, phase0, amp and phase postfilters, rate K
+  echo "ratek3_batch; ratek3_batch_tool(\"${filename}\",'A_out',\"${filename}_a.f32\",'H_out',\"${filename}_h.f32\",'amp_pf','phase_pf','rateK'); quit;" \
   | octave -p ${CODEC2_PATH}/octave -qf
-  c2sim $fullfile --hpf --phase0 --postfilter --amread ${filename}_novq.f32 -o - | \
-      sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_2_novq.wav
-  echo "ratek2_batch;  ratek2_model_to_ratek(\"${filename}\",${Nb},30,'','vq_stage1.f32','',\"${filename}_vq1.f32\"); quit;" \
-  | octave -p ${CODEC2_PATH}/octave -qf
-  c2sim $fullfile --hpf --phase0 --postfilter --amread ${filename}_vq1.f32 -o - | \
-      sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_3_vq1.wav
-  echo "ratek2_batch;  ratek2_model_to_ratek(\"${filename}\",${Nb},30,'','vq_stage1.f32','vq_stage2.f32',\"${filename}_vq2.f32\"); quit;" \
-  | octave -p ${CODEC2_PATH}/octave -qf
-  c2sim $fullfile --hpf --phase0 --postfilter --amread ${filename}_vq2.f32 -o - | \
-      sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_4_vq2.wav
-  c2enc 3200 $fullfile - | c2dec 3200 - - | sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_5_3200.wav
-  #TODO consider SSB simulation, codec 2 1200, 700C
+  c2sim $fullfile --hpf --phase0 --postfilter --amread ${filename}_a.f32 --hmread ${filename}_h.f32 -o - | \
+      sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_1_Nb_p0_pf_rateK.wav
+
+  # As above plus stage1 VQ
+  echo "ratek3_batch; ratek3_batch_tool(\"${filename}\", \
+        'A_out',\"${filename}_a.f32\",'H_out',\"${filename}_h.f32\",'amp_pf','phase_pf','rateK', \
+        'vq_stage1', 'vq_stage1.f32'); quit;" \
+        | octave -p ${CODEC2_PATH}/octave -qf
+  c2sim $fullfile --hpf --phase0 --postfilter --amread ${filename}_a.f32 --hmread ${filename}_h.f32 -o - | \
+      sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_2_vq1.wav
+
+  # As above plus stage2 VQ
+  echo "ratek3_batch; ratek3_batch_tool(\"${filename}\", \
+        'A_out',\"${filename}_a.f32\",'H_out',\"${filename}_h.f32\",'amp_pf','phase_pf','rateK', \
+        'vq_stage1', 'vq_stage1.f32', 'vq_stage2', 'vq_stage2.f32'); quit;" \
+        | octave -p ${CODEC2_PATH}/octave -qf
+  c2sim $fullfile --hpf --phase0 --postfilter --amread ${filename}_a.f32 --hmread ${filename}_h.f32 -o - | \
+      sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_3_vq2.wav
+
+  # Codec 2 3200 & 700C controls
+  c2enc 3200 $fullfile - | c2dec 3200 - - | sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_4_3200.wav
+  c2enc 700C $fullfile - | c2dec 700C - - | sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_5_700C.wav
 }
 
-# usage:
-#   cd ~/codec2/build_linux
-#   ../script/ratek_resampler.sh
-function vq_test1() {
+# generate amp postfiltered rate K training material from source speech file 
+function gen_train() {
   fullfile=$1
   filename=$(basename -- "$fullfile")
   extension="${filename##*.}"
   filename="${filename%.*}"
-
+  
   c2sim $fullfile --hpf --dump $filename
-  echo "ratek2_batch;  ratek2_model_to_ratek(\"../build_linux/${filename}\",20,30,\"${filename}.f32\"); quit;" \
+  echo "ratek3_batch; ratek3_batch_tool(\"${filename}\",'B_out',\"${filename}_b.f32\",'amp_pf'); quit;" \
   | octave -p ${CODEC2_PATH}/octave -qf
-  extract -t $K -s $Kst -e $Ken --removemean --writeall ${filename}.f32 ${filename}_nomean.f32
-  cat ${filename}_nomean.f32 | vq_mbest --mbest 5 -k $K -q vq_stage1.f32,vq_stage2.f32 >> /dev/null
 }
 
-# usage: see ratek2_batch.m
 function train_kmeans() {
   fullfile=$1
   filename=$(basename -- "$fullfile")
@@ -237,7 +241,7 @@ function train_Nb() {
 
 if [ $# -gt 0 ]; then
   case $1 in
-    --postfilter_rate_test)
+    postfilter_rate_test)
         postfilter_rate_test ../raw/big_dog.raw
         postfilter_rate_test ../raw/hts1a.raw
         postfilter_rate_test ../raw/hts2a.raw
@@ -246,10 +250,20 @@ if [ $# -gt 0 ]; then
         postfilter_rate_test ../raw/kristoff.raw
         postfilter_rate_test ../raw/mmt1.raw      
         ;;
+    gen_train)
+        gen_train $2
+        ;;
+    vq_train)
+        train_kmeans $2
+        ;;
+    vq_test)
+        vq_test ../raw/big_dog.raw
+        vq_test ../raw/two_lines.raw
+        ;;
   esac
 else
-  echo usage:
-  echo   ./ratek_resampler.sh --test_name
+  echo "usage:
+  echo "  ./ratek_resampler.sh command [options ...]""
 fi
 
 # TODO: make these selectable via CLI

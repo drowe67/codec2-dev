@@ -34,7 +34,7 @@ function B = ratek3_batch_tool(samname, varargin)
   newamp_700c;
   Fs = 8000; max_amp = 160; resampler='spline'; Lhigh=80; max_amp = 160;
   
-  Nb=20; K=30; rateK_en = 0;
+  Nb=20; K=30; rateK_en = 0; verbose = 1;
   A_out_fn = ""; B_out_fn = ""; vq_stage1_f32=""; vq_stage2_f32="";
   H_out_fn = ""; amp_pf_en = 0;  phase_pf_en=0; i = 1;
   while i<=length(varargin)
@@ -124,12 +124,14 @@ function B = ratek3_batch_tool(samname, varargin)
 
       if vq_en
         amean = mean(B(f,:));
-        [res B_hat ind] = mbest(vq, B(f,:)-amean, mbest_depth);
-        B_hat = B_hat + amean;
-        Eq(f) = sum((B(f,:)-B_hat).^2)/K;
-        YdB_ = interp1([0 rate_K_sample_freqs_kHz 4], [0 B_hat 0], rate_L_sample_freqs_kHz, "spline", 0);
+        [res aB_hat ind] = mbest(vq, B(f,:)-amean, mbest_depth);
+        B_hat(f,:) = aB_hat + amean;
+        Eq(f) = sum((B(f,:)-B_hat(f,:)).^2)/K;
+        YdB_ = interp1([0 rate_K_sample_freqs_kHz 4], [0 B_hat(f,:) 0], rate_L_sample_freqs_kHz, "spline", 0);
         Y_(f,1:L) = 10.^(YdB_/20);
-        printf("f: %d Eq: %3.2f dB\n", f, Eq(f));
+        if verbose >= 2
+          printf("f: %d Eq: %3.2f dB\n", f, Eq(f));
+        end  
       else
         B_hat(f,:) = B(f,:);
       end
@@ -149,6 +151,7 @@ function B = ratek3_batch_tool(samname, varargin)
         H(f,1:L) = synth_phase_from_mag(rate_Lhigh_sample_freqs_kHz, YdB, Fs, Wo, L, phase_pf_en);
       end
     end
+    printf("%d/%d %3.0f%%\r", f,frames, (f/frames)*100);
   end
 
   % optionally write B to a .f32 file for external VQ training
@@ -160,7 +163,6 @@ function B = ratek3_batch_tool(samname, varargin)
     end
     fclose(fb);
   end
-  mesh(Am_)
   
   % optionally write Am, so we can listen using:
   %   ./src/c2sim ../raw/big_dog.raw --amread ../octave/big_dog_am.f32 -o - | aplay -f S16_LE
@@ -190,8 +192,9 @@ function B = ratek3_batch_tool(samname, varargin)
     fclose(fhm);
   end
   
-  if vq_en
-    printf("Nb: %d K: %d mean SD: %4.2f dB^2\n", Nb, K, mean(Eq));
+  if vq_en && verbose
+    sd = mean(Eq);
+    printf("Nb: %d K: %d mean SD: %4.2f dB^2 %4.2f dB\n", Nb, K, sd, sqrt(sd));
   end
 endfunction
 
