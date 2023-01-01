@@ -506,7 +506,7 @@ endif()
     # Check Octave and C compressed waveforms are about the same
     add_test(NAME test_OFDM_modem_datac0_compression
              COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/unittest;
-                            ./check_comp.sh ${CMAKE_CURRENT_SOURCE_DIR} $PATH:${CMAKE_CURRENT_BINARY_DIR}/src")
+                            ./check_comp.sh ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR}/src")
            
     #  ---------------------------------- ofdm_mod/demod level C modem tests ----------------------------------
     
