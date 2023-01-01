@@ -860,7 +860,7 @@ void fsk_demod_core(struct FSK *fsk, uint8_t rx_bits[], float rx_filt[], COMP fs
         fc_avg += f_est[m]/M;
         fc_tx  += (fsk->f1_tx + m*fsk->tone_spacing)/M;
     }
-    fsk->stats->foff = fc_tx-fc_avg;
+    fsk->stats->foff = fc_avg-fc_tx;
     
     /* Take a sample for the eye diagrams ---------------------------------- */
 
