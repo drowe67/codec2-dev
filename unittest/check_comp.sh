@@ -8,7 +8,7 @@
 #  ../unittest/check_comp.sh ${CODEC2} ${PATH}:${CODEC2}/build_linux/src
 
 CODEC2=$1
-PATH=$2
+PATH=$2:$PATH
 set -x
 octave_log=$(mktemp)
 ch_log=$(mktemp)
