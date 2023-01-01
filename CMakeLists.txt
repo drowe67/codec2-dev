@@ -1248,7 +1248,7 @@ endif(NOT APPLE)
      # FEC/acquisition a work out, bursts of 1 frame as that stresses acquisition
      add_test(NAME test_freedv_data_raw_fsk_ldpc_100
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
-                            ./freedv_data_raw_tx --testframes 10 --bursts 10 FSK_LDPC /dev/zero - |
+                            ./freedv_data_raw_tx --testframes 10 --bursts 11 FSK_LDPC /dev/zero - |
                             ./ch - - --No -5 --ssbfilt 0 |
                             ./freedv_data_raw_rx --testframes -v FSK_LDPC - /dev/null")
              set_tests_properties(test_freedv_data_raw_fsk_ldpc_100 PROPERTIES PASS_REGULAR_EXPRESSION "Frms.:    10")
