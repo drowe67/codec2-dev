@@ -748,10 +748,9 @@ static int est_timing(struct OFDM *ofdm, complex float *rx, int length,
 
 #ifdef __EMBEDDED__
 #ifdef __REAL__
-        // Note: this code untested
 	float re,im;
         
-        codec2_dot_product_f32(&rx_real[i], wvec_pilot_real, ofdm->samplespersymbol, &re);
+	codec2_dot_product_f32(&rx_real[i], wvec_pilot_real, ofdm->samplespersymbol, &re);
 	codec2_dot_product_f32(&rx_real[i], wvec_pilot_imag, ofdm->samplespersymbol, &im);
 	corr_st = re + im * I;
 
@@ -1129,6 +1128,7 @@ int ofdm_sync_search_shorts(struct OFDM *ofdm, short *rxbuf_in, float gain) {
 
 /* Determine if we can use vector ops below. Only for non-embedded platforms
    as double can be significantly slower on those.  */
+#ifndef __EMBEDDED__
 #if __GNUC__ > 4 || \
     (__GNUC__ == 4 && (__GNUC_MINOR__ > 6 || \
                        (__GNUC_MINOR__ == 6 && \
@@ -1140,6 +1140,9 @@ int ofdm_sync_search_shorts(struct OFDM *ofdm, short *rxbuf_in, float gain) {
                         __clang_patchlevel__ > 0)))
 #define USE_VECTOR_OPS 1
 #endif
+#else
+#include "codec2_math.h"
+#endif /* __EMBEDDED__ */
 
 #if USE_VECTOR_OPS
 typedef float float4 __attribute__ ((vector_size (16)));
@@ -1200,6 +1203,10 @@ static float est_timing_and_freq(struct OFDM *ofdm,
             {
                 corr += rx[i + t] * mvec[i];
             }
+#elif __EMBEDDED__
+            float corrReal = 0, corrImag = 0;
+            codec2_complex_dot_product_f32((COMP*)&rx[t], (COMP*)mvec, Npsam, &corrReal, &corrImag);
+            complex float corr = corrReal + I * corrImag;
 #else
             complex float corr = 0;
             for (int i = 0; i < Npsam; i++)
