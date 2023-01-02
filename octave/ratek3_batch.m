@@ -34,7 +34,7 @@ function B = ratek3_batch_tool(samname, varargin)
   newamp_700c;
   Fs = 8000; max_amp = 160; resampler='spline'; Lhigh=80; max_amp = 160;
   
-  Nb=20; K=30; rateK_en = 0; verbose = 1;
+  Nb=20; K=30; rateK_en = 0; verbose = 1; restore_slope = 1;
   A_out_fn = ""; B_out_fn = ""; vq_stage1_f32=""; vq_stage2_f32="";
   H_out_fn = ""; amp_pf_en = 0;  phase_pf_en=0; i = 1;
   while i<=length(varargin)
@@ -55,6 +55,8 @@ function B = ratek3_batch_tool(samname, varargin)
       amp_pf_en = 1;
     elseif strcmp(varargin{i},"phase_pf") 
       phase_pf_en = 1;
+    elseif strcmp(varargin{i},"eq") 
+      restore_slope = 0;
     else
       printf("\nERROR unknown argument: %s\n", varargin{i});
       return;
@@ -115,7 +117,7 @@ function B = ratek3_batch_tool(samname, varargin)
 
     % Optional amplitude post filtering
     if amp_pf_en
-      YdB = amplitude_postfilter(rate_Lhigh_sample_freqs_kHz, YdB, Fs, F0high);
+      YdB = amplitude_postfilter(rate_Lhigh_sample_freqs_kHz, YdB, Fs, F0high, restore_slope);
     end
     
     if rateK_en

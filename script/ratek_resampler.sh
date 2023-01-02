@@ -7,11 +7,41 @@
 CODEC2_PATH=$HOME/codec2
 PATH=$PATH:$CODEC2_PATH/build_linux/src:$CODEC2_PATH/build_linux/misc
 K=30
-M=4096
-Kst=0
-Ken=29
+M="${M:-4096}"
+Kst="${Kst:-0}"
+Ken="${Ken:-29}"
 out_dir="${out_dir:-ratek_out}"
 Nb=20
+
+# Listen to effect of not restoring slope, which has potential to lower dynamic range
+function postfilter_slope_test() {
+  fullfile=$1
+  filename=$(basename -- "$fullfile")
+  extension="${filename##*.}"
+  filename="${filename%.*}"
+  mkdir -p $out_dir
+
+  c2sim $fullfile --hpf --dump $filename
+
+  # Amps Nb filtered, phase0, amp and phase postfilters, rate K
+  echo "ratek3_batch; ratek3_batch_tool(\"${filename}\", \
+       'A_out',\"${filename}_a.f32\",'H_out',\"${filename}_h.f32\", \
+       'amp_pf','phase_pf','rateK'); quit;" \
+  | octave -p ${CODEC2_PATH}/octave -qf
+  c2sim $fullfile --hpf --phase0 --postfilter --amread ${filename}_a.f32 --hmread ${filename}_h.f32 -o - | \
+      sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_1_slope.wav
+
+  # As above but don't restore slope after amplitude post filtering
+  echo "ratek3_batch; ratek3_batch_tool(\"${filename}\", \
+       'A_out',\"${filename}_a.f32\",'H_out',\"${filename}_h.f32\", \
+       'amp_pf','phase_pf','rateK', 'eq'); quit;" \
+  | octave -p ${CODEC2_PATH}/octave -qf
+  c2sim $fullfile --hpf --phase0 --postfilter --amread ${filename}_a.f32 --hmread ${filename}_h.f32 -o - | \
+      sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_2_eq.wav
+
+  # Codec 2 3200 control
+  c2enc 3200 $fullfile - | c2dec 3200 - - | sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_3_3200.wav
+}
 
 # Test postfilter/Am resampling with rate Lhigh and rate K processing, using ratek3_batch processing tool
 # usage:
@@ -156,6 +186,17 @@ function gen_train() {
   | octave -p ${CODEC2_PATH}/octave -qf
 }
 
+function gen_train_eq() {
+  fullfile=$1
+  filename=$(basename -- "$fullfile")
+  extension="${filename##*.}"
+  filename="${filename%.*}"
+  
+  c2sim $fullfile --hpf --dump $filename
+  echo "ratek3_batch; ratek3_batch_tool(\"${filename}\",'B_out',\"${filename}_eq_b.f32\",'amp_pf','eq'); quit;" \
+  | octave -p ${CODEC2_PATH}/octave -qf
+}
+
 function train_kmeans() {
   fullfile=$1
   filename=$(basename -- "$fullfile")
@@ -166,6 +207,7 @@ function train_kmeans() {
   extract -t $K -s $Kst -e $Ken --lower 10 --removemean --writeall $fullfile ${filename}_nomean.f32
   vqtrain ${filename}_nomean.f32 $K $M  --st $Kst --en $Ken -s 1e-3 vq_stage1.f32 -r res1.f32 > kmeans_res1.txt
   vqtrain res1.f32 $K $M  --st $Kst --en $Ken  -s 1e-3 vq_stage2.f32 -r res2.f32 > kmeans_res2.txt
+  vqtrain res2.f32 $K $M  --st $Kst --en $Ken  -s 1e-3 vq_stage3.f32 -r res3.f32 > kmeans_res3.txt
 }
 
 # comparing kmeans to lbg
@@ -253,12 +295,19 @@ if [ $# -gt 0 ]; then
     gen_train)
         gen_train $2
         ;;
+    gen_train_eq)
+        gen_train_eq $2
+        ;;
     vq_train)
         train_kmeans $2
         ;;
     vq_test)
         vq_test ../raw/big_dog.raw
         vq_test ../raw/two_lines.raw
+        ;;
+    postfilter_slope_test)
+        postfilter_slope_test ../raw/big_dog.raw
+        postfilter_slope_test ../raw/two_lines.raw
         ;;
   esac
 else
