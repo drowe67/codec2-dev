@@ -30,9 +30,8 @@
 */
 
 #include <assert.h>
-#include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
+#include <stdio.h>
 #include "codec2_fifo.h"
 
 struct FIFO {
@@ -71,6 +70,7 @@ void codec2_fifo_destroy(struct FIFO *fifo) {
 }
 
 int codec2_fifo_write(struct FIFO *fifo, short data[], int n) {
+    int            i;
     short         *pdata;
     short         *pin = fifo->pin;
 
@@ -82,17 +82,15 @@ int codec2_fifo_write(struct FIFO *fifo, short data[], int n) {
     }
     else {
 
+	/* This could be made more efficient with block copies
+	   using memcpy */
+
 	pdata = data;
-        if ((pin + n) >= (fifo->buf + fifo->nshort))
-        {
-            int firstSamples = fifo->buf + fifo->nshort - pin;
-            memcpy(pin, pdata, firstSamples * sizeof(short));
-            n -= firstSamples;
-            pin = fifo->buf;
-            pdata += firstSamples;
-        }
-        memcpy(pin, pdata, n * sizeof(short));
-        pin += n;
+	for(i=0; i<n; i++) {
+	    *pin++ = *pdata++;
+	    if (pin == (fifo->buf + fifo->nshort))
+		pin = fifo->buf;
+	}
 	fifo->pin = pin;
     }
 
@@ -101,6 +99,7 @@ int codec2_fifo_write(struct FIFO *fifo, short data[], int n) {
 
 int codec2_fifo_read(struct FIFO *fifo, short data[], int n)
 {
+    int            i;
     short         *pdata;
     short         *pout = fifo->pout;
 
@@ -112,17 +111,15 @@ int codec2_fifo_read(struct FIFO *fifo, short data[], int n)
     }
     else {
 
+	/* This could be made more efficient with block copies
+	   using memcpy */
+
 	pdata = data;
-        if ((pout + n) >= (fifo->buf + fifo->nshort))
-        {
-            int firstSamples = fifo->buf + fifo->nshort - pout;
-            memcpy(pdata, pout, firstSamples * sizeof(short));
-            n -= firstSamples;
-            pout = fifo->buf;
-            pdata += firstSamples;
-        }
-        memcpy(pdata, pout, n * sizeof(short));
-        pout += n;
+	for(i=0; i<n; i++) {
+	    *pdata++ = *pout++;
+	    if (pout == (fifo->buf + fifo->nshort))
+		pout = fifo->buf;
+	}
 	fifo->pout = pout;
     }
 

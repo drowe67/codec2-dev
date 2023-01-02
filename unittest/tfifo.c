@@ -9,7 +9,6 @@
 #include <assert.h>
 #include <stdio.h>
 #include <pthread.h>
-#include <unistd.h>
 #include "codec2_fifo.h"
 
 #define FIFO_SZ  1024
@@ -26,7 +25,7 @@ void *writer_thread(void *data);
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
 #define USE_THREADS
-#define USE_MUTEX
+//#define USE_MUTEX
 
 int main() {
     pthread_t awriter_thread;
