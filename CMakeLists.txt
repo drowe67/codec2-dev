@@ -548,10 +548,6 @@ endif()
              COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/unittest;
                             PATH=$PATH:${CMAKE_CURRENT_BINARY_DIR}/src ./ofdm_phase_est_bw.sh ${CMAKE_CURRENT_BINARY_DIR}/unittest")
 
-    add_test(NAME test_OFDM_modem_fading_DPSK_BER
-             COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/unittest;
-                            PATH=$PATH:${CMAKE_CURRENT_BINARY_DIR}/src ./ofdm_fade_dpsk.sh ${CMAKE_CURRENT_BINARY_DIR}/unittest")
-
     add_test(NAME test_OFDM_modem_time_sync_700D
              COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/unittest;
                             PATH=$PATH:${CMAKE_CURRENT_BINARY_DIR}/src ./ofdm_time_sync.sh 700D")
@@ -946,7 +942,7 @@ if(LPCNET)
          set_tests_properties(test_freedv_reliable_text_awgn_1600 PROPERTIES PASS_REGULAR_EXPRESSION "1")
                             
     add_test(NAME test_freedv_reliable_text_fade_2020
-          COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/unittest; ./reliable_text_fade.sh 2020 -26 6 0 '${CMAKE_CURRENT_BINARY_DIR}/src'")
+          COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/unittest; ./reliable_text_fade.sh 2020 -26 4 0 '${CMAKE_CURRENT_BINARY_DIR}/src'")
 endif(LPCNET)
                                                      
     # -------------------------------------------------------------------------

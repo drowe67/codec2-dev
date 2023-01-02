@@ -58,7 +58,7 @@
 
 #include "debug_alloc.h"
 
-#define VERSION     14    /* The API version number.  The first version
+#define VERSION     15    /* The API version number.  The first version
                            is 10.  Increment if the API changes in a
                            way that would require changes by the API
                            user. */
@@ -74,6 +74,8 @@
  * Version 14   May 2020
  *              Number of returned speech samples can vary, use freedv_get_n_max_speech_samples() to allocate
  *              buffers.
+ * Version 15   December 2022
+ *              Removing rarely used DPSK support which is not needed given fast fading modes
  */
 
 char *ofdm_statemode[] = {"search","trial","synced"};
@@ -1269,16 +1271,8 @@ void freedv_set_clip(struct freedv *f, bool val) {
 /* Band Pass Filter to cleanup OFDM tx waveform, only supported by some modes */
 
 void freedv_set_tx_bpf(struct freedv *f, int val) {
-    if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_700E, f->mode) 
-        || FDV_MODE_ACTIVE( FREEDV_MODE_DATAC0, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_DATAC3, f->mode)) {
+    if (is_ofdm_mode(f)) {
         ofdm_set_tx_bpf(f->ofdm, val);
-    }
-}
-
-/* DPSK option for OFDM modem, useful for high SNR, fast fading */
-void freedv_set_dpsk(struct freedv *f, int val) {
-    if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_2020, f->mode)) {
-        ofdm_set_dpsk(f->ofdm, val);
     }
 }
 
