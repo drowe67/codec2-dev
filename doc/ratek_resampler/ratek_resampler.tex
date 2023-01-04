@@ -576,11 +576,11 @@ Possible ways forward:
 
 \section{Post Filter Design}
 
-We require a function $P()$ that modifies a smoothed vector of spectral magnitude samples $\mathbf{y}$ to sharpen formant peaks and increase peak/valley ratio at high frequencies.
+We require a function $P()$ that modifies a smoothed vector of spectral magnitude samples $\mathbf{y}$ to sharpen formant peaks and increase peak/valley ratio, in particular at high frequencies.
 
 The filter $P()$ is needed for low $F0$ speakers and voiced speech.
 
-The smoothed vector $\mathbf{y}$ is obtained by filtering $\mathbf{y}=H(\mathbf{x})$, where $H()$ is a filter function defined by the parameter $N_b$ that provides progressively more smoothing as frequency increases.  This smoothing reduces the information in $\mathbf{y}$ making it possible to quantise at low bit rates. At low frequencies $H(X_k)=X_k$ therefore $P()$ should modify the spectra only at high frequencies, leaving low frequencies unchanged. 
+The smoothed vector $\mathbf{y}$ is obtained by filtering $\mathbf{y}=H(\mathbf{x})$, where $H()$ is a filter function defined by the parameter $N_b$ that provides progressively more smoothing as frequency increases.  This smoothing reduces the information in $\mathbf{y}$ making it possible to quantise at low bit rates.
 
 Representing the sharp peaks required for male speech is possible by direct quantisation of $\mathbf{x}$ but requires a prohibitively high bit rate for our use case.  High $F0$ speakers can be adequately represented by a low $N_b$ vector  which suggests there should be a way to reproduce male speech of adequate quality from low $N_b$ vectors.  $P()$ should have no effect on high $F0$ speakers, which are already adequately represented by the smoothed spectral samples.
 
