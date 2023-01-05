@@ -87,6 +87,7 @@ int main(int argc, char *argv[]) {
     int     ret;
     float   deltaq_stop = DELTAQ;
     FILE   *fres = NULL;
+    FILE   *fused = NULL;
     int     st = -1;
     int     en = -1;
     int     reseed = 0;
@@ -103,6 +104,7 @@ int main(int argc, char *argv[]) {
             {"en",       required_argument, 0, 'e'},
             {"reseed",   no_argument,       0, 'i'},
             {"split",    no_argument,       0, 'p'},
+            {"used",     required_argument, 0, 'u'},
             {0, 0, 0, 0}
         };
         
@@ -127,6 +129,9 @@ int main(int argc, char *argv[]) {
         case 'p':
             split_en = 1;
             break;
+        case 'u':
+            fused = fopen(optarg,"wt"); assert(fused != NULL);
+            break;
         case 'h':
         case '?':
             goto helpmsg;
@@ -145,6 +150,7 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "     --en   Ken        end vector element for error calculation (default K-1)\n");
         fprintf(stderr, "     --reseed          reseed random number generator used for init\n");
         fprintf(stderr, "     --split           use LBG style splitting\n");
+        fprintf(stderr, "     --used UsedFile   Text file of how many times each CB entry used\n");
         exit(1);
     }
 
@@ -290,6 +296,15 @@ int main(int argc, char *argv[]) {
 	}
         fclose(fres);
     }
+    
+    /* optionally output test file with number of times each vector is used */
+    if (fused != NULL) {
+	for(i=0; i<m; i++)
+	    fprintf(fused,"%ld\n", n[i]);
+        fclose(fused);
+    }
+    
+   
     
     fclose(fvq);
     fclose(ftrain);

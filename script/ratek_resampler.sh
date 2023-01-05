@@ -210,8 +210,8 @@ function train_kmeans() {
 
   # remove mean, train 2 stages - kmeans
   extract -t $K -s $Kst -e $Ken --lower 10 --removemean --writeall $fullfile ${filename}_nomean.f32
-  vqtrain ${filename}_nomean.f32 $K $M  --st $Kst --en $Ken -s 1e-3 vq_stage1.f32 -r res1.f32 > kmeans_res1.txt
-  vqtrain res1.f32 $K $M  --st $Kst --en $Ken  -s 1e-3 vq_stage2.f32 -r res2.f32 > kmeans_res2.txt
+  vqtrain ${filename}_nomean.f32 $K $M --st $Kst --en $Ken -s 1e-3 vq_stage1.f32 -r res1.f32 --used ${filename}_used1.txt > kmeans_res1.txt
+  vqtrain res1.f32 $K $M  --st $Kst --en $Ken  -s 1e-3 vq_stage2.f32 -r res2.f32 --used ${filename}_used2.txt > kmeans_res2.txt
 }
 
 # comparing kmeans to lbg
