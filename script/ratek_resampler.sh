@@ -21,7 +21,7 @@ function postfilter_slope_test() {
   filename="${filename%.*}"
   mkdir -p $out_dir
 
-  c2sim $fullfile --hpf --dump $filename
+  c2sim $fullfile --hpf --modelout ${filename}_model.bin
 
   # Amps Nb filtered, phase0, amp and phase postfilters, rate K
   echo "ratek3_batch; ratek3_batch_tool(\"${filename}\", \
@@ -59,7 +59,7 @@ function postfilter_rate_test() {
   c2sim $fullfile --hpf -o - | sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_1_out.wav
   
   # orig amp and phase0.  Note uses c2sim internal Am->Hm, rather than our Octave version, bypassing Nb filtering
-  c2sim $fullfile --hpf --phase0 --postfilter --dump $filename -o - | sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_2_p0.wav
+  c2sim $fullfile --hpf --phase0 --postfilter --modelout ${filename}_model.bin -o - | sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_2_p0.wav
 
   # amps Nb filtered, original phase
   echo "ratek3_batch; ratek3_batch_tool(\"${filename}\",'A_out',\"${filename}_a.f32\"); quit;" \
@@ -145,7 +145,7 @@ function vq_test() {
   filename="${filename%.*}"
   mkdir -p $out_dir
 
-  c2sim $fullfile --hpf --dump $filename
+  c2sim $fullfile --hpf --modelout ${filename}_model.bin
   
   # Amps Nb filtered, phase0, amp and phase postfilters, rate K
   echo "ratek3_batch; ratek3_batch_tool(\"${filename}\",'A_out',\"${filename}_a.f32\",'H_out',\"${filename}_h.f32\",'amp_pf','phase_pf','rateK'); quit;" \
@@ -181,8 +181,13 @@ function gen_train() {
   extension="${filename##*.}"
   filename="${filename%.*}"
   
-  c2sim $fullfile --hpf --dump $filename
-  echo "ratek3_batch; ratek3_batch_tool(\"${filename}\",'B_out',\"${filename}_b.f32\",'amp_pf'); quit;" \
+  filename_b=${filename}_b.f32
+  if [ $# -eq 2 ]; then
+    filename_b=$2
+  fi
+
+  c2sim $fullfile --hpf --modelout ${filename}_model.bin
+  echo "ratek3_batch; ratek3_batch_tool(\"${filename}\",'B_out',\"${filename_b}\",'amp_pf'); quit;" \
   | octave -p ${CODEC2_PATH}/octave -qf
 }
 
@@ -207,7 +212,6 @@ function train_kmeans() {
   extract -t $K -s $Kst -e $Ken --lower 10 --removemean --writeall $fullfile ${filename}_nomean.f32
   vqtrain ${filename}_nomean.f32 $K $M  --st $Kst --en $Ken -s 1e-3 vq_stage1.f32 -r res1.f32 > kmeans_res1.txt
   vqtrain res1.f32 $K $M  --st $Kst --en $Ken  -s 1e-3 vq_stage2.f32 -r res2.f32 > kmeans_res2.txt
-  vqtrain res2.f32 $K $M  --st $Kst --en $Ken  -s 1e-3 vq_stage3.f32 -r res3.f32 > kmeans_res3.txt
 }
 
 # comparing kmeans to lbg
@@ -293,7 +297,7 @@ if [ $# -gt 0 ]; then
         postfilter_rate_test ../raw/mmt1.raw      
         ;;
     gen_train)
-        gen_train $2
+        gen_train $2 $3
         ;;
     gen_train_eq)
         gen_train_eq $2
