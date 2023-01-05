@@ -6,7 +6,7 @@
 
 CODEC2_PATH=$HOME/codec2
 PATH=$PATH:$CODEC2_PATH/build_linux/src:$CODEC2_PATH/build_linux/misc
-K=30
+K="${K:-30}"
 M="${M:-4096}"
 Kst="${Kst:-0}"
 Ken="${Ken:-29}"
@@ -187,7 +187,7 @@ function gen_train() {
   fi
 
   c2sim $fullfile --hpf --modelout ${filename}_model.bin
-  echo "ratek3_batch; ratek3_batch_tool(\"${filename}\",'B_out',\"${filename_b}\",'amp_pf'); quit;" \
+  echo "ratek3_batch; ratek3_batch_tool(\"${filename}\",'B_out',\"${filename_b}\",'amp_pf','K',${K}); quit;" \
   | octave -p ${CODEC2_PATH}/octave -qf
 }
 

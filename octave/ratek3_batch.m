@@ -57,6 +57,8 @@ function B = ratek3_batch_tool(samname, varargin)
       phase_pf_en = 1;
     elseif strcmp(varargin{i},"eq") 
       restore_slope = 0;
+    elseif strcmp(varargin{i},"K") 
+      K = varargin{i+1}; i++;
     else
       printf("\nERROR unknown argument: %s\n", varargin{i});
       return;
