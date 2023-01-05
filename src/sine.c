@@ -434,6 +434,12 @@ void estimate_amplitudes(MODEL *model, COMP Sw[], float W[], int est_phase)
         model->phi[m] = atan2f(Sw[b].imag,Sw[b].real);
     }
   }
+  
+  for(m=model->L+1; m<=MAX_AMP; m++) {
+    model->A[m] = 0.0;
+    model->phi[m] = 0.0;
+  }
+  model->voiced = 0;
 }
 
 /*---------------------------------------------------------------------------*\

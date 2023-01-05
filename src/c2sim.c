@@ -720,6 +720,10 @@ int main(int argc, char *argv[])
 	two_stage_pitch_refinement(&c2const, &model, Sw);
 	estimate_amplitudes(&model, Sw, W, 1);
 
+        /* estimate voicing - do this all the time so model.voicing
+	 * is set, useful for machine learning work */
+	snr = est_voicing_mbe(&c2const, &model, Sw, W);
+        
         #ifdef DUMP
         dump_Sn(m_pitch, Sn); dump_Sw(Sw); dump_model(&model);
         #endif
@@ -749,10 +753,6 @@ int main(int argc, char *argv[])
                             Zero-phase modelling
 
 	\*------------------------------------------------------------*/
-
-	/* estimate voicing - do this all the time so model.voicing
-	 * is set, useful for machine learning work */
-	snr = est_voicing_mbe(&c2const, &model, Sw, W);
 
 	if (phase0) {
             #ifdef DUMP
