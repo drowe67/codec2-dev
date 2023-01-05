@@ -14,7 +14,7 @@
   + files of vectors that can be input to c2sim for synthesis
 
   cd ~/codec2/build_linux
-  ./src/c2sim --hpf ~/raw/big_dog.raw --dump big_dog
+  ./src/c2sim --hpf ~/raw/big_dog.raw --modelout big_dog
   
   cd ~/codec2/octave
   octave:49> ratek3_batch; 
@@ -64,8 +64,8 @@ function B = ratek3_batch_tool(samname, varargin)
     i++;      
   end  
 
-  model_name = strcat(samname,"_model.txt");
-  model = load(model_name);
+  model_name = strcat(samname,"_model.bin");
+  model = load_codec2_model(model_name);
   [frames tmp] = size(model);
   rate_K_sample_freqs_kHz = mel_sample_freqs_kHz(K);
   B = zeros(frames,K);
@@ -101,7 +101,7 @@ function B = ratek3_batch_tool(samname, varargin)
     Wo = model(f,1); F0 = Fs*Wo/(2*pi); L = model(f,2);
     Am = model(f,3:(L+2)); AmdB = 20*log10(Am);
     rate_L_sample_freqs_kHz = ((1:L)*F0)/1000;
-
+ 
     % resample from rate L to rate Lhigh (both linearly spaced)
 
     AmdB_rate_Lhigh = interp1([0 rate_L_sample_freqs_kHz 4], [0 AmdB 0], rate_Lhigh_sample_freqs_kHz, "spline", "extrap");
@@ -119,7 +119,7 @@ function B = ratek3_batch_tool(samname, varargin)
     if amp_pf_en
       YdB = amplitude_postfilter(rate_Lhigh_sample_freqs_kHz, YdB, Fs, F0high, restore_slope);
     end
-    
+ 
     if rateK_en
       % Resample from rate Lhigh to rate K b=R(Y), note K are non-linearly spaced (warped freq axis)
       B(f,:) = interp1(rate_Lhigh_sample_freqs_kHz, YdB, rate_K_sample_freqs_kHz, "spline", "extrap");
@@ -155,7 +155,8 @@ function B = ratek3_batch_tool(samname, varargin)
     end
     printf("%d/%d %3.0f%%\r", f,frames, (f/frames)*100);
   end
-
+  printf("\n");
+  
   % optionally write B to a .f32 file for external VQ training
   if length(B_out_fn)
     fb = fopen(B_out_fn,"wb");
