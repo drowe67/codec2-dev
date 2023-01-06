@@ -37,6 +37,11 @@ function B = ratek3_batch_tool(samname, varargin)
   Nb=20; K=30; rateK_en = 0; verbose = 1; restore_slope = 1;
   A_out_fn = ""; B_out_fn = ""; vq_stage1_f32=""; vq_stage2_f32="";
   H_out_fn = ""; amp_pf_en = 0;  phase_pf_en=0; i = 1;
+  Kst=0; Ken=K-1; dec = 1;
+  
+  lower = 10;             % only consider vectors above this mean
+  dynamic_range = 40;     % restrict dynamic range of vectors
+  
   while i<=length(varargin)
     if strcmp(varargin{i},"rateK") 
       rateK_en = 1;
@@ -62,6 +67,14 @@ function B = ratek3_batch_tool(samname, varargin)
       verbose = 2;
     elseif strcmp(varargin{i},"K") 
       K = varargin{i+1}; i++;
+      Kst=0; Ken=K-1;
+    elseif strcmp(varargin{i},"subset") 
+      % restrict range of VQ match to a subset of rate K vector B
+      % these are in C index format for compatability with C
+      % so default is Kst=0 Ken=K-1;
+      Kst = 0; Ken = 24;
+    elseif strcmp(varargin{i},"dec") 
+      dec = varargin{i+1}; i++;
     else
       printf("\nERROR unknown argument: %s\n", varargin{i});
       return;
@@ -102,6 +115,8 @@ function B = ratek3_batch_tool(samname, varargin)
     end
   end
 
+  sum_Eq = 0; nEq = 0;
+  
   for f=1:frames
     Wo = model(f,1); F0 = Fs*Wo/(2*pi); L = model(f,2);
     Am = model(f,3:(L+2)); AmdB = 20*log10(Am);
@@ -130,15 +145,15 @@ function B = ratek3_batch_tool(samname, varargin)
       B(f,:) = interp1(rate_Lhigh_sample_freqs_kHz, YdB, rate_K_sample_freqs_kHz, "spline", "extrap");
      
       if vq_en
-        #w = ones(1,K); w(1:2) = 0; w(25:K) = 0;
-        #B(f,:) .*= w;
-        m = max(B(f,:)); B(f,:) = max(B(f,:), m-40);
+        w = ones(1,K); w(1:Kst+1) = 0; w(Ken+1:K) = 0;
+        m = max(B(f,:)); B(f,:) = max(B(f,:), m-dynamic_range);
         amean = mean(B(f,:));
-        [res aB_hat ind] = mbest(vq, B(f,:)-amean, mbest_depth);
+        [res aB_hat ind] = mbest(vq, B(f,:)-amean, mbest_depth, w);
         B_hat(f,:) = aB_hat + amean;
-        Eq(f) = sum((B(f,:)-B_hat(f,:)).^2)/K;
+        Eq(f) = sum( ((B(f,:)-B_hat(f,:)).*w) .^2)/K;
+        if amean > lower, sum_Eq += Eq(f); nEq++; end
         if verbose >= 2
-          printf("f: %3d amean: %4.1f Eq: %4.2f dB^2", f, amean, Eq(f));
+          printf("f: %3d amean: %5.1f Eq: %4.2f dB^2", f, amean, Eq(f));
           for i=1:length(ind)
             printf(" %4d",ind(i));
           end
@@ -166,6 +181,26 @@ function B = ratek3_batch_tool(samname, varargin)
     printf("%d/%d %3.0f%%\r", f,frames, (f/frames)*100);
   end
   printf("\n");
+  
+  if dec > 1
+    for f=1:dec:frames-dec
+      fa = f; fb = f+dec;
+      x = 1/dec; x_inc = 1/dec;
+      for sf=fa+1:fb-1 
+        Wo = model(sf,1); F0 = Fs*Wo/(2*pi); L = model(sf,2);
+        rate_L_sample_freqs_kHz = ((1:L)*F0)/1000;
+        B_hat(sf,:) = (1-x)*B_hat(fa,:) + x*B_hat(fb,:);
+        printf("f: %d sf: %d fa: %d fb: %d x: %3.2f\n", f,sf, fa,fb,x);
+        x += x_inc;
+        AmdB_ = interp1([0 rate_K_sample_freqs_kHz 4], [0 B_hat(sf,:) 0], rate_L_sample_freqs_kHz, "spline", 0);
+        Am_(sf,1:L) = 10.^(AmdB_/20);
+ 
+        if length(H_out_fn)
+          H(sf,1:L) = synth_phase_from_mag(rate_K_sample_freqs_kHz, B_hat(sf,:), Fs, Wo, L, phase_pf_en);
+        end
+      end
+    end
+  end
   
   % optionally write B to a .f32 file for external VQ training
   if length(B_out_fn)
@@ -206,7 +241,7 @@ function B = ratek3_batch_tool(samname, varargin)
   end
   
   if vq_en && verbose
-    sd = mean(Eq);
+    sd = sum_Eq/nEq;
     printf("Nb: %d K: %d mean SD: %4.2f dB^2 %4.2f dB\n", Nb, K, sd, sqrt(sd));
   end
 endfunction
