@@ -128,16 +128,17 @@ function B = ratek3_batch_tool(samname, varargin)
     if rateK_en
       % Resample from rate Lhigh to rate K b=R(Y), note K are non-linearly spaced (warped freq axis)
       B(f,:) = interp1(rate_Lhigh_sample_freqs_kHz, YdB, rate_K_sample_freqs_kHz, "spline", "extrap");
-      #B(f,1:10)
+     
       if vq_en
+        #w = ones(1,K); w(1:2) = 0; w(25:K) = 0;
+        #B(f,:) .*= w;
+        m = max(B(f,:)); B(f,:) = max(B(f,:), m-40);
         amean = mean(B(f,:));
         [res aB_hat ind] = mbest(vq, B(f,:)-amean, mbest_depth);
         B_hat(f,:) = aB_hat + amean;
         Eq(f) = sum((B(f,:)-B_hat(f,:)).^2)/K;
-        YdB_ = interp1([0 rate_K_sample_freqs_kHz 4], [0 B_hat(f,:) 0], rate_L_sample_freqs_kHz, "spline", 0);
-        Y_(f,1:L) = 10.^(YdB_/20);
         if verbose >= 2
-          printf("f: %3d Eq: %3.2f dB^2", f, Eq(f));
+          printf("f: %3d amean: %4.1f Eq: %4.2f dB^2", f, amean, Eq(f));
           for i=1:length(ind)
             printf(" %4d",ind(i));
           end

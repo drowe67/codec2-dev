@@ -39,12 +39,12 @@ function ratek2_high_fbf(samname, f, vq_stage1_f32="", vq_stage2_f32="")
     vq_stage1 = load_f32(vq_stage1_f32,K);
     vq(:,:,1)= vq_stage1; 
     [M tmp] = size(vq_stage1); printf("stage 1 vq size: %d\n", M);
-    mbest_depth = 1;
+    nvq = 1;    
     if length(vq_stage2_f32)
       vq_stage2 = load_f32(vq_stage2_f32,K);
       vq(:,:,2)= vq_stage2; 
       [M tmp] = size(vq_stage2); printf("stage 2 vq size: %d\n", M);
-      mbest_depth = 5;
+      nvq++; mbest_depth = 5;
     end
   end
 
@@ -53,12 +53,10 @@ function ratek2_high_fbf(samname, f, vq_stage1_f32="", vq_stage2_f32="")
 
   h = zeros(Lhigh, Lhigh);
   F0high = (Fs/2)/Lhigh;
-  figure(2); clf; hold on;
   for m=1:Lhigh-1
     h(m,:) = generate_filter(m,F0high,Lhigh,Nb);
     plot((1:Lhigh-1)*F0high,h(m,1:Lhigh-1))
   end
-  hold off;
   
   rate_Lhigh_sample_freqs_kHz = (F0high:F0high:(Lhigh-1)*F0high)/1000;
 
@@ -96,11 +94,18 @@ function ratek2_high_fbf(samname, f, vq_stage1_f32="", vq_stage2_f32="")
     
     Eq = 0;
     if vq_en
+      m = max(B); B = max(B, m-40);
       amean = mean(B);
       [res B_hat ind] = mbest(vq, B-amean, mbest_depth);
       B_hat = B_hat + amean;
       Eq = sum((B-B_hat).^2)/K;
       B = B_hat;
+      figure(2); clf; hold on;
+      for i=1:nvq
+        plot(rate_K_sample_freqs_kHz*1000, vq(ind(i),:,i));
+      end
+      plot([0 4000], [amean amean]);
+      hold off; axis([0 4000 -40 60]);
     end
     YdB_ = interp1([0 rate_K_sample_freqs_kHz 4], [0 B 0], rate_Lhigh_sample_freqs_kHz, "spline", 0);
     
