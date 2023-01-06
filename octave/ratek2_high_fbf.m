@@ -19,7 +19,8 @@ function ratek2_high_fbf(samname, f, vq_stage1_f32="", vq_stage2_f32="")
 
   newamp_700c; melvq;
   Fs = 8000; Nb = 20; K = 30; resampler = 'spline'; Lhigh = 80; vq_en = 0; all_en = 0;
-
+  amp_pf_en = 1; restore_slope = 1;
+  
   % load up text files dumped from c2sim ---------------------------------------
 
   sn_name = strcat(samname,"_sn.txt");
@@ -34,6 +35,7 @@ function ratek2_high_fbf(samname, f, vq_stage1_f32="", vq_stage2_f32="")
   % optionally load up VQ
 
   if length(vq_stage1_f32)
+    vq_en = 1;
     vq_stage1 = load_f32(vq_stage1_f32,K);
     vq(:,:,1)= vq_stage1; 
     [M tmp] = size(vq_stage1); printf("stage 1 vq size: %d\n", M);
@@ -70,7 +72,7 @@ function ratek2_high_fbf(samname, f, vq_stage1_f32="", vq_stage2_f32="")
     Wo = model(f,1); F0 = Fs*Wo/(2*pi); L = model(f,2);
     Am = model(f,3:(L+2)); AmdB = 20*log10(Am);
     Am_freqs_kHz = (1:L)*Wo*4/pi;
-
+    
     % resample from rate L to rate Lhigh (both linearly spaced)
     
     AmdB_rate_Lhigh = interp1([0 Am_freqs_kHz 4], [0 AmdB 0], rate_Lhigh_sample_freqs_kHz, "spline", "extrap");
@@ -84,14 +86,17 @@ function ratek2_high_fbf(samname, f, vq_stage1_f32="", vq_stage2_f32="")
       YdB(m) = 10*log10(Y);
     end
     
+    % Optional amplitude post filtering
+    if amp_pf_en
+      YdB = amplitude_postfilter(rate_Lhigh_sample_freqs_kHz, YdB, Fs, F0high, restore_slope);
+    end
+    
     % Resample to rate K, optionally VQ, then back to rate Lhigh to check error
-
     B = interp1(rate_Lhigh_sample_freqs_kHz, YdB, rate_K_sample_freqs_kHz, "spline", "extrap");
-
+    
     Eq = 0;
     if vq_en
       amean = mean(B);
-      %[mse_list index_list] = search_vq(vq, B-amean, 1);
       [res B_hat ind] = mbest(vq, B-amean, mbest_depth);
       B_hat = B_hat + amean;
       Eq = sum((B-B_hat).^2)/K;
@@ -119,29 +124,21 @@ function ratek2_high_fbf(samname, f, vq_stage1_f32="", vq_stage2_f32="")
 
     % interactive menu ------------------------------------------
 
-    printf("\rframe: %d  menu: n-next  b-back  q-quit p-png v-vq[%d] a-all plots", f, vq_en);
+    printf("\rframe: %d  menu: n-next  b-back  q-quit p-png f-postfilter v-vq[%d] a-all plots", f, vq_en);
+    if vq_en 
+      printf(" Eq: %3.2f dB^2", Eq);
+      for i=1:length(ind)
+        printf(" %4d",ind(i));
+      end
+    end  
     fflush(stdout);
     k = kbhit();
 
-    if k == 'n'
-      f = f + 1;
-    endif
-    if k == 'b'
-      f = f - 1;
-    endif
-    if k == 'e'
-      if energy == 1
-        energy = 0;
-      else
-        energy = 1;
-      end
-    end
-    if k == 'v'
-      if vq_en, vq_en = 0; else vq_en = 1; end
-    end
-    if k == 'a'
-      if all_en, all_en = 0; else all_en = 1; end
-    end
+    if k == 'n', f = f + 1; end
+    if k == 'b', f = f - 1; end
+    if k == 'v', vq_en = mod(vq_en+1,2); end
+    if k == 'a', all_en = mod(all_en+1,2); end
+    if k == 'f', amp_pf_en = mod(amp_pf_en+1,2); end
     if (k == 'p')
       [dir name ext]=fileparts(samname);
       set(gca, 'FontSize', 16);

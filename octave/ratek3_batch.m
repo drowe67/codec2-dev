@@ -47,9 +47,10 @@ function B = ratek3_batch_tool(samname, varargin)
       B_out_fn = varargin{i+1}; i++;
     elseif strcmp(varargin{i},"H_out")
       H_out_fn = varargin{i+1}; i++;
-    elseif strcmp(varargin{i},"vq_stage1") 
+    elseif strcmp(varargin{i},"vq1") 
       vq_stage1_f32 = varargin{i+1}; i++;
-    elseif strcmp(varargin{i},"vq_stage2") 
+      rateK_en = 1; amp_pf_en=1;
+    elseif strcmp(varargin{i},"vq2") 
       vq_stage2_f32 = varargin{i+1}; i++;
     elseif strcmp(varargin{i},"amp_pf") 
       amp_pf_en = 1;
@@ -57,6 +58,8 @@ function B = ratek3_batch_tool(samname, varargin)
       phase_pf_en = 1;
     elseif strcmp(varargin{i},"eq") 
       restore_slope = 0;
+    elseif strcmp(varargin{i},"verbose") 
+      verbose = 2;
     elseif strcmp(varargin{i},"K") 
       K = varargin{i+1}; i++;
     else
@@ -103,11 +106,11 @@ function B = ratek3_batch_tool(samname, varargin)
     Wo = model(f,1); F0 = Fs*Wo/(2*pi); L = model(f,2);
     Am = model(f,3:(L+2)); AmdB = 20*log10(Am);
     rate_L_sample_freqs_kHz = ((1:L)*F0)/1000;
- 
+    
     % resample from rate L to rate Lhigh (both linearly spaced)
 
     AmdB_rate_Lhigh = interp1([0 rate_L_sample_freqs_kHz 4], [0 AmdB 0], rate_Lhigh_sample_freqs_kHz, "spline", "extrap");
-
+    
     % Filter at rate Lhigh, y = F(R(a)). Note we filter in linear energy domain, and Lhigh are linearly spaced
 
     YdB = zeros(1,Lhigh-1);
@@ -116,16 +119,16 @@ function B = ratek3_batch_tool(samname, varargin)
       Y = sum(Am_rate_Lhigh.^2 .* h(m,1:Lhigh-1));
       YdB(m) = 10*log10(Y);
     end
-
+    
     % Optional amplitude post filtering
     if amp_pf_en
       YdB = amplitude_postfilter(rate_Lhigh_sample_freqs_kHz, YdB, Fs, F0high, restore_slope);
     end
- 
+    
     if rateK_en
       % Resample from rate Lhigh to rate K b=R(Y), note K are non-linearly spaced (warped freq axis)
       B(f,:) = interp1(rate_Lhigh_sample_freqs_kHz, YdB, rate_K_sample_freqs_kHz, "spline", "extrap");
-
+      #B(f,1:10)
       if vq_en
         amean = mean(B(f,:));
         [res aB_hat ind] = mbest(vq, B(f,:)-amean, mbest_depth);
@@ -134,7 +137,11 @@ function B = ratek3_batch_tool(samname, varargin)
         YdB_ = interp1([0 rate_K_sample_freqs_kHz 4], [0 B_hat(f,:) 0], rate_L_sample_freqs_kHz, "spline", 0);
         Y_(f,1:L) = 10.^(YdB_/20);
         if verbose >= 2
-          printf("f: %d Eq: %3.2f dB\n", f, Eq(f));
+          printf("f: %3d Eq: %3.2f dB^2", f, Eq(f));
+          for i=1:length(ind)
+            printf(" %4d",ind(i));
+          end
+          printf("\n");
         end  
       else
         B_hat(f,:) = B(f,:);
