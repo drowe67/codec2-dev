@@ -29,16 +29,18 @@ function vq = trainvq(training_data, Nvec, stages, city_en=0)
 
 end
 
-function [mse_list index_list] = search_vq(vq, target, m)
-
+function [mse_list index_list] = search_vq(vq, target, m, w)
   [Nvec order] = size(vq);
 
   mse = zeros(1, Nvec);
+  if nargin == 3
+    w = ones(1,order);
+  end
  
   % find mse for each vector
 
   for i=1:Nvec
-     mse(i) = sum((target - vq(i,:)) .^2);
+     mse(i) = sum(((target - vq(i,:)).*w) .^2);
   end
 
   % sort and keep top m matches
@@ -53,10 +55,13 @@ endfunction
 
 % Search multi-stage VQ, retaining m best candidates at each stage
 
-function [res output_vecs ind] = mbest(vqset, input_vecs, m)
+function [res output_vecs ind] = mbest(vqset, input_vecs, m, w)
 
   [Nvec order stages] = size(vqset);
   [Ninput tmp] = size(input_vecs);
+  if nargin == 3
+    w = ones(1,order);
+  end
 
   res = [];         % residual error after VQ
   output_vecs = []; % quantised ouput vectors
@@ -66,7 +71,7 @@ function [res output_vecs ind] = mbest(vqset, input_vecs, m)
   
     % first stage, find mbest candidates
 
-    [mse_list index_list] = search_vq(vqset(:,:,1), input_vecs(i,:), m);
+    [mse_list index_list] = search_vq(vqset(:,:,1), input_vecs(i,:), m, w);
     cand_list = [mse_list' index_list'];
     cand_list = sortrows(cand_list,1);
 
@@ -93,7 +98,7 @@ function [res output_vecs ind] = mbest(vqset, input_vecs, m)
       avq = vqset(:,:,s);
       cand_list = [];
       for t=1:m
-        [mse_list index_list] = search_vq(avq, target(t,:), m);
+        [mse_list index_list] = search_vq(avq, target(t,:), m, w);
         x = ones(m,1)*prev_indexes(t,:);
         cand_row = [mse_list' x index_list'];
         cand_list = [cand_list; cand_row];
