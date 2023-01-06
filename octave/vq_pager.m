@@ -1,10 +1,10 @@
 % vq_pager.m
 % Plot VQ entries in a grid to visualise codebook
 
-function vq_pager(vq_fn)
+function vq_pager(vq_fn, K=30)
   graphics_toolkit ("gnuplot");
+  figure(1); clf;
   rows=4; cols=4;
-  K=20;
   vq=load_f32(vq_fn,K);
 
   [n_left tmp] = size(vq);
