@@ -24,7 +24,7 @@ int main(int argc, char *argv[]) {
     int removemean = 0;
     float lower = -1E32;
     int writeall = 0;
-    float dynamicrange = 0.0;
+    float dynamicrange = 100.0;
     
     static struct option long_options[] = {
         {"startcol",      required_argument, 0, 's'},
@@ -117,7 +117,7 @@ int main(int argc, char *argv[]) {
             features_prev[f][i] = 0.0;
 
     while((fread(features, sizeof(float), stride, fin) == stride)) {
-        if (dynamicrange != 0.0) {
+        if (dynamicrange != 100.0) {
             float max = -1E32;
 	    for(i=st; i<=en; i++)
 	        if (features[i] > max) max = features[i];

@@ -34,13 +34,13 @@ function B = ratek3_batch_tool(samname, varargin)
   newamp_700c;
   Fs = 8000; max_amp = 160; resampler='spline'; Lhigh=80; max_amp = 160;
   
-  Nb=20; K=30; rateK_en = 0; verbose = 1; restore_slope = 1;
+  Nb=20; K=30; rateK_en = 0; verbose = 1; eq =0;
   A_out_fn = ""; B_out_fn = ""; vq_stage1_f32=""; vq_stage2_f32="";
   H_out_fn = ""; amp_pf_en = 0;  phase_pf_en=0; i = 1;
   Kst=0; Ken=K-1; dec = 1;
   
   lower = 10;             % only consider vectors above this mean
-  dynamic_range = 40;     % restrict dynamic range of vectors
+  dynamic_range = 100;     % restrict dynamic range of vectors
   
   while i<=length(varargin)
     if strcmp(varargin{i},"rateK") 
@@ -62,7 +62,7 @@ function B = ratek3_batch_tool(samname, varargin)
     elseif strcmp(varargin{i},"phase_pf") 
       phase_pf_en = 1;
     elseif strcmp(varargin{i},"eq") 
-      restore_slope = 0;
+      eq = varargin{i+1}; i++;
     elseif strcmp(varargin{i},"verbose") 
       verbose = 2;
     elseif strcmp(varargin{i},"K") 
@@ -75,6 +75,8 @@ function B = ratek3_batch_tool(samname, varargin)
       Kst = 0; Ken = 24;
     elseif strcmp(varargin{i},"dec") 
       dec = varargin{i+1}; i++;
+    elseif strcmp(varargin{i},"DR") 
+      dynamic_range = varargin{i+1}; i++;
     else
       printf("\nERROR unknown argument: %s\n", varargin{i});
       return;
@@ -137,16 +139,18 @@ function B = ratek3_batch_tool(samname, varargin)
     
     % Optional amplitude post filtering
     if amp_pf_en
-      YdB = amplitude_postfilter(rate_Lhigh_sample_freqs_kHz, YdB, Fs, F0high, restore_slope);
+      YdB = amplitude_postfilter(rate_Lhigh_sample_freqs_kHz, YdB, Fs, F0high, eq);
     end
     
     if rateK_en
       % Resample from rate Lhigh to rate K b=R(Y), note K are non-linearly spaced (warped freq axis)
       B(f,:) = interp1(rate_Lhigh_sample_freqs_kHz, YdB, rate_K_sample_freqs_kHz, "spline", "extrap");
      
+      % dynamic range limiting
+      m = max(B(f,:)); B(f,:) = max(B(f,:), m-dynamic_range);
+      
       if vq_en
         w = ones(1,K); w(1:Kst+1) = 0; w(Ken+1:K) = 0;
-        m = max(B(f,:)); B(f,:) = max(B(f,:), m-dynamic_range);
         amean = mean(B(f,:));
         [res aB_hat ind] = mbest(vq, B(f,:)-amean, mbest_depth, w);
         B_hat(f,:) = aB_hat + amean;

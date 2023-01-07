@@ -19,7 +19,7 @@ function ratek2_high_fbf(samname, f, vq_stage1_f32="", vq_stage2_f32="")
 
   newamp_700c; melvq;
   Fs = 8000; Nb = 20; K = 30; resampler = 'spline'; Lhigh = 80; vq_en = 0; all_en = 0;
-  amp_pf_en = 1; restore_slope = 1;
+  amp_pf_en = 1; eq = 0;
   
   % load up text files dumped from c2sim ---------------------------------------
 
@@ -86,15 +86,17 @@ function ratek2_high_fbf(samname, f, vq_stage1_f32="", vq_stage2_f32="")
     
     % Optional amplitude post filtering
     if amp_pf_en
-      YdB = amplitude_postfilter(rate_Lhigh_sample_freqs_kHz, YdB, Fs, F0high, restore_slope);
+      [YdB SdB] = amplitude_postfilter(rate_Lhigh_sample_freqs_kHz, YdB, Fs, F0high, eq);
+      figure(2); clf;
+      plot(rate_Lhigh_sample_freqs_kHz, YdB-SdB);
     end
-    
+   
     % Resample to rate K, optionally VQ, then back to rate Lhigh to check error
     B = interp1(rate_Lhigh_sample_freqs_kHz, YdB, rate_K_sample_freqs_kHz, "spline", "extrap");
     
     Eq = 0;
     if vq_en
-      m = max(B); B = max(B, m-40);
+      #m = max(B); B = max(B, m-40);
       amean = mean(B);
       [res B_hat ind] = mbest(vq, B-amean, mbest_depth);
       B_hat = B_hat + amean;
@@ -129,7 +131,7 @@ function ratek2_high_fbf(samname, f, vq_stage1_f32="", vq_stage2_f32="")
 
     % interactive menu ------------------------------------------
 
-    printf("\rframe: %d  menu: n-next  b-back  q-quit p-png f-postfilter v-vq[%d] a-all plots", f, vq_en);
+    printf("\rframe: %d  menu: n-next  b-back  q-quit p-png f-postfilter e-eq[%d] v-vq[%d] a-all plots", f, eq, vq_en);
     if vq_en 
       printf(" Eq: %3.2f dB^2", Eq);
       for i=1:length(ind)
@@ -143,6 +145,7 @@ function ratek2_high_fbf(samname, f, vq_stage1_f32="", vq_stage2_f32="")
     if k == 'b', f = f - 1; end
     if k == 'v', vq_en = mod(vq_en+1,2); end
     if k == 'a', all_en = mod(all_en+1,2); end
+    if k == 'e', eq = mod(eq+1,3); end
     if k == 'f', amp_pf_en = mod(amp_pf_en+1,2); end
     if (k == 'p')
       [dir name ext]=fileparts(samname);
