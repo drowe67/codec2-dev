@@ -217,6 +217,44 @@ function vq_test() {
   c2enc 700C $fullfile - | c2dec 700C - - | sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_7_700C.wav
 }
 
+function vq_test_subset() {
+  fullfile=$1
+  filename=$(basename -- "$fullfile")
+  extension="${filename##*.}"
+  filename="${filename%.*}"
+  mkdir -p $out_dir
+  vq1="train_b_vq1.f32"
+  vq2="train_b_vq2.f32"
+
+  c2sim $fullfile --hpf --modelout ${filename}_model.bin
+  
+  # Amps Nb filtered, phase0, amp and phase postfilters, rate K
+  echo "ratek3_batch; ratek3_batch_tool(\"${filename}\",'A_out',\"${filename}_a.f32\",'H_out',\"${filename}_h.f32\",'amp_pf','phase_pf','rateK'); quit;" \
+  | octave -p ${CODEC2_PATH}/octave -qf
+  c2sim $fullfile --hpf --phase0 --postfilter --amread ${filename}_a.f32 --hmread ${filename}_h.f32 -o - | \
+      sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_1_Nb_p0_pf_rateK.wav
+
+  # As above plus stage1 VQ
+  echo "ratek3_batch; ratek3_batch_tool(\"${filename}\", \
+        'A_out',\"${filename}_a.f32\",'H_out',\"${filename}_h.f32\",'amp_pf','phase_pf','rateK', \
+        'vq1', \"${vq1}\",'DR',40,'subset'); quit;" \
+        | octave -p ${CODEC2_PATH}/octave -qf
+  c2sim $fullfile --hpf --phase0 --postfilter --amread ${filename}_a.f32 --hmread ${filename}_h.f32 -o - | \
+      sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_2_vq1.wav
+
+  # As above plus stage2 VQ
+  echo "ratek3_batch; ratek3_batch_tool(\"${filename}\", \
+        'A_out',\"${filename}_a.f32\",'H_out',\"${filename}_h.f32\",'amp_pf','phase_pf','rateK', \
+        'vq1', \"${vq1}\", 'vq2', \"${vq2}\",'DR',40,'subset'); quit;" \
+        | octave -p ${CODEC2_PATH}/octave -qf
+  c2sim $fullfile --hpf --phase0 --postfilter --amread ${filename}_a.f32 --hmread ${filename}_h.f32 -o - | \
+      sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_3_vq2.wav
+   
+  # Codec 2 3200 & 700C controls
+  c2enc 3200 $fullfile - | c2dec 3200 - - | sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_6_3200.wav
+  c2enc 700C $fullfile - | c2dec 700C - - | sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_7_700C.wav
+}
+
 # generate amp postfiltered rate K training material from source speech file 
 function gen_train() {
   fullfile=$1
@@ -258,42 +296,25 @@ function train_kmeans() {
   res1=$(mktemp)
   
   # remove mean, train 2 stages - kmeans
-  extract -t $K -s $Kst -e $Ken --lower 10 --removemean --writeall $fullfile ${filename}_nomean.f32
+  extract -t $K -s $Kst -e $Ken --lower 10 --removemean --dynamicrange 40 --writeall $fullfile ${filename}_nomean.f32
   vqtrain ${filename}_nomean.f32 $K $M --st $Kst --en $Ken -s 1e-3 ${filename}_vq1.f32 -r ${res1} --used ${filename}_used1.txt > kmeans_res1.txt
   vqtrain ${res1} $K $M --st $Kst --en $Ken  -s 1e-3 ${filename}_vq2.f32 -r res2.f32 --used ${filename}_used2.txt > kmeans_res2.txt
+#  cat ${filename}_nomean.f32 | vq_mbest --mbest 5 -k $K --st $Kst --en $Ken  -q ${filename}_vq1.f32,${filename}_vq2.f32 >> /dev/null
 }
 
 # comparing kmeans to lbg
 
-function train_kmeans_lbg() {
+function train_lbg() {
   fullfile=$1
   filename=$(basename -- "$fullfile")
   extension="${filename##*.}"
   filename="${filename%.*}"
 
-  # remove mean, train 2 stages - kmeans
-  extract -t $K -s $Kst -e $Ken --removemean --writeall $fullfile ${filename}_nomean.f32
-  vqtrain ${filename}_nomean.f32 $K $M  --st $Kst --en $Ken -s 1e-3 vq_stage1.f32 -r res1.f32 > kmeans_res1.txt
-  vqtrain res1.f32 $K $M  --st $Kst --en $Ken  -s 1e-3 vq_stage2.f32 -r res2.f32 > kmeans_res2.txt
-
   # remove mean, train 2 stages - LBG
-  extract -t $K -s $Kst -e $Ken --removemean --writeall $fullfile ${filename}_nomean.f32
-  vqtrain ${filename}_nomean.f32 $K $M  --st $Kst --en $Ken -s 1e-3 vq_stage1.f32 -r res1.f32 --split > lbg_res1.txt
-  vqtrain res1.f32 $K $M  --st $Kst --en $Ken  -s 1e-3 vq_stage2.f32 -r res2.f32 --split > lbg_res2.txt
-  cat ${filename}_nomean.f32 | vq_mbest --mbest 5 -k $K -q vq_stage1.f32,vq_stage2.f32 >> /dev/null
-
-  echo "kmeans1=load('kmeans_res1.txt'); kmeans2=load('kmeans_res2.txt'); \
-        lbg1=load('lbg_res1.txt'); lbg2=load('lbg_res2.txt'); \
-        hold on; \
-        plot(log2(kmeans1(:,1)),kmeans1(:,2),'+-','markersize', 15); plot(log2(kmeans2(:,1)),kmeans2(:,2),'+-','markersize', 15); \
-        plot(log2(lbg1(:,1)),lbg1(:,2),'+-'); plot(log2(lbg2(:,1)),lbg2(:,2),'+-'); \
-        hold off; \
-        leg = {'kmeans stage1','kmeans stage2','lbg stage1','lbg stage2'}; \
-        h = legend(leg); legend('boxoff'); \
-        set(gca, 'FontSize', 16); set (h, 'fontsize', 16);
-        xlabel('Bits'); ylabel('Eq dB^2'); grid; \
-        print(\"${filename}_vq.png\",'-dpng','-S500,500'); \
-        quit" | octave  -qf
+  extract -t $K -s $Kst -e $Ken --removemean --dynamicrange 40 --writeall $fullfile ${filename}_nomean.f32
+  vqtrain ${filename}_nomean.f32 $K $M  --st $Kst --en $Ken -s 1e-3 ${filename}_vq21.f32 -r res1.f32 --split > lbg_res1.txt
+  vqtrain res1.f32 $K $M  --st $Kst --en $Ken -s 1e-3 ${filename}_vq2.f32 -r res2.f32 --split > lbg_res2.txt
+#  cat ${filename}_nomean.f32 | vq_mbest --mbest 5 -k $K -q ${filename}_vq2.f32,${filename}_vq2.f32 >> /dev/null
 }
 
 # Try training with two different Nb
@@ -351,12 +372,19 @@ if [ $# -gt 0 ]; then
     gen_train_eq)
         gen_train_eq $2
         ;;
-    vq_train)
+    train_kmeans)
         train_kmeans $2
+        ;;
+    train_lbg)
+        train_lbg $2
         ;;
     vq_test)
         vq_test ../raw/big_dog.raw
         vq_test ../raw/two_lines.raw
+        ;;
+    vq_test_subset)
+        vq_test_subset ../raw/big_dog.raw
+        vq_test_subset ../raw/two_lines.raw
         ;;
     postfilter_eq_test)
         postfilter_eq_test ../raw/big_dog.raw
@@ -368,19 +396,3 @@ else
   echo "  ./ratek_resampler.sh command [options ...]""
 fi
 
-# TODO: make these selectable via CLI
-#postfilter_test ../raw/hts1a.raw
-#postfilter_test ../raw/two_lines.raw
-#postfilter_test ../raw/cq_ref.raw
-#postfilter_test ../raw/kristoff.raw
-#postfilter_test ../raw/mmt1.raw
-
-#test $1
-
-#train_kmeans $1
-
-#../script/ratek_resampler.sh ../octave/train_120_Nb20_K30.f32
-#train_kmeans_lbg $1
-
-# ../script/ratek_resampler.sh ../octave/train_120_Nb20_K30.f32 ../octave/train_120_Nb100_K30.f32 20 100
-#train_Nb $1 $2 $3 $4

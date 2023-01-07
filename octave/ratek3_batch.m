@@ -72,7 +72,7 @@ function B = ratek3_batch_tool(samname, varargin)
       % restrict range of VQ match to a subset of rate K vector B
       % these are in C index format for compatability with C
       % so default is Kst=0 Ken=K-1;
-      Kst = 0; Ken = 24;
+      Kst = 2; Ken = 24;
     elseif strcmp(varargin{i},"dec") 
       dec = varargin{i+1}; i++;
     elseif strcmp(varargin{i},"DR") 
@@ -115,6 +115,7 @@ function B = ratek3_batch_tool(samname, varargin)
       [M tmp] = size(vq_stage2); printf("stage 2 vq size: %d\n", M);
       mbest_depth = 5;
     end
+    w = zeros(1,K); w(Kst+1:Ken+1) = 1;
   end
 
   sum_Eq = 0; nEq = 0;
@@ -150,11 +151,12 @@ function B = ratek3_batch_tool(samname, varargin)
       m = max(B(f,:)); B(f,:) = max(B(f,:), m-dynamic_range);
       
       if vq_en
-        w = ones(1,K); w(1:Kst+1) = 0; w(Ken+1:K) = 0;
-        amean = mean(B(f,:));
-        [res aB_hat ind] = mbest(vq, B(f,:)-amean, mbest_depth, w);
-        B_hat(f,:) = aB_hat + amean;
-        Eq(f) = sum( ((B(f,:)-B_hat(f,:)).*w) .^2)/K;
+        B(f,:) .*= w;
+        amean = sum(B(f,:))/(Ken-Kst+1);
+        target = zeros(1,K); target(Kst+1:Ken+1) = B(f,Kst+1:Ken+1)-amean;
+        [res target_ ind] = mbest(vq, target, mbest_depth);
+        B_hat(f,:) = target_; B_hat(f,Kst+1:Ken+1) += amean;
+        Eq(f) = sum((target-target_).^2)/(Ken-Kst+1);
         if amean > lower, sum_Eq += Eq(f); nEq++; end
         if verbose >= 2
           printf("f: %3d amean: %5.1f Eq: %4.2f dB^2", f, amean, Eq(f));
@@ -168,6 +170,10 @@ function B = ratek3_batch_tool(samname, varargin)
       end
     
       AmdB_ = interp1([0 rate_K_sample_freqs_kHz 4], [0 B_hat(f,:) 0], rate_L_sample_freqs_kHz, "spline", 0);
+      if Kst
+        nzero = floor(rate_K_sample_freqs_kHz(Kst)*1000/F0);
+        AmdB_(1:nzero) = 0;
+      end
       Am_(f,1:L) = 10.^(AmdB_/20);
       
       % Synthesised phase0 model using Hilbert Transform

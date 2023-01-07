@@ -19,7 +19,7 @@ function ratek2_high_fbf(samname, f, vq_stage1_f32="", vq_stage2_f32="")
 
   newamp_700c; melvq;
   Fs = 8000; Nb = 20; K = 30; resampler = 'spline'; Lhigh = 80; vq_en = 0; all_en = 0;
-  amp_pf_en = 1; eq = 0;
+  amp_pf_en = 1; eq = 0; Kst = 2; Ken = 24;
   
   % load up text files dumped from c2sim ---------------------------------------
 
@@ -39,13 +39,14 @@ function ratek2_high_fbf(samname, f, vq_stage1_f32="", vq_stage2_f32="")
     vq_stage1 = load_f32(vq_stage1_f32,K);
     vq(:,:,1)= vq_stage1; 
     [M tmp] = size(vq_stage1); printf("stage 1 vq size: %d\n", M);
-    nvq = 1;    
+    nvq = 1; mbest_depth = 1;
     if length(vq_stage2_f32)
       vq_stage2 = load_f32(vq_stage2_f32,K);
       vq(:,:,2)= vq_stage2; 
       [M tmp] = size(vq_stage2); printf("stage 2 vq size: %d\n", M);
       nvq++; mbest_depth = 5;
     end
+    w = zeros(1,K); w(Kst+1:Ken+1) = 1
   end
 
   % precompute filters at rate Lhigh. Note range of harmonics is 1:Lhigh-1, as
@@ -87,8 +88,11 @@ function ratek2_high_fbf(samname, f, vq_stage1_f32="", vq_stage2_f32="")
     % Optional amplitude post filtering
     if amp_pf_en
       [YdB SdB] = amplitude_postfilter(rate_Lhigh_sample_freqs_kHz, YdB, Fs, F0high, eq);
-      figure(2); clf;
-      plot(rate_Lhigh_sample_freqs_kHz, YdB-SdB);
+      if vq_en == 0
+        figure(2); clf;
+        plot(rate_Lhigh_sample_freqs_kHz*1000, YdB-SdB);
+        axis([0 4000 -20 20]);
+      end        
     end
    
     % Resample to rate K, optionally VQ, then back to rate Lhigh to check error
@@ -97,19 +101,25 @@ function ratek2_high_fbf(samname, f, vq_stage1_f32="", vq_stage2_f32="")
     Eq = 0;
     if vq_en
       #m = max(B); B = max(B, m-40);
-      amean = mean(B);
-      [res B_hat ind] = mbest(vq, B-amean, mbest_depth);
-      B_hat = B_hat + amean;
-      Eq = sum((B-B_hat).^2)/K;
-      B = B_hat;
+      B .*= w;
+      amean = sum(B)/(Ken-Kst+1);
+      target = zeros(1,K);
+      target(Kst+1:Ken+1) = B(Kst+1:Ken+1)-amean;
+      [res target_ ind] = mbest(vq, target, mbest_depth);
+      B_hat = target_; B_hat(Kst+1:Ken+1) += amean;
+      Eq = sum((target-target_).^2)/(Ken-Kst+1);
       figure(2); clf; hold on;
       for i=1:nvq
-        plot(rate_K_sample_freqs_kHz*1000, vq(ind(i),:,i));
+        plot(rate_K_sample_freqs_kHz*1000, vq(ind(i),:,i),'b;vq;');
       end
+      plot(rate_K_sample_freqs_kHz*1000, target,'g;target;');
+      B = B_hat
       plot([0 4000], [amean amean]);
       hold off; axis([0 4000 -40 60]);
     end
     YdB_ = interp1([0 rate_K_sample_freqs_kHz 4], [0 B 0], rate_Lhigh_sample_freqs_kHz, "spline", 0);
+    nzero = floor(rate_K_sample_freqs_kHz(Kst)*1000/F0high);
+    YdB_(1:nzero) = 0;
     
     figure(3); clf;
     hold on;
