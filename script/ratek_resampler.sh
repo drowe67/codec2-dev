@@ -225,6 +225,8 @@ function vq_test_subset() {
   mkdir -p $out_dir
   vq1="train_b_vq1.f32"
   vq2="train_b_vq2.f32"
+  vq1eq="train_eq_b_vq1.f32"
+  vq2eq="train_eq_b_vq2.f32"
 
   c2sim $fullfile --hpf --modelout ${filename}_model.bin
   
@@ -249,10 +251,33 @@ function vq_test_subset() {
         | octave -p ${CODEC2_PATH}/octave -qf
   c2sim $fullfile --hpf --phase0 --postfilter --amread ${filename}_a.f32 --hmread ${filename}_h.f32 -o - | \
       sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_3_vq2.wav
+
+  # Amps Nb filtered, phase0, amp and phase postfilters, rate K, EQ1
+  echo "ratek3_batch; ratek3_batch_tool(\"${filename}\",'A_out',\"${filename}_a.f32\",'H_out',\"${filename}_h.f32\", \
+       'amp_pf','phase_pf','rateK','eq',1); quit;" \
+  | octave -p ${CODEC2_PATH}/octave -qf
+  c2sim $fullfile --hpf --phase0 --postfilter --amread ${filename}_a.f32 --hmread ${filename}_h.f32 -o - | \
+      sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_4_eq1.wav
+
+  # As above plus stage1 VQ
+  echo "ratek3_batch; ratek3_batch_tool(\"${filename}\", \
+        'A_out',\"${filename}_a.f32\",'H_out',\"${filename}_h.f32\",'amp_pf','phase_pf','rateK', \
+        'vq1', \"${vq1eq}\",'DR',40,'subset','eq',1); quit;" \
+        | octave -p ${CODEC2_PATH}/octave -qf
+  c2sim $fullfile --hpf --phase0 --postfilter --amread ${filename}_a.f32 --hmread ${filename}_h.f32 -o - | \
+      sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_5_eq1_vq1.wav
+
+  # As above plus stage2 VQ
+  echo "ratek3_batch; ratek3_batch_tool(\"${filename}\", \
+        'A_out',\"${filename}_a.f32\",'H_out',\"${filename}_h.f32\",'amp_pf','phase_pf','rateK', \
+        'vq1', \"${vq1eq}\", 'vq2', \"${vq2eq}\",'DR',40,'subset','eq',1); quit;" \
+        | octave -p ${CODEC2_PATH}/octave -qf
+  c2sim $fullfile --hpf --phase0 --postfilter --amread ${filename}_a.f32 --hmread ${filename}_h.f32 -o - | \
+      sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_6_eq1_vq2.wav
    
   # Codec 2 3200 & 700C controls
-  c2enc 3200 $fullfile - | c2dec 3200 - - | sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_6_3200.wav
-  c2enc 700C $fullfile - | c2dec 700C - - | sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_7_700C.wav
+  c2enc 3200 $fullfile - | c2dec 3200 - - | sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_7_3200.wav
+  c2enc 700C $fullfile - | c2dec 700C - - | sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_8_700C.wav
 }
 
 # generate amp postfiltered rate K training material from source speech file 
@@ -284,7 +309,7 @@ function gen_train_eq() {
   fi
 
   c2sim $fullfile --hpf --modelout ${filename}_model.bin
-  echo "ratek3_batch; ratek3_batch_tool(\"${filename}\",'B_out',\"${filename}_eq_b.f32\",'amp_pf','eq',2); quit;" \
+  echo "ratek3_batch; ratek3_batch_tool(\"${filename}\",'B_out',\"${filename}_eq_b.f32\",'amp_pf','eq',1); quit;" \
   | octave -p ${CODEC2_PATH}/octave -qf
 }
 

@@ -491,9 +491,14 @@ function [YdB SdB] = amplitude_postfilter(rate_Lhigh_sample_freqs_kHz, YdB, Fs, 
   if eq == 0, YdB += SdB; end
   if eq == 1, YdB += 0.5*SdB; end
   if eq == 2
-    dynamic_range = 30;
-    mx = max(YdB); YdB = max(YdB, mx-dynamic_range);
-    YdB += SdB;
+    %dynamic_range = 30;
+    %mx = max(YdB); YdB = max(YdB, mx-dynamic_range);
+    %printf("  b: %f m: %f\n",b, m);
+    
+    % whiten voiced speech (voiced speech has -6dB/octave fall off)
+    if (m > 0)
+      YdB += w*m;
+    end
   end
   
   % normalise energy
