@@ -38,7 +38,8 @@ function B = ratek3_batch_tool(samname, varargin)
   A_out_fn = ""; B_out_fn = ""; vq_stage1_f32=""; vq_stage2_f32="";
   H_out_fn = ""; amp_pf_en = 0;  phase_pf_en=0; i = 1;
   Kst=0; Ken=K-1; dec = 1;
-  
+  w = ones(1,K);
+
   lower = 10;             % only consider vectors above this mean
   dynamic_range = 100;     % restrict dynamic range of vectors
   
@@ -73,6 +74,7 @@ function B = ratek3_batch_tool(samname, varargin)
       % these are in C index format for compatability with C
       % so default is Kst=0 Ken=K-1;
       Kst = 2; Ken = 24;
+      w(1:Kst) = 0; w(Ken+2:K) = 0;
     elseif strcmp(varargin{i},"dec") 
       dec = varargin{i+1}; i++;
     elseif strcmp(varargin{i},"DR") 
@@ -115,7 +117,6 @@ function B = ratek3_batch_tool(samname, varargin)
       [M tmp] = size(vq_stage2); printf("stage 2 vq size: %d\n", M);
       mbest_depth = 5;
     end
-    w = zeros(1,K); w(Kst+1:Ken+1) = 1;
   end
 
   sum_Eq = 0; nEq = 0;
@@ -148,14 +149,14 @@ function B = ratek3_batch_tool(samname, varargin)
       B(f,:) = interp1(rate_Lhigh_sample_freqs_kHz, YdB, rate_K_sample_freqs_kHz, "spline", "extrap");
      
       % dynamic range limiting
-      m = max(B(f,:)); B(f,:) = max(B(f,:), m-dynamic_range);
-      
+      lower=-100;
+      B(f,:) .*= w;
+      amean = sum(B(f,:))/(Ken-Kst+1);
+      target = zeros(1,K);
+      target(Kst+1:Ken+1) = B(f,Kst+1:Ken+1)-amean;
+      mx = max(target); target = max(target, mx-dynamic_range);
       if vq_en
-        B(f,:) .*= w;
-        amean = sum(B(f,:))/(Ken-Kst+1);
-        target = zeros(1,K); target(Kst+1:Ken+1) = B(f,Kst+1:Ken+1)-amean;
         [res target_ ind] = mbest(vq, target, mbest_depth);
-        B_hat(f,:) = target_; B_hat(f,Kst+1:Ken+1) += amean;
         Eq(f) = sum((target-target_).^2)/(Ken-Kst+1);
         if amean > lower, sum_Eq += Eq(f); nEq++; end
         if verbose >= 2
@@ -166,14 +167,18 @@ function B = ratek3_batch_tool(samname, varargin)
           printf("\n");
         end  
       else
-        B_hat(f,:) = B(f,:);
+        target_ = target;
       end
-    
+      B_hat(f,:) = target_ + amean;
+   
       AmdB_ = interp1([0 rate_K_sample_freqs_kHz 4], [0 B_hat(f,:) 0], rate_L_sample_freqs_kHz, "spline", 0);
-      if Kst
-        nzero = floor(rate_K_sample_freqs_kHz(Kst)*1000/F0);
-        AmdB_(1:nzero) = 0;
+      nzero = floor(rate_K_sample_freqs_kHz(Kst+1)*1000/F0);
+      AmdB_(1:nzero) = 0;
+      if Ken+1 < K
+        nzero = floor(rate_K_sample_freqs_kHz(Ken+2)*1000/F0);
+        AmdB_(nzero:L) = 0;
       end
+      
       Am_(f,1:L) = 10.^(AmdB_/20);
       
       % Synthesised phase0 model using Hilbert Transform

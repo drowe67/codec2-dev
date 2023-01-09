@@ -236,48 +236,63 @@ function vq_test_subset() {
   c2sim $fullfile --hpf --phase0 --postfilter --amread ${filename}_a.f32 --hmread ${filename}_h.f32 -o - | \
       sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_1_Nb_p0_pf_rateK.wav
 
+  # As above plus subset
+  echo "ratek3_batch; ratek3_batch_tool(\"${filename}\",\
+       'A_out',\"${filename}_a.f32\",'H_out',\"${filename}_h.f32\",'amp_pf','phase_pf','rateK',
+       'subset'); quit;" \
+  | octave -p ${CODEC2_PATH}/octave -qf
+  c2sim $fullfile --hpf --phase0 --postfilter --amread ${filename}_a.f32 --hmread ${filename}_h.f32 -o - | \
+      sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_2_subset.wav
+
   # As above plus stage1 VQ
   echo "ratek3_batch; ratek3_batch_tool(\"${filename}\", \
         'A_out',\"${filename}_a.f32\",'H_out',\"${filename}_h.f32\",'amp_pf','phase_pf','rateK', \
-        'vq1', \"${vq1}\",'DR',40,'subset'); quit;" \
+        'vq1', \"${vq1}\",'subset'); quit;" \
         | octave -p ${CODEC2_PATH}/octave -qf
   c2sim $fullfile --hpf --phase0 --postfilter --amread ${filename}_a.f32 --hmread ${filename}_h.f32 -o - | \
-      sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_2_vq1.wav
+      sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_3_vq1.wav
 
   # As above plus stage2 VQ
   echo "ratek3_batch; ratek3_batch_tool(\"${filename}\", \
         'A_out',\"${filename}_a.f32\",'H_out',\"${filename}_h.f32\",'amp_pf','phase_pf','rateK', \
-        'vq1', \"${vq1}\", 'vq2', \"${vq2}\",'DR',40,'subset'); quit;" \
+        'vq1', \"${vq1}\", 'vq2', \"${vq2}\",'subset'); quit;" \
         | octave -p ${CODEC2_PATH}/octave -qf
   c2sim $fullfile --hpf --phase0 --postfilter --amread ${filename}_a.f32 --hmread ${filename}_h.f32 -o - | \
-      sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_3_vq2.wav
-
+      sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_4_vq2.wav
+      
   # Amps Nb filtered, phase0, amp and phase postfilters, rate K, EQ1
   echo "ratek3_batch; ratek3_batch_tool(\"${filename}\",'A_out',\"${filename}_a.f32\",'H_out',\"${filename}_h.f32\", \
        'amp_pf','phase_pf','rateK','eq',1); quit;" \
   | octave -p ${CODEC2_PATH}/octave -qf
   c2sim $fullfile --hpf --phase0 --postfilter --amread ${filename}_a.f32 --hmread ${filename}_h.f32 -o - | \
-      sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_4_eq1.wav
+      sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_5_eq1.wav
 
+  # As above plus subset
+  echo "ratek3_batch; ratek3_batch_tool(\"${filename}\",'A_out',\"${filename}_a.f32\",'H_out',\"${filename}_h.f32\", \
+       'amp_pf','phase_pf','rateK','eq',1,'subset'); quit;" \
+  | octave -p ${CODEC2_PATH}/octave -qf
+  c2sim $fullfile --hpf --phase0 --postfilter --amread ${filename}_a.f32 --hmread ${filename}_h.f32 -o - | \
+      sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_6_eq1_subset.wav
+  
   # As above plus stage1 VQ
   echo "ratek3_batch; ratek3_batch_tool(\"${filename}\", \
         'A_out',\"${filename}_a.f32\",'H_out',\"${filename}_h.f32\",'amp_pf','phase_pf','rateK', \
-        'vq1', \"${vq1eq}\",'DR',40,'subset','eq',1); quit;" \
+        'vq1', \"${vq1eq}\",'subset','eq',1); quit;" \
         | octave -p ${CODEC2_PATH}/octave -qf
   c2sim $fullfile --hpf --phase0 --postfilter --amread ${filename}_a.f32 --hmread ${filename}_h.f32 -o - | \
-      sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_5_eq1_vq1.wav
+      sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_7_eq1_vq1.wav
 
   # As above plus stage2 VQ
   echo "ratek3_batch; ratek3_batch_tool(\"${filename}\", \
         'A_out',\"${filename}_a.f32\",'H_out',\"${filename}_h.f32\",'amp_pf','phase_pf','rateK', \
-        'vq1', \"${vq1eq}\", 'vq2', \"${vq2eq}\",'DR',40,'subset','eq',1); quit;" \
+        'vq1', \"${vq1eq}\", 'vq2', \"${vq2eq}\",'subset','eq',1); quit;" \
         | octave -p ${CODEC2_PATH}/octave -qf
   c2sim $fullfile --hpf --phase0 --postfilter --amread ${filename}_a.f32 --hmread ${filename}_h.f32 -o - | \
-      sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_6_eq1_vq2.wav
+      sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_8_eq1_vq2.wav
    
   # Codec 2 3200 & 700C controls
-  c2enc 3200 $fullfile - | c2dec 3200 - - | sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_7_3200.wav
-  c2enc 700C $fullfile - | c2dec 700C - - | sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_8_700C.wav
+  c2enc 3200 $fullfile - | c2dec 3200 - - | sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_9_3200.wav
+  c2enc 700C $fullfile - | c2dec 700C - - | sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_10_700C.wav
 }
 
 # generate amp postfiltered rate K training material from source speech file 
@@ -321,12 +336,22 @@ function train_kmeans() {
   res1=$(mktemp)
   
   # remove mean, train 2 stages - kmeans
-  extract -t $K -s $Kst -e $Ken --lower 10 --removemean --dynamicrange 40 --writeall $fullfile ${filename}_nomean.f32
+  extract -t $K -s $Kst -e $Ken --lower 10 --removemean --writeall $fullfile ${filename}_nomean.f32
   vqtrain ${filename}_nomean.f32 $K $M --st $Kst --en $Ken -s 1e-3 ${filename}_vq1.f32 -r ${res1} --used ${filename}_used1.txt > kmeans_res1.txt
   vqtrain ${res1} $K $M --st $Kst --en $Ken  -s 1e-3 ${filename}_vq2.f32 -r res2.f32 --used ${filename}_used2.txt > kmeans_res2.txt
 #  cat ${filename}_nomean.f32 | vq_mbest --mbest 5 -k $K --st $Kst --en $Ken  -q ${filename}_vq1.f32,${filename}_vq2.f32 >> /dev/null
 }
 
+function train_test() {
+  fullfile=$1
+  filename=$(basename -- "$fullfile")
+  extension="${filename##*.}"
+  filename="${filename%.*}"
+  res1=$(mktemp)
+  
+  cat ${filename}_nomean.f32 | vq_mbest --mbest 5 -k $K --st $Kst --en $Ken -q $2 >> /dev/null        
+}
+        
 # comparing kmeans to lbg
 
 function train_lbg() {
@@ -336,8 +361,8 @@ function train_lbg() {
   filename="${filename%.*}"
 
   # remove mean, train 2 stages - LBG
-  extract -t $K -s $Kst -e $Ken --removemean --dynamicrange 40 --writeall $fullfile ${filename}_nomean.f32
-  vqtrain ${filename}_nomean.f32 $K $M  --st $Kst --en $Ken -s 1e-3 ${filename}_vq21.f32 -r res1.f32 --split > lbg_res1.txt
+  extract -t $K -s $Kst -e $Ken --removemean --writeall $fullfile ${filename}_nomean.f32
+  vqtrain ${filename}_nomean.f32 $K $M  --st $Kst --en $Ken -s 1e-3 ${filename}_vq1.f32 -r res1.f32 --split > lbg_res1.txt
   vqtrain res1.f32 $K $M  --st $Kst --en $Ken -s 1e-3 ${filename}_vq2.f32 -r res2.f32 --split > lbg_res2.txt
 #  cat ${filename}_nomean.f32 | vq_mbest --mbest 5 -k $K -q ${filename}_vq2.f32,${filename}_vq2.f32 >> /dev/null
 }
@@ -400,7 +425,10 @@ if [ $# -gt 0 ]; then
     train_kmeans)
         train_kmeans $2
         ;;
-    train_lbg)
+    train_test)
+        train_test $2 $3
+        ;;
+     train_lbg)
         train_lbg $2
         ;;
     vq_test)

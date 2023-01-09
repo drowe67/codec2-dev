@@ -117,16 +117,6 @@ int main(int argc, char *argv[]) {
             features_prev[f][i] = 0.0;
 
     while((fread(features, sizeof(float), stride, fin) == stride)) {
-        if (dynamicrange != 100.0) {
-            float max = -1E32;
-	    for(i=st; i<=en; i++)
-	        if (features[i] > max) max = features[i];
-	    for(i=st; i<=en; i++) {
-                float min = max-dynamicrange;
-                if (features[i] < min ) features[i] = min;
-            }        
-        }
-        
 	float mean = 0.0;
 	for(i=st; i<=en; i++)
 	    mean += features[i];
@@ -139,6 +129,17 @@ int main(int argc, char *argv[]) {
 	for(i=st; i<=en; i++) {
 	    delta[i] = gain*(features[i] - pred*features_prev[frame_delay-1][i]);
 	}
+        
+        if (dynamicrange != 100.0) {
+            float max = -1E32;
+	    for(i=st; i<=en; i++)
+	        if (features[i] > max) max = features[i];
+	    for(i=st; i<=en; i++) {
+                float min = max-dynamicrange;
+                if (features[i] < min ) features[i] = min;
+            }        
+        }
+        
 	if (mean > lower) {
 	    if (writeall)
                 fwrite(delta, sizeof(float), stride, fout);
