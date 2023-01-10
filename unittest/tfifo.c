@@ -26,7 +26,7 @@ void *writer_thread(void *data);
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
 #define USE_THREADS
-#define USE_MUTEX
+//#define USE_MUTEX
 
 int main() {
     pthread_t awriter_thread;
