@@ -86,23 +86,44 @@ void codec2_fifo_destroy(struct FIFO *fifo) {
     free(fifo);
 }
 
+static int codec2_fifo_used_internal(short* pin, short* pout, int nshort)
+{
+    int used = 0;
+    
+    if (pin >= pout)
+        used = pin - pout;
+    else
+        used = nshort + (unsigned int)(pin - pout);
+
+    return used;
+}
+
+static int codec2_fifo_free_internal(short* pin, short* pout, int nshort)
+{
+    // available storage is one less than nshort as prd == pwr
+    // is reserved for empty rather than full
+
+    return nshort - codec2_fifo_used_internal(pin, pout, nshort) - 1;
+}
+
 int codec2_fifo_write(struct FIFO *fifo, short data[], int n) {
     assert(fifo != NULL);
     assert(data != NULL);
 
-    int free = codec2_fifo_free(fifo);
+#ifdef __STDC_NO_ATOMICS__
+    short         *pin = fifo->pin;
+    short         *pin = fifo->pout;
+#else
+    short         *pin = (short*)atomic_load(&fifo->pin);
+    short         *pout = (short*)atomic_load(&fifo->pout);
+#endif /* __STDC_NO_ATOMICS__ */
+        
+    int free = codec2_fifo_free_internal(pin, pout, fifo->nshort);
     if (n > free) {
         return -1;
     }
     else {
-        short         *pdata;
-#ifdef __STDC_NO_ATOMICS__
-        short         *pin = fifo->pin;
-#else
-        short         *pin = (short*)atomic_load(&fifo->pin);
-#endif /* __STDC_NO_ATOMICS__ */
-
-	pdata = data;
+        short         *pdata = data;
         if ((pin + n) >= (fifo->buf + fifo->nshort))
         {
             int firstSamples = fifo->buf + fifo->nshort - pin;
@@ -116,7 +137,7 @@ int codec2_fifo_write(struct FIFO *fifo, short data[], int n) {
 #ifdef __STDC_NO_ATOMICS__
         fifo->pin = pin;
 #else
-	atomic_store(&fifo->pin, (intptr_t)pin);
+        atomic_store(&fifo->pin, (intptr_t)pin);
 #endif /* __STDC_NO_ATOMICS__ */
     }
 
@@ -127,20 +148,21 @@ int codec2_fifo_read(struct FIFO *fifo, short data[], int n)
 {
     assert(fifo != NULL);
     assert(data != NULL);
+    
+#ifdef __STDC_NO_ATOMICS__
+    short         *pin = fifo->pin;
+    short         *pin = fifo->pout;
+#else
+    short         *pin = (short*)atomic_load(&fifo->pin);
+    short         *pout = (short*)atomic_load(&fifo->pout);
+#endif /* __STDC_NO_ATOMICS__ */
 
-    int used = codec2_fifo_used(fifo);
+    int used = codec2_fifo_used_internal(pin, pout, fifo->nshort);
     if (n > used) {
         return -1;
     }
     else {
-        short         *pdata;
-#ifdef __STDC_NO_ATOMICS__
-        short         *pout = fifo->pout;
-#else
-        short         *pout = (short*)atomic_load(&fifo->pout);
-#endif /* __STDC_NO_ATOMICS__ */
-
-	pdata = data;
+        short         *pdata = data;
         if ((pout + n) >= (fifo->buf + fifo->nshort))
         {
             int firstSamples = fifo->buf + fifo->nshort - pout;
@@ -170,21 +192,19 @@ int codec2_fifo_used(const struct FIFO * const fifo)
     short         *pin = (short*)atomic_load(&fifo->pin);
     short         *pout = (short*)atomic_load(&fifo->pout);
 #endif /* __STDC_NO_ATOMICS__ */
-    unsigned int   used;
-
-    assert(fifo != NULL);
-    if (pin >= pout)
-        used = pin - pout;
-    else
-        used = fifo->nshort + (unsigned int)(pin - pout);
-
-    return used;
+    
+    return codec2_fifo_used_internal(pin, pout, fifo->nshort);
 }
 
 int codec2_fifo_free(const struct FIFO * const fifo)
 {
-    // available storage is one less than nshort as prd == pwr
-    // is reserved for empty rather than full
-
-    return fifo->nshort - codec2_fifo_used(fifo) - 1;
+#ifdef __STDC_NO_ATOMICS__
+    short         *pin = fifo->pin;
+    short         *pout = fifo->pout;
+#else
+    short         *pin = (short*)atomic_load(&fifo->pin);
+    short         *pout = (short*)atomic_load(&fifo->pout);
+#endif /* __STDC_NO_ATOMICS__ */
+    
+    return codec2_fifo_free_internal(pin, pout, fifo->nshort);
 }
