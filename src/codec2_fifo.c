@@ -35,6 +35,7 @@
 #include <string.h>
 
 #ifndef __STDC_NO_ATOMICS__
+#include <stdint.h>
 #include <stdatomic.h>
 #endif /* !__STDC_NO_ATOMICS__ */
 
