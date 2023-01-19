@@ -346,11 +346,12 @@ function train_lbg() {
   filename=$(basename -- "$fullfile")
   extension="${filename##*.}"
   filename="${filename%.*}"
+  res1=$(mktemp)
 
   # remove mean, train 2 stages - LBG
   extract -t $K -s $Kst -e $Ken --removemean --writeall $fullfile ${filename}_nomean.f32
-  vqtrain ${filename}_nomean.f32 $K $M  --st $Kst --en $Ken -s 1e-3 ${filename}_vq1.f32 -r res1.f32 --split > lbg_res1.txt
-  vqtrain res1.f32 $K $M  --st $Kst --en $Ken -s 1e-3 ${filename}_vq2.f32 -r res2.f32 --split > lbg_res2.txt
+  vqtrain ${filename}_nomean.f32 $K $M --st $Kst --en $Ken -s 1e-3 ${filename}_vq1.f32 -r ${res1} --split > ${filename}_lbg_res1.txt
+  vqtrain ${res1} $K $M --st $Kst --en $Ken -s 1e-3 ${filename}_vq2.f32 --split > ${filename}_lbg_res2.txt
 #  cat ${filename}_nomean.f32 | vq_mbest --mbest 5 -k $K -q ${filename}_vq2.f32,${filename}_vq2.f32 >> /dev/null
 }
 
