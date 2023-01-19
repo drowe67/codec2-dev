@@ -11,6 +11,7 @@ M="${M:-4096}"
 Kst="${Kst:-0}"
 Ken="${Ken:-29}"
 out_dir="${out_dir:-ratek_out}"
+options="${options:-}"
 Nb=20
 
 # Listen to effect of various eq algorithms.  Goal is to reduce dynamic range of
@@ -308,23 +309,9 @@ function gen_train() {
   fi
 
   c2sim $fullfile --hpf --modelout ${filename}_model.bin
-  echo "ratek3_batch; ratek3_batch_tool(\"${filename}\",'B_out',\"${filename_b}\",'amp_pf','K',${K}); quit;" \
-  | octave -p ${CODEC2_PATH}/octave -qf
-}
-
-function gen_train_eq() {
-  fullfile=$1
-  filename=$(basename -- "$fullfile")
-  extension="${filename##*.}"
-  filename="${filename%.*}"
-  
-  filename_b=${filename}_b.f32
-  if [ $# -eq 2 ]; then
-    filename_b=$2
-  fi
-
-  c2sim $fullfile --hpf --modelout ${filename}_model.bin
-  echo "ratek3_batch; ratek3_batch_tool(\"${filename}\",'B_out',\"${filename}_eq_b.f32\",'amp_pf','eq',1); quit;" \
+  echo "ratek3_batch; ratek3_batch_tool(\"${filename}\",'B_out',\"${filename_b}\", \
+        ${options} \
+        'K',${K}); quit;" \
   | octave -p ${CODEC2_PATH}/octave -qf
 }
 
@@ -418,9 +405,6 @@ if [ $# -gt 0 ]; then
         ;;
     gen_train)
         gen_train $2 $3
-        ;;
-    gen_train_eq)
-        gen_train_eq $2
         ;;
     train_kmeans)
         train_kmeans $2
