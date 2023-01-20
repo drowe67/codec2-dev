@@ -1,4 +1,7 @@
 # ratek_resampler.mk
+# usage:
+#   cd codec2/build/linux
+#   make -f ../script/ratek_resampler.mk
 
 SHELL  := /bin/bash
 CODEC2 := $(HOME)/codec2
@@ -7,8 +10,8 @@ TRAIN      := train_120
 
 ratek.png: $(TRAIN)_b_lbg_res1.txt $(TRAIN)_b_lbg_res2.txt
 	echo "ratek_resampler_plot(\"ratek.png\", \
-             \"$(TRAIN)_lbg_b_res1.txt\",'g-+;lbg1;', \
-             \"$(TRAIN)_lbg_b_res2.txt\",'g-+;lbg2;'); \
+             \"$(TRAIN)_b_lbg_res1.txt\",'g-+;stage11;', \
+             'continue',\"$(TRAIN)_b_lbg_res2.txt\",'r-+;stage2;'); \
              quit" | octave-cli -p $(CODEC2)/octave
 
 $(TRAIN)_lbg_b_res1.txt $(TRAIN)_b_lbg_res1.txt: $(TRAIN)_b.f32
