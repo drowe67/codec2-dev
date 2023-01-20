@@ -23,7 +23,7 @@ function ratek_resampler_plot(plot_fn, varargin)
   % plot variance against bits for decorrelated scalars,
   % e.g. 6dB/bit/VQ element, or each bit reduces variance by factor 4
   K = 30; bits=1:20; m = 6/30; var0 = 20; % var0 arbitrary choice
-  scalar = var0*10.^(-m*bits/10)
+  scalar = var0*10.^(-m*bits/10);
   plot(bits,scalar,'b+-;scalar;');
   
   xlabel('bits'); ylabel('var dB*dB'); grid('minor');

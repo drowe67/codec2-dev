@@ -12,6 +12,7 @@ Kst="${Kst:-0}"
 Ken="${Ken:-29}"
 out_dir="${out_dir:-ratek_out}"
 options="${options:-}"
+mbest="${mbest:-0}"
 Nb=20
 
 # Listen to effect of various eq algorithms.  Goal is to reduce dynamic range of
@@ -339,20 +340,41 @@ function train_test() {
   cat ${filename}_nomean.f32 | vq_mbest --mbest 5 -k $K --st $Kst --en $Ken -q $2 >> /dev/null        
 }
         
-# comparing kmeans to lbg
+function log2 {
+    local x=0
+    for (( y=$1-1 ; $y > 0; y >>= 1 )) ; do
+        let x=$x+1
+    done
+    echo $x
+}
 
 function train_lbg() {
   fullfile=$1
   filename=$(basename -- "$fullfile")
   extension="${filename##*.}"
   filename="${filename%.*}"
-  res1=$(mktemp)
-
+  
   # remove mean, train 2 stages - LBG
   extract -t $K -s $Kst -e $Ken --removemean --writeall $fullfile ${filename}_nomean.f32
-  vqtrain ${filename}_nomean.f32 $K $M --st $Kst --en $Ken -s 1e-3 ${filename}_vq1.f32 -r ${res1} --split > ${filename}_lbg_res1.txt
-  vqtrain ${res1} $K $M --st $Kst --en $Ken -s 1e-3 ${filename}_vq2.f32 --split > ${filename}_lbg_res2.txt
-#  cat ${filename}_nomean.f32 | vq_mbest --mbest 5 -k $K -q ${filename}_vq2.f32,${filename}_vq2.f32 >> /dev/null
+  vqtrain ${filename}_nomean.f32 $K $M --st $Kst --en $Ken -s 1e-3 ${filename}_vq1.f32 -r res1.f32 --split > ${filename}_lbg_res1.txt
+  vqtrain res1.f32 $K $M --st $Kst --en $Ken -s 1e-3 ${filename}_vq2.f32 --split > ${filename}_lbg_res2.txt
+
+  # optionally compare stage2 search with mbest
+  if [ $mbest -eq 1 ]; then
+    tmp=$(mktemp)
+    rm ${filename}_lbg_mbest2.txt
+    log2M=$(log2 $M)
+    for alog2M in $(seq 1 $log2M)
+    do
+      aM=$(( 2 ** $alog2M ))
+      vqtrain res1.f32 $K $aM --st $Kst --en $Ken -s 1e-3 ${filename}_vq2.f32 --split > /dev/null
+      cat ${filename}_nomean.f32 | \
+          vq_mbest --mbest 5 -k $K -q ${filename}_vq1.f32,${filename}_vq2.f32 2>${tmp} >> /dev/null
+      echo -n "$aM " >> ${filename}_lbg_mbest2.txt
+      cat ${tmp} | grep var | cut -d' ' -f 2 >> ${filename}_lbg_mbest2.txt
+    done
+  fi
+
 }
 
 # Try training with two different Nb
