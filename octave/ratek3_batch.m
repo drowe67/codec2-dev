@@ -68,7 +68,7 @@ function B = ratek3_batch_tool(samname, varargin)
       verbose = 2;
     elseif strcmp(varargin{i},"K") 
       K = varargin{i+1}; i++;
-      Kst=0; Ken=K-1;
+      Kst=0; Ken=K-1; w = ones(1,K);
     elseif strcmp(varargin{i},"subset") 
       % restrict range of VQ match to a subset of rate K vector B
       % these are in C index format for compatability with C

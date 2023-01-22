@@ -353,25 +353,31 @@ function train_lbg() {
   filename=$(basename -- "$fullfile")
   extension="${filename##*.}"
   filename="${filename%.*}"
+
+  filename_out=${filename}_lbg
+  if [ $# -eq 2 ]; then
+    filename_out=$2
+  fi
   
   # remove mean, train 2 stages - LBG
-  extract -t $K -s $Kst -e $Ken --removemean --writeall $fullfile ${filename}_nomean.f32
-  vqtrain ${filename}_nomean.f32 $K $M --st $Kst --en $Ken -s 1e-3 ${filename}_vq1.f32 -r res1.f32 --split > ${filename}_lbg_res1.txt
-  vqtrain res1.f32 $K $M --st $Kst --en $Ken -s 1e-3 ${filename}_vq2.f32 --split > ${filename}_lbg_res2.txt
+  extract -t $K -s $Kst -e $Ken --removemean --writeall $fullfile ${filename_out}_nomean.f32
+  vqtrain ${filename_out}_nomean.f32 $K $M --st $Kst --en $Ken -s 1e-3 ${filename_out}_vq1.f32 -r res1.f32 --split > ${filename_out}_res1.txt
+  vqtrain res1.f32 $K $M --st $Kst --en $Ken -s 1e-3 ${filename_out}_vq2.f32 --split > ${filename_out}_res2.txt
 
   # optionally compare stage2 search with mbest
   if [ $mbest -eq 1 ]; then
     tmp=$(mktemp)
-    rm ${filename}_lbg_mbest2.txt
+    results=${filename_out}_mbest2.txt
+    rm ${results}
     log2M=$(log2 $M)
     for alog2M in $(seq 1 $log2M)
     do
       aM=$(( 2 ** $alog2M ))
-      vqtrain res1.f32 $K $aM --st $Kst --en $Ken -s 1e-3 ${filename}_vq2.f32 --split > /dev/null
-      cat ${filename}_nomean.f32 | \
-          vq_mbest --mbest 5 -k $K -q ${filename}_vq1.f32,${filename}_vq2.f32 2>${tmp} >> /dev/null
-      echo -n "$aM " >> ${filename}_lbg_mbest2.txt
-      cat ${tmp} | grep var | cut -d' ' -f 2 >> ${filename}_lbg_mbest2.txt
+      vqtrain res1.f32 $K $aM --st $Kst --en $Ken -s 1e-3 ${filename_out}_vq2.f32 --split > /dev/null
+      cat ${filename_out}_nomean.f32 | \
+          vq_mbest --mbest 5 -k $K -q ${filename_out}_vq1.f32,${filename_out}_vq2.f32 2>${tmp} >> /dev/null
+      echo -n "$aM " >> ${results}
+      cat ${tmp} | grep var | cut -d' ' -f 2 >> ${results}
     done
   fi
 
@@ -436,7 +442,7 @@ if [ $# -gt 0 ]; then
         train_test $2 $3
         ;;
      train_lbg)
-        train_lbg $2
+        train_lbg $2 $3
         ;;
     vq_test)
         vq_test ../raw/big_dog.raw

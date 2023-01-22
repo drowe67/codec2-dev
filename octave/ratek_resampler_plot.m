@@ -15,7 +15,7 @@ function ratek_resampler_plot(plot_fn, varargin)
       fn = varargin{i}; i++;
       leg = varargin{i}; i++;
       x = load(fn);
-      plot(bits_offset+log2(x(:,1)),x(:,2),leg);
+      semilogy(bits_offset+log2(x(:,1)),x(:,2),leg);
       bits_offset = 0;
     end  
   end
@@ -24,7 +24,7 @@ function ratek_resampler_plot(plot_fn, varargin)
   % e.g. 6dB/bit/VQ element, or each bit reduces variance by factor 4
   K = 30; bits=1:20; m = 6/30; var0 = 20; % var0 arbitrary choice
   scalar = var0*10.^(-m*bits/10);
-  plot(bits,scalar,'b+-;scalar;');
+  plot(bits,scalar,'b+-;scalar slope;');
   
   xlabel('bits'); ylabel('var dB*dB'); grid('minor');
   axis([0 20 0 20]);
