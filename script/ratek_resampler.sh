@@ -6,13 +6,17 @@
 
 CODEC2_PATH=$HOME/codec2
 PATH=$PATH:$CODEC2_PATH/build_linux/src:$CODEC2_PATH/build_linux/misc
+
+# bunch of options we can set via variables
 K="${K:-30}"
 M="${M:-4096}"
 Kst="${Kst:-0}"
 Ken="${Ken:-29}"
 out_dir="${out_dir:-ratek_out}"
 options="${options:-}"
-mbest="${mbest:-0}"
+mbest="${mbest:-no}"
+removemean="${removemean:---removemean}"
+stage2="${stage2:-yes}"
 Nb=20
 
 # Listen to effect of various eq algorithms.  Goal is to reduce dynamic range of
@@ -324,7 +328,7 @@ function train_kmeans() {
   res1=$(mktemp)
   
   # remove mean, train 2 stages - kmeans
-  extract -t $K -s $Kst -e $Ken --lower 10 --removemean --writeall $fullfile ${filename}_nomean.f32
+  extract -t $K -s $Kst -e $Ken --lower 10 $removemean --writeall $fullfile ${filename}_nomean.f32
   vqtrain ${filename}_nomean.f32 $K $M --st $Kst --en $Ken -s 1e-3 ${filename}_vq1.f32 -r ${res1} --used ${filename}_used1.txt > kmeans_res1.txt
   vqtrain ${res1} $K $M --st $Kst --en $Ken  -s 1e-3 ${filename}_vq2.f32 -r res2.f32 --used ${filename}_used2.txt > kmeans_res2.txt
 #  cat ${filename}_nomean.f32 | vq_mbest --mbest 5 -k $K --st $Kst --en $Ken  -q ${filename}_vq1.f32,${filename}_vq2.f32 >> /dev/null
@@ -360,12 +364,14 @@ function train_lbg() {
   fi
   
   # remove mean, train 2 stages - LBG
-  extract -t $K -s $Kst -e $Ken --removemean --writeall $fullfile ${filename_out}_nomean.f32
+  extract -t $K -s $Kst -e $Ken $removemean --writeall $fullfile ${filename_out}_nomean.f32
   vqtrain ${filename_out}_nomean.f32 $K $M --st $Kst --en $Ken -s 1e-3 ${filename_out}_vq1.f32 -r res1.f32 --split > ${filename_out}_res1.txt
-  vqtrain res1.f32 $K $M --st $Kst --en $Ken -s 1e-3 ${filename_out}_vq2.f32 --split > ${filename_out}_res2.txt
-
+  if [ "$stage2" == "yes" ]; then
+    vqtrain res1.f32 $K $M --st $Kst --en $Ken -s 1e-3 ${filename_out}_vq2.f32 --split > ${filename_out}_res2.txt
+  fi
+      
   # optionally compare stage2 search with mbest
-  if [ $mbest -eq 1 ]; then
+  if [ "$mbest" == "yes" ]; then
     tmp=$(mktemp)
     results=${filename_out}_mbest2.txt
     rm ${results}

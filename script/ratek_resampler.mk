@@ -33,7 +33,7 @@ $(TRAIN)_ratek.png: $(PLOT_DATA)
 
 # (1) no amp PF before VQ, include 2nd stage mbest
 $(TRAIN)_lbg_res1.txt $(TRAIN)_lbg_res2.txt $(TRAIN)_lbg_mbest2.txt: $(TRAIN)_b.f32
-	mbest=1 M=$(M) ../script/ratek_resampler.sh train_lbg $(TRAIN)_b.f32 $(TRAIN)_lbg
+	mbest="yes" M=$(M) ../script/ratek_resampler.sh train_lbg $(TRAIN)_b.f32 $(TRAIN)_lbg
 
 # (2) as above, subset
 $(TRAIN)_sub_res1.txt $(TRAIN)_sub_res2.txt: $(TRAIN)_b.f32
@@ -45,8 +45,8 @@ $(TRAIN)_k20_res1.txt $(TRAIN)_k20_res2.txt: $(TRAIN)_b20.f32
 
 # K=20 split, energy removed first
 $(TRAIN)_splt1_res1.txt $(TRAIN)_splt2_res1.txt: $(TRAIN)_b20.f32
-	K=20 Kst=0 Ken=9 M=$(M) ../script/ratek_resampler.sh train_lbg $(TRAIN)_b20.f32 $(TRAIN)_splt1
-	K=20 Kst=10 Ken=19 M=$(M) ../script/ratek_resampler.sh train_lbg $(TRAIN)_b20.f32 $(TRAIN)_splt2
+	K=20 Kst=0  Ken=9  M=$(M) stage2="no" ../script/ratek_resampler.sh train_lbg $(TRAIN)_b20.f32 $(TRAIN)_splt1
+	K=20 Kst=10 Ken=19 M=$(M) stage2="no" ../script/ratek_resampler.sh train_lbg $(TRAIN)_b20.f32 $(TRAIN)_splt2
 
 $(TRAIN)_b.f32:
 	../script/ratek_resampler.sh gen_train $(TRAIN_FULL)
