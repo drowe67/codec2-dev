@@ -48,6 +48,11 @@ $(TRAIN)_splt1_res1.txt $(TRAIN)_splt2_res1.txt: $(TRAIN)_b20.f32
 	K=20 Kst=0  Ken=9  M=$(M) stage2="no" ../script/ratek_resampler.sh train_lbg $(TRAIN)_b20.f32 $(TRAIN)_splt1
 	K=20 Kst=10 Ken=19 M=$(M) stage2="no" ../script/ratek_resampler.sh train_lbg $(TRAIN)_b20.f32 $(TRAIN)_splt2
 
+# K=20 split, energy removed first
+$(TRAIN)_splt1_res1.txt $(TRAIN)_splt2_res1.txt: $(TRAIN)_b20.f32
+	K=20 Kst=0  Ken=9  M=$(M) stage2="no" ../script/ratek_resampler.sh train_lbg $(TRAIN)_b20.f32 $(TRAIN)_splt1
+	K=20 Kst=10 Ken=19 M=$(M) stage2="no" ../script/ratek_resampler.sh train_lbg $(TRAIN)_b20.f32 $(TRAIN)_splt2
+
 $(TRAIN)_b.f32:
 	../script/ratek_resampler.sh gen_train $(TRAIN_FULL)
 
