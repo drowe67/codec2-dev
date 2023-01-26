@@ -363,8 +363,10 @@ function train_lbg() {
     filename_out=$2
   fi
   
-  # remove mean, train 2 stages - LBG
-  extract -t $K -s $Kst -e $Ken $removemean --writeall $fullfile ${filename_out}_nomean.f32
+  # remove mean, extract columns from training data
+  extract -t $K -s $Kst -e $Ken --lower 10 $removemean --writeall $fullfile ${filename_out}_nomean.f32
+
+  # train 2 stages - LBG
   vqtrain ${filename_out}_nomean.f32 $K $M --st $Kst --en $Ken -s 1e-3 ${filename_out}_vq1.f32 -r res1.f32 --split > ${filename_out}_res1.txt
   if [ "$stage2" == "yes" ]; then
     vqtrain res1.f32 $K $M --st $Kst --en $Ken -s 1e-3 ${filename_out}_vq2.f32 --split > ${filename_out}_res2.txt
@@ -387,6 +389,28 @@ function train_lbg() {
     done
   fi
 
+}
+
+# extract length K=en-st+1 vector, then concatenate with next extracted vector
+# to jointly VQ across freq and time
+function train_lbg_time_freq() {
+  fullfile=$1
+  filename=$(basename -- "$fullfile")
+  extension="${filename##*.}"
+  filename="${filename%.*}"
+
+  filename_out=${filename}_lbg
+  if [ $# -eq 2 ]; then
+    filename_out=$2
+  fi
+  
+  K1=$(( $Ken-$Kst+1 ))
+  K2=$(( 2*$K1 ))
+  # remove mean, extract K1 columns from training data
+  extract -t $K -s $Kst -e $Ken --lower 10 $removemean --timestep 2 $fullfile ${filename_out}_nomean.f32
+
+  # train 1 stage with LBG, concatenating two K/2 vectors to form length K vectors
+  vqtrain ${filename_out}_nomean.f32 $K2 $M -s 1e-3 ${filename_out}_vq1.f32 --split > ${filename_out}_res1.txt
 }
 
 # Try training with two different Nb
@@ -447,8 +471,11 @@ if [ $# -gt 0 ]; then
     train_test)
         train_test $2 $3
         ;;
-     train_lbg)
+    train_lbg)
         train_lbg $2 $3
+        ;;
+    train_lbg_time_freq)
+        train_lbg_time_freq $2 $3
         ;;
     vq_test)
         vq_test ../raw/big_dog.raw

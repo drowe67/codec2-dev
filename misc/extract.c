@@ -1,6 +1,6 @@
 /*
   extract.c
-  david Rowe Jan 2019
+  David Rowe Jan 2019
 
   Vector Quantiser tool that pre-processes training data before vq_train.
 */
@@ -25,17 +25,21 @@ int main(int argc, char *argv[]) {
     float lower = -1E32;
     int writeall = 0;
     float dynamicrange = 100.0;
+    int timestep = 1;
+    int timeoffset = 0;
     
     static struct option long_options[] = {
         {"startcol",      required_argument, 0, 's'},
         {"endcol",        required_argument, 0, 'e'},
         {"stride",        required_argument, 0, 't'},
+        {"timestep",      required_argument, 0, 'i'},
+        {"timeoffset",    required_argument, 0, 'o'},
         {"gain",          required_argument, 0, 'g'},
         {"pred",          required_argument, 0, 'p'},
         {"delay",         required_argument, 0, 'd'},
         {"removemean",    no_argument,       0, 'm'},
         {"lower",         required_argument, 0, 'l'},
-        {"dynamicrange", required_argument, 0, 'y'},
+        {"dynamicrange",  required_argument, 0, 'y'},
         {"writeall",      no_argument,       0, 'w'},
         {0, 0, 0, 0}
     };
@@ -43,7 +47,7 @@ int main(int argc, char *argv[]) {
     int opt_index = 0;
     int c;
     
-    while ((c = getopt_long (argc, argv, "s:e:t:g:p:d:ml:y:", long_options, &opt_index)) != -1) {
+    while ((c = getopt_long (argc, argv, "s:e:t:g:p:d:ml:y:i:o:", long_options, &opt_index)) != -1) {
         switch (c) {
         case 's':
             st = atoi(optarg);
@@ -53,6 +57,12 @@ int main(int argc, char *argv[]) {
             break;
         case 't':
             stride = atoi(optarg);
+            break;
+        case 'i':
+            timestep = atoi(optarg);
+            break;
+        case 'o':
+            timeoffset = atoi(optarg);
             break;
         case 'g':
             gain = atof(optarg);
@@ -77,16 +87,18 @@ int main(int argc, char *argv[]) {
             break;
         default:
         helpmsg:
-            fprintf(stderr, "usage: %s  -s startCol -e endCol [options] input.f32 output.f32\n"
+            fprintf(stderr, "VQ pre-processing tool\n\nusage: %s  -s startCol -e endCol [options] input.f32 output.f32\n"
                             "\n"
-                            "-t strideCol           Vector dimenstion, e.g. 30\n"
+                            "-t K                   Vector length, e.g. 20\n"
                             "-g gain                Gain applied to vectors\n"
                             "-p predCoeff           Coefficient used for prediction, e.g. 0.9\n"
-                            "-d framesDelay Delay   Delay (frames) between vectors used for prediction\n"
+                            "-d predDelay           Delay (frames) between vectors used for prediction\n"
                             "--removemean           Remove mean from vectors\n"
                             "--lower minEnergy      Remove all vectors less than minEnergy\n"
-                            "--writeall             Write all K outputs for each vectoir, even if EndCol-StartCol+1 < stride\n"
+                            "--writeall             Write all K outputs for each vector, even if EndCol-StartCol+1 < stride\n"
                             "--dynamicrange RangedB Clip min value of each vector to max - RangedB\n"
+                            "--timestep frames      time step (frames) between vectors\n"
+                            "--timeoffset frames    Ignore this many initial frames\n"
                             "input.f32 output.f32\n", argv[0]);
             exit(1);
         }
@@ -116,7 +128,11 @@ int main(int argc, char *argv[]) {
         for(i=0; i<stride; i++)
             features_prev[f][i] = 0.0;
 
+    for(int i=0; i<timeoffset; i++)
+        assert(fread(features, sizeof(float), stride, fin) == stride);
+
     while((fread(features, sizeof(float), stride, fin) == stride)) {
+        rd++;
 	float mean = 0.0;
 	for(i=st; i<=en; i++)
 	    mean += features[i];
@@ -152,7 +168,13 @@ int main(int argc, char *argv[]) {
 		features_prev[f][i] = features_prev[f-1][i];
 	for(i=0; i<stride; i++)
 	    features_prev[0][i] = features[i];
-        rd++;    
+
+        for(int i=0; i<timestep-1; i++) {
+            int ret = fread(features, sizeof(float), stride, fin);
+            if (ret != stride) {
+                fprintf(stderr, "warning: end of input reached ...\n");
+            } else rd++;
+        }
     }
 
     fclose(fin); fclose(fout);
