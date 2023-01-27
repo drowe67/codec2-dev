@@ -42,7 +42,7 @@
 
   Pre-emphasise (high pass filter with zero close to 0 Hz) a frame of
   speech samples.  Helps reduce dynamic range of LPC spectrum, giving
-  greater weight and hense a better match to low energy formants.
+  greater weight and hence a better match to low energy formants.
 
   Should be balanced by de-emphasis of the output speech.
 
