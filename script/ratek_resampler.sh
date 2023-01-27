@@ -10,9 +10,9 @@ PATH=$PATH:$CODEC2_PATH/build_linux/src:$CODEC2_PATH/build_linux/misc
 # bunch of options we can set via variables
 K="${K:-30}"
 M="${M:-4096}"
-Kst="${Kst:-0}"
-Ksp="${Ksp:-9}"
-Ken="${Ken:-29}"
+Kst="${Kst:-0}"  # first index 
+Ksp="${Ksp:-9}"  # last element of first vector in split
+Ken="${Ken:-29}" # last index max K-1
 out_dir="${out_dir:-ratek_out}"
 options="${options:-}"
 mbest="${mbest:-no}"
@@ -420,7 +420,8 @@ function train_lbg_split_time() {
   filename="${filename%.*}"
   tmp=$(mktemp)
   tmp1=$(mktemp)
-  
+  tmp2=$(mktemp)
+ 
   filename_out=${filename}_lbg
   if [ $# -eq 2 ]; then
     filename_out=$2
@@ -429,17 +430,20 @@ function train_lbg_split_time() {
   # extract all columns used, at 20ms time steps
   extract -t $K -s $Kst -e $Ken --timestep 2 $fullfile $tmp
   # Reshaping to vectors 2K long that include freq and 40ms of time, remove low
-  # energy vectors and a single mean across entire vector
-  extract -t $(( 2*K )) --lower 10 --removemean $tmp $tmp1
-  # Reshaping back to vectors K long, extract two splits
-  extract -t $K -s $Kst -e $Ksp $tmp1 ${filename_out}_nomean1.f32
-  extract -t $K -s $(( $Ksp+1 )) -e $Ken $tmp1 ${filename_out}_nomean2.f32
+  # energy vectors across entire 40ms block
+  extract -t $(( 2*K )) --lower 10 $tmp $tmp1
+  # Reshaping back to vectors K long, extract mean across freq, implying
+  # two means/40ms block that need quantising as side information
+  extract -t $K --removemean $tmp1 $tmp2
+  # Now extract two splits
+  extract -t $K -s $Kst -e $Ksp $tmp2 ${filename_out}_nomean1.f32
+  extract -t $K -s $(( $Ksp+1 )) -e $Ken $tmp2 ${filename_out}_nomean2.f32
   
   # train 2 x 1 stage split VQ, over 40ms time blocks
   K1=$(( $Ksp-$Kst+1 ))
-  K2=$(( $Ken-$Ksp+1 ))
-  vqtrain ${filename_out}_nomean1.f32 $(( K1 )) $M -s 1e-3 ${filename_out}_vq1.f32 --split > ${filename_out}_res1.txt
-  vqtrain ${filename_out}_nomean2.f32 $(( K2 )) $M -s 1e-3 ${filename_out}_vq2.f32 --split > ${filename_out}_res2.txt
+  K2=$(( $Ken-$Ksp ))
+  vqtrain ${filename_out}_nomean1.f32 $(( 2*K1 )) $M -s 1e-3 ${filename_out}_vq1.f32 --split > ${filename_out}_res1.txt
+  vqtrain ${filename_out}_nomean2.f32 $(( 2*K2 )) $M -s 1e-3 ${filename_out}_vq2.f32 --split > ${filename_out}_res2.txt
  }
 
 # Try training with two different Nb

@@ -28,6 +28,6 @@ function ratek_resampler_plot(plot_fn, varargin)
   plot([min(bits) max(bits)], [4 4],'b--;4 dB*dB;');
   
   xlabel('bits'); ylabel('var dB*dB'); grid('minor');
-  axis([0 20 0 20]);
+  axis([0 20 1 20]);
   print("-dpng", plot_fn);
 endfunction
