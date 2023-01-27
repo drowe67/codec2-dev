@@ -101,7 +101,7 @@ int main(int argc, char *argv[])
     int   vector_quant_Wo_e = 0;
     int   dump_pitch_e = 0;
     float gainoutlin = 1.0;
-    float comp_limit_dB = 100.0;
+    float comp_limit_samples = 32767;
     float comp_gain_dB = 0.0;
     int   comp_en = 0;
     int   bpf_en = 0;
@@ -374,7 +374,7 @@ int main(int argc, char *argv[])
 	    } else if(strcmp(long_options[option_index].name, "gainoutlin") == 0) {
 		gainoutlin = atof(optarg);
 	    } else if(strcmp(long_options[option_index].name, "comp") == 0) {
-		comp_limit_dB = atof(optarg);
+		comp_limit_samples = atof(optarg);
                 comp_en = 1;
 	    } else if(strcmp(long_options[option_index].name, "comp_gain") == 0) {
 		comp_gain_dB = atof(optarg);
@@ -784,6 +784,18 @@ int main(int argc, char *argv[])
 	\*------------------------------------------------------------*/
 
         if (comp_en) {
+            float s_max = 0.0;
+            float comp_gain_lin = pow(10.0, comp_gain_dB/20.0);
+            for(int m=1; m<=model.L; m++)
+                s_max += 2.0*model.A[m]*comp_gain_lin;
+            //fprintf(stderr, "s_max: %f\n", s_max);
+            float g = 1.0;
+            if (s_max > comp_limit_samples)
+                g = comp_limit_samples/s_max;
+            for(int m=1; m<=model.L; m++)
+                model.A[m] *= g*comp_gain_lin;
+            
+#ifdef OLD               
             float pre[MAX_AMP+1];
             float AmdB[MAX_AMP+1];
             float AmdB_pre[MAX_AMP+1];
@@ -819,6 +831,7 @@ int main(int argc, char *argv[])
                     AmdB_comp[m] = AmdB[m] + gain_band2;
                 model.A[m] = pow(10.0, AmdB_comp[m]/20.0);
             }
+#endif            
         }
         
 	/*------------------------------------------------------------*\
