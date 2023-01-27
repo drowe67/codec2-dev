@@ -321,6 +321,24 @@ function gen_train() {
   | octave -p ${CODEC2_PATH}/octave -qf
 }
 
+function gen_train_comp() {
+  fullfile=$1
+  filename=$(basename -- "$fullfile")
+  extension="${filename##*.}"
+  filename="${filename%.*}"
+  
+  filename_b=${filename}_b.f32
+  if [ $# -eq 2 ]; then
+    filename_b=$2
+  fi
+
+  c2sim $fullfile --hpf --comp_gain 12 --comp 70 --modelout ${filename}_model.bin
+  echo "ratek3_batch; ratek3_batch_tool(\"${filename}\",'B_out',\"${filename_b}\", \
+        ${options} \
+        'K',${K}); quit;" \
+  | octave -p ${CODEC2_PATH}/octave -qf
+}
+
 function train_kmeans() {
   fullfile=$1
   filename=$(basename -- "$fullfile")
@@ -497,6 +515,9 @@ if [ $# -gt 0 ]; then
         ;;
     gen_train)
         gen_train $2 $3
+        ;;
+    gen_train_comp)
+        gen_train_comp $2 $3
         ;;
     train_kmeans)
         train_kmeans $2
