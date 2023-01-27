@@ -15,9 +15,9 @@
 
 int main(int argc, char *argv[]) {
     FILE *fin, *fout;
-    int st = 0;
-    int en = 17;
     int stride = NB_FEATURES;
+    int st = 0;
+    int en = stride-1;
     float gain = 1.0;
     int frame_delay = 1;
     float pred = 0.0;
@@ -57,6 +57,8 @@ int main(int argc, char *argv[]) {
             break;
         case 't':
             stride = atoi(optarg);
+            st = 0;
+            en = stride-1;
             break;
         case 'i':
             timestep = atoi(optarg);
@@ -115,9 +117,9 @@ int main(int argc, char *argv[]) {
     
     fin = fopen(argv[optind],"rb"); assert(fin != NULL);
     fout = fopen(argv[optind+1],"wb"); assert(fout != NULL);
-    printf("extracting from %d to %d inclusive (stride %d) ... \n"
-           "gain = %f pred = %f frame_delay = %d dynamic range = %f\n",
-           st, en, stride, gain, pred, frame_delay, dynamicrange);
+    printf("extracting from %d to %d inclusive (K=%d, timestep=%d) ... \n"
+           "gain = %f pred = %f pred_frame_delay = %d dynamic range = %f\n",
+           st, en, stride, timestep, gain, pred, frame_delay, dynamicrange);
    
     float features[stride], features_prev[frame_delay][stride], delta[stride];
     int i,f,rd=0,wr=0;

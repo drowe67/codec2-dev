@@ -11,6 +11,7 @@ PATH=$PATH:$CODEC2_PATH/build_linux/src:$CODEC2_PATH/build_linux/misc
 K="${K:-30}"
 M="${M:-4096}"
 Kst="${Kst:-0}"
+Ksp="${Ksp:-9}"
 Ken="${Ken:-29}"
 out_dir="${out_dir:-ratek_out}"
 options="${options:-}"
@@ -391,27 +392,55 @@ function train_lbg() {
 
 }
 
-# extract length K=en-st+1 vector, then concatenate with next extracted vector
-# to jointly VQ across freq and time
-function train_lbg_time_freq() {
+# Split VQ across freq |Kst..Ksp| and |Ksp+1 .. Ken|
+function train_lbg_split() {
   fullfile=$1
   filename=$(basename -- "$fullfile")
   extension="${filename##*.}"
   filename="${filename%.*}"
-
+  
   filename_out=${filename}_lbg
   if [ $# -eq 2 ]; then
     filename_out=$2
   fi
   
-  K1=$(( $Ken-$Kst+1 ))
-  K2=$(( 2*$K1 ))
-  # remove mean, extract K1 columns from training data
-  extract -t $K -s $Kst -e $Ken --lower 10 $removemean --timestep 2 $fullfile ${filename_out}_nomean.f32
-
-  # train 1 stage with LBG, concatenating two K/2 vectors to form length K vectors
-  vqtrain ${filename_out}_nomean.f32 $K2 $M -s 1e-3 ${filename_out}_vq1.f32 --split > ${filename_out}_res1.txt
+  # extract columns, remove mean and low energy vectors
+  extract -t $K -s $Kst -e $Ken --lower 10 --removemean $fullfile ${filename_out}_nomean.f32
+ 
+  # train 2 x 1 stage split VQ
+  vqtrain ${filename_out}_nomean.f32 $K $M --st $Kst --en $Ksp -s 1e-3 ${filename_out}_vq1.f32 --split > ${filename_out}_res1.txt
+  vqtrain ${filename_out}_nomean.f32 $K $M --st $(( $Ksp+1 )) --en $Ken -s 1e-3 ${filename_out}_vq2.f32 --split > ${filename_out}_res2.txt
 }
+
+# Split VQ across freq |Kst..Ksp| and |Ksp+1 .. Ken| and time (2 x 20ms)
+function train_lbg_split_time() {
+  fullfile=$1
+  filename=$(basename -- "$fullfile")
+  extension="${filename##*.}"
+  filename="${filename%.*}"
+  tmp=$(mktemp)
+  tmp1=$(mktemp)
+  
+  filename_out=${filename}_lbg
+  if [ $# -eq 2 ]; then
+    filename_out=$2
+  fi
+  
+  # extract all columns used, at 20ms time steps
+  extract -t $K -s $Kst -e $Ken --timestep 2 $fullfile $tmp
+  # Reshaping to vectors 2K long that include freq and 40ms of time, remove low
+  # energy vectors and a single mean across entire vector
+  extract -t $(( 2*K )) --lower 10 --removemean $tmp $tmp1
+  # Reshaping back to vectors K long, extract two splits
+  extract -t $K -s $Kst -e $Ksp $tmp1 ${filename_out}_nomean1.f32
+  extract -t $K -s $(( $Ksp+1 )) -e $Ken $tmp1 ${filename_out}_nomean2.f32
+  
+  # train 2 x 1 stage split VQ, over 40ms time blocks
+  K1=$(( $Ksp-$Kst+1 ))
+  K2=$(( $Ken-$Ksp+1 ))
+  vqtrain ${filename_out}_nomean1.f32 $(( K1 )) $M -s 1e-3 ${filename_out}_vq1.f32 --split > ${filename_out}_res1.txt
+  vqtrain ${filename_out}_nomean2.f32 $(( K2 )) $M -s 1e-3 ${filename_out}_vq2.f32 --split > ${filename_out}_res2.txt
+ }
 
 # Try training with two different Nb
 function train_Nb() {
@@ -474,8 +503,11 @@ if [ $# -gt 0 ]; then
     train_lbg)
         train_lbg $2 $3
         ;;
-    train_lbg_time_freq)
-        train_lbg_time_freq $2 $3
+    train_lbg_split)
+        train_lbg_split $2 $3
+        ;;
+    train_lbg_split_time)
+        train_lbg_split_time $2 $3
         ;;
     vq_test)
         vq_test ../raw/big_dog.raw
