@@ -19,7 +19,7 @@ function ratek2_high_fbf(samname, f, vq_stage1_f32="", vq_stage2_f32="")
 
   newamp_700c; melvq;
   Fs = 8000; Nb = 20; K = 30; resampler = 'spline'; Lhigh = 80; vq_en = 0; all_en = 0;
-  amp_pf_en = 1; eq = 0; Kst = 2; Ken = 24;
+  amp_pf_en = 0; eq = 0; Kst = 2; Ken = 24;
   
   % load up text files dumped from c2sim ---------------------------------------
 

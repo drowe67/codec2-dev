@@ -784,54 +784,40 @@ int main(int argc, char *argv[])
 	\*------------------------------------------------------------*/
 
         if (comp_en) {
-            float s_max = 0.0;
+            float Acomp[MAX_AMP+1];
+            float s_max_low = 0.0, s_max_high = 0.0;
             float comp_gain_lin = pow(10.0, comp_gain_dB/20.0);
-            for(int m=1; m<=model.L; m++)
-                s_max += 2.0*model.A[m]*comp_gain_lin;
-            //fprintf(stderr, "s_max: %f\n", s_max);
-            float g = 1.0;
-            if (s_max > comp_limit_samples)
-                g = comp_limit_samples/s_max;
-            for(int m=1; m<=model.L; m++)
-                model.A[m] *= g*comp_gain_lin;
-            
-#ifdef OLD               
-            float pre[MAX_AMP+1];
-            float AmdB[MAX_AMP+1];
-            float AmdB_pre[MAX_AMP+1];
-            float max_band1 = 0.0, max_band2 = 0.0;
             float Fs2 = Fs/2;
             
+            // apply compressor gain and pre-emphasis from 1000 Hz,
+            // so 6dB up at 2000 Hz
             for(int m=1; m<=model.L; m++) {
+                float pre_lin = 1.0;
                 float sample_freq_Hz = m*model.Wo*Fs2/PI;
-                pre[m] = 20.0*log10(sample_freq_Hz/300.0);
-                AmdB[m] = 20.0*log10(model.A[m]) + comp_gain_dB;
-                AmdB_pre[m] = AmdB[m] + pre[m];
-                if (sample_freq_Hz < 1000.0) {
-                    if (AmdB_pre[m] > max_band1)
-                        max_band1 = AmdB_pre[m];
-                } else {
-                    if (AmdB_pre[m] > max_band2)
-                        max_band2 = AmdB_pre[m];
-                }
+                if (sample_freq_Hz > 1000.0)
+                    pre_lin = sample_freq_Hz/1000;
+                Acomp[m] = 2.0*comp_gain_lin*pre_lin*model.A[m];
+                if (sample_freq_Hz < 1000.0)
+                    s_max_low += Acomp[m];
+                else
+                    s_max_high += Acomp[m];
             }
-
-            float gain_band1 = 0.0;
-            if (comp_limit_dB-max_band1 < 0.0)
-                gain_band1 = comp_limit_dB-max_band1;
-            float gain_band2 = 0.0;
-            if (comp_limit_dB-max_band2 < 0.0)
-                gain_band2 = comp_limit_dB-max_band2;
-            float AmdB_comp[MAX_AMP+1];
+            float g_low = 1.0;
+            if (s_max_low > comp_limit_samples)
+                g_low = comp_limit_samples/s_max_low;
+            float g_high = 1.0;
+            if (s_max_high > comp_limit_samples)
+                g_high = comp_limit_samples/s_max_high;
+            fprintf(stderr, "f: %d s_max_low: %6.0f s_max_high: %6.0f gains: %3.2f %3.2f\n", 
+                            frames, s_max_low, s_max_high, g_low, g_high);
             for(int m=1; m<=model.L; m++) {
                 float sample_freq_Hz = m*model.Wo*Fs2/PI;
                 if (sample_freq_Hz < 1000.0)
-                    AmdB_comp[m] = AmdB[m] + gain_band1;
+                    model.A[m] = g_low*Acomp[m];
                 else
-                    AmdB_comp[m] = AmdB[m] + gain_band2;
-                model.A[m] = pow(10.0, AmdB_comp[m]/20.0);
+                    model.A[m] = g_high*Acomp[m];
             }
-#endif            
+                 
         }
         
 	/*------------------------------------------------------------*\

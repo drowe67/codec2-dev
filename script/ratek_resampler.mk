@@ -59,7 +59,7 @@ $(TRAIN)_stf_res1.txt $(TRAIN)_stf_res2.txt: $(TRAIN)_b20.f32
 
 # as per (1), K=20, first pass at source compressor
 $(TRAIN)_comp_res1.txt $(TRAIN)_comp_res2.txt: $(TRAIN)_b20_comp.f32
-	K=20 Kst=0 Ken=19 M=$(M) ../script/ratek_resampler.sh train_lbg $(TRAIN)_b20_comp.f32 $(TRAIN)_comp
+	lower=30 K=20 Kst=0 Ken=19 M=$(M) ../script/ratek_resampler.sh train_lbg $(TRAIN)_b20_comp.f32 $(TRAIN)_comp
 
 $(TRAIN)_b.f32:
 	../script/ratek_resampler.sh gen_train $(TRAIN_FULL)
