@@ -37,7 +37,7 @@ function B = ratek3_batch_tool(samname, varargin)
   Nb=20; K=30; rateK_en = 0; verbose = 1; eq =0;
   A_out_fn = ""; B_out_fn = ""; vq_stage1_f32=""; vq_stage2_f32="";
   H_out_fn = ""; amp_pf_en = 0;  phase_pf_en=0; i = 1;
-  Kst=0; Ken=K-1; dec = 1;
+  Kst=0; Ken=K-1; dec = 1; scatter_en = 0;
   w = ones(1,K);
 
   lower = 10;             % only consider vectors above this mean
@@ -79,6 +79,9 @@ function B = ratek3_batch_tool(samname, varargin)
       dec = varargin{i+1}; i++;
     elseif strcmp(varargin{i},"DR") 
       dynamic_range = varargin{i+1}; i++;
+    elseif strcmp(varargin{i},"scatter") 
+      % energy scatter plots
+      scatter_en = 1;
     else
       printf("\nERROR unknown argument: %s\n", varargin{i});
       return;
@@ -147,7 +150,7 @@ function B = ratek3_batch_tool(samname, varargin)
     if rateK_en
       % Resample from rate Lhigh to rate K b=R(Y), note K are non-linearly spaced (warped freq axis)
       B(f,:) = interp1(rate_Lhigh_sample_freqs_kHz, YdB, rate_K_sample_freqs_kHz, "spline", "extrap");
-     
+      
       % dynamic range limiting
       lower=-100;
       B(f,:) .*= w;
@@ -258,6 +261,23 @@ function B = ratek3_batch_tool(samname, varargin)
   if vq_en && verbose
     sd = sum_Eq/nEq;
     printf("Nb: %d K: %d mean SD: %4.2f dB^2 %4.2f dB\n", Nb, K, sd, sqrt(sd));
+  end
+  
+  % optional energy scatter plots
+  if scatter_en
+    E_A = zeros(1,frames); E_B = zeros(1,frames); Wo = zeros(1,frames);
+    for f=1:frames
+      Wo(f) = model(f,1); L = model(f,2);
+      Am = model(f,3:(L+2));
+      E_A(f) = 10*log10(sum(Am.^2));
+      Blin = 10 .^ (B(f,:)/20);
+      E_B(f) = 10*log10(sum(Blin .^2));
+    end
+    figure(1); clf; 
+    semilogx(Fs*Wo/(2*pi),E_A,'b.;Energy {A};');
+    hold on;
+    semilogx(Fs*Wo/(2*pi),E_B,'g.;Energy {B};');
+    hold off; axis([50 400 20 80])
   end
 endfunction
 
