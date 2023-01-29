@@ -142,11 +142,6 @@ function B = ratek3_batch_tool(samname, varargin)
       YdB(m) = 10*log10(Y);
     end
     
-    % Optional amplitude post filtering
-    if amp_pf_en
-      YdB = amplitude_postfilter(rate_Lhigh_sample_freqs_kHz, YdB, Fs, F0high, eq);
-    end
-    
     if rateK_en
       % Resample from rate Lhigh to rate K b=R(Y), note K are non-linearly spaced (warped freq axis)
       B(f,:) = interp1(rate_Lhigh_sample_freqs_kHz, YdB, rate_K_sample_freqs_kHz, "spline", "extrap");
@@ -182,14 +177,24 @@ function B = ratek3_batch_tool(samname, varargin)
         AmdB_(nzero:L) = 0;
       end
       
-      Am_(f,1:L) = 10.^(AmdB_/20);
+      % Optional amplitude post filtering
+      if amp_pf_en
+        AmdB_ = amplitude_postfilter(rate_L_sample_freqs_kHz, AmdB_, Fs, F0, eq);
+      end
+
+      Am_(f,1:L) = 10.^(AmdB_/20);      
       
       % Synthesised phase0 model using Hilbert Transform
       if length(H_out_fn)
         H(f,1:L) = synth_phase_from_mag(rate_K_sample_freqs_kHz, B_hat(f,:), Fs, Wo, L, phase_pf_en);
       end
     else
-      % rate Lhigh processing
+      % Optional amplitude post filtering
+      if amp_pf_en
+        YdB = amplitude_postfilter(rate_Lhigh_sample_freqs_kHz, YdB, Fs, F0high, eq);
+      end
+      
+     % rate Lhigh processing
       AmdB_ = interp1([0 rate_Lhigh_sample_freqs_kHz 4], [0 YdB 0], rate_L_sample_freqs_kHz, "spline", "extrap");
       Am_(f,1:L) = 10.^(AmdB_/20);
       if length(H_out_fn)
@@ -260,7 +265,7 @@ function B = ratek3_batch_tool(samname, varargin)
   
   if vq_en && verbose
     sd = sum_Eq/nEq;
-    printf("Nb: %d K: %d mean SD: %4.2f dB^2 %4.2f dB\n", Nb, K, sd, sqrt(sd));
+    printf("Nb: %d K: %d mean Eq: %4.2f dB^2 %4.2f dB\n", Nb, K, sd, sqrt(sd));
   end
   
   % optional energy scatter plots
