@@ -27,6 +27,7 @@ int main(int argc, char *argv[]) {
     float dynamicrange = 100.0;
     int timestep = 1;
     int timeoffset = 0;
+    int mean_l2 = 0;
     
     static struct option long_options[] = {
         {"startcol",      required_argument, 0, 's'},
@@ -38,6 +39,7 @@ int main(int argc, char *argv[]) {
         {"pred",          required_argument, 0, 'p'},
         {"delay",         required_argument, 0, 'd'},
         {"removemean",    no_argument,       0, 'm'},
+        {"meanl2",        no_argument,       0, '2'},
         {"lower",         required_argument, 0, 'l'},
         {"dynamicrange",  required_argument, 0, 'y'},
         {"writeall",      no_argument,       0, 'w'},
@@ -47,7 +49,7 @@ int main(int argc, char *argv[]) {
     int opt_index = 0;
     int c;
     
-    while ((c = getopt_long (argc, argv, "s:e:t:g:p:d:ml:y:i:o:", long_options, &opt_index)) != -1) {
+    while ((c = getopt_long (argc, argv, "s:e:t:g:p:d:ml:y:i:o:2", long_options, &opt_index)) != -1) {
         switch (c) {
         case 's':
             st = atoi(optarg);
@@ -77,6 +79,9 @@ int main(int argc, char *argv[]) {
             break;
         case 'm':
             removemean = 1;
+            break;
+        case '2':
+            mean_l2 = 1;
             break;
         case 'l':
             lower = atof(optarg);
@@ -136,9 +141,17 @@ int main(int argc, char *argv[]) {
     while((fread(features, sizeof(float), stride, fin) == stride)) {
         rd++;
 	float mean = 0.0;
-	for(i=st; i<=en; i++)
-	    mean += features[i];
-	mean /= (en-st+1);
+	if (mean_l2) {
+            // if features are in dB, mean is L2 norm of linear vector
+            for(i=st; i<=en; i++)
+	        mean += pow(10,features[i]/10);
+	    mean = 10*log10(mean/(en-st+1));
+        } else {
+            for(i=st; i<=en; i++)
+	        mean += features[i];
+	    mean /= (en-st+1);
+        }
+          
  	if (removemean) {
 	    for(i=0; i<stride; i++)
 		features[i] -= mean;

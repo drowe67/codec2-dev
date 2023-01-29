@@ -8,6 +8,7 @@ add_executable(16_8_short 16_8_short.c ../src/fdmdv.c ../src/kiss_fft.c)
 target_link_libraries(16_8_short codec2)
 
 add_executable(extract extract.c)
+target_link_libraries(extract m)
 
 add_executable(vqtrain vqtrain.c)
 target_link_libraries(vqtrain m)
