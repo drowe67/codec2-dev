@@ -37,8 +37,8 @@ function B = ratek3_batch_tool(samname, varargin)
   Nb=20; K=30; rateK_en = 0; verbose = 1; eq =0;
   A_out_fn = ""; B_out_fn = ""; vq_stage1_f32=""; vq_stage2_f32="";
   H_out_fn = ""; amp_pf_en = 0;  phase_pf_en=0; i = 1;
-  Kst=0; Ken=K-1; dec = 1; scatter_en = 0;
-  w = ones(1,K);
+  Kst=0; Ken=K-1; dec = 1; scatter_en = 0; noise_var = 0;
+  w = ones(1,K); w1 = ones(1,K); dec_lin = 1;
 
   lower = 10;             % only consider vectors above this mean
   dynamic_range = 100;     % restrict dynamic range of vectors
@@ -82,6 +82,15 @@ function B = ratek3_batch_tool(samname, varargin)
     elseif strcmp(varargin{i},"scatter") 
       % energy scatter plots
       scatter_en = 1;
+    elseif strcmp(varargin{i},"noise") 
+      % add noise to B vector
+      noise_var = varargin{i+1}; i++;
+    elseif strcmp(varargin{i},"w") 
+      % user define weights
+      w1 = varargin{i+1}; i++;
+    elseif strcmp(varargin{i},"nearest") 
+      % choose nearest when decimating
+      dec_lin = 0;
     else
       printf("\nERROR unknown argument: %s\n", varargin{i});
       return;
@@ -154,7 +163,7 @@ function B = ratek3_batch_tool(samname, varargin)
       target(Kst+1:Ken+1) = B(f,Kst+1:Ken+1)-amean;
       mx = max(target); target = max(target, mx-dynamic_range);
       if vq_en
-        [res target_ ind] = mbest(vq, target, mbest_depth);
+        [res target_ ind] = mbest(vq, target, mbest_depth, w1);
         Eq(f) = sum((target-target_).^2)/(Ken-Kst+1);
         if amean > lower, sum_Eq += Eq(f); nEq++; end
         if verbose >= 2
@@ -168,7 +177,16 @@ function B = ratek3_batch_tool(samname, varargin)
         target_ = target;
       end
       B_hat(f,:) = target_ + amean;
-   
+      
+      % optional noise injection to simulate quantisation - low freq samples 
+      % appear more sensitive to quantisation noise
+      B_hat(f,1:K/2) += sqrt(noise_var)*randn(1,K/2);
+
+      % ensure frame energy is unchanged after quantisation
+      Blin = 10 .^ (B(f,:)/20); E1 = sum(Blin .^2);
+      Blin_hat = 10 .^ (B_hat(f,:)/20); E2 = sum(Blin_hat .^2);      
+      B_hat(f,:) += 10*log10(E1/E2);
+       
       AmdB_ = interp1([0 rate_K_sample_freqs_kHz 4], [0 B_hat(f,:) 0], rate_L_sample_freqs_kHz, "spline", 0);
       nzero = floor(rate_K_sample_freqs_kHz(Kst+1)*1000/F0);
       AmdB_(1:nzero) = 0;
@@ -212,10 +230,31 @@ function B = ratek3_batch_tool(samname, varargin)
       for sf=fa+1:fb-1 
         Wo = model(sf,1); F0 = Fs*Wo/(2*pi); L = model(sf,2);
         rate_L_sample_freqs_kHz = ((1:L)*F0)/1000;
-        B_hat(sf,:) = (1-x)*B_hat(fa,:) + x*B_hat(fb,:);
-        printf("f: %d sf: %d fa: %d fb: %d x: %3.2f\n", f,sf, fa,fb,x);
+        if dec_lin
+          % linear interpolation, tends to muffle speech
+          B_hat(sf,:) = (1-x)*B_hat(fa,:) + x*B_hat(fb,:);
+          printf("f: %d sf: %d fa: %d fb: %d x: %3.2f\n", f,sf, fa,fb,x);
+        else
+          % choose closest, requires an extra bit, doesn't sound very good (could be a bug)
+          dista = sum((B_hat(sf,:) - B_hat(fa,:)) .^ 2);
+          distb = sum((B_hat(sf,:) - B_hat(fb,:)) .^ 2);
+          if dista < distb
+            B_hat(sf,:) = B_hat(fa,:);
+            choice = 'a';
+          else
+            B_hat(sf,:) = B_hat(fb,:);
+            choice = 'b';
+          end
+          printf("f: %d sf: %d fa: %d fb: %d choice: %c\n", f, sf, fa, fb, choice);
+        end
+        
         x += x_inc;
         AmdB_ = interp1([0 rate_K_sample_freqs_kHz 4], [0 B_hat(sf,:) 0], rate_L_sample_freqs_kHz, "spline", 0);
+        
+        % Optional amplitude post filtering
+        if amp_pf_en
+          AmdB_ = amplitude_postfilter(rate_L_sample_freqs_kHz, AmdB_, Fs, F0, eq);
+        end
         Am_(sf,1:L) = 10.^(AmdB_/20);
  
         if length(H_out_fn)
