@@ -271,6 +271,8 @@ function B = ratek3_batch_tool(samname, varargin)
       Am = model(f,3:(L+2));
       E_A(f) = 10*log10(sum(Am.^2));
       Blin = 10 .^ (B(f,:)/20);
+      % try compensating for higher energy high F0 Bm
+      %Blin *= L/K;
       E_B(f) = 10*log10(sum(Blin .^2));
     end
     figure(1); clf; 

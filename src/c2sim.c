@@ -103,6 +103,7 @@ int main(int argc, char *argv[])
     float gainoutlin = 1.0;
     float comp_limit_samples = 32767;
     float comp_gain_dB = 0.0;
+    float comp_dr_lin = 0.0;
     int   comp_en = 0;
     int   bpf_en = 0;
     int   bpfb_en = 0;
@@ -180,6 +181,7 @@ int main(int argc, char *argv[])
         { "gainoutlin", required_argument, NULL, 0 },
         { "comp", required_argument, NULL, 0 },
         { "comp_gain", required_argument, NULL, 0 },
+        { "comp_dr", required_argument, NULL, 0 },
         { "bpf", no_argument, &bpf_en, 1 },
         { "bpfb", no_argument, &bpfb_en, 1 },
         { "hpf200", no_argument, &hpf200_en, 1 },
@@ -379,6 +381,9 @@ int main(int argc, char *argv[])
 	    } else if(strcmp(long_options[option_index].name, "comp_gain") == 0) {
 		comp_gain_dB = atof(optarg);
                 comp_en = 1;
+        } else if(strcmp(long_options[option_index].name, "comp_dr") == 0) {
+		float comp_dr_dB = atof(optarg);
+                comp_dr_lin = pow(10,-comp_dr_dB/20);
 	    } else if(strcmp(long_options[option_index].name, "framelength_s") == 0) {
 		framelength_s = atof(optarg);
 	    } else if(strcmp(long_options[option_index].name, "pahw") == 0) {
@@ -724,6 +729,39 @@ int main(int argc, char *argv[])
 	 * is set, useful for machine learning work */
 	snr = est_voicing_mbe(&c2const, &model, Sw, W);
         
+        /*------------------------------------------------------------*\
+
+                            Hilbert Compressor
+
+	\*------------------------------------------------------------*/
+
+        if (comp_en) {
+            float Acomp[MAX_AMP+1];
+            float s_max = 0.0;
+            float comp_gain_lin = pow(10.0, comp_gain_dB/20.0);
+            
+            // apply compressor gain
+            for(int m=1; m<=model.L; m++) {
+                Acomp[m] = 2.0*comp_gain_lin*model.A[m];
+                s_max += Acomp[m];
+            }
+            float g = 1.0;
+            if (s_max > comp_limit_samples)
+                g = comp_limit_samples/s_max;
+            /*fprintf(stderr, "f: %d s_max_low: %6.0f s_max_high: %6.0f gains: %3.2f %3.2f\n", 
+                            frames, s_max_low, s_max_high, g_low, g_high); */
+            float mx = 0.0;
+            for(int m=1; m<=model.L; m++) {
+                model.A[m] = g*Acomp[m];
+                if (model.A[m] > mx) mx = model.A[m];
+            }
+            
+            // limit dynamic range
+            for(int m=1; m<=model.L; m++)
+              if (model.A[m] < mx*comp_dr_lin) model.A[m] = mx*comp_dr_lin;
+                 
+        }
+        
         #ifdef DUMP
         dump_Sn(m_pitch, Sn); dump_Sw(Sw); dump_model(&model);
         #endif
@@ -777,49 +815,6 @@ int main(int argc, char *argv[])
 	    }
 	}
 
-	/*------------------------------------------------------------*\
-
-                            Two Band Hilbert Compressor
-
-	\*------------------------------------------------------------*/
-
-        if (comp_en) {
-            float Acomp[MAX_AMP+1];
-            float s_max_low = 0.0, s_max_high = 0.0;
-            float comp_gain_lin = pow(10.0, comp_gain_dB/20.0);
-            float Fs2 = Fs/2;
-            
-            // apply compressor gain and pre-emphasis from 1000 Hz,
-            // so 6dB up at 2000 Hz
-            for(int m=1; m<=model.L; m++) {
-                float pre_lin = 1.0;
-                float sample_freq_Hz = m*model.Wo*Fs2/PI;
-                if (sample_freq_Hz > 1000.0)
-                    pre_lin = sample_freq_Hz/1000;
-                Acomp[m] = 2.0*comp_gain_lin*pre_lin*model.A[m];
-                if (sample_freq_Hz < 1000.0)
-                    s_max_low += Acomp[m];
-                else
-                    s_max_high += Acomp[m];
-            }
-            float g_low = 1.0;
-            if (s_max_low > comp_limit_samples)
-                g_low = comp_limit_samples/s_max_low;
-            float g_high = 1.0;
-            if (s_max_high > comp_limit_samples)
-                g_high = comp_limit_samples/s_max_high;
-            fprintf(stderr, "f: %d s_max_low: %6.0f s_max_high: %6.0f gains: %3.2f %3.2f\n", 
-                            frames, s_max_low, s_max_high, g_low, g_high);
-            for(int m=1; m<=model.L; m++) {
-                float sample_freq_Hz = m*model.Wo*Fs2/PI;
-                if (sample_freq_Hz < 1000.0)
-                    model.A[m] = g_low*Acomp[m];
-                else
-                    model.A[m] = g_high*Acomp[m];
-            }
-                 
-        }
-        
 	/*------------------------------------------------------------*\
 
 	        LPC model amplitudes and LSP quantisation

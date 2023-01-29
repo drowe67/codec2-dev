@@ -54,12 +54,12 @@ $(TRAIN)_splt_res1.txt $(TRAIN)_splt_res2.txt: $(TRAIN)_b20.f32
 	K=20 Kst=0 Ksp=11 Ken=19  M=$(M) ../script/ratek_resampler.sh train_lbg_split $(TRAIN)_b20.f32 $(TRAIN)_splt
 
 # K=20 split, time and freq, energy removed first, slight subset at HF end
-$(TRAIN)_stf_res1.txt $(TRAIN)_stf_res2.txt: $(TRAIN)_b20.f32
-	K=20 Kst=0 Ksp=11 Ken=19 M=$(M) ../script/ratek_resampler.sh train_lbg_split_time $(TRAIN)_b20.f32 $(TRAIN)_stf
+$(TRAIN)_stf_res1.txt $(TRAIN)_stf_res2.txt: $(TRAIN)_b20_comp.f32
+	K=20 Kst=0 Ksp=11 Ken=19 M=$(M) ../script/ratek_resampler.sh train_lbg_split_time $(TRAIN)_b20_comp.f32 $(TRAIN)_stf
 
 # as per (1), K=20, first pass at source compressor
 $(TRAIN)_comp_res1.txt $(TRAIN)_comp_res2.txt: $(TRAIN)_b20_comp.f32
-	lower=30 K=20 Kst=0 Ken=19 M=$(M) ../script/ratek_resampler.sh train_lbg $(TRAIN)_b20_comp.f32 $(TRAIN)_comp
+	lower=30 K=20 Kst=0 Ken=18 M=$(M) ../script/ratek_resampler.sh train_lbg $(TRAIN)_b20_comp.f32 $(TRAIN)_comp
 
 $(TRAIN)_b.f32:
 	../script/ratek_resampler.sh gen_train $(TRAIN_FULL)
