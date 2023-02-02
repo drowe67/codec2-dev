@@ -22,6 +22,66 @@ meanl2=${meanl2:-}
 stage2="${stage2:-yes}"
 Nb=20
 
+function batch_process {
+  fullfile=$1
+  filename=$(basename -- "$fullfile")
+  filename="${filename%.*}"
+  batch_opt=$2
+  outname=$3
+  
+  echo "ratek3_batch;" \
+       "ratek3_batch_tool(\"${filename}\", "\
+                          "'A_out',\"${filename}_a.f32\"," \
+                          "'H_out',\"${filename}_h.f32\"," \
+                          "${batch_opt}); quit;" \
+  | octave -p ${CODEC2_PATH}/octave -qf
+  c2sim $fullfile --hpf --phase0 --postfilter --amread ${filename}_a.f32 --hmread ${filename}_h.f32 -o - \
+  | sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_${outname}.wav
+}
+
+# 230202: Process samples with simulated quant noise, 1 & 2 stage VQ, weighted search, 
+# postfilter at rate L after VQ
+function vq_test_230202() {
+  fullfile=$1
+  filename=$(basename -- "$fullfile")
+  filename="${filename%.*}"
+  mkdir -p $out_dir
+  
+  # K=20 LBG trained VQs
+  vq1="train_k20_vq1.f32"
+  vq2="train_k20_vq2.f32"
+
+  c2sim $fullfile --hpf --modelout ${filename}_model.bin
+  
+  # 1/ Amps Nb filtered, phase0, phase postfilter, rate Lhigh amp postfilter
+  batch_process $fullfile "'amp_pf','phase_pf'" "1_lhigh"
+  
+  # 2/ (1) but rate K=20 resampling, rate L amp postfilter
+  batch_process $fullfile "'amp_pf','phase_pf','K',20" "2_k20"
+
+  # 3/ (1) with 2dB^2 random quant noise
+  batch_process $fullfile "'amp_pf','phase_pf','K',20,'noise',2" "3_2dB"
+
+  # 4/ (1) plus 1 stage VQ
+  batch_process $fullfile "'amp_pf','phase_pf','K',20, \
+  'vq1','../build_linux/train_k20_vq1.f32'" "4_vq1"
+  
+  # 5/ (1) plus 1 stage VQ with weighted search
+  batch_process $fullfile "'amp_pf','phase_pf','K',20, \
+  'vq1','../build_linux/train_k20_vq1.f32', \
+  'weights', [ones(1,10) 0.5*ones(1,10)]" "5_vq1w"
+   
+  # 6/ (1) plus 2 stage VQ with weighted search
+  batch_process $fullfile "'amp_pf','phase_pf','K',20, \
+  'vq1','../build_linux/train_k20_vq1.f32', \
+  'vq2','../build_linux/train_k20_vq2.f32', \
+  'weights', [ones(1,10) 0.5*ones(1,10)]" "6_vq2w"
+  
+  # Codec 2 3200 & 700C controls
+  c2enc 3200 $fullfile - | c2dec 3200 - - | sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_7_3200.wav
+  c2enc 700C $fullfile - | c2dec 700C - - | sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_8_700C.wav
+}
+
 # Listen to effect of various eq algorithms.  Goal is to reduce dynamic range of
 # data VQ has to handle
 function postfilter_eq_test() {
@@ -539,6 +599,10 @@ if [ $# -gt 0 ]; then
     vq_test)
         vq_test ../raw/big_dog.raw
         vq_test ../raw/two_lines.raw
+        ;;
+    vq_test_230202)
+        #vq_test_230202 ../raw/big_dog.raw
+        vq_test_230202 ../raw/two_lines.raw
         ;;
     vq_test_subset)
         vq_test_subset ../raw/big_dog.raw

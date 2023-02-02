@@ -477,7 +477,7 @@ function [YdB SdB] = amplitude_postfilter(rate_Lhigh_sample_freqs_kHz, YdB, Fs, 
   % straight line fit to YdB to estimate spectral slope SdB
   w = 2*pi*rate_Lhigh_sample_freqs_kHz*1000/Fs;
   st = round(200/F0high);
-  en = round(3700/F0high);
+  en = min(round(3700/F0high), length(w));
   [m b] = linreg(w(st:en),YdB(st:en),en-st+1);
   SdB = w*m+b;
 

@@ -55,7 +55,7 @@ function B = ratek3_batch_tool(samname, varargin)
       H_out_fn = varargin{i+1}; i++;
     elseif strcmp(varargin{i},"vq1") 
       vq_stage1_f32 = varargin{i+1}; i++;
-      rateK_en = 1; amp_pf_en=1;
+      rateK_en = 1;
     elseif strcmp(varargin{i},"vq2") 
       vq_stage2_f32 = varargin{i+1}; i++;
     elseif strcmp(varargin{i},"amp_pf") 
@@ -67,9 +67,11 @@ function B = ratek3_batch_tool(samname, varargin)
     elseif strcmp(varargin{i},"verbose") 
       verbose = 2;
     elseif strcmp(varargin{i},"K") 
+      rateK_en = 1;
       K = varargin{i+1}; i++;
       Kst=0; Ken=K-1; w = ones(1,K);
-    elseif strcmp(varargin{i},"subset") 
+      w1 = ones(1,K);
+   elseif strcmp(varargin{i},"subset") 
       % restrict range of VQ match to a subset of rate K vector B
       % these are in C index format for compatability with C
       % so default is Kst=0 Ken=K-1;
@@ -85,8 +87,8 @@ function B = ratek3_batch_tool(samname, varargin)
     elseif strcmp(varargin{i},"noise") 
       % add noise to B vector
       noise_var = varargin{i+1}; i++;
-    elseif strcmp(varargin{i},"w") 
-      % user define weights
+    elseif strcmp(varargin{i},"weights") 
+      % user defined weights
       w1 = varargin{i+1}; i++;
     elseif strcmp(varargin{i},"nearest") 
       % choose nearest when decimating
@@ -180,7 +182,7 @@ function B = ratek3_batch_tool(samname, varargin)
       
       % optional noise injection to simulate quantisation - low freq samples 
       % appear more sensitive to quantisation noise
-      B_hat(f,1:K/2) += sqrt(noise_var)*randn(1,K/2);
+      B_hat(f,1:K) += sqrt(noise_var)*randn(1,K);
 
       % ensure frame energy is unchanged after quantisation
       Blin = 10 .^ (B(f,:)/20); E1 = sum(Blin .^2);
