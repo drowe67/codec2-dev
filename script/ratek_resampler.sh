@@ -19,6 +19,7 @@ mbest="${mbest:-no}"
 removemean="${removemean:---removemean}"
 lower=${lower:-10}
 meanl2=${meanl2:-}
+dr=${dr:-100}
 stage2="${stage2:-yes}"
 Nb=20
 
@@ -445,7 +446,8 @@ function train_lbg() {
   fi
   
   # remove mean, extract columns from training data
-  extract -t $K -s $Kst -e $Ken --lower $lower $removemean $meanl2 --writeall $fullfile ${filename_out}_nomean.f32
+  extract -t $K -s $Kst -e $Ken --lower $lower $removemean $meanl2 \
+  --dynamicrange ${dr} --writeall $fullfile ${filename_out}_nomean.f32
 
   # train 2 stages - LBG
   vqtrain ${filename_out}_nomean.f32 $K $M --st $Kst --en $Ken -s 1e-3 ${filename_out}_vq1.f32 -r res1.f32 --split > ${filename_out}_res1.txt

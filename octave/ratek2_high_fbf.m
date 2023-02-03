@@ -18,8 +18,8 @@ function ratek2_high_fbf(samname, f, vq_stage1_f32="", vq_stage2_f32="")
   more off;
 
   newamp_700c; melvq;
-  Fs = 8000; Nb = 20; K = 30; resampler = 'spline'; Lhigh = 80; vq_en = 0; all_en = 0;
-  amp_pf_en = 0; eq = 0; Kst = 2; Ken = 24;
+  Fs = 8000; Nb = 20; K = 20; resampler = 'spline'; Lhigh = 80; vq_en = 0; all_en = 0;
+  amp_pf_en = 0; eq = 0; Kst = 2; Ken = 24; pre_en = 0;
   
   % load up text files dumped from c2sim ---------------------------------------
 
@@ -72,6 +72,12 @@ function ratek2_high_fbf(samname, f, vq_stage1_f32="", vq_stage2_f32="")
     Am = model(f,3:(L+2)); AmdB = 20*log10(Am);
     Am_freqs_kHz = (1:L)*Wo*4/pi;
     
+    % optionally apply pre-emphasis
+    if pre_en
+      p = 1 - cos(Wo*(1:L)) + j*sin(Wo*(1:L));
+      PdB = 20*log10(abs(p));
+      AmdB += PdB;
+    end
     % resample from rate L to rate Lhigh (both linearly spaced)
     
     AmdB_rate_Lhigh = interp1([0 Am_freqs_kHz 4], [0 AmdB 0], rate_Lhigh_sample_freqs_kHz, "spline", "extrap");
@@ -141,7 +147,7 @@ function ratek2_high_fbf(samname, f, vq_stage1_f32="", vq_stage2_f32="")
 
     % interactive menu ------------------------------------------
 
-    printf("\rframe: %d  menu: n-next  b-back  q-quit p-png f-postfilter e-eq[%d] v-vq[%d] a-all plots", f, eq, vq_en);
+    printf("\rframe: %d  menu: n-next  b-back  q-quit p-pre f-postfilter e-eq[%d] v-vq[%d] a-all plots", f, eq, vq_en);
     if vq_en 
       printf(" Eq: %3.2f dB^2", Eq);
       for i=1:length(ind)
@@ -157,15 +163,7 @@ function ratek2_high_fbf(samname, f, vq_stage1_f32="", vq_stage2_f32="")
     if k == 'a', all_en = mod(all_en+1,2); end
     if k == 'e', eq = mod(eq+1,3); end
     if k == 'f', amp_pf_en = mod(amp_pf_en+1,2); end
-    if (k == 'p')
-      [dir name ext]=fileparts(samname);
-      set(gca, 'FontSize', 16);
-      hl = legend({"Rate Lhigh YdB","Rate K" "Rate Lhigh YdB hat",le}, "location", "northeast");
-      legend("boxoff")
-      set (hl, "fontsize", 16);
-      xlabel('Freq (Hz)'); ylabel('Amplitude (dB)');
-      print(sprintf("ratek2_%s_%d",name,f),"-dpng","-S500,500");
-    endif
+    if k == 'p', pre_en = mod(pre_en+1,2); end
 
   until (k == 'q')
   printf("\n");

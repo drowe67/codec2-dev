@@ -38,7 +38,7 @@ function B = ratek3_batch_tool(samname, varargin)
   A_out_fn = ""; B_out_fn = ""; vq_stage1_f32=""; vq_stage2_f32="";
   H_out_fn = ""; amp_pf_en = 0;  phase_pf_en=0; i = 1;
   Kst=0; Ken=K-1; dec = 1; scatter_en = 0; noise_var = 0;
-  w = ones(1,K); w1 = ones(1,K); dec_lin = 1;
+  w = ones(1,K); w1 = ones(1,K); dec_lin = 1; pre_en = 0;
 
   lower = 10;             % only consider vectors above this mean
   dynamic_range = 100;     % restrict dynamic range of vectors
@@ -93,7 +93,9 @@ function B = ratek3_batch_tool(samname, varargin)
     elseif strcmp(varargin{i},"nearest") 
       % choose nearest when decimating
       dec_lin = 0;
-    else
+    elseif strcmp(varargin{i},"pre") 
+      pre_en = 1;    
+  else
       printf("\nERROR unknown argument: %s\n", varargin{i});
       return;
     end
@@ -139,6 +141,13 @@ function B = ratek3_batch_tool(samname, varargin)
     Wo = model(f,1); F0 = Fs*Wo/(2*pi); L = model(f,2);
     Am = model(f,3:(L+2)); AmdB = 20*log10(Am);
     rate_L_sample_freqs_kHz = ((1:L)*F0)/1000;
+    
+    % optionally apply pre-emphasis
+    if pre_en
+      p = 1 - cos(Wo*(1:L)) + j*sin(Wo*(1:L));
+      PdB = 20*log10(abs(p));
+      AmdB += PdB;
+    end
     
     % resample from rate L to rate Lhigh (both linearly spaced)
 
@@ -202,6 +211,9 @@ function B = ratek3_batch_tool(samname, varargin)
         AmdB_ = amplitude_postfilter(rate_L_sample_freqs_kHz, AmdB_, Fs, F0, eq);
       end
 
+      if pre_en
+        AmdB -= PdB;
+      end
       Am_(f,1:L) = 10.^(AmdB_/20);      
       
       % Synthesised phase0 model using Hilbert Transform
@@ -214,9 +226,13 @@ function B = ratek3_batch_tool(samname, varargin)
         YdB = amplitude_postfilter(rate_Lhigh_sample_freqs_kHz, YdB, Fs, F0high, eq);
       end
       
-     % rate Lhigh processing
+      % back to rate L
       AmdB_ = interp1([0 rate_Lhigh_sample_freqs_kHz 4], [0 YdB 0], rate_L_sample_freqs_kHz, "spline", "extrap");
+      if pre_en
+        AmdB -= PdB;
+      end
       Am_(f,1:L) = 10.^(AmdB_/20);
+      
       if length(H_out_fn)
         H(f,1:L) = synth_phase_from_mag(rate_Lhigh_sample_freqs_kHz, YdB, Fs, Wo, L, phase_pf_en);
       end
