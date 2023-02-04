@@ -92,6 +92,7 @@ int main(int argc, char *argv[]) {
     int     en = -1;
     int     reseed = 0;
     int     split_en = 0;
+    int     notrain = 0;
     
     int o = 0;
     int opt_idx = 0;
@@ -105,10 +106,11 @@ int main(int argc, char *argv[]) {
             {"reseed",   no_argument,       0, 'i'},
             {"split",    no_argument,       0, 'p'},
             {"used",     required_argument, 0, 'u'},
+            {"notrain",  no_argument,       0, 'o'},
             {0, 0, 0, 0}
         };
         
-        o = getopt_long(argc,argv,"hr:s:t:e:p",long_opts,&opt_idx);
+        o = getopt_long(argc,argv,"hr:s:t:e:pou:",long_opts,&opt_idx);
         
         switch(o) {
         case 'r':
@@ -128,6 +130,9 @@ int main(int argc, char *argv[]) {
             break;
         case 'p':
             split_en = 1;
+            break;
+        case 'o':
+            notrain = 1;
             break;
         case 'u':
             fused = fopen(optarg,"wt"); assert(fused != NULL);
@@ -151,6 +156,7 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "     --reseed          reseed random number generator used for init\n");
         fprintf(stderr, "     --split           use LBG style splitting\n");
         fprintf(stderr, "     --used UsedFile   Text file of how many times each CB entry used\n");
+        fprintf(stderr, "     --notrain         VQ is simply a random sample of training database\n");
         exit(1);
     }
 
@@ -214,6 +220,8 @@ int main(int argc, char *argv[]) {
 	    ret = fread(&cb[i*k], sizeof(float), k, ftrain);
 	    assert(ret == k);
 	}
+        
+        if (notrain) goto finish;
     }
     
     do {
@@ -273,6 +281,7 @@ int main(int argc, char *argv[]) {
  
     } while (m < m_final);
     
+    finish:
     /* save VQ to disk */
     fvq = fopen(argv[dx+3],"wt");
     if (fvq == NULL) {

@@ -64,7 +64,7 @@ int main(int argc, char *argv[]) {
     int opt_index = 0;
     int c;
     
-    while ((c = getopt_long (argc, argv, "s:e:t:g:p:d:ml:y:i:o:2", long_options, &opt_index)) != -1) {
+    while ((c = getopt_long (argc, argv, "s:e:t:g:p:d:ml:y:i:o:2zw", long_options, &opt_index)) != -1) {
         switch (c) {
         case 's':
             st = atoi(optarg);
