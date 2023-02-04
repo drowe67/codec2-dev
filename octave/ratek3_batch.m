@@ -35,10 +35,10 @@ function B = ratek3_batch_tool(samname, varargin)
   Fs = 8000; max_amp = 160; resampler='spline'; Lhigh=80; max_amp = 160;
   
   Nb=20; K=30; rateK_en = 0; verbose = 1; eq =0;
-  A_out_fn = ""; B_out_fn = ""; vq_stage1_f32=""; vq_stage2_f32="";
+  A_out_fn = ""; B_out_fn = ""; vq_stage1_f32=""; vq_stage2_f32=""; vq_stage3_f32="";
   H_out_fn = ""; amp_pf_en = 0;  phase_pf_en=0; i = 1;
   Kst=0; Ken=K-1; dec = 1; scatter_en = 0; noise_var = 0;
-  w = ones(1,K); w1 = ones(1,K); dec_lin = 1; pre_en = 0;
+  w = ones(1,K); w1 = ones(1,K); dec_lin = 1; pre_en = 0; logfn="";
 
   lower = 10;             % only consider vectors above this mean
   dynamic_range = 100;     % restrict dynamic range of vectors
@@ -58,6 +58,8 @@ function B = ratek3_batch_tool(samname, varargin)
       rateK_en = 1;
     elseif strcmp(varargin{i},"vq2") 
       vq_stage2_f32 = varargin{i+1}; i++;
+    elseif strcmp(varargin{i},"vq3") 
+      vq_stage3_f32 = varargin{i+1}; i++;
     elseif strcmp(varargin{i},"amp_pf") 
       amp_pf_en = 1;
     elseif strcmp(varargin{i},"phase_pf") 
@@ -95,6 +97,9 @@ function B = ratek3_batch_tool(samname, varargin)
       dec_lin = 0;
     elseif strcmp(varargin{i},"pre") 
       pre_en = 1;    
+    elseif strcmp(varargin{i},"logfn") 
+      logfn = varargin{i+1}; i++;
+      printf("logfn: %s\n", logfn);
   else
       printf("\nERROR unknown argument: %s\n", varargin{i});
       return;
@@ -132,6 +137,11 @@ function B = ratek3_batch_tool(samname, varargin)
       vq(:,:,2)= vq_stage2;
       [M tmp] = size(vq_stage2); printf("stage 2 vq size: %d\n", M);
       mbest_depth = 5;
+    end
+    if length(vq_stage3_f32)
+      vq_stage3 = load_f32(vq_stage3_f32,K);
+      vq(:,:,3)= vq_stage3;
+      [M tmp] = size(vq_stage3); printf("stage 3 vq size: %d\n", M);
     end
   end
 
@@ -274,6 +284,12 @@ function B = ratek3_batch_tool(samname, varargin)
         if amp_pf_en
           AmdB_ = amplitude_postfilter(rate_L_sample_freqs_kHz, AmdB_, Fs, F0, eq);
         end
+        nzero = floor(rate_K_sample_freqs_kHz(Kst+1)*1000/F0);
+        AmdB_(1:nzero) = 0;
+        if Ken+1 < K
+          nzero = floor(rate_K_sample_freqs_kHz(Ken+2)*1000/F0);
+          AmdB_(nzero:L) = 0;
+        end
         Am_(sf,1:L) = 10.^(AmdB_/20);
  
         if length(H_out_fn)
@@ -324,6 +340,9 @@ function B = ratek3_batch_tool(samname, varargin)
   if vq_en && verbose
     sd = sum_Eq/nEq;
     printf("Nb: %d K: %d mean Eq: %4.2f dB^2 %4.2f dB\n", Nb, K, sd, sqrt(sd));
+    if length(logfn)
+      fl = fopen(logfn,"wt"); fprintf(fl,"%4.2f\n",sd); fclose(fl);
+    end
   end
   
   % optional energy scatter plots
