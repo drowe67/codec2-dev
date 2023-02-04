@@ -22,6 +22,7 @@ meanl2=${meanl2:-}
 dr=${dr:-100}
 drlate=${drlate:-}
 stage2="${stage2:-yes}"
+stage3="${stage3:-no}"
 Nb=20
 
 function batch_process {
@@ -30,15 +31,59 @@ function batch_process {
   filename="${filename%.*}"
   batch_opt=$2
   outname=$3
+  tmp=$(mktemp)
   
   echo "ratek3_batch;" \
        "ratek3_batch_tool(\"${filename}\", "\
                           "'A_out',\"${filename}_a.f32\"," \
                           "'H_out',\"${filename}_h.f32\"," \
-                          "${batch_opt}); quit;" \
+                          "${batch_opt},'logfn',\"${tmp}\"); quit;" \
   | octave -p ${CODEC2_PATH}/octave -qf
   c2sim $fullfile --hpf --phase0 --postfilter --amread ${filename}_a.f32 --hmread ${filename}_h.f32 -o - \
   | sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_${outname}.wav
+  printf "%-10s %-20s %4.2f\n" ${filename} ${outname} $(cat ${tmp}) >> ${out_dir}/zlog.txt
+}
+
+# 230204: Process sample different VQ designes 1x12, 2x12, 2x9, 3x9
+function vq_test_230204() {
+  fullfile=$1
+  filename=$(basename -- "$fullfile")
+  filename="${filename%.*}"
+  mkdir -p $out_dir
+  
+  c2sim $fullfile --hpf --modelout ${filename}_model.bin
+
+  # (1) Amps Nb filtered, phase0, rate K=20 resampling, phase postfilter,
+  # rate L amp postfilter, pre-emp
+  batch_process $fullfile "'K',20,'amp_pf','phase_pf','pre'" "1_k20"
+
+  # 1 x 12 VQ
+  batch_process $fullfile "'K',20,'amp_pf','phase_pf', \
+  'vq1','../build_linux/train_k20_vq1.f32'" "2_k20_vq1_12"
+
+  # 2 x 12 VQ
+  batch_process $fullfile "'K',20,'amp_pf','phase_pf', \
+  'vq1','../build_linux/train_k20_vq1.f32', \
+  'vq2','../build_linux/train_k20_vq2.f32'" "3_k20_vq2_24"
+
+  # 2 x 9 VQ
+  batch_process $fullfile "'K',20,'amp_pf','phase_pf', \
+  'vq1','../build_linux/train_three_vq1.f32',
+  'vq2','../build_linux/train_three_vq2.f32'" "4_three_vq2_18"
+
+  # 3 x 9 VQ
+  batch_process $fullfile "'K',20,'amp_pf','phase_pf', \
+  'vq1','../build_linux/train_three_vq1.f32', \
+  'vq2','../build_linux/train_three_vq2.f32', \ 
+  'vq3','../build_linux/train_three_vq3.f32'"  "5_three_vq3_27"
+
+  # 3 x 9 VQ, decimate by 2
+  batch_process $fullfile "'K',20,'amp_pf','phase_pf', 'dec', 2, \
+  'vq1','../build_linux/train_three_vq1.f32', \
+  'vq2','../build_linux/train_three_vq2.f32', \ 
+  'vq3','../build_linux/train_three_vq3.f32'"  "6_three_vq3_27_dec2"
+
+  c2enc 3200 $fullfile - | c2dec 3200 - - | sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_7_3200.wav
 }
 
 # 230204: Dynamic range reduction test, see how it sounds with and without VQ
@@ -48,16 +93,6 @@ function dr_vq_test_230204() {
   filename="${filename%.*}"
   mkdir -p $out_dir
   
-  # K=20 LBG trained VQs
-  vq1="train_k20_vq1.f32"
-  vq2="train_k20_vq2.f32"
-  # K=20 LBG with pre-emp
-  vq1="train_pre_vq1.f32"
-  vq2="train_pre_vq2.f32"
-  # K=20 LBG with pre-emp, DR comp 
-  vq1="train_comp_vq1.f32"
-  vq2="train_comp_vq2.f32"
-
   c2sim $fullfile --hpf --modelout ${filename}_model.bin
   
   # (1) Amps Nb filtered, phase0, rate K=20 resampling, phase postfilter,
@@ -105,10 +140,6 @@ function vq_test_230202() {
   filename="${filename%.*}"
   mkdir -p $out_dir
   
-  # K=20 LBG trained VQs
-  vq1="train_k20_vq1.f32"
-  vq2="train_k20_vq2.f32"
-
   c2sim $fullfile --hpf --modelout ${filename}_model.bin
   
   # 1/ Amps Nb filtered, phase0, phase postfilter, rate Lhigh amp postfilter
@@ -281,68 +312,6 @@ function postfilter_test() {
   c2enc 3200 $fullfile - | c2dec 3200 - - | sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_9_3200.wav
 }
 
-# Process sample with various methods including 1 and 2 stage VQ
-function vq_test() {
-  fullfile=$1
-  filename=$(basename -- "$fullfile")
-  extension="${filename##*.}"
-  filename="${filename%.*}"
-  mkdir -p $out_dir
-  vq1="train_b_vq1.f32"
-  vq2="train_b_vq2.f32"
-
-  c2sim $fullfile --hpf --modelout ${filename}_model.bin
-  
-  # Amps Nb filtered, phase0, amp and phase postfilters, rate K
-  echo "ratek3_batch; ratek3_batch_tool(\"${filename}\",'A_out',\"${filename}_a.f32\",'H_out',\"${filename}_h.f32\",'amp_pf','phase_pf','rateK'); quit;" \
-  | octave -p ${CODEC2_PATH}/octave -qf
-  c2sim $fullfile --hpf --phase0 --postfilter --amread ${filename}_a.f32 --hmread ${filename}_h.f32 -o - | \
-      sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_1_Nb_p0_pf_rateK.wav
-
-  # As above plus stage1 VQ
-  echo "ratek3_batch; ratek3_batch_tool(\"${filename}\", \
-        'A_out',\"${filename}_a.f32\",'H_out',\"${filename}_h.f32\",'amp_pf','phase_pf','rateK', \
-        'vq1', \"${vq1}\"); quit;" \
-        | octave -p ${CODEC2_PATH}/octave -qf
-  c2sim $fullfile --hpf --phase0 --postfilter --amread ${filename}_a.f32 --hmread ${filename}_h.f32 -o - | \
-      sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_2_vq1.wav
-
-  # As above plus stage2 VQ
-  echo "ratek3_batch; ratek3_batch_tool(\"${filename}\", \
-        'A_out',\"${filename}_a.f32\",'H_out',\"${filename}_h.f32\",'amp_pf','phase_pf','rateK', \
-        'vq1', \"${vq1}\", 'vq2', \"${vq2}\"); quit;" \
-        | octave -p ${CODEC2_PATH}/octave -qf
-  c2sim $fullfile --hpf --phase0 --postfilter --amread ${filename}_a.f32 --hmread ${filename}_h.f32 -o - | \
-      sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_3_vq2.wav
-
-  # stage1 VQ -subset
-  echo "ratek3_batch; ratek3_batch_tool(\"${filename}\", \
-        'A_out',\"${filename}_a.f32\",'H_out',\"${filename}_h.f32\",'amp_pf','phase_pf','rateK', \
-        'vq1', \"${vq1}\", 'subset'); quit;" \
-        | octave -p ${CODEC2_PATH}/octave -qf
-  c2sim $fullfile --hpf --phase0 --postfilter --amread ${filename}_a.f32 --hmread ${filename}_h.f32 -o - | \
-      sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_4_sub_vq1.wav
-  
-  # stage1 VQ - dec2
-  echo "ratek3_batch; ratek3_batch_tool(\"${filename}\", \
-        'A_out',\"${filename}_a.f32\",'H_out',\"${filename}_h.f32\",'amp_pf','phase_pf','rateK', \
-        'vq1', \"${vq1}\",'dec',2); quit;" \
-        | octave -p ${CODEC2_PATH}/octave -qf
-  c2sim $fullfile --hpf --phase0 --postfilter --amread ${filename}_a.f32 --hmread ${filename}_h.f32 -o - | \
-      sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_4_dec2_vq1.wav
-    
-  # stage1 VQ - dec3
-  echo "ratek3_batch; ratek3_batch_tool(\"${filename}\", \
-        'A_out',\"${filename}_a.f32\",'H_out',\"${filename}_h.f32\",'amp_pf','phase_pf','rateK', \
-        'vq1', \"${vq1}\",'dec',3); quit;" \
-        | octave -p ${CODEC2_PATH}/octave -qf
-  c2sim $fullfile --hpf --phase0 --postfilter --amread ${filename}_a.f32 --hmread ${filename}_h.f32 -o - | \
-      sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_5_dec3_vq1.wav
-    
-  # Codec 2 3200 & 700C controls
-  c2enc 3200 $fullfile - | c2dec 3200 - - | sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_6_3200.wav
-  c2enc 700C $fullfile - | c2dec 700C - - | sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_7_700C.wav
-}
 
 function vq_test_subset() {
   fullfile=$1
@@ -473,6 +442,26 @@ function train_kmeans() {
 #  cat ${filename}_nomean.f32 | vq_mbest --mbest 5 -k $K --st $Kst --en $Ken  -q ${filename}_vq1.f32,${filename}_vq2.f32 >> /dev/null
 }
 
+# Generate a VQ by simply sampling ttrain database, idea is it avoids averaging
+function train_no() {
+  fullfile=$1
+  filename=$(basename -- "$fullfile")
+  extension="${filename##*.}"
+  filename="${filename%.*}"
+  res1=$(mktemp)
+  
+  filename_out=${filename}_no
+  if [ $# -eq 2 ]; then
+    filename_out=$2
+  fi
+
+  # remove mean, train 1 stages 
+  extract -t $K -s $Kst -e $Ken --lower 10 --removemean --writeall $fullfile ${filename}_nomean.f32
+  vqtrain ${filename}_nomean.f32 $K $M --st $Kst --en $Ken -s 1e-3 --notrain ${filename_out}_vq1.f32 -r ${res1} > ${filename_out}_res1.txt
+  vqtrain ${res1} $K $M --st $Kst --en $Ken  -s 1e-3 --notrain ${filename_out}_vq2.f32 > ${filename_out}_res2.txt
+  cat ${filename}_nomean.f32 | vq_mbest --mbest 5 -k $K --st $Kst --en $Ken  -q ${filename_out}_vq1.f32,${filename_out}_vq2.f32 >> /dev/null
+}
+
 function train_test() {
   fullfile=$1
   filename=$(basename -- "$fullfile")
@@ -509,21 +498,24 @@ function train_lbg() {
   # train 2 stages - LBG
   vqtrain ${filename_out}_nomean.f32 $K $M --st $Kst --en $Ken -s 1e-3 ${filename_out}_vq1.f32 -r res1.f32 --split > ${filename_out}_res1.txt
   if [ "$stage2" == "yes" ]; then
-    vqtrain res1.f32 $K $M --st $Kst --en $Ken -s 1e-3 ${filename_out}_vq2.f32 --split > ${filename_out}_res2.txt
+    vqtrain res1.f32 $K $M --st $Kst --en $Ken -s 1e-3 ${filename_out}_vq2.f32 -r res2.f32 --split > ${filename_out}_res2.txt
+  fi
+  if [ "$stage3" == "yes" ]; then
+    vqtrain res2.f32 $K $M --st $Kst --en $Ken -s 1e-3 ${filename_out}_vq3.f32 --split > ${filename_out}_res3.txt
   fi
       
-  # optionally compare stage2 search with mbest
+  # optionally compare stage3 search with mbest
   if [ "$mbest" == "yes" ]; then
     tmp=$(mktemp)
-    results=${filename_out}_mbest2.txt
+    results=${filename_out}_mbest3.txt
     rm ${results}
     log2M=$(log2 $M)
     for alog2M in $(seq 1 $log2M)
     do
       aM=$(( 2 ** $alog2M ))
-      vqtrain res1.f32 $K $aM --st $Kst --en $Ken -s 1e-3 ${filename_out}_vq2.f32 --split > /dev/null
+      vqtrain res2.f32 $K $aM --st $Kst --en $Ken -s 1e-3 ${filename_out}_vq3.f32 --split > /dev/null
       cat ${filename_out}_nomean.f32 | \
-          vq_mbest --mbest 5 -k $K -q ${filename_out}_vq1.f32,${filename_out}_vq2.f32 2>${tmp} >> /dev/null
+          vq_mbest --mbest 5 -k $K -q ${filename_out}_vq1.f32,${filename_out}_vq2.f32,${filename_out}_vq3.f32 2>${tmp} >> /dev/null
       echo -n "$aM " >> ${results}
       cat ${tmp} | grep var | cut -d' ' -f 2 >> ${results}
     done
@@ -655,6 +647,9 @@ if [ $# -gt 0 ]; then
     train_lbg_split_time)
         train_lbg_split_time $2 $3
         ;;
+    train_no)
+        train_no $2 $3
+        ;;
     vq_test)
         vq_test ../raw/big_dog.raw
         vq_test ../raw/two_lines.raw
@@ -666,6 +661,15 @@ if [ $# -gt 0 ]; then
     dr_vq_test_230204)
         dr_vq_test_230204 ../raw/big_dog.raw
         dr_vq_test_230204 ../raw/two_lines.raw
+        ;;
+    vq_test_230204)
+        rm -f ${out_dir}/zlog.txt
+        vq_test_230204 ../raw/big_dog.raw
+        vq_test_230204 ../raw/two_lines.raw
+        vq_test_230204 ../raw/cq_ref.raw
+        vq_test_230204 ../raw/morig.raw
+        #vq_test_230204 ../raw/hts2a.raw
+        
         ;;
     vq_test_subset)
         vq_test_subset ../raw/big_dog.raw

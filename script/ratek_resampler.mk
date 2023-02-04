@@ -23,8 +23,9 @@ PLOT_DATA := $(TRAIN)_lbg_res1.txt $(TRAIN)_lbg_res2.txt $(TRAIN)_lbg_mbest2.txt
 PLOT_DATA1 := $(TRAIN)_k20_res1.txt $(TRAIN)_k20_res2.txt \
 	      $(TRAIN)_pre_res1.txt $(TRAIN)_pre_res2.txt \
 	      $(TRAIN)_comp_res1.txt $(TRAIN)_comp_res2.txt \
-	      $(TRAIN)_compl_res1.txt $(TRAIN)_compl_res2.txt
-
+	      $(TRAIN)_three_res1.txt $(TRAIN)_three_res2.txt \
+	      $(TRAIN)_three_res3.txt $(TRAIN)_three_mbest3.txt
+	      
 all: $(TRAIN)_ratek.png $(TRAIN)_ratek1.png
 
 $(TRAIN)_ratek.png: $(PLOT_DATA)
@@ -48,12 +49,12 @@ $(TRAIN)_ratek1.png: $(PLOT_DATA1)
 	echo "ratek_resampler_plot(\"$(TRAIN)_ratek1.png\", \
              \"$(TRAIN)_k20_res1.txt\",'r-*;k20 1;', \
              'continue',\"$(TRAIN)_k20_res2.txt\",'r-*;k20 2;', \
-             \"$(TRAIN)_pre_res1.txt\",'b-x;pre 1;', \
-             'continue',\"$(TRAIN)_pre_res2.txt\",'b-x;pre 2;', \
-             \"$(TRAIN)_comp_res1.txt\",'c-o;k20 comp1;', \
-             'continue', \"$(TRAIN)_comp_res2.txt\",'c-o;k20 comp2;', \
-             \"$(TRAIN)_compl_res1.txt\",'g-*;k20 compl1;', \
-             'continue', \"$(TRAIN)_compl_res2.txt\",'g-*;k20 compl2;' \
+             \"$(TRAIN)_three_res1.txt\",'g-*;k20 three1;', \
+             'continue', \"$(TRAIN)_three_res2.txt\",'g-*;k20 three2;', \
+             'continue', \"$(TRAIN)_three_res3.txt\",'g-*;k20 three3;', \
+             \"$(TRAIN)_three_res1.txt\",'g-*;k20 three1;', \
+             'continue', \"$(TRAIN)_three_res2.txt\",'g-*;k20 three2;', \
+             'continue', \"$(TRAIN)_three_mbest3.txt\",'gx;mbest3;' \
              ); quit" | octave-cli -p $(CODEC2)/octave --no-init-file
 
 # (1) no amp PF before VQ, include 2nd stage mbest
@@ -87,6 +88,14 @@ $(TRAIN)_comp_res1.txt $(TRAIN)_comp_res2.txt: $(TRAIN)_b20_pre.f32
 # (8) As per (7), but limit dynamic range after mean removal
 $(TRAIN)_compl_res1.txt $(TRAIN)_compl_res2.txt: $(TRAIN)_b20_pre.f32
 	K=20 Kst=0 Ken=19 M=$(M) dr=30 drlate="--drlate" ../script/ratek_resampler.sh train_lbg $(TRAIN)_b20_pre.f32 $(TRAIN)_compl
+
+# (9) no training, just random sampling
+$(TRAIN)_no_res1.txt $(TRAIN)_no_res2.txt: $(TRAIN)_b20.f32
+	K=20 Kst=0 Ken=19 M=$(M) ../script/ratek_resampler.sh train_no $(TRAIN)_b20.f32 $(TRAIN)_no
+
+# (10) three stages 9 bit/stage
+$(TRAIN)_three_res1.txt $(TRAIN)_three_res2.txt $(TRAIN)_three_res3.txt $(TRAIN)_three_mbest3.txt: $(TRAIN)_b20.f32
+	K=20 Kst=0 Ken=19 M=512 stage3="yes" mbest="yes" ../script/ratek_resampler.sh train_lbg $(TRAIN)_b20.f32 $(TRAIN)_three
 
 $(TRAIN)_b.f32:
 	../script/ratek_resampler.sh gen_train $(TRAIN_FULL)
