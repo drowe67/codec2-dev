@@ -20,6 +20,7 @@ removemean="${removemean:---removemean}"
 lower=${lower:-10}
 meanl2=${meanl2:-}
 dr=${dr:-100}
+drlate=${drlate:-}
 stage2="${stage2:-yes}"
 Nb=20
 
@@ -38,6 +39,62 @@ function batch_process {
   | octave -p ${CODEC2_PATH}/octave -qf
   c2sim $fullfile --hpf --phase0 --postfilter --amread ${filename}_a.f32 --hmread ${filename}_h.f32 -o - \
   | sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_${outname}.wav
+}
+
+# 230204: Dynamic range reduction test, see how it sounds with and without VQ
+function dr_vq_test_230204() {
+  fullfile=$1
+  filename=$(basename -- "$fullfile")
+  filename="${filename%.*}"
+  mkdir -p $out_dir
+  
+  # K=20 LBG trained VQs
+  vq1="train_k20_vq1.f32"
+  vq2="train_k20_vq2.f32"
+  # K=20 LBG with pre-emp
+  vq1="train_pre_vq1.f32"
+  vq2="train_pre_vq2.f32"
+  # K=20 LBG with pre-emp, DR comp 
+  vq1="train_comp_vq1.f32"
+  vq2="train_comp_vq2.f32"
+
+  c2sim $fullfile --hpf --modelout ${filename}_model.bin
+  
+  # (1) Amps Nb filtered, phase0, rate K=20 resampling, phase postfilter,
+  # rate L amp postfilter, pre-emp
+  
+  batch_process $fullfile "'K',20,'amp_pf','phase_pf','pre'" "1_k20"
+
+  # (2) with 30dB dynamic range limit
+  batch_process $fullfile "'K',20,'amp_pf','phase_pf','pre','DR',30" "2_dr"
+
+  # non pre-emp 1 stage VQ
+  batch_process $fullfile "'K',20,'amp_pf','phase_pf', \
+  'vq1','../build_linux/train_k20_vq1.f32'" "3_k20_vq1"
+
+  # non pre-emp 2 stage VQ
+  batch_process $fullfile "'K',20,'amp_pf','phase_pf', \
+  'vq1','../build_linux/train_k20_vq1.f32', \
+  'vq2','../build_linux/train_k20_vq2.f32'" "4_k20_vq2"
+
+  # pre-emp 1 stage VQ
+  batch_process $fullfile "'K',20,'amp_pf','phase_pf','pre', \
+  'vq1','../build_linux/train_pre_vq1.f32'" "5_pre_vq1"
+
+  # pre-emp 2 stage VQ
+  batch_process $fullfile "'K',20,'amp_pf','phase_pf','pre', \
+  'vq1','../build_linux/train_pre_vq1.f32', \
+  'vq2','../build_linux/train_pre_vq2.f32'" "6_pre_vq2"
+
+  # pre-emp, dr limit 1 stage VQ
+  batch_process $fullfile "'K',20,'amp_pf','phase_pf','pre','DR',30, \
+  'vq1','../build_linux/train_comp_vq1.f32'" "7_dr_vq1"
+ 
+  # pre-emp, dr limit 2 stage VQ
+  batch_process $fullfile "'K',20,'amp_pf','phase_pf','pre','DR',30, \
+  'vq1','../build_linux/train_comp_vq1.f32', \
+  'vq2','../build_linux/train_comp_vq2.f32'" "8_dr_vq2"
+
 }
 
 # 230202: Process samples with simulated quant noise, 1 & 2 stage VQ, weighted search, 
@@ -324,7 +381,7 @@ function vq_test_subset() {
 
   # As above plus stage2 VQ
   echo "ratek3_batch; ratek3_batch_tool(\"${filename}\", \
-        'A_out',\"${filename}_a.f32\",'H_out',\"${filename}_h.f32\",'amp_pf','phase_pf','rateK', \
+        'A_out',\"${dr}${filename}_a.f32\",'H_out',\"${filename}_h.f32\",'amp_pf','phase_pf','rateK', \
         'vq1', \"${vq1}\", 'vq2', \"${vq2}\",'subset'); quit;" \
         | octave -p ${CODEC2_PATH}/octave -qf
   c2sim $fullfile --hpf --phase0 --postfilter --amread ${filename}_a.f32 --hmread ${filename}_h.f32 -o - | \
@@ -447,7 +504,7 @@ function train_lbg() {
   
   # remove mean, extract columns from training data
   extract -t $K -s $Kst -e $Ken --lower $lower $removemean $meanl2 \
-  --dynamicrange ${dr} --writeall $fullfile ${filename_out}_nomean.f32
+  --dynamicrange $dr $drlate --writeall $fullfile ${filename_out}_nomean.f32
 
   # train 2 stages - LBG
   vqtrain ${filename_out}_nomean.f32 $K $M --st $Kst --en $Ken -s 1e-3 ${filename_out}_vq1.f32 -r res1.f32 --split > ${filename_out}_res1.txt
@@ -603,8 +660,12 @@ if [ $# -gt 0 ]; then
         vq_test ../raw/two_lines.raw
         ;;
     vq_test_230202)
-        #vq_test_230202 ../raw/big_dog.raw
+        vq_test_230202 ../raw/big_dog.raw
         vq_test_230202 ../raw/two_lines.raw
+        ;;
+    dr_vq_test_230204)
+        dr_vq_test_230204 ../raw/big_dog.raw
+        dr_vq_test_230204 ../raw/two_lines.raw
         ;;
     vq_test_subset)
         vq_test_subset ../raw/big_dog.raw

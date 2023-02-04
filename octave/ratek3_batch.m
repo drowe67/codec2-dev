@@ -169,10 +169,11 @@ function B = ratek3_batch_tool(samname, varargin)
       % dynamic range limiting
       lower=-100;
       B(f,:) .*= w;
-      amean = sum(B(f,:))/(Ken-Kst+1);
       target = zeros(1,K);
-      target(Kst+1:Ken+1) = B(f,Kst+1:Ken+1)-amean;
-      mx = max(target); target = max(target, mx-dynamic_range);
+      target(Kst+1:Ken+1) = B(f,Kst+1:Ken+1);
+      mx = max(target(Kst+1:Ken+1)); target(Kst+1:Ken+1) = max(target(Kst+1:Ken+1), mx - dynamic_range);
+      amean = sum(target)/(Ken-Kst+1);
+      target -= amean;
       if vq_en
         [res target_ ind] = mbest(vq, target, mbest_depth, w1);
         Eq(f) = sum((target-target_).^2)/(Ken-Kst+1);
@@ -212,7 +213,7 @@ function B = ratek3_batch_tool(samname, varargin)
       end
 
       if pre_en
-        AmdB -= PdB;
+        AmdB_ -= PdB;
       end
       Am_(f,1:L) = 10.^(AmdB_/20);      
       
@@ -229,7 +230,7 @@ function B = ratek3_batch_tool(samname, varargin)
       % back to rate L
       AmdB_ = interp1([0 rate_Lhigh_sample_freqs_kHz 4], [0 YdB 0], rate_L_sample_freqs_kHz, "spline", "extrap");
       if pre_en
-        AmdB -= PdB;
+        AmdB_ += PdB;
       end
       Am_(f,1:L) = 10.^(AmdB_/20);
       

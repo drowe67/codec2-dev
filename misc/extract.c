@@ -13,6 +13,19 @@
 
 #define NB_FEATURES 55 /* number of cols per row */
 
+void restrict_dynamic_range(float features[], int st, int en, float dynamicrange) {
+    int i;
+    if (dynamicrange != 100.0) {
+        float max = -1E32;
+        for(i=st; i<=en; i++)
+            if (features[i] > max) max = features[i];
+        for(i=st; i<=en; i++) {
+            float min = max-dynamicrange;
+            if (features[i] < min ) features[i] = min;
+        }        
+    }
+}
+
 int main(int argc, char *argv[]) {
     FILE *fin, *fout;
     int stride = NB_FEATURES;
@@ -25,6 +38,7 @@ int main(int argc, char *argv[]) {
     float lower = -1E32;
     int writeall = 0;
     float dynamicrange = 100.0;
+    int drlate = 0;
     int timestep = 1;
     int timeoffset = 0;
     int mean_l2 = 0;
@@ -42,6 +56,7 @@ int main(int argc, char *argv[]) {
         {"meanl2",        no_argument,       0, '2'},
         {"lower",         required_argument, 0, 'l'},
         {"dynamicrange",  required_argument, 0, 'y'},
+        {"drlate",        no_argument,       0, 'z'},
         {"writeall",      no_argument,       0, 'w'},
         {0, 0, 0, 0}
     };
@@ -92,6 +107,9 @@ int main(int argc, char *argv[]) {
         case 'y':
             dynamicrange = atof(optarg);
             break;
+        case 'z':
+            drlate = 1;
+            break;
         default:
         helpmsg:
             fprintf(stderr, "VQ pre-processing tool\n\nusage: %s  -s startCol -e endCol [options] input.f32 output.f32\n"
@@ -104,6 +122,7 @@ int main(int argc, char *argv[]) {
                             "--lower minEnergy      Remove all vectors less than minEnergy\n"
                             "--writeall             Write all K outputs for each vector, even if EndCol-StartCol+1 < stride\n"
                             "--dynamicrange RangedB Clip min value of each vector to max - RangedB\n"
+                            "--drlate               Dynamic range clip after mean removed\n"
                             "--timestep frames      time step (frames) between vectors\n"
                             "--timeoffset frames    Ignore this many initial frames\n"
                             "input.f32 output.f32\n", argv[0]);
@@ -123,8 +142,8 @@ int main(int argc, char *argv[]) {
     fin = fopen(argv[optind],"rb"); assert(fin != NULL);
     fout = fopen(argv[optind+1],"wb"); assert(fout != NULL);
     printf("extracting from %d to %d inclusive (K=%d, timestep=%d) ... \n"
-           "gain = %f pred = %f pred_frame_delay = %d dynamic range = %f\n",
-           st, en, stride, timestep, gain, pred, frame_delay, dynamicrange);
+           "gain = %f pred = %f pred_frame_delay = %d dynamic range = %f drlate = %d\n",
+           st, en, stride, timestep, gain, pred, frame_delay, dynamicrange, drlate);
    
     float features[stride], features_prev[frame_delay][stride], delta[stride];
     int i,f,rd=0,wr=0;
@@ -140,6 +159,10 @@ int main(int argc, char *argv[]) {
 
     while((fread(features, sizeof(float), stride, fin) == stride)) {
         rd++;
+
+        if (drlate == 0)
+          restrict_dynamic_range(features, st, en, dynamicrange);
+
 	float mean = 0.0;
 	if (mean_l2) {
             // if features are in dB, mean is L2 norm of linear vector
@@ -161,16 +184,9 @@ int main(int argc, char *argv[]) {
 	    delta[i] = gain*(features[i] - pred*features_prev[frame_delay-1][i]);
 	}
         
-        if (dynamicrange != 100.0) {
-            float max = -1E32;
-	    for(i=st; i<=en; i++)
-	        if (features[i] > max) max = features[i];
-	    for(i=st; i<=en; i++) {
-                float min = max-dynamicrange;
-                if (features[i] < min ) features[i] = min;
-            }        
-        }
-        
+        if (drlate)
+          restrict_dynamic_range(features, st, en, dynamicrange);
+
 	if (mean > lower) {
 	    if (writeall)
                 fwrite(delta, sizeof(float), stride, fout);

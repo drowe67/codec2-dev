@@ -22,7 +22,8 @@ PLOT_DATA := $(TRAIN)_lbg_res1.txt $(TRAIN)_lbg_res2.txt $(TRAIN)_lbg_mbest2.txt
 
 PLOT_DATA1 := $(TRAIN)_k20_res1.txt $(TRAIN)_k20_res2.txt \
 	      $(TRAIN)_pre_res1.txt $(TRAIN)_pre_res2.txt \
-	     $(TRAIN)_comp_res1.txt $(TRAIN)_comp_res2.txt
+	      $(TRAIN)_comp_res1.txt $(TRAIN)_comp_res2.txt \
+	      $(TRAIN)_compl_res1.txt $(TRAIN)_compl_res2.txt
 
 all: $(TRAIN)_ratek.png $(TRAIN)_ratek1.png
 
@@ -50,7 +51,9 @@ $(TRAIN)_ratek1.png: $(PLOT_DATA1)
              \"$(TRAIN)_pre_res1.txt\",'b-x;pre 1;', \
              'continue',\"$(TRAIN)_pre_res2.txt\",'b-x;pre 2;', \
              \"$(TRAIN)_comp_res1.txt\",'c-o;k20 comp1;', \
-             'continue', \"$(TRAIN)_comp_res2.txt\",'c-o;k20 comp2;' \
+             'continue', \"$(TRAIN)_comp_res2.txt\",'c-o;k20 comp2;', \
+             \"$(TRAIN)_compl_res1.txt\",'g-*;k20 compl1;', \
+             'continue', \"$(TRAIN)_compl_res2.txt\",'g-*;k20 compl2;' \
              ); quit" | octave-cli -p $(CODEC2)/octave --no-init-file
 
 # (1) no amp PF before VQ, include 2nd stage mbest
@@ -70,8 +73,8 @@ $(TRAIN)_splt_res1.txt $(TRAIN)_splt_res2.txt: $(TRAIN)_b20.f32
 	K=20 Kst=0 Ksp=11 Ken=19  M=$(M) ../script/ratek_resampler.sh train_lbg_split $(TRAIN)_b20.f32 $(TRAIN)_splt
 
 # (5) K=20 split, time and freq, energy removed first, slight subset at HF end
-$(TRAIN)_stf_res1.txt $(TRAIN)_stf_res2.txt: $(TRAIN)_b20_comp.f32
-	K=20 Kst=0 Ksp=11 Ken=19 M=$(M) ../script/ratek_resampler.sh train_lbg_split_time $(TRAIN)_b20_comp.f32 $(TRAIN)_stf
+$(TRAIN)_stf_res1.txt $(TRAIN)_stf_res2.txt: $(TRAIN)_b20.f32
+	K=20 Kst=0 Ksp=11 Ken=19 M=$(M) ../script/ratek_resampler.sh train_lbg_split_time $(TRAIN)_b20.f32 $(TRAIN)_stf
 
 # (6) K=20, pre-emphasis on {Am} before rate K, VQ
 $(TRAIN)_pre_res1.txt $(TRAIN)_pre_res2.txt: $(TRAIN)_b20_pre.f32
@@ -79,7 +82,11 @@ $(TRAIN)_pre_res1.txt $(TRAIN)_pre_res2.txt: $(TRAIN)_b20_pre.f32
 
 # (7) As per (6), but limit dynamic range
 $(TRAIN)_comp_res1.txt $(TRAIN)_comp_res2.txt: $(TRAIN)_b20_pre.f32
-	K=20 Kst=0 Ken=19 M=$(M) dr=30 ../script/ratek_resampler.sh train_lbg $(TRAIN)_b20_comp.f32 $(TRAIN)_comp
+	K=20 Kst=0 Ken=19 M=$(M) dr=30 ../script/ratek_resampler.sh train_lbg $(TRAIN)_b20_pre.f32 $(TRAIN)_comp
+
+# (8) As per (7), but limit dynamic range after mean removal
+$(TRAIN)_compl_res1.txt $(TRAIN)_compl_res2.txt: $(TRAIN)_b20_pre.f32
+	K=20 Kst=0 Ken=19 M=$(M) dr=30 drlate="--drlate" ../script/ratek_resampler.sh train_lbg $(TRAIN)_b20_pre.f32 $(TRAIN)_compl
 
 $(TRAIN)_b.f32:
 	../script/ratek_resampler.sh gen_train $(TRAIN_FULL)
