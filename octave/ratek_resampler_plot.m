@@ -43,6 +43,6 @@ function ratek_resampler_plot(plot_fn, varargin)
   plot([min(bits) max(bits)], [4 4],'b--;4 dB*dB;');
   
   xlabel('bits'); ylabel('var dB*dB'); grid('minor');
-  axis([5 30 1 20]); legend("location", "southwest")
+  axis([5 30 1 20]);
   print("-dpng", plot_fn);
 endfunction
