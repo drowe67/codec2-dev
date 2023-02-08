@@ -19,7 +19,7 @@ function ratek2_high_fbf(samname, f, vq_stage1_f32="", vq_stage2_f32="")
 
   newamp_700c; melvq;
   Fs = 8000; Nb = 20; K = 20; resampler = 'spline'; Lhigh = 80; vq_en = 0; all_en = 0;
-  amp_pf_en = 0; eq = 0; Kst = 0; Ken = K-1; pre_en = 0;
+  amp_pf_en = 0; eq = 0; Kst = 0; Ken = K-1; pre_en = 0; w_en = 0;
   
   % load up text files dumped from c2sim ---------------------------------------
 
@@ -46,6 +46,7 @@ function ratek2_high_fbf(samname, f, vq_stage1_f32="", vq_stage2_f32="")
       [M tmp] = size(vq_stage2); printf("stage 2 vq size: %d\n", M);
       nvq++; mbest_depth = 5;
     end
+    w = ones(1,K);
   end
 
   % precompute filters at rate Lhigh. Note range of harmonics is 1:Lhigh-1, as
@@ -98,10 +99,17 @@ function ratek2_high_fbf(samname, f, vq_stage1_f32="", vq_stage2_f32="")
       amean = sum(B(Kst+1:Ken+1))/(Ken-Kst+1);
       target = zeros(1,K);
       target(Kst+1:Ken+1) = B(Kst+1:Ken+1)-amean;
-      [res target_ ind] = mbest(vq, target, mbest_depth);
+      if w_en
+        mx = max(target)
+        w = (0.75/30)*(target-mx) + 1.0;
+      else
+        w = ones(1,K);
+      end
+      w
+      [res target_ ind] = mbest(vq, target, mbest_depth, w);
       B_hat = target_; B_hat(Kst+1:Ken+1) += amean;
       Eq = sum((target-target_).^2)/(Ken-Kst+1);
-      figure(2); clf; hold on;
+      figure(2); clf; subplot(211); hold on;
       for i=1:nvq
         plot(rate_K_sample_freqs_kHz*1000, vq(ind(i),:,i),'b;vq;');
       end
@@ -109,7 +117,10 @@ function ratek2_high_fbf(samname, f, vq_stage1_f32="", vq_stage2_f32="")
       B = B_hat;
       plot([0 4000], [amean amean]);
       hold off; axis([0 4000 -40 60]);
-    end
+      subplot(212);
+      plot(rate_K_sample_freqs_kHz*1000, w);
+      %axis([0 4000 0 1]); 
+   end
     YdB_ = interp1([0 rate_K_sample_freqs_kHz 4], [0 B 0], rate_Lhigh_sample_freqs_kHz, "spline", 0);
     nzero = floor(rate_K_sample_freqs_kHz(Kst+1)*1000/F0high);
     YdB_(1:nzero) = 0;
@@ -156,6 +167,7 @@ function ratek2_high_fbf(samname, f, vq_stage1_f32="", vq_stage2_f32="")
     if k == 'e', eq = mod(eq+1,3); end
     if k == 'f', amp_pf_en = mod(amp_pf_en+1,2); end
     if k == 'p', pre_en = mod(pre_en+1,2); end
+    if k == 'w', w_en = mod(w_en+1,2); end
 
   until (k == 'q')
   printf("\n");
