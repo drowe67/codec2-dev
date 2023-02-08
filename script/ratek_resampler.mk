@@ -24,7 +24,11 @@ PLOT_DATA1 := $(TRAIN)_k20_res1.txt $(TRAIN)_k20_res2.txt \
 	      $(TRAIN)_pre_res1.txt $(TRAIN)_pre_res2.txt \
 	      $(TRAIN)_comp_res1.txt $(TRAIN)_comp_res2.txt \
 	      $(TRAIN)_three_res1.txt $(TRAIN)_three_res2.txt \
-	      $(TRAIN)_three_res3.txt $(TRAIN)_three_mbest3.txt
+	      $(TRAIN)_three_res3.txt $(TRAIN)_three_mbest3.txt \
+	      $(TRAIN)_pred_res1.txt $(TRAIN)_pred_res2.txt \
+	      $(TRAIN)_sub_res1.txt $(TRAIN)_sub_res2.txt \
+	      $(TRAIN)_suba_res1.txt $(TRAIN)_suba_res2.txt \
+	      $(TRAIN)_pred2_res1.txt $(TRAIN)_pred2_res2.txt
 	      
 all: $(TRAIN)_ratek.png $(TRAIN)_ratek1.png
 
@@ -47,14 +51,14 @@ $(TRAIN)_ratek.png: $(PLOT_DATA)
 
 $(TRAIN)_ratek1.png: $(PLOT_DATA1)
 	echo "ratek_resampler_plot(\"$(TRAIN)_ratek1.png\", \
-             \"$(TRAIN)_k20_res1.txt\",'r-*;k20 1;', \
-             'continue',\"$(TRAIN)_k20_res2.txt\",'r-*;k20 2;', \
-             \"$(TRAIN)_three_res1.txt\",'g-*;k20 three1;', \
-             'continue', \"$(TRAIN)_three_res2.txt\",'g-*;k20 three2;', \
-             'continue', \"$(TRAIN)_three_res3.txt\",'g-*;k20 three3;', \
-             \"$(TRAIN)_three_res1.txt\",'g-*;k20 three1;', \
-             'continue', \"$(TRAIN)_three_res2.txt\",'g-*;k20 three2;', \
-             'continue', \"$(TRAIN)_three_mbest3.txt\",'gx;mbest3;' \
+	     \"$(TRAIN)_k20_res1.txt\",'r-x;k20 1;', \
+	     'continue',\"$(TRAIN)_k20_res2.txt\",'r-x;k20 2;', \
+             \"$(TRAIN)_sub_res1.txt\",'b-+;sub1 2..24;', \
+             'continue',\"$(TRAIN)_sub_res2.txt\",'b-+;sub2 2..24;', \
+             \"$(TRAIN)_suba_res1.txt\",'g-+;suba1 0..17;', \
+             'continue',\"$(TRAIN)_suba_res2.txt\",'g-+;suba2 0..17;', \
+             \"$(TRAIN)_pred2_res1.txt\",'c-+;pred2 1;', \
+             'continue',\"$(TRAIN)_pred2_res2.txt\",'c-+;pred2 2;' \
              ); quit" | octave-cli -p $(CODEC2)/octave --no-init-file
 
 # (1) no amp PF before VQ, include 2nd stage mbest
@@ -96,6 +100,21 @@ $(TRAIN)_no_res1.txt $(TRAIN)_no_res2.txt: $(TRAIN)_b20.f32
 # (10) three stages 9 bit/stage
 $(TRAIN)_three_res1.txt $(TRAIN)_three_res2.txt $(TRAIN)_three_res3.txt $(TRAIN)_three_mbest3.txt: $(TRAIN)_b20.f32
 	K=20 Kst=0 Ken=19 M=512 stage3="yes" mbest="yes" ../script/ratek_resampler.sh train_lbg $(TRAIN)_b20.f32 $(TRAIN)_three
+
+# (11) predictive 20ms
+$(TRAIN)_pred_res1.txt $(TRAIN)_pred_res2.txt: $(TRAIN)_b20.f32
+	K=20 Kst=0 Ken=19 M=$(M) removemean=" " lower=-100 extract_options="--p 0.9 -d 2" \
+	../script/ratek_resampler.sh train_lbg_pred $(TRAIN)_b20.f32 $(TRAIN)_pred
+
+# (12) Another attempt at subset
+$(TRAIN)_suba_res1.txt $(TRAIN)_suba_res2.txt: $(TRAIN)_b20.f32
+	K=20 Kst=0 Ken=17 M=$(M) ../script/ratek_resampler.sh train_lbg $(TRAIN)_b20.f32 $(TRAIN)_suba
+
+# (13) Another attempt at subset
+$(TRAIN)_pred2_res1.txt $(TRAIN)_pred2_res2.txt: $(TRAIN)_b20.f32
+	K=20 Kst=0 Ken=19 M=$(M) removemean=" " extract_options="-d 4 --pred2" \
+	../script/ratek_resampler.sh train_lbg $(TRAIN)_b20.f32 $(TRAIN)_pred2
+
 
 $(TRAIN)_b.f32:
 	../script/ratek_resampler.sh gen_train $(TRAIN_FULL)

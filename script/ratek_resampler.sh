@@ -14,6 +14,7 @@ Kst="${Kst:-0}"  # first index
 Ksp="${Ksp:-9}"  # last element of first vector in split
 Ken="${Ken:-29}" # last index max K-1
 out_dir="${out_dir:-ratek_out}"
+extract_options="${extract_options:-}"
 options="${options:-}"
 mbest="${mbest:-no}"
 removemean="${removemean:---removemean}"
@@ -493,7 +494,7 @@ function train_lbg() {
   
   # remove mean, extract columns from training data
   extract -t $K -s $Kst -e $Ken --lower $lower $removemean $meanl2 \
-  --dynamicrange $dr $drlate --writeall $fullfile ${filename_out}_nomean.f32
+  --dynamicrange $dr $extract_options $drlate --writeall $fullfile ${filename_out}_nomean.f32
 
   # train 2 stages - LBG
   vqtrain ${filename_out}_nomean.f32 $K $M --st $Kst --en $Ken -s 1e-3 ${filename_out}_vq1.f32 -r res1.f32 --split > ${filename_out}_res1.txt
@@ -577,6 +578,33 @@ function train_lbg_split_time() {
   vqtrain ${filename_out}_nomean2.f32 $(( 2*K2 )) $M -s 1e-3 ${filename_out}_vq2.f32 --split > ${filename_out}_res2.txt
  }
 
+# predictive, 20ms steps
+function train_lbg_pred() {
+  fullfile=$1
+  filename=$(basename -- "$fullfile")
+  filename="${filename%.*}"
+  tmp=$(mktemp)
+  tmp1=$(mktemp)
+  tmp2=$(mktemp)
+ 
+  filename_out=${filename}_lbg
+  if [ $# -eq 2 ]; then
+    filename_out=$2
+  fi
+  
+  # extract all columns used, at 20ms time steps
+  extract -t $K -s $Kst -e $Ken --timestep 2 $fullfile $tmp
+  # Reshaping to vectors 2K long that are 40ms of time, remove low
+  # energy vectors across entire 40ms block
+  extract -t $(( 2*K )) --lower 10 $tmp $tmp1
+  # Reshaping back to vectors K long, and do prediction on 20ms steps
+  extract -t $K -p 0.8 $tmp1 ${filename_out}_pred.f32
+  
+  # train 2 stage VQ, over 20ms time blocks
+  vqtrain ${filename_out}_pred.f32 $K $M -s 1e-3 ${filename_out}_vq1.f32 -r res1.f32 --split > ${filename_out}_res1.txt
+  vqtrain res1.f32 $K $M -s 1e-3 ${filename_out}_vq2.f32 --split > ${filename_out}_res2.txt
+ }
+
 # Try training with two different Nb
 function train_Nb() {
   fullfile1=$1
@@ -646,6 +674,9 @@ if [ $# -gt 0 ]; then
         ;;
     train_lbg_split_time)
         train_lbg_split_time $2 $3
+        ;;
+    train_lbg_pred)
+        train_lbg_pred $2 $3
         ;;
     train_no)
         train_no $2 $3
