@@ -96,31 +96,52 @@ function ratek2_high_fbf(samname, f, vq_stage1_f32="", vq_stage2_f32="")
     
     Eq = 0;
     if vq_en
-      amean = sum(B(Kst+1:Ken+1))/(Ken-Kst+1);
-      target = zeros(1,K);
-      target(Kst+1:Ken+1) = B(Kst+1:Ken+1)-amean;
       if w_en
-        mx = max(target)
+        % weighted search, requires gain calculation for each 
+        % codebook entry. we only support single stage
+        mx = max(target);
         w = (0.75/30)*(target-mx) + 1.0;
+        w2 = w .^ 2;
+        I = length(vq_stage1);
+        Emin = 1E32;
+        for i=1:I
+          g = sum((B-vq_stage1(i,:)).*w2)/sum(w2);
+          E = sum( ((B - vq_stage1(i,:) - g) .* w) .^ 2 );
+          if E < Emin
+            best_i = i;
+            Emin = E;
+            gmin = g;
+          end
+        end
+        Eq = Emin/K; B_hat = vq_stage1(best_i,:) + gmin;
+
+        figure(2); clf; hold on;
+        plot(rate_K_sample_freqs_kHz*1000, vq_stage1(best_i,:),'b;vq;');
+        plot(rate_K_sample_freqs_kHz*1000, B-gmin,'g;B-gmin;');
+        plot([0 4000], [gmin gmin],'r;gmin;');
+        hold off; axis([0 4000 -40 60]);
       else
-        w = ones(1,K);
+        % regular unweighted search, we can remove gain/mean outside of loop
+        amean = sum(B(Kst+1:Ken+1))/(Ken-Kst+1);
+        target = zeros(1,K);
+        target(Kst+1:Ken+1) = B(Kst+1:Ken+1)-amean;
+        [res target_ ind] = mbest(vq, target, mbest_depth);
+        B_hat = target_; B_hat(Kst+1:Ken+1) += amean;
+        Eq = sum((target-target_).^2)/(Ken-Kst+1);
+        gmin = amean; best_i = ind(1);
+
+        figure(2); clf; hold on;
+        for i=1:nvq
+          plot(rate_K_sample_freqs_kHz*1000, vq(ind(i),:,i),'b;vq;');
+        end
+        plot(rate_K_sample_freqs_kHz*1000, target,'g;target;');
+        plot([0 4000], [amean amean],'r;mean;');
+        hold off; axis([0 4000 -40 60]);
       end
-      w
-      [res target_ ind] = mbest(vq, target, mbest_depth, w);
-      B_hat = target_; B_hat(Kst+1:Ken+1) += amean;
-      Eq = sum((target-target_).^2)/(Ken-Kst+1);
-      figure(2); clf; subplot(211); hold on;
-      for i=1:nvq
-        plot(rate_K_sample_freqs_kHz*1000, vq(ind(i),:,i),'b;vq;');
-      end
-      plot(rate_K_sample_freqs_kHz*1000, target,'g;target;');
+      
       B = B_hat;
-      plot([0 4000], [amean amean]);
-      hold off; axis([0 4000 -40 60]);
-      subplot(212);
-      plot(rate_K_sample_freqs_kHz*1000, w);
-      %axis([0 4000 0 1]); 
-   end
+    end
+    
     YdB_ = interp1([0 rate_K_sample_freqs_kHz 4], [0 B 0], rate_Lhigh_sample_freqs_kHz, "spline", 0);
     nzero = floor(rate_K_sample_freqs_kHz(Kst+1)*1000/F0high);
     YdB_(1:nzero) = 0;
@@ -150,13 +171,10 @@ function ratek2_high_fbf(samname, f, vq_stage1_f32="", vq_stage2_f32="")
 
     % interactive menu ------------------------------------------
 
-    printf("\rframe: %d  menu: n-next  b-back  q-quit p-pre f-postfilter e-eq[%d] v-vq[%d] a-all plots", f, eq, vq_en);
-    if vq_en 
-      printf(" Eq: %3.2f dB^2", Eq);
-      for i=1:length(ind)
-        printf(" %4d",ind(i));
-      end
-    end  
+    printf("\rframe: %d  menu: n-nxt b-bck q-qt p-pre f-pf w[%d]-wght v-vq[%d] a-all", f, w_en, vq_en);
+    if vq_en
+      printf(" Eq: %5.2f gmin: %3.1f best_i: %d\n", Eq, gmin, best_i);
+    end
     fflush(stdout);
     k = kbhit();
 
