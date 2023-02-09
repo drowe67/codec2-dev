@@ -61,6 +61,10 @@ function ratek2_high_fbf(samname, f, vq_stage1_f32="", vq_stage2_f32="")
   
   rate_Lhigh_sample_freqs_kHz = (F0high:F0high:(Lhigh-1)*F0high)/1000;
 
+  % closed form input equaliser
+  ratek3_batch; B=ratek3_batch_tool(samname,'K',20);
+  q = mean(B-mean(B,2)) - mean(vq_stage1);
+  
   % Keyboard loop --------------------------------------------------------------
 
   k = ' '; 
@@ -93,8 +97,11 @@ function ratek2_high_fbf(samname, f, vq_stage1_f32="", vq_stage2_f32="")
     
     % Resample to rate K, optionally VQ, then back to rate Lhigh to check error
     B = interp1(rate_Lhigh_sample_freqs_kHz, YdB, rate_K_sample_freqs_kHz, "spline", "extrap");
+    if eq
+      B -= q;
+    end
     
-    Eq = 0;
+    Eq = 0; B_hat = B;
     if vq_en
       if w_en
         % weighted search, requires gain calculation for each 
@@ -118,8 +125,7 @@ function ratek2_high_fbf(samname, f, vq_stage1_f32="", vq_stage2_f32="")
         figure(2); clf; hold on;
         plot(rate_K_sample_freqs_kHz*1000, vq_stage1(best_i,:),'b;vq;');
         plot(rate_K_sample_freqs_kHz*1000, B-gmin,'g;B-gmin;');
-        plot([0 4000], [gmin gmin],'r;gmin;');
-        hold off; axis([0 4000 -40 60]);
+        hold off; axis([0 4000 -30 30]);
       else
         % regular unweighted search, we can remove gain/mean outside of loop
         amean = sum(B(Kst+1:Ken+1))/(Ken-Kst+1);
@@ -135,11 +141,9 @@ function ratek2_high_fbf(samname, f, vq_stage1_f32="", vq_stage2_f32="")
           plot(rate_K_sample_freqs_kHz*1000, vq(ind(i),:,i),'b;vq;');
         end
         plot(rate_K_sample_freqs_kHz*1000, target,'g;target;');
-        plot([0 4000], [amean amean],'r;mean;');
-        hold off; axis([0 4000 -40 60]);
+        plot(rate_K_sample_freqs_kHz*1000, q,'c;EQ;');
+        hold off; axis([0 4000 -30 30]);
       end
-      
-      B = B_hat;
     end
     
     YdB_ = interp1([0 rate_K_sample_freqs_kHz 4], [0 B 0], rate_Lhigh_sample_freqs_kHz, "spline", 0);
@@ -148,7 +152,7 @@ function ratek2_high_fbf(samname, f, vq_stage1_f32="", vq_stage2_f32="")
     
     % Optional amplitude post filtering
     if amp_pf_en
-      [YdB_ SdB] = amplitude_postfilter(rate_Lhigh_sample_freqs_kHz, YdB_, Fs, F0high, eq);
+      [YdB_ SdB] = amplitude_postfilter(rate_Lhigh_sample_freqs_kHz, YdB_, Fs, F0high);
     end  
    
     figure(3); clf;
@@ -158,22 +162,21 @@ function ratek2_high_fbf(samname, f, vq_stage1_f32="", vq_stage2_f32="")
       plot((1:L)*Wo*4000/pi, AmdB, l);
       plot(rate_Lhigh_sample_freqs_kHz*1000, AmdB_rate_Lhigh, ';rate Lhigh AdB;k+-');    
     end
-    plot(rate_Lhigh_sample_freqs_kHz*1000, YdB, ';rate Lhigh YdB;b+-');    
-    stem(rate_K_sample_freqs_kHz*1000, B, ";rate K;c+-");
+    plot(rate_K_sample_freqs_kHz*1000, B, ';rate K B;b+-');    
+    plot(rate_K_sample_freqs_kHz*1000, B_hat, ";rate K B hat;c+-");
 
     Lmin = round(200/F0high); Lmax = floor(3700/F0high);
-    E = sum((YdB(Lmin:Lmax) - YdB_(Lmin:Lmax)).^2)/(Lmax-Lmin+1);
-    plot((1:Lhigh-1)*F0high, YdB_,";rate Lhigh YdB hat;r+-");
-    le = sprintf("Eq %3.2f E %3.2f dB", Eq, E);
-    plot((Lmin:Lmax)*F0high, (YdB(Lmin:Lmax) - YdB_(Lmin:Lmax)), sprintf(";%s;bk+-",le));
+    plot((1:Lhigh-1)*F0high, YdB_,";rate Lhigh Y hat;r--");
+    le = sprintf("Eq %3.2fdB", Eq);
+    plot(rate_K_sample_freqs_kHz*1000, B - B_hat, sprintf(";%s;bk+-",le));
     axis([0 Fs/2 -10 80]);
     hold off;
 
     % interactive menu ------------------------------------------
 
-    printf("\rframe: %d  menu: n-nxt b-bck q-qt p-pre f-pf w[%d]-wght v-vq[%d] a-all", f, w_en, vq_en);
+    printf("\rframe: %d  menu: n-nxt b-bck q-qt p-pre f-pf w[%d]-wght v-vq[%d] e-eq[%d] a-all", f, w_en, vq_en, eq);
     if vq_en
-      printf(" Eq: %5.2f gmin: %3.1f best_i: %d\n", Eq, gmin, best_i);
+      printf(" Eq: %5.2f gmin: %3.1f best_i: %d", Eq, gmin, best_i);
     end
     fflush(stdout);
     k = kbhit();
@@ -182,7 +185,7 @@ function ratek2_high_fbf(samname, f, vq_stage1_f32="", vq_stage2_f32="")
     if k == 'b', f = f - 1; end
     if k == 'v', vq_en = mod(vq_en+1,2); end
     if k == 'a', all_en = mod(all_en+1,2); end
-    if k == 'e', eq = mod(eq+1,3); end
+    if k == 'e', eq = mod(eq+1,2); end
     if k == 'f', amp_pf_en = mod(amp_pf_en+1,2); end
     if k == 'p', pre_en = mod(pre_en+1,2); end
     if k == 'w', w_en = mod(w_en+1,2); end
