@@ -1,18 +1,19 @@
-% ratek2_high_fbf.m
+% ratek3_fbf.m
 %
-% David Rowe 2022
+% David Rowe 2023
 %
-% Rate K Experiment 2 - Resample rate L to rate Lhigh, filter, and optionally VQ
-%                     - interactive Octave script to explore frame by frame
-%                       operation of rate K resampling
+% Rate K Experiment 3
+%
+% Interactive Octave script to explore frame by frame operation of rate K
+% resampling, VQ, and various keyboard controlled options.  Companion to
+% ratek3_batch
 %
 % Usage:
 %   Make sure codec2-dev is compiled with the -DDUMP option - see README.md for
 %    instructions.
 %   ~/codec2-dev/build_linux$ ./c2sim ../raw/big_dog.raw --hpf --dump big_dog
 %   $ cd ~/codec2-dev/octave
-%   octave:14> ratek2_high_fbf("../build_linux/big_dog",50)
-
+%   octave:14> ratek3_fbf("../build_linux/big_dog",61)
 
 function ratek2_high_fbf(samname, f, vq_stage1_f32="", vq_stage2_f32="")
   more off;
@@ -61,7 +62,7 @@ function ratek2_high_fbf(samname, f, vq_stage1_f32="", vq_stage2_f32="")
   
   rate_Lhigh_sample_freqs_kHz = (F0high:F0high:(Lhigh-1)*F0high)/1000;
 
-  % closed form input equaliser
+  % microphone equaliser (closed form solution)
   ratek3_batch; B=ratek3_batch_tool(samname,'K',20);
   q = mean(B-mean(B,2)) - mean(vq_stage1);
   
@@ -95,7 +96,7 @@ function ratek2_high_fbf(samname, f, vq_stage1_f32="", vq_stage2_f32="")
       YdB(m) = 10*log10(Y);
     end
     
-    % Resample to rate K, optionally VQ, then back to rate Lhigh to check error
+    % Resample to rate K, optional EQ
     B = interp1(rate_Lhigh_sample_freqs_kHz, YdB, rate_K_sample_freqs_kHz, "spline", "extrap");
     if eq
       B -= q;
@@ -105,7 +106,8 @@ function ratek2_high_fbf(samname, f, vq_stage1_f32="", vq_stage2_f32="")
     if vq_en
       if w_en
         % weighted search, requires gain calculation for each 
-        % codebook entry. we only support single stage
+        % codebook entry. We only support single stage.
+        assert(length(vq_stage2_f32) == "");
         mx = max(target);
         w = (0.75/30)*(target-mx) + 1.0;
         w2 = w .^ 2;
@@ -174,7 +176,7 @@ function ratek2_high_fbf(samname, f, vq_stage1_f32="", vq_stage2_f32="")
 
     % interactive menu ------------------------------------------
 
-    printf("\rframe: %d  menu: n-nxt b-bck q-qt p-pre f-pf w[%d]-wght v-vq[%d] e-eq[%d] a-all", f, w_en, vq_en, eq);
+    printf("\rframe: %d  menu: n-nxt b-bck q-qt p-pre f-pf w[%d]-wght v-vq[%d] e-mic_eq[%d] a-all", f, w_en, vq_en, eq);
     if vq_en
       printf(" Eq: %5.2f gmin: %3.1f best_i: %d", Eq, gmin, best_i);
     end

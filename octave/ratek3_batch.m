@@ -2,8 +2,7 @@
 %
 % David Rowe 2022
 %
-% Rate K Experiment 3 - batch processing tool
-%                     - similar signal processing to pl2phase.m
+% Rate K Experiment 3 batch processing tool, companion to ratek3_fbf.m
 
 #{
   Ratek tool with various options to support
@@ -14,14 +13,14 @@
   + files of vectors that can be input to c2sim for synthesis
 
   cd ~/codec2/build_linux
-  ./src/c2sim --hpf ~/raw/big_dog.raw --modelout big_dog
+  ./src/c2sim --hpf ../raw/big_dog.raw --modelout big_dog_model.bin
   
   cd ~/codec2/octave
   octave:49> ratek3_batch; 
   octave:50> B=ratek3_batch_tool("../build_linux/big_dog","B_out","big_dog_B.f32");
   octave:51> mesh(B);
   
-  octave:8> ratek3_batch; ratek3_batch_tool("../build_linux/big_dog","A_out","big_dog_a.f32","H_out","big_dog_h.f32");
+  octave:8> ratek3_batch; ratek3_batch_tool("../build_linux/big_dog","K", 20, "A_out","big_dog_a.f32","H_out","big_dog_h.f32");
   ./src/c2sim --hpf ../raw/big_dog.raw --phase0 --postfilter --amread ../octave/big_dog_a.f32 --hmread ../octave/big_dog_h.f32 -o - | aplay -f S16_LE
   
 #}
@@ -38,7 +37,7 @@ function B = ratek3_batch_tool(samname, varargin)
   A_out_fn = ""; B_out_fn = ""; vq_stage1_f32=""; vq_stage2_f32=""; vq_stage3_f32="";
   H_out_fn = ""; amp_pf_en = 0;  phase_pf_en=0; i = 1;
   Kst=0; Ken=K-1; dec = 1; scatter_en = 0; noise_var = 0;
-  w = ones(1,K); w1 = ones(1,K); dec_lin = 1; pre_en = 0; logfn="";
+  w = ones(1,K); w1 = ones(1,K); dec_lin = 1; pre_en = 0; logfn=""; mic_eq = 0;
 
   lower = 10;             % only consider vectors above this mean
   dynamic_range = 100;     % restrict dynamic range of vectors
@@ -97,6 +96,8 @@ function B = ratek3_batch_tool(samname, varargin)
       dec_lin = 0;
     elseif strcmp(varargin{i},"pre") 
       pre_en = 1;    
+    elseif strcmp(varargin{i},"mic_eq") 
+      mic_eq = 1;    
     elseif strcmp(varargin{i},"logfn") 
       logfn = varargin{i+1}; i++;
       printf("logfn: %s\n", logfn);
@@ -145,6 +146,12 @@ function B = ratek3_batch_tool(samname, varargin)
     end
   end
 
+  if mic_eq
+    % microphone equaliser (closed form solution)
+    B = ratek3_batch_tool(samname,'K',20);
+    q = mean(B-mean(B,2)) - mean(vq_stage1);
+  end
+  
   sum_Eq = 0; nEq = 0;
   
   for f=1:frames
@@ -175,7 +182,10 @@ function B = ratek3_batch_tool(samname, varargin)
     if rateK_en
       % Resample from rate Lhigh to rate K b=R(Y), note K are non-linearly spaced (warped freq axis)
       B(f,:) = interp1(rate_Lhigh_sample_freqs_kHz, YdB, rate_K_sample_freqs_kHz, "spline", "extrap");
-      
+      if eq
+        B(f,:) -= q;
+      end
+     
       % dynamic range limiting
       lower=-100;
       B(f,:) .*= w;
@@ -200,7 +210,7 @@ function B = ratek3_batch_tool(samname, varargin)
       end
       B_hat(f,:) = target_ + amean;
       
-      % optional noise injection to simulate quantisation - low freq samples 
+      % optional noise injection to simulate quantisation
       % appear more sensitive to quantisation noise
       B_hat(f,1:K) += sqrt(noise_var)*randn(1,K);
 
