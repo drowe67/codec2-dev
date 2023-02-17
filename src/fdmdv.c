@@ -1972,6 +1972,69 @@ void fdmdv_48_to_8_short(short out8k[], short in48k[], int n)
 }
 
 /*---------------------------------------------------------------------------*\
+                                                       
+  FUNCTION....: fdmdv_8_to_24()	     
+  AUTHOR......: Mooneer Salem		      
+  DATE CREATED: 16 Feb 2023
+
+  Changes the sample rate of a signal from 8 to 24 kHz (and from short to float).
+
+  n is the number of samples at the 8 kHz rate, there are FDMDV_OS_24*n samples
+  at the 24 kHz rate.  A memory of FDMDV_OS_TAPS_24/FDMDV_OS_24 samples is reqd for
+  in8k[] (see t24_8.c unit test as example).
+
+\*---------------------------------------------------------------------------*/
+
+void fdmdv_8_to_24(float out24k[], short in8k[], int n)
+{
+    int i,j,k,l;
+
+    for(i=0; i<n; i++) {
+	    for(j=0; j<FDMDV_OS_24; j++) {
+	        out24k[i*FDMDV_OS_24+j] = 0.0;
+	        for(k=0,l=0; k<FDMDV_OS_TAPS_24K; k+=FDMDV_OS_24,l++)
+		        out24k[i*FDMDV_OS_24+j] += fdmdv_os_filter24[k+j]*in8k[i-l];
+	        out24k[i*FDMDV_OS_24+j] *= FDMDV_OS_24 * FDMDV_SHORT_TO_FLOAT;
+        }
+    }	
+
+    /* update filter memory */
+
+    for(i=-FDMDV_OS_TAPS_24_8K; i<0; i++)
+	    in8k[i] = in8k[i + n];
+}
+
+/*---------------------------------------------------------------------------*\
+                                                       
+  FUNCTION....: fdmdv_24_to_8()	     
+  AUTHOR......: Mooneer Salem			      
+  DATE CREATED: 16 Feb 2023
+
+  Changes the sample rate of a signal from 24 to 8 kHz (and from float to short)
+ 
+  n is the number of samples at the 8 kHz rate, there are FDMDV_OS_24*n
+  samples at the 24 kHz rate.  As above however a memory of
+  FDMDV_OS_TAPS_24 samples is reqd for in24k[] (see t24_8.c unit test as example).
+
+\*---------------------------------------------------------------------------*/
+
+void fdmdv_24_to_8(short out8k[], float in24k[], int n)
+{
+    int i,j;
+
+    for(i=0; i<n; i++) {
+	    out8k[i] = 0.0;
+	    for(j=0; j<FDMDV_OS_TAPS_24K; j++)
+	        out8k[i] += fdmdv_os_filter24[j]*in24k[i*FDMDV_OS_24-j]*FDMDV_FLOAT_TO_SHORT;
+    }
+
+    /* update filter memory */
+
+    for(i=-FDMDV_OS_TAPS_48K; i<0; i++)
+	    in24k[i] = in24k[i + n*FDMDV_OS_24];
+}
+
+/*---------------------------------------------------------------------------*\
 
   Function used during development to test if magnitude of digital
   oscillators was drifting.  It was!

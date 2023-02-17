@@ -355,6 +355,14 @@ endif()
                             ")
              set_tests_properties(test_fdmdv_48to8 PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
 
+     # 24<->8 kHz resamplers
+     add_test(NAME test_fdmdv_24to8
+              COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/octave;
+                             ${CMAKE_CURRENT_BINARY_DIR}/unittest/t24_8;
+                             DISPLAY=\"\" echo \"diff_fft_mag('in8.raw','out8.raw'); quit;\" | octave-cli -qf
+                             ")
+    set_tests_properties(test_fdmdv_24to8 PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
+    
     add_test(NAME test_CML_ldpcut
              COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/octave; SHORT_VERSION_FOR_CTEST=1 octave-cli -qf ldpcut.m")
              set_tests_properties(test_CML_ldpcut PROPERTIES PASS_REGULAR_EXPRESSION "Nerr: 0")

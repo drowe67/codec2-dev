@@ -78,6 +78,14 @@ extern "C" {
 #define FDMDV_OS_48             6                               /* oversampling rate                   */
 #define FDMDV_OS_TAPS_48K       48                              /* number of OS filter taps at 48kHz   */
 #define FDMDV_OS_TAPS_48_8K     (FDMDV_OS_TAPS_48K/FDMDV_OS_48) /* number of OS filter taps at 8kHz    */
+    
+/* 8 to 24 kHz sample rate conversion */
+
+#define FDMDV_OS_24             3                               /* oversampling rate                   */
+#define FDMDV_OS_TAPS_24K       48                              /* number of OS filter taps at 24kHz   */
+#define FDMDV_OS_TAPS_24_8K     (FDMDV_OS_TAPS_24K/FDMDV_OS_24) /* number of OS filter taps at 8kHz    */
+#define FDMDV_FLOAT_TO_SHORT    ((float)32767.0)                /* Multiplication factor to convert float between -1.0 and 1.0 to short */
+#define FDMDV_SHORT_TO_FLOAT    ((float)1.0 / FDMDV_FLOAT_TO_SHORT) /* Multiplication factor to convert short between -32768 and 32767 to float */
 
 /* FDMDV states and stats structures */
 
@@ -107,6 +115,12 @@ void           fdmdv_8_to_48(float out48k[], float in8k[], int n);
 void           fdmdv_48_to_8(float out8k[], float in48k[], int n);
 void           fdmdv_8_to_48_short(short out48k[], short in8k[], int n);
 void           fdmdv_48_to_8_short(short out8k[], short in48k[], int n);
+
+/* Special purpose 8->24K conversion functions for the Flex 6000 series.
+   The Flex uses floating point numbers while Codec2 uses shorts, so we
+   also have code to convert between those formats. */
+void           fdmdv_8_to_24(float out24k[], short in8k[], int n);
+void           fdmdv_24_to_8(short out8k[], float in24k[], int n);
 
 void           fdmdv_freq_shift(COMP rx_fdm_fcorr[], COMP rx_fdm[], float foff, COMP *foff_phase_rect, int nin);
 
