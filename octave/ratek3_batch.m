@@ -37,8 +37,9 @@ function B = ratek3_batch_tool(samname, varargin)
   A_out_fn = ""; B_out_fn = ""; vq_stage1_f32=""; vq_stage2_f32=""; vq_stage3_f32="";
   H_out_fn = ""; amp_pf_en = 0;  phase_pf_en=0; i = 1;
   Kst=0; Ken=K-1; dec = 1; scatter_en = 0; noise_var = 0;
-  w = ones(1,K); w1 = ones(1,K); dec_lin = 1; pre_en = 0; logfn=""; mic_eq = 0;
-
+  w = ones(1,K); w_en = 0; dec_lin = 1; pre_en = 0; logfn=""; mic_eq = 0;
+  plot_mic_eq = 0; vq_en = 0;
+  
   lower = 10;             % only consider vectors above this mean
   dynamic_range = 100;     % restrict dynamic range of vectors
   
@@ -54,11 +55,13 @@ function B = ratek3_batch_tool(samname, varargin)
       H_out_fn = varargin{i+1}; i++;
     elseif strcmp(varargin{i},"vq1") 
       vq_stage1_f32 = varargin{i+1}; i++;
-      rateK_en = 1;
+      rateK_en = 1; vq_en = 1;
     elseif strcmp(varargin{i},"vq2") 
       vq_stage2_f32 = varargin{i+1}; i++;
     elseif strcmp(varargin{i},"vq3") 
       vq_stage3_f32 = varargin{i+1}; i++;
+    elseif strcmp(varargin{i},"vq_en") 
+      vq_en = varargin{i+1}; i++;
     elseif strcmp(varargin{i},"amp_pf") 
       amp_pf_en = 1;
     elseif strcmp(varargin{i},"phase_pf") 
@@ -88,16 +91,17 @@ function B = ratek3_batch_tool(samname, varargin)
     elseif strcmp(varargin{i},"noise") 
       % add noise to B vector
       noise_var = varargin{i+1}; i++;
-    elseif strcmp(varargin{i},"weights") 
-      % user defined weights
-      w1 = varargin{i+1}; i++;
+    elseif strcmp(varargin{i},"w_en") 
+      w_en = 1;
     elseif strcmp(varargin{i},"nearest") 
       % choose nearest when decimating
       dec_lin = 0;
     elseif strcmp(varargin{i},"pre") 
       pre_en = 1;    
     elseif strcmp(varargin{i},"mic_eq") 
-      mic_eq = 1;    
+      mic_eq = varargin{i+1}; i++;
+    elseif strcmp(varargin{i},"plot_mic_eq") 
+      plot_mic_eq = 1;    
     elseif strcmp(varargin{i},"logfn") 
       logfn = varargin{i+1}; i++;
       printf("logfn: %s\n", logfn);
@@ -126,9 +130,7 @@ function B = ratek3_batch_tool(samname, varargin)
 
   % optionally load up VQ
 
-  vq_en = 0;
   if length(vq_stage1_f32)
-    vq_en = 1;
     vq_stage1 = load_f32(vq_stage1_f32,K);
     vq(:,:,1)= vq_stage1;
     [M tmp] = size(vq_stage1); printf("stage 1 vq size: %d\n", M);
@@ -147,9 +149,28 @@ function B = ratek3_batch_tool(samname, varargin)
   end
 
   if mic_eq
-    % microphone equaliser (closed form solution)
+    assert(length(vq_stage1_f32));
+    printf("training mic EQ %d...\n", mic_eq);
     B = ratek3_batch_tool(samname,'K',20);
-    q = mean(B-mean(B,2)) - mean(vq_stage1);
+    if mic_eq == 1
+      % microphone equaliser (closed form solution)
+      q = mean(B-mean(B,2)) - mean(vq_stage1);
+      q = max(q,0);
+    end
+    if mic_eq == 2
+      q = zeros(1,K);
+      for i=1:frames
+        q = eq_cand_b(q, B(i,:), vq, delta=0.01);
+        printf("%d/%d %3.0f%%\r", i,frames, (i/frames)*100);
+      end
+    end  
+ 
+    if plot_mic_eq
+      figure(1); clf; 
+      plot(rate_K_sample_freqs_kHz*1000, q);
+      axis([0 4000 -10 10]); 
+      print("-dpng", sprintf("%s_eq.png",samname));
+    end
   end
   
   sum_Eq = 0; nEq = 0;
@@ -182,7 +203,7 @@ function B = ratek3_batch_tool(samname, varargin)
     if rateK_en
       % Resample from rate Lhigh to rate K b=R(Y), note K are non-linearly spaced (warped freq axis)
       B(f,:) = interp1(rate_Lhigh_sample_freqs_kHz, YdB, rate_K_sample_freqs_kHz, "spline", "extrap");
-      if eq
+      if mic_eq
         B(f,:) -= q;
       end
      
@@ -192,23 +213,36 @@ function B = ratek3_batch_tool(samname, varargin)
       target = zeros(1,K);
       target(Kst+1:Ken+1) = B(f,Kst+1:Ken+1);
       mx = max(target(Kst+1:Ken+1)); target(Kst+1:Ken+1) = max(target(Kst+1:Ken+1), mx - dynamic_range);
-      amean = sum(target)/(Ken-Kst+1);
-      target -= amean;
       if vq_en
-        [res target_ ind] = mbest(vq, target, mbest_depth, w1);
-        Eq(f) = sum((target-target_).^2)/(Ken-Kst+1);
-        if amean > lower, sum_Eq += Eq(f); nEq++; end
+        if w_en
+          % weighted search, requires gain calculation for each 
+          % codebook entry. We only support single stage.
+          assert(length(vq_stage2_f32) == 0);
+          [aEq best_i gmin] = weighted_search(vq_stage1, B(f,:));
+          B_hat(f,:) = vq_stage1(best_i,:) + gmin;
+          Eq(f) = aEq;
+          if gmin > lower, sum_Eq += Eq(f); nEq++; end
+        else
+          % regular unweighted search, we can remove gain/mean outside of loop
+          amean = sum(target)/(Ken-Kst+1);
+          target -= amean;
+          [res target_ ind] = mbest(vq, target, mbest_depth, w1);
+          B_hat(f,:) = target_ + amean;
+          Eq(f) = sum((target-target_).^2)/(Ken-Kst+1);
+          if amean > lower, sum_Eq += Eq(f); nEq++; end
+        end
         if verbose >= 2
-          printf("f: %3d amean: %5.1f Eq: %4.2f dB^2", f, amean, Eq(f));
-          for i=1:length(ind)
-            printf(" %4d",ind(i));
-          end
+          printf("f: %3d Eq: %4.2f dB^2", f, Eq(f));
+          if w_en == 0
+            for i=1:length(ind)
+              printf(" %4d",ind(i));
+            end
+          end  
           printf("\n");
         end  
       else
-        target_ = target;
+        B_hat(f,:) = B(f,:);
       end
-      B_hat(f,:) = target_ + amean;
       
       % optional noise injection to simulate quantisation
       % appear more sensitive to quantisation noise

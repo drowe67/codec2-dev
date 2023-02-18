@@ -45,7 +45,64 @@ function batch_process {
   printf "%-10s %-20s %4.2f\n" ${filename} ${outname} $(cat ${tmp}) >> ${out_dir}/zlog.txt
 }
 
-# 230204: Process sample different VQ designes 1x12, 2x12, 2x9, 3x9
+# 230213: Mic EQ versions 1 & 2
+function vq_test_230217() {
+  fullfile=$1
+  filename=$(basename -- "$fullfile")
+  filename="${filename%.*}"
+  mkdir -p $out_dir
+  
+  c2sim $fullfile --hpf --modelout ${filename}_model.bin
+
+  # (1) Amps Nb filtered, phase0, rate K=20 resampling, phase postfilter,
+  # rate L amp postfilter, pre-emp
+  batch_process $fullfile "'K',20,'amp_pf','phase_pf','pre'" "1_k20"
+
+  # with mic EQ 1
+  batch_process $fullfile "'K',20,'amp_pf','phase_pf', \
+  'vq1','../build_linux/train_k20_vq1.f32', \
+  'vq_en',0,'mic_eq',1,'plot_mic_eq'" "2_k20_eq1"
+
+  # with mic EQ 2
+  batch_process $fullfile "'K',20,'amp_pf','phase_pf', \
+  'vq1','../build_linux/train_k20_vq1.f32', \
+  'vq_en',0,'mic_eq',2,'plot_mic_eq'" "3_k20_eq2"
+
+  # 1 x 12 VQ vanilla
+  batch_process $fullfile "'K',20,'amp_pf','phase_pf', \
+  'vq1','../build_linux/train_k20_vq1.f32'" "4_k20_vq1"
+
+  # 2 x 12 VQ vanilla
+  batch_process $fullfile "'K',20,'amp_pf','phase_pf', \
+  'vq1','../build_linux/train_k20_vq1.f32', 
+  'vq2','../build_linux/train_k20_vq2.f32'" "5_k20_vq2"
+
+  # 1 x 12 VQ with mic EQ 1
+  batch_process $fullfile "'K',20,'amp_pf','phase_pf', \
+  'vq1','../build_linux/train_k20_vq1.f32', \
+  'mic_eq',1" "6_k20_vq1_eq1"
+
+  # 2 x 12 VQ with mic EQ 1
+  batch_process $fullfile "'K',20,'amp_pf','phase_pf', \
+  'vq1','../build_linux/train_k20_vq1.f32', \
+  'vq2','../build_linux/train_k20_vq2.f32', \
+  'mic_eq',1" "7_k20_vq2_eq1"
+  
+  # 1 x 12 VQ with mic EQ 2
+  batch_process $fullfile "'K',20,'amp_pf','phase_pf', \
+  'vq1','../build_linux/train_k20_vq1.f32', \
+  'mic_eq',2" "8_k20_vq1_eq2"
+
+  # 2 x 12 VQ with mic EQ 2
+  batch_process $fullfile "'K',20,'amp_pf','phase_pf', \
+  'vq1','../build_linux/train_k20_vq1.f32', \
+  'vq2','../build_linux/train_k20_vq2.f32', \
+  'mic_eq',2" "9_k20_vq2_eq2"
+  
+  c2enc 3200 $fullfile - | c2dec 3200 - - | sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_10_3200.wav
+}
+
+# 230204: Process sample different VQ designs 1x12, 2x12, 2x9, 3x9
 function vq_test_230204() {
   fullfile=$1
   filename=$(basename -- "$fullfile")
@@ -696,11 +753,23 @@ if [ $# -gt 0 ]; then
     vq_test_230204)
         rm -f ${out_dir}/zlog.txt
         vq_test_230204 ../raw/big_dog.raw
-        vq_test_230204 ../raw/two_lines.raw
-        vq_test_230204 ../raw/cq_ref.raw
-        vq_test_230204 ../raw/morig.raw
-        #vq_test_230204 ../raw/hts2a.raw
+        #vq_test_230204 ../raw/two_lines.raw
+        #vq_test_230204 ../raw/cq_ref.raw
+        #vq_test_230204 ../raw/morig.raw
+        #vq_test_230204 ../raw/hts2a.raw        
+        ;;
         
+    vq_test_230217)
+        #rm -f ${out_dir}/zlog.txt
+        vq_test_230217 ../raw/morig.raw
+        #vq_test_230217 ../raw/big_dog.raw
+        vq_test_230217 ../raw/cq_ref.raw
+        vq_test_230217 ../raw/two_lines.raw
+        #vq_test_230217 ../raw/hts1a.raw        
+        #vq_test_230217 ../raw/hts2a.raw        
+        vq_test_230217 ../raw/kristoff.raw        
+        vq_test_230217 ../raw/forig.raw     
+        vq_test_230217 ../raw/ve9qrp_10s.raw     
         ;;
     vq_test_subset)
         vq_test_subset ../raw/big_dog.raw
