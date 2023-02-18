@@ -476,8 +476,9 @@ end
 function [YdB SdB] = amplitude_postfilter(rate_Lhigh_sample_freqs_kHz, YdB, Fs, F0high, eq=0)
   % straight line fit to YdB to estimate spectral slope SdB
   w = 2*pi*rate_Lhigh_sample_freqs_kHz*1000/Fs;
-  st = round(200/F0high);
+  st = max(round(200/F0high),1);
   en = min(round(3700/F0high), length(w));
+  %printf("st: %d en: %d\n", st, en);
   [m b] = linreg(w(st:en),YdB(st:en),en-st+1);
   SdB = w*m+b;
 
@@ -510,4 +511,28 @@ end
 function str = papr(s)
   papr_dB = 10*log10(max(abs(s).^2)/mean(abs(s).^2));
   str = sprintf("CPAPR: %3.1f dB", papr_dB);
+end
+
+function [Eq best_i gmin] = weighted_search(vq_stage1, target);
+  mx = max(target);
+  w = (0.75/30)*(target-mx) + 1.0;
+  w2 = w .^ 2;
+  I = length(vq_stage1);
+  Emin = 1E32;
+  for i=1:I
+    g = sum((target-vq_stage1(i,:)).*w2)/sum(w2);
+    E = sum( ((target - vq_stage1(i,:) - g) .* w) .^ 2 );
+    if E < Emin
+      best_i = i;
+      Emin = E;
+      gmin = g;
+    end
+  end
+  Eq = Emin/length(target);
+end
+
+function f = eq_cand_b(f, target, vq, delta=0.01)
+  g = mean(target);
+  [res target_ ind] = mbest(vq, target-f-g, 1);
+  f += 2*delta*(target-f-g-target_);
 end
