@@ -15,7 +15,7 @@
 %   $ cd ~/codec2-dev/octave
 %   octave:14> ratek3_fbf("../build_linux/big_dog",61)
 
-function ratek2_high_fbf(samname, f, vq_stage1_f32="", vq_stage2_f32="")
+function ratek3_fbf(samname, f, vq_stage1_f32="", vq_stage2_f32="")
   more off;
 
   newamp_700c; melvq;
@@ -62,9 +62,13 @@ function ratek2_high_fbf(samname, f, vq_stage1_f32="", vq_stage2_f32="")
   
   rate_Lhigh_sample_freqs_kHz = (F0high:F0high:(Lhigh-1)*F0high)/1000;
 
-  % microphone equaliser (closed form solution)
-  ratek3_batch; B=ratek3_batch_tool(samname,'K',20);
-  q = mean(B-mean(B,2)) - mean(vq_stage1);
+  if length(vq_stage1_f32)
+    printf("training mic EQ...\n");
+    % microphone equaliser (closed form solution)
+    ratek3_batch; B=ratek3_batch_tool(samname,'K',20);
+    q = mean(B-mean(B,2)) - mean(vq_stage1);
+    q = max(q,0);
+  end
   
   % Keyboard loop --------------------------------------------------------------
 
@@ -107,22 +111,9 @@ function ratek2_high_fbf(samname, f, vq_stage1_f32="", vq_stage2_f32="")
       if w_en
         % weighted search, requires gain calculation for each 
         % codebook entry. We only support single stage.
-        assert(length(vq_stage2_f32) == "");
-        mx = max(target);
-        w = (0.75/30)*(target-mx) + 1.0;
-        w2 = w .^ 2;
-        I = length(vq_stage1);
-        Emin = 1E32;
-        for i=1:I
-          g = sum((B-vq_stage1(i,:)).*w2)/sum(w2);
-          E = sum( ((B - vq_stage1(i,:) - g) .* w) .^ 2 );
-          if E < Emin
-            best_i = i;
-            Emin = E;
-            gmin = g;
-          end
-        end
-        Eq = Emin/K; B_hat = vq_stage1(best_i,:) + gmin;
+        assert(length(vq_stage2_f32) == 0);
+        [Eq best_i gmin] = weighted_search(vq_stage1, B);
+        B_hat = vq_stage1(best_i,:) + gmin;
 
         figure(2); clf; hold on;
         plot(rate_K_sample_freqs_kHz*1000, vq_stage1(best_i,:),'b;vq;');
