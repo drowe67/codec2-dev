@@ -87,8 +87,10 @@ int main(int argc, char *argv[])
     float          hf_gain;
     COMP          *ch_fdm_delay = NULL, aspread, aspread_2ms, delayed, direct;
     float          tx_pwr, tx_pwr_fade, noise_pwr, user_multipath_delay;
-    int            frames, i, j, k, Fs, ret, nclipped, noutclipped, ssbfilt_en, complex_out, ctest;
-    float          sam, peak, clip, clipmin, papr, CNo, snr3k, gain;
+    int            frames, i, j, k, Fs, ret, nclipped, noutclipped, ssbfilt_en,
+                   complex_out, ctest, impulse_en, impulse_clock, impulse_wait_samples,
+                   impulse_state;
+    float          sam, peak, clip, papr, CNo, snr3k, gain, impulse_period;
 
     if (argc < 3) {
     helpmsg:
@@ -97,10 +99,9 @@ int main(int argc, char *argv[])
                         "usage: %s InputRealModemRawFile OutputRealModemRawFile [Options]\n"
                         "\n"
                         "  real int16 input -> Gain -> Hilbert Transform -> clipper -> freq shift ->\n"
-                        "  Multipath -> AWGN noise -> SSB filter -> real int16 output\n"
+                        "  Multipath -> AWGN+impulse noise -> SSB filter -> real int16 output\n"
                         "\n"
-                        "[--clip int16]         Hilbert clipper max (clip complex signal magnitude, default 32767)\n"
-                        "[--clipmin int16]      Hilbert clipper min (default 0)\n"
+                        "[--clip int16]         Hilbert clipper (clip complex signal magnitude, default 32767)\n"
                         "[--complexout]         Optional int16 IQ complex output (default real int16)\n"
                         "[--ctest]              Check PAPR is around 0dB, used to support ctests\n"
                         "[--freq FoffHz]        Frequency offset (default 0Hz)\n"
@@ -108,11 +109,12 @@ int main(int argc, char *argv[])
                         "[--Fs SampleRateHz]    Sample rate of simulation (default 8000 Hz)\n"
                         "[--gain G]             Linear gain (default 1.0)\n"
                         "[--mpg]                Multipath good 0.1Hz Doppler, 0.5ms delay\n"
-                        "[--mpp]                Multipath poor 1.0Hz Doppler, 1.0ms delay\n"
-                        "[--mpd]                Multipath disturbed 2.0Hz Doppler, 2.0ms delay\n"
+                        "[--mpp]                Multipath poor 1.0Hz Doppler, 2.0ms delay\n"
+                        "[--mpd]                Multipath disturbed 2.0Hz Doppler, 4.0ms delay\n"
                         "[--ssbfilt 0|1]        SSB bandwidth filter (default 1 on)\n"
                         "[--mulipath_delay ms]  Optionally adjust multipath delay\n"
-                        "[--No dBHz]            AWGN Noise density dB/Hz (default -100)"
+                        "[--No dBHz]            AWGN Noise density dB/Hz (default -100)\n"
+                        "[--impulse ms]         simulate impulse noise with mean ms\n"
                         "\n"
                 , argv[0]);
         exit(1);
@@ -134,8 +136,9 @@ int main(int argc, char *argv[])
 
     NodB = -100;
     Fs = 8000; foff_hz = 0.0; fading_en = 0; ctest = 0;
-    clip = 32767; clipmin = 0; gain = 1.0;
+    clip =32767; gain = 1.0;
     ssbfilt_en = 1; complex_out = 0;
+    impulse_en = 0; impulse_period = 0.0; impulse_state = 0;    
     fading_dir = strdup(DEFAULT_FADING_DIR); user_multipath_delay = -1.0;
 
     int o = 0;
@@ -145,7 +148,6 @@ int main(int argc, char *argv[])
             {"complexout",      no_argument,        0, 'o'},
             {"ctest",           no_argument,        0, 't'},
             {"clip",            required_argument,  0, 'c'},
-            {"clipmin",         required_argument,  0, 'e'},
             {"fading_dir",      required_argument,  0, 'u'},
             {"freq",            required_argument,  0, 'f'},
             {"Fs",              required_argument,  0, 'r'},
@@ -157,10 +159,11 @@ int main(int argc, char *argv[])
             {"mpd",             no_argument,        0, 'd'},
             {"multipath_delay", required_argument,  0, 'm'},
             {"No",              required_argument,  0, 'n'},
-            {0, 0, 0, 0}
+            {"impulse",         required_argument,  0, 'j'},
+           {0, 0, 0, 0}
         };
 
-        o = getopt_long(argc,argv,"c:de:f:g:im:n:opr:s:tu:h",long_opts,&opt_idx);
+        o = getopt_long(argc,argv,"c:df:g:im:n:opr:s:tu:hj:",long_opts,&opt_idx);
         
         switch(o) {
         case 'c':
@@ -168,9 +171,6 @@ int main(int argc, char *argv[])
             break;
         case 'd':
             fading_en = 3;
-            break;
-        case 'e':
-            clipmin = atof(optarg);
             break;
         case 'f':
             foff_hz = atof(optarg);
@@ -205,6 +205,10 @@ int main(int argc, char *argv[])
         case 'u':
             fading_dir = strdup(optarg);
             break;
+        case 'j':
+            impulse_en = 1;
+            impulse_period = atof(optarg);
+            break;
         case 'h':
         case '?':
             goto helpmsg;
@@ -216,11 +220,12 @@ int main(int argc, char *argv[])
 
     /*  N = var = NoFs */
 
-    // arbitrary noise scaling, to maintain backwards compatability with many tests.  TODO make the No
+    // arbitrary noise scaling, to maintain backwards compatibility with many tests.  TODO make the No
     // units more sensible, and fix all the tests that depend on this scaling
     No = pow(10.0, NodB/10.0)*1000*1000;
     variance = Fs*No;
-
+    impulse_clock = 0; impulse_wait_samples = 0;
+    
     tx_pwr = tx_pwr_fade = noise_pwr = 0.0;
     noutclipped = 0; nclipped = 0;
     peak = 0.0;
@@ -336,7 +341,7 @@ int main(int argc, char *argv[])
            htbuf[i] = htbuf[i+BUF_N];
 
         /* --------------------------------------------------------*\
-   	                    Clipping mag of complex signal
+   	                    Clipping  mag of complex signal
         \*---------------------------------------------------------*/
 
         for(i=0; i<BUF_N; i++) {
@@ -346,12 +351,13 @@ int main(int argc, char *argv[])
               mag = clip;
               nclipped++;
             }
-            if (mag < clipmin) {
-              mag = clipmin;
-              nclipped++;
-            }
             tx_pwr += mag*mag;
-            if (mag > peak) { peak = mag; /*fprintf(stderr, "%f\n",mag);*/ }
+            /* we get a bit of overshoot in peak measurements if HT filter hasn't been primed */
+            if (frames*BUF_N > HT_N)
+                if (mag > peak) {
+                    peak = mag;
+                    //fprintf(stderr, "%d %f\n",frames, mag);
+                }
             ch_in[i].real = mag*cos(angle);
             ch_in[i].imag = mag*sin(angle);
         }
@@ -410,6 +416,39 @@ int main(int argc, char *argv[])
             scaled_noise = fcmult(sqrt(variance), n);
             ch_fdm[i] = cadd(ch_fdm[i], scaled_noise);
             noise_pwr += pow(scaled_noise.real, 2.0) + pow(scaled_noise.imag, 2.0);
+        }
+
+        /* Impulse noise --------------------------------------*/
+
+        /* we simulate front end overload (e.g. static crash) by
+           dropping out the channel for 10ms */
+        
+        if (impulse_en) {
+            for(i=0; i<BUF_N; i++) {
+                impulse_clock++;
+                int next_state = impulse_state;
+                switch(impulse_state) {
+                case 0:
+                    if (impulse_clock >= impulse_wait_samples) {
+                        impulse_clock = 0;
+                        impulse_wait_samples = 0.01*Fs;
+                        next_state = 1;
+                    }
+                    break;
+                case 1:
+                    ch_fdm[i].real = 32767; ch_fdm[i].imag = 32767;
+                    if (impulse_clock >= impulse_wait_samples) {
+                        impulse_clock = 0;
+                        // std dev of time to next impulse is mean period/2  
+                        float impulse_wait_s = impulse_period/1000.0 + (impulse_period/2000.0)*gaussian();
+                        if (impulse_wait_s < 0) impulse_wait_s = 0;
+                        impulse_wait_samples = impulse_wait_s*Fs;
+                        next_state = 0;
+                    }
+                    break;
+                }
+                impulse_state = next_state;
+            }
         }
 
         /* FIR filter to simulate (a rather flat) SSB filter. We
