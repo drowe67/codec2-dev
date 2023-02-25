@@ -114,11 +114,13 @@ ExternalProject_Add(cml
 
 # Create fading files (used for channel simulation) as part of unit test setup
 add_custom_target(fading_files ALL
+  DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/slow_fading_samples.float
   DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/fast_fading_samples.float
   DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/faster_fading_samples.float
   )
 add_custom_command(
-  OUTPUT  ${CMAKE_CURRENT_BINARY_DIR}/fast_fading_samples.float
+  OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/slow_fading_samples.float
+  OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/fast_fading_samples.float
   OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/faster_fading_samples.float
   COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR} && ./fading_files.sh ${CMAKE_CURRENT_BINARY_DIR}
 )
