@@ -1,6 +1,7 @@
 % plphase2.m
 %
 % Experiment to explore original and phase0 synthesised phase combined with rate K amplitude model.
+% Part of August 2022-> speech quality improvement campaign
 % 1. Plot time domain speech in 0-1000Hz, 1000-2000, and 2000-4000Hz bands so we can explore envelope
 %    of synthesised speech, which is related to phase spectra in formants
 % 2. UI to cycle between orig/phase0 phase, and apply amplitude and phase post filter
@@ -11,11 +12,11 @@
   Usage:
 
     $ cd codec2/build_linux
-    $ ./src/c2sim ../raw/hts1a.raw --phase0 --dump hts1a
+    $ ./src/c2sim ../raw/big_dog.raw --hpf --phase0 --dump big_dog
 
     $ cd codec2/build_linux/octave
     $ octave-cli
-    octave:> plphase2("../build_linux/hts1a", 44)
+    octave:> plphase2("../build_linux/big_dog", 61)
 #}
 
 function plphase2(samname, f, Nb=20, K=30, print_path="../doc/ratek_resampler/")
@@ -52,6 +53,9 @@ function plphase2(samname, f, Nb=20, K=30, print_path="../doc/ratek_resampler/")
   k = ' '; plot_group_delay=0; Pms = 6; plot_synth_sn=1; phase0_en=1;
   postfilter_en = 0; ratek_en = 1;
   do
+    s = [ Sn(2*f-1,:) Sn(2*f,:) ];
+    figure(1); clf; plot(s); axis([1 length(s) -20000 20000]);
+    
     Wo = model(f,1); F0 = Fs*Wo/(2*pi); L = model(f,2);
     Am = model(f,3:(L+2)); AmdB = 20*log10(Am);
     Am_freqs_kHz = (1:L)*Wo*4/pi;
@@ -79,7 +83,7 @@ function plphase2(samname, f, Nb=20, K=30, print_path="../doc/ratek_resampler/")
     Am_ = 10 .^ (AmdB_/20);
 
     % plot time domain speech ---------------------------------------------
-    figure(1); clf;
+    figure(3); clf;
     s = [ Sn(2*f-1,:) Sn(2*f,:) ];
     y_off = -5000;
     if phase0_en, phase_ratek(f,1:L) = phase0(f,1:L); else phase_ratek(f,1:L) = phase(f,1:L); end
@@ -147,7 +151,7 @@ function plphase2(samname, f, Nb=20, K=30, print_path="../doc/ratek_resampler/")
     hold off; xlabel('Frequency (Hz)');
     grid;
 
-    figure(3); clf;
+    figure(4); clf;
     subplot(211);
     adj_ratek = 0;
     if mean(phase0(f,1:L)) < -2*pi
