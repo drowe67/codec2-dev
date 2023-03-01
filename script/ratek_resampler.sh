@@ -45,6 +45,26 @@ function batch_process {
   printf "%-10s %-20s %4.2f\n" ${filename} ${outname} $(cat ${tmp}) >> ${out_dir}/zlog.txt
 }
 
+# 230226: debugging clicks
+function vq_test_230226() {
+  fullfile=$1
+  filename=$(basename -- "$fullfile")
+  filename="${filename%.*}"
+  mkdir -p $out_dir
+if [ 0 -eq 1]; then 
+  # orig amp and phase
+  c2sim $fullfile --hpf --modelout ${filename}_model.bin -o - | \
+  sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_1_out.wav
+ 
+  # Amps Nb filtered, phase0, rate K=20 resampling, phase postfilter,
+  # rate L amp postfilter
+  batch_process $fullfile "'K',20,'amp_pf','phase_pf'" "2_k20"
+fi
+  # Amps Nb filtered, phase0, rate K=20 resampling, phase postfilter,
+  # rate L amp postfilter
+  batch_process $fullfile "'K',20,'amp_pf','phase_pf','rand50'" "3_rand50"
+}
+
 # 230213: Mic EQ versions 1 & 2
 function vq_test_230217() {
   fullfile=$1
@@ -111,7 +131,7 @@ function vq_test_230204() {
   mkdir -p $out_dir
   
   c2sim $fullfile --hpf --modelout ${filename}_model.bin
-if [ 0 -eq 1 ]; then
+
   # (1) Amps Nb filtered, phase0, rate K=20 resampling, phase postfilter,
   # rate L amp postfilter, pre-emp, EQ2
   batch_process $fullfile "'K',20,'amp_pf','phase_pf', \
@@ -143,13 +163,13 @@ if [ 0 -eq 1 ]; then
   'vq1','../build_linux/train_three_vq1.f32', \
   'vq2','../build_linux/train_three_vq2.f32', \ 
   'vq3','../build_linux/train_three_vq3.f32'"  "6_three_vq3_27_dec2"
-fi
+
   # 3 x 9 VQ, decimate by 3 (target 1200 bits/s when side info added)
   batch_process $fullfile "'K',20,'amp_pf','phase_pf','mic_eq',2,'dec', 3, \
   'vq1','../build_linux/train_three_vq1.f32', \
   'vq2','../build_linux/train_three_vq2.f32', \ 
   'vq3','../build_linux/train_three_vq3.f32'"  "7_three_vq3_27_dec3"
-if [ 0 -eq 1 ]; then
+
   # 1 x 12 VQ, decimate by 3 (target 700 bits/s)
   batch_process $fullfile "'K',20,'amp_pf','phase_pf','mic_eq',2,'dec', 3, \
   'vq1','../build_linux/train_k20_vq1.f32'" "8_k20_vq1_12_dec3"
@@ -160,7 +180,7 @@ if [ 0 -eq 1 ]; then
   'vq2','../build_linux/train_k20_vq2.f32'" "9_k20_vq2_24_dec4"
 
    cat $fullfile | hpf | c2enc 3200 - - | c2dec 3200 - - | sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_10_3200.wav
-fi
+
 }
 
 # 230204: Dynamic range reduction test, see how it sounds with and without VQ
@@ -796,6 +816,13 @@ if [ $# -gt 0 ]; then
         vq_test_230217 ../raw/forig.raw     
         vq_test_230217 ../raw/ve9qrp_10s.raw     
         ;;
+
+    vq_test_230226)
+        vq_test_230226 ../raw/two_lines.raw
+        #vq_test_230226 ../raw/pickle.raw
+        #vq_test_230226 ../raw/tea.raw
+        ;;
+ 
     vq_test_subset)
         vq_test_subset ../raw/big_dog.raw
         vq_test_subset ../raw/two_lines.raw
