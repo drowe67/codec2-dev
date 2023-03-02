@@ -221,7 +221,7 @@ void phase_synth_zero_order(
         }
 
 	if (phase_excitation_only) {
-	  // development mode used to visiulate excitation
+	  // development mode used to visualise excitation
 	  H[m].real = 1.0; H[m].imag = 0.0; model->A[m]= 100.0;
 	}
         /* filter using LPC filter */
