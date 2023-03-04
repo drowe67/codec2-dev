@@ -536,3 +536,29 @@ function f = eq_cand_b(f, target, vq, delta=0.01)
   [res target_ ind] = mbest(vq, target-f-g, 1);
   f += 2*delta*(target-f-g-target_);
 end
+
+% normalises the energy in AmdB_rate2 to be the same as AmdB_rate1
+function AmdB_rate2_hat = norm_energy(AmdB_rate1, AmdB_rate2)
+  c = sum(10 .^ (AmdB_rate1/10))/sum(10 .^ (AmdB_rate2/10));
+  AmdB_rate2_hat = AmdB_rate2 + 10*log10(c);
+end
+
+function test_norm_energy
+  Fs = 8000; L = 20; F0 = (Fs/2)/L; K=20;
+  Am_freqs_kHz = (1:L-1)/1000;
+  AmdB = ones(1,L-1);
+ 
+  rate_K_sample_freqs_kHz = mel_sample_freqs_kHz(K);
+
+  AmdB_rate_K = interp1([0 Am_freqs_kHz 4], [0 AmdB 0],
+                        rate_K_sample_freqs_kHz, "spline", "extrap");
+
+  AmdB_rate_K_hat = norm_energy(AmdB, AmdB_rate_K);
+  E_L = sum(10 .^ (AmdB/10));
+  E_K = sum(10 .^ (AmdB_rate_K_hat/10));
+  if abs(E_L-E_K) < 1E-3
+    printf("PASS\n");
+  else
+    printf("FAIL\n");
+  end
+end
