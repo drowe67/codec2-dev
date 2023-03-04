@@ -135,9 +135,6 @@ function plphase3(samname, f, Nb=20, K=20)
     if k == 'r',
       if ratek_en, ratek_en = 0; else ratek_en = 1; end
     end
-    if k == '5',
-      if rand_50, rand_50 = 0; else rand_50 = 1; end
-    end
     until (k == 'q')
   printf("\n");
 

@@ -38,7 +38,7 @@ function B = ratek3_batch_tool(samname, varargin)
   H_out_fn = ""; amp_pf_en = 0;  phase_pf_en=0; i = 1;
   Kst=0; Ken=K-1; dec = 1; scatter_en = 0; noise_var = 0;
   w = ones(1,K); w_en = 0; dec_lin = 1; pre_en = 0; logfn=""; mic_eq = 0;
-  plot_mic_eq = 0; vq_en = 0; rand50 = 0;
+  plot_mic_eq = 0; vq_en = 0;
   
   lower = 10;             % only consider vectors above this mean
   dynamic_range = 100;     % restrict dynamic range of vectors
@@ -102,8 +102,6 @@ function B = ratek3_batch_tool(samname, varargin)
       mic_eq = varargin{i+1}; i++;
     elseif strcmp(varargin{i},"plot_mic_eq") 
       plot_mic_eq = 1;    
-    elseif strcmp(varargin{i},"rand50") 
-      rand50 = 1;    
     elseif strcmp(varargin{i},"logfn") 
       logfn = varargin{i+1}; i++;
       printf("logfn: %s\n", logfn);
@@ -366,16 +364,6 @@ function B = ratek3_batch_tool(samname, varargin)
       fwrite(fam, Afloat_, "float32");
     end
     fclose(fam);
-  end
-  
-  if rand50
-    for f=1:frames
-      Wo = model(f,1); F0 = Fs*Wo/(2*pi); L = model(f,2);
-      if F0 < 60
-        printf("rand 50 f: %d\n", f);
-        H(f,1:L) += 2*pi*rand(1,L);
-      end
-    end
   end
   
   if length(H_out_fn)
