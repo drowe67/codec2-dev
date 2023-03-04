@@ -59,24 +59,24 @@
 
 \*---------------------------------------------------------------------------*/
 
-void analyse_one_frame(struct CODEC2 *c2, MODEL *model, short speech[]);
+void analyse_one_frame(struct CODEC2 *c2, MODEL *model, const short speech[]);
 void synthesise_one_frame(struct CODEC2 *c2, short speech[], MODEL *model,
 			  COMP Aw[], float gain);
-void codec2_encode_3200(struct CODEC2 *c2, unsigned char * bits, short speech[]);
+void codec2_encode_3200(struct CODEC2 *c2, unsigned char * bits, const short speech[]);
 void codec2_decode_3200(struct CODEC2 *c2, short speech[], const unsigned char * bits);
-void codec2_encode_2400(struct CODEC2 *c2, unsigned char * bits, short speech[]);
+void codec2_encode_2400(struct CODEC2 *c2, unsigned char * bits, const short speech[]);
 void codec2_decode_2400(struct CODEC2 *c2, short speech[], const unsigned char * bits);
-void codec2_encode_1600(struct CODEC2 *c2, unsigned char * bits, short speech[]);
+void codec2_encode_1600(struct CODEC2 *c2, unsigned char * bits, const short speech[]);
 void codec2_decode_1600(struct CODEC2 *c2, short speech[], const unsigned char * bits);
-void codec2_encode_1400(struct CODEC2 *c2, unsigned char * bits, short speech[]);
+void codec2_encode_1400(struct CODEC2 *c2, unsigned char * bits, const short speech[]);
 void codec2_decode_1400(struct CODEC2 *c2, short speech[], const unsigned char * bits);
-void codec2_encode_1300(struct CODEC2 *c2, unsigned char * bits, short speech[]);
+void codec2_encode_1300(struct CODEC2 *c2, unsigned char * bits, const short speech[]);
 void codec2_decode_1300(struct CODEC2 *c2, short speech[], const unsigned char * bits, float ber_est);
-void codec2_encode_1200(struct CODEC2 *c2, unsigned char * bits, short speech[]);
+void codec2_encode_1200(struct CODEC2 *c2, unsigned char * bits, const short speech[]);
 void codec2_decode_1200(struct CODEC2 *c2, short speech[], const unsigned char * bits);
-void codec2_encode_700c(struct CODEC2 *c2, unsigned char * bits, short speech[]);
+void codec2_encode_700c(struct CODEC2 *c2, unsigned char * bits, const short speech[]);
 void codec2_decode_700c(struct CODEC2 *c2, short speech[], const unsigned char * bits);
-void codec2_encode_450(struct CODEC2 *c2, unsigned char * bits, short speech[]);
+void codec2_encode_450(struct CODEC2 *c2, unsigned char * bits, const short speech[]);
 void codec2_decode_450(struct CODEC2 *c2, short speech[], const unsigned char * bits);
 void codec2_decode_450pwb(struct CODEC2 *c2, short speech[], const unsigned char * bits);
 static void ear_protection(float in_out[], int n);
@@ -458,7 +458,7 @@ int codec2_samples_per_frame(struct CODEC2 *c2) {
 
 \*---------------------------------------------------------------------------*/
 
-void codec2_encode(struct CODEC2 *c2, unsigned char *bytes, short speech[])
+void codec2_encode(struct CODEC2 *c2, unsigned char *bytes, const short speech[])
 {
     assert(c2 != NULL);
     assert(c2->encode != NULL);
@@ -526,7 +526,7 @@ void codec2_decode_ber(struct CODEC2 *c2, short speech[], const unsigned char *b
 
 \*---------------------------------------------------------------------------*/
 
-void codec2_encode_3200(struct CODEC2 *c2, unsigned char * bits, short speech[])
+void codec2_encode_3200(struct CODEC2 *c2, unsigned char * bits, const short speech[])
 {
     MODEL   model;
     float   ak[LPC_ORD+1];
@@ -671,7 +671,7 @@ void codec2_decode_3200(struct CODEC2 *c2, short speech[], const unsigned char *
 
 \*---------------------------------------------------------------------------*/
 
-void codec2_encode_2400(struct CODEC2 *c2, unsigned char * bits, short speech[])
+void codec2_encode_2400(struct CODEC2 *c2, unsigned char * bits, const short speech[])
 {
     MODEL   model;
     float   ak[LPC_ORD+1];
@@ -829,7 +829,7 @@ void codec2_decode_2400(struct CODEC2 *c2, short speech[], const unsigned char *
 
 \*---------------------------------------------------------------------------*/
 
-void codec2_encode_1600(struct CODEC2 *c2, unsigned char * bits, short speech[])
+void codec2_encode_1600(struct CODEC2 *c2, unsigned char * bits, const short speech[])
 {
     MODEL   model;
     float   lsps[LPC_ORD];
@@ -1012,7 +1012,7 @@ void codec2_decode_1600(struct CODEC2 *c2, short speech[], const unsigned char *
 
 \*---------------------------------------------------------------------------*/
 
-void codec2_encode_1400(struct CODEC2 *c2, unsigned char * bits, short speech[])
+void codec2_encode_1400(struct CODEC2 *c2, unsigned char * bits, const short speech[])
 {
     MODEL   model;
     float   lsps[LPC_ORD];
@@ -1183,7 +1183,7 @@ void codec2_decode_1400(struct CODEC2 *c2, short speech[], const unsigned char *
 
 \*---------------------------------------------------------------------------*/
 
-void codec2_encode_1300(struct CODEC2 *c2, unsigned char * bits, short speech[])
+void codec2_encode_1300(struct CODEC2 *c2, unsigned char * bits, const short speech[])
 {
     MODEL   model;
     float   lsps[LPC_ORD];
@@ -1373,7 +1373,7 @@ void codec2_decode_1300(struct CODEC2 *c2, short speech[], const unsigned char *
 
 \*---------------------------------------------------------------------------*/
 
-void codec2_encode_1200(struct CODEC2 *c2, unsigned char * bits, short speech[])
+void codec2_encode_1200(struct CODEC2 *c2, unsigned char * bits, const short speech[])
 {
     MODEL   model;
     float   lsps[LPC_ORD];
@@ -1551,7 +1551,7 @@ void codec2_decode_1200(struct CODEC2 *c2, short speech[], const unsigned char *
 
 \*---------------------------------------------------------------------------*/
 
-void codec2_encode_700c(struct CODEC2 *c2, unsigned char * bits, short speech[])
+void codec2_encode_700c(struct CODEC2 *c2, unsigned char * bits, const short speech[])
 {
     MODEL        model;
     int          indexes[4], i, M=4;
@@ -1832,7 +1832,7 @@ float codec2_get_energy(struct CODEC2 *c2, const unsigned char *bits)
 
 \*---------------------------------------------------------------------------*/
 
-void codec2_encode_450(struct CODEC2 *c2, unsigned char * bits, short speech[])
+void codec2_encode_450(struct CODEC2 *c2, unsigned char * bits, const short speech[])
 {
 	MODEL        model;
     int          indexes[4], i,h, M=4;
@@ -2073,7 +2073,7 @@ void synthesise_one_frame(struct CODEC2 *c2, short speech[], MODEL *model, COMP 
 
 \*---------------------------------------------------------------------------*/
 
-void analyse_one_frame(struct CODEC2 *c2, MODEL *model, short speech[])
+void analyse_one_frame(struct CODEC2 *c2, MODEL *model, const short speech[])
 {
     COMP    Sw[FFT_ENC];
     float   pitch;

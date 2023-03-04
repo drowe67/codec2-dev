@@ -97,13 +97,13 @@ struct CODEC2 {
     FILE *fmlfeat, *fmlmodel;
 
     /* encode/decode function pointers for the selected mode */
-    void (*encode)(struct CODEC2 *c2, unsigned char * bits, short speech[]);
+    void (*encode)(struct CODEC2 *c2, unsigned char * bits, const short speech[]);
     void (*decode)(struct CODEC2 *c2, short speech[], const unsigned char * bits);
     void (*decode_ber)(struct CODEC2 *c2, short speech[], const unsigned char * bits, float ber_est);
 };
 
 // test and debug
-void analyse_one_frame(struct CODEC2 *c2, MODEL *model, short speech[]);
+void analyse_one_frame(struct CODEC2 *c2, MODEL *model, const short speech[]);
 void synthesise_one_frame(struct CODEC2 *c2, short speech[], MODEL *model,
 			  COMP Aw[], float gain);
 #endif
