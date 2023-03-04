@@ -117,6 +117,7 @@ option(BUILD_SHARED_LIBS
     "Build shared library. Set to OFF for static library." ON)
 option(UNITTEST "Build unittest binaries." OFF)
 option(INSTALL_EXAMPLES "Install example code." OFF)
+option(BUILD_EXECUTABLES "Build executables with all and install targets" ON)
 if(INSTALL_EXAMPLES)
     install(DIRECTORY octave raw script wav
         USE_SOURCE_PERMISSIONS
@@ -218,7 +219,9 @@ endif()
 # codec2 library and demo apps
 #
 add_subdirectory(src)
-add_subdirectory(demo)
+if(BUILD_EXECUTABLES)
+    add_subdirectory(demo)
+endif(BUILD_EXECUTABLES)
 
 
 if(UNITTEST)
