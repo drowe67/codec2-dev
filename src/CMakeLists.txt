@@ -273,6 +273,7 @@ export(TARGETS codec2
     FILE ${CMAKE_BINARY_DIR}/codec2.cmake
 )
 
+if(BUILD_EXECUTABLES)
 add_executable(c2enc c2enc.c)
 target_link_libraries(c2enc codec2)
 
@@ -391,6 +392,8 @@ target_link_libraries(ldpc_enc codec2)
 
 add_executable(ldpc_dec ldpc_dec.c)
 target_link_libraries(ldpc_dec codec2)
+
+endif(BUILD_EXECUTABLES)
 
 install(TARGETS codec2 EXPORT codec2-config
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT lib
