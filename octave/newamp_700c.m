@@ -543,17 +543,20 @@ function AmdB_rate2_hat = norm_energy(AmdB_rate1, AmdB_rate2)
   AmdB_rate2_hat = AmdB_rate2 + 10*log10(c);
 end
 
+% combine interpolation with energy normalisation
+function YIdB_norm = interp1_norm(XkHz,YdB,XIkHz)
+  YIdB = interp1([0 XkHz 4],[0 YdB 0],XIkHz,"spline", "extrap");
+  YIdB_norm = norm_energy(YdB,YIdB);
+end
+
 function test_norm_energy
-  Fs = 8000; L = 20; F0 = (Fs/2)/L; K=20;
+  Fs = 8000; L = 80; F0 = (Fs/2)/L; K=20;
   Am_freqs_kHz = (1:L-1)/1000;
   AmdB = ones(1,L-1);
  
   rate_K_sample_freqs_kHz = mel_sample_freqs_kHz(K);
-
-  AmdB_rate_K = interp1([0 Am_freqs_kHz 4], [0 AmdB 0],
-                        rate_K_sample_freqs_kHz, "spline", "extrap");
-
-  AmdB_rate_K_hat = norm_energy(AmdB, AmdB_rate_K);
+  AmdB_rate_K_hat = interp1_norm(Am_freqs_kHz, AmdB,
+                    rate_K_sample_freqs_kHz);
   E_L = sum(10 .^ (AmdB/10));
   E_K = sum(10 .^ (AmdB_rate_K_hat/10));
   if abs(E_L-E_K) < 1E-3
