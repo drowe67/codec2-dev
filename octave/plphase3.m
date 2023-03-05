@@ -48,7 +48,6 @@ function plphase3(samname, f, Nb=20, K=20)
   rate_Lhigh_sample_freqs_kHz = (F0high:F0high:(Lhigh-1)*F0high)/1000;
 
   k = ' '; plot_synth_sn=1; phase0_en=1; postfilter_en = 1; ratek_en = 1;
-  rand_50 = 0;
   do
     s = [ Sn(2*f-1,:) Sn(2*f,:) ];
     figure(1); clf; plot(s); axis([1 length(s) -20000 20000]);
@@ -58,8 +57,7 @@ function plphase3(samname, f, Nb=20, K=20)
     Am_freqs_kHz = (1:L)*Wo*4/pi;
 
     % resample from rate L to rate Lhigh (both linearly spaced)
-    AmdB_rate_Lhigh = interp1([0 Am_freqs_kHz 4], [0 AmdB 0],
-                              rate_Lhigh_sample_freqs_kHz, "spline", "extrap");
+    AmdB_rate_Lhigh = interp1_norm(Am_freqs_kHz,AmdB,rate_Lhigh_sample_freqs_kHz);
 
     if ratek_en
       [YdB Y] = filter_rate_Lhigh(Lhigh,h,AmdB_rate_Lhigh);
@@ -76,7 +74,7 @@ function plphase3(samname, f, Nb=20, K=20)
     phase0(f,1:L) = synth_phase_from_mag(rate_Lhigh_sample_freqs_kHz, YdB, Fs, Wo, L, postfilter_en);
 
     % resample from rate Lhigh to rate L (both linearly spaced)
-    AmdB_ = interp1([0 rate_Lhigh_sample_freqs_kHz 4], [0 YdB 0], Am_freqs_kHz, "spline", "extrap");
+    AmdB_ = interp1_norm(rate_Lhigh_sample_freqs_kHz, YdB, Am_freqs_kHz);
     Am_ = 10 .^ (AmdB_/20);
 
     % plot time domain speech ---------------------------------------------
@@ -85,10 +83,6 @@ function plphase3(samname, f, Nb=20, K=20)
     if phase0_en, phase_ratek(f,1:L) = phase0(f,1:L); else phase_ratek(f,1:L) = phase(f,1:L); end
     if plot_synth_sn
        N=320;
-       if rand_50 && F0 < 60
-         printf("rand phases...\n");
-         phase_ratek(f,round(L/4):L) += 2*pi*rand(1,L-round(L/4)+1);
-       end
        s = synth_time(Wo, L, Am, phase_ratek(f,:), N);
        plot(real(s),sprintf('g;%s;',papr(s)));
     end
@@ -116,8 +110,8 @@ function plphase3(samname, f, Nb=20, K=20)
     % interactive menu
 
     if phase0_en; s2="orig/[phase0]"; else s2="[orig]/phase0"; end
-    printf("\rframe: %d  n-nxt b-bk ratek-r 0-%s f-pf[%d] 5-rand50[%d] q-quit",
-           f,s2,postfilter_en, rand_50);
+    printf("\rframe: %d  n-nxt b-bk ratek-r 0-%s f-pf[%d] q-quit",
+           f,s2,postfilter_en);
     fflush(stdout);
     k = kbhit();
     if (k == 'n')

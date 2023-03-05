@@ -51,18 +51,24 @@ function vq_test_230226() {
   filename=$(basename -- "$fullfile")
   filename="${filename%.*}"
   mkdir -p $out_dir
-if [ 0 -eq 1]; then 
+
   # orig amp and phase
   c2sim $fullfile --hpf --modelout ${filename}_model.bin -o - | \
   sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_1_out.wav
  
   # Amps Nb filtered, phase0, rate K=20 resampling, phase postfilter,
   # rate L amp postfilter
-  batch_process $fullfile "'K',20,'amp_pf','phase_pf'" "2_k20"
-fi
-  # Amps Nb filtered, phase0, rate K=20 resampling, phase postfilter,
-  # rate L amp postfilter
-  batch_process $fullfile "'K',20,'amp_pf','phase_pf','rand50'" "3_rand50"
+  batch_process $fullfile "'K',20,'amp_pf','phase_pf'" "2_k20"  
+
+  # dec 3, with and without norm_energy
+  batch_process $fullfile "'K',20,'amp_pf','phase_pf','dec',3" "3_dec3"
+  batch_process $fullfile "'K',20,'amp_pf','phase_pf','dec',3,'norm_en'" "4_dec3_norm"
+
+  # 11 stage 12 bit VQ, dec 3, EQ2, with and without norm_energy
+  batch_process $fullfile "'K',20,'amp_pf','phase_pf','dec',3,'mic_eq',2, \
+  'vq1','../build_linux/train_k20_vq1.f32'" "5_vq1_dec3"
+  batch_process $fullfile "'K',20,'amp_pf','phase_pf','dec',3,'mic_eq',2,'norm_en', \
+  'vq1','../build_linux/train_k20_vq1.f32'" "6_vq1_dec3_norm"
 }
 
 # 230213: Mic EQ versions 1 & 2
@@ -818,7 +824,8 @@ if [ $# -gt 0 ]; then
         ;;
 
     vq_test_230226)
-        vq_test_230226 ../raw/two_lines.raw
+        vq_test_230226 ../raw/big_dog.raw
+        #vq_test_230226 ../raw/two_lines.raw
         #vq_test_230226 ../raw/pickle.raw
         #vq_test_230226 ../raw/tea.raw
         ;;

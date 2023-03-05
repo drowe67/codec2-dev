@@ -38,7 +38,7 @@ function B = ratek3_batch_tool(samname, varargin)
   H_out_fn = ""; amp_pf_en = 0;  phase_pf_en=0; i = 1;
   Kst=0; Ken=K-1; dec = 1; scatter_en = 0; noise_var = 0;
   w = ones(1,K); w_en = 0; dec_lin = 1; pre_en = 0; logfn=""; mic_eq = 0;
-  plot_mic_eq = 0; vq_en = 0;
+  plot_mic_eq = 0; vq_en = 0; norm_en = 0;
   
   lower = 10;             % only consider vectors above this mean
   dynamic_range = 100;     % restrict dynamic range of vectors
@@ -102,6 +102,8 @@ function B = ratek3_batch_tool(samname, varargin)
       mic_eq = varargin{i+1}; i++;
     elseif strcmp(varargin{i},"plot_mic_eq") 
       plot_mic_eq = 1;    
+    elseif strcmp(varargin{i},"norm_en") 
+      norm_en = 1;    
     elseif strcmp(varargin{i},"logfn") 
       logfn = varargin{i+1}; i++;
       printf("logfn: %s\n", logfn);
@@ -188,8 +190,10 @@ function B = ratek3_batch_tool(samname, varargin)
     end
     
     % resample from rate L to rate Lhigh (both linearly spaced)
-
     AmdB_rate_Lhigh = interp1([0 rate_L_sample_freqs_kHz 4], [0 AmdB 0], rate_Lhigh_sample_freqs_kHz, "spline", "extrap");
+    if norm_en
+      AmdB_rate_Lhigh = norm_energy(AmdB, AmdB_rate_Lhigh);
+    end
     
     % Filter at rate Lhigh, y = F(R(a)). Note we filter in linear energy domain, and Lhigh are linearly spaced
 
@@ -203,6 +207,9 @@ function B = ratek3_batch_tool(samname, varargin)
     if rateK_en
       % Resample from rate Lhigh to rate K b=R(Y), note K are non-linearly spaced (warped freq axis)
       B(f,:) = interp1(rate_Lhigh_sample_freqs_kHz, YdB, rate_K_sample_freqs_kHz, "spline", "extrap");
+      if norm_en
+        B(f,:) = norm_energy(YdB, B(f,:));
+      end
       if mic_eq
         B(f,:) -= q;
       end
@@ -249,11 +256,15 @@ function B = ratek3_batch_tool(samname, varargin)
       B_hat(f,1:K) += sqrt(noise_var)*randn(1,K);
 
       % ensure frame energy is unchanged after quantisation
+      % TODO: could this be done with norm_energy() ?
       Blin = 10 .^ (B(f,:)/20); E1 = sum(Blin .^2);
       Blin_hat = 10 .^ (B_hat(f,:)/20); E2 = sum(Blin_hat .^2);      
       B_hat(f,:) += 10*log10(E1/E2);
        
       AmdB_ = interp1([0 rate_K_sample_freqs_kHz 4], [0 B_hat(f,:) 0], rate_L_sample_freqs_kHz, "spline", 0);
+      if norm_en
+        AmdB_ = norm_energy(B_hat(f,:), AmdB_);
+      end
       nzero = floor(rate_K_sample_freqs_kHz(Kst+1)*1000/F0);
       AmdB_(1:nzero) = 0;
       if Ken+1 < K
@@ -283,6 +294,9 @@ function B = ratek3_batch_tool(samname, varargin)
       
       % back to rate L
       AmdB_ = interp1([0 rate_Lhigh_sample_freqs_kHz 4], [0 YdB 0], rate_L_sample_freqs_kHz, "spline", "extrap");
+      if norm_en
+        AmdB_ = norm_energy(YdB, AmdB_);
+      end
       if pre_en
         AmdB_ += PdB;
       end
@@ -323,6 +337,9 @@ function B = ratek3_batch_tool(samname, varargin)
         
         x += x_inc;
         AmdB_ = interp1([0 rate_K_sample_freqs_kHz 4], [0 B_hat(sf,:) 0], rate_L_sample_freqs_kHz, "spline", 0);
+        if norm_en
+          AmdB_ = norm_energy(B_hat(sf,:), AmdB_);
+        end
         
         % Optional amplitude post filtering
         if amp_pf_en
