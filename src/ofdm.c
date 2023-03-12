@@ -695,7 +695,7 @@ typedef float float4 __attribute__ ((vector_size (16)));
 
 static complex float ofdm_complex_dot_product(complex float *left, complex float *right, int numSamples)
 {
-    complex float result;
+    complex float result = 0;
 
 #if USE_VECTOR_OPS
     float *leftPtr = (float*)left;
