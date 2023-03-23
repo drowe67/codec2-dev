@@ -565,3 +565,78 @@ function test_norm_energy
     printf("FAIL\n");
   end
 end
+
+% Returns mu-law compressed frame energy. F_dB is scaled to 0dB when E_db = E_max_dB
+function F_dB = mulaw_comp(E_dB)
+  E_lin = 10 .^ (E_dB/10);
+  E_max_dB = 60;
+  s_max = 10 .^ (E_max_dB/20);
+  x = sqrt(E_lin)/s_max;
+  mu = 255;
+  F = log(1+mu*x)/log(1+mu);
+  F_dB = 20*log10(F);
+endfunction
+
+function E_dB = mulaw_decomp(F_dB)
+  y = 10 .^ (F_dB/20);
+  mu = 255;
+  F_hat = (((1+mu).^y) - 1)/mu;
+  E_max_dB = 60;
+  s_max = 10 .^ (E_max_dB/20);
+  E_hat = F_hat*s_max;
+  E_dB = 20*log10(E_hat);
+endfunction
+
+% F and F_hat should be exact inverses when not quantised 
+function test_mulaw
+  E_dB=-20:80; 
+  F_dB = mulaw_comp(E_dB);
+  E_hat_dB = mulaw_decomp(F_dB); 
+  figure(1); clf; plot(E_dB,F_dB); grid;
+  xlabel('E (dB)'); ylabel('F (dB)');
+  figure(2); clf; plot(E_dB,E_hat_dB); grid;
+  xlabel('E (dB)'); ylabel('E\_hat (dB)');
+  hold on; plot(E_dB, E_dB - E_hat_dB,'r-'); hold off;
+  assert(abs(E_dB - E_hat_dB) < 0.001);
+endfunction
+
+function test_mulaw_quant
+  E_dB=-20:0.1:80; 
+  F_dB = mulaw_comp(E_dB);
+  levels = -20 + (20/16)*(0:15)
+  Q_dB = zeros(1,length(E_dB));
+  for i=1:length(E_dB)
+    Q_dB(i) = quantise(levels, F_dB(i));
+  end
+  E_hat_dB = mulaw_decomp(Q_dB); 
+  figure(1); clf; plot(E_dB,F_dB); grid;
+  hold on; plot(E_dB,Q_dB,'r-'); hold off;
+  xlabel('E (dB)'); ylabel('F (dB)');
+  figure(2); clf; plot(E_dB,E_hat_dB); grid;
+  xlabel('E (dB)'); ylabel('E\_hat (dB)');
+  assert(abs(E_dB - E_hat_dB) < 0.001);
+endfunction
+
+function vec_out = mean_compression(vec_in, noise_gate, thresh, slope, maximum, makeup_gain)
+  x = mean(vec_in,2);
+  y = zeros(length(x),1);
+  for i=1:length(x)
+    if (x(i) > noise_gate) && (x(i) < thresh)
+      y(i) = x(i) + makeup_gain;;
+    elseif (x(i) >= thresh) && (x(i) < maximum)
+      y(i) = thresh + (x(i)-thresh)*slope + makeup_gain;
+    elseif x(i) >= maximum
+      y(i) = thresh + (maximum-thresh)*slope + makeup_gain;
+    end
+   end
+  vec_out = vec_in - x + y;
+end
+
+function test_mean_compression
+  mean_in = -20:80;
+  vec_in = ones(length(mean_in),K=20);
+  vec_in = diag(mean_in)*vec_in;
+  vec_out = mean_compression(vec_in, 0, 20, 0.5, 60, 60-40);
+  figure(1); clf; plot(vec_in, vec_out); grid;
+end
+
