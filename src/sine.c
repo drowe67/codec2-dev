@@ -113,7 +113,7 @@ void make_analysis_window(C2CONST *c2const, codec2_fft_cfg fft_fwd_cfg, float w[
         |-------|-------|
             nw samples
 
-     All our analysis/synthsis is centred on the M/2 sample.
+     All our analysis/synthesis is centred on the M/2 sample.
   */
 
   m = 0.0;
@@ -139,7 +139,7 @@ void make_analysis_window(C2CONST *c2const, codec2_fft_cfg fft_fwd_cfg, float w[
      we modulo FFT_ENC shift the time domain window w[], this makes the
      imaginary part of the DFT W[] equal to zero as the shifted w[] is
      even about the n=0 time axis if nw is odd.  Having the imag part
-     of the DFT W[] makes computation easier.
+     of the DFT W[] equal to zero makes computation easier.
 
      0                      FFT_ENC-1
      |-------------------------|
@@ -229,9 +229,6 @@ float hpf(float x, float states[])
 
 \*---------------------------------------------------------------------------*/
 
-// TODO: we can either go for a faster FFT using fftr and some stack usage
-// or we can reduce stack usage to almost zero on STM32 by switching to fft_inplace
-#if 1
 void dft_speech(C2CONST *c2const, codec2_fft_cfg fft_fwd_cfg, COMP Sw[], float Sn[], float w[])
 {
     int  i;
@@ -258,33 +255,6 @@ void dft_speech(C2CONST *c2const, codec2_fft_cfg fft_fwd_cfg, COMP Sw[], float S
 
     codec2_fft_inplace(fft_fwd_cfg, Sw);
 }
-#else
-void dft_speech(codec2_fftr_cfg fftr_fwd_cfg, COMP Sw[], float Sn[], float w[])
-{
-    int  i;
-  float sw[FFT_ENC];
-
-  for(i=0; i<FFT_ENC; i++) {
-    sw[i] = 0.0;
-  }
-
-  /* Centre analysis window on time axis, we need to arrange input
-     to FFT this way to make FFT phases correct */
-
-  /* move 2nd half to start of FFT input vector */
-
-  for(i=0; i<nw/2; i++)
-    sw[i] = Sn[i+m_pitch/2]*w[i+m_pitch/2];
-
-  /* move 1st half to end of FFT input vector */
-
-  for(i=0; i<nw/2; i++)
-    sw[FFT_ENC-nw/2+i] = Sn[i+m_pitch/2-nw/2]*w[i+m_pitch/2-nw/2];
-
-  codec2_fftr(fftr_fwd_cfg, sw, Sw);
-}
-#endif
-
 
 /*---------------------------------------------------------------------------*\
 
@@ -299,7 +269,7 @@ void dft_speech(codec2_fftr_cfg fftr_fwd_cfg, COMP Sw[], float Sn[], float w[])
 
 void two_stage_pitch_refinement(C2CONST *c2const, MODEL *model, COMP Sw[])
 {
-  float pmin,pmax,pstep;	/* pitch refinment minimum, maximum and step */
+  float pmin,pmax,pstep;	/* pitch refinement minimum, maximum and step */
 
   /* Coarse refinement */
 
@@ -429,7 +399,7 @@ void estimate_amplitudes(MODEL *model, COMP Sw[], float W[], int est_phase)
         int b = (int)(m*model->Wo/r + 0.5); /* DFT bin of centre of current harmonic */
 
         /* Estimate phase of harmonic, this is expensive in CPU for
-           embedded devicesso we make it an option */
+           embedded devices so we make it an option */
 
         model->phi[m] = atan2f(Sw[b].imag,Sw[b].real);
     }
@@ -446,7 +416,7 @@ void estimate_amplitudes(MODEL *model, COMP Sw[], float W[], int est_phase)
 
   est_voicing_mbe()
 
-  Returns the error of the MBE cost function for a fiven F0.
+  Returns the error of the MBE cost function for a given F0.
 
   Note: I think a lot of the operations below can be simplified as
   W[].imag = 0 and has been normalised such that den always equals 1.
@@ -460,7 +430,7 @@ float est_voicing_mbe(
                       float  W[]
                       )
 {
-    int   l,al,bl,m;    /* loop variables */
+    int   l,al,bl,m;      /* loop variables */
     COMP  Am;             /* amplitude sample for this band */
     int   offset;         /* centers Hw[] about current harmonic */
     float den;            /* denominator of Am expression */
@@ -555,8 +525,8 @@ float est_voicing_mbe(
 
 	/* A common source of Type 2 errors is the pitch estimator
 	   gives a low (50Hz) estimate for UV speech, which gives a
-	   good match with noise due to the close harmoonic spacing.
-	   These errors are much more common than people with 50Hz3
+	   good match with noise due to the close harmonic spacing.
+	   These errors are much more common than people with 50Hz
 	   pitch, so we have just a small eratio threshold. */
 
 	sixty = 60.0*TWO_PI/c2const->Fs;
@@ -574,7 +544,7 @@ float est_voicing_mbe(
   AUTHOR......: David Rowe
   DATE CREATED: 11/5/94
 
-  Init function that generates the trapezoidal (Parzen) sythesis window.
+  Init function that generates the trapezoidal (Parzen) synthesis window.
 
 \*---------------------------------------------------------------------------*/
 
@@ -609,7 +579,7 @@ void make_synthesis_window(C2CONST *c2const, float Pn[])
   DATE CREATED: 20/2/95
 
   Synthesise a speech signal in the frequency domain from the
-  sinusodal model parameters.  Uses overlap-add with a trapezoidal
+  sinusoidal model parameters.  Uses overlap-add with a trapezoidal
   window to smoothly interpolate betwen frames.
 
 \*---------------------------------------------------------------------------*/
