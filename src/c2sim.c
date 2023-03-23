@@ -55,7 +55,7 @@
 #include "lpcnet_freq.h"
 #include "sd.h"
 
-void synth_one_frame(int n_samp, codec2_fftr_cfg fftr_inv_cfg, short buf[],
+void synth_one_frame(int n_samp, codec2_fft_cfg fft_inv_cfg, short buf[],
                      MODEL *model, float Sn_[], float Pn[], int prede, float *de_mem, float gain);
 void print_help(const struct option *long_options, int num_opts, char* argv[]);
 
@@ -547,7 +547,7 @@ int main(int argc, char *argv[])
     COMP  Sw[FFT_ENC];	/* DFT of Sn[]                           */
     codec2_fft_cfg  fft_fwd_cfg;
     codec2_fftr_cfg  fftr_fwd_cfg;
-    codec2_fftr_cfg  fftr_inv_cfg;
+    codec2_fft_cfg  fft_inv_cfg;
     float w[m_pitch];	        /* time domain hamming window            */
     float W[FFT_ENC];	/* DFT of w[]                            */
     MODEL model;
@@ -618,7 +618,7 @@ int main(int argc, char *argv[])
 
     fft_fwd_cfg = codec2_fft_alloc(FFT_ENC, 0, NULL, NULL);   /* fwd FFT,used in several places   */
     fftr_fwd_cfg = codec2_fftr_alloc(FFT_ENC, 0, NULL, NULL); /* fwd FFT,used in several places   */
-    fftr_inv_cfg = codec2_fftr_alloc(FFT_DEC, 1, NULL, NULL); /* inverse FFT, used just for synth */
+    fft_inv_cfg = codec2_fft_alloc(FFT_DEC, 1, NULL, NULL);   /* inverse FFT, used just for synth */
     codec2_fft_cfg phase_fft_fwd_cfg = codec2_fft_alloc(NEWAMP1_PHASE_NFFT, 0, NULL, NULL);
     codec2_fft_cfg phase_fft_inv_cfg = codec2_fft_alloc(NEWAMP1_PHASE_NFFT, 1, NULL, NULL);
 
@@ -1144,7 +1144,7 @@ int main(int argc, char *argv[])
 
                 if (postfilt)
                     postfilter(&model_dec[i], &bg_est);
-                synth_one_frame(n_samp, fftr_inv_cfg, buf, &model_dec[i], Sn_, Pn, prede, &de_mem, gainoutlin);
+                synth_one_frame(n_samp, fft_inv_cfg, buf, &model_dec[i], Sn_, Pn, prede, &de_mem, gainoutlin);
                 #ifdef DUMP
                 dump_quantised_model(&model_dec[i]);
                 #endif
@@ -1212,12 +1212,12 @@ int main(int argc, char *argv[])
     return 0;
 }
 
-void synth_one_frame(int n_samp, codec2_fftr_cfg fftr_inv_cfg, short buf[], MODEL *model, float Sn_[],
+void synth_one_frame(int n_samp, codec2_fft_cfg fft_inv_cfg, short buf[], MODEL *model, float Sn_[],
                      float Pn[], int prede, float *de_mem, float gain)
 {
     int     i;
 
-    synthesise(n_samp, fftr_inv_cfg, Sn_, model, Pn, 1);
+    synthesise(n_samp, fft_inv_cfg, Sn_, model, Pn, 1);
     if (prede)
         de_emp(Sn_, Sn_, de_mem, n_samp);
 

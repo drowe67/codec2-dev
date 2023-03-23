@@ -586,7 +586,7 @@ void make_synthesis_window(C2CONST *c2const, float Pn[])
 
 void synthesise(
   int    n_samp,
-  codec2_fftr_cfg fftr_inv_cfg,
+  codec2_fft_cfg fft_inv_cfg,
   float  Sn_[],		/* time domain synthesised signal              */
   MODEL *model,		/* ptr to model parameters for this frame      */
   float  Pn[],		/* time domain Parzen window                   */
@@ -594,8 +594,8 @@ void synthesise(
 )
 {
     int   i,l,j,b;	        /* loop variables */
-    COMP  Sw_[FFT_DEC/2+1];	/* DFT of synthesised signal */
-    float sw_[FFT_DEC];	        /* synthesised signal */
+    COMP  Sw_[FFT_DEC];	        /* DFT of synthesised signal */
+    COMP  sw_[FFT_DEC];	        /* synthesised signal */
 
     if (shift) {
 	/* Update memories */
@@ -605,7 +605,7 @@ void synthesise(
 	Sn_[n_samp-1] = 0.0;
     }
 
-    for(i=0; i<FFT_DEC/2+1; i++) {
+    for(i=0; i<FFT_DEC; i++) {
 	Sw_[i].real = 0.0;
 	Sw_[i].imag = 0.0;
     }
@@ -617,13 +617,16 @@ void synthesise(
         if (b > ((FFT_DEC/2)-1)) {
             b = (FFT_DEC/2)-1;
         }
+        if (b == 0) b = 1;
         Sw_[b].real = model->A[l]*cosf(model->phi[l]);
         Sw_[b].imag = model->A[l]*sinf(model->phi[l]);
+        Sw_[FFT_DEC-b].real = Sw_[b].real;
+        Sw_[FFT_DEC-b].imag = -Sw_[b].imag;
     }
 
     /* Perform inverse DFT */
 
-    codec2_fftri(fftr_inv_cfg, Sw_,sw_);
+    codec2_fft(fft_inv_cfg, Sw_, sw_);
 
     /* Overlap add to previous samples */
 
@@ -634,15 +637,15 @@ void synthesise(
     #endif
 
     for(i=0; i<n_samp-1; i++) {
-        Sn_[i] += sw_[FFT_DEC-n_samp+1+i]*Pn[i] * FFTI_FACTOR;
+        Sn_[i] += sw_[FFT_DEC-n_samp+1+i].real*Pn[i] * FFTI_FACTOR;
     }
 
     if (shift)
         for(i=n_samp-1,j=0; i<2*n_samp; i++,j++)
-            Sn_[i] = sw_[j]*Pn[i] * FFTI_FACTOR;
+            Sn_[i] = sw_[j].real*Pn[i] * FFTI_FACTOR;
     else
         for(i=n_samp-1,j=0; i<2*n_samp; i++,j++)
-            Sn_[i] += sw_[j]*Pn[i] * FFTI_FACTOR;
+            Sn_[i] += sw_[j].real*Pn[i] * FFTI_FACTOR;
 }
 
 

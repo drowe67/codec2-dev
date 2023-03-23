@@ -178,7 +178,7 @@ struct CODEC2 * codec2_create(int mode)
     c2->fftr_fwd_cfg = codec2_fftr_alloc(FFT_ENC, 0, NULL, NULL);
     make_analysis_window(&c2->c2const, c2->fft_fwd_cfg, c2->w,c2->W);
     make_synthesis_window(&c2->c2const, c2->Pn);
-    c2->fftr_inv_cfg = codec2_fftr_alloc(FFT_DEC, 1, NULL, NULL);
+    c2->fft_inv_cfg = codec2_fft_alloc(FFT_DEC, 1, NULL, NULL);
     c2->prev_f0_enc = 1/P_MAX_S;
     c2->bg_est = 0.0;
     c2->ex_phase = 0.0;
@@ -345,7 +345,7 @@ void codec2_destroy(struct CODEC2 *c2)
     nlp_destroy(c2->nlp);
     codec2_fft_free(c2->fft_fwd_cfg);
     codec2_fftr_free(c2->fftr_fwd_cfg);
-    codec2_fftr_free(c2->fftr_inv_cfg);
+    codec2_fft_free(c2->fft_inv_cfg);
     if ( CODEC2_MODE_ACTIVE(CODEC2_MODE_700C, c2->mode)) {
         codec2_fft_free(c2->phase_fft_fwd_cfg);
         codec2_fft_free(c2->phase_fft_inv_cfg);
@@ -2043,7 +2043,7 @@ void synthesise_one_frame(struct CODEC2 *c2, short speech[], MODEL *model, COMP 
     }
 
     postfilter(model, &c2->bg_est);
-    synthesise(c2->n_samp, c2->fftr_inv_cfg, c2->Sn_, model, c2->Pn, 1);
+    synthesise(c2->n_samp, c2->fft_inv_cfg, c2->Sn_, model, c2->Pn, 1);
 
     for(i=0; i<c2->n_samp; i++) {
         c2->Sn_[i] *= gain;
