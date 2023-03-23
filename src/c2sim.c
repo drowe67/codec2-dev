@@ -925,7 +925,7 @@ int main(int argc, char *argv[])
 	   newamp1/rateK, as used in 700C.  We resample the rate L {Am}
            samples to rate K.  L is dependant on the pitch Wo, so is
            time varying. K is constant, but sampled at non-linear 
-           points n the frequency axis.
+           points on the frequency axis.
 
 	\*------------------------------------------------------------*/
 
