@@ -1217,12 +1217,14 @@ void synth_one_frame(int n_samp, codec2_fft_cfg fft_inv_cfg, short buf[], MODEL 
 {
     int     i;
 
+    // Apply gain to {Am} so we can Hilbert Compress any overshoot
+    for(int m=1; m<=model->L; m++) model->A[m] *= gain;
+    
     synthesise(n_samp, fft_inv_cfg, Sn_, model, Pn, 1);
     if (prede)
         de_emp(Sn_, Sn_, de_mem, n_samp);
 
     for(i=0; i<n_samp; i++) {
-	Sn_[i] *= gain;
 	if (Sn_[i] > 32767.0)
 	    buf[i] = 32767;
 	else if (Sn_[i] < -32767.0)

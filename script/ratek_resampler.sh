@@ -32,6 +32,7 @@ function batch_process {
   filename="${filename%.*}"
   batch_opt=$2
   outname=$3
+  c2sim_opt=$4
   tmp=$(mktemp)
   
   echo "ratek3_batch;" \
@@ -41,7 +42,7 @@ function batch_process {
                           "${batch_opt},'logfn',\"${tmp}\"); quit;" \
   | octave -p ${CODEC2_PATH}/octave -qf
   c2sim $fullfile --hpf --phase0 --postfilter --amread ${filename}_a.f32 --hmread ${filename}_h.f32 -o - \
-  | sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_${outname}.wav
+  ${c2sim_opt} | sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_${outname}.wav
   printf "%-10s %-20s %4.2f\n" ${filename} ${outname} $(cat ${tmp}) >> ${out_dir}/zlog.txt
 }
 
@@ -60,8 +61,11 @@ function comp_test_230323() {
   # rate L amp postfilter, normalise energy
   batch_process $fullfile "'K',20,'amp_pf','phase_pf','norm_en'" "2_k20"  
 
-  # with norm_energy and compression
-  batch_process $fullfile "'K',20,'amp_pf','phase_pf','norm_en', 'compress_en'" "3_comp"
+  # with norm_energy and compression applied to rate K vectors
+  batch_process $fullfile "'K',20,'amp_pf','phase_pf','norm_en', 'compress_en'" "3_comp_K"
+
+  # with norm_energy and hilbert compression applied at synthesis
+  batch_process $fullfile "'K',20,'amp_pf','phase_pf','norm_en'" "4_comp_hc" "--gainoutlin 3.0"
 }
 
 # 230226: debugging clicks
@@ -851,13 +855,13 @@ if [ $# -gt 0 ]; then
         ;;
  
     comp_test_230323)
-        #comp_test_230323 ../raw/big_dog.raw
-        #comp_test_230323 ../raw/forig.raw     
-        #comp_test_230323 ../raw/two_lines.raw
-        #comp_test_230323 ../raw/pickle.raw
-        #comp_test_230323 ../raw/tea.raw
-        #comp_test_230323 ../raw/kristoff.raw        
-        #comp_test_230323 ../raw/ve9qrp_10s.raw     
+        comp_test_230323 ../raw/big_dog.raw
+        comp_test_230323 ../raw/forig.raw     
+        comp_test_230323 ../raw/two_lines.raw
+        comp_test_230323 ../raw/pickle.raw
+        comp_test_230323 ../raw/tea.raw
+        comp_test_230323 ../raw/kristoff.raw        
+        comp_test_230323 ../raw/ve9qrp_10s.raw     
         comp_test_230323 ../raw/mmt1.raw     
         ;;
  
