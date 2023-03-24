@@ -218,10 +218,10 @@ function B = ratek3_batch_tool(samname, varargin)
    
       % optionally compress energy
       if compress_en
-        amean = mean(B(f,:));
-        amean_ = piecewise_compressor(10,20,40,50,60,50, amean);
+        E_dB = 10*log10(sum(10 .^ (B(f,:)/10)));
+        Ec_dB = piecewise_compressor(20,36,60,76,80,76,E_dB);
         %printf("amean: %f amean_: %f\n", amean, amean_);
-        B(f,:) = B(f,:) - amean + amean_;
+        B(f,:) = B(f,:) - E_dB + Ec_dB;
       end
  
       % dynamic range limiting

@@ -640,11 +640,11 @@ function test_mean_compression
   figure(1); clf; plot(vec_in, vec_out); grid;
 end
 
-% energy compression using two stage peicewise linear curve
+% energy compression using two stage piecewise linear curve
 function y = piecewise_compressor(x1,y1,x2,y2,x3,y3,x)
   m1 = (y2-y1)/(x2-x1); c1 = y1 - m1*x1;
   m2 = (y3-y2)/(x3-x2); c2 = y2 - m2*x2;
-  y = zeros(1,length(x));
+  y = zeros(length(x),1);
   for i =1:length(x)
     if x(i) < x1
       y(i) = 0;
@@ -660,6 +660,25 @@ endfunction
 
 function test_piecewise_compressor
   x=-20:80; 
-  y = piecewise_compressor(10,20,40,50,60,50,x);
+  y = piecewise_compressor(20,36,60,76,80,76,x);
   figure(1); clf; plot(x,y); grid;
 endfunction
+
+% some plot to explore relationship between 
+function test_energy_and_mean(B)
+  mean_dB = mean(B,2);
+  E_dB = 10*log10(sum(10 .^ (B(:,:)/10),2));
+  Ec_dB = piecewise_compressor(20,36,60,76,80,76, E_dB);
+  meanc_dB = mean_dB - E_dB + Ec_dB;
+  figure(1); clf;
+  subplot(211); hist(mean_dB,20); title('mean (dB)');
+  subplot(212); hist(E_dB,20); title('Energy (dB)');
+  figure(2); clf; plot(mean_dB, E_dB,'+'); grid;
+  hold on; plot(meanc_dB, Ec_dB,'r+'); hold off;
+  xlabel('mean (dB)'); ylabel('Energy (dB)');
+  figure(3); clf;
+  subplot(211); hist(meanc_dB,20); title('mean comp (dB)');
+  subplot(212); hist(Ec_dB,20); title('Energy comp (dB)');
+  figure(4); plot(E_dB); hold on; plot(Ec_dB,'r'); hold off;
+endfunction
+

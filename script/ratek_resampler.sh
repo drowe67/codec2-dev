@@ -851,13 +851,14 @@ if [ $# -gt 0 ]; then
         ;;
  
     comp_test_230323)
-        comp_test_230323 ../raw/big_dog.raw
-        comp_test_230323 ../raw/forig.raw     
-        comp_test_230323 ../raw/two_lines.raw
-        comp_test_230323 ../raw/pickle.raw
-        comp_test_230323 ../raw/tea.raw
-        comp_test_230323 ../raw/kristoff.raw        
-        comp_test_230323 ../raw/ve9qrp_10s.raw     
+        #comp_test_230323 ../raw/big_dog.raw
+        #comp_test_230323 ../raw/forig.raw     
+        #comp_test_230323 ../raw/two_lines.raw
+        #comp_test_230323 ../raw/pickle.raw
+        #comp_test_230323 ../raw/tea.raw
+        #comp_test_230323 ../raw/kristoff.raw        
+        #comp_test_230323 ../raw/ve9qrp_10s.raw     
+        comp_test_230323 ../raw/mmt1.raw     
         ;;
  
     vq_test_subset)
