@@ -610,7 +610,9 @@ void synthesise(
 	Sw_[i].imag = 0.0;
     }
 
-    /* Now set up frequency domain synthesised speech */
+    /* Now set up frequency domain synthesised speech.  We only set up +ve
+       frequency side so the synthesised speech will be a complex (analytical) 
+       signal */
 
     for(l=1; l<=model->L; l++) {
         b = (int)(l*model->Wo*FFT_DEC/TWO_PI + 0.5);
@@ -618,23 +620,34 @@ void synthesise(
             b = (FFT_DEC/2)-1;
         }
         if (b == 0) b = 1;
-        Sw_[b].real = model->A[l]*cosf(model->phi[l]);
-        Sw_[b].imag = model->A[l]*sinf(model->phi[l]);
-        Sw_[FFT_DEC-b].real = Sw_[b].real;
-        Sw_[FFT_DEC-b].imag = -Sw_[b].imag;
+        Sw_[b].real = 2.0*model->A[l]*cosf(model->phi[l]);
+        Sw_[b].imag = 2.0*model->A[l]*sinf(model->phi[l]);
     }
 
     /* Perform inverse DFT */
 
     codec2_fft(fft_inv_cfg, Sw_, sw_);
 
-    /* Overlap add to previous samples */
-
     #ifdef USE_KISS_FFT
     #define    FFTI_FACTOR ((float)1.0)
     #else
     #define    FFTI_FACTOR ((float32_t)FFT_DEC)
     #endif
+
+    /* Hilbert clipper, clamp complex magnitude to +/- 32000 */
+    
+    for(i=0; i<FFT_DEC; i++) {
+        float re =  sw_[i].real * FFTI_FACTOR;
+        float im =  sw_[i].imag * FFTI_FACTOR;
+        float mag = sqrtf(re*re + im*im);
+        if (mag > 32000.0) {
+           float scale = 32000.0/mag;
+           sw_[i].real *= scale;
+           sw_[i].imag *= scale;
+        }
+    }
+    
+    /* Overlap add to previous samples */
 
     for(i=0; i<n_samp-1; i++) {
         Sn_[i] += sw_[FFT_DEC-n_samp+1+i].real*Pn[i] * FFTI_FACTOR;
