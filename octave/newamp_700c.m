@@ -640,3 +640,26 @@ function test_mean_compression
   figure(1); clf; plot(vec_in, vec_out); grid;
 end
 
+% energy compression using two stage peicewise linear curve
+function y = piecewise_compressor(x1,y1,x2,y2,x3,y3,x)
+  m1 = (y2-y1)/(x2-x1); c1 = y1 - m1*x1;
+  m2 = (y3-y2)/(x3-x2); c2 = y2 - m2*x2;
+  y = zeros(1,length(x));
+  for i =1:length(x)
+    if x(i) < x1
+      y(i) = 0;
+    elseif x(i) < x2
+      y(i) = m1*x(i) + c1;
+    elseif x(i) < x3
+      y(i) = m2*x(i) + c2;
+    else
+      y(i) = y3;
+    end  
+  end   
+endfunction
+
+function test_piecewise_compressor
+  x=-20:80; 
+  y = piecewise_compressor(10,20,40,50,60,50,x);
+  figure(1); clf; plot(x,y); grid;
+endfunction
