@@ -86,7 +86,7 @@
      estimate drop quickly?  What is noise suddenly re-appears?
 
   3/ Background noise with a non-flat sepctrum.  Current algorithm just
-     comsiders scpetrum as a whole, but this could be broken up into
+     considers spectrum as a whole, but this could be broken up into
      bands, each with their own estimator.
 
   4/ Males and females with the same level of background noise.  Check
@@ -134,7 +134,7 @@ void postfilter(
 	      model->phi[m] = (TWO_PI/CODEC2_RAND_MAX)*(float)codec2_rand();
 	      uv++;
 	  }
-
+ 
 #ifdef DUMP
   dump_bg(e, *bg_est, 100.0*uv/model->L);
 #endif
