@@ -38,7 +38,7 @@ function B = ratek3_batch_tool(samname, varargin)
   H_out_fn = ""; amp_pf_en = 0;  phase_pf_en=0; i = 1;
   Kst=0; Ken=K-1; dec = 1; scatter_en = 0; noise_var = 0;
   w = ones(1,K); w_en = 0; dec_lin = 1; pre_en = 0; logfn=""; mic_eq = 0;
-  plot_mic_eq = 0; vq_en = 0; norm_en = 0;
+  plot_mic_eq = 0; vq_en = 0; norm_en = 0; compress_en = 0;
   
   lower = 10;             % only consider vectors above this mean
   dynamic_range = 100;     % restrict dynamic range of vectors
@@ -107,6 +107,8 @@ function B = ratek3_batch_tool(samname, varargin)
     elseif strcmp(varargin{i},"logfn") 
       logfn = varargin{i+1}; i++;
       printf("logfn: %s\n", logfn);
+    elseif strcmp(varargin{i},"compress_en") 
+      compress_en = 1;    
   else
       printf("\nERROR unknown argument: %s\n", varargin{i});
       return;
@@ -213,7 +215,15 @@ function B = ratek3_batch_tool(samname, varargin)
       if mic_eq
         B(f,:) -= q;
       end
-     
+   
+      % optionally compress energy
+      if compress_en
+        amean = mean(B(f,:));
+        amean_ = piecewise_compressor(10,20,40,50,60,50, amean);
+        %printf("amean: %f amean_: %f\n", amean, amean_);
+        B(f,:) = B(f,:) - amean + amean_;
+      end
+ 
       % dynamic range limiting
       lower=-100;
       B(f,:) .*= w;
@@ -231,7 +241,7 @@ function B = ratek3_batch_tool(samname, varargin)
           if gmin > lower, sum_Eq += Eq(f); nEq++; end
         else
           % regular unweighted search, we can remove gain/mean outside of loop
-          amean = sum(target)/(Ken-Kst+1);
+          amean = sum(target)/(Ken-Kst+1);          
           target -= amean;
           [res target_ ind] = mbest(vq, target, mbest_depth, w1);
           B_hat(f,:) = target_ + amean;

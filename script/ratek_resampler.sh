@@ -45,6 +45,25 @@ function batch_process {
   printf "%-10s %-20s %4.2f\n" ${filename} ${outname} $(cat ${tmp}) >> ${out_dir}/zlog.txt
 }
 
+# 230323: compressor
+function comp_test_230323() {
+  fullfile=$1
+  filename=$(basename -- "$fullfile")
+  filename="${filename%.*}"
+  mkdir -p $out_dir
+
+  # orig amp and phase
+  c2sim $fullfile --hpf --modelout ${filename}_model.bin -o - | \
+  sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_1_out.wav
+ 
+  # Amps Nb filtered, phase0, rate K=20 resampling, phase postfilter,
+  # rate L amp postfilter, normalise energy
+  batch_process $fullfile "'K',20,'amp_pf','phase_pf','norm_en'" "2_k20"  
+
+  # with norm_energy and compression
+  batch_process $fullfile "'K',20,'amp_pf','phase_pf','norm_en', 'compress_en'" "3_comp"
+}
+
 # 230226: debugging clicks
 function vq_test_230226() {
   fullfile=$1
@@ -824,10 +843,21 @@ if [ $# -gt 0 ]; then
         ;;
 
     vq_test_230226)
+        vq_test_230326 ../raw/forig.raw     
         vq_test_230226 ../raw/big_dog.raw
-        #vq_test_230226 ../raw/two_lines.raw
-        #vq_test_230226 ../raw/pickle.raw
-        #vq_test_230226 ../raw/tea.raw
+        vq_test_230226 ../raw/two_lines.raw
+        vq_test_230226 ../raw/pickle.raw
+        vq_test_230226 ../raw/tea.raw
+        ;;
+ 
+    comp_test_230323)
+        comp_test_230323 ../raw/big_dog.raw
+        comp_test_230323 ../raw/forig.raw     
+        comp_test_230323 ../raw/two_lines.raw
+        comp_test_230323 ../raw/pickle.raw
+        comp_test_230323 ../raw/tea.raw
+        comp_test_230323 ../raw/kristoff.raw        
+        comp_test_230323 ../raw/ve9qrp_10s.raw     
         ;;
  
     vq_test_subset)
