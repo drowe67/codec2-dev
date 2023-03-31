@@ -46,7 +46,7 @@ function batch_process {
   printf "%-10s %-20s %4.2f\n" ${filename} ${outname} $(cat ${tmp}) >> ${out_dir}/zlog.txt
 }
 
-# 230323: compressor
+# 230323: compressor, mean limiting and quantisation
 function comp_test_230323() {
   fullfile=$1
   filename=$(basename -- "$fullfile")
@@ -66,6 +66,9 @@ function comp_test_230323() {
 
   # with norm_energy and hilbert compression applied at synthesis
   batch_process $fullfile "'K',20,'amp_pf','phase_pf','norm_en'" "4_comp_hc" "--gainoutlin 3.0"
+
+  # (4) plus mean limiting
+  batch_process $fullfile "'K',20,'amp_pf','phase_pf','norm_en','limit_mean'" "5_hc_lim" "--gainoutlin 3.0"
 }
 
 # 230226: debugging clicks

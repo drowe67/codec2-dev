@@ -664,21 +664,18 @@ function test_piecewise_compressor
   figure(1); clf; plot(x,y); grid;
 endfunction
 
-% some plot to explore relationship between 
+% some plot to explore relationship between energy and mean
 function test_energy_and_mean(B)
   mean_dB = mean(B,2);
   E_dB = 10*log10(sum(10 .^ (B(:,:)/10),2));
-  Ec_dB = piecewise_compressor(20,36,60,76,80,76, E_dB);
-  meanc_dB = mean_dB - E_dB + Ec_dB;
   figure(1); clf;
   subplot(211); hist(mean_dB,20); title('mean (dB)');
   subplot(212); hist(E_dB,20); title('Energy (dB)');
   figure(2); clf; plot(mean_dB, E_dB,'+'); grid;
-  hold on; plot(meanc_dB, Ec_dB,'r+'); hold off;
-  xlabel('mean (dB)'); ylabel('Energy (dB)');
-  figure(3); clf;
-  subplot(211); hist(meanc_dB,20); title('mean comp (dB)');
-  subplot(212); hist(Ec_dB,20); title('Energy comp (dB)');
-  figure(4); plot(E_dB); hold on; plot(Ec_dB,'r'); hold off;
+  xlabel('mean (dB)'); ylabel('E (dB)');
+  figure(3);
+  mx = max(mean_dB); Nsteps=25;
+  cdf = empirical_cdf(mx*(1:Nsteps)/Nsteps,mean_dB);
+  plot(mx*(1:Nsteps)/Nsteps,cdf); title('CDF Estimates'); grid;
 endfunction
 

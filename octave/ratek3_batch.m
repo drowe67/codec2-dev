@@ -38,7 +38,7 @@ function B = ratek3_batch_tool(samname, varargin)
   H_out_fn = ""; amp_pf_en = 0;  phase_pf_en=0; i = 1;
   Kst=0; Ken=K-1; dec = 1; scatter_en = 0; noise_var = 0;
   w = ones(1,K); w_en = 0; dec_lin = 1; pre_en = 0; logfn=""; mic_eq = 0;
-  plot_mic_eq = 0; vq_en = 0; norm_en = 0; compress_en = 0;
+  plot_mic_eq = 0; vq_en = 0; norm_en = 0; compress_en = 0; limit_mean = 0;
   
   lower = 10;             % only consider vectors above this mean
   dynamic_range = 100;     % restrict dynamic range of vectors
@@ -109,6 +109,8 @@ function B = ratek3_batch_tool(samname, varargin)
       printf("logfn: %s\n", logfn);
     elseif strcmp(varargin{i},"compress_en") 
       compress_en = 1;    
+    elseif strcmp(varargin{i},"limit_mean") 
+      limit_mean = 1;    
   else
       printf("\nERROR unknown argument: %s\n", varargin{i});
       return;
@@ -271,6 +273,15 @@ function B = ratek3_batch_tool(samname, varargin)
       Blin_hat = 10 .^ (B_hat(f,:)/20); E2 = sum(Blin_hat .^2);      
       B_hat(f,:) += 10*log10(E1/E2);
        
+      % limit/quantise mean
+      if limit_mean
+        amean = sum(B_hat(f,:))/K;
+        B_hat(f,:) -= amean;
+        amean = min(amean, 45);
+        amean = max(amean, 15);       
+        B_hat(f,:) += amean;     
+      end
+      
       AmdB_ = interp1([0 rate_K_sample_freqs_kHz 4], [0 B_hat(f,:) 0], rate_L_sample_freqs_kHz, "spline", 0);
       if norm_en
         AmdB_ = norm_energy(B_hat(f,:), AmdB_);
