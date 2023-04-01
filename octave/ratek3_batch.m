@@ -39,6 +39,7 @@ function B = ratek3_batch_tool(samname, varargin)
   Kst=0; Ken=K-1; dec = 1; scatter_en = 0; noise_var = 0;
   w = ones(1,K); w_en = 0; dec_lin = 1; pre_en = 0; logfn=""; mic_eq = 0;
   plot_mic_eq = 0; vq_en = 0; norm_en = 0; compress_en = 0; limit_mean = 0;
+  quant_mean3 = 0;
   
   lower = 10;             % only consider vectors above this mean
   dynamic_range = 100;     % restrict dynamic range of vectors
@@ -111,7 +112,10 @@ function B = ratek3_batch_tool(samname, varargin)
       compress_en = 1;    
     elseif strcmp(varargin{i},"limit_mean") 
       limit_mean = 1;    
-  else
+    elseif strcmp(varargin{i},"quant_mean3") 
+      quant_mean3 = 1;
+      mean_q_3bit = [17.470 21.719 25.559 29.162 32.676 36.186 39.663 43.177];
+    else
       printf("\nERROR unknown argument: %s\n", varargin{i});
       return;
     end
@@ -273,12 +277,20 @@ function B = ratek3_batch_tool(samname, varargin)
       Blin_hat = 10 .^ (B_hat(f,:)/20); E2 = sum(Blin_hat .^2);      
       B_hat(f,:) += 10*log10(E1/E2);
        
-      % limit/quantise mean
+      % limit mean
       if limit_mean
         amean = sum(B_hat(f,:))/K;
         B_hat(f,:) -= amean;
         amean = min(amean, 45);
         amean = max(amean, 15);       
+        B_hat(f,:) += amean;     
+      end
+      
+      % quantise mean
+      if quant_mean3
+        amean = sum(B_hat(f,:))/K;
+        B_hat(f,:) -= amean;
+        amean = quantise(mean_q_3bit,amean);
         B_hat(f,:) += amean;     
       end
       
@@ -341,7 +353,7 @@ function B = ratek3_batch_tool(samname, varargin)
         if dec_lin
           % linear interpolation, tends to muffle speech
           B_hat(sf,:) = (1-x)*B_hat(fa,:) + x*B_hat(fb,:);
-          printf("f: %d sf: %d fa: %d fb: %d x: %3.2f\n", f,sf, fa,fb,x);
+          %printf("f: %d sf: %d fa: %d fb: %d x: %3.2f\n", f,sf, fa,fb,x);
         else
           % choose closest, requires an extra bit, doesn't sound very good (could be a bug)
           dista = sum((B_hat(sf,:) - B_hat(fa,:)) .^ 2);
@@ -353,7 +365,7 @@ function B = ratek3_batch_tool(samname, varargin)
             B_hat(sf,:) = B_hat(fb,:);
             choice = 'b';
           end
-          printf("f: %d sf: %d fa: %d fb: %d choice: %c\n", f, sf, fa, fb, choice);
+          %printf("f: %d sf: %d fa: %d fb: %d choice: %c\n", f, sf, fa, fb, choice);
         end
         
         x += x_inc;
