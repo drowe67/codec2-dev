@@ -666,6 +666,7 @@ endfunction
 
 % some plot to explore relationship between energy and mean
 function test_energy_and_mean(B)
+  pkg load statistics;
   mean_dB = mean(B,2);
   E_dB = 10*log10(sum(10 .^ (B(:,:)/10),2));
   figure(1); clf;
@@ -677,5 +678,15 @@ function test_energy_and_mean(B)
   mx = max(mean_dB); Nsteps=25;
   cdf = empirical_cdf(mx*(1:Nsteps)/Nsteps,mean_dB);
   plot(mx*(1:Nsteps)/Nsteps,cdf); title('CDF Estimates'); grid;
+  
+  mean_dB = mean_dB(find(mean_dB > 15)); mean_dB = mean_dB(find(mean_dB < 45));
+  figure(4); subplot(211); hist(mean_dB,20);
+  [idx, centers] = kmeans (mean_dB,8);
+  centers = sort(centers);
+  mean_in = 15:0.1:45; mean_out = zeros(1,mean_in); 
+  for i=1:length(mean_in)
+    mean_out(i) = quantise(centers,mean_in(i));
+  end
+  subplot(212); plot(mean_in, mean_out);
 endfunction
 
