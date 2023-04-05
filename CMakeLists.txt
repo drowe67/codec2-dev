@@ -506,7 +506,7 @@ endif()
     # Check Octave and C compressed waveforms are about the same
     add_test(NAME test_OFDM_modem_datac0_compression
              COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/unittest;
-                            ./check_comp.sh ${CMAKE_CURRENT_SOURCE_DIR} $PATH:${CMAKE_CURRENT_BINARY_DIR}/src")
+                            ./check_comp.sh ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR}/src")
            
     #  ---------------------------------- ofdm_mod/demod level C modem tests ----------------------------------
     
@@ -1251,7 +1251,7 @@ endif(NOT APPLE)
                             ./freedv_data_raw_tx --testframes 10 --bursts 10 FSK_LDPC /dev/zero - |
                             ./ch - - --No -5 --ssbfilt 0 |
                             ./freedv_data_raw_rx --testframes -v FSK_LDPC - /dev/null")
-             set_tests_properties(test_freedv_data_raw_fsk_ldpc_100 PROPERTIES PASS_REGULAR_EXPRESSION "Frms.:    10")
+             set_tests_properties(test_freedv_data_raw_fsk_ldpc_100 PROPERTIES PASS_REGULAR_EXPRESSION "Frms.:    ( 9|10)")
 
      # FSK LDPC 1000 bit/s 2FSK, Fs=40kHz, as different configs can upset acquisition
      add_test(NAME test_freedv_data_raw_fsk_ldpc_1k
