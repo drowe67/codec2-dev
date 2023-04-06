@@ -68,21 +68,21 @@ function vq_test_230331() {
   batch_process $fullfile "'K',20,'amp_pf','phase_pf','norm_en','mic_eq',2,'dec',3, \
   'vq1','../build_linux/train_three_vq1.f32', \
   'vq2','../build_linux/train_three_vq2.f32', \ 
-  'vq3','../build_linux/train_three_vq3.f32'"  "3_vq3_27_dec3" "--gainoutlin 3.0"
+  'vq3','../build_linux/train_three_vq3.f32'"  "3_vq3_27_dec3"
 
   # 3 x 9 VQ, decimate by 3, 3 bit mean quant (target 1200 bits/s when side info added)
   batch_process $fullfile "'K',20,'amp_pf','phase_pf','norm_en','mic_eq',2,'dec',3,'quant_mean3', \
   'vq1','../build_linux/train_three_vq1.f32', \
   'vq2','../build_linux/train_three_vq2.f32', \ 
-  'vq3','../build_linux/train_three_vq3.f32'"  "4_vq3_27_dec3_q3" "--gainoutlin 3.0"
+  'vq3','../build_linux/train_three_vq3.f32'"  "4_vq3_27_dec3_q3"
 
   # 1 x 12 VQ, decimate by 3 (target 700 bits/s when side info added)
   batch_process $fullfile "'K',20,'amp_pf','phase_pf','norm_en','mic_eq',2,'dec',3, \
-  'vq1','../build_linux/train_k20_vq1.f32'" "5_vq1_12_dec3" "--gainoutlin 3.0"
+  'vq1','../build_linux/train_k20_vq1.f32'" "5_vq1_12_dec3"
 
   # 1 x 12 VQ, decimate by 3, 3 bit mean quant (target 700 bits/s when side info added)
   batch_process $fullfile "'K',20,'amp_pf','phase_pf','norm_en','mic_eq',2,'dec',3,'quant_mean3', \
-  'vq1','../build_linux/train_k20_vq1.f32'" "6_vq1_12_dec3_q3" "--gainoutlin 3.0"
+  'vq1','../build_linux/train_k20_vq1.f32'" "6_vq1_12_dec3_q3"
 
   cat $fullfile | hpf | c2enc 3200 - - | c2dec 3200 - - | sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_7_3200.wav
   
@@ -914,12 +914,12 @@ if [ $# -gt 0 ]; then
         ;;
  
     vq_test_230331)
-        #vq_test_230331 ../raw/big_dog.raw
+        vq_test_230331 ../raw/big_dog.raw
         #vq_test_230331 ../raw/forig.raw     
         #vq_test_230331 ../raw/two_lines.raw
         #vq_test_230331 ../raw/pickle.raw
         #vq_test_230331 ../raw/tea.raw
-        vq_test_230331  ../raw/ship.raw
+        #vq_test_230331  ../raw/ship.raw
         #vq_test_230331  ../raw/sickness.raw
         #vq_test_230331 ../raw/kristoff.raw        
         #vq_test_230331 ../raw/ve9qrp_10s.raw     
