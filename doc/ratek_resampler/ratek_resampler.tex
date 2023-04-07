@@ -676,6 +676,10 @@ For low frequency harmonics, it is important to have phase continuity between fr
 
 The question of where to apply the post filter (e.g. before or after quantisation) is open.  Equalisation of the speech spectra early in the signal processing chain would likely lead to lower VQ distortion, if the effect on speech quality is acceptable.
 
+\section{Vector Quantiser Experiment}
+
+Makefile, Makhoul reference, summary of a few algorithms, a plot.
+
 \section{Microphone Equaliser}
 
 The input speech may be subject to arbitrary filtering, for example due to the microphone frequency response, room acoustics, and anti-aliasing filter.  This filtering is fixed or slowly time varying.  The filtering biases the target vectors away from the VQ training material, resulting in significant additional distortion.  The filtering does not affect the input speech intelligibility, only the VQ performance suffers.
@@ -688,29 +692,41 @@ where $t_k^j$ is the target, $f_k$ is the filter, $g^j$ the scalar gain (mean) a
 \begin{equation}
 \frac{\partial e_k^j}{\partial f_k^j} = -2(t_k^j - f_k^j -g^j - v_k^j)
 \end{equation}
-We then adjust $f_k^j$ to move in the opposite direction to the gradient:
+We then adjust $f_k^j$ to move in the opposite direction to the gradient towards a (probably local) minima of $\mathbf{e}$:
 \begin{equation}
 f_k^{j+1} = f_k^j + 2 \Delta (t_k^j - f_k^j -g^j - v_k^j)
 \end{equation}
 where $\Delta$ is some small constant.  The procedure them becomes:
 \begin{itemize}
-\item At iteration $j$, we have $\mathbf{f}^j$ and $\mathbf{t}^j$.
+\item At iteration $j$, we have $\mathbf{t}^j$ and $\mathbf{f}^j$ .
 \item Find $g^j = \frac{1}{K} \sum_{k=1}^K(t_k^j - f_k^j)$
 \item Search VQ to minimise:
 \begin{equation}
 E_i=|\mathbf{u}-\mathbf{v}_i|^2
 \end{equation}
 \begin{equation}
-\mathbf{u} = \mathbf{t}^j - \mathbf{f}_i -g^j
+\mathbf{u} = \mathbf{t}^j - \mathbf{f}^j -g^j
 \end{equation}
 where $\mathbf{v}_i$ is the $i$th VQ entry. Let $i_{min}$ be the VQ entry where $E_i$ is minimised.
 \item Update the equaliser filter estimate:
 \begin{equation}
-\mathbf{f}^{j+1} = \mathbf{f}^j + 2 \Delta (\mathbf{t}^j - \mathbf{f}^j - g^j - \mathbf{v}_{imin}^j)
+\mathbf{f}^{j+1} = \mathbf{f}^j + 2 \Delta (\mathbf{t}^j - \mathbf{f}^j - g^j - \mathbf{v}_{i_{min}}^j)
 \end{equation}
 \end{itemize}
 
 A unit test for this algorithm (known as \emph{EQ2}) is in \path{tmic_eq.m}.
+
+\section{Energy Normalisation and resampling}
+
+Justification and maths, decimation, possibly revisit time-freq VQ
+
+\section{Mean and Energy quantisation}
+
+Discussion and maths
+
+\section{Hilbert Compression}
+
+Plots of before and after, notes on benefits
 
 \bibliographystyle{plain}
 \bibliography{ratek_references}
