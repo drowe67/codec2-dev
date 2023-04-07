@@ -39,7 +39,7 @@ function B = ratek3_batch_tool(samname, varargin)
   Kst=0; Ken=K-1; dec = 1; scatter_en = 0; noise_var = 0;
   w = ones(1,K); w_en = 0; dec_lin = 1; pre_en = 0; logfn=""; mic_eq = 0;
   plot_mic_eq = 0; vq_en = 0; norm_en = 0; compress_en = 0; limit_mean = 0;
-  quant_mean3 = 0;
+  quant_e4 = 0;
   
   lower = 10;             % only consider vectors above this mean
   dynamic_range = 100;     % restrict dynamic range of vectors
@@ -112,9 +112,10 @@ function B = ratek3_batch_tool(samname, varargin)
       compress_en = 1;    
     elseif strcmp(varargin{i},"limit_mean") 
       limit_mean = 1;    
-    elseif strcmp(varargin{i},"quant_mean3") 
-      quant_mean3 = 1;
-      mean_q_3bit = [17.470 21.719 25.559 29.162 32.676 36.186 39.663 43.177];
+    elseif strcmp(varargin{i},"quant_e4") 
+      quant_e4 = 1;
+      e_q_4bit = [21.892 25.783 29.595 33.169 36.549 39.743 42.868 45.920 \
+                  49.002 52.023 54.937 57.811 60.608 63.290 65.929 68.622];
     else
       printf("\nERROR unknown argument: %s\n", varargin{i});
       return;
@@ -286,12 +287,16 @@ function B = ratek3_batch_tool(samname, varargin)
         B_hat(f,:) += amean;     
       end
       
-      % quantise mean
-      if quant_mean3
-        amean = sum(B_hat(f,:))/K;
-        B_hat(f,:) -= amean;
-        amean = quantise(mean_q_3bit,amean);
-        B_hat(f,:) += amean;     
+      % quantise energy
+      if quant_e4
+        mu = sum(B_hat(f,:))/K;
+        C = B_hat(f,:) - mu;
+        e = 10*log10(sum(10 .^ (B_hat(f,:)/10)));
+        e_hat = quantise(e_q_4bit,e);
+        
+        % we send C and e over the channel, so we need to recover mu_hat
+        mu_hat = e_hat -  10*log10(sum(10 .^ (C/10)));
+        B_hat(f,:) = C + mu_hat;     
       end
       
       AmdB_ = interp1([0 rate_K_sample_freqs_kHz 4], [0 B_hat(f,:) 0], rate_L_sample_freqs_kHz, "spline", 0);

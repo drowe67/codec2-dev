@@ -665,28 +665,60 @@ function test_piecewise_compressor
 endfunction
 
 % some plot to explore relationship between energy and mean
+%   octave:1> train=load_f32("../build_linux/train_b20.f32",20);
+%   octave:2> newamp_700c; test_energy_and_mean(train)
 function test_energy_and_mean(B)
   pkg load statistics;
   mean_dB = mean(B,2);
-  E_dB = 10*log10(sum(10 .^ (B(:,:)/10),2));
+  e_dB = 10*log10(sum(10 .^ (B(:,:)/10),2));
+
   figure(1); clf;
   subplot(211); hist(mean_dB,20); title('mean (dB)');
-  subplot(212); hist(E_dB,20); title('Energy (dB)');
-  figure(2); clf; plot(mean_dB, E_dB,'+'); grid;
-  xlabel('mean (dB)'); ylabel('E (dB)');
+  subplot(212); hist(e_dB,20); title('Energy (dB)');
+  figure(2); clf; plot(mean_dB, e_dB,'+'); grid;
+  xlabel('mean (dB)'); ylabel('e (dB)');
+
   figure(3);
-  mx = max(mean_dB); Nsteps=25;
-  cdf = empirical_cdf(mx*(1:Nsteps)/Nsteps,mean_dB);
-  plot(mx*(1:Nsteps)/Nsteps,cdf); title('CDF Estimates'); grid;
+  mx = max(e_dB); Nsteps=25;
+  cdf = empirical_cdf(mx*(1:Nsteps)/Nsteps,e_dB);
+  plot(mx*(1:Nsteps)/Nsteps,cdf); title('CDF of e'); grid;
   
-  mean_dB = mean_dB(find(mean_dB > 15)); mean_dB = mean_dB(find(mean_dB < 45));
-  figure(4); subplot(211); hist(mean_dB,20);
-  [idx, centers] = kmeans (mean_dB,8);
-  centers = sort(centers);
-  mean_in = 15:0.1:45; mean_out = zeros(1,mean_in); 
-  for i=1:length(mean_in)
-    mean_out(i) = quantise(centers,mean_in(i));
+  % try designing an energy quantiser --------------------------
+  
+  % limit to 10-90% points eyeballed from CDF
+  e_min = 20; e_max = 70;
+  e_dB = e_dB(find(e_dB > e_min)); e_dB = e_dB(find(e_dB <e_max));
+  figure(4); subplot(211); hist(e_dB,20);
+  
+  % PDF optimised quantiser
+  levels = 16;
+  [idx, centers] = kmeans (e_dB,levels);
+  centers = sort(centers)'
+  e_in = e_min:0.1:e_max; e_out = zeros(1,length(e_in)); 
+  for i=1:length(e_in)
+    e_out(i) = quantise(centers,e_in(i));
   end
-  subplot(212); plot(mean_in, mean_out);
+  subplot(212); plot(e_in, e_out); grid;
+endfunction
+
+% Testing maths around quantising & transmitting energy of B, then
+% recovering mean at Rx. Example:
+%   octave:1> train=load_f32("../build_linux/train_b20.f32",20);
+%   octave:2> newamp_700c; test_energy_to_mean_conversion(train)
+function test_energy_to_mean_conversion(B)
+  [N K] = size(B);
+  mu = mean(B,2);
+  C = B - mu;
+  e = 10*log10(sum(10 .^ (B(:,:)/10),2));
+  
+  % we send C and e over the channel, so we need to recover mu_hat
+
+  mu_hat = e -  10*log10(sum(10 .^ (C(:,:)/10),2));
+  B_hat = C + mu_hat;
+  
+  % test e and e_hat should be the same
+  e_hat = 10*log10(sum(10 .^ (B_hat(:,:)/10),2));
+  
+  figure(1); clf; plot(e,e_hat);
 endfunction
 
