@@ -27,9 +27,9 @@
 
 \section{Introduction}
 
-To efficiently transmit spectral amplitude information Codec 2 700C uses a set of algorithms collectively denoted \emph{newamp1}. One of these algorithms is the Rate K resampler which transforms the variable length vectors of spectral amplitude samples to fixed length $K$ vectors suitable for vector quantisation.  This document was written in order to explore and possibly improve rate $K$ resampling.
+To efficiently transmit spectral amplitude information Codec 2 700C uses a set of algorithms collectively denoted \emph{newamp1}. One of these algorithms is the Rate K resampler which transforms the variable length vectors of spectral amplitude samples to fixed length $K$ vectors suitable for vector quantisation.  This document was written in order to explore and possibly improve rate $K$ resampling, and the issues around quantising the resampled vectors.
 
-\section{Theoretical Model}
+\section{Resampler Model}
 
 Consider a vector $\mathbf{a}$ of $L$ spectral amplitudes, sampled at time $t=nT$ seconds, where $n$ is the frame number, and $T$ is the frame period, typically $T=0.01$ seconds. 
 \begin{equation}
@@ -85,7 +85,7 @@ Substituting (\ref{eq:f_mel}) into the LHS:
 \begin{equation} \label{eq:warp}
 \begin{split}
 2595log_{10}(1+f/700) &= g(k-1) + mel(200) \\
-f = warp(k,K) &= mel^{-1} ( g(k-1) + mel(200) ) \\
+f = warp(k,K) &= mcan solve forel^{-1} ( g(k-1) + mel(200) ) \\
 \end{split}
 \end{equation}
 and the inverse warp function:
@@ -151,7 +151,9 @@ warp(k+1,K)-warp(k,K) < F0
 \end{equation}
 If $A_m$ is changing rapidly, undersampling may introduce undesirable aliasing, which may manifest as noise that is superimposed on $\mathbf{b}$. This noise may reduce perceptual quality and consume valuable quantiser bits for no benefit. Therefore $H()$ should be chosen to smooth high frequency detail such that local undersampling and uncontrolled aliasing is minimised. This may be restated as choosing $H()$ to minimise $E$ (\ref{eq:E1}) when $\hat{\mathbf{b}} = \mathbf{b}$.
 
-\section{Suggested Experiments}
+\section{Rate K Resampler Experiments}
+
+\subsection{Suggested Experiments}
  
 Here are a suggested set of experiments to evaluate the ideas presented in this document.  Some of them require informal listening tests, others have objective measures which could be used as the basis for automated tests:
 
@@ -188,7 +190,7 @@ If $\mathbf{n}_{n}$ and $\mathbf{n}_{n+1}$ are not well correlated they may beco
 \item If the sample rate $K$ is sufficiently high (or bandwidth of $\mathbf{a}$ sufficiently constrained), the actual VQ dimension won't matter.  The decorrelation properties of the VQ will ensure it achieves the same distortion over a range of dimensions.  A large enough dimension $K$ could be chosen to simplify $S$, which could be linear resampling. It would be good to decouple $warp()$ from K.
 \end{enumerate}
 
-\section{Experiment 1: rate $K>L$ linear}
+\subsection{Experiment 1: rate $K>L$ linear}
 
 This experiment tests the ability to resample perfectly ($E=0$) with $K>L$, no filtering ($H(x)=x$) and linear frequency sampling and was implemented with Octave scripts \path{ratek1_fbf.m} and \path{ratek1_batch.m}.
 
@@ -249,7 +251,7 @@ Conclusions:
 
 \end{enumerate}
 
-\section{Experiment 2 - Filtering}
+\subsection{Experiment 2 - Filtering}
 
 The goal of this experiment is to filter the spectral amplitudes $\mathbf{a}$ such that they can be coarsely resampled without resampling or aliasing errors, and with minimal impact on the perceptual quality.
 The $m$th filtered sample can be obtained by:
@@ -403,7 +405,7 @@ In Figure \ref{fig:20_100_vq} and Figure \ref{fig:train_120_Nb20_K30_vq} we note
 \end{center}
 \end{figure}
 
-\section{Efficient Filtering}
+\subsection{Efficient Filtering}
 
 As $L$ is time varying, it is necessary to determine the filters $g(k)$ for every frame which is computationally inefficient.  A more efficient procedure is to resample $\mathbf{a}$ to rate $L_{high}=L_{max}$ vector $\mathbf{x}$ using the resampler $T()$, perform the filtering $H()$ at rate $L_{high}$, then resample $R()$ to the no\begin{equation}
 \begin{split}
@@ -429,7 +431,7 @@ where $\hat{\mathbf{y}}^L$ is sampled at rate $L$, unlike $\mathbf{y}$ which is 
 
 In Figure \ref{fig:ratek2_E_K_hts}, the \emph{Nb=20 eff} curve shows the results of the efficient filtering algorithm with $\hat{\mathbf{b}} = \mathbf{b}$, which as expected, are very close to the \emph{Nb=20} curve.
 
-\section{Vector Quantiser Training}
+\subsection{Vector Quantiser Training}
 
 Using the algorithms developed above, the 24 minute (144,000 frame) \emph{train.spc} sample was used to train several vector quantisers (Table \ref{table:train_vqs}).  Each frame was resampled to rate $L_{high}$, $N_b=20$ filtered, and resampled to a training set of rate $K=30$ vectors. The spectral distortion $E_q$ results for the single stage VQ were disappointing, however the two stage VQ appears to perform quite well, and is a candidate for an improved 1200 bit/s Codec 2 mode.  As a sanity check, two 4 second samples from within the training set (\emph{big\_dog} and \emph{two\_lines}) were tested with results consistent with the entire training data set.
 
@@ -467,7 +469,7 @@ Using the algorithms developed above, the 24 minute (144,000 frame) \emph{train.
 
 \FloatBarrier
 
-\section{Pitch Dependant Spectral Envelope}
+\subsection{Pitch Dependant Spectral Envelope}
 
 Figures \ref{fig:ratek7_big_dog_61} and \ref{fig:ratek7_two_lines_61} overlay the speech spectrum and the corresponding upsampled and filtered rate $L_{high}$ vector $\mathbf{y}$.
 
@@ -507,7 +509,7 @@ and thus forms narrow bandwidth formants in the model output $\hat{\mathbf{y}}$ 
 \end{center}
 \end{figure}
 
-\section{First Pass VQ Listening tests}
+\subsection{First Pass VQ Listening tests}
 
 Initial listening tests were conducted using a single male (\emph{big\_dog}) and female (\emph{two\_lines}) samples from inside the training dataset and evaluated using headphones.  Samples synthesised with original amplitudes and codec 2 3200 were used as controls.  The \emph{phase0} algorithm was used for all samples to synthesise phases. The female sample sounded quite good under quantisation, however the male sounded buzzy and muffled.
 
@@ -574,7 +576,7 @@ Possible ways forward:
 \item A NN is one solution - sharp peaks for males (based on F0), and enhance peaks/valley ratio at high frequencies.  What would we use as ground truth?  Is there a toy example we can train against?  How can we make it handle wide dynamic ranges?  How do we know we have enough training data? Need to see it enhancing indep of frequency of formant - that would be a good test.  Just train on voiced, high energy frames.
 \end{enumerate}
 
-\section{Post Filter Design}
+\subsection{Post Filter Design}
 
 We require a function $P()$ that modifies a smoothed vector of spectral magnitude samples $\mathbf{y}$ to sharpen formant peaks and increase peak/valley ratio, in particular at high frequencies.
 
@@ -584,7 +586,7 @@ The smoothed vector $\mathbf{y}$ is obtained by filtering $\mathbf{y}=H(\mathbf{
 
 Representing the sharp peaks required for male speech is possible by direct quantisation of $\mathbf{x}$ but requires a prohibitively high bit rate for our use case.  High $F0$ speakers can be adequately represented by a low $N_b$ vector  which suggests there should be a way to reproduce male speech of adequate quality from low $N_b$ vectors.  $P()$ should have no effect on high $F0$ speakers, which are already adequately represented by the smoothed spectral samples.
 
-\section{Group Delay Interpretation}
+\subsection{Group Delay Interpretation}
 
 Explanation of why ratek with original phases works.  At high frequency, the bandwidth of the spectral peak is broadened. Original phases means the group delay $\tau_g=\frac{d\phi}{d\omega}$ will remain the same for the central harmonic(s) that were part of the original peak.  High group delay means a slow response to amplitude envelope changes, in our case an impulse train exciting the system. Harmonic energy in the peak centre will be smeared in time (ringing), lowering PAPR, and having the same probability of detection by the ear as the original waveform.
 
@@ -596,7 +598,7 @@ Another interpretation.  With broadened peaks but original phases, we now have a
 
 This suggests a post filter design (and indeed explanation of current post filters).  Enhancing the spectral envelope by expanding the dynamic range of the envelope $\hat{\mathbf{y}}=\beta\mathbf{y}$ ($\mathbf{y}$ in dB) will increase the slope of the edges of the spectral peak.  If we derive a phase spectra using a HT, the group delay will be large at the peak edges, but small in the centre.  The amplitudes at the edges will be similar to the central peak.  Thus each edge will contribute low PAPR harmonics with increased probability of detection.  It remains to be seen if this will will be perceived in the same way as a single peak in the centre of the harmonic, given the poor ability of the ear to separate closely spaced tones at high frequencies.
 
-\section{Post filter}
+\subsection{Post filter}
 
 A post filter has been developed, and is providing a reasonable improvement in speech quality over a small database of speech samples from the \emph{codec2} repository, in particular when a small loudspeaker is used for playback. The post filter reduces the buzzy/muffled effect for low pitch males, and importantly does not reduce the quality of other samples (such as females). It improves intelligibility of several samples, even those with high pitch.  It does "colour" the speech - samples sound different compared to no post filtering, however the overall effect is positive. 
 
