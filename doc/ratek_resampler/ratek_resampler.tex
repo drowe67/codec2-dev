@@ -688,7 +688,7 @@ Consider the $k$th element of the error vector $\mathbf{e}^j$ for the $j$th targ
 \begin{equation}
 e_k^j=(t_k^j - f_k^j -g^j - v_k^j)^2
 \end{equation}
-where $t_k^j$ is the target, $f_k$ is the filter, $g^j$ the scalar gain (mean) added to the target, and $v_k^j$ the chosen VQ entry.  Solving for $\mathbf{f}^j$ is a highly non-linear problem, as $g^j$ is a function of $t_k^j$ and $f_k^j$; and $v_k^j$ is a function of the preceding three variables.  However if can solved by gradient descent:
+where $t_k^j$ is the target, $f_k$ is an estimate of the filter, $g^j$ the scalar gain (mean) added to the target, and $v_k^j$ the chosen VQ entry.  Solving for $\mathbf{f}^j$ is a highly non-linear problem, as $g^j$ is a function of $t_k^j$ and $f_k^j$; and $v_k^j$ is a function of the preceding three variables.  However if can solved by gradient descent:
 \begin{equation}
 \frac{\partial e_k^j}{\partial f_k^j} = -2(t_k^j - f_k^j -g^j - v_k^j)
 \end{equation}
@@ -720,9 +720,24 @@ A unit test for this algorithm (known as \emph{EQ2}) is in \path{tmic_eq.m}.
 
 Justification and maths, decimation, possibly revisit time-freq VQ
 
-\section{Mean and Energy quantisation}
+\section{Mean and Energy Quantisation}
 
-Discussion and maths
+The current approach for vector quantising $\mathbf{b}$ is to remove the mean $\mu=\frac{1}{K} \sum_{k=1}^K B_k$, and send that separately as side information, along with the vector quantised, mean removed vector $\hat{\mathbf{c}}=Q(\mathbf{c})=Q(\mathbf{b}-\mu)$.  The mean is correlated with the frame energy, but they are not quite the same thing.  Coarsely quantising $\mu$ resulted in unusual variations in peak amplitude in the synthesised speech at the decoder, as clipping $\mu$ to some maximum does not guarantee frame energy will be constant.  We are interested in coarse quantisation of frame energy to reduce bit rate, and clipping to reduce dynamic range.  It is therefore preferable to quantise and transmit frame energy, which can be converted to $\hat{\mu}$ at the decoder.
+
+The frame energy to be quantised and sent to the decoder is given by:
+\begin{equation}
+e = 10log_{10}\left( \sum_{k=1}^K 10^{ (\hat{C_k}+\hat{\mu})/10 } \right)
+\end{equation}
+Given $\hat{e}=Q(e)$ and $\hat{\mathbf{c}}$ at the decoder we obtain $\hat{\mu}$:
+\begin{equation}
+\hat{\mu} = \hat{e} - 10log_{10}\left( \sum_{k=1}^K 10^{\hat{C_k}/10} \right)
+\end{equation}
+$\hat{\mathbf{b}}$ can then be recovered with:
+\begin{equation}
+\hat{\mathbf{b}} = \hat{\mathbf{c}} + \hat{\mu}
+\end{equation}
+
+TODO: scatter plot, in nice postscript form
 
 \section{Hilbert Compression}
 
