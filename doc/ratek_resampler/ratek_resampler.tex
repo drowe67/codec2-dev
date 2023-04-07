@@ -676,6 +676,41 @@ For low frequency harmonics, it is important to have phase continuity between fr
 
 The question of where to apply the post filter (e.g. before or after quantisation) is open.  Equalisation of the speech spectra early in the signal processing chain would likely lead to lower VQ distortion, if the effect on speech quality is acceptable.
 
+\section{Microphone Equaliser}
+
+The input speech may be subject to arbitrary filtering, for example due to the microphone frequency response, room acoustics, and anti-aliasing filter.  This filtering is fixed or slowly time varying.  The filtering biases the target vectors away from the VQ training material, resulting in significant additional distortion.  The filtering does not affect the input speech intelligibility, only the VQ performance suffers.
+
+Consider the $k$th element of the error vector $\mathbf{e}^j$ for the $j$th target vector:
+\begin{equation}
+e_k^j=(t_k^j - f_k^j -g^j - v_k^j)^2
+\end{equation}
+where $t_k^j$ is the target, $f_k$ is the filter, $g^j$ the scalar gain (mean) added to the target, and $v_k^j$ the chosen VQ entry.  Solving for $\mathbf{f}^j$ is a highly non-linear problem, as $g^j$ is a function of $t_k^j$ and $f_k^j$; and $v_k^j$ is a function of the preceding three variables.  However if can solved by gradient descent:
+\begin{equation}
+\frac{\partial e_k^j}{\partial f_k^j} = -2(t_k^j - f_k^j -g^j - v_k^j)
+\end{equation}
+We then adjust $f_k^j$ to move in the opposite direction to the gradient:
+\begin{equation}
+f_k^{j+1} = f_k^j + 2 \Delta (t_k^j - f_k^j -g^j - v_k^j)
+\end{equation}
+where $\Delta$ is some small constant.  The procedure them becomes:
+\begin{itemize}
+\item At iteration $j$, we have $\mathbf{f}^j$ and $\mathbf{t}^j$.
+\item Find $g^j = \frac{1}{K} \sum_{k=1}^K(t_k^j - f_k^j)$
+\item Search VQ to minimise:
+\begin{equation}
+E_i=|\mathbf{u}-\mathbf{v}_i|^2
+\end{equation}
+\begin{equation}
+\mathbf{u} = \mathbf{t}^j - \mathbf{f}_i -g^j
+\end{equation}
+where $\mathbf{v}_i$ is the $i$th VQ entry. Let $i_{min}$ be the VQ entry where $E_i$ is minimised.
+\item Update the equaliser filter estimate:
+\begin{equation}
+\mathbf{f}^{j+1} = \mathbf{f}^j + 2 \Delta (\mathbf{t}^j - \mathbf{f}^j - g^j - \mathbf{v}_{imin}^j)
+\end{equation}
+\end{itemize}
+
+A unit test for this algorithm (known as \emph{EQ2}) is in \path{tmic_eq.m}.
 
 \bibliographystyle{plain}
 \bibliography{ratek_references}
