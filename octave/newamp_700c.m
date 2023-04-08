@@ -667,7 +667,8 @@ endfunction
 % some plot to explore relationship between energy and mean
 %   octave:1> train=load_f32("../build_linux/train_b20.f32",20);
 %   octave:2> newamp_700c; test_energy_and_mean(train)
-function test_energy_and_mean(B)
+
+function test_energy_and_mean(B, epslatex_path="")
   pkg load statistics;
   mean_dB = mean(B,2);
   e_dB = 10*log10(sum(10 .^ (B(:,:)/10),2));
@@ -675,9 +676,29 @@ function test_energy_and_mean(B)
   figure(1); clf;
   subplot(211); hist(mean_dB,20); title('mean (dB)');
   subplot(212); hist(e_dB,20); title('Energy (dB)');
+
+  if length(epslatex_path)
+    textfontsize = get(0,"defaulttextfontsize");
+    linewidth = get(0,"defaultlinelinewidth");
+    set(0, "defaulttextfontsize", 10);
+    set(0, "defaultaxesfontsize", 10);
+    set(0, "defaultlinelinewidth", 0.5);
+  end
+  
   figure(2); clf; plot(mean_dB, e_dB,'+'); grid;
   xlabel('mean (dB)'); ylabel('e (dB)');
 
+  if length(epslatex_path)
+    old_dir=cd(epslatex_path);
+    fn = "train_e_mean.tex"
+    print(fn,"-depslatex","-S300,300");
+    printf("printing... %s%s\n", epslatex_path,fn);
+    cd(old_dir);
+    set(0, "defaulttextfontsize", textfontsize);
+    set(0, "defaultaxesfontsize", textfontsize);
+    set(0, "defaultlinelinewidth", linewidth);
+  end
+  
   figure(3);
   mx = max(e_dB); Nsteps=25;
   cdf = empirical_cdf(mx*(1:Nsteps)/Nsteps,e_dB);

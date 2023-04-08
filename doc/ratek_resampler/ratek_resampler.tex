@@ -724,7 +724,15 @@ Justification and maths, decimation, possibly revisit time-freq VQ
 
 \section{Mean and Energy Quantisation}
 
-The current approach for vector quantising $\mathbf{b}$ is to remove the mean $\mu=\frac{1}{K} \sum_{k=1}^K B_k$, and send that separately as side information, along with the vector quantised, mean removed vector $\hat{\mathbf{c}}=Q(\mathbf{c})=Q(\mathbf{b}-\mu)$.  The mean is correlated with the frame energy, but they are not quite the same thing.  Coarsely quantising $\mu$ resulted in unusual variations in peak amplitude in the synthesised speech at the decoder, as clipping $\mu$ to some maximum does not guarantee frame energy will be constant.  We are interested in coarse quantisation of frame energy to reduce bit rate, and clipping to reduce dynamic range.  It is therefore preferable to quantise and transmit frame energy, which can be converted to $\hat{\mu}$ at the decoder.
+The current approach for vector quantising $\mathbf{b}$ is to remove the mean $\mu=\frac{1}{K} \sum_{k=1}^K B_k$, and send that separately as side information, along with the vector quantised, mean removed vector $\hat{\mathbf{c}}=Q(\mathbf{c})=Q(\mathbf{b}-\mu)$.  The mean is correlated with the frame energy, but they are not quite the same thing.  Figure \ref{fig:train_e_mean} shows that for a given energy $e$, a range of means is possible. Coarsely quantising $\mu$ resulted in unusual variations in peak amplitude in the synthesised speech at the decoder, as clipping $\mu$ to some maximum does not guarantee frame energy will be constant.  We are interested in coarse quantisation of frame energy to reduce bit rate, and clipping to reduce dynamic range.  It is therefore preferable to quantise and transmit frame energy, which can be converted to $\hat{\mu}$ at the decoder.
+
+\begin{figure}[h]
+\caption{Scatter plot of $\mathbf{b}$ energy against mean for \emph{train.spc}}
+\label{fig:train_e_mean}
+\begin{center}
+\input train_e_mean.tex
+\end{center}
+\end{figure}
 
 The frame energy to be quantised and sent to the decoder is given by:
 \begin{equation}
@@ -739,7 +747,7 @@ $\hat{\mathbf{b}}$ can then be recovered with:
 \hat{\mathbf{b}} = \hat{\mathbf{c}} + \hat{\mu}
 \end{equation}
 
-TODO: scatter plot, in nice postscript form
+A unit test for this procedure is the function \path{test_energy_to_mean_conversion()} in the file \path{ newamp_700c.m}.
 
 \section{Hilbert Compression}
 
