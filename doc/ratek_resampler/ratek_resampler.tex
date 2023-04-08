@@ -684,13 +684,13 @@ Makefile, Makhoul reference, summary of a few algorithms, a plot.
 
 \section{Microphone Equaliser}
 
-The input speech may be subject to arbitrary filtering, for example due to the microphone frequency response, room acoustics, and anti-aliasing filter.  This filtering is fixed or slowly time varying.  The filtering biases the target vectors away from the VQ training material, resulting in significant additional distortion.  The filtering does not affect the input speech intelligibility, only the VQ performance suffers.
+The input speech may be subject to arbitrary filtering, for example due to the microphone frequency response, room acoustics, and anti-aliasing filter.  This filtering is fixed or slowly time varying.  The filtering biases the target vectors away from the VQ training material, resulting in significant additional distortion.  The filtering does not greatly affect the input speech quality, however the VQ performance distortion increases and the output speech quality is reduced.
 
 Consider the $k$th element of the error vector $\mathbf{e}^j$ for the $j$th target vector:
 \begin{equation}
 e_k^j=(t_k^j - f_k^j -g^j - v_k^j)^2
 \end{equation}
-where $t_k^j$ is the target, $f_k$ is an estimate of the filter, $g^j$ the scalar gain (mean) added to the target, and $v_k^j$ the chosen VQ entry.  Solving for $\mathbf{f}^j$ is a highly non-linear problem, as $g^j$ is a function of $t_k^j$ and $f_k^j$; and $v_k^j$ is a function of the preceding three variables.  However if can solved by gradient descent:
+where $t_k^j$ is the target, $f_k$ is an estimate of the filter, $g^j$ the scalar gain (mean) added to the target, and $v_k^j$ the chosen VQ entry.  Solving for $\mathbf{f}^j$ is a highly non-linear problem, as $g^j$ is a function of $t_k^j$ and $f_k^j$; and $v_k^j$ is a function of the preceding three variables.  However as the function is differentiable it can be solved by gradient descent.  We first find the derivative:
 \begin{equation}
 \frac{\partial e_k^j}{\partial f_k^j} = -2(t_k^j - f_k^j -g^j - v_k^j)
 \end{equation}

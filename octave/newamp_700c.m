@@ -685,7 +685,7 @@ function test_energy_and_mean(B, epslatex_path="")
     set(0, "defaultlinelinewidth", 0.5);
   end
   
-  figure(2); clf; plot(mean_dB, e_dB,'+'); grid;
+  figure(2); clf; plot(mean_dB(1:100:end), e_dB(1:100:end),'.'); grid;
   xlabel('mean (dB)'); ylabel('e (dB)');
 
   if length(epslatex_path)
