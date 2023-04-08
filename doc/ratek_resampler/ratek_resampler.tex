@@ -746,7 +746,7 @@ So the procedure for resampling is:
 \item The output normalised rate $K$ vector is $\hat{\mathbf{b}}=\sqrt(c)\mathbf{b}$
 \item When $\mathbf{b}$ is expressed in dB, a convenient result is $\hat{B}_{m\_dB} = 10log_{10}(c)+B_{m\_dB}$
 \end{itemize}
-This procedure should be used for any resampling, e.g. from rate $L$ to rate $K$, or rate $K$ to rate $L$, to ensure constant energy is preserved across all resampling operations.
+This procedure should be used for any resampling, e.g. from rate $L$ to rate $K$, or rate $K$ to rate $L$, to ensure constant energy is preserved across all resampling operations.  A unit test for this procedure is the function \path{test_norm_energy()} in the file \path{ newamp_700c.m}.
 
 \section{Mean and Energy Quantisation}
 
@@ -780,6 +780,32 @@ A unit test for this procedure is the function \path{test_energy_to_mean_convers
 \section{Hilbert Compression}
 
 Plots of before and after, notes on benefits
+
+\section{Summary of Software}
+
+In this section the software used for the R\&D presented in this report is summarised.  Further instructions can generally by found at the top of each script.  The Octave scripts come in two flavours (a) frame-by-frame (fbf) that allow single stepping through samples while plotting various waveforms and vectors, and (b) "batch" that process entire speech files, producing WAV files ready for informal listening tests.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{p{4.5cm}|p{8cm}}
+ \hline
+ Name & Description \\
+ \hline
+ \path{c2sim} & Codec 2 encoder and decoder that can exchange signal vectors with external scripts \\
+ \path{plphase2.m} & fbf experiment to explore original and phase0 synthesised phase combined with rate K amplitude model \\
+ \path{plphase3.m} & fbf script to explore issues with clicks in synthesised audio \\ 
+ \path{ratek3_batch.m} & batch processing script with many options for rate $K$ resampling, postfilters and VQ \\ 
+ \path{ratek_resampler.sh} & Ties C and Octave code together to generate VQ training data, train VQs, and  run various experiments \\
+ \path{ratek_resampler_plot.m} & Plotting curves of VQ performance from \path{ratek_resampler.mk} \\
+ \path{ratek_resampler.mk} & Generates VQ training data, trains various VQs, and generated plots of VQ performance \\
+ \path{newamp_700c.m} & Library of rate $K$ processing functions and tests, code developed for this report at bottom \\ 
+ \path{tmic_eq.m} & Unit test for microphone equaliser \\
+ \path{ratek_plots.m} & Generates plots for this report \\
+ \hline
+\end{tabular}
+\caption{Summary of software used for the work described in this report}
+\label{table:scripts}
+\end{table}
 
 \bibliographystyle{plain}
 \bibliography{ratek_references}
