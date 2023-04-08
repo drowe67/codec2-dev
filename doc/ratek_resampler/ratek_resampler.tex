@@ -660,7 +660,7 @@ s(n) &= \sum_{m=1}^{L}A_m e^{j(\omega_0mn+\theta_m)} \\
 \end{equation}
 CPAPR is sensitive to the time domain magnitude envelope of the synthesised speech signal.
 
-\subsection{Further Work}
+\subsection{Post Filter Further Work}
 
 We now have a better understanding of how frequency domain post filters such as those used in the \emph{newamp1} algorithm improve speech quality:
 \begin{enumerate}
@@ -718,9 +718,35 @@ where $\mathbf{v}_i$ is the $i$th VQ entry. Let $i_{min}$ be the VQ entry where 
 
 A unit test for this algorithm (known as \emph{EQ2}) is in \path{tmic_eq.m}.
 
-\section{Energy Normalisation and resampling}
+\section{Energy Normalisation and Resampling}
 
-Justification and maths, decimation, possibly revisit time-freq VQ
+Resampling the frequency domain vectors (e.g. from rate $L$ to rate $K$) is a common operation above.  This section discuses how to ensure frame energy remains constant across the resampling operations.  This is necessary to handle the following use cases:
+\begin{itemize}
+\item In unvoiced or transition frames the pitch estimator output $F0$ is undefined. However the energy of adjacent frames in the time or frequency domain will only vary slightly. If $F0$ is not smooth, it is still desirable for the energy of adjacent frames represented by $\mathbf{b}$ in frame $f$ and $f+1$ to be similar.
+\item To reduce bit rate we often decimate $\mathbf{b}$ in time then interpolate at the decoder.  For example we may attempt to reconstruct $\mathbf{b}_{f+1}$ by linear interpolation of $\mathbf{b}_{f}$ and $\mathbf{b}_{f+2}$. Despite $F0$ variations, we would like the energy of adjacent frames to be similar to facilitate smooth interpolation.
+\end{itemize}
+The initial procedure for resampling did not normalise energy, leading to the energy of $\mathbf{b}$ being $F0$ dependant.  When synthesising unvoiced speech energy variations lead to audible clicks (especially when combined with pitch estimation errors during voiced speech or voicing errors when $F0$ was random).
+
+Consider a sampling operation between rate $L$ and rate $K$.  We would like the energy $e$ in the vector at both sample rates to be the same:
+\begin{equation}
+e = \sum_{m=1}^L | A_m |^2 = c \sum_{k=1}^K | B_k |^2 
+\end{equation}
+Note here we assume $A_m$ and $B_k$ are linear (not dB). Solving for c:
+\begin{equation}
+c = \frac{\sum_{m=1}^L | A_m |^2}{\sum_{k=1}^K | B_k |^2} 
+\end{equation}
+The normalised rate $K$ vector elements are then:
+\begin{equation}
+\hat{B}_m = \sqrt{c}B_m
+\end{equation}
+So the procedure for resampling is:
+\begin{itemize}
+\item Resample from $\mathbf{a}$ to $\mathbf{b}$ using a spline, or similar low distortion resampler.
+\item calculate $c$
+\item The output normalised rate $K$ vector is $\hat{\mathbf{b}}=\sqrt(c)\mathbf{b}$
+\item When $\mathbf{b}$ is expressed in dB, a convenient result is $\hat{B}_{m\_dB} = 10log_{10}(c)+B_{m\_dB}$
+\end{itemize}
+This procedure should be used for any resampling, e.g. from rate $L$ to rate $K$, or rate $K$ to rate $L$, to ensure constant energy is preserved across all resampling operations.
 
 \section{Mean and Energy Quantisation}
 
@@ -742,7 +768,9 @@ Given $\hat{e}=Q(e)$ and $\hat{\mathbf{c}}$ at the decoder we obtain $\hat{\mu}$
 \begin{equation}
 \hat{\mu} = \hat{e} - 10log_{10}\left( \sum_{k=1}^K 10^{\hat{C_k}/10} \right)
 \end{equation}
+
 $\hat{\mathbf{b}}$ can then be recovered with:
+
 \begin{equation}
 \hat{\mathbf{b}} = \hat{\mathbf{c}} + \hat{\mu}
 \end{equation}
