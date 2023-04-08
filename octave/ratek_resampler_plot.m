@@ -51,7 +51,7 @@ function ratek_resampler_plot(plot_fn, varargin)
   plot(bits,scalar,'b--;K=20 scalar;');
   plot([min(bits) max(bits)], [4 4],'b--;4 dB*dB;');
   
-  xlabel('bits'); ylabel('var dB*dB'); grid('minor');
+  xlabel('bits'); ylabel('E dB*dB'); grid('minor');
   axis([5 30 1 20]);
   if length(epslatex_path)
     legend("boxoff");
