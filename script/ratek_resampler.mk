@@ -3,10 +3,22 @@
 # Makefile to build up curves for various VQ schemes
 #
 # usage:
+#
+# 1. Use train_120.spc (runs fairly quickly, good for initial tests)
+#
 #   cd codec2/build/linux
 #   make -f ../script/ratek_resampler.mk
+#
+# 2. Use train.spc 
+#
+#    TRAIN=train M=4096 make -f ../script/ratek_resampler.mk
+#
+# 3. Generate .tex/.eps file for use in report
+#
+#  rm train_ratek1.png
+#  epslatex_path=../doc/ratek_resampler/ TRAIN=train M=4096 make -f ../script/ratek_resampler.mk
 
-TRAIN  ?= train_120
+TRAIN ?= train_120
 M ?= 512
 
 SHELL  := /bin/bash

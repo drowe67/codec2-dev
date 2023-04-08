@@ -3,6 +3,15 @@
 
 function ratek_resampler_plot(plot_fn, varargin)
   more off;
+  epslatex_path = getenv("epslatex_path");
+  if length(epslatex_path)
+    textfontsize = get(0,"defaulttextfontsize");
+    linewidth = get(0,"defaultlinelinewidth");
+    set(0, "defaulttextfontsize", 10);
+    set(0, "defaultaxesfontsize", 10);
+    set(0, "defaultlinelinewidth", 0.5);
+  end
+  
   figure(1); clf;
   hold on;
   
@@ -44,5 +53,18 @@ function ratek_resampler_plot(plot_fn, varargin)
   
   xlabel('bits'); ylabel('var dB*dB'); grid('minor');
   axis([5 30 1 20]);
-  print("-dpng", plot_fn);
+  if length(epslatex_path)
+    legend("boxoff");
+    old_dir=cd(epslatex_path);
+    [dir name ext] = fileparts(plot_fn);
+    fn = sprintf("%s.tex",name);
+    print(fn, "-depslatex","-S400,300");
+    printf("printing... %s%s\n", epslatex_path, fn);
+    cd(old_dir);
+    set(0, "defaulttextfontsize", textfontsize);
+    set(0, "defaultaxesfontsize", textfontsize);
+    set(0, "defaultlinelinewidth", linewidth);
+  else
+    print("-dpng", plot_fn);
+  end  
 endfunction
