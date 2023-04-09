@@ -27,7 +27,7 @@
 
 \section{Introduction}
 
-To efficiently transmit spectral amplitude information Codec 2 700C uses a set of algorithms collectively denoted \emph{newamp1}. One of these algorithms is the Rate K resampler which transforms the variable length vectors of spectral amplitude samples to fixed length $K$ vectors suitable for vector quantisation.  This document was written in order to explore and possibly improve rate $K$ resampling, and the issues around quantising the resampled vectors.
+To efficiently transmit spectral amplitude information Codec 2 700C uses a set of algorithms collectively denoted \emph{newamp1}. One of these algorithms is the Rate K resampler which transforms the variable length vectors of spectral amplitude samples to fixed length $K$ vectors suitable for vector quantisation.  This document was written in order to explore and possibly improve rate $K$ resampling, and the issues around quantising the resampled vectors.  The results of this study are several algorithm innovations and candidate designs for new 700 and 1200 bit/s modes.
 
 \section{Resampler Model}
 
@@ -678,26 +678,23 @@ For low frequency harmonics, it is important to have phase continuity between fr
 
 The question of where to apply the post filter (e.g. before or after quantisation) is open.  Equalisation of the speech spectra early in the signal processing chain would likely lead to lower VQ distortion, if the effect on speech quality is acceptable.
 
-\section{Vector Quantiser Experiment}
+\section{Vector Quantiser Experiments}
 
-Makefile, \cite{makhoul1985vector} Makhoul reference, summary of a few algorithms.
+A range of VQ designs were explored, strongly influenced the excellent introduction on VQ for speech coding presented in \cite{makhoul1985vector}. Using the \emph{train.spc}, the  distortion of each VQ $E_q$ in $dB^2$ for a range of bits was plotted.  The Makefile \path{ratek_resampler.mk} was used to automate the process. Figure \ref{fig:train_ratek} presents a range of experiment VQ results:
+\begin{itemize}
+\item All of the VQ designs are "mean removed"; we remove the mean of the vector and transmit this separately as side information.  This results in some loss of VQ efficiency but reduces storage and search complexity.  As further work it would be interesting to explore alternatives to this design choice, especially when combined with dynamic range compression.
+\item The $K=20$ \emph{scalar} line shows the performance of scalar quantiser at the same bit rate.  Scalar quantisers encode each VQ element independently and cannot take into account correlation between elements, making them generally less efficient. As the number of bits allocated to the VQ increases, correlation is removed and the slope starts to approach that of the scalar quantiser.
+\item The $4 dB^2$ reference is a rough acceptability bar for communications quality speech, based on historical Codec 2 use cases.
+\item \emph{lbg} is a two stage, 24 bit quantiser with $K=30$. \emph{k20} is similar but uses $K=20$, and shows very similar performance with reduced storage requirements.  The break in performance from stage1 to stage2 is clearly evident from the change in slope.  \cite{makhoul1985vector} suggests this break is due to the loss of correlation in the stage 1 residual.  Maximising the size of the first stage VQ is important for low bit rate speech coding.
+\item \emph{sub} uses just a subset of the $K=20$ elements, for example ignoring the first few and last few elements.  This leads to a more efficient VQ at the expense of reduced speech quality as the LF and HF response is lost.  Informal listening tests were not encouraging, the subjective quality lost some intelligibility.
+\item \emph{split} uses two smaller single stage VQs e.g. $K_1=10$ and $K_2=10$ to quantise the $K=20$ elements.  The has lower performance, e.g. at $4 dB^2$ \emph{split} requires $2 \times 10 = 20$ bits compared to $12+3=15$ bits for \emph{k20}, as the correlation between high and low frequencies is lost.
+\item \emph{stf} is combined time and frequency VQ, where two vectors 20ms apart are combined and VQ-ed together, effectively quantisation a 40ms by $K=20$ time-frequency vector.  This attempts to gain VQ efficiencies due to correlations in time as well as frequency. To make the VQ size manageable it is split into two $K=10$ by 40ms vectors.  Results were disappointing, with no significant advantage compared to \emph{k20} at a 20ms update rate. However this experiment was performed before energy normalisation (see below) was implemented, so as further work it would be useful to repeat this experiment.
+\end{itemize}
 
-First busy plot
-
-Second plot showing candidates
-
-THey all remove mean first, not necc most efficient
-
-vanilla1 1 and two stage
-27 bit
-TF, another go
-prediction, another go
-split
-discuss candidates and why
-table evaluating
+For new modes, it was decided to proceed with a single stage 12 bit VQ, and 3 stage $3 \times 9 = 27$ bit VQ.  The performance of these VQs is shown in Figure \ref{fig:train_ratek1}.  The 12 bit VQ at a 30ms update rate is 400 bits/s, leaving 300 bits for the mean (energy) and pitch in a candidate 700 bits/s mode.  The 27 bit VQ using 9 bits/s stage has modest storage and search complexity, and requires 900 bits/s at a 30ms update rate. Combined with 300 bits for the mean (energy) and pitch this VQ is a candidate 1200 bits/s mode. Improvements in quantisation efficiency allow the use of a 30ms update rate which will improve intelligibility compared to existing Codec 2 modes at these rates that use a 40ms update rate.
 
 \begin{figure}[h]
-\caption{Vector Quantiser Distortion for }
+\caption{Vector Quantiser Distortion for a range of VQ designs}
 \label{fig:train_ratek}
 \begin{center}
 \input train_ratek.tex
@@ -705,7 +702,7 @@ table evaluating
 \end{figure}
 
 \begin{figure}[h]
-\caption{Vector Quantiser Distortion for 12 bit and 27 bit candidates}
+\caption{Vector Quantiser Distortion for 12 bit (700 bits/s mode) and 27 bit (1200 bits/s) candidates}
 \label{fig:train_ratek1}
 \begin{center}
 \input train_ratek1.tex
@@ -807,8 +804,11 @@ $\hat{\mathbf{b}}$ can then be recovered with:
 
 A unit test for this procedure is the function \path{test_energy_to_mean_conversion()} in the file \path{ newamp_700c.m}.
 
-\section{Hilbert Compression}
+\section{Miscellaneous Topics}
 
+Hilbert compression on syhthesies
+background noise
+pitch errors/need for tracker
 Plots of before and after, notes on benefits
 
 \section{Summary of Software}
