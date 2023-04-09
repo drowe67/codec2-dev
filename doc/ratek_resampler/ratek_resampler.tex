@@ -85,7 +85,7 @@ Substituting (\ref{eq:f_mel}) into the LHS:
 \begin{equation} \label{eq:warp}
 \begin{split}
 2595log_{10}(1+f/700) &= g(k-1) + mel(200) \\
-f = warp(k,K) &= mcan solve forel^{-1} ( g(k-1) + mel(200) ) \\
+f = warp(k,K) &= mel^{-1} ( g(k-1) + mel(200) ) \\
 \end{split}
 \end{equation}
 and the inverse warp function:
@@ -661,6 +661,7 @@ s(n) &= \sum_{m=1}^{L}A_m e^{j(\omega_0mn+\theta_m)} \\
 CPAPR is sensitive to the time domain magnitude envelope of the synthesised speech signal.
 
 \subsection{Post Filter Further Work}
+\label{section:postfilter_futher}
 
 We now have a better understanding of how frequency domain post filters such as those used in the \emph{newamp1} algorithm improve speech quality:
 \begin{enumerate}
@@ -806,10 +807,51 @@ A unit test for this procedure is the function \path{test_energy_to_mean_convers
 
 \section{Miscellaneous Topics}
 
-Hilbert compression on syhthesies
-background noise
-pitch errors/need for tracker
-Plots of before and after, notes on benefits
+\subsection{Background Noise and Clicks}
+\label{section:clicks}
+
+High level or background noise is handled poorly by Codec 2 at present.  The key issue is the \emph{phase0} phase model, which can produce perceptually annoying clicks (impulses) in the presence of random signals.  With random signals, the pitch estimator produces random pitch estimates.  Occasionally, the voicing estimator fails, and declares a noise like signal to be voiced.  The combination of low $F0$, voiced synthesis, and flat spectra synthesised speech with clicks (all time domain energy for the frame in concentrated in one impulse).
+
+An example of a spurious impulse can be seen in Figure \ref{fig:hilbert_clipper} around sample 4800 (most obvious in the bottom plot).  This is an unvoiced segment where one frame with a low $F0$ estimate has accidentally been declared voiced.
+
+The \path{postfilter.c} algorithm attempts to address this.  This algorithm estimates the background noise level.  When a harmonic is beneath the threshold it randomises the phase of the harmonic. It handles modest levels of background noise reasonably well.  However this algorithm relies on a level threshold, above the threshold it can't distinguish background noise from speech. It therefore breaks down when at higher noise levels, resulting in harsh sounding background noise with clicks.
+
+Possible solutions:
+\begin{itemize}
+\item Multiple voicing bits like MELP or MBE, so that the entire spectra is not declared voiced.
+\item A better phase synthesis model, as discussed in Section \ref{section:postfilter_futher}.  Codec 2 should never synthesise an impulse - they are not present in either voiced speech, unvoiced speech, or background noise signals.
+\item An algorithm to detect and suppress background noise signals, such that they are not transmitted to the decoder.
+\end{itemize}
+
+\subsection{Pitch Estimator Errors}
+
+Some time was spent tracking down errors in the synthesised speech, and several impulse noises were tracked down to pitch estimator errors. A similar breakdown to background noise sometimes occurs during transition of voiced speech segments when the pitch estimator returns an incorrect estimate.  The combination of a $F0$ and voiced speech decision causes a perceptually annoying time domain click. As these are high energy segments of speech, the error is particularly noticeable.
+
+A suitable solution would be a pitch tracker that considers 1-2 few frames forward or backwards in time.
+
+\subsection{Hilbert Compression on Synthesis}
+
+In SSB it is common to apply some compression to audio signals at the transmitter to maximise the RMS transmitted power and hence received SNR.  Some FM transmitters also apply clipping to input audio to similarly increase average deviation and maximise the RMS audio level output from the discriminator. 
+
+A Hilbert Compressor (HC) was added to the \path{synthesise()} function in \path{sine.c}.  Unlike SSB or FM, this implements compression at the \textbf{receiver}.  The decoder has gain applied (e.g. 10dB), then time domain Hilbert clipping to limit the amplitude excursions of the time domain synthesised signal. This has several effects:
+\begin{itemize}
+\item The RMS level of the speech signal is increased, so it sounds louder.  Many people equate "louder is better".
+\item Clipping distortion is minimised, as Hilbert Clipping (clipping the absolute value of the analytical version of the synthesised signal) reduces clipping distortion compared to a traditional clipper that operates on the real valued signal.
+\item It is a form of automatic gain control. Louder signals are limited in amplitude, so the ratio of softer to louder speech is reduced. This makes the Codec 2 voice link less fussy about mic gain settings.  A little extra "mic gain" will results in some relatively benign Hilbert Clipping.
+\item As the peak/RMS ratio is reduced, we use small speakers and audio amplifiers more efficiently.  The speech sounds louder for a given speaker/audio power amplifier.
+\item The energy quantiser also compresses the speech dynamic range, as the maximum level of the energy quantiser tends to "flat top" the speech waveform without undue distortion.  It could be argued this is a form of frequency domain/frame based Hilbert Clipping. How the energy limiting compliments the time domain HC is a topic for future work (e.g. only one may be required).
+\item It is still possible to overdrive the clipper, and care must be taken such that the intelligibility of the already low fidelity signal is not further reduced.  How best to use the HC is a useful topic for further work.  One idea is make the compressor gain adjustable by the end user at the Rx station.
+\end{itemize}
+
+The Hilbert Compressor may also be useful for existing Codec 2 modes.
+
+\begin{figure}[h]
+\caption{Effect of energy limiting and Hilbert Clipper when synthesising \emph{forig} sample. Top is the vanilla synthesised speech, in the middle the energy limiting during 4 bit energy quantisation and at bottom we have applied 10dB gain and Hilbert Clipping.  The bottom sample sounds much louder with no noticeable distortion. Also visible around sample 4800 is a spurious impulse (see Section \ref{section:clicks}).}
+\label{fig:hilbert_clipper}
+\begin{center}
+\input hilbert_clipper.tex
+\end{center}
+\end{figure}
 
 \section{Summary of Software}
 
