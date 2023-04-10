@@ -681,7 +681,7 @@ The question of where to apply the post filter (e.g. before or after quantisatio
 
 \section{Vector Quantiser Experiments}
 
-A range of VQ designs were explored, strongly influenced the excellent introduction on VQ for speech coding presented in \cite{makhoul1985vector}. Using the \emph{train.spc}, the  distortion of each VQ $E_q$ in $dB^2$ for a range of bits was plotted.  The Makefile \path{ratek_resampler.mk} was used to automate the process. Figure \ref{fig:train_ratek} presents a range of experiment VQ results:
+A range of VQ designs were explored, strongly influenced by the excellent introduction presented in \cite{makhoul1985vector}. Using \emph{train.spc}, the  distortion of each VQ $E_q$ in $dB^2$ for a range of bits was plotted.  The Makefile \path{ratek_resampler.mk} was used to automate the process. Figure \ref{fig:train_ratek} presents a range of experimental VQ results:
 \begin{itemize}
 \item All of the VQ designs are "mean removed"; we remove the mean of the vector and transmit this separately as side information.  This results in some loss of VQ efficiency but reduces storage and search complexity.  As further work it would be interesting to explore alternatives to this design choice, especially when combined with dynamic range compression.
 \item The $K=20$ \emph{scalar} line shows the performance of scalar quantiser at the same bit rate.  Scalar quantisers encode each VQ element independently and cannot take into account correlation between elements, making them generally less efficient. As the number of bits allocated to the VQ increases, correlation is removed and the slope starts to approach that of the scalar quantiser.
@@ -689,10 +689,10 @@ A range of VQ designs were explored, strongly influenced the excellent introduct
 \item \emph{lbg} is a two stage, 24 bit quantiser with $K=30$. \emph{k20} is similar but uses $K=20$, and shows very similar performance with reduced storage requirements.  The break in performance from stage1 to stage2 is clearly evident from the change in slope.  \cite{makhoul1985vector} suggests this break is due to the loss of correlation in the stage 1 residual.  Maximising the size of the first stage VQ is important for low bit rate speech coding.
 \item \emph{sub} uses just a subset of the $K=20$ elements, for example ignoring the first few and last few elements.  This leads to a more efficient VQ at the expense of reduced speech quality as the LF and HF response is lost.  Informal listening tests were not encouraging, the subjective quality lost some intelligibility.
 \item \emph{split} uses two smaller single stage VQs e.g. $K_1=10$ and $K_2=10$ to quantise the $K=20$ elements.  The has lower performance, e.g. at $4 dB^2$ \emph{split} requires $2 \times 10 = 20$ bits compared to $12+3=15$ bits for \emph{k20}, as the correlation between high and low frequencies is lost.
-\item \emph{stf} is combined time and frequency VQ, where two vectors 20ms apart are combined and VQ-ed together, effectively quantisation a 40ms by $K=20$ time-frequency vector.  This attempts to gain VQ efficiencies due to correlations in time as well as frequency. To make the VQ size manageable it is split into two $K=10$ by 40ms vectors.  Results were disappointing, with no significant advantage compared to \emph{k20} at a 20ms update rate. However this experiment was performed before energy normalisation (see below) was implemented, so as further work it would be useful to repeat this experiment.
+\item \emph{stf} is combined time and frequency VQ, where two vectors 20ms apart are combined and VQ-ed together, encoding a 40ms by $K=20$ time-frequency vector.  This attempts to gain VQ efficiencies due to correlations in time as well as frequency. To make the VQ size manageable it is split into two $K=10$ by 40ms vectors.  Results were disappointing, with no significant advantage compared to \emph{k20} at a 20ms update rate. However this experiment was performed before energy normalisation (see below) was implemented, so as further work it would be useful to repeat this experiment.
 \end{itemize}
 
-For new modes, it was decided to proceed with a single stage 12 bit VQ, and 3 stage $3 \times 9 = 27$ bit VQ.  The performance of these VQs is shown in Figure \ref{fig:train_ratek1}.  The 12 bit VQ at a 30ms update rate is 400 bits/s, leaving 300 bits for the mean (energy) and pitch in a candidate 700 bits/s mode.  The 27 bit VQ using 9 bits/s stage has modest storage and search complexity, and requires 900 bits/s at a 30ms update rate. Combined with 300 bits for the mean (energy) and pitch this VQ is a candidate 1200 bits/s mode. Improvements in quantisation efficiency allow the use of a 30ms update rate which will improve intelligibility compared to existing Codec 2 modes at these rates that use a 40ms update rate.
+For new modes, it was decided to proceed with a single stage 12 bit VQ, and 3 stage $3 \times 9 = 27$ bit VQ.  The performance of these VQs is shown in Figure \ref{fig:train_ratek1}.  A 12 bit VQ at a 30ms update rate requires 400 bits/s, leaving 300 bits for the mean (energy) and pitch in a candidate 700 bits/s mode.  The 27 bit VQ using 9 bits/s stage has modest storage and search complexity, and requires 900 bits/s at a 30ms update rate. Combined with 300 bits for the mean (energy) and pitch this VQ is a candidate for a 1200 bits/s mode. Improvements in quantisation efficiency allow the use of a 30ms update rate which will improve intelligibility compared to existing Codec 2 modes at these rates that use a 40ms update rate.
 
 \begin{figure}[h]
 \caption{Vector Quantiser Distortion for a range of VQ designs}
@@ -810,7 +810,7 @@ A unit test for this procedure is the function \path{test_energy_to_mean_convers
 \subsection{Background Noise and Clicks}
 \label{section:clicks}
 
-High level or background noise is handled poorly by Codec 2 at present.  The key issue is the \emph{phase0} phase model, which can produce perceptually annoying clicks (impulses) in the presence of random signals.  With random signals, the pitch estimator produces random pitch estimates.  Occasionally, the voicing estimator fails, and declares a noise like signal to be voiced.  The combination of low $F0$, voiced synthesis, and flat spectra synthesised speech with clicks (all time domain energy for the frame in concentrated in one impulse).
+High level background noise is handled poorly by Codec 2 at present.  The key issue is the \emph{phase0} phase model, which can produce perceptually annoying clicks (impulses) in the presence of random input signals.  With random signals, the pitch estimator produces random pitch estimates.  Occasionally, the voicing estimator fails, and declares a noise like signal to be voiced.  The combination of low $F0$, voiced synthesis, and flat spectra synthesises speech with clicks (all time domain energy for the frame concentrated in one impulse).
 
 An example of a spurious impulse can be seen in Figure \ref{fig:hilbert_clipper} around sample 4800 (most obvious in the bottom plot).  This is an unvoiced segment where one frame with a low $F0$ estimate has accidentally been declared voiced.
 
@@ -825,9 +825,9 @@ Possible solutions:
 
 \subsection{Pitch Estimator Errors}
 
-Some time was spent tracking down errors in the synthesised speech, and several impulse noises were tracked down to pitch estimator errors. A similar breakdown to background noise sometimes occurs during transition of voiced speech segments when the pitch estimator returns an incorrect estimate.  The combination of a $F0$ and voiced speech decision causes a perceptually annoying time domain click. As these are high energy segments of speech, the error is particularly noticeable.
+Some time was spent tracking down errors in the synthesised speech, and several impulse noises were tracked down to pitch estimator errors. A similar breakdown to background noise sometimes occurs during transition of voiced speech segments when the pitch estimator returns an incorrect estimate.  The combination of low $F0$ and voiced speech decision causes a perceptually annoying time domain click. As these are high energy segments of speech, the error is particularly noticeable.
 
-A suitable solution would be a pitch tracker that considers 1-2 few frames forward or backwards in time.
+A possible solution is a pitch tracker that considers 1-2 few frames forward or backwards in time.
 
 \subsection{Hilbert Compression on Synthesis}
 
@@ -835,7 +835,7 @@ In SSB it is common to apply some compression to audio signals at the transmitte
 
 A Hilbert Compressor (HC) was added to the \path{synthesise()} function in \path{sine.c}.  Unlike SSB or FM, this implements compression at the \textbf{receiver}.  The decoder has gain applied (e.g. 10dB), then time domain Hilbert clipping to limit the amplitude excursions of the time domain synthesised signal. This has several effects:
 \begin{itemize}
-\item The RMS level of the speech signal is increased, so it sounds louder.  Many people equate "louder is better".
+\item The RMS level of the speech signal is increased, so it sounds louder.  Many people consider "louder is better".
 \item Clipping distortion is minimised, as Hilbert Clipping (clipping the absolute value of the analytical version of the synthesised signal) reduces clipping distortion compared to a traditional clipper that operates on the real valued signal.
 \item It is a form of automatic gain control. Louder signals are limited in amplitude, so the ratio of softer to louder speech is reduced. This makes the Codec 2 voice link less fussy about mic gain settings.  A little extra "mic gain" will results in some relatively benign Hilbert Clipping.
 \item As the peak/RMS ratio is reduced, we use small speakers and audio amplifiers more efficiently.  The speech sounds louder for a given speaker/audio power amplifier.
