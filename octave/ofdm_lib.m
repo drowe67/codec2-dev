@@ -387,7 +387,7 @@ function config = ofdm_init_mode(mode="700D")
     config.state_machine = "data"; 
     config.amp_scale = 300E3; config.clip_gain1 = 2.2; config.clip_gain2 = 0.8;
   elseif strcmp(mode,"datac4")
-    Ns=5; config.Np=34; Tcp = 0.006; Ts = 0.016; Nc = 3; config.data_mode = "streaming";
+    Ns=5; config.Np=50; Tcp = 0.006; Ts = 0.016; Nc = 3; config.data_mode = "streaming";
     config.edge_pilots = 0;
     config.Ntxtbits = 0; config.Nuwbits = 48; config.bad_uw_errors = 14;
     config.ftwindow_width = 80; config.timing_mx_thresh = 0.3;
@@ -1735,8 +1735,8 @@ function [code_param Nbitspercodecframe Ncodecframespermodemframe] = codec_to_fr
     code_param = ldpc_init_user(H, modulation, mod_order, mapping);
   end
   if strcmp(mode, "datac4")
-    load H_256_768_22.txt
-    code_param = ldpc_init_user(H_256_768_22, modulation, mod_order, mapping);
+    framesize = 576*2; rate = 0.5;
+    code_param = ldpc_init_builtin("wimax", rate, framesize, modulation, mod_order, mapping);
   end
   if strcmp(mode, "datac0") || strcmp(mode, "datac1") || strcmp(mode, "datac3") || strcmp(mode, "datac4") || strcmp(mode, "qam16c1") || strcmp(mode, "qam16c2") || strcmp(mode, "datac5") 
     printf("ldpc_data_bits_per_frame = %d\n", code_param.ldpc_data_bits_per_frame);
