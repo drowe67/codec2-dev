@@ -54,7 +54,7 @@ function ofdm_ldpc_rx(filename, mode="700D", varargin)
   frx=fopen(filename,"rb"); rx = fread(frx, Inf, "short")/Ascale; fclose(frx);
   Nsam = length(rx);
   prx = 1;
-  if strcmp(mode,"datac4")
+  if strcmp(mode,"datac4") || strcmp(mode,"datac13")
     rx = filter(fir1(100,[1400 1600]/4000),1,rx);
   end
   

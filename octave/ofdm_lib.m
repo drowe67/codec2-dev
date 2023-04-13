@@ -387,7 +387,7 @@ function config = ofdm_init_mode(mode="700D")
     config.state_machine = "data"; 
     config.amp_scale = 300E3; config.clip_gain1 = 2.2; config.clip_gain2 = 0.8;
   elseif strcmp(mode,"datac4")
-    Ns=5; config.Np=50; Tcp = 0.006; Ts = 0.016; Nc = 3; config.data_mode = "streaming";
+    Ns=5; config.Np=34; Tcp = 0.006; Ts = 0.016; Nc = 3; config.data_mode = "streaming";
     config.edge_pilots = 0;
     config.Ntxtbits = 0; config.Nuwbits = 48; config.bad_uw_errors = 14;
     config.ftwindow_width = 80; config.timing_mx_thresh = 0.3;
@@ -396,7 +396,18 @@ function config = ofdm_init_mode(mode="700D")
     config.tx_uw(end-24+1:end) = [1 1 0 0  1 0 1 0  1 1 1 1  0 0 0 0  1 1 1 1  0 0 0 0];
     config.amp_est_mode = 1; config.EsNodB = 3;
     config.state_machine = "data"; 
-    config.amp_scale = 300E3; config.clip_gain1 = 2.2; config.clip_gain2 = 0.8;
+    config.amp_scale = 300*2.3E3; config.clip_gain1 = 1.5; config.clip_gain2 = 0.8;
+  elseif strcmp(mode,"datac13")
+    Ns=5; config.Np=12; Tcp = 0.006; Ts = 0.016; Nc = 3; config.data_mode = "streaming";
+    config.edge_pilots = 0;
+    config.Ntxtbits = 0; config.Nuwbits = 32; config.bad_uw_errors = 8;
+    config.ftwindow_width = 80; config.timing_mx_thresh = 0.3;
+    config.tx_uw = zeros(1,config.Nuwbits);
+    config.tx_uw(1:24) = [1 1 0 0  1 0 1 0  1 1 1 1  0 0 0 0  1 1 1 1  0 0 0 0];
+    config.tx_uw(end-24+1:end) = [1 1 0 0  1 0 1 0  1 1 1 1  0 0 0 0  1 1 1 1  0 0 0 0];
+    config.amp_est_mode = 1; config.EsNodB = 3;
+    config.state_machine = "data"; 
+    config.amp_scale = 300*2.3E3; config.clip_gain1 = 1.5; config.clip_gain2 = 0.8;
   elseif strcmp(mode,"1")
     Ns=5; config.Np=10; Tcp=0; Tframe = 0.1; Ts = Tframe/Ns; Nc = 1;
   else
@@ -1722,7 +1733,7 @@ function [code_param Nbitspercodecframe Ncodecframespermodemframe] = codec_to_fr
       framesize = 16200; rate = 0.6;
       code_param = ldpc_init_builtin("dvbs2", rate, framesize, modulation='QPSK', mod_order=4, mapping="");
   end
-  if strcmp(mode, "datac0")
+  if strcmp(mode, "datac0") || strcmp(mode, "datac13")
     load H_128_256_5.mat
     code_param = ldpc_init_user(H, modulation, mod_order, mapping);
   end
@@ -1735,10 +1746,10 @@ function [code_param Nbitspercodecframe Ncodecframespermodemframe] = codec_to_fr
     code_param = ldpc_init_user(H, modulation, mod_order, mapping);
   end
   if strcmp(mode, "datac4")
-    framesize = 576*2; rate = 0.5;
-    code_param = ldpc_init_builtin("wimax", rate, framesize, modulation, mod_order, mapping);
+    load H_256_768_22.txt
+    code_param = ldpc_init_user(H_256_768_22, modulation, mod_order, mapping);
   end
-  if strcmp(mode, "datac0") || strcmp(mode, "datac1") || strcmp(mode, "datac3") || strcmp(mode, "datac4") || strcmp(mode, "qam16c1") || strcmp(mode, "qam16c2") || strcmp(mode, "datac5") 
+  if strcmp(mode, "datac0") || strcmp(mode, "datac1") || strcmp(mode, "datac3") || strcmp(mode, "datac4") || strcmp(mode, "qam16c1") || strcmp(mode, "qam16c2") || strcmp(mode, "datac5") || strcmp(mode, "datac13")
     printf("ldpc_data_bits_per_frame = %d\n", code_param.ldpc_data_bits_per_frame);
     printf("ldpc_coded_bits_per_frame  = %d\n", code_param.ldpc_coded_bits_per_frame);
     printf("ldpc_parity_bits_per_frame  = %d\n", code_param.ldpc_parity_bits_per_frame);
