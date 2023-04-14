@@ -99,18 +99,23 @@ function states = ofdm_init(config)
   % encoded bits.
 
   states.uw_ind = states.uw_ind_sym = [];
-  uw_step = Nc+1;                                % default step for UW sym placement
 
   % lets see if all UW syms will fit in frame
   Nuwsyms = states.Nuwbits/bps;
   Ndatasymsperframe = (Ns-1)*Nc;
+  states.spread_uw = 0;
+  if states.spread_uw
+    uw_step = 1.8*floor(states.Nbitsperpacket/states.Nuwbits);
+  else
+    uw_step = Nc+1;                                % default step for UW sym placement
+  end  
   last_sym = floor(Nuwsyms*uw_step/bps+1);
   if last_sym > states.Np*Ndatasymsperframe
     uw_step = Nc-1;                                 % try a different step
   end
   last_sym = floor(Nuwsyms*uw_step/bps+1);
   assert(last_sym <= states.Np*Ndatasymsperframe);  % we still can't fit them all
-
+  
   % Place UW symbols in frame
   for i=1:Nuwsyms
     ind_sym = floor(i*uw_step/bps+1);
@@ -401,7 +406,7 @@ function config = ofdm_init_mode(mode="700D")
     Ns=5; config.Np=12; Tcp = 0.006; Ts = 0.016; Nc = 3; config.data_mode = "streaming";
     config.edge_pilots = 0;
     config.Ntxtbits = 0; config.Nuwbits = 32; config.bad_uw_errors = 12;
-    config.ftwindow_width = 80; config.timing_mx_thresh = 0.3;
+    config.ftwindow_width = 80; config.timing_mx_thresh = 0.25;
     config.tx_uw = zeros(1,config.Nuwbits);
     config.tx_uw(1:24) = [1 1 0 0  1 0 1 0  1 1 1 1  0 0 0 0  1 1 1 1  0 0 0 0];
     config.tx_uw(end-24+1:end) = [1 1 0 0  1 0 1 0  1 1 1 1  0 0 0 0  1 1 1 1  0 0 0 0];
