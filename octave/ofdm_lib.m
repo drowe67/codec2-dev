@@ -400,7 +400,7 @@ function config = ofdm_init_mode(mode="700D")
   elseif strcmp(mode,"datac13")
     Ns=5; config.Np=12; Tcp = 0.006; Ts = 0.016; Nc = 3; config.data_mode = "streaming";
     config.edge_pilots = 0;
-    config.Ntxtbits = 0; config.Nuwbits = 32; config.bad_uw_errors = 8;
+    config.Ntxtbits = 0; config.Nuwbits = 32; config.bad_uw_errors = 12;
     config.ftwindow_width = 80; config.timing_mx_thresh = 0.3;
     config.tx_uw = zeros(1,config.Nuwbits);
     config.tx_uw(1:24) = [1 1 0 0  1 0 1 0  1 1 1 1  0 0 0 0  1 1 1 1  0 0 0 0];
@@ -437,7 +437,15 @@ function print_config(states)
     for r=1:Ns
       for c=cr
         if r == 1
-          sym="P";
+          if (c==1) && states.edge_pilots
+            sym="P";
+          elseif (c==Nc+1) && states.edge_pilots
+            sym="P";
+          elseif c>1 && c <=(Nc+1)
+            sym="P";
+          else
+            sym=" ";
+          end
         elseif c>1 && c <=(Nc+1)
           sym=".";
           if (u <= Nuwsyms) && (s == uw_ind_sym(u)) sym="U"; u++; end
