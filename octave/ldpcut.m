@@ -39,6 +39,7 @@ function sim_out = run_simulation(sim_in)
     code_param = ldpc_init_builtin(sim_in.code, rate, framesize, modulation, mod_order, mapping);
     rate = code_param.ldpc_data_bits_per_frame/code_param.ldpc_coded_bits_per_frame;
   else
+    % deal with H stored in different file formats
     tempStruct = load(sim_in.code);
     b = fieldnames(tempStruct);
     ldpcArrayName = b{1,1};
