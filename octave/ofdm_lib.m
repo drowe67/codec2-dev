@@ -392,10 +392,10 @@ function config = ofdm_init_mode(mode="700D")
     config.state_machine = "data"; 
     config.amp_scale = 300E3; config.clip_gain1 = 2.2; config.clip_gain2 = 0.8;
   elseif strcmp(mode,"datac4")
-    Ns=5; config.Np=63; Tcp = 0.006; Ts = 0.016; Nc = 3; config.data_mode = "streaming";
+    Ns=5; config.Np=47; Tcp = 0.006; Ts = 0.016; Nc = 4; config.data_mode = "streaming";
     config.edge_pilots = 0;
-    config.Ntxtbits = 0; config.Nuwbits = 40; config.bad_uw_errors = 15;
-    config.ftwindow_width = 80; config.timing_mx_thresh = 0.30;
+    config.Ntxtbits = 0; config.Nuwbits = 32; config.bad_uw_errors = 12;
+    config.ftwindow_width = 80; config.timing_mx_thresh = 0.25;
     config.tx_uw = zeros(1,config.Nuwbits);
     config.tx_uw(1:24) = [1 1 0 0  1 0 1 0  1 1 1 1  0 0 0 0  1 1 1 1  0 0 0 0];
     config.tx_uw(end-24+1:end) = [1 1 0 0  1 0 1 0  1 1 1 1  0 0 0 0  1 1 1 1  0 0 0 0];
