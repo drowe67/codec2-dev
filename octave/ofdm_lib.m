@@ -138,7 +138,10 @@ function states = ofdm_init(config)
     if bps == 4 tx_uw_syms = [tx_uw_syms qam16_mod(states.qam16, states.tx_uw(b:b+bps-1))]; end
   end
   states.tx_uw_syms = tx_uw_syms;
-  % if the UW has this many errors it is "bad", the binomal cdf can be used to set this:
+  
+  % if the UW has this many errors it is "bad", the binomal cdf can be used to
+  % set this with the ofdm_determine_bad_uw_errors() function below
+  %
   %   Nuw=12; plot(0:Nuw, binocdf(0:Nuw,Nuw,0.05)); hold on; plot(binocdf(0:Nuw,Nuw,0.5)); hold off;
   states.bad_uw_errors = bad_uw_errors;
 
@@ -1909,8 +1912,32 @@ function bpf_coeff = make_ofdm_bpf(write_c_header_file)
 
 endfunction
 
+% Helper function to help design UW error thresholds, in particular for raw
+% data modes.  See also https://www.rowetel.com/wordpress/?p=7467
+function ofdm_determine_bad_uw_errors(Nuw)
+   figure(1); clf;
+   
+   % Ideally the 10% and 50% BER cruves are a long way apart
+   
+   plot(0:Nuw, binocdf(0:Nuw,Nuw,0.1),';BER=0.1;'); hold on; 
+   plot(binocdf(0:Nuw,Nuw,0.5),';BER=0.5;'); 
+   
+   % Suggested threshold for raw data modes is the 5% probability
+   % level for the 50% BER curve.  The pre/post-amble has a low chance
+   % of failure.  If it does make an error, then we will have random
+   % bits presented as the UW (50% BER in UW). This threshold means
+   % there is only a 5% case of random bits being accepted as a valid UW
+ 
+   bad_uw_errors = max(find(binocdf(0:Nuw,Nuw,0.5) <= 0.05))+1; 
+   plot([bad_uw_errors bad_uw_errors],[0 1],';bad uw errors;'); hold off; grid
+   
+   xlabel('bits');
+   printf("for Nuw = %d, suggest bad_uw_errors = %d\n", Nuw, bad_uw_errors);
+end
 
-% returns level threshold such that threshold_cdf of the tx magnitudes are beneath that level
+% Returns level threshold such that threshold_cdf of the tx magnitudes are 
+% beneath that level.  Helper function that can be used to design 
+% the clipper level.  See also https://www.rowetel.com/?p=7596
 function threshold_level = ofdm_determine_clip_threshold(tx, threshold_cdf)
   Nsteps = 25;
   mx = max(abs(tx));
