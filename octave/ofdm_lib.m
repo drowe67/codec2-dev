@@ -392,10 +392,10 @@ function config = ofdm_init_mode(mode="700D")
     config.state_machine = "data"; 
     config.amp_scale = 300E3; config.clip_gain1 = 2.2; config.clip_gain2 = 0.8;
   elseif strcmp(mode,"datac4")
-    Ns=5; config.Np=34; Tcp = 0.006; Ts = 0.016; Nc = 3; config.data_mode = "streaming";
+    Ns=5; config.Np=63; Tcp = 0.006; Ts = 0.016; Nc = 3; config.data_mode = "streaming";
     config.edge_pilots = 0;
-    config.Ntxtbits = 0; config.Nuwbits = 48; config.bad_uw_errors = 18;
-    config.ftwindow_width = 80; config.timing_mx_thresh = 0.25;
+    config.Ntxtbits = 0; config.Nuwbits = 40; config.bad_uw_errors = 15;
+    config.ftwindow_width = 80; config.timing_mx_thresh = 0.30;
     config.tx_uw = zeros(1,config.Nuwbits);
     config.tx_uw(1:24) = [1 1 0 0  1 0 1 0  1 1 1 1  0 0 0 0  1 1 1 1  0 0 0 0];
     config.tx_uw(end-24+1:end) = [1 1 0 0  1 0 1 0  1 1 1 1  0 0 0 0  1 1 1 1  0 0 0 0];
@@ -1759,8 +1759,11 @@ function [code_param Nbitspercodecframe Ncodecframespermodemframe] = codec_to_fr
     code_param = ldpc_init_user(H, modulation, mod_order, mapping);
   end
   if strcmp(mode, "datac4")
-    load H_256_768_22.txt
-    code_param = ldpc_init_user(H_256_768_22, modulation, mod_order, mapping);
+    load H_1024_2048_4f
+    code_param = ldpc_init_user(H, modulation, mod_order, mapping);
+    code_param.data_bits_per_frame = 448;
+    code_param.coded_bits_per_frame = code_param.data_bits_per_frame + code_param.ldpc_parity_bits_per_frame;
+    code_param.coded_syms_per_frame = code_param.coded_bits_per_frame/code_param.bits_per_symbol;
   end
   if strcmp(mode, "datac13")
     load H_256_512_4.mat
