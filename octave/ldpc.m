@@ -109,18 +109,28 @@ function [codeword s] = ldpc_enc(data, code_param)
 endfunction
 
 
-function [detected_data paritychecks] = ldpc_dec(code_param, max_iterations, demod_type, decoder_type, r, EsNo, fading)
+function [detected_data paritychecks] = ldpc_dec(code_param, max_iterations, ...
+                                                 demod_type, decoder_type, r, ...
+                                                 EsNo, fading)
+    % handle case where we don't use all data bits
+    Nunused = code_param.ldpc_data_bits_per_frame - code_param.data_bits_per_frame;
+
     symbol_likelihood = Demod2D( r, code_param.S_matrix, EsNo, fading);
     
     % initialize the extrinsic decoder input
 
-    input_somap_c = zeros(1, code_param.ldpc_coded_bits_per_frame );
+    input_somap_c = zeros(1, code_param.ldpc_coded_bits_per_frame - Nunused);
     bit_likelihood = Somap( symbol_likelihood, demod_type, input_somap_c );
     
-    input_decoder_c = bit_likelihood(1:code_param.ldpc_coded_bits_per_frame);
+    input_decoder_c = bit_likelihood(1:(code_param.ldpc_coded_bits_per_frame-Nunused));
+    
+    % handle case where we don't use all data bits
+    input_decoder_c = [input_decoder_c(1:code_param.data_bits_per_frame) ...
+                       -100*ones(1,Nunused) ...
+                       input_decoder_c(code_param.data_bits_per_frame+1:end)];
     
     [x_hat paritychecks] = MpDecode( -input_decoder_c, code_param.H_rows, code_param.H_cols, ...
-                              max_iterations, decoder_type, 1, 1);
+                                      max_iterations, decoder_type, 1, 1);
     [mx mx_ind] = max(paritychecks);
     detected_data = x_hat(mx_ind,:);    
 endfunction

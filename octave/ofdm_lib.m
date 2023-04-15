@@ -394,18 +394,18 @@ function config = ofdm_init_mode(mode="700D")
   elseif strcmp(mode,"datac4")
     Ns=5; config.Np=34; Tcp = 0.006; Ts = 0.016; Nc = 3; config.data_mode = "streaming";
     config.edge_pilots = 0;
-    config.Ntxtbits = 0; config.Nuwbits = 48; config.bad_uw_errors = 14;
-    config.ftwindow_width = 80; config.timing_mx_thresh = 0.3;
+    config.Ntxtbits = 0; config.Nuwbits = 48; config.bad_uw_errors = 18;
+    config.ftwindow_width = 80; config.timing_mx_thresh = 0.25;
     config.tx_uw = zeros(1,config.Nuwbits);
     config.tx_uw(1:24) = [1 1 0 0  1 0 1 0  1 1 1 1  0 0 0 0  1 1 1 1  0 0 0 0];
     config.tx_uw(end-24+1:end) = [1 1 0 0  1 0 1 0  1 1 1 1  0 0 0 0  1 1 1 1  0 0 0 0];
     config.amp_est_mode = 1; config.EsNodB = 3;
-    config.state_machine = "data"; 
+    config.state_machine = "data";
     config.amp_scale = 300*2.3E3; config.clip_gain1 = 1.5; config.clip_gain2 = 0.8;
   elseif strcmp(mode,"datac13")
-    Ns=5; config.Np=12; Tcp = 0.006; Ts = 0.016; Nc = 3; config.data_mode = "streaming";
+    Ns=5; config.Np=18; Tcp = 0.006; Ts = 0.016; Nc = 3; config.data_mode = "streaming";
     config.edge_pilots = 0;
-    config.Ntxtbits = 0; config.Nuwbits = 32; config.bad_uw_errors = 12;
+    config.Ntxtbits = 0; config.Nuwbits = 48; config.bad_uw_errors = 18;
     config.ftwindow_width = 80; config.timing_mx_thresh = 0.25;
     config.tx_uw = zeros(1,config.Nuwbits);
     config.tx_uw(1:24) = [1 1 0 0  1 0 1 0  1 1 1 1  0 0 0 0  1 1 1 1  0 0 0 0];
@@ -1762,7 +1762,16 @@ function [code_param Nbitspercodecframe Ncodecframespermodemframe] = codec_to_fr
     load H_256_768_22.txt
     code_param = ldpc_init_user(H_256_768_22, modulation, mod_order, mapping);
   end
-  if strcmp(mode, "datac0") || strcmp(mode, "datac1") || strcmp(mode, "datac3") || strcmp(mode, "datac4") || strcmp(mode, "qam16c1") || strcmp(mode, "qam16c2") || strcmp(mode, "datac5") || strcmp(mode, "datac13")
+  if strcmp(mode, "datac13")
+    load H_256_512_4.mat
+    code_param = ldpc_init_user(H, modulation, mod_order, mapping);
+    code_param.data_bits_per_frame = 128;
+    code_param.coded_bits_per_frame = code_param.data_bits_per_frame + code_param.ldpc_parity_bits_per_frame;
+    code_param.coded_syms_per_frame = code_param.coded_bits_per_frame/code_param.bits_per_symbol;
+  end
+  if strcmp(mode, "datac0") || strcmp(mode, "datac1") || strcmp(mode, "datac3") ...
+     || strcmp(mode, "datac4") || strcmp(mode, "qam16c1") ...
+     || strcmp(mode, "qam16c2") || strcmp(mode, "datac5") || strcmp(mode, "datac13")
     printf("ldpc_data_bits_per_frame = %d\n", code_param.ldpc_data_bits_per_frame);
     printf("ldpc_coded_bits_per_frame  = %d\n", code_param.ldpc_coded_bits_per_frame);
     printf("ldpc_parity_bits_per_frame  = %d\n", code_param.ldpc_parity_bits_per_frame);
@@ -1777,13 +1786,13 @@ endfunction
 
 
 % ------------------------------------------------------------------------------
-% fec_encode - Handle FEC encoding
+% Handle FEC encoding/decoding
 % ------------------------------------------------------------------------------
 
 function [frame_bits bits_per_frame] = fec_encode(states, code_param, mode, payload_bits, ...
                                                       Ncodecframespermodemframe, Nbitspercodecframe)
   ofdm_load_const;
-  if strcmp(mode, "2020")
+  if code_param.data_bits_per_frame != code_param.ldpc_data_bits_per_frame
     Nunused = code_param.ldpc_data_bits_per_frame - code_param.data_bits_per_frame;
     frame_bits = LdpcEncode([payload_bits zeros(1,Nunused)], code_param.H_rows, code_param.P_matrix);
     % remove unused data bits
@@ -1793,6 +1802,16 @@ function [frame_bits bits_per_frame] = fec_encode(states, code_param, mode, payl
   end
   bits_per_frame = length(frame_bits);
 
+endfunction
+
+function [rx_bits paritychecks] = fec_decode(states, code_param, ...
+                                              payload_syms_de, payload_amps_de, ...
+                                              mean_amp, EsNo)
+  ofdm_load_const;
+  [rx_codeword paritychecks] = ldpc_dec(code_param, mx_iter=100, demod=0, dec=0, ...
+                                        payload_syms_de/mean_amp, EsNo, 
+                                        payload_amps_de/mean_amp);
+  rx_bits = rx_codeword(1:code_param.data_bits_per_frame);
 endfunction
 
 

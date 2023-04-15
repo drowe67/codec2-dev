@@ -154,9 +154,8 @@ function ofdm_ldpc_rx(filename, mode="700D", varargin)
 
         % TODO 2020 support for padding with known data bits
 
-        [rx_codeword paritychecks] = ldpc_dec(code_param, mx_iter=100, demod=0, dec=0, ...
-                                              payload_syms_de/mean_amp, EsNo, payload_amps_de/mean_amp);
-        rx_bits = rx_codeword(1:code_param.data_bits_per_frame);
+        [rx_bits paritychecks] = fec_decode(states, code_param, payload_syms_de,...
+                                            payload_amps_de, mean_amp, EsNo);
         errors = xor(payload_bits, rx_bits);
         Nerrs_coded  = sum(errors);
 
