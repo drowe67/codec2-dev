@@ -48,6 +48,18 @@ function sim_out = run_simulation(sim_in)
     [code_param framesize rate] = ldpc_init_user(HRA, modulation, mod_order, mapping);
   end
 
+  % optional zero stuffing 
+  if isfield(sim_in, "data_bits_per_frame")
+    code_param.data_bits_per_frame = sim_in.data_bits_per_frame;
+    code_param.coded_bits_per_frame = code_param.data_bits_per_frame + code_param.ldpc_parity_bits_per_frame;
+    code_param.coded_syms_per_frame = code_param.coded_bits_per_frame/code_param.bits_per_symbol;
+    rate = code_param.data_bits_per_frame/code_param.coded_bits_per_frame;
+    printf("data_bits_per_frame = %d\n", code_param.data_bits_per_frame);
+    printf("coded_bits_per_frame = %d\n", code_param.coded_bits_per_frame);
+    printf("coded_syms_per_frame = %d\n", code_param.coded_syms_per_frame);
+    printf("rate: %f\n",rate);
+  end
+
   % ----------------------------------
   % run simulation at each Eb/No point
   % ----------------------------------
@@ -149,7 +161,7 @@ endfunction
 % 1/ Simplest possible one frame simulation
 % ---------------------------------------------------------------------------------
 
-function test1_single(code="wimax")
+function test1_single(code="wimax", data_bits_per_frame)
   printf("\nTest 1:Single -----------------------------------\n");
 
   mod_order = 4;
@@ -163,16 +175,25 @@ function test1_single(code="wimax")
   if strcmp(code,'wimax') framesize = 576*2; rate = 0.5; end
   if strcmp(code,'dvbs2') framesize = 16200; rate = 0.6; end
   code_param = ldpc_init_builtin(code, rate, framesize, modulation, mod_order, mapping);
-
+    
+  % optional zero stuffing 
+  if nargin == 2
+    code_param.data_bits_per_frame = data_bits_per_frame;
+    code_param.coded_bits_per_frame = code_param.data_bits_per_frame + code_param.ldpc_parity_bits_per_frame;
+    code_param.coded_syms_per_frame = code_param.coded_bits_per_frame/code_param.bits_per_symbol;
+    framesize = code_param.coded_bits_per_frame;
+  end
+  
   % find out what rate we actually obtained ...
-  rate = code_param.ldpc_data_bits_per_frame/code_param.ldpc_coded_bits_per_frame;
+  rate = code_param.data_bits_per_frame/code_param.coded_bits_per_frame;
   printf("Ndata_bits: %d Nparity_bits: %d Ncodeword_bits: %d rate: %3.2f\n",
-         code_param.ldpc_data_bits_per_frame, code_param.ldpc_parity_bits_per_frame, code_param.ldpc_coded_bits_per_frame, rate);
+         code_param.data_bits_per_frame, code_param.ldpc_parity_bits_per_frame, 
+         code_param.coded_bits_per_frame, rate);
 
   % decoder needs an estimated channel EsNo (linear ratio, not dB)
   EsNo = 10;
 
-  tx_bits = round(rand(1, code_param.ldpc_data_bits_per_frame));
+  tx_bits = round(rand(1, code_param.data_bits_per_frame));
   [tx_codeword, qpsk_symbols] = ldpc_enc(tx_bits, code_param);
   rx_codeword = ldpc_dec(code_param, max_iterations, demod_type, decoder_type, qpsk_symbols, EsNo, ones(1,length(qpsk_symbols)));
 
@@ -186,7 +207,7 @@ endfunction
 % 2/ Run a bunch of trials at just one EsNo point
 % ---------------------------------------------------------------------------------
 
-function test2_multiple(code, Ntrials=100)
+function test2_multiple(code, Ntrials=100, data_bits_per_frame)
   printf("\nTest 2: Multiple: %s ----------------------------\n", code);
 
   % these are inputs for Wimax mode, e.g. framesize defines code used
@@ -195,6 +216,9 @@ function test2_multiple(code, Ntrials=100)
   sim_in.verbose = 2;
   sim_in.Ntrials = Ntrials;
   sim_in.EbNodBvec = 3;
+  if nargin == 3
+    sim_in.data_bits_per_frame = data_bits_per_frame;
+  end
   run_simulation(sim_in);
 end
 
@@ -241,11 +265,17 @@ format;
 
 init_cml();
 
-if getenv("SHORT_VERSION_FOR_CTEST")
+% Ctest kicks off these tests using env variables
+if getenv("CTEST_SINGLE")
   test1_single
   return;
 end
+if getenv("CTEST_ZERO_STUFFING")
+  test2_multiple("wimax",10,576);
+  return;
+end
 
+% Uncomment and try some of these tests if you like ....
 %test3_curves("H_1024_2048_4f.mat",1)
 %test1_single("dvbs2")
 %test3_curves("dvbs2",1,10)

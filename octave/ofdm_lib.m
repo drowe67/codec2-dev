@@ -432,7 +432,7 @@ end
 
 
 %------------------------------------------------------------------------------
-% print_config - utility function to use ascsii-art to describe the modem frame
+% print_config - utility function to use ascii-art to describe the modem frame
 %------------------------------------------------------------------------------
 
 function print_config(states)
@@ -1795,13 +1795,13 @@ endfunction
 % Handle FEC encoding/decoding
 % ------------------------------------------------------------------------------
 
-function [frame_bits bits_per_frame] = fec_encode(states, code_param, mode, payload_bits, ...
-                                                      Ncodecframespermodemframe, Nbitspercodecframe)
+function [frame_bits bits_per_frame] = fec_encode(states, code_param, mode, payload_bits)
   ofdm_load_const;
   if code_param.data_bits_per_frame != code_param.ldpc_data_bits_per_frame
+    % optionally lower the code rate by "zero stuffing" - setting Nunused data bits to 0
     Nunused = code_param.ldpc_data_bits_per_frame - code_param.data_bits_per_frame;
     frame_bits = LdpcEncode([payload_bits zeros(1,Nunused)], code_param.H_rows, code_param.P_matrix);
-    % remove unused data bits
+    % remove unused data bits from codeword, as they are known to the receiver and don't need to be transmitted
     frame_bits = [ frame_bits(1:code_param.data_bits_per_frame) frame_bits(code_param.ldpc_data_bits_per_frame+1:end) ];
   else
     frame_bits = LdpcEncode(payload_bits, code_param.H_rows, code_param.P_matrix);
@@ -1811,9 +1811,10 @@ function [frame_bits bits_per_frame] = fec_encode(states, code_param, mode, payl
 endfunction
 
 function [rx_bits paritychecks] = fec_decode(states, code_param, ...
-                                              payload_syms_de, payload_amps_de, ...
-                                              mean_amp, EsNo)
+                                             payload_syms_de, payload_amps_de, ...
+                                             mean_amp, EsNo)
   ofdm_load_const;
+  % note ldpc_dec() handles optional lower code rate zero-stuffing
   [rx_codeword paritychecks] = ldpc_dec(code_param, mx_iter=100, demod=0, dec=0, ...
                                         payload_syms_de/mean_amp, EsNo, 
                                         payload_amps_de/mean_amp);
@@ -1917,7 +1918,7 @@ endfunction
 function ofdm_determine_bad_uw_errors(Nuw)
    figure(1); clf;
    
-   % Ideally the 10% and 50% BER cruves are a long way apart
+   % Ideally the 10% and 50% BER curves are a long way apart
    
    plot(0:Nuw, binocdf(0:Nuw,Nuw,0.1),';BER=0.1;'); hold on; 
    plot(binocdf(0:Nuw,Nuw,0.5),';BER=0.5;'); 
