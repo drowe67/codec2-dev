@@ -359,9 +359,9 @@ endif()
              COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/octave; CTEST_SINGLE=1 octave-cli -qf ldpcut.m")
              set_tests_properties(test_CML_ldpcut PROPERTIES PASS_REGULAR_EXPRESSION "Nerr: 0")
 
-    add_test(NAME test_CML_ldpcut_zero_stuffing
-             COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/octave; CTEST_ZERO_STUFFING=1 octave-cli -qf ldpcut.m")
-             set_tests_properties(test_CML_ldpcut_zero_stuffing PROPERTIES PASS_REGULAR_EXPRESSION "Ferrs: 0")
+    add_test(NAME test_CML_ldpcut_one_stuffing
+             COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/octave; CTEST_ONE_STUFFING=1 octave-cli -qf ldpcut.m")
+             set_tests_properties(test_CML_ldpcut_one_stuffing PROPERTIES PASS_REGULAR_EXPRESSION "Ferrs: 0")
 
     # Golay (23,11) unit tests
     add_test(NAME test_golay23 COMMAND sh -c "${CMAKE_CURRENT_BINARY_DIR}/unittest/golay23")
@@ -1328,7 +1328,7 @@ endif(NOT APPLE)
     # Set common properties for tests that need Octave/CML
     set_tests_properties(
         test_CML_ldpcut
-        test_CML_ldpcut_zero_stuffing
+        test_CML_ldpcut_one_stuffing
         test_OFDM_modem_octave_port
         test_OFDM_modem_octave_port_Nc_31
         test_OFDM_modem_octave_datac0_mpp_coded

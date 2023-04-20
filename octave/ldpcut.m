@@ -48,7 +48,7 @@ function sim_out = run_simulation(sim_in)
     [code_param framesize rate] = ldpc_init_user(HRA, modulation, mod_order, mapping);
   end
 
-  % optional zero stuffing 
+  % optional 1's stuffing 
   if isfield(sim_in, "data_bits_per_frame")
     code_param.data_bits_per_frame = sim_in.data_bits_per_frame;
     code_param.coded_bits_per_frame = code_param.data_bits_per_frame + code_param.ldpc_parity_bits_per_frame;
@@ -176,7 +176,7 @@ function test1_single(code="wimax", data_bits_per_frame)
   if strcmp(code,'dvbs2') framesize = 16200; rate = 0.6; end
   code_param = ldpc_init_builtin(code, rate, framesize, modulation, mod_order, mapping);
     
-  % optional zero stuffing 
+  % optional 1's stuffing 
   if nargin == 2
     code_param.data_bits_per_frame = data_bits_per_frame;
     code_param.coded_bits_per_frame = code_param.data_bits_per_frame + code_param.ldpc_parity_bits_per_frame;
@@ -270,7 +270,7 @@ if getenv("CTEST_SINGLE")
   test1_single
   return;
 end
-if getenv("CTEST_ZERO_STUFFING")
+if getenv("CTEST_ONE_STUFFING")
   test2_multiple("wimax",10,576);
   return;
 end

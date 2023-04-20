@@ -96,7 +96,7 @@ function [code_param framesize rate] = ldpc_init_user(HRA, modulation, mod_order
     code_param.ldpc_parity_bits_per_frame = framesize - code_param.ldpc_data_bits_per_frame;
     code_param.ldpc_coded_bits_per_frame = framesize;
 
-    % these variables support zero stuffing (not using all data bits to lower code rate)
+    % these variables support 1's stuffing (not using all data bits to lower code rate)
     code_param.data_bits_per_frame  = code_param.ldpc_data_bits_per_frame;
     code_param.coded_bits_per_frame = code_param.ldpc_coded_bits_per_frame;
     code_param.coded_syms_per_frame = code_param.coded_bits_per_frame/code_param.bits_per_symbol;
@@ -105,9 +105,9 @@ endfunction
 
 function [codeword s] = ldpc_enc(data, code_param)
   if code_param.data_bits_per_frame != code_param.ldpc_data_bits_per_frame
-    % optionally lower the code rate by "zero stuffing" - setting Nunused data bits to 0
+    % optionally lower the code rate by "1's stuffing" - setting Nunused data bits to 1
     Nunused = code_param.ldpc_data_bits_per_frame - code_param.data_bits_per_frame;
-    codeword = LdpcEncode([data zeros(1,Nunused)], code_param.H_rows, code_param.P_matrix);
+    codeword = LdpcEncode([data ones(1,Nunused)], code_param.H_rows, code_param.P_matrix);
     % remove unused data bits from codeword, as they are known to the receiver and don't need to be transmitted
     codeword = [ codeword(1:code_param.data_bits_per_frame) codeword(code_param.ldpc_data_bits_per_frame+1:end) ];
   else
@@ -120,7 +120,7 @@ endfunction
 function [detected_data paritychecks] = ldpc_dec(code_param, max_iterations, ...
                                                  demod_type, decoder_type, r, ...
                                                  EsNo, fading)
-    % handle "zero stuffing" case where we don't use all data bits
+    % handle "1's stuffing" case where we don't use all data bits
     Nunused = code_param.ldpc_data_bits_per_frame - code_param.data_bits_per_frame;
 
     symbol_likelihood = Demod2D( r, code_param.S_matrix, EsNo, fading);
@@ -132,9 +132,9 @@ function [detected_data paritychecks] = ldpc_dec(code_param, max_iterations, ...
     
     input_decoder_c = bit_likelihood(1:(code_param.ldpc_coded_bits_per_frame-Nunused));
     
-    % insert "very likley" zero LLRs for unsed data bits (in zero stuffing case)
+    % insert "very likely" LLRs for unsed data bits (in 1's stuffing case)
     input_decoder_c = [input_decoder_c(1:code_param.data_bits_per_frame) ...
-                       -100*ones(1,Nunused) ...
+                       100*ones(1,Nunused) ...
                        input_decoder_c(code_param.data_bits_per_frame+1:end)];
     
     [x_hat paritychecks] = MpDecode( -input_decoder_c, code_param.H_rows, code_param.H_cols, ...

@@ -1169,9 +1169,9 @@ endfunction
 function [frame_bits bits_per_frame] = fec_encode(states, code_param, mode, payload_bits)
   ofdm_load_const;
   if code_param.data_bits_per_frame != code_param.ldpc_data_bits_per_frame
-    % optionally lower the code rate by "zero stuffing" - setting Nunused data bits to 0
+    % optionally lower the code rate by "one stuffing" - setting Nunused data bits to 1
     Nunused = code_param.ldpc_data_bits_per_frame - code_param.data_bits_per_frame;
-    frame_bits = LdpcEncode([payload_bits zeros(1,Nunused)], code_param.H_rows, code_param.P_matrix);
+    frame_bits = LdpcEncode([payload_bits ones(1,Nunused)], code_param.H_rows, code_param.P_matrix);
     % remove unused data bits from codeword, as they are known to the receiver and don't need to be transmitted
     frame_bits = [ frame_bits(1:code_param.data_bits_per_frame) frame_bits(code_param.ldpc_data_bits_per_frame+1:end) ];
   else
