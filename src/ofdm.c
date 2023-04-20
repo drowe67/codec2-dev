@@ -468,7 +468,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
 
     // work out how many frames UW is spread over
     int symsperframe = ofdm->bitsperframe / ofdm->bps;
-    ofdm->nuwframes = (int) ceilf((float)ofdm->uw_ind_sym[nuwsyms-1]/symsperframe);
+    ofdm->nuwframes = (int) ceilf((float)(ofdm->uw_ind_sym[nuwsyms-1]+1)/symsperframe);
      
     ofdm->tx_uw_syms = MALLOC(sizeof (complex float) * (ofdm->nuwbits / ofdm->bps));
     assert(ofdm->tx_uw_syms != NULL);
