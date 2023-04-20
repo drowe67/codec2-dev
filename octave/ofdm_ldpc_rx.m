@@ -55,7 +55,7 @@ function ofdm_ldpc_rx(filename, mode="700D", varargin)
   Nsam = length(rx);
   prx = 1;
   if strcmp(mode,"datac4") || strcmp(mode,"datac13")
-    rx = filter(fir1(100,[1350 1600]/4000),1,rx);
+    rx = filter(fir1(100,[1250 1700]/4000),1,rx);
   end
   
   % Generate tx frame for BER calcs

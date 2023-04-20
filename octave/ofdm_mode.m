@@ -120,7 +120,7 @@ function config = ofdm_init_mode(mode="700D")
     config.tx_uw(end-24+1:end) = [1 1 0 0  1 0 1 0  1 1 1 1  0 0 0 0  1 1 1 1  0 0 0 0];
     config.amp_est_mode = 1; config.EsNodB = 3;
     config.state_machine = "data";
-    config.amp_scale = 300*2.3E3; config.clip_gain1 = 1.5; config.clip_gain2 = 0.8;
+    config.amp_scale = 2*300E3; config.clip_gain1 = 1.5; config.clip_gain2 = 0.8;
   elseif strcmp(mode,"datac13")
     Ns=5; config.Np=18; Tcp = 0.006; Ts = 0.016; Nc = 3; config.data_mode = "streaming";
     config.edge_pilots = 0;
@@ -131,7 +131,7 @@ function config = ofdm_init_mode(mode="700D")
     config.tx_uw(end-24+1:end) = [1 1 0 0  1 0 1 0  1 1 1 1  0 0 0 0  1 1 1 1  0 0 0 0];
     config.amp_est_mode = 1; config.EsNodB = 3;
     config.state_machine = "data"; 
-    config.amp_scale = 300*2.3E3; config.clip_gain1 = 1.5; config.clip_gain2 = 0.8;
+    config.amp_scale = 2.5*300E3; config.clip_gain1 = 1.5; config.clip_gain2 = 0.8;
   elseif strcmp(mode,"1")
     Ns=5; config.Np=10; Tcp=0; Tframe = 0.1; Ts = Tframe/Ns; Nc = 1;
   else

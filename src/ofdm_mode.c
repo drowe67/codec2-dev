@@ -130,8 +130,8 @@ void ofdm_init_mode(char mode[], struct OFDM_CONFIG *config) {
         memcpy(config->tx_uw, uw, sizeof(uw));
         memcpy(&config->tx_uw[config->nuwbits-sizeof(uw)], uw, sizeof(uw));
         config->data_mode = "streaming";
-        config->amp_scale = 300*2.2E3; config->clip_gain1 = 1.5; config->clip_gain2 = 0.8;
-        config->tx_bpf_en = false; config->clip_en = true;
+        config->amp_scale = 2*300E3; config->clip_gain1 = 1.5; config->clip_gain2 = 0.8;
+        config->tx_bpf_en = false; config->clip_en = false;
      }
     else {
         assert(0);
