@@ -265,6 +265,7 @@ int main(int argc, char *argv[]) {
             ldpc.protection_mode = LDPC_PROT_2020B;
         }
         if (!strcmp(mode,"2020C")) set_data_bits_per_frame(&ldpc, 156);
+        if (!strcmp(mode,"datac4")) set_data_bits_per_frame(&ldpc, 448);
         Ndatabitsperpacket = ldpc.data_bits_per_frame;
 
         if (verbose > 1) {

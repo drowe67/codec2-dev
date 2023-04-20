@@ -50,7 +50,8 @@ static const int b_table[] = {
     210, 131,   /* 2020:   HRAb_396_504 with 312 data bits used   */
     1024, 641,  /* datac3: H_1024_2048_4f                         */
     1290, 797,  /* datac2: H2064_516_sparse                       */
-    4096, 2531  /* datac1: H_4096_8192_3d                         */
+    4096, 2531, /* datac1: H_4096_8192_3d                         */
+    736, 457    /* datac4: H_1024_2048_4f, 448 data bits used     */
 };
 
 int choose_interleaver_b(int Nbits)
