@@ -132,7 +132,21 @@ void ofdm_init_mode(char mode[], struct OFDM_CONFIG *config) {
         config->data_mode = "streaming";
         config->amp_scale = 2*300E3; config->clip_gain1 = 1.5; config->clip_gain2 = 0.8;
         config->tx_bpf_en = false; config->clip_en = false;
-     }
+} else if (strcmp(mode,"datac13") == 0) {
+        config->ns=5; config->np=18; config->tcp = 0.006; config->ts = 0.016; config->nc = 3;
+        config->edge_pilots = 0;
+        config->txtbits = 0; config->state_machine = "data";
+        config->ftwindowwidth = 80; config->timing_mx_thresh = 0.25;
+        config->codename = "H_256_512_4"; config->amp_est_mode = 1;
+        config->nuwbits = 48; config->bad_uw_errors = 18;
+        uint8_t uw[] = {1,1,0,0, 1,0,1,0,  1,1,1,1, 0,0,0,0, 1,1,1,1, 0,0,0,0};
+        assert(sizeof(uw) <= MAX_UW_BITS);
+        memcpy(config->tx_uw, uw, sizeof(uw));
+        memcpy(&config->tx_uw[config->nuwbits-sizeof(uw)], uw, sizeof(uw));
+        config->data_mode = "streaming";
+        config->amp_scale = 2.5*300E3; config->clip_gain1 = 1.5; config->clip_gain2 = 0.8;
+        config->tx_bpf_en = false; config->clip_en = false;
+    }
     else {
         assert(0);
     }

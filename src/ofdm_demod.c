@@ -67,7 +67,7 @@ void opt_help() {
     fprintf(stderr, "  --in          filename   Name of InputModemRawFile\n");
     fprintf(stderr, "  --out         filename   Name of OutputOneCharPerBitFile\n");
     fprintf(stderr, "  --log         filename   Octave log file for testing\n");
-    fprintf(stderr, "  --mode       modeName    Predefined mode e.g. 700D|2020|datac1\n");
+    fprintf(stderr, "  --mode       modeName    Predefined mode e.g. 700D|2020|datac1 etc\n");
     fprintf(stderr, "  --nc          [17..62]   Number of Carriers (17 default, 62 max)\n");
     fprintf(stderr, "  --np                     Number of packets\n");
     fprintf(stderr, "  --ns           Nframes   One pilot every ns symbols (8 default)\n");
@@ -329,7 +329,7 @@ int main(int argc, char *argv[]) {
     int Nsymsperframe = Nbitsperframe / ofdm_config->bps;
     int Nsymsperpacket = Nbitsperpacket / ofdm_config->bps;
     int Nmaxsamperframe = ofdm_get_max_samples_per_frame(ofdm);
-    int Npayloadbitsperframe = ofdm_bitsperframe - ofdm_nuwbits - ofdm_ntxtbits;
+    int Npayloadbitsperframe = ofdm_bitsperframe;
     int Npayloadbitsperpacket = Nbitsperpacket - ofdm_nuwbits - ofdm_ntxtbits;
     int Npayloadsymsperframe = Npayloadbitsperframe/ofdm_config->bps;
     int Npayloadsymsperpacket = Npayloadbitsperpacket/ofdm_config->bps;
@@ -351,6 +351,8 @@ int main(int argc, char *argv[]) {
             ldpc.protection_mode = LDPC_PROT_2020B;
         }
         if (!strcmp(mode,"2020C")) set_data_bits_per_frame(&ldpc, 156);
+        if (!strcmp(mode,"datac4")) set_data_bits_per_frame(&ldpc, 448);
+        if (!strcmp(mode,"datac13")) set_data_bits_per_frame(&ldpc, 128);
         Ndatabitsperpacket = ldpc.data_bits_per_frame;
 
         if (verbose > 1) {

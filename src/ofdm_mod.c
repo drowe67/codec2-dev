@@ -52,7 +52,7 @@ void opt_help() {
     fprintf(stderr, "\nusage: %s [options]\n\n", progname);
     fprintf(stderr, "  --in      filename    Name of InputOneCharPerBitFile\n");
     fprintf(stderr, "  --out     filename    Name of OutputModemRawFile\n");
-    fprintf(stderr, "  --mode    modeName    Predefined mode 700D|700E|2020|2020B|datac0|datac1|datac3\n");
+    fprintf(stderr, "  --mode    modeName    Predefined mode 700D|700E|2020|2020B|datac0 ... etc\n");
     fprintf(stderr, "  --nc      [17..62]    Number of Carriers (17 default, 62 max)\n");
     fprintf(stderr, "  --ns       symbols    One pilot every ns symbols (8 default)\n");
     fprintf(stderr, "  --tcp        Nsecs    Cyclic Prefix Duration (.002 default)\n");
@@ -266,6 +266,7 @@ int main(int argc, char *argv[]) {
         }
         if (!strcmp(mode,"2020C")) set_data_bits_per_frame(&ldpc, 156);
         if (!strcmp(mode,"datac4")) set_data_bits_per_frame(&ldpc, 448);
+        if (!strcmp(mode,"datac13")) set_data_bits_per_frame(&ldpc, 128);
         Ndatabitsperpacket = ldpc.data_bits_per_frame;
 
         if (verbose > 1) {
