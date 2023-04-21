@@ -168,7 +168,7 @@ int main(int argc, char *argv[]) {
 
     if (argc < 4) {
     helpmsg:
-        fprintf(stderr, "\nusage: %s [options] FSK_LDPC|DATAC0|DATAC1|DATAC3 InputBinaryDataFile OutputModemRawFile\n"
+        fprintf(stderr, "\nusage: %s [options] FSK_LDPC|DATAC0|... InputBinaryDataFile OutputModemRawFile\n"
                "\n"
                "  --testframes      T         send a total of T test frames (T should equal B*N)\n"
                "  --bursts          B         send B bursts of N testframes (default 1)\n"
@@ -208,6 +208,8 @@ int main(int argc, char *argv[]) {
     if (!strcmp(argv[dx],"DATAC0") || !strcmp(argv[dx],"datac0")) mode = FREEDV_MODE_DATAC0;
     if (!strcmp(argv[dx],"DATAC1") || !strcmp(argv[dx],"datac1")) mode = FREEDV_MODE_DATAC1;
     if (!strcmp(argv[dx],"DATAC3") || !strcmp(argv[dx],"datac3")) mode = FREEDV_MODE_DATAC3;
+    if (!strcmp(argv[dx],"DATAC4") || !strcmp(argv[dx],"datac4")) mode = FREEDV_MODE_DATAC4;
+    if (!strcmp(argv[dx],"DATAC13") || !strcmp(argv[dx],"datac13")) mode = FREEDV_MODE_DATAC13;
     if (mode == -1) {
       fprintf(stderr, "Error: in mode: %s", argv[dx]);
       exit(1);

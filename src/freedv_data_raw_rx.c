@@ -161,7 +161,7 @@ int main(int argc, char *argv[]) {
 
     if (argc < 3) {
     helpmsg:
-      	fprintf(stderr, "\nusage: %s [options] FSK_LDPC|DATAC0|DATAC1|DATAC3 InputModemSpeechFile BinaryDataFile\n"
+      	fprintf(stderr, "\nusage: %s [options] FSK_LDPC|DATAC0|... InputModemSpeechFile BinaryDataFile\n"
                "  -v or --vv              verbose options\n"
                "  --testframes            count raw and coded errors in testframes sent by tx\n"
                "  --framesperburst  N     N frames per burst (default 1, must match Tx)\n"
@@ -195,6 +195,8 @@ int main(int argc, char *argv[]) {
     if (!strcmp(argv[dx],"DATAC0") || !strcmp(argv[dx],"datac0")) mode = FREEDV_MODE_DATAC0;
     if (!strcmp(argv[dx],"DATAC1") || !strcmp(argv[dx],"datac1")) mode = FREEDV_MODE_DATAC1;
     if (!strcmp(argv[dx],"DATAC3") || !strcmp(argv[dx],"datac3")) mode = FREEDV_MODE_DATAC3;
+    if (!strcmp(argv[dx],"DATAC4") || !strcmp(argv[dx],"datac4")) mode = FREEDV_MODE_DATAC4;
+    if (!strcmp(argv[dx],"DATAC13") || !strcmp(argv[dx],"datac13")) mode = FREEDV_MODE_DATAC13;
     if (mode == -1) {
         fprintf(stderr, "Error in mode: %s\n", argv[dx]);
         exit(1);

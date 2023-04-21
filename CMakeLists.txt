@@ -1049,6 +1049,24 @@ if (NOT APPLE)
                             ./freedv_data_raw_tx --testframes 10 DATAC1 /dev/zero /dev/null")
              set_tests_properties(test_memory_leak_FreeDV_DATAC1_tx PROPERTIES PASS_REGULAR_EXPRESSION "ERROR SUMMARY: 0 errors")
 
+     add_test(NAME test_memory_leak_FreeDV_DATAC3_tx
+             COMMAND sh -c "cd  ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes \
+                            ./freedv_data_raw_tx --testframes 10 DATAC3 /dev/zero /dev/null")
+             set_tests_properties(test_memory_leak_FreeDV_DATAC3_tx PROPERTIES PASS_REGULAR_EXPRESSION "ERROR SUMMARY: 0 errors")
+
+     add_test(NAME test_memory_leak_FreeDV_DATAC4_tx
+             COMMAND sh -c "cd  ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes \
+                            ./freedv_data_raw_tx --testframes 10 DATAC4 /dev/zero /dev/null")
+             set_tests_properties(test_memory_leak_FreeDV_DATAC4_tx PROPERTIES PASS_REGULAR_EXPRESSION "ERROR SUMMARY: 0 errors")
+
+     add_test(NAME test_memory_leak_FreeDV_DATAC13_tx
+             COMMAND sh -c "cd  ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes \
+                            ./freedv_data_raw_tx --testframes 10 DATAC13 /dev/zero /dev/null")
+             set_tests_properties(test_memory_leak_FreeDV_DATAC13_tx PROPERTIES PASS_REGULAR_EXPRESSION "ERROR SUMMARY: 0 errors")
+
      add_test(NAME test_memory_leak_FreeDV_700E_tx
              COMMAND sh -c "cd  ${CMAKE_CURRENT_BINARY_DIR}/src;
                             valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes \
@@ -1284,6 +1302,20 @@ endif(NOT APPLE)
                             head -c $((126*10)) </dev/urandom > binaryIn.bin;
                             ./freedv_data_raw_tx DATAC3 binaryIn.bin - --bursts 10 |
                             ./freedv_data_raw_rx DATAC3 - binaryOut.bin -v;
+                            diff binaryIn.bin binaryOut.bin")
+
+     add_test(NAME test_freedv_data_raw_ofdm_datac4_burst_file
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            head -c $((54*10)) </dev/urandom > binaryIn.bin;
+                            ./freedv_data_raw_tx DATAC4 binaryIn.bin - --bursts 10 |
+                            ./freedv_data_raw_rx DATAC4 - binaryOut.bin -v;
+                            diff binaryIn.bin binaryOut.bin")
+
+     add_test(NAME test_freedv_data_raw_ofdm_datac13_burst_file
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            head -c $((14*10)) </dev/urandom > binaryIn.bin;
+                            ./freedv_data_raw_tx DATAC13 binaryIn.bin - --bursts 10 |
+                            ./freedv_data_raw_rx DATAC13 - binaryOut.bin -v;
                             diff binaryIn.bin binaryOut.bin")
 
      # FSK LDPC default 100 bit/s 2FSK, enough noise for several % raw BER to give
