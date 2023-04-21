@@ -52,6 +52,8 @@
 static float cnormf(complex float);
 static void allocate_tx_bpf(struct OFDM *);
 static void deallocate_tx_bpf(struct OFDM *);
+static void allocate_rx_bpf(struct OFDM *);
+static void deallocate_rx_bpf(struct OFDM *);
 static void dft(struct OFDM *, complex float *, complex float *);
 static void idft(struct OFDM *, complex float *, complex float *);
 static complex float vector_sum(complex float *, int);
@@ -213,6 +215,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
         ofdm->codename = "HRA_112_112";
         ofdm->amp_est_mode = 0;
         ofdm->tx_bpf_en = true;
+        ofdm->rx_bpf_en = false;
         ofdm->amp_scale = 245E3;
         ofdm->clip_gain1 = 2.0;
         ofdm->clip_gain2 = 0.9;
@@ -247,6 +250,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
         ofdm->codename = config->codename;
         ofdm->amp_est_mode = config->amp_est_mode;
         ofdm->tx_bpf_en = config->tx_bpf_en;
+        ofdm->rx_bpf_en = config->rx_bpf_en;
         ofdm->foff_limiter = config->foff_limiter;
         ofdm->amp_scale = config->amp_scale;
         ofdm->clip_gain1 = config->clip_gain1;
@@ -294,6 +298,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     ofdm->config.codename = ofdm->codename;
     ofdm->config.amp_est_mode = ofdm->amp_est_mode;
     ofdm->config.tx_bpf_en = ofdm->tx_bpf_en;
+    ofdm->config.rx_bpf_en = ofdm->rx_bpf_en;
     ofdm->config.foff_limiter = ofdm->foff_limiter;
     ofdm->config.amp_scale = ofdm->amp_scale;
     ofdm->config.clip_gain1 = ofdm->clip_gain1;
@@ -367,6 +372,9 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     ofdm->tx_bpf = NULL;
     if (ofdm->tx_bpf_en)
         allocate_tx_bpf(ofdm);
+    ofdm->rx_bpf = NULL;
+    if (ofdm->rx_bpf_en)
+        allocate_rx_bpf(ofdm);
 
     /* store complex BPSK pilot symbols */
 
@@ -576,6 +584,26 @@ static void deallocate_tx_bpf(struct OFDM *ofdm) {
     ofdm->tx_bpf = NULL;
 }
 
+static void allocate_rx_bpf(struct OFDM *ofdm) {
+    ofdm->rx_bpf = MALLOC(sizeof(struct quisk_cfFilter));
+    assert(ofdm->rx_bpf != NULL);
+
+    /* Receive bandpass filter; complex coefficients, center frequency */
+
+    if (!strcmp(ofdm->mode, "datac4") || !strcmp(ofdm->mode, "datac13")) {
+        quisk_filt_cfInit(ofdm->rx_bpf, filtP200S400, sizeof (filtP200S400) / sizeof (float));
+        quisk_cfTune(ofdm->rx_bpf, ofdm->rx_centre / ofdm->fs);
+    }
+    else assert(0);
+}
+
+static void deallocate_rx_bpf(struct OFDM *ofdm) {
+    assert(ofdm->rx_bpf != NULL);
+    quisk_filt_destroy(ofdm->rx_bpf);
+    FREE(ofdm->rx_bpf);
+    ofdm->rx_bpf = NULL;
+}
+
 void ofdm_destroy(struct OFDM *ofdm) {
     int i;
 
@@ -585,6 +613,9 @@ void ofdm_destroy(struct OFDM *ofdm) {
     }
     if (ofdm->tx_bpf) {
         deallocate_tx_bpf(ofdm);
+    }
+   if (ofdm->rx_bpf) {
+        deallocate_rx_bpf(ofdm);
     }
 
     FREE(ofdm->pilot_samples);
@@ -1025,7 +1056,7 @@ void ofdm_hilbert_clipper(struct OFDM *ofdm, complex float *tx, size_t n) {
     for(int i=0; i<n; i++) tx[i] *= ofdm->amp_scale;
 
     if (ofdm->clip_en) {
-        // this gain set the drive into the Hilbert Clipper and sets PAPR
+        // this gain sets the drive into the Hilbert Clipper and sets PAPR
         for(int i=0; i<n; i++) tx[i] *= ofdm->clip_gain1;
         ofdm_clip(tx, OFDM_PEAK, n);
     }
@@ -1404,18 +1435,25 @@ static int ofdm_sync_search_core(struct OFDM *ofdm) {
  */
 
 /*
- * This is a wrapper to maintain the older functionality with an
- * array of COMPs as input
+ * This wrapper accepts an array of COMPs as input
  */
 void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
     complex float *rx = (complex float *) &rxbuf_in[0]; // complex has same memory layout
+    complex float rx_filt[ofdm->nin];
     int i, j;
 
-    /* shift the buffer left based on nin */
+   /* shift the buffer left based on nin */
     for (i = 0, j = ofdm->nin; i < (ofdm->nrxbuf - ofdm->nin); i++, j++) {
         ofdm->rxbuf[i] = ofdm->rxbuf[j];
     }
 
+    /* Optional input BPF used by some modes (e.g. to improve acquisition) */
+    if (ofdm->rx_bpf_en) {
+        assert(ofdm->rx_bpf != NULL);
+        quisk_ccfFilter(rx, rx_filt, ofdm->nin, ofdm->rx_bpf);
+        rx = rx_filt;
+    }
+    
     /* insert latest input samples onto tail of rxbuf */
     for (j = 0, i = (ofdm->nrxbuf - ofdm->nin); i < ofdm->nrxbuf; j++, i++) {
         ofdm->rxbuf[i] = rx[j];
@@ -1425,7 +1463,7 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
 }
 
 /*
- * This is a wrapper with a new interface to reduce memory allocated.
+ * This is a wrapper with a real short interface to minimise allocated memory.
  * This works with ofdm_demod and freedv_api. Gain is not used here.
  */
 void ofdm_demod_shorts(struct OFDM *ofdm, int *rx_bits, short *rxbuf_in, float gain) {
@@ -1437,12 +1475,26 @@ void ofdm_demod_shorts(struct OFDM *ofdm, int *rx_bits, short *rxbuf_in, float g
         ofdm->rxbuf[i] = ofdm->rxbuf[j];
     }
 
-    /* insert latest input samples onto tail of rxbuf */
-
-    for (j = 0, i = (ofdm->nrxbuf - ofdm->nin); i < ofdm->nrxbuf; j++, i++) {
-        ofdm->rxbuf[i] = ((float)rxbuf_in[j] / 32767.0f);
+    /* Optional input BPF used by some modes (e.g. to improve acquisition) */
+    if (ofdm->rx_bpf_en) {
+        assert(ofdm->rx_bpf != NULL);
+        complex float rx[ofdm->nin];
+        complex float rx_filt[ofdm->nin];
+        for(i=0; i<ofdm->nin; i++)
+            rx[i] = rxbuf_in[i];
+        quisk_ccfFilter(rx, rx_filt, ofdm->nin, ofdm->rx_bpf);
+        /* insert latest input samples onto tail of rxbuf */
+        for (j = 0, i = (ofdm->nrxbuf - ofdm->nin); i < ofdm->nrxbuf; j++, i++) {
+            ofdm->rxbuf[i] = creal(rx_filt[j]) / 32767.0f;
+        }
     }
-
+    else {
+        /* insert latest input samples onto tail of rxbuf */
+        for (j = 0, i = (ofdm->nrxbuf - ofdm->nin); i < ofdm->nrxbuf; j++, i++) {
+            ofdm->rxbuf[i] = ((float)rxbuf_in[j] / 32767.0f);
+        }
+    }
+    
     ofdm_demod_core(ofdm, rx_bits);
 }
 
@@ -2549,6 +2601,7 @@ void ofdm_print_info(struct OFDM *ofdm) {
     fprintf(stderr, "ofdm->foff_est_en = %s\n", ofdm->foff_est_en ? "true" : "false");
     fprintf(stderr, "ofdm->phase_est_en = %s\n", ofdm->phase_est_en ? "true" : "false");
     fprintf(stderr, "ofdm->tx_bpf_en = %s\n", ofdm->tx_bpf_en ? "true" : "false");
+    fprintf(stderr, "ofdm->rx_bpf_en = %s\n", ofdm->rx_bpf_en ? "true" : "false");
     fprintf(stderr, "ofdm->dpsk_en = %s\n", ofdm->dpsk_en ? "true" : "false");
     fprintf(stderr, "ofdm->phase_est_bandwidth_mode = %s\n", phase_est_bandwidth_mode[ofdm->phase_est_bandwidth_mode]);
 }
