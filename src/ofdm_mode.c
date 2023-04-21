@@ -133,7 +133,7 @@ void ofdm_init_mode(char mode[], struct OFDM_CONFIG *config) {
         config->amp_scale = 2*300E3; config->clip_gain1 = 1.5; config->clip_gain2 = 0.8;
         config->tx_bpf_en = false; config->clip_en = false;
         config->rx_bpf_en = true; 
-} else if (strcmp(mode,"datac13") == 0) {
+     } else if (strcmp(mode,"datac13") == 0) {
         config->ns=5; config->np=18; config->tcp = 0.006; config->ts = 0.016; config->nc = 3;
         config->edge_pilots = 0;
         config->txtbits = 0; config->state_machine = "data";
@@ -147,6 +147,7 @@ void ofdm_init_mode(char mode[], struct OFDM_CONFIG *config) {
         config->data_mode = "streaming";
         config->amp_scale = 2.5*300E3; config->clip_gain1 = 1.5; config->clip_gain2 = 0.8;
         config->tx_bpf_en = false; config->clip_en = false;
+        config->rx_bpf_en = true; 
     }
     else {
         assert(0);
