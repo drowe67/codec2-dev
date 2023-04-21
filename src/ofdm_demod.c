@@ -342,20 +342,11 @@ int main(int argc, char *argv[]) {
 
     if (ldpc_en) {
         ldpc_codes_setup(&ldpc, ofdm->codename);
-        if (verbose > 1) { fprintf(stderr, "using: %s\n", ofdm->codename); }
-
-        /* mode specific set up */
-        if (!strcmp(mode,"2020")) set_data_bits_per_frame(&ldpc, 312);
-        if (!strcmp(mode,"2020B")) {
-            set_data_bits_per_frame(&ldpc, 156);
-            ldpc.protection_mode = LDPC_PROT_2020B;
-        }
-        if (!strcmp(mode,"2020C")) set_data_bits_per_frame(&ldpc, 156);
-        if (!strcmp(mode,"datac4")) set_data_bits_per_frame(&ldpc, 448);
-        if (!strcmp(mode,"datac13")) set_data_bits_per_frame(&ldpc, 128);
+        ldpc_mode_specific_setup(ofdm, &ldpc);
         Ndatabitsperpacket = ldpc.data_bits_per_frame;
 
         if (verbose > 1) {
+            fprintf(stderr, "using: %s\n", ofdm->codename);
             fprintf(stderr, "LDPC codeword data bits = %d\n", ldpc.ldpc_data_bits_per_frame);
             fprintf(stderr, "LDPC codeword total bits  = %d\n", ldpc.ldpc_coded_bits_per_frame);
             fprintf(stderr, "LDPC codeword data bits used = %d\n", Ndatabitsperpacket);
