@@ -117,6 +117,7 @@ void freedv_ofdm_voice_open(struct freedv *f, char *mode) {
     assert(f->ldpc != NULL);
 
     ldpc_codes_setup(f->ldpc, f->ofdm->codename);
+    ldpc_mode_specific_setup(f->ofdm, f->ldpc);
 #ifdef __EMBEDDED__
     f->ldpc->max_iter = 10; /* limit LDPC decoder iterations to limit CPU load */
 #endif
