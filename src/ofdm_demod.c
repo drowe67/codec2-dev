@@ -84,7 +84,6 @@ void opt_help() {
     fprintf(stderr, "  --start_secs      secs   Number of seconds delay before we start to demod\n");
     fprintf(stderr, "  --len_secs        secs   Number of seconds to run demod\n");
     fprintf(stderr, "  --skip_secs   timeSecs   At timeSecs introduce a large timing error by skipping half a frame of samples\n");
-    fprintf(stderr, "  --dpsk                   Differential PSK.\n");
     fprintf(stderr, "  --packetsperburst p      use burst mode; number of packets we expect per burst\n");
     fprintf(stderr, "\n");
 
@@ -126,7 +125,6 @@ int main(int argc, char *argv[]) {
     bool output_specified = false;
     bool log_specified = false;
     bool log_active = false;
-    bool dpsk = false;
 
     float time_to_sync = -1;
     float start_secs = 0.0;
@@ -158,7 +156,6 @@ int main(int argc, char *argv[]) {
         {"start_secs", 'x', OPTPARSE_REQUIRED},
         {"len_secs", 'y', OPTPARSE_REQUIRED},
         {"skip_secs", 'z', OPTPARSE_REQUIRED},
-        {"dpsk", 'q', OPTPARSE_NONE},
         {"mode", 'r', OPTPARSE_REQUIRED},
         {"packetsperburst", 'e', OPTPARSE_REQUIRED},
         {0, 0, 0}
@@ -224,9 +221,6 @@ int main(int argc, char *argv[]) {
             case 'o':
                 phase_est_bandwidth_mode = atoi(options.optarg);
                 break;
-            case 'q':
-                dpsk = true;
-                break;
             case 'r':
                 strcpy(mode, options.optarg);
                 ofdm_init_mode(mode, ofdm_config);
@@ -283,7 +277,6 @@ int main(int argc, char *argv[]) {
     free(ofdm_config);
 
     ofdm_set_phase_est_bandwidth_mode(ofdm, phase_est_bandwidth_mode);
-    ofdm_set_dpsk(ofdm, dpsk);
     // default to one packet per burst for burst mode
     if (packetsperburst) {
         ofdm_set_packets_per_burst(ofdm, packetsperburst);
@@ -634,8 +627,6 @@ int main(int argc, char *argv[]) {
         f++;
     }
 
-    ofdm_destroy(ofdm);
-
     if (input_specified == true)
         fclose(fin);
 
@@ -695,5 +686,7 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "Npre.....: %6d Npost: %5d uw_fails: %2d\n", ofdm->pre, ofdm->post, ofdm->uw_fails);
     }
     
+    ofdm_destroy(ofdm);
+
     return ret;
 }

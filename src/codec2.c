@@ -206,7 +206,7 @@ struct CODEC2 * codec2_create(int mode)
     c2->smoothing = 0;
     c2->se = 0.0; c2->nse = 0;
     c2->user_rate_K_vec_no_mean_ = NULL;
-    c2->post_filter_en = 1;
+    c2->post_filter_en = true;
     
     c2->bpf_buf = (float*)MALLOC(sizeof(float)*(BPF_N+4*c2->n_samp));
     assert(c2->bpf_buf != NULL);
@@ -225,7 +225,7 @@ struct CODEC2 * codec2_create(int mode)
             c2->prev_rate_K_vec_[k] = 0.0;
             c2->eq[k] = 0.0;
         }
-        c2->eq_en = 0;
+        c2->eq_en = false;
         c2->Wo_left = 0.0;
         c2->voicing_left = 0;;
         c2->phase_fft_fwd_cfg = codec2_fft_alloc(NEWAMP1_PHASE_NFFT, 0, NULL, NULL);
@@ -2296,11 +2296,11 @@ float *codec2_enable_user_ratek(struct CODEC2 *codec2_state, int *K) {
     return codec2_state->user_rate_K_vec_no_mean_;
 }
 
-void codec2_700c_post_filter(struct CODEC2 *codec2_state, int en) {
+void codec2_700c_post_filter(struct CODEC2 *codec2_state, bool en) {
     codec2_state->post_filter_en = en;
 }
 
-void codec2_700c_eq(struct CODEC2 *codec2_state, int en) {
+void codec2_700c_eq(struct CODEC2 *codec2_state, bool en) {
     codec2_state->eq_en = en;
     codec2_state->se = 0.0; codec2_state->nse = 0;
 }

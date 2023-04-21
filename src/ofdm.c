@@ -671,6 +671,86 @@ static complex float vector_sum(complex float *a, int num_elements) {
     return sum;
 }
 
+/* Determine if we can use vector ops below. Only for non-embedded platforms
+   as double can be significantly slower on those.  */
+#ifndef __EMBEDDED__
+#if __GNUC__ > 4 || \
+    (__GNUC__ == 4 && (__GNUC_MINOR__ > 6 || \
+                       (__GNUC_MINOR__ == 6 && \
+                        __GNUC_PATCHLEVEL__ > 0)))
+#define USE_VECTOR_OPS 1
+#elif __clang_major__ > 3 || \
+    (__clang_minor__ == 3 && (__clang_minor__ > 7 || \
+                       (__clang_minor__ == 7 && \
+                        __clang_patchlevel__ > 0)))
+#define USE_VECTOR_OPS 1
+#endif
+#else
+#include "codec2_math.h"
+#endif /* __EMBEDDED__ */
+
+#if USE_VECTOR_OPS
+typedef float float4 __attribute__ ((vector_size (16)));
+#endif /* USE_VECTOR_OPS */
+
+static complex float ofdm_complex_dot_product(complex float *left, complex float *right, int numSamples)
+{
+    complex float result = 0;
+
+#if USE_VECTOR_OPS
+    float *leftPtr = (float*)left;
+    float *rightPtr = (float*)right;
+    float4 accumPos = { 0, 0, 0, 0 };
+    float4 accumNeg = { 0, 0, 0, 0 };
+    float4 accumImag = { 0, 0, 0, 0 };
+    float resultReal = 0;
+    float resultImag = 0;
+    int numBlocks = numSamples >> 1;
+    for (int i = 0; i < numBlocks; i++)
+    {
+        /* Lay out vectors as follows: 
+            vec1 = rx[0].a, rx[0].b, rx[1].a, rx[1].b, ...
+            vec2 = mvec[0].c, mvec[0].d, mvec[1].c, mvec1[1].d, ... */
+        float4 vec1 = { leftPtr[0], leftPtr[1], leftPtr[2], leftPtr[3] };
+        float4 vec2 = { rightPtr[0], rightPtr[1], rightPtr[2], rightPtr[3] };
+
+        accumPos += vec1 * vec2;
+        accumNeg -= vec1 * vec2;
+
+        /* Lay out vec3 as { rx[0].b, rx[0].a, rx[1].b, rx[0].b, ... }.
+            Multiply vec3 by vec2 to get us bc, ad, bc, ad
+            and add to second accumulator. */
+        float4 vec3 = { leftPtr[1], leftPtr[0], leftPtr[3], leftPtr[2] };
+        accumImag += vec3 * vec2;
+
+        /* Shift pointers forward by 4 (2 complex floats). */
+        leftPtr += 4; rightPtr += 4;
+    }
+
+    /* dot product: (a + bi)(c + di) = (ac - bd) + i(bc + ad) */
+    resultReal = accumPos[0] + accumNeg[1] + accumPos[2] + accumNeg[3];
+    resultImag = accumImag[0] + accumImag[1] + accumImag[2] + accumImag[3];
+    result = resultReal + I * resultImag;
+
+    /* Add remaining values to corr that couldn't be vectorized above. */
+    for (int i = numBlocks << 1; i < numSamples; i++)
+    {
+        result += left[i] * right[i];
+    }
+#elif __EMBEDDED__
+    float resultReal = 0, resultImag = 0;
+    codec2_complex_dot_product_f32((COMP*)left, (COMP*)right, numSamples, &resultReal, &resultImag);
+    result = resultReal + I * resultImag;
+#else
+    for (int i = 0; i < numSamples; i++)
+    {
+        result += left[i] * right[i];
+    }
+#endif /* USE_VECTOR_OPS */
+
+    return result;
+}
+
 
 /*
  * Correlates the OFDM pilot symbol samples with a window of received
@@ -748,10 +828,9 @@ static int est_timing(struct OFDM *ofdm, complex float *rx, int length,
 
 #ifdef __EMBEDDED__
 #ifdef __REAL__
-        // Note: this code untested
 	float re,im;
         
-        codec2_dot_product_f32(&rx_real[i], wvec_pilot_real, ofdm->samplespersymbol, &re);
+	codec2_dot_product_f32(&rx_real[i], wvec_pilot_real, ofdm->samplespersymbol, &re);
 	codec2_dot_product_f32(&rx_real[i], wvec_pilot_imag, ofdm->samplespersymbol, &im);
 	corr_st = re + im * I;
 
@@ -769,12 +848,8 @@ static int est_timing(struct OFDM *ofdm, complex float *rx, int length,
 	corr_en = re + im * I;
 #endif
 #else
-	for (j = 0; j < ofdm->samplespersymbol; j++) {
-            int ind = i + j;
-
-	    corr_st = corr_st + (rx[ind                        ] * wvec_pilot[j]);
-            corr_en = corr_en + (rx[ind + ofdm->samplesperframe] * wvec_pilot[j]);
-        }
+        corr_st = ofdm_complex_dot_product(&rx[i], wvec_pilot, ofdm->samplespersymbol);
+        corr_en = ofdm_complex_dot_product(&rx[i + ofdm->samplesperframe], wvec_pilot, ofdm->samplespersymbol);
 #endif // __EMBEDDED__
         corr[i] = (cabsf(corr_st) + cabsf(corr_en)) * av_level;
     }
@@ -957,11 +1032,6 @@ void ofdm_hilbert_clipper(struct OFDM *ofdm, complex float *tx, size_t n) {
 
     /* BPF to remove out of band energy clipper introduces */
     if (ofdm->tx_bpf_en) {
-        assert(!strcmp(ofdm->mode, "700D") || !strcmp(ofdm->mode, "700E")
-               || !strcmp(ofdm->mode, "2020") || !strcmp(ofdm->mode, "2020B")
-               || !strcmp(ofdm->mode, "2020C")
-               || !strcmp(ofdm->mode, "datac0") || !strcmp(ofdm->mode, "datac1")
-               || !strcmp(ofdm->mode, "datac3"));
         assert(ofdm->tx_bpf != NULL);
         complex float tx_filt[n];
 
@@ -1140,12 +1210,11 @@ static float est_timing_and_freq(struct OFDM *ofdm,
         complex float mvec[Npsam];
         for(int i=0; i<Npsam; i++) {
             complex float ph = cmplx(w*i);
-            mvec[i] = known_samples[i]*ph;
+            mvec[i] = conjf(known_samples[i]*ph);
         }
         for(int t=0; t<Ncorr; t+=tstep) {
-            complex float corr = 0;
-            for(int i=0; i<Npsam; i++)
-                corr += rx[i+t]*conjf(mvec[i]);
+            complex float corr = ofdm_complex_dot_product(&rx[t], mvec, Npsam);
+
             if (cabsf(corr) > max_corr) {
                 max_corr = cabsf(corr);
                 *t_est = t;
