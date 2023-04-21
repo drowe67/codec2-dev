@@ -411,6 +411,10 @@ endif()
                DISPLAY=\"\" octave-cli -qf fdmdv_ut.m")
              set_tests_properties(test_FDMDV_modem_octave_c PROPERTIES PASS_REGULAR_EXPRESSION "errors......: 0")
 
+    # -------------------------------------------------------------------------
+    #                                COHPSK Modem
+    # -------------------------------------------------------------------------
+
     add_test(NAME test_COHPSK_modem_octave_port
              COMMAND sh -c "$<TARGET_FILE:tcohpsk> && DISPLAY=\"\" octave-cli --no-gui -qf ${CMAKE_CURRENT_SOURCE_DIR}/octave/tcohpsk.m"
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/octave)
@@ -592,8 +596,9 @@ endif()
     # -------------------------------------------------------------------------
 
     # To integrate a new mode/waveform we prototype in Octave, get the core OFDM modem
-    # running in C, then the FreeDV API.  Here we test Octave and the C versions of the
-    # OFDM modem working together, to help prevent any bit rot between them
+    # running in C (ofdm_mod & ofdm_demod), then the FreeDV API (frredv_tx & freedv_rx).  
+    # Here we test Octave and the C versions of the OFDM modem working together, to help
+    # prevent any bit rot between them
 
     # DATAC0 burst mode Octave Tx, C Rx
     add_test(NAME test_OFDM_modem_datac0_octave_burst
@@ -638,7 +643,36 @@ endif()
                             ./ch - - --No -17 |
                             ./ofdm_demod --mode datac0 --out /dev/null --testframes --ldpc --verbose 2 --packetsperburst 1")
 
-    # -------------------------------------------------------------------------
+    # DATAC4 C Tx, Octave Rx, burst mode
+    add_test(NAME test_OFDM_modem_datac4_octave
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR};
+                            ./src/ofdm_mod --mode datac4 --in /dev/zero --testframes 1 --verbose 1 --ldpc --bursts 5 > test.raw;
+                            cd ${CMAKE_CURRENT_SOURCE_DIR}/octave;
+                            DISPLAY=\"\" octave-cli -qf --eval 'ofdm_ldpc_rx(\"${CMAKE_CURRENT_BINARY_DIR}/test.raw\",\"datac4\",\"packetsperburst\",1)'")
+             set_tests_properties(test_OFDM_modem_datac3_octave PROPERTIES PASS_REGULAR_EXPRESSION "Coded PER: 0.0000 Pckts:     5")
+             
+    # DATAC13 Octave Tx, C Rx, burst mode
+    add_test(NAME test_OFDM_modem_datac13_octave
+             COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/octave;
+                            DISPLAY=\"\" octave-cli -qf --eval 'ofdm_ldpc_tx(\"${CMAKE_CURRENT_BINARY_DIR}/src/test.raw\",\"datac13\",1,3,\"awgn\",\"bursts\",5)';
+                            cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            cat test.raw | ./ofdm_demod --mode datac13 --out /dev/null --testframes --ldpc --verbose 2 --packetsperburst 1")
+             
+    # DATAC4 C Tx, C Rx, burst mode
+    add_test(NAME test_OFDM_modem_datac4_ldpc_burst
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            ./ofdm_mod --mode datac4 --in /dev/zero --testframes 1 --verbose 1 --ldpc --bursts 10 |
+                            ./ch - - --No -17 |
+                            ./ofdm_demod --mode datac4 --out /dev/null --testframes --ldpc --verbose 2 --packetsperburst 1")
+
+    # DATAC13 C Tx, C Rx, burst mode
+    add_test(NAME test_OFDM_modem_datac13_ldpc_burst
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            ./ofdm_mod --mode datac13 --in /dev/zero --testframes 1 --verbose 1 --ldpc --bursts 10 |
+                            ./ch - - --No -17 |
+                            ./ofdm_demod --mode datac13 --out /dev/null --testframes --ldpc --verbose 2 --packetsperburst 1")
+
+   # -------------------------------------------------------------------------
     #                                LDPC
     # -------------------------------------------------------------------------
 
@@ -1335,6 +1369,8 @@ endif(NOT APPLE)
         test_OFDM_modem_datac0_octave_burst
         test_OFDM_modem_datac1_octave
         test_OFDM_modem_datac3_octave
+        test_OFDM_modem_datac4_octave
+        test_OFDM_modem_datac13_octave
         test_fsk_lib_4fsk_ldpc
         test_OFDM_modem_datac0_compression
         PROPERTIES
