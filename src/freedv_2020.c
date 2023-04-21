@@ -89,7 +89,7 @@ void freedv_2020x_open(struct freedv *f) {
         fprintf(stderr, "vq_type = %d\n", vq_type);
         fprintf(stderr, "ldpc_data_bits_per_frame = %d\n", f->ldpc->ldpc_data_bits_per_frame);
         fprintf(stderr, "ldpc_coded_bits_per_frame  = %d\n", f->ldpc->ldpc_coded_bits_per_frame);
-        fprintf(stderr, "data_bits_per_frame = %d\n", data_bits_per_frame);
+        fprintf(stderr, "data_bits_per_frame = %d\n", f->ldpc->data_bits_per_frame);
         fprintf(stderr, "coded_bits_per_frame  = %d\n", f->ldpc->coded_bits_per_frame);
         fprintf(stderr, "coded_syms_per_frame  = %d\n", f->ldpc->coded_bits_per_frame/f->ofdm->bps);
         fprintf(stderr, "ofdm_bits_per_frame  = %d\n", f->ofdm_bitsperframe);
