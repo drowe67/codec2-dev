@@ -55,13 +55,15 @@ function ofdm_ldpc_rx(filename, mode="700D", varargin)
   Nsam = length(rx);
   prx = 1;
   if strcmp(mode,"datac4") || strcmp(mode,"datac13")
-    % BPF, we actually shift the signal back down to baseband to filter, as per
-    % C version
-    ssbfilt_n = 100;
+    % Complex bandpass filter as per src/filter.c
+    n_coeffs = 100;
     rxbpf_width_Hz = 600;
-    ssbfilt_coeff = fir1(ssbfilt_n, rxbpf_width_Hz/states.Fs);
-    lo = exp(j*2*pi*states.fcentre*(1:length(rx))/(states.Fs))';
-    rx = conj(lo).*filter(ssbfilt_coeff,1,rx.*lo);
+    % note this designs a lowpass filter with cutoff rxbpf_width_Hz/2, as third
+    % argument is normalised to Fs/2
+    lowpass_coeff = fir1(n_coeffs-1, rxbpf_width_Hz/states.Fs);
+    w = 2*pi*states.fcentre/states.Fs; k = (0:n_coeffs-1);
+    bandpass_coeff = lowpass_coeff .* exp(j*w*k);
+    rx = filter(bandpass_coeff,1,rx);
   end
   
   % Generate tx frame for BER calcs
