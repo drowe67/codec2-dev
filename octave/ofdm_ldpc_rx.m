@@ -55,7 +55,13 @@ function ofdm_ldpc_rx(filename, mode="700D", varargin)
   Nsam = length(rx);
   prx = 1;
   if strcmp(mode,"datac4") || strcmp(mode,"datac13")
-    rx = filter(fir1(100,[1250 1700]/4000),1,rx);
+    % BPF, we actually shift the signal back down to baseband to filter, as per
+    % C version
+    ssbfilt_n = 100;
+    rxbpf_width_Hz = 600;
+    ssbfilt_coeff = fir1(ssbfilt_n, rxbpf_width_Hz/states.Fs);
+    lo = exp(j*2*pi*states.fcentre*(1:length(rx))/(states.Fs))';
+    rx = conj(lo).*filter(ssbfilt_coeff,1,rx.*lo);
   end
   
   % Generate tx frame for BER calcs
