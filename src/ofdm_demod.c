@@ -386,8 +386,8 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "Warning EsNo: %f hard coded\n", EsNo);
 
     /* More logging */
-    COMP payload_syms_log[NFRAMES][Npayloadsymsperframe];
-    float payload_amps_log[NFRAMES][Npayloadsymsperframe];
+    COMP payload_syms_log[NFRAMES][Npayloadsymsperpacket];
+    float payload_amps_log[NFRAMES][Npayloadsymsperpacket];
 
     for (i = 0; i < NFRAMES; i++) {
         for (j = 0; j < Npayloadsymsperframe; j++) {
