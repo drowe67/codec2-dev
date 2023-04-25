@@ -514,11 +514,13 @@ float filtP1100S1300[]={
 };
 
 /*
-  Low pass filter, sample rate 8000 Hz, 60dB dB atten, pass 200 Hz, stop 400 Hz
-  Designed as an input BPF for datac4 and datac13
+  Low pass prototype, sample rate 8000 Hz, 60dB dB atten, pass 200 Hz, stop 450 Hz,
+  note when used as BPF in modem this gives a flat passband 400 Hz wide.
+  
+  Used as an input BPF for datac4 and datac13
 
   Generated using Octave:
-  octave:77> h = fir1(99, 300/4000); f=0:500; w=f*pi/4000; H=freqz(h,1,w);
+  octave:77> h = fir1(99, 600/8000); f=0:500; w=f*pi/4000; H=freqz(h,1,w);
   octave:78> clf; plot(f,20*log10(abs(H))); grid; axis([0 500 -60 10])
   octave:79> save_array_c_header(h,"filtP200S400","t.h")
 */

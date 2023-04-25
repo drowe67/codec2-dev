@@ -1481,11 +1481,11 @@ void ofdm_demod_shorts(struct OFDM *ofdm, int *rx_bits, short *rxbuf_in, float g
         complex float rx[ofdm->nin];
         complex float rx_filt[ofdm->nin];
         for(i=0; i<ofdm->nin; i++)
-            rx[i] = rxbuf_in[i];
+            rx[i] = rxbuf_in[i] / 32767.0f;
         quisk_ccfFilter(rx, rx_filt, ofdm->nin, ofdm->rx_bpf);
         /* insert latest input samples onto tail of rxbuf */
         for (j = 0, i = (ofdm->nrxbuf - ofdm->nin); i < ofdm->nrxbuf; j++, i++) {
-            ofdm->rxbuf[i] = creal(rx_filt[j]) / 32767.0f;
+            ofdm->rxbuf[i] = rx_filt[j];
         }
     }
     else {
