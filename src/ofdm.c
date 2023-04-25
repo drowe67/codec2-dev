@@ -1422,6 +1422,11 @@ static int ofdm_sync_search_stream(struct OFDM *ofdm) {
 }
 
 static int ofdm_sync_search_core(struct OFDM *ofdm) {
+    if (ofdm->rx_bpf_en) {
+      assert(ofdm->rx_bpf != NULL);
+      complex float *rxbuf_in = &ofdm->rxbuf[(ofdm->nrxbuf - ofdm->nin)];
+      quisk_ccfFilter(rxbuf_in, rxbuf_in, ofdm->nin, ofdm->rx_bpf);
+    }
     if (!strcmp(ofdm->data_mode, "burst"))
         return ofdm_sync_search_burst(ofdm);
     else
@@ -1439,7 +1444,6 @@ static int ofdm_sync_search_core(struct OFDM *ofdm) {
  */
 void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
     complex float *rx = (complex float *) &rxbuf_in[0]; // complex has same memory layout
-    complex float rx_filt[ofdm->nin];
     int i, j;
 
    /* shift the buffer left based on nin */
@@ -1447,13 +1451,6 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
         ofdm->rxbuf[i] = ofdm->rxbuf[j];
     }
 
-    /* Optional input BPF used by some modes (e.g. to improve acquisition) */
-    if (ofdm->rx_bpf_en) {
-        assert(ofdm->rx_bpf != NULL);
-        quisk_ccfFilter(rx, rx_filt, ofdm->nin, ofdm->rx_bpf);
-        rx = rx_filt;
-    }
-    
     /* insert latest input samples onto tail of rxbuf */
     for (j = 0, i = (ofdm->nrxbuf - ofdm->nin); i < ofdm->nrxbuf; j++, i++) {
         ofdm->rxbuf[i] = rx[j];
@@ -1475,24 +1472,9 @@ void ofdm_demod_shorts(struct OFDM *ofdm, int *rx_bits, short *rxbuf_in, float g
         ofdm->rxbuf[i] = ofdm->rxbuf[j];
     }
 
-    /* Optional input BPF used by some modes (e.g. to improve acquisition) */
-    if (ofdm->rx_bpf_en) {
-        assert(ofdm->rx_bpf != NULL);
-        complex float rx[ofdm->nin];
-        complex float rx_filt[ofdm->nin];
-        for(i=0; i<ofdm->nin; i++)
-            rx[i] = rxbuf_in[i] / 32767.0f;
-        quisk_ccfFilter(rx, rx_filt, ofdm->nin, ofdm->rx_bpf);
-        /* insert latest input samples onto tail of rxbuf */
-        for (j = 0, i = (ofdm->nrxbuf - ofdm->nin); i < ofdm->nrxbuf; j++, i++) {
-            ofdm->rxbuf[i] = rx_filt[j];
-        }
-    }
-    else {
-        /* insert latest input samples onto tail of rxbuf */
-        for (j = 0, i = (ofdm->nrxbuf - ofdm->nin); i < ofdm->nrxbuf; j++, i++) {
-            ofdm->rxbuf[i] = ((float)rxbuf_in[j] / 32767.0f);
-        }
+    /* insert latest input samples onto tail of rxbuf */
+    for (j = 0, i = (ofdm->nrxbuf - ofdm->nin); i < ofdm->nrxbuf; j++, i++) {
+        ofdm->rxbuf[i] = ((float)rxbuf_in[j] / 32767.0f);
     }
     
     ofdm_demod_core(ofdm, rx_bits);
@@ -1505,6 +1487,12 @@ void ofdm_demod_shorts(struct OFDM *ofdm, int *rx_bits, short *rxbuf_in, float g
 static void ofdm_demod_core(struct OFDM *ofdm, int *rx_bits) {
     int prev_timing_est = ofdm->timing_est;
     int i, j, k, rr, st, en;
+
+     if (ofdm->rx_bpf_en) {
+      assert(ofdm->rx_bpf != NULL);
+      complex float *rxbuf_in = &ofdm->rxbuf[(ofdm->nrxbuf - ofdm->nin)];
+      quisk_ccfFilter(rxbuf_in, rxbuf_in, ofdm->nin, ofdm->rx_bpf);
+    }
 
     /*
      * get user and calculated freq offset

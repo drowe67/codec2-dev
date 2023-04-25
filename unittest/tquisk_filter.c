@@ -41,7 +41,6 @@ int main() {
             buf_short[i] = creal(buf[i]);
         n += fwrite(buf_short, sizeof(short), N, stdout);
     }
-    fprintf(stderr,"n = %d written\n", n);
     
     quisk_filt_destroy(bpf);
     free(bpf);
