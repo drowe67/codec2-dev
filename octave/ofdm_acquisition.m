@@ -41,10 +41,10 @@ function [rx tx_preamble tx_postamble burst_len padded_burst_len ct_targets stat
   %printf("SNR3kdB: %f Burst offset: %f\n", sim_in.SNR3kdB, mark_space_SNR_offset)
   rx = channel_simulate(Fs, SNRdB_setpoint, sim_in.foff_Hz, sim_in.channel, tx);
 
-  % experimental BPF
-  if strcmp(sim_in.mode,"datac4")
-    rx = filter(fir1(100,[1400 1600]/4000),1,rx);
-    l = length(rx); rx = [rx(50:l) zeros(1,50)];
+  % optional BPF
+  if strcmp(sim_in.mode,"datac4") || strcmp(mode,"datac13")
+    [rx delay_samples] = ofdm_complex_bandpass_filter(states, sim_in.mode, rx);
+    l = length(rx); rx = [rx(delay_samples:l) zeros(1,delay_samples)];
   end
 endfunction
 

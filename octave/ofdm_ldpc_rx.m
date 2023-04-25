@@ -54,18 +54,7 @@ function ofdm_ldpc_rx(filename, mode="700D", varargin)
   frx=fopen(filename,"rb"); rx = fread(frx, Inf, "short")/Ascale; fclose(frx);
   Nsam = length(rx);
   prx = 1;
-  if strcmp(mode,"datac4") || strcmp(mode,"datac13")
-    % Complex bandpass filter as per src/filter.c
-    n_coeffs = 100;
-    rxbpf_width_Hz = 600;
-    % note this designs a lowpass filter with cutoff rxbpf_width_Hz/2, as third
-    % argument is normalised to Fs/2
-    lowpass_coeff = fir1(n_coeffs-1, rxbpf_width_Hz/states.Fs);
-    w = 2*pi*states.fcentre/states.Fs; k = (0:n_coeffs-1);
-    bandpass_coeff = lowpass_coeff .* exp(j*w*k);
-    rx = filter(bandpass_coeff,1,rx);
-  end
-  
+
   % Generate tx frame for BER calcs
 
   payload_bits = round(ofdm_rand(code_param.data_bits_per_frame)/32767);
@@ -95,6 +84,8 @@ function ofdm_ldpc_rx(filename, mode="700D", varargin)
 
   % main loop ----------------------------------------------------------------
 
+  rx = ofdm_complex_bandpass_filter(states, mode, rx);
+  
   f = 1;
   while(prx < Nsam)
 
