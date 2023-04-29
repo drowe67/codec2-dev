@@ -512,7 +512,7 @@ function [t_est foff_est timing_mx] = est_timing_and_freq(states, rx, known_samp
     end
     
     % At each timing position, correlate with known samples at all possible freq offsets.  Result
-    % is a column vector for each timing offset.  Each matrix cell is s freq,timing coordinate
+    % is a column vector for each timing offset.  Each matrix cell is a freq,timing coordinate
     
     corr = [];
     for t=1:tstep:Ncorr
@@ -1246,13 +1246,14 @@ endfunction
 function [rx delay_samples] = ofdm_complex_bandpass_filter(states, mode, rx)
   delay_samples = 0;
   if strcmp(mode,"datac4") || strcmp(mode,"datac13")
+    w_centre = mean(states.w);
     n_coeffs = 100;
-    rxbpf_width_Hz = 600;
+    rxbpf_width_Hz = 400;
     % note this designs a lowpass filter with cutoff rxbpf_width_Hz/2, as third
     % argument is normalised to Fs/2
     lowpass_coeff = fir1(n_coeffs-1, rxbpf_width_Hz/states.Fs);
-    w = 2*pi*states.fcentre/states.Fs; k = (0:n_coeffs-1);
-    bandpass_coeff = lowpass_coeff .* exp(j*w*k);
+    k = (0:n_coeffs-1);
+    bandpass_coeff = lowpass_coeff .* exp(j*w_centre*k);
     rx = filter(bandpass_coeff,1,rx);
     delay_samples = n_coeffs/2;
   end
