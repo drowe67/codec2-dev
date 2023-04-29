@@ -1217,13 +1217,11 @@ function tx = ofdm_hilbert_clipper(states, tx, tx_clip_en)
     end
     [tx nclipped] = ofdm_clip(states, tx*states.clip_gain1, states.ofdm_peak);
     
-    % BPF, we actually shift the signal back down to baseband to filter
-    ssbfilt_n = 100;
-    ssbfilt_coeff = fir1(ssbfilt_n, states.txbpf_width_Hz/states.Fs);
-    lo = exp(j*2*pi*states.fcentre*(1:length(tx))/(states.Fs));
-    tx = lo.*filter(ssbfilt_coeff,1,tx.*conj(lo));
-    
-    % filter messs up peak levels use this to get us back to approx 16384
+    cutoff_norm = states.txbpf_width_Hz/states.Fs;
+    w_centre = mean(states.w); centre_norm = w_centre/(2*pi);
+    tx = ofdm_complex_bandpass_filter(cutoff_norm, centre_norm,100,tx);
+     
+    % filter messes up peak levels use this to get us back to approx 16384
     tx *= states.clip_gain2;
   end
 
@@ -1242,20 +1240,25 @@ function tx = ofdm_hilbert_clipper(states, tx, tx_clip_en)
 endfunction
 
 
-% Complex bandpass filter as per src/filter.c
-function [rx delay_samples] = ofdm_complex_bandpass_filter(states, mode, rx)
+% Complex bandpass filter built from low pass prototype as per src/filter.c, 
+% cutoff_freq and center_freq are normalised such that cutoff_freq = 0.5 is Fs/2
+function out = ofdm_complex_bandpass_filter(cutoff_freq,center_freq,n_coeffs,in)
+  lowpass_coeff = fir1(n_coeffs-1, cutoff_freq);
+  k = (0:n_coeffs-1);
+  bandpass_coeff = lowpass_coeff .* exp(j*2*pi*center_freq*k);
+  out = filter(bandpass_coeff,1,in);
+endfunction
+
+
+% Complex bandpass filter for Rx - just used on the very low SNR modes to help 
+% with acquisition
+function [rx delay_samples] = ofdm_rx_filter(states, mode, rx)
   delay_samples = 0;
   if strcmp(mode,"datac4") || strcmp(mode,"datac13")
-    w_centre = mean(states.w);
-    %printf("f centre: %f\n", w_centre*states.Fs/(2*pi));
+    w_centre = mean(states.w); centre_norm = w_centre/(2*pi);
     n_coeffs = 100;
-    rxbpf_width_Hz = 400;
-    % note this designs a lowpass filter with cutoff rxbpf_width_Hz/2, as third
-    % argument is normalised to Fs/2
-    lowpass_coeff = fir1(n_coeffs-1, rxbpf_width_Hz/states.Fs);
-    k = (0:n_coeffs-1);
-    bandpass_coeff = lowpass_coeff .* exp(j*w_centre*k);
-    rx = filter(bandpass_coeff,1,rx);
+    cutoff_Hz = 400; cutoff_norm = cutoff_Hz/states.Fs;
+    rx = ofdm_complex_bandpass_filter(cutoff_norm,centre_norm,n_coeffs,rx);
     delay_samples = n_coeffs/2;
   end
 endfunction

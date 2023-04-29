@@ -84,7 +84,7 @@ function ofdm_ldpc_rx(filename, mode="700D", varargin)
 
   % main loop ----------------------------------------------------------------
 
-  rx = ofdm_complex_bandpass_filter(states, mode, rx);
+  rx = ofdm_rx_filter(states, mode, rx);
   
   f = 1;
   while(prx < Nsam)
