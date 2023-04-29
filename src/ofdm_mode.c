@@ -122,7 +122,7 @@ void ofdm_init_mode(char mode[], struct OFDM_CONFIG *config) {
         config->ns=5; config->np=47; config->tcp = 0.006; config->ts = 0.016; config->nc = 4;
         config->edge_pilots = 0;
         config->txtbits = 0; config->state_machine = "data";
-        config->ftwindowwidth = 80; config->timing_mx_thresh = 0.25;
+        config->ftwindowwidth = 80; config->timing_mx_thresh = 0.5;
         config->codename = "H_1024_2048_4f"; config->amp_est_mode = 1;
         config->nuwbits = 32; config->bad_uw_errors = 12;
         uint8_t uw[] = {1,1,0,0, 1,0,1,0,  1,1,1,1, 0,0,0,0, 1,1,1,1, 0,0,0,0};
@@ -137,7 +137,7 @@ void ofdm_init_mode(char mode[], struct OFDM_CONFIG *config) {
         config->ns=5; config->np=18; config->tcp = 0.006; config->ts = 0.016; config->nc = 3;
         config->edge_pilots = 0;
         config->txtbits = 0; config->state_machine = "data";
-        config->ftwindowwidth = 80; config->timing_mx_thresh = 0.25;
+        config->ftwindowwidth = 80; config->timing_mx_thresh = 0.45;
         config->codename = "H_256_512_4"; config->amp_est_mode = 1;
         config->nuwbits = 48; config->bad_uw_errors = 18;
         uint8_t uw[] = {1,1,0,0, 1,0,1,0,  1,1,1,1, 0,0,0,0, 1,1,1,1, 0,0,0,0};

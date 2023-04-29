@@ -368,14 +368,6 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     ofdm->aphase_est_pilot_log = MALLOC(sizeof (float) * (ofdm->rowsperframe * ofdm->nc));
     assert(ofdm->aphase_est_pilot_log != NULL);
 
-    /* Null pointers to unallocated buffers */
-    ofdm->tx_bpf = NULL;
-    if (ofdm->tx_bpf_en)
-        allocate_tx_bpf(ofdm);
-    ofdm->rx_bpf = NULL;
-    if (ofdm->rx_bpf_en)
-        allocate_rx_bpf(ofdm);
-
     /* store complex BPSK pilot symbols */
 
     assert(sizeof (pilotvalues) >= (ofdm->nc + 2) * sizeof (int8_t));
@@ -394,6 +386,14 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     tval = ((float) ofdm->nc / 2.0f);
     ofdm->tx_nlower = roundf((ofdm->tx_centre / ofdm->rs) - tval) - 1.0f;
     ofdm->rx_nlower = roundf((ofdm->rx_centre / ofdm->rs) - tval) - 1.0f;
+
+    /* Tx and Rx band pass filters */
+    ofdm->tx_bpf = NULL;
+    if (ofdm->tx_bpf_en)
+        allocate_tx_bpf(ofdm);
+    ofdm->rx_bpf = NULL;
+    if (ofdm->rx_bpf_en)
+        allocate_rx_bpf(ofdm);
 
     for (i = 0; i < ofdm->nrxbuf; i++) {
         ofdm->rxbuf[i] = 0.0f;
@@ -592,7 +592,13 @@ static void allocate_rx_bpf(struct OFDM *ofdm) {
 
     if (!strcmp(ofdm->mode, "datac4") || !strcmp(ofdm->mode, "datac13")) {
         quisk_filt_cfInit(ofdm->rx_bpf, filtP200S400, sizeof (filtP200S400) / sizeof (float));
-        quisk_cfTune(ofdm->rx_bpf, ofdm->rx_centre / ofdm->fs);
+        // centre the filter on the mean carrier freq, allows a narrower filter to be used
+        float rx_centre = 0.0;
+        for(int c=0; c<ofdm->nc+2; c++)
+            rx_centre += (ofdm->rx_nlower + c) * ofdm->doc;
+        rx_centre = (ofdm->fs/TAU)*rx_centre/(ofdm->nc+2);   
+        //fprintf(stderr, " rx_centre: %f\n", rx_centre);
+        quisk_cfTune(ofdm->rx_bpf, rx_centre / ofdm->fs);
     }
     else assert(0);
 }

@@ -1247,6 +1247,7 @@ function [rx delay_samples] = ofdm_complex_bandpass_filter(states, mode, rx)
   delay_samples = 0;
   if strcmp(mode,"datac4") || strcmp(mode,"datac13")
     w_centre = mean(states.w);
+    %printf("f centre: %f\n", w_centre*states.Fs/(2*pi));
     n_coeffs = 100;
     rxbpf_width_Hz = 400;
     % note this designs a lowpass filter with cutoff rxbpf_width_Hz/2, as third
