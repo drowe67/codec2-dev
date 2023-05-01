@@ -50,6 +50,8 @@ if [ "$1" == "LPCNet" ]; then
     data_test "datac0"
     data_test "datac1"
     data_test "datac3"
+    data_test "datac4"
+    data_test "datac13"
 fi
 
 exit 0
