@@ -52,6 +52,7 @@
 static float cnormf(complex float);
 static void allocate_tx_bpf(struct OFDM *);
 static void deallocate_tx_bpf(struct OFDM *);
+static float find_carrier_centre(struct OFDM *ofdm);
 static void allocate_rx_bpf(struct OFDM *);
 static void deallocate_rx_bpf(struct OFDM *);
 static void dft(struct OFDM *, complex float *, complex float *);
@@ -574,6 +575,12 @@ static void allocate_tx_bpf(struct OFDM *ofdm) {
         quisk_filt_cfInit(ofdm->tx_bpf, filtP400S600, sizeof (filtP400S600) / sizeof (float));
         quisk_cfTune(ofdm->tx_bpf, ofdm->tx_centre / ofdm->fs);
     }
+    else if (!strcmp(ofdm->mode, "datac4") || !strcmp(ofdm->mode, "datac13")) {
+        quisk_filt_cfInit(ofdm->tx_bpf, filtP200S400, sizeof (filtP200S400) / sizeof (float));
+        // centre the filter on the mean carrier freq, allows a narrower filter to be used
+        float tx_centre = find_carrier_centre(ofdm);
+        quisk_cfTune(ofdm->tx_bpf, tx_centre / ofdm->fs);
+    }
     else assert(0);
 }
 
@@ -582,6 +589,13 @@ static void deallocate_tx_bpf(struct OFDM *ofdm) {
     quisk_filt_destroy(ofdm->tx_bpf);
     FREE(ofdm->tx_bpf);
     ofdm->tx_bpf = NULL;
+}
+
+static float find_carrier_centre(struct OFDM *ofdm) {
+    float rx_centre = 0.0;
+    for(int c=0; c<ofdm->nc+2; c++)
+        rx_centre += (ofdm->rx_nlower + c) * ofdm->doc;
+    return (ofdm->fs/TAU)*rx_centre/(ofdm->nc+2);   
 }
 
 static void allocate_rx_bpf(struct OFDM *ofdm) {
@@ -593,11 +607,8 @@ static void allocate_rx_bpf(struct OFDM *ofdm) {
     if (!strcmp(ofdm->mode, "datac4") || !strcmp(ofdm->mode, "datac13")) {
         quisk_filt_cfInit(ofdm->rx_bpf, filtP200S400, sizeof (filtP200S400) / sizeof (float));
         // centre the filter on the mean carrier freq, allows a narrower filter to be used
-        float rx_centre = 0.0;
-        for(int c=0; c<ofdm->nc+2; c++)
-            rx_centre += (ofdm->rx_nlower + c) * ofdm->doc;
-        rx_centre = (ofdm->fs/TAU)*rx_centre/(ofdm->nc+2);   
-        //fprintf(stderr, " rx_centre: %f\n", rx_centre);
+        float rx_centre = find_carrier_centre(ofdm);
+         //fprintf(stderr, " rx_centre: %f\n", rx_centre);
         quisk_cfTune(ofdm->rx_bpf, rx_centre / ofdm->fs);
     }
     else assert(0);
