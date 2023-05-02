@@ -145,7 +145,7 @@ These modes use an OFDM modem with powerful LDPC codes and are designed for send
 | DATAC1 | 1700 | 980 | 510 | (8192,4096) | 4.18 | 92/100 at 5dB | Forward link data (medium SNR) |
 | DATAC3 | 500 | 321 | 126 | (2048,1024) | 3.19 | 74/100 at 0dB | Forward link data (low SNR) |
 | DATAC4 | 250 | 87 | 56 | (1472,448) | 5.17 | 90/100 at -4dB | Forward link data (low SNR) |
-| DATAC13 | 200 | 64 | 126 | (384,128) | 2.0 | 90/100 at -4dB | Reverse link ACK packets (low SNR) |
+| DATAC13 | 200 | 64 | 14 | (384,128) | 2.0 | 90/100 at -4dB | Reverse link ACK packets (low SNR) |
 
 Notes:
 1. 16 bits (2 bytes) per frame are reserved for a 16 bit CRC, e.g. for `datac3` we have 128 byte frames, and 128-2=126 bytes/frame of payload data.
