@@ -259,6 +259,8 @@ The following plots illustrate the SNR estimates versus actual channel SNR with 
 1. Examples in the [ctests](CMakeLists.txt) (look for "FreeDV API raw data")
 1. [Codec 2 HF Data Modes Part 1 blog post](http://www.rowetel.com/?p=7167)
 1. [HF Data Acquisition](https://github.com/drowe67/codec2/pull/171) GitHub Pull Request
+1. [datac4 & datac13](https://github.com/drowe67/codec2/pull/364) GitHub Pull Request
+1. [FreeDATA](https://freedata.app/) uses these modems
 
 # VHF Packet Data Channel
 
