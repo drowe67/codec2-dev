@@ -58,10 +58,10 @@ function snrest_snr_screen(source, channel)
   snr_scatter(source, 'datac0', channel,'b+-')
   snr_scatter(source, 'datac1', channel,'g+-')
   snr_scatter(source, 'datac3', channel,'r+-')
-  snr_scatter(source, 'datac4', channel,'r+-')
-  snr_scatter(source, 'datac13', channel,'r+-')
+  snr_scatter(source, 'datac4', channel,'c+-')
+  snr_scatter(source, 'datac13', channel,'m+-')
   xlabel('SNR (dB)'); ylabel('SNRest (dB)'); grid('minor');
-  axis([-5 12 -5 12]);
+  axis([-12 12 -12 12]);
   a = axis;
   plot([a(1) a(2)],[a(1) a(2)],'bk-');
   hold off; grid;
