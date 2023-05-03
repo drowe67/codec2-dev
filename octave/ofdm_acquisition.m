@@ -5,7 +5,7 @@
 %
 % To run headless on a server:
 %
-%   DISPLAY=\"\" octave-cli --no-gui -qf ofdm_dev.m > 210218.txt &
+%   DISPLAY=\"\" octave-cli --no-gui -qf ofdm_acquisition.m > 210218.txt &
 
 ofdm_lib;
 channel_lib;
@@ -40,6 +40,12 @@ function [rx tx_preamble tx_postamble burst_len padded_burst_len ct_targets stat
   SNRdB_setpoint = sim_in.SNR3kdB + mark_space_SNR_offset;
   %printf("SNR3kdB: %f Burst offset: %f\n", sim_in.SNR3kdB, mark_space_SNR_offset)
   rx = channel_simulate(Fs, SNRdB_setpoint, sim_in.foff_Hz, sim_in.channel, tx);
+
+  % optional BPF
+  if strcmp(sim_in.mode,"datac4") || strcmp(sim_in.mode,"datac13")
+    [rx delay_samples] = ofdm_complex_bandpass_filter(states, sim_in.mode, rx);
+    l = length(rx); rx = [rx(delay_samples:l) zeros(1,delay_samples)];
+  end
 endfunction
 
 
@@ -120,7 +126,7 @@ function Pa = frame_by_frame_acquisition_test(mode="datac1", Ntests=10, channel=
          delta_foff_log = [delta_foff_log pre_eval.delta_foff];
          ct_log = [ct_log w+pre_eval.ct_est];
          if states.verbose
-           printf("Pre  i: %2d n: %8d ct_est: %6d delta_ct: %6d foff_est: %5.1f timing_mx: %3.2f Acq: %d\n",
+           printf("Pre  i: %2d n: %8d ct_est: %6d delta_ct: %6d foff_est: %5.1f timing_mx: %3.2f Acq: %2d\n",
                   i, n, pre_eval.ct_est, pre_eval.delta_ct, pre.foff_est, pre.timing_mx, target_acq(i));
          end
        end
@@ -138,7 +144,7 @@ function Pa = frame_by_frame_acquisition_test(mode="datac1", Ntests=10, channel=
          delta_foff_log = [delta_foff_log post_eval.delta_foff];
          ct_log = [ct_log w+post_eval.ct_est];
          if states.verbose
-           printf("Post i: %2d n: %8d ct_est: %6d delta_ct: %6d foff_est: %5.1f timing_mx: %3.2f Acq: %d\n",
+           printf("Post i: %2d n: %8d ct_est: %6d delta_ct: %6d foff_est: %5.1f timing_mx: %3.2f Acq: %2d\n",
                   i, n, post_eval.ct_est, post_eval.delta_ct, post.foff_est, post.timing_mx, target_acq(i));
          end
        end
@@ -160,18 +166,24 @@ function Pa = frame_by_frame_acquisition_test(mode="datac1", Ntests=10, channel=
                plot(timing_mx_log(1,:),'+-;preamble;'); 
                hold on; 
                plot(timing_mx_log(2,:),'o-;postamble;'); 
-               plot(0.35+0.1*state_log,'-g;state;'); 
-               title('mx log'); axis([0 length(timing_mx_log) 0 0.5]); grid;
+               plot(0.45+0.1*state_log,'-g;state;'); 
+               title('mx log'); axis([0 length(timing_mx_log) 0 1.0]); grid;
                hold off;
     figure(4); clf; plot(real(rx)); axis([0 length(rx) -3E4 3E4]);
                hold on;
                plot(ct_log,zeros(1,length(ct_log)),'r+','markersize', 25, 'linewidth', 2);
                hold off; 
     figure(5); clf; plot_specgram(rx, Fs, 500, 2500);
+    all_mx = [ timing_mx_log(1,:) timing_mx_log(2,:)];
+    figure(6); clf; [nn xx] = hist(all_mx); semilogy(xx,nn+1); grid;
+    figure(7); clf; cdf = empirical_cdf(0:0.1:1,all_mx); plot(0:0.1:1, cdf); grid;
+
   end
   
-  Pa = length(find(target_acq == 1))/Ntests;
-  printf("%s %s SNR: %3.1f foff: %3.1f P(acq) = %3.2f\n", mode, channel, SNR3kdB, foff_Hz, Pa);
+  Pacq = length(find(target_acq == 1))/Ntests;
+  Pfalse_acq = length(find(target_acq == -1))/Ntests;
+  printf("%s %s SNR: %3.1f foff: %3.1f P(acq) = %3.2f P(false_acq) = %3.2f\n", mode, channel, SNR3kdB, foff_Hz,
+         Pacq, Pfalse_acq);
 endfunction
 
 
@@ -227,5 +239,11 @@ randn('seed',1);
 % choose simulation to run here 
 % ---------------------------------------------------------
 
-frame_by_frame_acquisition_test("datac0", Ntests=5, 'mpp', SNR3kdB=5, foff_hz=0, verbose=1+8);
-%acquistion_curves_frame_by_frame_modes_channels_snr(Ntests=50, quick_test=0)
+if exist("ctest","var")
+  % simple tests to run as part of ctests
+  frame_by_frame_acquisition_test("datac0", Ntests=5, 'mpp', SNR3kdB=5, foff_hz=0, verbose=1+8);
+else
+  % other development work here
+  frame_by_frame_acquisition_test("datac13", Ntests=100, 'mpp', SNR3kdB=-4, foff_hz=0, verbose=1+8);
+  %acquistion_curves_frame_by_frame_modes_channels_snr(Ntests=50, quick_test=0)
+end

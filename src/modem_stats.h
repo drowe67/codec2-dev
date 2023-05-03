@@ -35,7 +35,7 @@
 #endif
 
 #define MODEM_STATS_NC_MAX      50
-#define MODEM_STATS_NR_MAX      160
+#define MODEM_STATS_NR_MAX      320
 #define MODEM_STATS_ET_MAX      8
 #define MODEM_STATS_EYE_IND_MAX 160
 #define MODEM_STATS_NSPEC       512

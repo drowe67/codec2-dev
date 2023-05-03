@@ -52,7 +52,7 @@ void opt_help() {
     fprintf(stderr, "\nusage: %s [options]\n\n", progname);
     fprintf(stderr, "  --in      filename    Name of InputOneCharPerBitFile\n");
     fprintf(stderr, "  --out     filename    Name of OutputModemRawFile\n");
-    fprintf(stderr, "  --mode    modeName    Predefined mode 700D|700E|2020|2020B|datac0|datac1|datac3\n");
+    fprintf(stderr, "  --mode    modeName    Predefined mode 700D|700E|2020|2020B|datac0 ... etc\n");
     fprintf(stderr, "  --nc      [17..62]    Number of Carriers (17 default, 62 max)\n");
     fprintf(stderr, "  --ns       symbols    One pilot every ns symbols (8 default)\n");
     fprintf(stderr, "  --tcp        Nsecs    Cyclic Prefix Duration (.002 default)\n");
@@ -250,18 +250,11 @@ int main(int argc, char *argv[]) {
     struct LDPC ldpc;
     if (ldpc_en) {
         ldpc_codes_setup(&ldpc, ofdm->codename);
-        if (verbose > 1) { fprintf(stderr, "using: %s\n", ofdm->codename); }
-
-        /* mode specific set up */
-        if (!strcmp(mode,"2020")) set_data_bits_per_frame(&ldpc, 312);
-        if (!strcmp(mode,"2020B")) {
-            set_data_bits_per_frame(&ldpc, 156);
-            ldpc.protection_mode = LDPC_PROT_2020B;
-        }
-        if (!strcmp(mode,"2020C")) set_data_bits_per_frame(&ldpc, 156);
+        ldpc_mode_specific_setup(ofdm, &ldpc);
         Ndatabitsperpacket = ldpc.data_bits_per_frame;
 
         if (verbose > 1) {
+            fprintf(stderr, "using: %s\n", ofdm->codename);
             fprintf(stderr, "LDPC codeword data bits = %d\n", ldpc.ldpc_data_bits_per_frame);
             fprintf(stderr, "LDPC codeword total bits  = %d\n", ldpc.ldpc_coded_bits_per_frame);
             fprintf(stderr, "LDPC codeword data bits used = %d\n", Ndatabitsperpacket);

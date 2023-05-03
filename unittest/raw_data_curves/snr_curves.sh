@@ -106,12 +106,13 @@ function generate_snrest_v_snr_data {
 
   snr_nudge=0
   aNo_list=$No_list
+
+  # nudge SNR test range to get meaningful results for these tests  
   if [ "$mode" == "datac1" ]; then
-    # nudge SNR test range to get meaningful results for this test  
     snr_nudge=4
-  else
-    # few extra points to test SNRest at high SNRs on low rate waveforms
-    aNo_list=$No_list" -28 -30"
+  fi
+  if [[ "$mode" == "datac4" || "$mode" == "datac13" ]]; then
+    snr_nudge=-6
   fi
   
   ch_multipath=''
@@ -158,6 +159,13 @@ function generate_snrest_v_snr_data {
   done
 
   echo ${SNRoffset} > offset_${id}_${mode}_${channel}.txt
+ 
+  # trap not enough fading file samples (with mpp)
+  grep "Fading file finished" ${ch_log}
+  if [ $? -eq 0 ]; then
+      cat ${ch_log}
+      exit 1
+  fi
   SNRch=$(cat ${ch_log} | grep SNR3k | tr -s ' ' | cut -d' ' -f3)
   echo ${SNRch} > snr_${id}_${mode}_${channel}.txt
 }
@@ -166,7 +174,7 @@ function generate_snrest_v_snr_data {
 function test_ldpc {
   echo "ldpcut; quit" | DISPLAY="" octave-cli -p ${CODEC2}/octave
   if [ "$?" -ne 0 ]; then
-     echo "basic octave test failed, you may need to"
+    echo "basic octave test failed, you may need to"
     echo "(a) run ctests to create build_xxx/cml"
     echo "(b) set up ~/.octaverc as per octave/ldpc.m"
     exit 1

@@ -117,6 +117,7 @@ void freedv_ofdm_voice_open(struct freedv *f, char *mode) {
     assert(f->ldpc != NULL);
 
     ldpc_codes_setup(f->ldpc, f->ofdm->codename);
+    ldpc_mode_specific_setup(f->ofdm, f->ldpc);
 #ifdef __EMBEDDED__
     f->ldpc->max_iter = 10; /* limit LDPC decoder iterations to limit CPU load */
 #endif
@@ -171,6 +172,8 @@ void freedv_ofdm_data_open(struct freedv *f) {
     if (f->mode == FREEDV_MODE_DATAC0) strcpy(mode, "datac0");
     if (f->mode == FREEDV_MODE_DATAC1) strcpy(mode, "datac1");
     if (f->mode == FREEDV_MODE_DATAC3) strcpy(mode, "datac3");
+    if (f->mode == FREEDV_MODE_DATAC4) strcpy(mode, "datac4");
+    if (f->mode == FREEDV_MODE_DATAC13) strcpy(mode, "datac13");
 
     ofdm_init_mode(mode, &ofdm_config);
     f->ofdm = ofdm_create(&ofdm_config);
@@ -180,6 +183,7 @@ void freedv_ofdm_data_open(struct freedv *f) {
     f->ldpc = (struct LDPC*)MALLOC(sizeof(struct LDPC));
     assert(f->ldpc != NULL);
     ldpc_codes_setup(f->ldpc, f->ofdm->codename);
+    ldpc_mode_specific_setup(f->ofdm, f->ldpc);
 #ifdef __EMBEDDED__
     f->ldpc->max_iter = 10; /* limit LDPC decoder iterations to limit CPU load */
 #endif
@@ -453,7 +457,8 @@ int freedv_comp_short_rx_ofdm(struct freedv *f, void *demod_in_8kHz, int demod_i
             uint8_t decoded_codeword[Npayloadbitsperpacket];
             symbols_to_llrs(llr, payload_syms_de, payload_amps_de,
                             EsNo, ofdm->mean_amp, Npayloadsymsperpacket);
-            iter = run_ldpc_decoder(ldpc, decoded_codeword, llr, &parityCheckCount);
+            ldpc_decode_frame(ldpc, &parityCheckCount, &iter, decoded_codeword, llr);
+            //iter = run_ldpc_decoder(ldpc, decoded_codeword, llr, &parityCheckCount);
             memcpy(f->rx_payload_bits, decoded_codeword, Ndatabitsperpacket);
 
             if (strlen(ofdm->data_mode)) {
@@ -534,7 +539,7 @@ int freedv_comp_short_rx_ofdm(struct freedv *f, void *demod_in_8kHz, int demod_i
         print_truncated = 1;
     if (print_full) { 
         fprintf(stderr, "%3d nin: %4d st: %-6s euw: %2d %2d mf: %2d f: %5.1f pbw: %d snr: %4.1f eraw: %4d ecdd: %4d iter: %3d "
-                "pcc: %3d rxst: %s\n",
+                "pcc: %4d rxst: %s\n",
                 f->frames++, ofdm->nin,
                 ofdm_statemode[ofdm->last_sync_state],
                 ofdm->uw_errors,
@@ -545,7 +550,7 @@ int freedv_comp_short_rx_ofdm(struct freedv *f, void *demod_in_8kHz, int demod_i
     }
     if (print_truncated) { 
             fprintf(stderr, "%3d nin: %4d st: %-6s euw: %2d %2d mf: %2d f: %5.1f pbw: %d                                        "
-                "         rxst: %s\n",
+                "             rxst: %s\n",
                 f->frames++, ofdm->nin,
                 ofdm_statemode[ofdm->last_sync_state],
                 ofdm->uw_errors,

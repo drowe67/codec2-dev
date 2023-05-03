@@ -20,7 +20,7 @@ all: test \
 clean:
 	rm -f *.txt *.png *.raw
 
-# trap common setup error
+# run this first, traps common CML setup error
 test:
 	source snr_curves.sh; test_ldpc
 
@@ -55,25 +55,37 @@ $(snr_ch_mpp):
 	source snr_curves.sh; generate_ch_data datac1 mpp
 	source snr_curves.sh; generate_ch_data datac3 mpp
 
+# C without compression
+
 $(snr_ctx):
 	source snr_curves.sh; generate_snrest_v_snr_data datac0 awgn
 	source snr_curves.sh; generate_snrest_v_snr_data datac1 awgn
 	source snr_curves.sh; generate_snrest_v_snr_data datac3 awgn
+	source snr_curves.sh; generate_snrest_v_snr_data datac4 awgn
+	source snr_curves.sh; generate_snrest_v_snr_data datac13 awgn
 
 $(snr_ctx_mpp):
 	source snr_curves.sh; generate_snrest_v_snr_data datac0 mpp
 	source snr_curves.sh; generate_snrest_v_snr_data datac1 mpp
 	source snr_curves.sh; generate_snrest_v_snr_data datac3 mpp
+	source snr_curves.sh; generate_snrest_v_snr_data datac4 mpp
+	source snr_curves.sh; generate_snrest_v_snr_data datac13 mpp
+
+# C with compression
 
 $(snr_ctxc):
 	source snr_curves.sh; generate_snrest_v_snr_data datac0 awgn 1
 	source snr_curves.sh; generate_snrest_v_snr_data datac1 awgn 1
 	source snr_curves.sh; generate_snrest_v_snr_data datac3 awgn 1
+	source snr_curves.sh; generate_snrest_v_snr_data datac4 awgn 1
+	source snr_curves.sh; generate_snrest_v_snr_data datac13 awgn 1
 
 $(snr_ctxc_mpp):
 	source snr_curves.sh; generate_snrest_v_snr_data datac0 mpp 1
 	source snr_curves.sh; generate_snrest_v_snr_data datac1 mpp 1
 	source snr_curves.sh; generate_snrest_v_snr_data datac3 mpp 1
+	source snr_curves.sh; generate_snrest_v_snr_data datac4 mpp 1
+	source snr_curves.sh; generate_snrest_v_snr_data datac13 mpp 1
 
 # Octave and C curves should be on top of each other, indicating Octave
 # and ch noise injection/SNR measurement are equivalent
@@ -101,7 +113,7 @@ octave_c_tx_comp_mpp.png: $(snr_oct_mpp) $(snr_ctxc_mpp)
 	echo "snr_curves_plot; octave_c_tx_comp_print('mpp'); quit" | \
         octave-cli -p $(CODEC2)/octave
 
-# composite AWGN and MPP from C Tx (compressed) - what end users would run
+# combined AWGN and MPP from C Tx (compressed) - what end users would run
 c_tx_comp.png: $(snr_ctxc) $(snr_ctxc_mpp)
 	echo "snr_curves_plot; c_tx_comp_print; quit" | \
         octave-cli -p $(CODEC2)/octave

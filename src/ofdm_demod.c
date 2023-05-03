@@ -67,7 +67,7 @@ void opt_help() {
     fprintf(stderr, "  --in          filename   Name of InputModemRawFile\n");
     fprintf(stderr, "  --out         filename   Name of OutputOneCharPerBitFile\n");
     fprintf(stderr, "  --log         filename   Octave log file for testing\n");
-    fprintf(stderr, "  --mode       modeName    Predefined mode e.g. 700D|2020|datac1\n");
+    fprintf(stderr, "  --mode       modeName    Predefined mode e.g. 700D|2020|datac1 etc\n");
     fprintf(stderr, "  --nc          [17..62]   Number of Carriers (17 default, 62 max)\n");
     fprintf(stderr, "  --np                     Number of packets\n");
     fprintf(stderr, "  --ns           Nframes   One pilot every ns symbols (8 default)\n");
@@ -322,7 +322,7 @@ int main(int argc, char *argv[]) {
     int Nsymsperframe = Nbitsperframe / ofdm_config->bps;
     int Nsymsperpacket = Nbitsperpacket / ofdm_config->bps;
     int Nmaxsamperframe = ofdm_get_max_samples_per_frame(ofdm);
-    int Npayloadbitsperframe = ofdm_bitsperframe - ofdm_nuwbits - ofdm_ntxtbits;
+    int Npayloadbitsperframe = ofdm_bitsperframe;
     int Npayloadbitsperpacket = Nbitsperpacket - ofdm_nuwbits - ofdm_ntxtbits;
     int Npayloadsymsperframe = Npayloadbitsperframe/ofdm_config->bps;
     int Npayloadsymsperpacket = Npayloadbitsperpacket/ofdm_config->bps;
@@ -335,18 +335,11 @@ int main(int argc, char *argv[]) {
 
     if (ldpc_en) {
         ldpc_codes_setup(&ldpc, ofdm->codename);
-        if (verbose > 1) { fprintf(stderr, "using: %s\n", ofdm->codename); }
-
-        /* mode specific set up */
-        if (!strcmp(mode,"2020")) set_data_bits_per_frame(&ldpc, 312);
-        if (!strcmp(mode,"2020B")) {
-            set_data_bits_per_frame(&ldpc, 156);
-            ldpc.protection_mode = LDPC_PROT_2020B;
-        }
-        if (!strcmp(mode,"2020C")) set_data_bits_per_frame(&ldpc, 156);
+        ldpc_mode_specific_setup(ofdm, &ldpc);
         Ndatabitsperpacket = ldpc.data_bits_per_frame;
 
         if (verbose > 1) {
+            fprintf(stderr, "using: %s\n", ofdm->codename);
             fprintf(stderr, "LDPC codeword data bits = %d\n", ldpc.ldpc_data_bits_per_frame);
             fprintf(stderr, "LDPC codeword total bits  = %d\n", ldpc.ldpc_coded_bits_per_frame);
             fprintf(stderr, "LDPC codeword data bits used = %d\n", Ndatabitsperpacket);
@@ -393,8 +386,8 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "Warning EsNo: %f hard coded\n", EsNo);
 
     /* More logging */
-    COMP payload_syms_log[NFRAMES][Npayloadsymsperframe];
-    float payload_amps_log[NFRAMES][Npayloadsymsperframe];
+    COMP payload_syms_log[NFRAMES][Npayloadsymsperpacket];
+    float payload_amps_log[NFRAMES][Npayloadsymsperpacket];
 
     for (i = 0; i < NFRAMES; i++) {
         for (j = 0; j < Npayloadsymsperframe; j++) {

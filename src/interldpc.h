@@ -41,6 +41,7 @@
 
 void set_up_ldpc_constants(struct LDPC *ldpc, int code_length, int parity_bits);
 void set_data_bits_per_frame(struct LDPC *ldpc, int new_data_bits_per_frame);
+void ldpc_mode_specific_setup(struct OFDM *ofdm, struct LDPC *ldpc);
 void ldpc_encode_frame(struct LDPC *ldpc, int codeword[], unsigned char tx_bits_char[]);
 void qpsk_modulate_frame(COMP tx_symbols[], int codeword[], int n);
 void ldpc_decode_frame(struct LDPC *ldpc, int *parityCheckCount, int *iter,  uint8_t  out_char[], float llr[]);
