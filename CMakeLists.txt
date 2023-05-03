@@ -355,6 +355,18 @@ endif()
                             ")
              set_tests_properties(test_fdmdv_48to8 PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
 
+    # Basic sanity check of Quisk complex band pass filter.  Note complex filtering cosw(wn) gives
+    # just the +ve freq exp(jwn) so output power is 0.5 input power
+    add_test(NAME test_quisk_filter
+             COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/octave;
+                            ${CMAKE_CURRENT_BINARY_DIR}/misc/mksine in.raw 1500 1;
+                            cat in.raw | ${CMAKE_CURRENT_BINARY_DIR}/unittest/tquisk_filter |
+                            sox -t .s16 -r 8000 -c 1 - -t .s16 out.raw vol 2;
+                            cd ${CMAKE_CURRENT_SOURCE_DIR}/octave;
+                            DISPLAY=\"\" echo \"diff_fft_mag('in.raw','out.raw'); quit;\" | octave-cli -qf
+                            ")
+             set_tests_properties(test_quisk_filter PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
+
     add_test(NAME test_CML_ldpcut
              COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/octave; CTEST_SINGLE=1 octave-cli -qf ldpcut.m")
              set_tests_properties(test_CML_ldpcut PROPERTIES PASS_REGULAR_EXPRESSION "Nerr: 0")
