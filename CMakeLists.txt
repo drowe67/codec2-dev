@@ -83,6 +83,7 @@ add_custom_target(dist
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wno-strict-overflow")
 
 # Check for what C standard is supported.
+if(NOT WIN32)
 include(CheckCCompilerFlag)
 CHECK_C_COMPILER_FLAG("-std=gnu11" COMPILER_SUPPORTS_GNU11)
 CHECK_C_COMPILER_FLAG("-std=gnu99" COMPILER_SUPPORTS_GNU99)
@@ -94,6 +95,7 @@ elseif(COMPILER_SUPPORTS_GNU99)
 else()
    message(SEND_ERROR "Compiler doesn't seem to support at least gnu99, might cause problems" )
 endif()
+endif(NOT WIN32)
 
 # -fPIC is implied on MinGW...
 if((NOT WIN32) AND (NOT MICROCONTROLLER_BUILD))
