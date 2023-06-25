@@ -40,9 +40,4 @@ function ofdm_demod_c(filename, mode="700D")
   axis([1 max(length(foff_hz_log_c),2) -mx mx]);
   title('Fine Freq');
   ylabel('Hz')
-
-  figure(5); clf;
-  plot(snr_est_log_c);
-  ylabel('SNR (dB)')
-  title('SNR Estimates')
 endfunction

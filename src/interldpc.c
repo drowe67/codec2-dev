@@ -64,6 +64,19 @@ void set_data_bits_per_frame(struct LDPC *ldpc, int new_data_bits_per_frame) {
     ldpc->coded_bits_per_frame = ldpc->data_bits_per_frame + ldpc->NumberParityBits;
 }
 
+/* 1' stuffing (code rate reduction) - tweak LDPC code setup for selected modes */
+void ldpc_mode_specific_setup(struct OFDM *ofdm, struct LDPC *ldpc) {
+    /* mode specific set up */
+    if (!strcmp(ofdm->mode,"2020")) set_data_bits_per_frame(ldpc, 312);
+    if (!strcmp(ofdm->mode,"2020B")) {
+        set_data_bits_per_frame(ldpc, 156);
+        ldpc->protection_mode = LDPC_PROT_2020B;
+    }
+    if (!strcmp(ofdm->mode,"2020C")) set_data_bits_per_frame(ldpc, 156);
+    if (!strcmp(ofdm->mode,"datac4")) set_data_bits_per_frame(ldpc, 448);
+    if (!strcmp(ofdm->mode,"datac13")) set_data_bits_per_frame(ldpc, 128);
+}
+
 /* LDPC encode frame - generate parity bits and a codeword, applying the selected
    FEC protection scheme */ 
 void ldpc_encode_frame(struct LDPC *ldpc, int codeword[], unsigned char tx_bits_char[]) {

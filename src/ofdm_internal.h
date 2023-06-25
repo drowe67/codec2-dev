@@ -98,7 +98,8 @@ struct OFDM_CONFIG {
     char *codename;       /* name of LDPC code used with this mode */
     uint8_t tx_uw[MAX_UW_BITS]; /* user defined unique word */
     int amp_est_mode;
-    bool tx_bpf_en;       /* default clippedtx BPF state */
+    bool tx_bpf_en;       /* default tx (mod) hilbert clipper BPF enable */
+    bool rx_bpf_en;       /* default rx (demod) input BPF enable */
     bool foff_limiter;    /* tames freq offset updates in low SNR */
     float amp_scale;      /* used to scale Tx waveform to approx FREEDV_PEAK with clipper off */
     float clip_gain1;     /* gain we apply to Tx signal before clipping to control PAPR*/
@@ -174,6 +175,7 @@ struct OFDM {
     // Pointers
 
     struct quisk_cfFilter *tx_bpf;
+    struct quisk_cfFilter *rx_bpf;
 
     complex float *pilot_samples;
     complex float *rxbuf;
@@ -236,6 +238,7 @@ struct OFDM {
     bool foff_est_en;
     bool phase_est_en;
     bool tx_bpf_en;
+    bool rx_bpf_en;
     bool dpsk_en;
     bool postambledetectoren; /* allows us to optionally disable the postamble detector */
     

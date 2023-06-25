@@ -4,7 +4,7 @@
   AUTHOR......: David Rowe
   DATE CREATED: May 2020
 
-  Functions that implement the FreeDV 2020 mode.
+  Functions that implement the FreeDV 2020 modes.
 
 \*---------------------------------------------------------------------------*/
 
@@ -62,29 +62,23 @@ void freedv_2020x_open(struct freedv *f) {
     assert(f->ldpc != NULL);
 
     ldpc_codes_setup(f->ldpc, f->ofdm->codename);
-    int data_bits_per_frame;
+    ldpc_mode_specific_setup(f->ofdm, f->ldpc);
     int vq_type;
     switch (f->mode) {
     case FREEDV_MODE_2020:
-        data_bits_per_frame = 312;
         vq_type = 1;    /* vanilla VQ */
         break;
     case FREEDV_MODE_2020B:
-        f->ldpc->protection_mode = LDPC_PROT_2020B;
-        data_bits_per_frame = 156;
         vq_type = 2;    /* index optimised VQ for increased robustness to single bit errors */
         break;
     case FREEDV_MODE_2020C:
-        data_bits_per_frame = 156;
         vq_type = 2;    /* index optimised VQ for increased robustness to single bit errors */
         break;
     default:
         assert(0);
     }
 
-    set_data_bits_per_frame(f->ldpc, data_bits_per_frame);
     int coded_syms_per_frame = f->ldpc->coded_bits_per_frame/f->ofdm->bps;
-
     f->ofdm_bitsperframe = ofdm_get_bits_per_frame(f->ofdm);
     f->ofdm_nuwbits = f->ofdm->config.nuwbits;
     f->ofdm_ntxtbits = f->ofdm->config.txtbits;
@@ -95,7 +89,7 @@ void freedv_2020x_open(struct freedv *f) {
         fprintf(stderr, "vq_type = %d\n", vq_type);
         fprintf(stderr, "ldpc_data_bits_per_frame = %d\n", f->ldpc->ldpc_data_bits_per_frame);
         fprintf(stderr, "ldpc_coded_bits_per_frame  = %d\n", f->ldpc->ldpc_coded_bits_per_frame);
-        fprintf(stderr, "data_bits_per_frame = %d\n", data_bits_per_frame);
+        fprintf(stderr, "data_bits_per_frame = %d\n", f->ldpc->data_bits_per_frame);
         fprintf(stderr, "coded_bits_per_frame  = %d\n", f->ldpc->coded_bits_per_frame);
         fprintf(stderr, "coded_syms_per_frame  = %d\n", f->ldpc->coded_bits_per_frame/f->ofdm->bps);
         fprintf(stderr, "ofdm_bits_per_frame  = %d\n", f->ofdm_bitsperframe);

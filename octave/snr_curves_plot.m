@@ -58,8 +58,10 @@ function snrest_snr_screen(source, channel)
   snr_scatter(source, 'datac0', channel,'b+-')
   snr_scatter(source, 'datac1', channel,'g+-')
   snr_scatter(source, 'datac3', channel,'r+-')
+  snr_scatter(source, 'datac4', channel,'c+-')
+  snr_scatter(source, 'datac13', channel,'m+-')
   xlabel('SNR (dB)'); ylabel('SNRest (dB)'); grid('minor');
-  axis([-5 12 -5 12]);
+  axis([-12 12 -12 12]);
   a = axis;
   plot([a(1) a(2)],[a(1) a(2)],'bk-');
   hold off; grid;
@@ -111,6 +113,8 @@ function thruput_v_snr(source, mode, channel, colour)
   if strcmp(mode,"datac0") Rb=291; end;
   if strcmp(mode,"datac1") Rb=980; end;
   if strcmp(mode,"datac3") Rb=321; end;
+  if strcmp(mode,"datac4") Rb=87; end;
+  if strcmp(mode,"datac13") Rb=65; end;
   if strcmp(channel,"awgn")
     plot(snr, Rb*(1-per), sprintf('%s;%s %s;', colour, mode, channel));
   else
@@ -199,12 +203,16 @@ function c_tx_comp_screen
   per_v_snr('ctxc','datac0','awgn','bo-')
   per_v_snr('ctxc','datac1','awgn','go-')
   per_v_snr('ctxc','datac3','awgn','ro-')
+  per_v_snr('ctxc','datac4','awgn','co-')
+  per_v_snr('ctxc','datac13','awgn','mo-')
   per_v_snr('ctxc','datac0','mpp','bx-')
   per_v_snr('ctxc','datac1','mpp','gx-')
   per_v_snr('ctxc','datac3','mpp','rx-')
+  per_v_snr('ctxc','datac4','mpp','cx-')
+  per_v_snr('ctxc','datac13','mpp','mx-')
   xlabel('SNR (dB)'); ylabel('PER'); grid;
   hold off;
-  axis([-5 10 1E-3 1]);
+  axis([-10 10 1E-3 1]);
   title('PER of C Raw Data Modes (with compression)');
 endfunction
 
@@ -220,14 +228,18 @@ function c_tx_comp_thruput_screen
   thruput_v_snr('ctxc','datac0','awgn','bo-')
   thruput_v_snr('ctxc','datac1','awgn','go-')
   thruput_v_snr('ctxc','datac3','awgn','ro-')
+  thruput_v_snr('ctxc','datac4','awgn','co-')
+  thruput_v_snr('ctxc','datac13','awgn','mo-')
   thruput_v_snr('ctxc','datac0','mpp','bx-')
   thruput_v_snr('ctxc','datac1','mpp','gx-')
   thruput_v_snr('ctxc','datac3','mpp','rx-')
+  thruput_v_snr('ctxc','datac4','mpp','cx-')
+  thruput_v_snr('ctxc','datac13','mpp','mx-')
   xlabel('SNR (dB)'); ylabel('bits/s'); grid;
   hold off;
-  axis([-6 12 0 1000]);
+  axis([-10 10 0 1000]);
   title(' Throughput for C Tx (with compression)');
-  legend('location','east');
+  legend('location','west');
 endfunction
 
 function c_tx_comp_thruput_print;

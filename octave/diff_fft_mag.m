@@ -5,6 +5,9 @@ function diff_fft_mag(filename1, filename2, threshdB = -40, ignore=1000)
   s1 = s1(ignore:end);
   s2 = load_raw(filename2)'; 
   s2 = s2(ignore:end);
+
+  len = min([length(s1) length(s2)]);
+  s1 = s1(1:len); s2 = s2(1:len);
   
   S1 = abs(fft(s1.*hanning(length(s1))'));
   S2 = abs(fft(s2.*hanning(length(s2))'));

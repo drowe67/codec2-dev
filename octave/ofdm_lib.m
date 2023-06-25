@@ -8,6 +8,9 @@
 1;
 qam16;
 esno_est;
+ofdm_mode;
+ofdm_state;
+ofdm_helper;
 
 %-------------------------------------------------------------
 % ofdm_init
@@ -99,18 +102,23 @@ function states = ofdm_init(config)
   % encoded bits.
 
   states.uw_ind = states.uw_ind_sym = [];
-  uw_step = Nc+1;                                % default step for UW sym placement
 
   % lets see if all UW syms will fit in frame
   Nuwsyms = states.Nuwbits/bps;
   Ndatasymsperframe = (Ns-1)*Nc;
+  states.spread_uw = 0;
+  if states.spread_uw
+    uw_step = 1.8*floor(states.Nbitsperpacket/states.Nuwbits);
+  else
+    uw_step = Nc+1;                                % default step for UW sym placement
+  end  
   last_sym = floor(Nuwsyms*uw_step/bps+1);
   if last_sym > states.Np*Ndatasymsperframe
     uw_step = Nc-1;                                 % try a different step
   end
   last_sym = floor(Nuwsyms*uw_step/bps+1);
   assert(last_sym <= states.Np*Ndatasymsperframe);  % we still can't fit them all
-
+  
   % Place UW symbols in frame
   for i=1:Nuwsyms
     ind_sym = floor(i*uw_step/bps+1);
@@ -133,7 +141,10 @@ function states = ofdm_init(config)
     if bps == 4 tx_uw_syms = [tx_uw_syms qam16_mod(states.qam16, states.tx_uw(b:b+bps-1))]; end
   end
   states.tx_uw_syms = tx_uw_syms;
-  % if the UW has this many errors it is "bad", the binomal cdf can be used to set this:
+  
+  % if the UW has this many errors it is "bad", the binomal cdf can be used to
+  % set this with the ofdm_determine_bad_uw_errors() function below
+  %
   %   Nuw=12; plot(0:Nuw, binocdf(0:Nuw,Nuw,0.05)); hold on; plot(binocdf(0:Nuw,Nuw,0.5)); hold off;
   states.bad_uw_errors = bad_uw_errors;
 
@@ -278,153 +289,6 @@ function states = ofdm_init(config)
   test_qam16_mod_demod(states.qam16);
   test_assemble_disassemble(states);
 endfunction
-
-
-%------------------------------------------------------------------------------
-% ofdm_init_mode - Helper function to set up modems for various FreeDV modes,
-%                  and parse mode string.
-%------------------------------------------------------------------------------
-
-function config = ofdm_init_mode(mode="700D")
-  % defaults for 700D
-  
-  Tcp = 0.002; 
-  Ns = 8;
-  Ts = 0.018; 
-  Nc = 17;
-  config.bps = 2; 
-  config.Np = 1;
-  config.Ntxtbits = 4;
-  config.Nuwbits = 5*config.bps;
-  config.ftwindow_width = 32;
-  config.timing_mx_thresh  = 0.35;
-  config.bad_uw_errors = 3;
-  config.amp_scale = 245E3;
-  config.amp_est_mode = 0;
-  config.EsNo_est_all_symbols = 1;
-  config.EsNodB = 3;
-  config.state_machine = "voice1";
-  config.edge_pilots = 1;
-  config.clip_gain1 = 2.5;
-  config.clip_gain2 = 0.8;
-  config.foff_limiter = 0;
-  config.txbpf_width_Hz = 2000;
-  config.data_mode = "";
-
-  if strcmp(mode,"700D") ||  strcmp(mode,"700d")
-    % defaults above
-  elseif strcmp(mode,"700E") ||  strcmp(mode,"700e")
-    Ts = 0.014; Tcp=0.006; Nc = 21; Ns=4;
-    config.edge_pilots = 0; config.state_machine = "voice2";
-    config.Nuwbits = 12; config.bad_uw_errors = 3; config.Ntxtbits = 2;
-    config.amp_est_mode = 1; config.ftwindow_width = 80;
-    config.amp_scale = 155E3; config.clip_gain1 = 3; config.clip_gain2 = 0.8;
-    config.foff_limiter = 1;
-  elseif strcmp(mode,"2020")
-    Ts = 0.0205; Nc = 31;
-    config.amp_scale = 167E3; config.clip_gain1 = 2.5; config.clip_gain2 = 0.8;
-  elseif strcmp(mode,"2020B")
-    Ts = 0.014; Tcp = 0.004; Nc = 29; Ns=5;
-    config.Ntxtbits = 4; config.Nuwbits = 8*2; config.bad_uw_errors = 5;
-    config.amp_scale = 130E3; config.clip_gain1 = 2.5; config.clip_gain2 = 0.8;
-    config.edge_pilots = 0; config.state_machine = "voice2";
-    config.foff_limiter = 1; config.ftwindow_width = 64;
-    config.txbpf_width_Hz = 2200;
-  elseif strcmp(mode,"qam16c1")
-    Ns=5; config.Np=5; Tcp = 0.004; Ts = 0.016; Nc = 33; config.data_mode = "streaming";
-    config.bps=4; config.Ntxtbits = 0; config.Nuwbits = 15*4; config.bad_uw_errors = 5;
-    config.state_machine = "data";
-    config.ftwindow_width = 32; config.amp_scale = 132E3;
-    config.EsNo_est_all_symbols = 0; config.amp_est_mode = 1; config.EsNodB = 10;
-  elseif strcmp(mode,"qam16c2")
-    Ns=5; config.Np=31; Tcp = 0.004; Ts = 0.016; Nc = 33; config.data_mode = "streaming";
-    config.bps=4; config.Ntxtbits = 0; config.Nuwbits = 42*4; config.bad_uw_errors = 15;
-    config.ftwindow_width = 80; config.amp_scale = 135E3; config.state_machine = "data";
-    config.EsNo_est_all_symbols = 0; config.amp_est_mode = 1; config.EsNodB = 10;
-    config.tx_uw = zeros(1,config.Nuwbits = 42*4);
-    config.tx_uw(1:24) = [1 1 0 0  1 0 1 0  1 1 1 1  0 0 0 0  1 1 1 1  0 0 0 0];
-    config.tx_uw(end-24+1:end) = [1 1 0 0  1 0 1 0  1 1 1 1  0 0 0 0  1 1 1 1  0 0 0 0];
-  elseif strcmp(mode,"datac0")
-    Ns=5; config.Np=4; Tcp = 0.006; Ts = 0.016; Nc = 9; config.data_mode = "streaming";
-    config.Ntxtbits = 0; config.Nuwbits = 32; config.bad_uw_errors = 9;
-    config.state_machine = "data";
-    config.ftwindow_width = 80; config.amp_est_mode = 1; config.EsNodB = 3;
-    config.edge_pilots = 0; config.timing_mx_thresh = 0.08;
-    config.tx_uw = zeros(1,config.Nuwbits);
-    config.tx_uw(1:16) = [1 1 0 0  1 0 1 0  1 1 1 1  0 0 0 0];
-    config.amp_scale = 300E3; config.clip_gain1 = 2.2; config.clip_gain2 = 0.85;
-  elseif strcmp(mode,"datac1")
-    Ns=5; config.Np=38; Tcp = 0.006; Ts = 0.016; Nc = 27; config.data_mode = "streaming";
-    config.Ntxtbits = 0; config.Nuwbits = 16; config.bad_uw_errors = 6;
-    config.state_machine = "data";
-    config.ftwindow_width = 80; config.amp_est_mode = 1; config.EsNodB = 3;
-    % clipper/compression adjustment:
-    % 1. With clipper off increase amp_scale until peak just hit 16384
-    % 2. With clipper on increase clip_gain1 until about 30% clipped
-    % 3. BPF will drop level beneath 16384, adjust clip_gain2 to just hit 16384 peak again
-    % 4. Clipped/unclipped operating point for same PER should be about 1dB apart
-    config.amp_scale = 145E3; config.clip_gain1 = 2.7; config.clip_gain2 = 0.8;
-    config.edge_pilots = 0; config.timing_mx_thresh = 0.10;
-    config.tx_uw = [1 1 0 0  1 0 1 0  1 1 1 1  0 0 0 0];
-  elseif strcmp(mode,"datac3")
-    Ns=5; config.Np=29; Tcp = 0.006; Ts = 0.016; Nc = 9; config.data_mode = "streaming";
-    config.edge_pilots = 0;
-    config.Ntxtbits = 0; config.Nuwbits = 40; config.bad_uw_errors = 10;
-    config.ftwindow_width = 80; config.timing_mx_thresh = 0.10;
-    config.tx_uw = zeros(1,config.Nuwbits);
-    config.tx_uw(1:24) = [1 1 0 0  1 0 1 0  1 1 1 1  0 0 0 0  1 1 1 1  0 0 0 0];
-    config.tx_uw(end-24+1:end) = [1 1 0 0  1 0 1 0  1 1 1 1  0 0 0 0  1 1 1 1  0 0 0 0];
-    config.amp_est_mode = 1; config.EsNodB = 3;
-    config.state_machine = "data"; 
-    config.amp_scale = 300E3; config.clip_gain1 = 2.2; config.clip_gain2 = 0.8;
-  elseif strcmp(mode,"1")
-    Ns=5; config.Np=10; Tcp=0; Tframe = 0.1; Ts = Tframe/Ns; Nc = 1;
-  else
-    % try to parse mode string for user defined mode
-    vec = sscanf(mode, "Ts=%f Nc=%d Ncp=%f");
-    Ts=vec(1); Nc=vec(2); Ncp=vec(3);
-  end
-  Rs=1/Ts;
-  config.Rs = Rs; config.Tcp = Tcp; config.Ns = Ns; config.Nc = Nc;
-  if !isfield(config,"tx_uw") 
-    config.tx_uw = zeros(1,config.Nuwbits); 
-  end  
-end
-
-
-%------------------------------------------------------------------------------
-% print_config - utility function to use ascsii-art to describe the modem frame
-%------------------------------------------------------------------------------
-
-function print_config(states)
-  ofdm_load_const;
-
-  % ASCII-art packet visualisation
-  s=1; u=1; Nuwsyms=length(uw_ind_sym);
-  cr = 1:Nc+2;
-  for f=1:Np
-    for r=1:Ns
-      for c=cr
-        if r == 1
-          sym="P";
-        elseif c>1 && c <=(Nc+1)
-          sym=".";
-          if (u <= Nuwsyms) && (s == uw_ind_sym(u)) sym="U"; u++; end
-          s++;
-        else
-          sym=" ";
-        end
-        printf("%s",sym);
-      end
-      printf("\n");
-    end
-  end
-
-  printf("Nc=%d Ts=%4.3f Tcp=%4.3f Ns: %d Np: %d\n", Nc, 1/Rs, Tcp, Ns, Np);
-  printf("Nsymperframe: %d Nbitsperpacket: %d Nsamperframe: %d Ntxtbits: %d Nuwbits: %d Nuwframes: %d\n",
-          Ns*Nc, Nbitsperpacket, Nsamperframe, Ntxtbits, Nuwbits, Nuwframes);
-  printf("uncoded bits/s: %4.1f\n",  Nbitsperpacket*Fs/(Np*Nsamperframe));
-end
 
 % Gray coded QPSK modulation function
 function symbol = qpsk_mod(two_bits)
@@ -648,7 +512,7 @@ function [t_est foff_est timing_mx] = est_timing_and_freq(states, rx, known_samp
     end
     
     % At each timing position, correlate with known samples at all possible freq offsets.  Result
-    % is a column vector for each timing offset.  Each matrix cell is s freq,timing coordinate
+    % is a column vector for each timing offset.  Each matrix cell is a freq,timing coordinate
     
     corr = [];
     for t=1:tstep:Ncorr
@@ -1298,443 +1162,17 @@ function tx_preamble = ofdm_generate_preamble(states, seed=2)
 endfunction
 
 
-%-----------------------------------------------------------------------
-% create_ldpc_test_frame - generate a test frame of bits
-%-----------------------------------------------------------------------
-
-function [tx_bits payload_data_bits codeword] = create_ldpc_test_frame(states, coded_frame=1)
-  ofdm_load_const;
-  ldpc;
-  gp_interleaver;
-
-  if coded_frame
-    % Set up LDPC code
-
-    mod_order = 4; bps = 2; modulation = 'QPSK'; mapping = 'gray';
-
-    init_cml(); % TODO: make this path sensible and portable
-    load HRA_112_112.txt
-    [code_param framesize rate] = ldpc_init_user(HRA_112_112, modulation, mod_order, mapping);
-    assert(Nbitsperframe == (code_param.coded_bits_per_frame + Nuwbits + Ntxtbits));
-
-    payload_data_bits = round(ofdm_rand(code_param.data_bits_per_frame)/32767);
-    codeword = LdpcEncode(payload_data_bits, code_param.H_rows, code_param.P_matrix);
-    Nsymbolsperframe = length(codeword)/bps;
-
-    % need all these steps to get actual raw codeword bits at demod ..
-
-    tx_symbols = [];
-    for s=1:Nsymbolsperframe
-      tx_symbols = [tx_symbols qpsk_mod( codeword(2*(s-1)+1:2*s) )];
-    end
-
-    tx_symbols = gp_interleave(tx_symbols);
-
-    codeword_raw = [];
-    for s=1:Nsymbolsperframe
-      codeword_raw = [codeword_raw qpsk_demod(tx_symbols(s))];
-    end
-  else
-    codeword_raw = round(ofdm_rand(Nbitsperpacket-(Nuwbits+Ntxtbits))/32767);
-  end
-
-  % insert UW and txt bits
-
-  tx_bits = assemble_modem_packet(states, codeword_raw, zeros(1,Ntxtbits));
-  assert(Nbitsperpacket == length(tx_bits));
-
-endfunction
-
-% automated test
-
-function test_assemble_disassemble(states)
-  ofdm_load_const;
-
-  Nsymsperpacket = Nbitsperpacket/bps;
-  Ndatabitsperpacket = Nbitsperpacket-(Nuwbits+Ntxtbits);
-  Ndatasymsperpacket = Ndatabitsperpacket/bps;
-  codeword_bits = round(ofdm_rand(Ndatabitsperpacket)/32767);
-  tx_bits = assemble_modem_packet(states, codeword_bits, zeros(1,Ntxtbits));
-
-  tx_syms = zeros(1,Nsymsperpacket);
-  for s=1:Nsymsperpacket
-    if bps == 2
-      tx_syms(s) = qpsk_mod(tx_bits(bps*(s-1)+1:bps*s));
-    elseif bps == 4
-      tx_syms(s) = qam16_mod(states.qam16,tx_bits(bps*(s-1)+1:bps*s));
-    end
-  end
-  codeword_syms = zeros(1,Ndatasymsperpacket);
-  for s=1:Ndatasymsperpacket
-    if bps == 2
-      codeword_syms(s) = qpsk_mod(codeword_bits(bps*(s-1)+1:bps*s));
-    elseif bps == 4
-      codeword_syms(s) = qam16_mod(states.qam16,codeword_bits(bps*(s-1)+1:bps*s));
-    end
-  end
-
-  [rx_uw rx_codeword_syms payload_amps txt_bits] = disassemble_modem_packet(states, tx_syms, ones(1,Nsymsperpacket));
-  assert(rx_uw == states.tx_uw);
-  Ndatasymsperframe = (Nbitsperpacket-(Nuwbits+Ntxtbits))/bps;
-  assert(codeword_syms == rx_codeword_syms);
-endfunction
-
-%-------------------------------------------------------------------
-% sync_state_machine - calls mode-specific sync state state_machine
-%-------------------------------------------------------------------
-
-function states = sync_state_machine(states, rx_uw)
-  if strcmp(states.state_machine, "voice1")
-    states = sync_state_machine_voice1(states, rx_uw);
-  elseif strcmp(states.state_machine, "data")
-    if strcmp(states.data_mode, "streaming")
-      states = sync_state_machine_data_streaming(states, rx_uw);
-    else
-      states = sync_state_machine_data_burst(states, rx_uw);
-    end
-  elseif strcmp(states.state_machine, "voice2")
-    states = sync_state_machine_voice2(states, rx_uw);
-  else
-    assert(0);
-  endif
-endfunction
-
-%--------------------------------------------------------------------
-%  Due to the low pilot symbol insertion rate and acquisition issues
-%  the earlier OFDM modem waveforms (700D and 2020) need a complex
-%  state machine to help them avoid false sync.
-%--------------------------------------------------------------------
-
-function states = sync_state_machine_voice1(states, rx_uw)
-  ofdm_load_const;
-  next_state = states.sync_state;
-  states.sync_start = states.sync_end = 0;
-
-  if strcmp(states.sync_state,'search')
-
-    if states.timing_valid
-      states.frame_count = 0;
-      states.sync_counter = 0;
-      states.modem_frame = 0;
-      states.sync_start = 1;
-      next_state = 'trial';
-    end
-  end
-
-  if strcmp(states.sync_state,'synced') || strcmp(states.sync_state,'trial')
-
-    states.frame_count++;
-
-    % UW occurs at the start of a packet
-    if states.modem_frame == 0
-        states.uw_errors = sum(xor(tx_uw,rx_uw));
-
-        if strcmp(states.sync_state,'trial')
-          if states.uw_errors >= states.bad_uw_errors
-            states.sync_counter++;
-            states.frame_count = 0;
-          end
-          if states.sync_counter == 2
-            next_state = "search";
-            states.phase_est_bandwidth = "high";
-          end
-          if states.frame_count == 4
-            next_state = "synced";
-            % change to low bandwidth, but more accurate phase estimation
-            states.phase_est_bandwidth = "low";
-          end
-          if states.uw_errors < 2
-            next_state = "synced";
-            % change to low bandwidth, but more accurate phase estimation
-            states.phase_est_bandwidth = "low";
-          else
-            next_state = "search";
-          end
-        end
-
-        if strcmp(states.sync_state,'synced')
-          if states.uw_errors > 2
-            states.sync_counter++;
-          else
-            states.sync_counter = 0;
-          end
-
-          if states.sync_counter == 6
-            next_state = "search";
-            states.phase_est_bandwidth = "high";
-          end
-        end
-      end % if modem_frame == 0 ....
-
-      % keep track of where we are up to in packet
-      states.modem_frame++;
-      if (states.modem_frame >= states.Np) states.modem_frame = 0; end
-  end
-
-  states.last_sync_state = states.sync_state;
-  states.sync_state = next_state;
-endfunction
-
-
-%-------------------------------------------------------
-% data (streaming mode) state machine
-%-------------------------------------------------------
-
-function states = sync_state_machine_data_streaming(states, rx_uw)
-  ofdm_load_const;
-  next_state = states.sync_state;
-  states.sync_start = states.sync_end = 0;
-
-  if strcmp(states.sync_state,'search')
-    if states.timing_valid
-      states.sync_start = 1; 
-      states.sync_counter = 0;
-      next_state = 'trial';
-    end
-  end
-
-  states.uw_errors = sum(xor(tx_uw,rx_uw));
-
-  if strcmp(states.sync_state,'trial')
-    if states.uw_errors < states.bad_uw_errors;
-      next_state = "synced";
-      states.packet_count = 0;
-      states.modem_frame = Nuwframes;
-    else
-      states.sync_counter++;
-      if states.sync_counter > Np
-        next_state = "search";
-      end
-    end
-  end
- 
-  % Note packetsperburst==0 we don't ever lose sync, which is useful for 
-  % stream based testing or external control of state machine
-  
-  if strcmp(states.sync_state,'synced')
-    states.modem_frame++;
-    if (states.modem_frame >= states.Np) 
-      states.modem_frame = 0; 
-      states.packet_count++;
-      if (states.packetsperburst)
-        if (states.packet_count >= states.packetsperburst)
-          next_state = "search";
-        end
-      end
-    end
-  end
-  
-  states.last_sync_state = states.sync_state;
-  states.sync_state = next_state;
-endfunction
-
-%-------------------------------------------------------
-% data (burst mode) state machine
-%-------------------------------------------------------
-
-function states = sync_state_machine_data_burst(states, rx_uw)
-  ofdm_load_const;
-  next_state = states.sync_state;
-  states.sync_start = states.sync_end = 0;
-
-  if strcmp(states.sync_state,'search')
-    if states.timing_valid
-      states.sync_start = 1; 
-      states.sync_counter = 0;
-      next_state = 'trial';
-    end
-  end
-
-  states.uw_errors = sum(xor(tx_uw,rx_uw));
-
-  % pre or post-amble has told us this is the start of the packet.  Confirm we 
-  % have a valid frame by checking the UW after the modem frames containing
-  % the UW have been received 
-  if strcmp(states.sync_state,'trial')
-    states.sync_counter++;
-    if states.sync_counter == Nuwframes
-      if states.uw_errors < states.bad_uw_errors;
-        next_state = "synced";
-        states.packet_count = 0;                          % number of packets in this burst
-        states.modem_frame = Nuwframes;                   % which modem frame we are up to in packet
-      else
-        next_state = "search";
-        % reset rxbuf to make sure we only ever do a postamble loop once through same samples
-        states.rxbufst = states.Nrxbufhistory;
-        states.rxbuf = zeros(1, states.Nrxbuf);
-      end
-    end
-  end
-  
-  if strcmp(states.sync_state,'synced')
-    states.modem_frame++;
-    if (states.modem_frame >= states.Np) 
-      states.modem_frame = 0;                           % start of new packet
-      states.packet_count++;
-      if (states.packetsperburst)
-        if (states.packet_count >= states.packetsperburst)
-          next_state = "search";                        % we've finished this burst
-          % reset rxbuf to make sure we only ever do a postamble loop once through same samples
-          states.rxbufst = states.Nrxbufhistory;
-          states.rxbuf = zeros(1, states.Nrxbuf);
-        end
-      end
-    end
-  end
-  
-  states.last_sync_state = states.sync_state;
-  states.sync_state = next_state;
-endfunction
-
-%-------------------------------------------------------
-% fast sync voice state state_machine
-%-------------------------------------------------------
-
-function states = sync_state_machine_voice2(states, rx_uw)
-  ofdm_load_const;
-  next_state = states.sync_state;
-  states.sync_start = states.sync_end = 0;
-
-  if strcmp(states.sync_state,'search')
-
-    if states.timing_valid
-      states.frame_count = 0;
-      states.sync_counter = 0;
-      states.modem_frame = 0;
-      states.sync_start = 1;
-      next_state = 'trial';
-    end
-  end
-
-  if strcmp(states.sync_state,'synced') || strcmp(states.sync_state,'trial')
-
-    states.frame_count++;
-
-    % UW occurs at the start of a packet
-    if states.modem_frame == 0
-        states.uw_errors = sum(xor(tx_uw,rx_uw));
-
-        if strcmp(states.sync_state,'trial')
-          if states.uw_errors <= states.bad_uw_errors
-            next_state = "synced";
-          else
-            next_state = "search";
-          end
-        end
-
-        if strcmp(states.sync_state,'synced')
-          if states.uw_errors > states.bad_uw_errors
-            states.sync_counter++;
-          else
-            states.sync_counter = 0;
-          end
-
-          if states.sync_counter == 6
-            next_state = "search";
-          end
-        end
-      end
-
-      % keep track of where we are up to in packet
-      states.modem_frame++;
-      if (states.modem_frame >= states.Np) states.modem_frame = 0; end
-  end
-
-  states.last_sync_state = states.sync_state;
-  states.sync_state = next_state;
-endfunction
-
-
 % ------------------------------------------------------------------------------
-% codec_to_frame_packing - Set up a bunch of constants to support modem frame
-%                          construction from LDPC codewords and codec source bits
+% Handle FEC encoding/decoding
 % ------------------------------------------------------------------------------
 
-function [code_param Nbitspercodecframe Ncodecframespermodemframe] = codec_to_frame_packing(states, mode)
+function [frame_bits bits_per_frame] = fec_encode(states, code_param, mode, payload_bits)
   ofdm_load_const;
-  mod_order = 4; bps = 2; modulation = 'QPSK'; mapping = 'gray';
-
-  init_cml();
-  if strcmp(mode, "700D")
-    load HRA_112_112.txt
-    code_param = ldpc_init_user(HRA_112_112, modulation, mod_order, mapping);
-    assert(Nbitsperframe == (code_param.coded_bits_per_frame + Nuwbits + Ntxtbits));
-    % unused for this mode
-    Nbitspercodecframe = Ncodecframespermodemframe = 0;
-  end
-  if strcmp(mode, "700E")
-    load HRA_56_56.txt
-    code_param = ldpc_init_user(HRA_56_56, modulation, mod_order, mapping);
-    assert(Nbitsperframe == (code_param.coded_bits_per_frame + Nuwbits + Ntxtbits));
-    % unused for this mode
-    Nbitspercodecframe = Ncodecframespermodemframe = 0;
-  end
-  if strcmp(mode, "2020")
-    load HRA_504_396.txt
-    code_param = ldpc_init_user(HRA_504_396, modulation, mod_order, mapping);
-    code_param.data_bits_per_frame = 312;
-    code_param.coded_bits_per_frame = code_param.data_bits_per_frame + code_param.ldpc_parity_bits_per_frame;
-    code_param.coded_syms_per_frame = code_param.coded_bits_per_frame/code_param.bits_per_symbol;
-    printf("2020 mode\n");
-    printf("ldpc_data_bits_per_frame = %d\n", code_param.ldpc_data_bits_per_frame);
-    printf("ldpc_coded_bits_per_frame  = %d\n", code_param.ldpc_coded_bits_per_frame);
-    printf("ldpc_parity_bits_per_frame  = %d\n", code_param.ldpc_parity_bits_per_frame);
-    printf("data_bits_per_frame = %d\n", code_param.data_bits_per_frame);
-    printf("coded_bits_per_frame  = %d\n", code_param.coded_bits_per_frame);
-    printf("coded_syms_per_frame  = %d\n", code_param.coded_syms_per_frame);
-    printf("ofdm_bits_per_frame  = %d\n", Nbitsperframe);
-    Nbitspercodecframe = 52; Ncodecframespermodemframe = 6;
-    printf("  Nuwbits: %d  Ntxtbits: %d\n", Nuwbits, Ntxtbits);
-    Nparity = code_param.ldpc_parity_bits_per_frame;
-    totalbitsperframe = code_param.data_bits_per_frame + Nparity + Nuwbits + Ntxtbits;
-    printf("Total bits per frame: %d\n", totalbitsperframe);
-    assert(totalbitsperframe == Nbitsperframe);
-  end
-  if strcmp(mode, "qam16c1")
-      load H2064_516_sparse.mat
-      code_param = ldpc_init_user(HRA, modulation='QAM', mod_order=16, mapping="", reshape(states.qam16,1,16));
-  end
-  if strcmp(mode, "qam16c2")
-      framesize = 16200; rate = 0.6;
-      code_param = ldpc_init_builtin("dvbs2", rate, framesize, modulation='QAM', mod_order=16, mapping="", reshape(states.qam16,1,16));
-  end
-  if strcmp(mode, "datac0")
-    load H_128_256_5.mat
-    code_param = ldpc_init_user(H, modulation, mod_order, mapping);
-  end
-  if strcmp(mode, "datac1")
-    load H_4096_8192_3d.mat
-    code_param = ldpc_init_user(HRA, modulation, mod_order, mapping);
-  end
-  if strcmp(mode, "datac3")
-    load H_1024_2048_4f.mat
-    code_param = ldpc_init_user(H, modulation, mod_order, mapping);
-  end
-  if strcmp(mode, "datac0") || strcmp(mode, "datac1") || strcmp(mode, "datac3") || strcmp(mode, "qam16c1") || strcmp(mode, "qam16c2")
-    printf("ldpc_data_bits_per_frame = %d\n", code_param.ldpc_data_bits_per_frame);
-    printf("ldpc_coded_bits_per_frame  = %d\n", code_param.ldpc_coded_bits_per_frame);
-    printf("ldpc_parity_bits_per_frame  = %d\n", code_param.ldpc_parity_bits_per_frame);
-    printf("Nbitsperpacket  = %d\n", Nbitsperpacket);
-    Nparity = code_param.ldpc_parity_bits_per_frame;
-    totalbitsperframe = code_param.data_bits_per_frame + Nparity + Nuwbits + Ntxtbits;
-    printf("totalbitsperframe = %d\n", totalbitsperframe);
-    assert(totalbitsperframe == Nbitsperpacket);
-    Nbitspercodecframe = Ncodecframespermodemframe = -1;
-  end
-endfunction
-
-
-% ------------------------------------------------------------------------------
-% fec_encode - Handle FEC encoding
-% ------------------------------------------------------------------------------
-
-function [frame_bits bits_per_frame] = fec_encode(states, code_param, mode, payload_bits, ...
-                                                      Ncodecframespermodemframe, Nbitspercodecframe)
-  ofdm_load_const;
-  if strcmp(mode, "2020")
+  if code_param.data_bits_per_frame != code_param.ldpc_data_bits_per_frame
+    % optionally lower the code rate by "one stuffing" - setting Nunused data bits to 1
     Nunused = code_param.ldpc_data_bits_per_frame - code_param.data_bits_per_frame;
-    frame_bits = LdpcEncode([payload_bits zeros(1,Nunused)], code_param.H_rows, code_param.P_matrix);
-    % remove unused data bits
+    frame_bits = LdpcEncode([payload_bits ones(1,Nunused)], code_param.H_rows, code_param.P_matrix);
+    % remove unused data bits from codeword, as they are known to the receiver and don't need to be transmitted
     frame_bits = [ frame_bits(1:code_param.data_bits_per_frame) frame_bits(code_param.ldpc_data_bits_per_frame+1:end) ];
   else
     frame_bits = LdpcEncode(payload_bits, code_param.H_rows, code_param.P_matrix);
@@ -1743,109 +1181,16 @@ function [frame_bits bits_per_frame] = fec_encode(states, code_param, mode, payl
 
 endfunction
 
-
-% test function, kind of like a CRC for QPSK symbols, to compare two vectors
-
-function acc = test_acc(v)
-  sre = 0; sim = 0;
-  for i=1:length(v)
-    x = v(i);
-    re = round(real(x)); im = round(imag(x));
-    sre += re; sim += im;
-    %printf("%d %10f %10f %10f %10f\n", i, re, im, sre, sim);
-  end
-  acc = sre + j*sim;
-end
-
-
-% Save test bits frame to a text file in the form of a C array
-%
-% usage:
-%   ofdm_lib; test_bits_ofdm_file
-%
-
-function test_bits_ofdm_file
-  Ts = 0.018; Tcp = 0.002; Rs = 1/Ts; bps = 2; Nc = 17; Ns = 8;
-  states = ofdm_init(bps, Rs, Tcp, Ns, Nc);
-  [test_bits_ofdm payload_data_bits codeword] = create_ldpc_test_frame(states);
-  printf("%d test bits\n", length(test_bits_ofdm));
-
-  f=fopen("../src/test_bits_ofdm.h","wt");
-  fprintf(f,"/* Generated by test_bits_ofdm_file() Octave function */\n\n");
-  fprintf(f,"const int test_bits_ofdm[]={\n");
-  for m=1:length(test_bits_ofdm)-1
-    fprintf(f,"  %d,\n",test_bits_ofdm(m));
-  endfor
-  fprintf(f,"  %d\n};\n",test_bits_ofdm(end));
-
-  fprintf(f,"\nconst int payload_data_bits[]={\n");
-  for m=1:length(payload_data_bits)-1
-    fprintf(f,"  %d,\n",payload_data_bits(m));
-  endfor
-  fprintf(f,"  %d\n};\n",payload_data_bits(end));
-
-  fprintf(f,"\nconst int test_codeword[]={\n");
-  for m=1:length(codeword)-1
-    fprintf(f,"  %d,\n",codeword(m));
-  endfor
-  fprintf(f,"  %d\n};\n",codeword(end));
-
-  fclose(f);
-
+function [rx_bits paritychecks] = fec_decode(states, code_param, ...
+                                             payload_syms_de, payload_amps_de, ...
+                                             mean_amp, EsNo)
+  ofdm_load_const;
+  % note ldpc_dec() handles optional lower code rate zero-stuffing
+  [rx_codeword paritychecks] = ldpc_dec(code_param, mx_iter=100, demod=0, dec=0, ...
+                                        payload_syms_de/mean_amp, EsNo, 
+                                        payload_amps_de/mean_amp);
+  rx_bits = rx_codeword(1:code_param.data_bits_per_frame);
 endfunction
-
-
-% Get rid of nasty unfiltered stuff either side of OFDM signal
-% This may need to be tweaked, or better yet made a function of Nc, if Nc changes
-%
-% usage:
-%  ofdm_lib; make_ofdm_bpf(1);
-
-function bpf_coeff = make_ofdm_bpf(write_c_header_file)
-  filt_n = 100;
-  Fs = 8000;
-
-  bpf_coeff  = fir2(filt_n,[0 900 1000 2000 2100 4000]/(Fs/2),[0.001 0.001 1 1 0.001 0.001]);
-
-  if write_c_header_file
-    figure(1)
-    clf;
-    h = freqz(bpf_coeff,1,Fs/2);
-    plot(20*log10(abs(h)))
-    grid minor
-
-    % save coeffs to a C header file
-
-    f=fopen("../src/ofdm_bpf_coeff.h","wt");
-    fprintf(f,"/* 1000 - 2000 Hz FIR filter coeffs */\n");
-    fprintf(f,"/* Generated by make_ofdm_bpf() in ofdm_lib.m */\n");
-
-    fprintf(f,"\n#define OFDM_BPF_N %d\n\n", filt_n);
-
-    fprintf(f,"float ofdm_bpf_coeff[]={\n");
-    for r=1:filt_n
-      if r < filt_n
-        fprintf(f, "  %f,\n",  bpf_coeff(r));
-      else
-        fprintf(f, "  %f\n};", bpf_coeff(r));
-      end
-    end
-    fclose(f);
-  end
-
-endfunction
-
-
-% returns level threshold such that threshold_cdf of the tx magnitudes are beneath that level
-function threshold_level = ofdm_determine_clip_threshold(tx, threshold_cdf)
-  Nsteps = 25;
-  mx = max(abs(tx));
-  cdf = empirical_cdf(mx*(1:Nsteps)/Nsteps,abs(tx));
-  threshold_level = find(cdf >= threshold_cdf)(1)*mx/25;
-  printf("threshold_cdf: %f threshold_level: %f\n", threshold_cdf, threshold_level);
-  figure(1); clf; [hh nn] = hist(abs(tx),Nsteps,1);
-  plotyy(nn,hh,mx*(1:Nsteps)/Nsteps,cdf); title('PDF and CDF Estimates'); grid;
-end
 
 
 function [tx nclipped] = ofdm_clip(states, tx, threshold_level, plot_en=0)
@@ -1872,13 +1217,11 @@ function tx = ofdm_hilbert_clipper(states, tx, tx_clip_en)
     end
     [tx nclipped] = ofdm_clip(states, tx*states.clip_gain1, states.ofdm_peak);
     
-    % BPF, we actually shift the signal back down to baseband to filter
-    ssbfilt_n = 100;
-    ssbfilt_coeff = fir1(ssbfilt_n, states.txbpf_width_Hz/states.Fs);
-    lo = exp(j*2*pi*states.fcentre*(1:length(tx))/(states.Fs));
-    tx = lo.*filter(ssbfilt_coeff,1,tx.*conj(lo));
-    
-    % filter messs up peak levels use this to get us back to approx 16384
+    cutoff_norm = states.txbpf_width_Hz/states.Fs;
+    w_centre = mean(states.w); centre_norm = w_centre/(2*pi);
+    tx = ofdm_complex_bandpass_filter(cutoff_norm, centre_norm,100,tx);
+     
+    % filter messes up peak levels use this to get us back to approx 16384
     tx *= states.clip_gain2;
   end
 
@@ -1897,18 +1240,29 @@ function tx = ofdm_hilbert_clipper(states, tx, tx_clip_en)
 endfunction
 
 
-%  helper function that adds channel simulation and ensures we don't saturate int16 output samples  
-function [rx_real rx] = ofdm_channel(states, tx, SNR3kdB, channel, freq_offset_Hz)
-  [rx_real rx sigma] = channel_simulate(states.Fs, SNR3kdB, freq_offset_Hz, channel, tx, states.verbose);
-    
-  % multipath models can lead to clipping of int16 samples
-  num_clipped = length(find(abs(rx_real>32767)));
-  while num_clipped/length(rx_real) > 0.001
-    rx_real /= 2;
-    num_clipped = length(find(abs(rx_real>32767)));
-    printf("WARNING: output samples clipped, reducing level\n")
+% Complex bandpass filter built from low pass prototype as per src/filter.c, 
+% cutoff_freq and center_freq are normalised such that cutoff_freq = 0.5 is Fs/2
+function out = ofdm_complex_bandpass_filter(cutoff_freq,center_freq,n_coeffs,in)
+  lowpass_coeff = fir1(n_coeffs-1, cutoff_freq);
+  k = (0:n_coeffs-1);
+  bandpass_coeff = lowpass_coeff .* exp(j*2*pi*center_freq*k);
+  out = filter(bandpass_coeff,1,in);
+endfunction
+
+
+% Complex bandpass filter for Rx - just used on the very low SNR modes to help 
+% with acquisition
+function [rx delay_samples] = ofdm_rx_filter(states, mode, rx)
+  delay_samples = 0;
+  if strcmp(mode,"datac4") || strcmp(mode,"datac13")
+    w_centre = mean(states.w); centre_norm = w_centre/(2*pi);
+    n_coeffs = 100;
+    cutoff_Hz = 400; cutoff_norm = cutoff_Hz/states.Fs;
+    rx = ofdm_complex_bandpass_filter(cutoff_norm,centre_norm,n_coeffs,rx);
+    delay_samples = n_coeffs/2;
   end
 endfunction
+
 
 % returns an unpacked CRC16 (array of 16 bits) calculated from an array of unpacked bits 
 function unpacked_crc16 = crc16_unpacked(unpacked_bits)
