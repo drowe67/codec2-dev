@@ -1945,11 +1945,7 @@ float ofdm_esno_est_calc(complex float *rx_sym, int nsym) {
     noise_var *= 2.0f;
     
     float EsNodB = 10.0f * log10f((1E-12f + sig_var) / (1E-12f + noise_var));
-    if (isnan(EsNodB) != 0)
-    {
-        /* NaN shouldn't happen but if it does, let's assume the SNR is extremely low for now. */
-        EsNodB = -5;
-    }
+    assert(isnan(EsNodB) == 0);
     return EsNodB;
 }
 
