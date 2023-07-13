@@ -27,7 +27,7 @@ static int ofdm_ncp;
 
 // Forwards
 void run_modem(struct OFDM *ofdm, int tx_bits[], int rx_bits[], COMP tx_rx[]);
-void dummy_code();
+void dummy_code(int tx_bits[], int rx_bits[]);
 
 /////////////////////////////////////////////////////////////
 ///  MAIN()

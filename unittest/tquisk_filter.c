@@ -25,7 +25,6 @@ int main() {
     complex float buf[N];
     struct quisk_cfFilter *bpf; 
     int           i;
-    int           n = 0;
     
     bpf = malloc(sizeof(struct quisk_cfFilter));
     assert(bpf != NULL);
@@ -39,7 +38,7 @@ int main() {
         /* we only output the real part in this test */
         for(i=0; i<N; i++)
             buf_short[i] = creal(buf[i]);
-        n += fwrite(buf_short, sizeof(short), N, stdout);
+        fwrite(buf_short, sizeof(short), N, stdout);
     }
     
     quisk_filt_destroy(bpf);

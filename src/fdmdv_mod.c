@@ -46,7 +46,6 @@ int main(int argc, char *argv[])
     int           *tx_bits;
     COMP          tx_fdm[2*FDMDV_NOM_SAMPLES_PER_FRAME];
     short         tx_fdm_scaled[2*FDMDV_NOM_SAMPLES_PER_FRAME];
-    int           frames;
     int           i, bit, byte;
     int           sync_bit;
     int           bits_per_fdmdv_frame;
@@ -105,10 +104,7 @@ int main(int argc, char *argv[])
     foff_phase_rect.real = 1.0; foff_phase_rect.imag = 0.0;
 #endif
 
-    frames = 0;
-
     while(fread(packed_bits, sizeof(char), bytes_per_codec_frame, fin) == bytes_per_codec_frame) {
-	frames++;
 
 	/* unpack bits, MSB first */
 

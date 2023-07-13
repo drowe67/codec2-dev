@@ -74,7 +74,6 @@ int main(int argc, char **argv)
 
     printf("freedv_rawdatatx()/freedv_rawdatarx() ");
     int frames = 0;
-    int fails = 0;
     {
         short mod[nom_samples * 10];
 	/* Note: A codec frame is only 6.5 bytes!
@@ -94,7 +93,6 @@ int main(int argc, char **argv)
                 for (b = 0; b < 7; b++) {
 	    	    if (payload[b] != payload_rx[b]) {
 		        printf("Received codec bits 0x%02x do not match expected 0x%02x\n", payload_rx[b], payload[b]);
-		        fails++;
                     }
                 }
 	        frames++;

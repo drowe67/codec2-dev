@@ -359,7 +359,7 @@ int main(int argc,char *argv[]){
                 fprintf(stderr,"{");
                 time_t seconds  = time(NULL);
 
-                fprintf(stderr,"\"secs\": %ld, \"EbNodB\": %5.1f, \"ppm\": %4d,",seconds, stats.snr_est, (int)fsk->ppm);
+                fprintf(stderr,"\"secs\": %ld, \"EbNodB\": %5.1f, \"ppm\": %4d,",(long)seconds, stats.snr_est, (int)fsk->ppm);
                 float *f_est;
                 if (fsk->freq_est_type)
                     f_est = fsk->f2_est;

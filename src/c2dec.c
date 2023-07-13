@@ -54,7 +54,7 @@ int main(int argc, char *argv[])
     unsigned char *bits;
     float         *softdec_bits;
     char          *bitperchar_bits;
-    int            nsam, nbit, nbyte, i, byte, frames, bits_proc, bit_errors, error_mode;
+    int            nsam, nbit, nbyte, i, byte, bits_proc, bit_errors, error_mode;
     int            nstart_bit, nend_bit, bit_rate;
     int            state, next_state;
     float          ber, r, burst_length, burst_period, burst_timer, ber_est;
@@ -173,7 +173,7 @@ int main(int argc, char *argv[])
     bits = (unsigned char*)malloc(nbyte*sizeof(char));
     softdec_bits = (float*)malloc(nbit*sizeof(float));
     bitperchar_bits = (char*)malloc(nbit*sizeof(char));
-    frames = bit_errors = bits_proc = 0;
+    bit_errors = bits_proc = 0;
     nstart_bit = 0;
     nend_bit = nbit-1;
 
@@ -256,8 +256,6 @@ int main(int argc, char *argv[])
     }
 
     while(ret) {
-	frames++;
-
         // apply bit errors, MSB of byte 0 is bit 0 in frame, only works in packed mode
 
 	if ((error_mode == UNIFORM) || (error_mode == UNIFORM_RANGE)) {

@@ -49,10 +49,10 @@ int   frames;
 
 \*---------------------------------------------------------------------------*/
 
-int switch_present(sw,argc,argv)
-  char sw[];     /* switch in string form */
-  int argc;      /* number of command line arguments */
-  char *argv[];  /* array of command line arguments in string form */
+int switch_present(
+  char sw[],     /* switch in string form */
+  int argc,      /* number of command line arguments */
+  char *argv[])  /* array of command line arguments in string form */
 {
   int i;       /* loop variable */
 

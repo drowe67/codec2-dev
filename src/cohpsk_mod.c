@@ -55,7 +55,7 @@ int main(int argc, char *argv[])
     int           tx_bits[2*COHPSK_BITS_PER_FRAME];
     COMP          tx_fdm[COHPSK_NOM_SAMPLES_PER_FRAME];
     short         tx_fdm_scaled[COHPSK_NOM_SAMPLES_PER_FRAME];
-    int           frames, diversity;
+    int           diversity;
     int           i;
 
     if (argc < 3) {
@@ -91,10 +91,7 @@ int main(int argc, char *argv[])
     }
     fprintf(stderr, "diversity: %d\n", diversity);
 
-    frames = 0;
-
     while(fread(tx_bits_char, sizeof(char), COHPSK_BITS_PER_FRAME*diversity, fin) == COHPSK_BITS_PER_FRAME*diversity) {
-        frames++;
 
         for(i=0; i<COHPSK_BITS_PER_FRAME*diversity; i++)
             tx_bits[i] = tx_bits_char[i];
