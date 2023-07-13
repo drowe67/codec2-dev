@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-""" Plot phi0, and (later) anaylze approximations
+""" Plot phi0, and (later) analyze approximations
 
 """
 

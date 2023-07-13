@@ -543,7 +543,7 @@ int freedv_rx_fsk_ldpc_data(struct freedv *f, COMP demod_in[]) {
 
             }
 
-            /* extract packet sequnce numbers optionally placed in byte[0] */
+            /* extract packet sequence numbers optionally placed in byte[0] */
             seq = 0;
             for(int i=0; i<8; i++)
                 seq |= f->rx_payload_bits[8+i] << (7-i);

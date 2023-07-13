@@ -131,7 +131,7 @@ void mbest_search(
 {
     int j;
 
-    /* note weighting can be applied externally by modifiying cb[] and vec:
+    /* note weighting can be applied externally by modifying cb[] and vec:
 
       float e = 0.0;
       for(i=0; i<k; i++)

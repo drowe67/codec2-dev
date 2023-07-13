@@ -87,11 +87,11 @@ function listen_vq_eq() {
   FILES="hts1a hts2a vk5qi cq_ref ve9qrp_10s ma01_01 c01_01_8k cq_freedv_8k cq_freedv_8k_lfboost cq_freedv_8k_hfcut"
   for f in $FILES
   do
-    # try equaliser wth train_120 VQ
+    # try equaliser with train_120 VQ
     $CODEC2_BUILD/src/c2dec 700C $f'.bin' - --loadratek $f'_vq2.f32' | sox -q -t .s16 -c 1 -r 8000 -b 16  - $SAMPLES/$f'_vq2.wav'
     $CODEC2_BUILD/src/c2dec 700C $f'.bin' - --loadratek $f'_vq2_eq1.f32' | sox -q -t .s16 -c 1 -r 8000 -b 16  - $SAMPLES/$f'_vq2_eq1.wav'
     $CODEC2_BUILD/src/c2dec 700C $f'.bin' - --loadratek $f'_vq2_eq2.f32' | sox -q -t .s16 -c 1 -r 8000 -b 16  - $SAMPLES/$f'_vq2_eq2.wav'
-    # try equaliser wth train_all_speech VQ
+    # try equaliser with train_all_speech VQ
     #$CODEC2_BUILD/src/c2dec 700C $f'.bin' - --loadratek $f'_vq2_as.f32' | sox -q -t .s16 -c 1 -r 8000 -b 16  - $SAMPLES/$f'_vq2_as.wav'
     #$CODEC2_BUILD/src/c2dec 700C $f'.bin' - --loadratek $f'_vq2_as_eq.f32' | sox -q -t .s16 -c 1 -r 8000 -b 16  - $SAMPLES/$f'_vq2_as_eq.wav'
   done

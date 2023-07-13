@@ -629,7 +629,7 @@ function snr_dB = calc_snr(f, sig_est, noise_est)
 endfunction
 
 
-% sets up test bits system.  make sure rand('state', 1) has just beed called
+% sets up test bits system.  make sure rand('state', 1) has just been called
 % so we generate the right test_bits pattern!
 
 function f = init_test_bits(f)

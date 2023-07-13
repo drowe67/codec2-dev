@@ -38,7 +38,7 @@ static COMP S_matrix[] = {
 
 // c_nodes will be an array of NumberParityBits of struct c_node
 // Each c_node contains an array of <degree> c_sub_node elements
-// This structure reduces the indexing caluclations in SumProduct()
+// This structure reduces the indexing calculations in SumProduct()
 
 struct c_sub_node { // Order is important here to keep total size small.
   uint16_t index;   // Values from H_rows (except last 2 entries)

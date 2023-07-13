@@ -71,7 +71,7 @@ if Ic == 0.005
 
   gammaL = 0.8 - 0.4*j;
 
-  % Caclulate gammaS and make sure it's stable by visual inspection
+  % Calculate gammaS and make sure it's stable by visual inspection
   % compared to stability circle.
 
   gammaS = conj(S11 + ((S12*S21*gammaL)/(1 - (gammaL*S22))));

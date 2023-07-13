@@ -125,7 +125,7 @@ if(INSTALL_EXAMPLES)
         DESTINATION ${CMAKE_INSTALL_DATADIR}/codec2)
 endif()
 
-# LPCNet needs to be bootstraped because codec2 and freedvlpcnet are
+# LPCNet needs to be bootstrapped because codec2 and freedvlpcnet are
 # cross dependent.
 option(LPCNET "Build codec2 with LPCNet support." OFF)
 set(LPCNET_BUILD_DIR FALSE CACHE PATH "Location of lpcnet build tree.")

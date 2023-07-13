@@ -13,7 +13,7 @@
     
        ofdm_rx("test_datac0.raw","datac0","packetsperburst",1)
        
-    3. Burst mode, enable only postamble detecion:
+    3. Burst mode, enable only postamble detection:
     
        ofdm_rx("test_datac0.raw","datac0","packetsperburst",1, "postambletest")
 #}

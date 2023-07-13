@@ -281,7 +281,7 @@ void fsk_mod(struct FSK *fsk,float fsk_out[], uint8_t tx_bits[], int nbits) {
     COMP dph;                             /* phase shift of current bit */
     size_t i,j,m,bit_i,sym;
 
-    /* trap these parametrs being set to FSK_UNUSED, then calling mod */
+    /* trap these parameters being set to FSK_UNUSED, then calling mod */
     assert(f1_tx > 0);
     assert(tone_spacing > 0);
     
@@ -341,7 +341,7 @@ void fsk_mod_c(struct FSK *fsk,COMP fsk_out[], uint8_t tx_bits[], int nbits) {
     size_t i,j,bit_i,sym;
     int m;
     
-    /* trap these parametrs being set to FSK_UNUSED, then calling mod */
+    /* trap these parameters being set to FSK_UNUSED, then calling mod */
     assert(f1_tx > 0);
     assert(tone_spacing > 0);
 
@@ -397,7 +397,7 @@ void fsk_mod_ext_vco(struct FSK *fsk, float vco_out[], uint8_t tx_bits[], int nb
     int M = fsk->mode;
     int i, j, m, sym, bit_i;
     
-    /* trap these parametrs being set to FSK_UNUSED, then calling mod */
+    /* trap these parameters being set to FSK_UNUSED, then calling mod */
     assert(f1_tx > 0);
     assert(tone_spacing > 0);
 

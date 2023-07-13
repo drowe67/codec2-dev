@@ -103,7 +103,7 @@ void DCD_Init(USB_OTG_CORE_HANDLE *pdev ,
     ep->is_in = 1;
     ep->num = i;
     ep->tx_fifo_num = i;
-    /* Control until ep is actvated */
+    /* Control until ep is activated */
     ep->type = EP_TYPE_CTRL;
     ep->maxpacket =  USB_OTG_MAX_EP0_SIZE;
     ep->xfer_buff = 0;

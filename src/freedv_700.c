@@ -272,7 +272,7 @@ int freedv_comprx_700c(struct freedv *f, COMP demod_in_8kHz[]) {
     int rx_status = 0;
 
     // quisk_cfInterpDecim() modifies input data so lets make a copy just in case there
-    // is no sync and we need to echo inpout to output
+    // is no sync and we need to echo input to output
 
     // freedv_nin(f): input samples at Fs=8000 Hz
     // f->nin: input samples at Fs=7500 Hz

@@ -188,7 +188,7 @@ static void dac1_config(void)
   /*
      This line fixed a bug that cost me 5 days, bad wave amplitude
      value, and some STM32F4 periph library bugs caused triangle wave
-     geneartion to be enable resulting in a low level tone on the
+     generation to be enable resulting in a low level tone on the
      SM1000, that we thought was caused by analog issues like layour
      or power supply biasing
   */

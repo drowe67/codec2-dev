@@ -157,7 +157,7 @@ endfunction
 
 % Minimal Running Disparity, 4 symbol encoder
 % This is a simple 1 bit to 1 symbol encoding for 4fsk modems built
-% on old fashoned FM radios.
+% on old fashioned FM radios.
 function syms = mrd4(bits)
   syms = zeros(1,length(bits));
   rd=0;
@@ -176,7 +176,7 @@ endfunction
 
 % Minimal Running Disparity, 8 symbol encoder
 % This is a simple 2 bit to 1 symbol encoding for 8fsk modems built
-% on old fashoned FM radios.
+% on old fashioned FM radios.
 function syms = mrd8(bits)
   bitlen = length(bits);
   if mod(bitlen,2) == 1
