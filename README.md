@@ -1,3 +1,6 @@
+> **Note**
+> This repo contains deprecated code, the latest code can be found at https://github.com/drowe67/codec2
+
 # Codec 2 README
 
 Codec 2 is an open source (LGPL 2.1) low bit rate speech codec: http://rowetel.com/codec2.html
