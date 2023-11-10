@@ -65,11 +65,14 @@ set(CODEBOOKSNEWAMP2_ENERGY
 if(CMAKE_CROSSCOMPILING)
     set(CMAKE_DISABLE_SOURCE_CHANGES OFF)
     include(ExternalProject)
+    if (CMAKE_HOST_WIN32)
+        set(HOST_EXECUTABLE_SUFFIX .exe)
+    endif()
     ExternalProject_Add(codec2_native
        SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/..
        BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR}/codec2_native
        BUILD_COMMAND ${CMAKE_COMMAND} --build . --target generate_codebook
-       INSTALL_COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/codec2_native/src/generate_codebook ${CMAKE_CURRENT_BINARY_DIR}
+       INSTALL_COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/codec2_native/src/generate_codebook${HOST_EXECUTABLE_SUFFIX} ${CMAKE_CURRENT_BINARY_DIR}
        BUILD_BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/generate_codebook
     )
     add_executable(generate_codebook IMPORTED)
@@ -81,7 +84,9 @@ else(CMAKE_CROSSCOMPILING)
 # Build code generator binaries. These do not get installed.
     # generate_codebook
     add_executable(generate_codebook generate_codebook.c)
-    target_link_libraries(generate_codebook m)
+    if(NOT MSVC)
+        target_link_libraries(generate_codebook m)
+    endif()
     # Make native builds available for cross-compiling.
     export(TARGETS generate_codebook
         FILE ${CMAKE_BINARY_DIR}/ImportExecutables.cmake)
