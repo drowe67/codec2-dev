@@ -15,7 +15,8 @@ function fm_states = analog_fm_init(fm_states)
   fm_max = fm_states.fm_max;                 % max modulation freq
   fd = fm_states.fd;                         % (max) deviation
   fm_states.m = fd/fm_max;                   % modulation index
-  fm_states.Bfm = Bfm = 2*(fd+fm_max);       % Carson's rule for FM signal bandwidth
+  %fm_states.Bfm = Bfm = 2*(fd+fm_max);      % Carson's rule for FM signal bandwidth
+  fm_states.Bfm = Bfm = 9000;                % Standard IF filter for fd=2.5kHz
   fm_states.tc = tc = 50E-6;
   fm_states.prede = [1 -(1 - 1/(tc*Fs))];    % pre/de emp filter coeffs
   fm_states.ph_dont_limit = 0;               % Limit rx delta-phase
@@ -135,7 +136,8 @@ function sim_out = analog_fm_test(sim_in)
 
   Fs = fm_states.Fs = 96000;  
   fm_max = fm_states.fm_max = 3E3;
-  fd = fm_states.fd = 5E3;
+  fd = fm_states.fd = 2.5E3;
+  A = fm_states.A = 0.6;
   fm_states.fc = 24E3;
 
   fm_states.pre_emp = pre_emp = sim_in.pre_emp;
@@ -150,7 +152,13 @@ function sim_out = analog_fm_test(sim_in)
   t = 0:(nsam-1);
 
   fm = 1000; wm = 2*pi*fm/fm_states.Fs;
-  
+   
+  % Theory from Carlson, 1968 eq 6.39, modified by Bfm/Bfd as we measure CNR in Bfm
+  Sx = 0.5*A^2;
+  Gfm = 10*log10(3*m*m*Sx*Bfm/fd);
+
+  printf("m: %5.3f Bfm: %5.0f A: %4.2f Sx: %4.2f Gfm: %5.3f dB\n", m, Bfm, A, Sx, Gfm);
+
   % start simulation
 
   for ne = 1:length(CNdB)
@@ -165,7 +173,7 @@ function sim_out = analog_fm_test(sim_in)
      
     % FM Modulator -------------------------------
 
-    mod = sin(wm*t);
+    mod = A*sin(wm*t);
     tx = analog_fm_mod(fm_states, mod);
     
     % Channel ---------------------------------
@@ -192,24 +200,20 @@ function sim_out = analog_fm_test(sim_in)
 
     snr = (sinad-nad)/nad;
     sim_out.snrdB(ne) = 10*log10(snr);
-   
-    % Theory from FMTutorial.pdf, Lawrence Der, Silicon labs paper
-
-    snr_theory_dB = aCNdB + 10*log10(3*m*m*(m+1));
-    fx = 1/(2*pi*tc); W = fm_max;
-    I = (W/fx)^3/(3*((W/fx) - atan(W/fx)));
-    I_dB = 10*log10(I);
-
+    snr_theory_dB = aCNdB + Gfm;
+    
     sim_out.snr_theorydB(ne) = snr_theory_dB;
-    sim_out.snr_theory_pre_dedB(ne) = snr_theory_dB + I_dB;
+    %sim_out.snr_theory_pre_dedB(ne) = snr_theory_dB + I_dB;
    
     if verbose > 1
       printf("modn index: %2.1f Bfm: %.0f Hz\n", m, Bfm);
     end
 
     if verbose > 0
-      printf("C/N: %4.1f SNR: %4.1f dB THEORY: %4.1f dB or with pre/de: %4.1f dB\n", 
-      aCNdB, 10*log10(snr), snr_theory_dB, snr_theory_dB+I_dB);
+      %printf("C/N: %4.1f SNR: %4.1f dB THEORY: %4.1f dB or with pre/de: %4.1f dB\n", 
+      %aCNdB, 10*log10(snr), snr_theory_dB, snr_theory_dB+I_dB);
+      printf("C/N: %4.1f SNR: %4.1f dB THEORY: %4.1f dB\n", 
+      aCNdB, 10*log10(snr), snr_theory_dB);
     end
 
     if verbose > 1
@@ -232,6 +236,15 @@ function sim_out = analog_fm_test(sim_in)
       Rx = 20*log10(abs(fft(rx_out(settle:nsam))));
       plot(Rx(1:10000))
       axis([1 10000 0 100]);
+
+      figure(3); clf;
+      Rx = 20*log10(abs(fft(rx_out(settle:nsam))));
+      plot(Rx(1:10000))
+      hold on; f=1:10000;
+      plot(f,10*log10(f.^2)-32,'g;f^2;','linewidth',5'); 
+      %axis([1 4000 -20 60]);
+      hold off;
+
    end
 
   end
@@ -255,7 +268,7 @@ function run_fm_curves
   plot(sim_in.CNdB, sim_out.snr_theorydB,"g;FM Theory;");
   plot(sim_in.CNdB, sim_in.CNdB,"b; SSB Theory;");
   hold off;
-  grid("minor");
+  grid; axis([0 20 0 30]);
   xlabel("FM demod input C/N (dB)");
   ylabel("FM demod output S/N (dB)");
   legend("boxoff");
@@ -272,7 +285,7 @@ function run_fm_curves
   plot(sim_in.CNdB + Bfm_dB, sim_out.snr_theorydB,"g;FM Theory;");
   plot(sim_in.CNdB + Bssb_dB, sim_in.CNdB,"b; SSB Theory;");
   hold off;
-  grid("minor");
+  grid;
   xlabel("FM demod input C/No (dB)");
   ylabel("FM demod output S/N (dB)");
   legend("boxoff");
