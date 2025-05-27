@@ -38,6 +38,7 @@
 #include "comp_prim.h"
 #include "ht_coeff.h"
 #include "ssbfilt_coeff.h"
+#include "fmfilt_coeff.h"
 
 #include "debug_alloc.h"
 
@@ -78,9 +79,11 @@ int main(int argc, char *argv[])
     float          htbuf[HT_N+BUF_N];
     COMP           ch_in[BUF_N];
     COMP           ch_fdm[BUF_N];
-    COMP           ssbfiltbuf[SSBFILT_N+BUF_N];
-    COMP           ssbfiltout[BUF_N];
-
+    COMP           filtbuf[SSBFILT_N+BUF_N];
+    COMP           filtout[BUF_N];
+    float         *filt_coeff = NULL;
+    int            filt_n = 0;
+    
     COMP           phase_ch;
     float          No, variance;
     COMP           scaled_noise;
@@ -111,7 +114,7 @@ int main(int argc, char *argv[])
                         "[--mpg]                Multipath good 0.1Hz Doppler, 0.5ms delay\n"
                         "[--mpp]                Multipath poor 1.0Hz Doppler, 2.0ms delay\n"
                         "[--mpd]                Multipath disturbed 2.0Hz Doppler, 4.0ms delay\n"
-                        "[--ssbfilt 0|1]        SSB bandwidth filter (default 1 on)\n"
+                        "[--ssbfilt 0|1|2]      SSB bandwidth filter 0: off  1: 300-2700 Hz  2: 300-3100 Hz (default 1)\n"
                         "[--mulipath_delay ms]  Optionally adjust multipath delay\n"
                         "[--No dBHz]            AWGN Noise density dB/Hz (default -100)\n"
                         "[--impulse ms]         simulate impulse noise with mean ms\n"
@@ -204,7 +207,7 @@ int main(int argc, char *argv[])
             break;
         case 's':
             ssbfilt_en = atoi(optarg);
-            break;
+           break;
         case 't':
             ctest = 1;
             break;
@@ -299,8 +302,16 @@ int main(int argc, char *argv[])
     for(i=0; i<HT_N; i++) {
         htbuf[i] = 0.0;
     }
+    if (ssbfilt_en == 1) {
+        filt_n = SSBFILT_N;
+        filt_coeff = ssbfilt_coeff;
+    }
+    if (ssbfilt_en == 2) {
+        filt_n = FMFILT_N;
+        filt_coeff = fmfilt_coeff;
+    }
     for(i=0; i<SSBFILT_N; i++) {
-        ssbfiltbuf[i].real = 0.0; ssbfiltbuf[i].imag = 0.0;
+        filtbuf[i].real = 0.0; filtbuf[i].imag = 0.0;
     }
     COMP lo_phase = {1.0,0.0};
     COMP lo_freq;
@@ -457,39 +468,38 @@ int main(int argc, char *argv[])
             }
         }
 
-        /* FIR filter to simulate (a rather flat) SSB filter. We
-           filter the complex signal by shifting it down to DC and
-           using real coefficients. */
+        /* FIR bandpass filter. We filter the complex signal by shifting it down to DC and
+           using real coefficients. Can be configured for SSB (300-2700 or FM 300-3100 Hz */
 
-        for(i=0, j=SSBFILT_N; i<BUF_N; i++,j++) {
+        for(i=0, j=filt_n; i<BUF_N; i++,j++) {
             if (ssbfilt_en) {
-                ssbfiltbuf[j] = cmult(ch_fdm[i], cconj(lo_phase));
-                ssbfiltout[i].real = 0.0; ssbfiltout[i].imag = 0.0;
+                filtbuf[j] = cmult(ch_fdm[i], cconj(lo_phase));
+                filtout[i].real = 0.0; filtout[i].imag = 0.0;
                 for(k=0; k<SSBFILT_N; k++) {
-                    ssbfiltout[i].real += ssbfiltbuf[j-k].real*ssbfilt_coeff[k];
-                    ssbfiltout[i].imag += ssbfiltbuf[j-k].imag*ssbfilt_coeff[k];
+                    filtout[i].real += filtbuf[j-k].real*filt_coeff[k];
+                    filtout[i].imag += filtbuf[j-k].imag*filt_coeff[k];
                 }
-                ssbfiltout[i] = cmult(ssbfiltout[i], lo_phase);
+                filtout[i] = cmult(filtout[i], lo_phase);
                 lo_phase = cmult(lo_phase, lo_freq);
             }
             else {
-                ssbfiltout[i] = ch_fdm[i];
+                filtout[i] = ch_fdm[i];
             }
         }
 
-        /* update SSB filter memory */
+        /* update filter memory */
         for(i=0; i<SSBFILT_N; i++)
-           ssbfiltbuf[i] = ssbfiltbuf[i+BUF_N];
+           filtbuf[i] = filtbuf[i+BUF_N];
 
         int nout = (complex_out+1)*BUF_N;
         short bufout[nout], *pout=bufout;
         for(i=0; i<BUF_N; i++) {
-            sam = ssbfiltout[i].real;
+            sam = filtout[i].real;
             if (sam >  32767.0) { noutclipped++; sam = 32767.0; }
             if (sam < -32767.0) { noutclipped++; sam = -32767.0; }
             *pout++ = sam;
             if (complex_out) {
-                sam = ssbfiltout[i].imag;
+                sam = filtout[i].imag;
                 if (sam >  32767.0) { noutclipped++; sam = 32767.0; }
                 if (sam < -32767.0) { noutclipped++; sam = -32767.0; }
                 *pout++ = sam;
