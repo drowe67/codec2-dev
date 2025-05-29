@@ -93,7 +93,7 @@ int main(int argc, char *argv[])
     int            frames, i, j, k, Fs, ret, nclipped, noutclipped, ssbfilt_en,
                    complex_out, ctest, impulse_en, impulse_clock, impulse_wait_samples,
                    impulse_state, after_fade;
-    float          sam, peak, clip, papr, CNo, snr3k, gain, impulse_period;
+    float          sam, peak, clip, papr, CNo, snr3k, gain, impulse_period, fading_adv;
 
     if (argc < 3) {
     helpmsg:
@@ -119,7 +119,8 @@ int main(int argc, char *argv[])
                         "[--No dBHz]            AWGN Noise density dB/Hz (default -100)\n"
                         "[--impulse ms]         simulate impulse noise with mean ms\n"
                         "[--after_fade]         Measure power after fading modem (default before)\n"
-                        "\n"
+                        "[--fading_adv sec]     Start sampling fading samples from sec seconds (default 0)\n"
+                       "\n"
                 , argv[0]);
         exit(1);
     }
@@ -144,7 +145,7 @@ int main(int argc, char *argv[])
     ssbfilt_en = 1; complex_out = 0;
     impulse_en = 0; impulse_period = 0.0; impulse_state = 0;    
     fading_dir = strdup(DEFAULT_FADING_DIR); user_multipath_delay = -1.0;
-    after_fade = 0;
+    after_fade = 0; fading_adv = 0.0;
 
     int o = 0;
     int opt_idx = 0;
@@ -166,6 +167,7 @@ int main(int argc, char *argv[])
             {"No",              required_argument,  0, 'n'},
             {"impulse",         required_argument,  0, 'j'},
             {"after_fade",      no_argument,        0, 'a'},
+            {"fading_adv",      required_argument,  0, 'b'},
            {0, 0, 0, 0}
         };
 
@@ -174,6 +176,9 @@ int main(int argc, char *argv[])
         switch(o) {
         case 'a':
             after_fade = 1;
+            break;
+        case 'b':
+            fading_adv = atof(optarg);
             break;
         case 'c':
             clip = atof(optarg);
@@ -275,7 +280,7 @@ int main(int argc, char *argv[])
         }
 
         if (fading_en == 3) {
-	          sprintf(fname, "%s/%s", fading_dir, MPD_FADING_FILE_NAME);
+	        sprintf(fname, "%s/%s", fading_dir, MPD_FADING_FILE_NAME);
             ffading = fopen(fname, "rb");
             if (ffading == NULL) goto cant_load_fading_file;
             nhfdelay = floor(MPD_DELAY_MS*Fs/1000);
@@ -292,10 +297,17 @@ int main(int argc, char *argv[])
         if (user_multipath_delay >= 0.0) nhfdelay = floor(user_multipath_delay*Fs/1000);
 
         /* first values in file are HF gains */
-
         for (i=0; i<4; i++)
             ret = fread(&hf_gain, sizeof(float), 1, ffading);
         //fprintf(stderr, "hf_gain: %f\n", hf_gain);
+
+        if (fading_en) {
+            long offset = (long)(fading_adv*Fs*sizeof(COMP)*2.0);
+            fprintf(stderr, "fading_adv: %f offset: %ld\n", fading_adv, offset);
+            int ret = fseek(ffading, offset, SEEK_CUR); 
+            assert(ret == 0);
+        }
+
     }
 
     assert(HT_N == sizeof(ht_coeff)/sizeof(COMP));
